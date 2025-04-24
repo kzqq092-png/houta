@@ -1,0 +1,7 @@
+{
+  "theme": "blue",
+  "commission_rate": 0.0003,
+  "slippage": 0.0002,
+  "data_source": "本地数据",
+  "update_interval": 5
+}

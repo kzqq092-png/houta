@@ -1,0 +1,19 @@
+{
+  "theme": "light",
+  "update_interval": 1000,
+  "cache_size": 1000,
+  "log_level": "INFO",
+  "performance": {
+    "enabled": true,
+    "report_interval": 60
+  },
+  "chart": {
+    "show_grid": true,
+    "auto_update": true
+  },
+  "trading": {
+    "commission_rate": 0.0003,
+    "slippage": 0.0002,
+    "initial_cash": 1000000.0
+  }
+}
