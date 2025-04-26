@@ -44,12 +44,16 @@ class ChartWidget(QWidget):
             # 初始化管理器
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = get_theme_manager(self.config_manager)
+            self.theme_manager.theme_changed.connect(self.apply_theme)
             
             # 初始化日志管理器
             self.log_manager = LogManager()
             
             # 初始化UI
             self.init_ui()
+            
+            # 连接信号
+            self.connect_signals()
             
             # 应用主题
             self.apply_theme()
@@ -521,30 +525,56 @@ class ChartWidget(QWidget):
     def apply_theme(self):
         """应用主题到图表"""
         try:
-            # 获取当前主题
-            theme = self.theme_manager.current_theme
-            colors = self.theme_manager.get_theme_colors(theme)
+            # 获取当前主题颜色
+            colors = self.theme_manager.get_theme_colors()
             
-            # 设置背景色
-            self.setStyleSheet(f"background-color: {colors['background']};")
+            # 设置图表背景色
+            self.figure.patch.set_facecolor(colors['chart_background'])
             
-            # 设置图表样式
-            if hasattr(self, 'figure'):
-                self.figure.patch.set_facecolor(colors['chart_background'])
-                for ax in self.figure.axes:
-                    ax.set_facecolor(colors['chart_background'])
-                    ax.tick_params(colors=colors['text'])
-                    ax.spines['bottom'].set_color(colors['border'])
-                    ax.spines['top'].set_color(colors['border'])
-                    ax.spines['left'].set_color(colors['border'])
-                    ax.spines['right'].set_color(colors['border'])
-                    ax.title.set_color(colors['text'])
-                    ax.xaxis.label.set_color(colors['text'])
-                    ax.yaxis.label.set_color(colors['text'])
+            # 设置子图背景色和网格颜色
+            for ax in [self.price_ax, self.volume_ax]:
+                ax.set_facecolor(colors['chart_background'])
+                ax.grid(True, color=colors['chart_grid'], alpha=0.3)
+                ax.tick_params(colors=colors['chart_text'])
+                ax.spines['bottom'].set_color(colors['chart_grid'])
+                ax.spines['top'].set_color(colors['chart_grid'])
+                ax.spines['left'].set_color(colors['chart_grid'])
+                ax.spines['right'].set_color(colors['chart_grid'])
                 
-                # 更新画布
-                self.canvas.draw()
+                # 设置标签颜色
+                ax.xaxis.label.set_color(colors['chart_text'])
+                ax.yaxis.label.set_color(colors['chart_text'])
                 
+                # 设置刻度标签颜色
+                ax.tick_params(axis='x', colors=colors['chart_text'])
+                ax.tick_params(axis='y', colors=colors['chart_text'])
+            
+            # 设置工具栏样式
+            if hasattr(self, 'toolbar'):
+                self.toolbar.setStyleSheet(f"""
+                    QToolBar {{
+                        background-color: {colors['background']};
+                        border: none;
+                    }}
+                    QToolButton {{
+                        background-color: {colors['background']};
+                        border: none;
+                        padding: 6px;
+                        border-radius: 4px;
+                    }}
+                    QToolButton:hover {{
+                        background-color: {colors['hover']};
+                    }}
+                    QToolButton:pressed {{
+                        background-color: {colors['selected']};
+                    }}
+                """)
+                
+            # 重绘图表
+            self.canvas.draw()
+            
+            self.log_manager.info("主题应用完成")
+            
         except Exception as e:
             error_msg = f"应用主题失败: {str(e)}"
             self.log_manager.error(error_msg)

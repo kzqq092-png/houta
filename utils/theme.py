@@ -15,6 +15,9 @@ from .config_manager import ConfigManager
 from .theme_types import Theme
 from .config_types import ThemeConfig
 
+# Global theme manager instance
+_theme_manager_instance: Optional['ThemeManager'] = None
+
 class ThemeManager(QObject):
     """Enhanced theme manager with dynamic theme switching and customization
     
@@ -431,9 +434,6 @@ class ThemeManager(QObject):
             True if current theme is dark
         """
         return self.current_theme in [Theme.DARK]
-
-# 单例模式实现
-_theme_manager_instance = None
 
 def get_theme_manager(config_manager: Optional[ConfigManager] = None) -> ThemeManager:
     """Get theme manager instance

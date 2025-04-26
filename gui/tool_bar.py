@@ -7,7 +7,8 @@ This module contains the tool bar implementation for the trading system.
 from PyQt5.QtWidgets import (
     QToolBar, QAction, QToolButton, QMenu,
     QFileDialog, QMessageBox, QDialog, QVBoxLayout,
-    QLabel, QPushButton, QLineEdit, QSpinBox, QComboBox
+    QLabel, QPushButton, QLineEdit, QSpinBox, QComboBox,
+    QHBoxLayout
 )
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QKeySequence
@@ -39,14 +40,17 @@ class MainToolBar(QToolBar):
             # File actions
             self.new_action = QAction(QIcon("icons/new.png"), "新建", self)
             self.new_action.setStatusTip("创建新的策略")
+            self.new_action.setShortcut(QKeySequence.New)
             self.addAction(self.new_action)
             
             self.open_action = QAction(QIcon("icons/open.png"), "打开", self)
             self.open_action.setStatusTip("打开策略文件")
+            self.open_action.setShortcut(QKeySequence.Open)
             self.addAction(self.open_action)
             
             self.save_action = QAction(QIcon("icons/save.png"), "保存", self)
             self.save_action.setStatusTip("保存当前策略")
+            self.save_action.setShortcut(QKeySequence.Save)
             self.addAction(self.save_action)
             
             self.addSeparator()
@@ -54,12 +58,10 @@ class MainToolBar(QToolBar):
             # Edit actions
             self.undo_action = QAction(QIcon("icons/undo.png"), "撤销", self)
             self.undo_action.setShortcut(QKeySequence.Undo)
-            self.undo_action.triggered.connect(self.undo)
             self.addAction(self.undo_action)
             
             self.redo_action = QAction(QIcon("icons/redo.png"), "重做", self)
             self.redo_action.setShortcut(QKeySequence.Redo)
-            self.redo_action.triggered.connect(self.redo)
             self.addAction(self.redo_action)
             
             self.addSeparator()
@@ -113,6 +115,12 @@ class MainToolBar(QToolBar):
             self.search_box.setPlaceholderText("搜索股票...")
             self.search_box.setMaximumWidth(200)
             self.addWidget(self.search_box)
+            
+            # 添加主题选择器
+            self.theme_combo = QComboBox()
+            self.theme_combo.addItems(["浅色", "深色", "蓝色"])
+            self.theme_combo.setMaximumWidth(100)
+            self.addWidget(self.theme_combo)
             
             self.log_message("工具栏初始化完成")
             

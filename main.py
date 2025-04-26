@@ -8,10 +8,10 @@ import numpy as np
 import weakref
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QDate, pyqtSignal, QTimer, QMutex
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtCore import *
+from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
@@ -19,7 +19,7 @@ from matplotlib.figure import Figure
 
 from core.logger import LogManager
 from utils.config_types import LoggingConfig, PerformanceConfig
-from utils.theme import ThemeManager, Theme
+from utils.theme import ThemeManager, get_theme_manager, Theme
 from core.data_manager import DataManager
 from utils.config_manager import ConfigManager
 from gui.tool_bar import MainToolBar
@@ -31,31 +31,80 @@ from utils.exception_handler import ExceptionHandler
 GLOBAL_STYLE = """
 QWidget {
     font-family: 'Microsoft YaHei', 'SimHei', 'Arial Unicode MS', sans-serif;
+    background: #f7f9fa;
 }
-
-QTextEdit, QPlainTextEdit {
-    font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
-    font-size: 12px;
+QGroupBox {
+    border: 1.5px solid #e0e0e0;
+    border-radius: 10px;
+    margin-top: 10px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 8px;
 }
-
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 6px 0 6px;
+    background: #eaf3fb;
+    border-radius: 6px;
+    color: #1976d2;
+    font-weight: bold;
+}
 QPushButton {
     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-    font-size: 12px;
+    font-size: 13px;
+    border-radius: 8px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
+    border: 1px solid #90caf9;
+    padding: 6px 16px;
+    color: #1565c0;
+    transition: background 0.2s;
 }
-
+QPushButton:hover {
+    background: #90caf9;
+    color: #0d47a1;
+}
+QPushButton:pressed {
+    background: #64b5f6;
+}
 QLabel {
     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
     font-size: 12px;
 }
-
 QComboBox {
     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
     font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #bdbdbd;
+    background: #f5faff;
+    padding: 2px 8px;
 }
-
-QLineEdit {
-    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+QLineEdit, QTextEdit, QPlainTextEdit {
+    font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
     font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #bdbdbd;
+    background: #f5faff;
+    padding: 4px 8px;
+}
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+QTabWidget::pane {
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+}
+QTabBar::tab {
+    background: #e3f2fd;
+    border-radius: 6px 6px 0 0;
+    padding: 6px 16px;
+    margin-right: 2px;
+}
+QTabBar::tab:selected {
+    background: #1976d2;
+    color: #fff;
 }
 """
 
@@ -70,71 +119,61 @@ class TradingGUI(QMainWindow):
     error_occurred = pyqtSignal(str)
     
     def __init__(self):
-        """Initialize trading GUI"""
+        """Initialize the trading system GUI"""
         super().__init__()
-        
+        self.setWindowTitle("Trading System")
+        self.setGeometry(100, 100, 1200, 800)
+        self.setMinimumSize(800, 600)
+
         try:
-            # 初始化日志管理器
-            self.log_manager = LogManager()
-            
-            # 初始化主题管理器
-            self.theme_manager = ThemeManager()
-            
-            # 初始化数据管理器
-            self.data_manager = DataManager()
-            
             # 初始化配置管理器
             self.config_manager = ConfigManager()
             
-            # 初始化图表相关属性
-            self.main_figure = None
-            self.main_canvas = None
-            self.main_nav_toolbar = None
-            self.volume_figure = None
-            self.volume_canvas = None
-            self.indicator_figure = None
-            self.indicator_canvas = None
-            self.indicator_nav_toolbar = None
-            self.signals_figure = None
-            self.signals_canvas = None
-            self.signals_nav_toolbar = None
-            self.backtest_figure = None
-            self.backtest_canvas = None
-            self.backtest_nav_toolbar = None
+            # 从配置中获取日志配置
+            logging_config = self.config_manager.logging
             
-            # 初始化其他属性
-            self.current_stock = None
-            self.current_period = 'D'
-            self.current_chart_type = 'candlestick'
-            self.chart_tabs = None
-            self.main_chart_tab = None
-            self.indicator_chart_tab = None
-            self.signals_chart_tab = None
-            self.backtest_chart_tab = None
+            # 初始化日志管理器
+            self.log_manager = LogManager(logging_config)
+            self.log_manager.info("TradingGUI初始化开始")
+
+            # 初始化主题管理器
+            self.theme_manager = get_theme_manager(self.config_manager)
+            self.theme_manager.theme_changed.connect(self.apply_theme)
             
+            # 初始化性能监控器
+            performance_config = self.config_manager.performance
+            self.performance_monitor = PerformanceMonitor(performance_config)
+            self.performance_monitor.performance_updated.connect(self.handle_performance_update)
+            self.performance_monitor.alert_triggered.connect(self.handle_performance_alert)
+
+            # 初始化线程池
+            self.thread_pool = QThreadPool()
+            self.thread_pool.setMaxThreadCount(4)
+
+            # 初始化股票列表模型
+            self.stock_list_model = QStringListModel()
+            self.stock_list_cache = []
+
+            # 初始化收藏列表
+            self.favorites = set()
+
             # 初始化UI
             self.init_ui()
-            
+            self.init_data()
+
             # 连接信号
             self.connect_signals()
-            
-            # 应用主题
-            self.theme_manager.apply_theme(self)
-            
-            # 初始化性能监控
-            self.init_performance_display()
-            
-            # 启动性能监控
-            self.start_performance_monitoring()
-            
-            self.log_manager.info("交易系统主窗口初始化完成")
+
+            self.log_manager.info("TradingGUI初始化完成")
             
         except Exception as e:
-            error_msg = f"初始化交易系统主窗口失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-        
+            # 确保即使在初始化失败时也能记录错误
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"TradingGUI初始化失败: {str(e)}")
+            else:
+                print(f"初始化失败: {str(e)}")
+            raise
+
     def connect_signals(self):
         """连接所有信号和槽"""
         try:
@@ -306,9 +345,10 @@ class TradingGUI(QMainWindow):
             self.setWindowTitle("Hikyuu Trading System")
             self.setGeometry(100, 100, 1200, 800)
             
-            # 创建主布局
-            self.main_layout = QVBoxLayout()
-            self.setLayout(self.main_layout)
+            # 创建central widget和主布局
+            central_widget = QWidget()
+            self.main_layout = QVBoxLayout(central_widget)
+            self.setCentralWidget(central_widget)
             
             # 创建分割器
             self.top_splitter = QSplitter(Qt.Horizontal)
@@ -321,14 +361,20 @@ class TradingGUI(QMainWindow):
             self.bottom_splitter.setChildrenCollapsible(False)
             
             # 添加分割器到主布局
-            self.main_layout.addWidget(self.top_splitter)
-            self.main_layout.addWidget(self.bottom_splitter)
+            self.main_layout.addWidget(self.top_splitter, stretch=8)
+            self.main_layout.addWidget(self.bottom_splitter, stretch=2)
             
             # 创建面板
             self.create_left_panel()
             self.create_middle_panel()
             self.create_right_panel()
             self.create_bottom_panel()
+            
+            # 设置分割器初始比例，主图表区最大化
+            self.top_splitter.setStretchFactor(0, 1)  # 左侧
+            self.top_splitter.setStretchFactor(1, 6)  # 中间更大
+            self.top_splitter.setStretchFactor(2, 2)  # 右侧
+            self.bottom_splitter.setStretchFactor(0, 1)
             
             # 创建菜单栏和状态栏
             self.create_menubar()
@@ -483,41 +529,46 @@ class TradingGUI(QMainWindow):
             self.stock_list_cache = []
             print("初始化缓存完成")
                 
-            # Initialize thread pool
-            self.thread_pool = QThreadPool()
-            print("初始化线程池完成")
+            # 删除这里的线程池初始化，避免重复
+            # self.thread_pool = QThreadPool()
+            # print("初始化线程池完成")
                 
             # Load settings
             self.settings = self.config_manager.get_all()
             print("加载配置完成")
-            
+        
         except Exception as e:
             self.log_message(f"初始化数据失败: {str(e)}", "error")
             raise
         
     def apply_theme(self):
-        """Apply theme to all widgets"""
+        """Apply theme to all widgets (主窗口唯一递归入口)"""
         try:
-            # Apply theme to main window
-            if self.theme_manager:
-                self.theme_manager.apply_theme(self)
+            if not hasattr(self, 'theme_manager'):
+                self.log_manager.warning("主题管理器未初始化")
+                return
+
+            # 应用主题到主窗口
+            theme = self.theme_manager.current_theme
+            colors = self.theme_manager.get_theme_colors(theme)
             
-            # Apply theme to charts
-            if hasattr(self, 'chart_widget'):
-                self.theme_manager.apply_theme(self.chart_widget)
-            
-            # Apply theme to all child widgets
+            # 设置主窗口样式
+            self.setStyleSheet(f"""
+                QMainWindow {{
+                    background-color: {colors['background']};
+                    color: {colors['text']};
+                }}
+            """)
+
+            # 应用主题到所有子部件
             for widget in self.findChildren(QWidget):
-                try:
-                    # 获取父窗口，使用更安全的方式
-                    parent = widget.parentWidget()
-                    if widget is not None and parent is not None and parent is not self:
+                if widget is not self:  # 避免递归调用自身
+                    try:
                         self.theme_manager.apply_theme(widget)
-                except Exception as widget_error:
-                    # 记录单个widget的错误但继续处理其他widget
-                    self.log_manager.warning(f"应用主题到widget失败: {str(widget_error)}")
-                    continue
-            
+                    except Exception as widget_error:
+                        self.log_manager.warning(f"应用主题到部件失败: {str(widget_error)}")
+                        continue
+
             self.log_manager.info("主题应用完成")
             
         except Exception as e:
@@ -536,7 +587,7 @@ class TradingGUI(QMainWindow):
             # 创建股票列表组
             stock_group = QGroupBox("股票列表")
             stock_layout = QVBoxLayout(stock_group)
-            stock_layout.setContentsMargins(5, 5, 5, 5)
+            stock_layout.setContentsMargins(5, 15, 5, 5)
             stock_layout.setSpacing(5)
             
             # 创建股票类型选择器
@@ -566,7 +617,10 @@ class TradingGUI(QMainWindow):
             self.stock_list = QListWidget()
             self.stock_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self.stock_list.itemSelectionChanged.connect(self.on_stock_selected)
-            stock_layout.addWidget(self.stock_list)
+            stock_list_scroll = QScrollArea()
+            stock_list_scroll.setWidgetResizable(True)
+            stock_list_scroll.setWidget(self.stock_list)
+            stock_layout.addWidget(stock_list_scroll)
             
             # 添加收藏按钮
             favorites_btn = QPushButton("收藏")
@@ -579,7 +633,7 @@ class TradingGUI(QMainWindow):
             # 创建指标列表组
             indicator_group = QGroupBox("指标列表")
             indicator_layout = QVBoxLayout(indicator_group)
-            indicator_layout.setContentsMargins(5, 5, 5, 5)
+            indicator_layout.setContentsMargins(5, 15, 5, 5)
             indicator_layout.setSpacing(5)
             
             # 创建指标类型选择器
@@ -602,7 +656,10 @@ class TradingGUI(QMainWindow):
             self.indicator_list = QListWidget()
             self.indicator_list.setSelectionMode(QAbstractItemView.MultiSelection)
             self.indicator_list.itemSelectionChanged.connect(self.on_indicators_changed)
-            indicator_layout.addWidget(self.indicator_list)
+            indicator_list_scroll = QScrollArea()
+            indicator_list_scroll.setWidgetResizable(True)
+            indicator_list_scroll.setWidget(self.indicator_list)
+            indicator_layout.addWidget(indicator_list_scroll)
             
             # 添加指标操作按钮
             indicator_buttons_layout = QHBoxLayout()
@@ -618,8 +675,8 @@ class TradingGUI(QMainWindow):
             self.left_layout.addWidget(indicator_group)
             
             # 设置左侧面板的最小宽度
-            self.left_panel.setMinimumWidth(250)
-            self.left_panel.setMaximumWidth(400)
+            self.left_panel.setMinimumWidth(200)
+            self.left_panel.setMaximumWidth(320)
             
             # 添加左侧面板到顶部分割器
             self.top_splitter.addWidget(self.left_panel)
@@ -630,46 +687,39 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"创建左侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
-            
+
     def filter_stock_list(self, text: str):
-        """Filter stock list based on search text with performance optimization"""
+        """Filter stock list based on search text"""
         try:
-            # 使用线程池异步过滤
             def filter_list():
                 try:
-                    # 获取股票列表引用
-                    stock_list_ref = weakref.ref(self.stock_list)
-                    stock_list_cache_ref = weakref.ref(self.stock_list_cache)
-                    
-                    if stock_list_ref() and stock_list_cache_ref():
-                        # 暂停更新以提高性能
-                        stock_list_ref().setUpdatesEnabled(False)
-                        
-                        # 清空列表
-                        stock_list_ref().clear()
-                        
-                        # 过滤股票
-                        for stock_text in stock_list_cache_ref():
-                            if text.lower() in stock_text.lower():
-                                item = QListWidgetItem(stock_text)
-                                if stock_text.split()[0] in self.favorites:
-                                    item.setText(f"★ {stock_text}")
-                                stock_list_ref().addItem(item)
-                                
-                        # 恢复更新
-                        stock_list_ref().setUpdatesEnabled(True)
-                        
-                        # 记录日志
-                        self.log_message(f"已过滤股票列表，显示 {stock_list_ref().count()} 只股票", "info")
-                        
+                    # 获取原始股票列表
+                    original_stocks = self.stock_list_cache
+                    self.log_manager.info(f"原始股票列表数量: {len(original_stocks)}")
+
+                    # 过滤股票
+                    filtered_stocks = [stock for stock in original_stocks if text.lower() in stock.lower()]
+                    self.log_manager.info(f"过滤条件: '{text}'，过滤后股票数量: {len(filtered_stocks)}")
+
+                    # 更新股票列表
+                    self.stock_list.clear()
+                    for stock in filtered_stocks:
+                        item = QListWidgetItem(stock)
+                        if stock.split()[0] in self.favorites:
+                            item.setText(f"★ {stock}")
+                        self.stock_list.addItem(item)
+
+                    # 记录日志
+                    self.log_manager.info(f"已过滤股票列表，显示 {len(filtered_stocks)} 只股票")
                 except Exception as e:
-                    self.log_message(f"过滤股票列表失败: {str(e)}", "error")
-                    
-            # 使用线程池执行过滤
+                    self.log_manager.error(f"过滤股票列表失败: {str(e)}")
+                    self.log_manager.error(traceback.format_exc())
+
+            # 使用线程池执行过滤操作
             self.thread_pool.start(filter_list)
-            
         except Exception as e:
-            self.log_message(f"过滤股票列表失败: {str(e)}", "error")
+            self.log_manager.error(f"启动股票列表过滤线程失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def filter_indicator_list(self, text: str) -> None:
         """过滤指标列表
@@ -956,10 +1006,16 @@ class TradingGUI(QMainWindow):
             self.right_layout.setContentsMargins(5, 5, 5, 5)
             self.right_layout.setSpacing(5)
             
+            # 右侧内容widget（用于滚动）
+            right_content = QWidget()
+            right_content_layout = QVBoxLayout(right_content)
+            right_content_layout.setContentsMargins(0, 0, 0, 0)
+            right_content_layout.setSpacing(8)
+
             # 创建策略组
             strategy_group = QGroupBox("策略设置")
             strategy_layout = QVBoxLayout(strategy_group)
-            
+            strategy_layout.setContentsMargins(5, 15, 5, 5)
             # 添加策略选择
             strategy_type_layout = QHBoxLayout()
             strategy_label = QLabel("策略类型:")
@@ -979,14 +1035,15 @@ class TradingGUI(QMainWindow):
             strategy_layout.addWidget(self.strategy_params_widget)
             
             # 添加策略组到右侧布局
-            self.right_layout.addWidget(strategy_group)
+            right_content_layout.addWidget(strategy_group)
             
             # 创建回测设置组
             backtest_group = QGroupBox("回测设置")
             backtest_layout = QFormLayout(backtest_group)
-            
+            backtest_layout.setContentsMargins(5, 15, 5, 5)
             # 初始资金
             self.initial_capital = QDoubleSpinBox()
+            self.initial_capital.setFixedHeight(25)
             self.initial_capital.setRange(1000.0, 10000000.0)
             self.initial_capital.setValue(100000.0)
             self.initial_capital.setSuffix(" 元")
@@ -994,6 +1051,7 @@ class TradingGUI(QMainWindow):
             
             # 手续费率
             self.commission_rate = QDoubleSpinBox()
+            self.commission_rate.setFixedHeight(25)
             self.commission_rate.setDecimals(4)
             self.commission_rate.setRange(0.0, 0.01)
             self.commission_rate.setValue(0.0003)
@@ -1002,6 +1060,7 @@ class TradingGUI(QMainWindow):
             
             # 滑点设置
             self.slippage = QDoubleSpinBox()
+            self.slippage.setFixedHeight(25)
             self.slippage.setDecimals(4)
             self.slippage.setRange(0.0, 0.01)
             self.slippage.setValue(0.0001)
@@ -1010,10 +1069,13 @@ class TradingGUI(QMainWindow):
             
             # 回测时间范围
             date_range_layout = QHBoxLayout()
+            date_range_layout.setContentsMargins(0, 0, 0, 0)
             self.start_date = QDateEdit()
+            self.start_date.setFixedHeight(25)
             self.start_date.setCalendarPopup(True)
             self.start_date.setDate(QDate.currentDate().addYears(-1))
             self.end_date = QDateEdit()
+            self.end_date.setFixedHeight(25)
             self.end_date.setCalendarPopup(True)
             self.end_date.setDate(QDate.currentDate())
             date_range_layout.addWidget(self.start_date)
@@ -1022,14 +1084,15 @@ class TradingGUI(QMainWindow):
             backtest_layout.addRow("回测区间:", date_range_layout)
             
             # 添加回测设置组到右侧布局
-            self.right_layout.addWidget(backtest_group)
+            right_content_layout.addWidget(backtest_group)
             
             # 创建风险控制组
             risk_group = QGroupBox("风险控制")
             risk_layout = QFormLayout(risk_group)
-            
+            risk_layout.setContentsMargins(5, 15, 5, 5)
             # 止损设置
             self.stop_loss = QDoubleSpinBox()
+            self.stop_loss.setFixedHeight(25)
             self.stop_loss.setDecimals(2)
             self.stop_loss.setRange(0.0, 100.0)
             self.stop_loss.setValue(5.0)
@@ -1038,6 +1101,7 @@ class TradingGUI(QMainWindow):
             
             # 止盈设置
             self.take_profit = QDoubleSpinBox()
+            self.take_profit.setFixedHeight(25)
             self.take_profit.setDecimals(2)
             self.take_profit.setRange(0.0, 100.0)
             self.take_profit.setValue(10.0)
@@ -1046,13 +1110,14 @@ class TradingGUI(QMainWindow):
             
             # 最大持仓
             self.max_position = QSpinBox()
+            self.max_position.setFixedHeight(25)
             self.max_position.setRange(1, 100)
             self.max_position.setValue(5)
             self.max_position.setSuffix(" 只")
             risk_layout.addRow("最大持仓:", self.max_position)
             
             # 添加风险控制组到右侧布局
-            self.right_layout.addWidget(risk_group)
+            right_content_layout.addWidget(risk_group)
             
             # 创建操作按钮组
             button_layout = QHBoxLayout()
@@ -1073,17 +1138,19 @@ class TradingGUI(QMainWindow):
             button_layout.addWidget(optimize_btn)
             
             # 添加按钮组到右侧布局
-            self.right_layout.addLayout(button_layout)
+            right_content_layout.addLayout(button_layout)
             
-            # 设置右侧面板的最小宽度
-            self.right_panel.setMinimumWidth(300)
-            self.right_panel.setMaximumWidth(400)
-            
-            # 添加右侧面板到顶部分割器
+            # 滚动区域包裹右侧内容
+            right_scroll = QScrollArea()
+            right_scroll.setWidgetResizable(True)
+            right_scroll.setWidget(right_content)
+            self.right_layout.addWidget(right_scroll)
+
+            self.right_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.right_panel.setMinimumWidth(220)
+            self.right_panel.setMaximumWidth(350)
             self.top_splitter.addWidget(self.right_panel)
-            
             self.log_manager.info("右侧面板创建完成")
-            
         except Exception as e:
             self.log_manager.error(f"创建右侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1458,11 +1525,11 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_message(f"更新股票列表显示失败: {str(e)}", "error")
 
-    def log_message(self, message: str, level: str = "info") -> None:
-        """处理日志消息
+    def log_message(self, message: str, level: str = "INFO") -> None:
+        """记录日志消息
         
         Args:
-            message: 日志消息内容
+            message: 日志消息
             level: 日志级别，可选值为 "info", "warning", "error", "debug"
         """
         try:
@@ -1494,12 +1561,25 @@ class TradingGUI(QMainWindow):
             else:
                 print(f"[{timestamp}] [{level}] {message}")
             
+            # 如果有日志管理器，也记录到日志管理器
+            if hasattr(self, 'log_manager'):
+                if level == "ERROR":
+                    self.log_manager.error(message)
+                elif level == "WARNING":
+                    self.log_manager.warning(message)
+                elif level == "DEBUG":
+                    self.log_manager.debug(message)
+                else:
+                    self.log_manager.info(message)
+            
             # 如果日志级别为错误，显示错误对话框
             if level == "ERROR":
                 QMessageBox.critical(self, "错误", message)
                 
         except Exception as e:
             print(f"记录日志失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"记录日志失败: {str(e)}")
 
     def clear_log(self) -> None:
         """清除日志内容
@@ -1893,6 +1973,7 @@ class TradingGUI(QMainWindow):
             # 创建日志控件组
             log_group = QGroupBox("系统日志")
             log_layout = QVBoxLayout(log_group)
+            log_layout.setContentsMargins(5, 15, 5, 5)
             
             # 创建日志控件
             controls_layout = QHBoxLayout()
@@ -1928,13 +2009,19 @@ class TradingGUI(QMainWindow):
             self.log_text = QTextEdit()
             self.log_text.setReadOnly(True)
             self.log_text.setLineWrapMode(QTextEdit.NoWrap)
-            log_layout.addWidget(self.log_text)
+            log_text_scroll = QScrollArea()
+            log_text_scroll.setWidgetResizable(True)
+            log_text_scroll.setWidget(self.log_text)
+            log_layout.addWidget(log_text_scroll)
             
             # 添加日志组到底部布局
             self.bottom_layout.addWidget(log_group)
             
             # 添加底部面板到底部分割器
             self.bottom_splitter.addWidget(self.bottom_panel)
+            self.bottom_panel.setMinimumHeight(120)
+            self.bottom_panel.setMaximumHeight(300)
+            self.bottom_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             
             self.log_manager.info("底部面板创建完成")
             
@@ -2026,36 +2113,20 @@ class TradingGUI(QMainWindow):
                 try:
                     # 获取所有股票
                     all_stocks = sm.get_stock_list()  # 使用正确的API
+                    self.stock_list.clear()
+                    self.stock_list_cache.clear()
                     
-                    # 使用弱引用避免内存泄漏
-                    stock_list_ref = weakref.ref(self.stock_list)
-                    stock_list_cache_ref = weakref.ref(self.stock_list_cache)
+                    # 更新缓存和列表
+                    for stock in all_stocks:
+                        stock_text = f"{stock['code']} {stock['name']}"
+                        self.stock_list_cache.append(stock_text)
+                        item = QListWidgetItem(stock_text)
+                        if stock['code'] in self.favorites:
+                            item.setText(f"★ {stock_text}")
+                        self.stock_list.addItem(item)
+                        
+                    self.log_message(f"已更新股票列表，共 {len(all_stocks)} 只股票", "info")
                     
-                    if stock_list_ref() and stock_list_cache_ref():
-                        # 清空当前列表
-                        stock_list_ref().clear()
-                        stock_list_cache_ref().clear()
-                        
-                        # 添加股票到列表
-                        for stock in all_stocks:
-                            stock_text = f"{stock['code']} {stock['name']}"
-                            stock_list_cache_ref().append(stock_text)
-                            
-                            # 创建列表项
-                            item = QListWidgetItem(stock_text)
-                            
-                            # 如果是收藏的股票，添加星号标记
-                            if stock['code'] in self.favorites:
-                                item.setText(f"★ {stock_text}")
-                                
-                            stock_list_ref().addItem(item)
-                            
-                        # 更新UI显示
-                        self.update_stock_list_ui()
-                        
-                        # 记录日志
-                        self.log_message(f"已更新股票列表，共 {len(all_stocks)} 只股票", "info")
-                        
                 except Exception as e:
                     self.log_message(f"更新股票列表失败: {str(e)}", "error")
                     
@@ -2529,51 +2600,27 @@ class TradingGUI(QMainWindow):
             self.log_message(f"显示单位转换器失败: {str(e)}", "error")
 
     def start_performance_monitoring(self):
-        """启动性能监控系统"""
+        """启动性能监控"""
         try:
-            # 初始化性能监控器
-            if not hasattr(self, 'performance_monitor'):
-                # 使用配置管理器中的性能配置
-                if not hasattr(self.config_manager, 'performance'):
-                    # 如果配置管理器中没有性能配置，创建一个默认配置
-                    from utils.config_types import PerformanceConfig
-                    self.config_manager.performance = PerformanceConfig(
-                        cpu_threshold=80,
-                        memory_threshold=80,
-                        disk_threshold=90,
-                        response_threshold=5,
-                        update_interval=1.0,
-                        metrics_history_size=100,
-                        monitor_cpu=True,
-                        monitor_memory=True,
-                        monitor_disk=True,
-                        log_to_file=True
-                    )
-                
-                # 创建性能监控器
+            if self.performance_monitor is None:
+                self.log_manager.warning("性能监控未初始化，尝试重新初始化")
+                # 使用正确的配置访问方式
+                perf_config = self.config_manager.performance
                 self.performance_monitor = PerformanceMonitor(
-                    config=self.config_manager.performance
+                    cpu_threshold=perf_config.cpu_threshold,
+                    memory_threshold=perf_config.memory_threshold,
+                    disk_threshold=perf_config.disk_threshold,
+                    log_manager=self.log_manager
                 )
+            
+            if not self.performance_monitor.is_monitoring:
+                self.performance_monitor.start_monitoring()
+                self.log_manager.info("性能监控启动成功")
+            else:
+                self.log_manager.warning("性能监控已在运行中")
                 
-                # 设置日志管理器
-                self.performance_monitor.set_logger(self.log_manager)
-                
-            # 启动监控
-            self.performance_monitor.start_monitoring()
-            
-            # 连接性能信号
-            self.performance_monitor.performance_updated.connect(self.handle_performance_update)
-            self.performance_monitor.alert_triggered.connect(self.handle_performance_alert)
-            
-            # 添加内存清理定时器
-            self.cleanup_timer = QTimer()
-            self.cleanup_timer.timeout.connect(self.cleanup_memory)
-            self.cleanup_timer.start(30000)  # 每30秒清理一次内存
-            
-            self.log_manager.info("性能监控系统已启动")
-            
         except Exception as e:
-            self.log_manager.error(f"启动性能监控系统失败: {str(e)}")
+            self.log_manager.error(f"启动性能监控失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
 
     def handle_performance_update(self, metrics: dict):
@@ -2866,9 +2913,10 @@ class TradingGUI(QMainWindow):
             # 创建性能监控组
             monitor_group = QGroupBox("系统性能监控")
             monitor_layout = QGridLayout()
-            
+            monitor_layout.setContentsMargins(5, 15, 5, 5)
             # CPU使用率
             self.cpu_label = QLabel("0%")
+            self.cpu_label.setFixedHeight(25)
             self.cpu_progress = QProgressBar()
             self.cpu_progress.setRange(0, 100)
             monitor_layout.addWidget(QLabel("CPU使用率:"), 0, 0)
@@ -2877,6 +2925,7 @@ class TradingGUI(QMainWindow):
             
             # 内存使用率
             self.memory_label = QLabel("0%")
+            self.memory_label.setFixedHeight(25)
             self.memory_progress = QProgressBar()
             self.memory_progress.setRange(0, 100)
             monitor_layout.addWidget(QLabel("内存使用率:"), 1, 0)
@@ -2885,6 +2934,7 @@ class TradingGUI(QMainWindow):
             
             # 磁盘使用率
             self.disk_label = QLabel("0%")
+            self.disk_label.setFixedHeight(25)
             self.disk_progress = QProgressBar()
             self.disk_progress.setRange(0, 100)
             monitor_layout.addWidget(QLabel("磁盘使用率:"), 2, 0)
@@ -2893,8 +2943,15 @@ class TradingGUI(QMainWindow):
             
             # 响应时间
             self.response_label = QLabel("0ms")
+            self.response_label.setFixedHeight(25)
             monitor_layout.addWidget(QLabel("响应时间:"), 3, 0)
             monitor_layout.addWidget(self.response_label, 3, 1)
+
+            # 线程池活跃线程数
+            self.threadpool_label = QLabel("0")
+            self.threadpool_label.setFixedHeight(25)
+            monitor_layout.addWidget(QLabel("线程池活跃线程:"), 4, 0)
+            monitor_layout.addWidget(self.threadpool_label, 4, 1)
             
             monitor_group.setLayout(monitor_layout)
             layout.addWidget(monitor_group)
@@ -2902,6 +2959,7 @@ class TradingGUI(QMainWindow):
             # 创建告警区域
             warning_group = QGroupBox("性能告警")
             warning_layout = QVBoxLayout()
+            warning_layout.setContentsMargins(5, 15, 5, 5)
             self.warning_area = QTextEdit()
             self.warning_area.setReadOnly(True)
             self.warning_area.setMaximumHeight(100)
@@ -2936,7 +2994,7 @@ class TradingGUI(QMainWindow):
             
         except Exception as e:
             self.log_manager.error(f"初始化性能监控面板失败: {str(e)}")
-            
+
     def update_performance_metrics(self, metrics: dict):
         """更新性能指标显示
         
@@ -2965,10 +3023,14 @@ class TradingGUI(QMainWindow):
             # 更新响应时间
             response_time = metrics.get('response_time', 0)
             self.response_label.setText(f"{response_time*1000:.0f}ms")
+
+            # 更新线程池活跃线程数
+            if hasattr(self, 'thread_pool') and hasattr(self, 'threadpool_label'):
+                self.threadpool_label.setText(str(self.thread_pool.activeThreadCount()))
             
         except Exception as e:
             self.log_manager.error(f"更新性能指标显示失败: {str(e)}")
-            
+
     def _get_progress_style(self, value: float) -> str:
         """获取进度条样式
         

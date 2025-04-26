@@ -26,3 +26,1172 @@
 2025-04-26 14:44:02 - EXCEPTION - CPU使用率过高: 1354.2%
 2025-04-26 14:44:03 - EXCEPTION - CPU使用率过高: 82.3%
 2025-04-26 14:44:03 - EXCEPTION - 请先选择股票
+2025-04-26 14:50:48 - EXCEPTION - 左侧面板创建完成
+2025-04-26 14:50:48 - EXCEPTION - 中间面板创建完成
+2025-04-26 14:50:48 - EXCEPTION - 右侧面板创建完成
+2025-04-26 14:50:48 - EXCEPTION - 底部面板创建完成
+2025-04-26 14:50:48 - EXCEPTION - 菜单栏创建完成
+2025-04-26 14:50:48 - EXCEPTION - 工具栏初始化完成
+2025-04-26 14:50:48 - EXCEPTION - 工具栏创建完成
+2025-04-26 14:50:48 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:50:48 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:50:48 - EXCEPTION - 主题应用完成
+2025-04-26 14:50:48 - EXCEPTION - UI初始化完成
+2025-04-26 14:50:48 - EXCEPTION - 信号连接完成
+2025-04-26 14:50:48 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:50:48 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:50:48 - EXCEPTION - 主题应用完成
+2025-04-26 14:50:48 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 14:50:48 - EXCEPTION - 性能监控已启动
+2025-04-26 14:50:48 - EXCEPTION - 性能监控系统已启动
+2025-04-26 14:50:48 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 14:50:49 - EXCEPTION - CPU使用率过高: 239.1%
+2025-04-26 14:50:49 - EXCEPTION - CPU使用率过高: 239.1%
+2025-04-26 14:50:53 - EXCEPTION - CPU使用率过高: 293.0%
+2025-04-26 14:50:53 - EXCEPTION - CPU使用率过高: 293.0%
+2025-04-26 14:50:55 - EXCEPTION - CPU使用率过高: 97.7%
+2025-04-26 14:50:55 - EXCEPTION - CPU使用率过高: 97.7%
+2025-04-26 14:50:56 - EXCEPTION - CPU使用率过高: 97.7%
+2025-04-26 14:50:56 - EXCEPTION - CPU使用率过高: 97.7%
+2025-04-26 14:50:57 - EXCEPTION - CPU使用率过高: 1855.5%
+2025-04-26 14:50:57 - EXCEPTION - CPU使用率过高: 1855.5%
+2025-04-26 14:50:58 - EXCEPTION - CPU使用率过高: 81.5%
+2025-04-26 14:52:58 - EXCEPTION - 左侧面板创建完成
+2025-04-26 14:52:58 - EXCEPTION - 中间面板创建完成
+2025-04-26 14:52:58 - EXCEPTION - 右侧面板创建完成
+2025-04-26 14:52:58 - EXCEPTION - 底部面板创建完成
+2025-04-26 14:52:58 - EXCEPTION - 菜单栏创建完成
+2025-04-26 14:52:58 - EXCEPTION - 工具栏初始化完成
+2025-04-26 14:52:58 - EXCEPTION - 工具栏创建完成
+2025-04-26 14:52:58 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:52:58 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:52:58 - EXCEPTION - 主题应用完成
+2025-04-26 14:52:58 - EXCEPTION - UI初始化完成
+2025-04-26 14:52:58 - EXCEPTION - 信号连接完成
+2025-04-26 14:52:58 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:52:58 - EXCEPTION - 应用主题到部件失败: 'TradingGUI' object is not callable
+2025-04-26 14:52:58 - EXCEPTION - 主题应用完成
+2025-04-26 14:52:58 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 14:52:58 - EXCEPTION - 性能监控已启动
+2025-04-26 14:52:58 - EXCEPTION - 性能监控系统已启动
+2025-04-26 14:52:58 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 14:52:59 - EXCEPTION - CPU使用率过高: 227.6%
+2025-04-26 14:52:59 - EXCEPTION - CPU使用率过高: 227.6%
+2025-04-26 14:53:00 - EXCEPTION - CPU使用率过高: 223.7%
+2025-04-26 14:53:00 - EXCEPTION - CPU使用率过高: 223.7%
+2025-04-26 14:53:01 - EXCEPTION - CPU使用率过高: 218.7%
+2025-04-26 14:53:01 - EXCEPTION - CPU使用率过高: 218.7%
+2025-04-26 14:53:04 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 14:53:04 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 14:53:05 - EXCEPTION - CPU使用率过高: 195.3%
+2025-04-26 14:53:05 - EXCEPTION - CPU使用率过高: 195.3%
+2025-04-26 14:53:06 - EXCEPTION - CPU使用率过高: 218.7%
+2025-04-26 14:53:06 - EXCEPTION - CPU使用率过高: 218.7%
+2025-04-26 14:53:07 - EXCEPTION - CPU使用率过高: 201.7%
+2025-04-26 14:53:08 - EXCEPTION - CPU使用率过高: 609.4%
+2025-04-26 14:55:15 - EXCEPTION - 左侧面板创建完成
+2025-04-26 14:55:15 - EXCEPTION - 中间面板创建完成
+2025-04-26 14:55:15 - EXCEPTION - 右侧面板创建完成
+2025-04-26 14:55:15 - EXCEPTION - 底部面板创建完成
+2025-04-26 14:55:15 - EXCEPTION - 菜单栏创建完成
+2025-04-26 14:55:15 - EXCEPTION - 工具栏初始化完成
+2025-04-26 14:55:15 - EXCEPTION - 工具栏创建完成
+2025-04-26 14:55:15 - EXCEPTION - 应用主题失败: 'builtin_function_or_method' object has no attribute 'palette'
+2025-04-26 14:55:15 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-26e924e9f60d>", line 486, in apply_theme
+    self.theme_manager.apply_theme(widget)
+  File "d:\DevelopTool\FreeCode\HIkyuu-UI\hikyuu-ui\utils\theme.py", line 246, in apply_theme
+    palette = widget.palette()
+              ^^^^^^^^^^^^^^
+AttributeError: 'builtin_function_or_method' object has no attribute 'palette'
+
+2025-04-26 14:55:15 - EXCEPTION - UI初始化完成
+2025-04-26 14:55:15 - EXCEPTION - 信号连接完成
+2025-04-26 14:55:15 - EXCEPTION - 应用主题失败: 'builtin_function_or_method' object has no attribute 'palette'
+2025-04-26 14:55:15 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-26e924e9f60d>", line 486, in apply_theme
+    self.theme_manager.apply_theme(widget)
+  File "d:\DevelopTool\FreeCode\HIkyuu-UI\hikyuu-ui\utils\theme.py", line 246, in apply_theme
+    palette = widget.palette()
+              ^^^^^^^^^^^^^^
+AttributeError: 'builtin_function_or_method' object has no attribute 'palette'
+
+2025-04-26 14:55:15 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 14:55:15 - EXCEPTION - 性能监控已启动
+2025-04-26 14:55:15 - EXCEPTION - 性能监控系统已启动
+2025-04-26 14:55:15 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 14:55:21 - EXCEPTION - CPU使用率过高: 221.5%
+2025-04-26 14:55:21 - EXCEPTION - CPU使用率过高: 221.5%
+2025-04-26 14:55:22 - EXCEPTION - CPU使用率过高: 585.9%
+2025-04-26 14:55:22 - EXCEPTION - CPU使用率过高: 585.9%
+2025-04-26 14:55:23 - EXCEPTION - CPU使用率过高: 201.6%
+2025-04-26 14:55:23 - EXCEPTION - CPU使用率过高: 201.6%
+2025-04-26 14:55:24 - EXCEPTION - CPU使用率过高: 698.1%
+2025-04-26 14:55:24 - EXCEPTION - CPU使用率过高: 698.1%
+2025-04-26 14:55:28 - EXCEPTION - 分析失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 14:55:28 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-26e924e9f60d>", line 3124, in analyze
+    if not self.current_stock:
+           ^^^^^^^^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'current_stock'
+
+2025-04-26 14:55:28 - EXCEPTION - 分析失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 14:58:42 - EXCEPTION - 左侧面板创建完成
+2025-04-26 14:58:42 - EXCEPTION - 中间面板创建完成
+2025-04-26 14:58:42 - EXCEPTION - 右侧面板创建完成
+2025-04-26 14:58:42 - EXCEPTION - 底部面板创建完成
+2025-04-26 14:58:42 - EXCEPTION - 菜单栏创建完成
+2025-04-26 14:58:42 - EXCEPTION - 工具栏初始化完成
+2025-04-26 14:58:42 - EXCEPTION - 工具栏创建完成
+2025-04-26 14:58:42 - EXCEPTION - 主题应用完成
+2025-04-26 14:58:42 - EXCEPTION - UI初始化完成
+2025-04-26 14:58:42 - EXCEPTION - 信号连接完成
+2025-04-26 14:58:42 - EXCEPTION - 主题应用完成
+2025-04-26 14:58:42 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 14:58:42 - EXCEPTION - 性能监控已启动
+2025-04-26 14:58:42 - EXCEPTION - 性能监控系统已启动
+2025-04-26 14:58:42 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 14:58:45 - EXCEPTION - CPU使用率过高: 104.2%
+2025-04-26 14:58:45 - EXCEPTION - CPU使用率过高: 104.2%
+2025-04-26 14:58:49 - EXCEPTION - CPU使用率过高: 195.3%
+2025-04-26 14:58:49 - EXCEPTION - CPU使用率过高: 195.3%
+2025-04-26 14:58:50 - EXCEPTION - CPU使用率过高: 100.8%
+2025-04-26 14:58:50 - EXCEPTION - CPU使用率过高: 100.8%
+2025-04-26 14:58:51 - EXCEPTION - CPU使用率过高: 504.0%
+2025-04-26 14:58:51 - EXCEPTION - CPU使用率过高: 504.0%
+2025-04-26 14:59:01 - EXCEPTION - 切换主题: dark
+2025-04-26 15:03:30 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:03:30 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:03:30 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:03:30 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:03:30 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:03:30 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:03:30 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:03:30 - EXCEPTION - 主题应用完成
+2025-04-26 15:03:30 - EXCEPTION - UI初始化完成
+2025-04-26 15:03:30 - EXCEPTION - 信号连接完成
+2025-04-26 15:03:30 - EXCEPTION - 主题应用完成
+2025-04-26 15:03:30 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:03:30 - EXCEPTION - 性能监控已启动
+2025-04-26 15:03:30 - EXCEPTION - 性能监控系统已启动
+2025-04-26 15:03:30 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:03:31 - EXCEPTION - CPU使用率过高: 228.1%
+2025-04-26 15:03:31 - EXCEPTION - CPU使用率过高: 228.1%
+2025-04-26 15:03:32 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 15:03:32 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 15:03:33 - EXCEPTION - CPU使用率过高: 312.5%
+2025-04-26 15:03:33 - EXCEPTION - CPU使用率过高: 312.5%
+2025-04-26 15:03:34 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 15:03:34 - EXCEPTION - CPU使用率过高: 208.3%
+2025-04-26 15:03:35 - EXCEPTION - CPU使用率过高: 416.7%
+2025-04-26 15:03:35 - EXCEPTION - CPU使用率过高: 416.7%
+2025-04-26 15:03:36 - EXCEPTION - CPU使用率过高: 151.2%
+2025-04-26 15:03:36 - EXCEPTION - CPU使用率过高: 151.2%
+2025-04-26 15:03:37 - EXCEPTION - CPU使用率过高: 252.0%
+2025-04-26 15:03:37 - EXCEPTION - CPU使用率过高: 252.0%
+2025-04-26 15:03:38 - EXCEPTION - CPU使用率过高: 252.0%
+2025-04-26 15:03:38 - EXCEPTION - CPU使用率过高: 252.0%
+2025-04-26 15:03:39 - EXCEPTION - CPU使用率过高: 403.2%
+2025-04-26 15:03:39 - EXCEPTION - CPU使用率过高: 403.2%
+2025-04-26 15:03:47 - EXCEPTION - CPU使用率过高: 99.7%
+2025-04-26 15:03:47 - EXCEPTION - CPU使用率过高: 99.7%
+2025-04-26 15:03:49 - EXCEPTION - 回测失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 15:03:49 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-fbc820946176>", line 3183, in backtest
+    if not self.current_stock:
+           ^^^^^^^^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'current_stock'
+
+2025-04-26 15:03:49 - EXCEPTION - 回测失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 15:03:56 - EXCEPTION - 分析失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 15:03:56 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-fbc820946176>", line 3133, in analyze
+    if not self.current_stock:
+           ^^^^^^^^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'current_stock'
+
+2025-04-26 15:03:56 - EXCEPTION - 分析失败: 'TradingGUI' object has no attribute 'current_stock'
+2025-04-26 15:04:30 - EXCEPTION - CPU使用率过高: 89.3%
+2025-04-26 15:04:30 - EXCEPTION - CPU使用率过高: 89.3%
+2025-04-26 15:04:46 - EXCEPTION - CPU使用率过高: 92.9%
+2025-04-26 15:04:47 - EXCEPTION - CPU使用率过高: 98.9%
+2025-04-26 15:04:48 - EXCEPTION - CPU使用率过高: 90.8%
+2025-04-26 15:04:49 - EXCEPTION - CPU使用率过高: 95.0%
+2025-04-26 15:04:50 - EXCEPTION - CPU使用率过高: 98.2%
+2025-04-26 15:04:51 - EXCEPTION - CPU使用率过高: 94.5%
+2025-04-26 15:04:52 - EXCEPTION - CPU使用率过高: 96.1%
+2025-04-26 15:04:53 - EXCEPTION - CPU使用率过高: 96.4%
+2025-04-26 15:04:54 - EXCEPTION - CPU使用率过高: 96.1%
+2025-04-26 15:04:55 - EXCEPTION - CPU使用率过高: 93.9%
+2025-04-26 15:04:56 - EXCEPTION - CPU使用率过高: 99.6%
+2025-04-26 15:04:57 - EXCEPTION - CPU使用率过高: 86.5%
+2025-04-26 15:07:03 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:07:03 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:07:03 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:07:03 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:07:03 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:07:03 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:07:03 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:07:03 - EXCEPTION - 主题应用完成
+2025-04-26 15:07:03 - EXCEPTION - UI初始化完成
+2025-04-26 15:07:03 - EXCEPTION - 信号连接完成
+2025-04-26 15:07:03 - EXCEPTION - 主题应用完成
+2025-04-26 15:07:03 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:07:03 - EXCEPTION - 启动性能监控系统失败: 'NoneType' object has no attribute 'start_monitoring'
+2025-04-26 15:07:03 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-2a59884eb46e>", line 2562, in start_performance_monitoring
+    self.performance_monitor.start_monitoring()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'start_monitoring'
+
+2025-04-26 15:07:03 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:13:25 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:13:25 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:13:25 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:13:25 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:13:25 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:13:25 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:13:25 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:13:25 - EXCEPTION - 主题应用完成
+2025-04-26 15:13:25 - EXCEPTION - UI初始化完成
+2025-04-26 15:13:25 - EXCEPTION - 信号连接完成
+2025-04-26 15:13:25 - EXCEPTION - 主题应用完成
+2025-04-26 15:13:25 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:13:25 - EXCEPTION - 启动性能监控系统失败: 'NoneType' object has no attribute 'start_monitoring'
+2025-04-26 15:13:25 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-2a59884eb46e>", line 2562, in start_performance_monitoring
+    self.performance_monitor.start_monitoring()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'start_monitoring'
+
+2025-04-26 15:13:25 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:17:43 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:17:43 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:17:43 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:17:43 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:17:43 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:17:43 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:17:43 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:17:43 - EXCEPTION - 初始化UI失败: 'TradingGUI' object has no attribute 'logger'
+2025-04-26 15:17:43 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-1c1f7d6aea22>", line 491, in apply_theme
+    theme = self.theme_manager.get_current_theme()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ThemeManager' object has no attribute 'get_current_theme'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<ipython-input-1-1c1f7d6aea22>", line 330, in init_ui
+    self.apply_theme()
+  File "<ipython-input-1-1c1f7d6aea22>", line 500, in apply_theme
+    self.logger.error(f"应用主题失败: {str(e)}")
+    ^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'logger'
+
+2025-04-26 15:17:43 - EXCEPTION - 信号连接完成
+2025-04-26 15:17:43 - EXCEPTION - 初始化交易系统主窗口失败: 'TradingGUI' object has no attribute 'logger'
+2025-04-26 15:17:43 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-1c1f7d6aea22>", line 491, in apply_theme
+    theme = self.theme_manager.get_current_theme()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ThemeManager' object has no attribute 'get_current_theme'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<ipython-input-1-1c1f7d6aea22>", line 115, in __init__
+    self.apply_theme()
+  File "<ipython-input-1-1c1f7d6aea22>", line 500, in apply_theme
+    self.logger.error(f"应用主题失败: {str(e)}")
+    ^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'logger'
+
+2025-04-26 15:17:43 - EXCEPTION - 初始化交易系统主窗口失败: 'TradingGUI' object has no attribute 'logger'
+2025-04-26 15:19:46 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:19:46 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:19:46 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:19:46 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:19:46 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:19:46 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:19:46 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:19:46 - EXCEPTION - 主题应用完成
+2025-04-26 15:19:46 - EXCEPTION - UI初始化完成
+2025-04-26 15:19:46 - EXCEPTION - 信号连接完成
+2025-04-26 15:19:46 - EXCEPTION - 主题应用完成
+2025-04-26 15:19:46 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:19:46 - EXCEPTION - 启动性能监控系统失败: 'PerformanceMonitor' object has no attribute 'set_logger'
+2025-04-26 15:19:46 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-9c2b2dae4fbf>", line 2560, in start_performance_monitoring
+    self.performance_monitor.set_logger(self.log_manager)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'PerformanceMonitor' object has no attribute 'set_logger'
+
+2025-04-26 15:19:46 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:22:49 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:22:49 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:22:49 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:22:49 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:22:49 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:22:49 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:22:49 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:22:49 - EXCEPTION - 主题应用完成
+2025-04-26 15:22:49 - EXCEPTION - UI初始化完成
+2025-04-26 15:22:49 - EXCEPTION - 信号连接完成
+2025-04-26 15:22:49 - EXCEPTION - 主题应用完成
+2025-04-26 15:22:49 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:22:49 - EXCEPTION - 启动性能监控系统失败: 'LogManager' object has no attribute 'setLevel'
+2025-04-26 15:22:49 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-f6486eb4f919>", line 2555, in start_performance_monitoring
+    self.performance_monitor = PerformanceMonitor(
+                               ^^^^^^^^^^^^^^^^^^^
+  File "d:\DevelopTool\FreeCode\HIkyuu-UI\hikyuu-ui\utils\performance_monitor.py", line 39, in __init__
+    self.logger.setLevel(logging.INFO)
+    ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'LogManager' object has no attribute 'setLevel'
+
+2025-04-26 15:22:49 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:25:47 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:25:47 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:25:47 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:25:47 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:25:47 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:25:47 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:25:47 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:25:48 - EXCEPTION - 主题应用完成
+2025-04-26 15:25:48 - EXCEPTION - UI初始化完成
+2025-04-26 15:25:48 - EXCEPTION - 信号连接完成
+2025-04-26 15:25:48 - EXCEPTION - 主题应用完成
+2025-04-26 15:25:48 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:25:48 - EXCEPTION - 启动性能监控系统失败: 'LogManager' object has no attribute 'setLevel'
+2025-04-26 15:25:48 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-f6486eb4f919>", line 2555, in start_performance_monitoring
+    self.performance_monitor = PerformanceMonitor(
+                               ^^^^^^^^^^^^^^^^^^^
+  File "d:\DevelopTool\FreeCode\HIkyuu-UI\hikyuu-ui\utils\performance_monitor.py", line 39, in __init__
+    self.logger.setLevel(logging.INFO)
+    ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'LogManager' object has no attribute 'setLevel'
+
+2025-04-26 15:25:48 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:28:11 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:28:11 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:28:11 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:28:11 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:28:11 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:28:11 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:28:11 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:28:11 - EXCEPTION - 主题应用完成
+2025-04-26 15:28:11 - EXCEPTION - UI初始化完成
+2025-04-26 15:28:11 - EXCEPTION - 信号连接完成
+2025-04-26 15:28:11 - EXCEPTION - 主题应用完成
+2025-04-26 15:28:11 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:28:11 - EXCEPTION - 性能监控器初始化
+2025-04-26 15:28:11 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:35:06 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 15:35:06 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 15:35:06 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 15:35:06 - EXCEPTION - 初始化性能监控失败: 'ConfigManager' object has no attribute 'get_performance_config'
+2025-04-26 15:35:06 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:35:06 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:35:06 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:35:06 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:35:06 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:35:06 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:35:06 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:35:06 - EXCEPTION - 主题应用完成
+2025-04-26 15:35:06 - EXCEPTION - UI初始化完成
+2025-04-26 15:35:06 - EXCEPTION - 信号连接完成
+2025-04-26 15:35:06 - EXCEPTION - 主题应用完成
+2025-04-26 15:35:07 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:35:07 - EXCEPTION - 性能监控未初始化，尝试重新初始化
+2025-04-26 15:35:07 - EXCEPTION - 启动性能监控失败: 'ConfigManager' object has no attribute 'get_performance_config'
+2025-04-26 15:35:07 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-c0a98234ddc5>", line 2557, in start_performance_monitoring
+    perf_config = self.config_manager.get_performance_config()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ConfigManager' object has no attribute 'get_performance_config'
+
+2025-04-26 15:35:07 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:35:18 - EXCEPTION - 显示设置对话框
+2025-04-26 15:35:21 - EXCEPTION - 显示设置对话框
+2025-04-26 15:35:25 - EXCEPTION - 显示设置对话框
+2025-04-26 15:35:27 - EXCEPTION - 重置图表缩放失败: 'NoneType' object has no attribute 'reset_zoom'
+2025-04-26 15:35:30 - EXCEPTION - 放大图表失败: 'NoneType' object has no attribute 'zoom_in'
+2025-04-26 15:35:33 - EXCEPTION - 缩小图表失败: 'NoneType' object has no attribute 'zoom_out'
+2025-04-26 15:35:43 - EXCEPTION - 开始参数优化...
+2025-04-26 15:35:43 - EXCEPTION - 参数优化完成
+2025-04-26 15:35:46 - EXCEPTION - 请先选择股票
+2025-04-26 15:35:48 - EXCEPTION - 请先选择股票
+2025-04-26 15:35:58 - EXCEPTION - 显示设置对话框
+2025-04-26 15:38:48 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 15:38:48 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 15:38:48 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 15:38:48 - EXCEPTION - 初始化性能监控失败: 'ConfigManager' object has no attribute 'get_performance_config'
+2025-04-26 15:38:49 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:38:49 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:38:49 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:38:49 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:38:49 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:38:49 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:38:49 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:38:49 - EXCEPTION - UI初始化完成
+2025-04-26 15:38:49 - EXCEPTION - 主题应用完成
+2025-04-26 15:38:49 - EXCEPTION - 信号连接完成
+2025-04-26 15:38:49 - EXCEPTION - 主题应用完成
+2025-04-26 15:38:49 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:38:49 - EXCEPTION - 性能监控未初始化，尝试重新初始化
+2025-04-26 15:38:50 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:38:50 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:38:50 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:39:19 - EXCEPTION - 过滤股票列表失败: 'TradingGUI' object has no attribute 'thread_pool'
+2025-04-26 15:45:32 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 15:45:32 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 15:45:32 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 15:45:32 - EXCEPTION - 初始化性能监控失败: 'ConfigManager' object has no attribute 'get_performance_config'
+2025-04-26 15:45:32 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:45:32 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:45:32 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:45:32 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:45:32 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:45:32 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:45:32 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:45:32 - EXCEPTION - 主题应用完成
+2025-04-26 15:45:32 - EXCEPTION - UI初始化完成
+2025-04-26 15:45:32 - EXCEPTION - 信号连接完成
+2025-04-26 15:45:32 - EXCEPTION - 主题应用完成
+2025-04-26 15:45:32 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:45:32 - EXCEPTION - 性能监控未初始化，尝试重新初始化
+2025-04-26 15:45:33 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:45:33 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:45:33 - EXCEPTION - 程序启动失败: name 'QThreadPool' is not defined
+2025-04-26 15:45:33 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-2a408435850f>", line 3528, in main
+    window = TradingGUI()
+             ^^^^^^^^^^^^
+  File "<ipython-input-1-2a408435850f>", line 141, in __init__
+    self.thread_pool = QThreadPool()  # 保证线程池始终可用
+                       ^^^^^^^^^^^
+NameError: name 'QThreadPool' is not defined
+
+2025-04-26 15:45:33 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:48:58 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 15:48:58 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 15:48:58 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 15:48:58 - EXCEPTION - 初始化性能监控失败: 'ConfigManager' object has no attribute 'get_performance_config'
+2025-04-26 15:48:58 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:48:58 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:48:58 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:48:58 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:48:58 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:48:58 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:48:58 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:48:58 - EXCEPTION - 主题应用完成
+2025-04-26 15:48:58 - EXCEPTION - UI初始化完成
+2025-04-26 15:48:58 - EXCEPTION - 信号连接完成
+2025-04-26 15:48:58 - EXCEPTION - 主题应用完成
+2025-04-26 15:48:58 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:48:58 - EXCEPTION - 性能监控未初始化，尝试重新初始化
+2025-04-26 15:48:59 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:48:59 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:48:59 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:49:07 - EXCEPTION - 过滤股票列表失败: cannot create weak reference to 'list' object
+2025-04-26 15:52:05 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 15:52:05 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 15:52:05 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 15:52:05 - EXCEPTION - 初始化性能监控完成
+2025-04-26 15:52:05 - EXCEPTION - 左侧面板创建完成
+2025-04-26 15:52:05 - EXCEPTION - 中间面板创建完成
+2025-04-26 15:52:05 - EXCEPTION - 右侧面板创建完成
+2025-04-26 15:52:05 - EXCEPTION - 底部面板创建完成
+2025-04-26 15:52:05 - EXCEPTION - 菜单栏创建完成
+2025-04-26 15:52:05 - EXCEPTION - 工具栏初始化完成
+2025-04-26 15:52:05 - EXCEPTION - 工具栏创建完成
+2025-04-26 15:52:05 - EXCEPTION - 主题应用完成
+2025-04-26 15:52:05 - EXCEPTION - UI初始化完成
+2025-04-26 15:52:05 - EXCEPTION - 信号连接完成
+2025-04-26 15:52:05 - EXCEPTION - 主题应用完成
+2025-04-26 15:52:05 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 15:52:06 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:52:07 - EXCEPTION - 性能监控启动成功
+2025-04-26 15:52:07 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 15:52:11 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:14 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:20 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:23 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:23 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:24 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:24 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:26 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:27 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:27 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:28 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:28 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 15:52:28 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:29:01 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:29:01 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:29:01 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:29:01 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:29:02 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:29:02 - EXCEPTION - 创建中间面板失败: name 'QTabWidget' is not defined
+2025-04-26 16:29:02 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-45d979c21b79>", line 809, in create_middle_panel
+    self.chart_tabs = QTabWidget()
+                      ^^^^^^^^^^
+NameError: name 'QTabWidget' is not defined
+
+2025-04-26 16:29:02 - EXCEPTION - 初始化UI失败: name 'QTabWidget' is not defined
+2025-04-26 16:29:02 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-45d979c21b79>", line 340, in init_ui
+    self.create_middle_panel()
+  File "<ipython-input-1-45d979c21b79>", line 809, in create_middle_panel
+    self.chart_tabs = QTabWidget()
+                      ^^^^^^^^^^
+NameError: name 'QTabWidget' is not defined
+
+2025-04-26 16:29:02 - EXCEPTION - 信号连接完成
+2025-04-26 16:29:02 - EXCEPTION - 主题应用完成
+2025-04-26 16:29:02 - EXCEPTION - 初始化性能监控面板失败: 'TradingGUI' object has no attribute 'right_panel'
+2025-04-26 16:29:03 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:29:03 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:29:03 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:29:35 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:29:35 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:29:35 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:29:35 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:29:35 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:29:35 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:29:35 - EXCEPTION - 创建右侧面板失败: name 'QDoubleSpinBox' is not defined
+2025-04-26 16:29:35 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-5a49599d89a9>", line 989, in create_right_panel
+    self.initial_capital = QDoubleSpinBox()
+                           ^^^^^^^^^^^^^^
+NameError: name 'QDoubleSpinBox' is not defined
+
+2025-04-26 16:29:35 - EXCEPTION - 初始化UI失败: name 'QDoubleSpinBox' is not defined
+2025-04-26 16:29:35 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-5a49599d89a9>", line 341, in init_ui
+    self.create_right_panel()
+  File "<ipython-input-1-5a49599d89a9>", line 989, in create_right_panel
+    self.initial_capital = QDoubleSpinBox()
+                           ^^^^^^^^^^^^^^
+NameError: name 'QDoubleSpinBox' is not defined
+
+2025-04-26 16:29:35 - EXCEPTION - 信号连接完成
+2025-04-26 16:29:35 - EXCEPTION - 主题应用完成
+2025-04-26 16:29:35 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:29:36 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:29:36 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:29:36 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:30:08 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:30:08 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:30:08 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:30:08 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:30:08 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:30:08 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:30:08 - EXCEPTION - 创建右侧面板失败: name 'QDate' is not defined
+2025-04-26 16:30:08 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-e2302c4ec203>", line 1013, in create_right_panel
+    self.start_date.setDate(QDate.currentDate().addYears(-1))
+                            ^^^^^
+NameError: name 'QDate' is not defined
+
+2025-04-26 16:30:08 - EXCEPTION - 初始化UI失败: name 'QDate' is not defined
+2025-04-26 16:30:08 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-e2302c4ec203>", line 339, in init_ui
+    self.create_right_panel()
+  File "<ipython-input-1-e2302c4ec203>", line 1013, in create_right_panel
+    self.start_date.setDate(QDate.currentDate().addYears(-1))
+                            ^^^^^
+NameError: name 'QDate' is not defined
+
+2025-04-26 16:30:08 - EXCEPTION - 信号连接完成
+2025-04-26 16:30:08 - EXCEPTION - 主题应用完成
+2025-04-26 16:30:08 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:30:09 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:30:09 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:30:09 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:31:43 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:31:43 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:31:43 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:31:43 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:31:43 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:31:43 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:31:43 - EXCEPTION - 右侧面板创建完成
+2025-04-26 16:31:43 - EXCEPTION - 底部面板创建完成
+2025-04-26 16:31:43 - EXCEPTION - 菜单栏创建完成
+2025-04-26 16:31:43 - EXCEPTION - 工具栏初始化完成
+2025-04-26 16:31:43 - EXCEPTION - 工具栏创建完成
+2025-04-26 16:31:43 - EXCEPTION - 主题应用完成
+2025-04-26 16:31:43 - EXCEPTION - UI初始化完成
+2025-04-26 16:31:43 - EXCEPTION - 信号连接完成
+2025-04-26 16:31:43 - EXCEPTION - 主题应用完成
+2025-04-26 16:31:43 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:31:44 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:31:44 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:31:44 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:32:18 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:32:18 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:32:18 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:32:18 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:32:18 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:32:18 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:32:18 - EXCEPTION - 右侧面板创建完成
+2025-04-26 16:32:18 - EXCEPTION - 底部面板创建完成
+2025-04-26 16:32:18 - EXCEPTION - 菜单栏创建完成
+2025-04-26 16:32:18 - EXCEPTION - 工具栏初始化完成
+2025-04-26 16:32:18 - EXCEPTION - 工具栏创建完成
+2025-04-26 16:32:18 - EXCEPTION - 主题应用完成
+2025-04-26 16:32:18 - EXCEPTION - UI初始化完成
+2025-04-26 16:32:18 - EXCEPTION - 信号连接完成
+2025-04-26 16:32:18 - EXCEPTION - 主题应用完成
+2025-04-26 16:32:18 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:32:19 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:32:19 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:32:20 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:39:12 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:39:12 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:39:12 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:39:12 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:39:12 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:39:12 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:39:12 - EXCEPTION - 右侧面板创建完成
+2025-04-26 16:39:12 - EXCEPTION - 底部面板创建完成
+2025-04-26 16:39:12 - EXCEPTION - 菜单栏创建完成
+2025-04-26 16:39:12 - EXCEPTION - 工具栏初始化完成
+2025-04-26 16:39:12 - EXCEPTION - 工具栏创建完成
+2025-04-26 16:39:13 - EXCEPTION - 主题应用完成
+2025-04-26 16:39:13 - EXCEPTION - UI初始化完成
+2025-04-26 16:39:13 - EXCEPTION - 信号连接完成
+2025-04-26 16:39:13 - EXCEPTION - 主题应用完成
+2025-04-26 16:39:13 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:39:14 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:39:14 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:39:14 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:40:26 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:31 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:32 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:32 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:32 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:33 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:33 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:40:34 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 16:45:03 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:45:03 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:45:03 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:45:03 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:45:03 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:45:03 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:45:03 - EXCEPTION - 右侧面板创建完成
+2025-04-26 16:45:03 - EXCEPTION - 底部面板创建完成
+2025-04-26 16:45:03 - EXCEPTION - 菜单栏创建完成
+2025-04-26 16:45:03 - EXCEPTION - 工具栏初始化完成
+2025-04-26 16:45:03 - EXCEPTION - 工具栏创建完成
+2025-04-26 16:45:04 - EXCEPTION - 主题应用完成
+2025-04-26 16:45:04 - EXCEPTION - UI初始化完成
+2025-04-26 16:45:04 - EXCEPTION - 信号连接完成
+2025-04-26 16:45:05 - EXCEPTION - 主题应用完成
+2025-04-26 16:45:05 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:45:06 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:45:06 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:45:06 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 16:57:17 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 16:57:17 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 16:57:17 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 16:57:17 - EXCEPTION - 初始化性能监控完成
+2025-04-26 16:57:17 - EXCEPTION - 左侧面板创建完成
+2025-04-26 16:57:17 - EXCEPTION - 中间面板创建完成
+2025-04-26 16:57:17 - EXCEPTION - 右侧面板创建完成
+2025-04-26 16:57:17 - EXCEPTION - 底部面板创建完成
+2025-04-26 16:57:17 - EXCEPTION - 菜单栏创建完成
+2025-04-26 16:57:17 - EXCEPTION - 工具栏初始化完成
+2025-04-26 16:57:17 - EXCEPTION - 工具栏创建完成
+2025-04-26 16:57:18 - EXCEPTION - 主题应用完成
+2025-04-26 16:57:18 - EXCEPTION - UI初始化完成
+2025-04-26 16:57:18 - EXCEPTION - 信号连接完成
+2025-04-26 16:57:19 - EXCEPTION - 主题应用完成
+2025-04-26 16:57:19 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 16:57:20 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:57:20 - EXCEPTION - 性能监控启动成功
+2025-04-26 16:57:20 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:02:57 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:02:57 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:02:57 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:02:57 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:02:58 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:02:58 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:02:58 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:02:58 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:02:58 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:02:58 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:02:58 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:02:58 - EXCEPTION - 主题应用完成
+2025-04-26 17:02:58 - EXCEPTION - UI初始化完成
+2025-04-26 17:02:58 - EXCEPTION - 信号连接完成
+2025-04-26 17:02:59 - EXCEPTION - 主题应用完成
+2025-04-26 17:02:59 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:03:00 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:03:00 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:03:00 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:04:25 - EXCEPTION - 请先选择股票
+2025-04-26 17:12:28 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:12:28 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:12:28 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:12:28 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:12:28 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:12:28 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:12:28 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:12:28 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:12:28 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:12:28 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:12:28 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:12:29 - EXCEPTION - 主题应用完成
+2025-04-26 17:12:29 - EXCEPTION - UI初始化完成
+2025-04-26 17:12:29 - EXCEPTION - 信号连接完成
+2025-04-26 17:12:29 - EXCEPTION - 主题应用完成
+2025-04-26 17:12:29 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:12:30 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:12:30 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:12:30 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:14:18 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:14:18 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:14:18 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:14:18 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:14:19 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:14:19 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:14:19 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:14:19 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:14:19 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:14:19 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:14:19 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:14:19 - EXCEPTION - 主题应用完成
+2025-04-26 17:14:19 - EXCEPTION - UI初始化完成
+2025-04-26 17:14:19 - EXCEPTION - 信号连接完成
+2025-04-26 17:14:20 - EXCEPTION - 主题应用完成
+2025-04-26 17:14:20 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:14:21 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:14:21 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:14:21 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:14:44 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 17:17:32 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:17:32 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:17:32 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:17:32 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:17:33 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:17:33 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:17:33 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:17:33 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:17:33 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:17:33 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:17:33 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:17:33 - EXCEPTION - 主题应用完成
+2025-04-26 17:17:33 - EXCEPTION - UI初始化完成
+2025-04-26 17:17:33 - EXCEPTION - 信号连接完成
+2025-04-26 17:17:34 - EXCEPTION - 主题应用完成
+2025-04-26 17:17:34 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:17:35 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:17:35 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:17:35 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:17:58 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:17:58 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:17:58 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:17:58 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:17:58 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:17:58 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:17:58 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:17:58 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:17:58 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:17:58 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:17:58 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:17:59 - EXCEPTION - 主题应用完成
+2025-04-26 17:17:59 - EXCEPTION - UI初始化完成
+2025-04-26 17:17:59 - EXCEPTION - 信号连接完成
+2025-04-26 17:17:59 - EXCEPTION - 主题应用完成
+2025-04-26 17:17:59 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:18:00 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:18:00 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:18:01 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:19:03 - EXCEPTION - 请先选择一只股票
+2025-04-26 17:25:58 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:25:58 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:25:58 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:25:58 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:25:58 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:25:58 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:25:58 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:25:58 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:25:58 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:25:58 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:25:59 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:25:59 - EXCEPTION - 主题应用完成
+2025-04-26 17:25:59 - EXCEPTION - UI初始化完成
+2025-04-26 17:25:59 - EXCEPTION - 信号连接完成
+2025-04-26 17:26:00 - EXCEPTION - 主题应用完成
+2025-04-26 17:26:00 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:26:01 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:26:01 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:26:01 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:26:53 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:26:53 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:26:53 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:26:53 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:26:53 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:26:53 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:26:53 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:26:53 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:26:53 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:26:53 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:26:53 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:26:54 - EXCEPTION - 主题应用完成
+2025-04-26 17:26:54 - EXCEPTION - UI初始化完成
+2025-04-26 17:26:54 - EXCEPTION - 信号连接完成
+2025-04-26 17:26:55 - EXCEPTION - 主题应用完成
+2025-04-26 17:26:55 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:26:56 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:26:56 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:26:56 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:27:45 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:27:45 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:27:45 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:27:45 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:27:45 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:27:45 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:27:45 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:27:45 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:27:45 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:27:45 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:27:45 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:27:46 - EXCEPTION - UI初始化完成
+2025-04-26 17:27:46 - EXCEPTION - 主题应用完成
+2025-04-26 17:27:46 - EXCEPTION - 信号连接完成
+2025-04-26 17:27:47 - EXCEPTION - 主题应用完成
+2025-04-26 17:27:47 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:27:48 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:27:48 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:27:48 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:34:09 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:34:09 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:34:09 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:34:09 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:34:09 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:34:09 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:34:09 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:34:09 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:34:09 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:34:09 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:34:09 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:34:10 - EXCEPTION - 主题应用完成
+2025-04-26 17:34:10 - EXCEPTION - UI初始化完成
+2025-04-26 17:34:10 - EXCEPTION - 信号连接完成
+2025-04-26 17:34:11 - EXCEPTION - 主题应用完成
+2025-04-26 17:34:11 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:34:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:34:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:34:12 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 17:35:28 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 17:35:28 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 17:35:28 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 17:35:28 - EXCEPTION - 初始化性能监控完成
+2025-04-26 17:35:28 - EXCEPTION - 左侧面板创建完成
+2025-04-26 17:35:28 - EXCEPTION - 中间面板创建完成
+2025-04-26 17:35:28 - EXCEPTION - 右侧面板创建完成
+2025-04-26 17:35:28 - EXCEPTION - 底部面板创建完成
+2025-04-26 17:35:28 - EXCEPTION - 菜单栏创建完成
+2025-04-26 17:35:28 - EXCEPTION - 工具栏初始化完成
+2025-04-26 17:35:28 - EXCEPTION - 工具栏创建完成
+2025-04-26 17:35:29 - EXCEPTION - 主题应用完成
+2025-04-26 17:35:29 - EXCEPTION - UI初始化完成
+2025-04-26 17:35:29 - EXCEPTION - 信号连接完成
+2025-04-26 17:35:30 - EXCEPTION - 主题应用完成
+2025-04-26 17:35:30 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 17:35:31 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:35:31 - EXCEPTION - 性能监控启动成功
+2025-04-26 17:35:31 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:09:31 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:09:31 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:09:31 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:09:31 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:09:32 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:09:32 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:09:32 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:09:32 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:09:32 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:09:32 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:09:32 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:09:32 - EXCEPTION - 主题应用完成
+2025-04-26 18:09:32 - EXCEPTION - UI初始化完成
+2025-04-26 18:09:32 - EXCEPTION - 信号连接完成
+2025-04-26 18:09:33 - EXCEPTION - 主题应用完成
+2025-04-26 18:09:33 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:09:34 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:09:34 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:09:34 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:11:45 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:11:45 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:11:45 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:11:45 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:11:46 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:11:46 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:11:46 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:11:46 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:11:46 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:11:46 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:11:46 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:11:46 - EXCEPTION - 主题应用完成
+2025-04-26 18:11:46 - EXCEPTION - UI初始化完成
+2025-04-26 18:11:46 - EXCEPTION - 信号连接完成
+2025-04-26 18:11:47 - EXCEPTION - 主题应用完成
+2025-04-26 18:11:47 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:11:48 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:11:48 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:11:48 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:13:43 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:13:43 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:13:43 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:13:43 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:13:43 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:13:43 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:13:43 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:13:43 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:13:43 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:13:43 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:13:43 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:13:44 - EXCEPTION - 主题应用完成
+2025-04-26 18:13:44 - EXCEPTION - UI初始化完成
+2025-04-26 18:13:44 - EXCEPTION - 信号连接完成
+2025-04-26 18:13:45 - EXCEPTION - 主题应用完成
+2025-04-26 18:13:45 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:13:46 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:13:46 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:13:46 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:14:14 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:14:14 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:14:14 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:14:14 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:14:14 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:14:14 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:14:14 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:14:14 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:14:14 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:14:14 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:14:14 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:14:15 - EXCEPTION - 主题应用完成
+2025-04-26 18:14:15 - EXCEPTION - UI初始化完成
+2025-04-26 18:14:15 - EXCEPTION - 信号连接完成
+2025-04-26 18:14:16 - EXCEPTION - 主题应用完成
+2025-04-26 18:14:16 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:14:17 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:14:17 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:14:17 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:14:20 - EXCEPTION - 监控性能指标失败: wrapped C/C++ object of type PerformanceMonitor has been deleted
+2025-04-26 18:14:39 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:14:39 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:14:39 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:14:39 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:14:39 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:14:39 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:14:39 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:14:39 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:14:39 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:14:39 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:14:39 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:14:40 - EXCEPTION - 主题应用完成
+2025-04-26 18:14:40 - EXCEPTION - UI初始化完成
+2025-04-26 18:14:40 - EXCEPTION - 信号连接完成
+2025-04-26 18:14:41 - EXCEPTION - 主题应用完成
+2025-04-26 18:14:41 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:14:42 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:14:42 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:14:42 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:15:12 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:15:12 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:15:12 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:15:12 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:15:12 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:15:12 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:15:12 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:15:12 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:15:12 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:15:12 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:15:12 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:15:13 - EXCEPTION - 主题应用完成
+2025-04-26 18:15:13 - EXCEPTION - UI初始化完成
+2025-04-26 18:15:13 - EXCEPTION - 信号连接完成
+2025-04-26 18:15:13 - EXCEPTION - 主题应用完成
+2025-04-26 18:15:13 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:15:14 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:15:14 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:15:14 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:16:00 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:18:02 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:18:02 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:18:02 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:18:02 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:18:03 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:18:03 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:18:03 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:18:03 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:18:03 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:18:03 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:18:03 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:18:03 - EXCEPTION - 主题应用完成
+2025-04-26 18:18:03 - EXCEPTION - UI初始化完成
+2025-04-26 18:18:03 - EXCEPTION - 信号连接完成
+2025-04-26 18:18:04 - EXCEPTION - 主题应用完成
+2025-04-26 18:18:04 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:18:05 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:18:05 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:18:05 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:19:39 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:19:39 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:19:39 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:19:39 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:19:39 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:19:39 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:19:39 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:19:39 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:19:39 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:19:39 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:19:39 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:19:40 - EXCEPTION - 主题应用完成
+2025-04-26 18:19:40 - EXCEPTION - UI初始化完成
+2025-04-26 18:19:40 - EXCEPTION - 信号连接完成
+2025-04-26 18:19:41 - EXCEPTION - 主题应用完成
+2025-04-26 18:19:41 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:19:42 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:19:42 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:19:42 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:20:41 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:20:43 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:20:45 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:22:38 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:22:38 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:22:38 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:22:38 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:22:38 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:22:38 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:22:38 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:22:38 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:22:38 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:22:38 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:22:38 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:22:39 - EXCEPTION - 主题应用完成
+2025-04-26 18:22:39 - EXCEPTION - UI初始化完成
+2025-04-26 18:22:39 - EXCEPTION - 信号连接完成
+2025-04-26 18:22:40 - EXCEPTION - 主题应用完成
+2025-04-26 18:22:40 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:22:41 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:22:41 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:22:41 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:22:48 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:22:50 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:23:09 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:23:09 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:23:09 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:23:09 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:23:09 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:23:09 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:23:09 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:23:09 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:23:09 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:23:09 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:23:09 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:23:10 - EXCEPTION - 主题应用完成
+2025-04-26 18:23:10 - EXCEPTION - UI初始化完成
+2025-04-26 18:23:10 - EXCEPTION - 信号连接完成
+2025-04-26 18:23:11 - EXCEPTION - 主题应用完成
+2025-04-26 18:23:11 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:23:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:23:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:23:12 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:24:15 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 18:26:09 - EXCEPTION - 初始化日志管理器完成
+2025-04-26 18:26:09 - EXCEPTION - 初始化配置管理器完成
+2025-04-26 18:26:09 - EXCEPTION - 初始化主题管理器完成
+2025-04-26 18:26:09 - EXCEPTION - 初始化性能监控完成
+2025-04-26 18:26:10 - EXCEPTION - 左侧面板创建完成
+2025-04-26 18:26:10 - EXCEPTION - 中间面板创建完成
+2025-04-26 18:26:10 - EXCEPTION - 右侧面板创建完成
+2025-04-26 18:26:10 - EXCEPTION - 底部面板创建完成
+2025-04-26 18:26:10 - EXCEPTION - 菜单栏创建完成
+2025-04-26 18:26:10 - EXCEPTION - 工具栏初始化完成
+2025-04-26 18:26:10 - EXCEPTION - 工具栏创建完成
+2025-04-26 18:26:10 - EXCEPTION - 主题应用完成
+2025-04-26 18:26:10 - EXCEPTION - UI初始化完成
+2025-04-26 18:26:10 - EXCEPTION - 信号连接完成
+2025-04-26 18:26:11 - EXCEPTION - 主题应用完成
+2025-04-26 18:26:11 - EXCEPTION - 性能监控面板初始化完成
+2025-04-26 18:26:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:26:12 - EXCEPTION - 性能监控启动成功
+2025-04-26 18:26:12 - EXCEPTION - 交易系统主窗口初始化完成
+2025-04-26 18:26:17 - EXCEPTION - 过滤股票列表失败: 'TradingGUI' object has no attribute 'stock_list_model'
+2025-04-26 18:26:17 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-de948bb53509>", line 716, in filter_list
+    original_stocks = self.stock_list_model.stringList()
+                      ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'TradingGUI' object has no attribute 'stock_list_model'
+
+2025-04-26 19:35:27 - EXCEPTION - TradingGUI初始化开始
+2025-04-26 19:35:27 - EXCEPTION - 程序启动失败: 'ConfigManager' object has no attribute 'load_config'
+2025-04-26 19:35:27 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-8a546fc402ec>", line 3573, in main
+    window = TradingGUI()
+             ^^^^^^^^^^^^
+  File "<ipython-input-1-8a546fc402ec>", line 134, in __init__
+    self.config_manager.load_config()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ConfigManager' object has no attribute 'load_config'
+
+2025-04-26 19:39:10 - EXCEPTION - TradingGUI初始化开始
+2025-04-26 19:39:10 - EXCEPTION - TradingGUI初始化失败: name 'get_theme_manager' is not defined
+2025-04-26 19:39:10 - EXCEPTION - 程序启动失败: name 'get_theme_manager' is not defined
+2025-04-26 19:39:10 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-3c76bb0e95c3>", line 3584, in main
+    window = TradingGUI()
+             ^^^^^^^^^^^^
+  File "<ipython-input-1-3c76bb0e95c3>", line 140, in __init__
+    self.theme_manager = get_theme_manager(self.config_manager)
+                         ^^^^^^^^^^^^^^^^^
+NameError: name 'get_theme_manager' is not defined
+
+2025-04-26 19:42:11 - EXCEPTION - TradingGUI初始化开始
+2025-04-26 19:42:11 - EXCEPTION - 创建左侧面板失败: QListWidget.setModel() is a private method
+2025-04-26 19:42:11 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-65ebb93137bb>", line 620, in create_left_panel
+    self.stock_list.setModel(self.stock_list_model)
+TypeError: QListWidget.setModel() is a private method
+
+2025-04-26 19:42:11 - EXCEPTION - 初始化UI失败: QListWidget.setModel() is a private method
+2025-04-26 19:42:11 - EXCEPTION - Traceback (most recent call last):
+  File "<ipython-input-1-65ebb93137bb>", line 368, in init_ui
+    self.create_left_panel()
+  File "<ipython-input-1-65ebb93137bb>", line 620, in create_left_panel
+    self.stock_list.setModel(self.stock_list_model)
+TypeError: QListWidget.setModel() is a private method
+
+2025-04-26 19:42:11 - EXCEPTION - 信号连接完成
+2025-04-26 19:42:11 - EXCEPTION - TradingGUI初始化完成
+2025-04-26 19:45:32 - EXCEPTION - TradingGUI初始化开始
+2025-04-26 19:45:33 - EXCEPTION - 左侧面板创建完成
+2025-04-26 19:45:33 - EXCEPTION - 中间面板创建完成
+2025-04-26 19:45:33 - EXCEPTION - 右侧面板创建完成
+2025-04-26 19:45:33 - EXCEPTION - 底部面板创建完成
+2025-04-26 19:45:33 - EXCEPTION - 菜单栏创建完成
+2025-04-26 19:45:33 - EXCEPTION - 工具栏初始化完成
+2025-04-26 19:45:33 - EXCEPTION - 工具栏创建完成
+2025-04-26 19:45:33 - EXCEPTION - 主题应用完成
+2025-04-26 19:45:33 - EXCEPTION - UI初始化完成
+2025-04-26 19:45:34 - EXCEPTION - 信号连接完成
+2025-04-26 19:45:34 - EXCEPTION - TradingGUI初始化完成
+2025-04-26 19:45:44 - EXCEPTION - 原始股票列表数量: 0
+2025-04-26 19:45:44 - EXCEPTION - 过滤条件: '2'，过滤后股票数量: 0
+2025-04-26 19:45:44 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 19:45:45 - EXCEPTION - 原始股票列表数量: 0
+2025-04-26 19:45:45 - EXCEPTION - 过滤条件: '23'，过滤后股票数量: 0
+2025-04-26 19:45:45 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 19:45:47 - EXCEPTION - 原始股票列表数量: 0
+2025-04-26 19:45:47 - EXCEPTION - 过滤条件: '234'，过滤后股票数量: 0
+2025-04-26 19:45:47 - EXCEPTION - 已过滤股票列表，显示 0 只股票
+2025-04-26 19:45:48 - EXCEPTION - 原始股票列表数量: 0
+2025-04-26 19:45:48 - EXCEPTION - 过滤条件: '2342'，过滤后股票数量: 0
+2025-04-26 19:45:48 - EXCEPTION - 已过滤股票列表，显示 0 只股票

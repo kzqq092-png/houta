@@ -977,14 +977,6 @@
         "documentation": {}
     },
     {
-        "label": "Dict",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "Optional",
         "importPath": "typing",
         "description": "typing",
@@ -1972,22 +1964,6 @@
         "documentation": {}
     },
     {
-        "label": "QToolBar",
-        "importPath": "PyQt5.QtWidgets",
-        "description": "PyQt5.QtWidgets",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtWidgets",
-        "documentation": {}
-    },
-    {
-        "label": "QAction",
-        "importPath": "PyQt5.QtWidgets",
-        "description": "PyQt5.QtWidgets",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtWidgets",
-        "documentation": {}
-    },
-    {
         "label": "QWidget",
         "importPath": "PyQt5.QtWidgets",
         "description": "PyQt5.QtWidgets",
@@ -2916,6 +2892,14 @@
         "documentation": {}
     },
     {
+        "label": "QHBoxLayout",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
         "label": "QWidget",
         "importPath": "PyQt5.QtWidgets",
         "description": "PyQt5.QtWidgets",
@@ -3276,7 +3260,87 @@
         "documentation": {}
     },
     {
-        "label": "*",
+        "label": "QMainWindow",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QVBoxLayout",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QSplitter",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QLabel",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QComboBox",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QLineEdit",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QPushButton",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QGroupBox",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QProgressBar",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QMessageBox",
+        "importPath": "PyQt5.QtWidgets",
+        "description": "PyQt5.QtWidgets",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtWidgets",
+        "documentation": {}
+    },
+    {
+        "label": "QWidget",
         "importPath": "PyQt5.QtWidgets",
         "description": "PyQt5.QtWidgets",
         "isExtraImport": true,
@@ -3309,14 +3373,6 @@
     },
     {
         "label": "pyqtSignal",
-        "importPath": "PyQt5.QtCore",
-        "description": "PyQt5.QtCore",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtCore",
-        "documentation": {}
-    },
-    {
-        "label": "Qt",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
         "isExtraImport": true,
@@ -3748,6 +3804,14 @@
         "documentation": {}
     },
     {
+        "label": "QThread",
+        "importPath": "PyQt5.QtCore",
+        "description": "PyQt5.QtCore",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtCore",
+        "documentation": {}
+    },
+    {
         "label": "QObject",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
@@ -3780,15 +3844,7 @@
         "documentation": {}
     },
     {
-        "label": "Qt",
-        "importPath": "PyQt5.QtCore",
-        "description": "PyQt5.QtCore",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtCore",
-        "documentation": {}
-    },
-    {
-        "label": "QDate",
+        "label": "QObject",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
         "isExtraImport": true,
@@ -3804,7 +3860,7 @@
         "documentation": {}
     },
     {
-        "label": "QTimer",
+        "label": "QThreadPool",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
         "isExtraImport": true,
@@ -3813,6 +3869,14 @@
     },
     {
         "label": "QMutex",
+        "importPath": "PyQt5.QtCore",
+        "description": "PyQt5.QtCore",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtCore",
+        "documentation": {}
+    },
+    {
+        "label": "Qt",
         "importPath": "PyQt5.QtCore",
         "description": "PyQt5.QtCore",
         "isExtraImport": true,
@@ -3845,14 +3909,6 @@
     },
     {
         "label": "QFont",
-        "importPath": "PyQt5.QtGui",
-        "description": "PyQt5.QtGui",
-        "isExtraImport": true,
-        "detail": "PyQt5.QtGui",
-        "documentation": {}
-    },
-    {
-        "label": "QIcon",
         "importPath": "PyQt5.QtGui",
         "description": "PyQt5.QtGui",
         "isExtraImport": true,
@@ -4029,6 +4085,22 @@
     },
     {
         "label": "QFont",
+        "importPath": "PyQt5.QtGui",
+        "description": "PyQt5.QtGui",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtGui",
+        "documentation": {}
+    },
+    {
+        "label": "QColor",
+        "importPath": "PyQt5.QtGui",
+        "description": "PyQt5.QtGui",
+        "isExtraImport": true,
+        "detail": "PyQt5.QtGui",
+        "documentation": {}
+    },
+    {
+        "label": "QPalette",
         "importPath": "PyQt5.QtGui",
         "description": "PyQt5.QtGui",
         "isExtraImport": true,
@@ -5683,14 +5755,6 @@
         "documentation": {}
     },
     {
-        "label": "dataclass",
-        "importPath": "dataclasses",
-        "description": "dataclasses",
-        "isExtraImport": true,
-        "detail": "dataclasses",
-        "documentation": {}
-    },
-    {
         "label": "StandardScaler",
         "importPath": "sklearn.preprocessing",
         "description": "sklearn.preprocessing",
@@ -6316,7 +6380,7 @@
         "documentation": {}
     },
     {
-        "label": "QWebEngineView",
+        "label": "*",
         "importPath": "PyQt5.QtWebEngineWidgets",
         "description": "PyQt5.QtWebEngineWidgets",
         "isExtraImport": true,
@@ -6497,15 +6561,6 @@
         "description": "components.fund_flow",
         "peekOfCode": "mpl.rcParams[\"font.size\"] = 12\n# 设置Qt全局字体\nQApplication.setFont(QFont(\"Microsoft YaHei\", 10))\nclass DataUpdateThread(QThread):\n    \"\"\"数据更新线程\"\"\"\n    data_updated = pyqtSignal(dict)\n    def __init__(self, data_manager):\n        super().__init__()\n        self.data_manager = data_manager\n        self._running = True",
         "detail": "components.fund_flow",
-        "documentation": {}
-    },
-    {
-        "label": "MainToolBar",
-        "kind": 6,
-        "importPath": "components.main_toolbar",
-        "description": "components.main_toolbar",
-        "peekOfCode": "class MainToolBar(QToolBar):\n    \"\"\"主工具栏\"\"\"\n    def __init__(self, parent=None):\n        super().__init__(parent)\n        self.init_ui()\n    def init_ui(self):\n        \"\"\"初始化工具栏UI\"\"\"\n        # 设置工具栏属性\n        self.setMovable(True)\n        self.setFloatable(True)",
-        "detail": "components.main_toolbar",
         "documentation": {}
     },
     {
@@ -7400,15 +7455,6 @@
         "documentation": {}
     },
     {
-        "label": "MainToolBar",
-        "kind": 6,
-        "importPath": "gui.ui_components",
-        "description": "gui.ui_components",
-        "peekOfCode": "class MainToolBar(QToolBar):\n    \"\"\"Main toolbar with common actions\"\"\"\n    def __init__(self, parent=None):\n        super().__init__(parent)\n        self.init_ui()\n    def init_ui(self):\n        \"\"\"Initialize the UI\"\"\"\n        self.setMovable(False)\n        # File actions\n        self.addAction(\"打开\", self.open_file)",
-        "detail": "gui.ui_components",
-        "documentation": {}
-    },
-    {
         "label": "build_deep_learning_model",
         "kind": 2,
         "importPath": "models.deep_learning",
@@ -7733,20 +7779,11 @@
         "documentation": {}
     },
     {
-        "label": "PerformanceConfig",
-        "kind": 6,
-        "importPath": "utils.performance_config",
-        "description": "utils.performance_config",
-        "peekOfCode": "class PerformanceConfig:\n    \"\"\"性能监控配置类\"\"\"\n    # 更新间隔(秒)\n    update_interval: float = 1.0\n    # CPU使用率阈值(%)\n    cpu_threshold: float = 80.0\n    # 内存使用率阈值(%)\n    memory_threshold: float = 80.0\n    # 磁盘使用率阈值(%)\n    disk_threshold: float = 90.0",
-        "detail": "utils.performance_config",
-        "documentation": {}
-    },
-    {
         "label": "PerformanceMonitor",
         "kind": 6,
         "importPath": "utils.performance_monitor",
         "description": "utils.performance_monitor",
-        "peekOfCode": "class PerformanceMonitor(QObject):\n    \"\"\"性能监控器，用于监控系统性能指标\"\"\"\n    # 定义信号\n    performance_updated = pyqtSignal(dict)\n    alert_triggered = pyqtSignal(str)\n    def __init__(self, config=None):\n        \"\"\"初始化性能监控器\n        Args:\n            config: 性能监控配置\n        \"\"\"",
+        "peekOfCode": "class PerformanceMonitor(QObject):\n    \"\"\"性能监控器类，负责监控系统性能指标\"\"\"\n    performance_updated = pyqtSignal(dict)  # 性能指标更新信号\n    alert_triggered = pyqtSignal(str)       # 性能警报信号\n    def __init__(self, cpu_threshold=80, memory_threshold=80, disk_threshold=90, log_manager=None):\n        \"\"\"初始化性能监控器\n        Args:\n            cpu_threshold (float): CPU使用率阈值（百分比）\n            memory_threshold (float): 内存使用率阈值（百分比）\n            disk_threshold (float): 磁盘使用率阈值（百分比）",
         "detail": "utils.performance_monitor",
         "documentation": {}
     },
