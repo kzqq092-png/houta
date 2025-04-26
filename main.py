@@ -27,6 +27,12 @@ from gui.menu_bar import MainMenuBar
 from utils.performance_monitor import PerformanceMonitor
 from utils.exception_handler import ExceptionHandler
 
+from hikyuu import *
+from hikyuu.data import *
+from hikyuu.indicator import *
+from hikyuu.interactive import *
+%time from hikyuu.interactive import *
+
 # 定义全局样式表
 GLOBAL_STYLE = """
 QWidget {
@@ -136,6 +142,15 @@ class TradingGUI(QMainWindow):
             self.log_manager = LogManager(logging_config)
             self.log_manager.info("TradingGUI初始化开始")
 
+            # 初始化数据管理器
+            try:
+                self.data_manager = DataManager(self.log_manager)
+                self.log_manager.info("数据管理器初始化完成")
+            except Exception as e:
+                self.log_manager.error(f"数据管理器初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
+                raise
+
             # 初始化主题管理器
             self.theme_manager = get_theme_manager(self.config_manager)
             self.theme_manager.theme_changed.connect(self.apply_theme)
@@ -156,6 +171,7 @@ class TradingGUI(QMainWindow):
 
             # 初始化收藏列表
             self.favorites = set()
+            self.load_favorites()  # 加载收藏的股票
 
             # 初始化UI
             self.init_ui()
@@ -164,14 +180,19 @@ class TradingGUI(QMainWindow):
             # 连接信号
             self.connect_signals()
 
+            # 预加载数据
+            self.preload_data()
+
             self.log_manager.info("TradingGUI初始化完成")
             
         except Exception as e:
             # 确保即使在初始化失败时也能记录错误
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"TradingGUI初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
             else:
                 print(f"初始化失败: {str(e)}")
+                print(traceback.format_exc())
             raise
 
     def connect_signals(self):
@@ -590,20 +611,48 @@ class TradingGUI(QMainWindow):
             stock_layout.setContentsMargins(5, 15, 5, 5)
             stock_layout.setSpacing(5)
             
-            # 创建股票类型选择器
-            stock_type_layout = QHBoxLayout()
-            stock_type_label = QLabel("市场:")
-            self.stock_type_combo = QComboBox()
-            self.stock_type_combo.addItems(["全部", "A股", "港股", "美股"])
-            self.stock_type_combo.currentTextChanged.connect(self.filter_stock_list)
-            stock_type_layout.addWidget(stock_type_label)
-            stock_type_layout.addWidget(self.stock_type_combo)
-            stock_layout.addLayout(stock_type_layout)
+            # 创建市场选择区域
+            market_layout = QHBoxLayout()
+            market_label = QLabel("市场:")
+            self.market_combo = QComboBox()
+            self.market_combo.addItems([
+                "全部", 
+                "沪市主板", "深市主板", "创业板", "科创板", "北交所",
+                "港股通", "美股", "期货", "期权"
+            ])
+            self.market_combo.currentTextChanged.connect(self.filter_stock_list)
+            market_layout.addWidget(market_label)
+            market_layout.addWidget(self.market_combo)
+            stock_layout.addLayout(market_layout)
+            
+            # 创建行业选择区域
+            industry_layout = QHBoxLayout()
+            industry_label = QLabel("行业:")
+            self.industry_combo = QComboBox()
+            self.industry_combo.addItems([
+                "全部", 
+                # 一级行业
+                "金融", "科技", "医药生物", "消费", "制造", "能源", "材料", 
+                "通信", "公用事业", "房地产", "交通运输", "建筑", "农林牧渔",
+                # 二级行业
+                "银行", "证券", "保险", "多元金融",
+                "计算机", "通信", "电子", "传媒", "互联网",
+                "医药制造", "医疗器械", "生物制品",
+                "食品饮料", "家用电器", "纺织服装", "商业贸易",
+                "机械设备", "电气设备", "汽车", "国防军工",
+                "石油天然气", "煤炭", "电力", "新能源",
+                "钢铁", "有色金属", "化工", "建材",
+                "其他"
+            ])
+            self.industry_combo.currentTextChanged.connect(self.filter_stock_list)
+            industry_layout.addWidget(industry_label)
+            industry_layout.addWidget(self.industry_combo)
+            stock_layout.addLayout(industry_layout)
             
             # 创建股票搜索框
             search_layout = QHBoxLayout()
             self.stock_search = QLineEdit()
-            self.stock_search.setPlaceholderText("搜索股票...")
+            self.stock_search.setPlaceholderText("搜索股票代码或名称...")
             self.stock_search.textChanged.connect(self.filter_stock_list)
             search_layout.addWidget(self.stock_search)
             
@@ -617,6 +666,38 @@ class TradingGUI(QMainWindow):
             self.stock_list = QListWidget()
             self.stock_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self.stock_list.itemSelectionChanged.connect(self.on_stock_selected)
+            
+            # 启用拖放
+            self.stock_list.setDragEnabled(True)
+            self.stock_list.setAcceptDrops(True)
+            self.stock_list.setDropIndicatorShown(True)
+            self.stock_list.setDragDropMode(QAbstractItemView.InternalMove)
+            
+            # 设置自定义样式
+            self.stock_list.setStyleSheet("""
+                QListWidget {
+                    background-color: transparent;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 4px;
+                    padding: 2px;
+                }
+                QListWidget::item {
+                    padding: 5px;
+                    border-bottom: 1px solid #E0E0E0;
+                }
+                QListWidget::item:selected {
+                    background-color: #E3F2FD;
+                    color: #1976D2;
+                }
+                QListWidget::item:hover {
+                    background-color: #F5F5F5;
+                }
+            """)
+            
+            # 设置右键菜单
+            self.stock_list.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.stock_list.customContextMenuRequested.connect(self.show_stock_list_context_menu)
+            
             stock_list_scroll = QScrollArea()
             stock_list_scroll.setWidgetResizable(True)
             stock_list_scroll.setWidget(self.stock_list)
@@ -627,7 +708,7 @@ class TradingGUI(QMainWindow):
             favorites_btn.clicked.connect(self.toggle_favorite)
             stock_layout.addWidget(favorites_btn)
             
-            # 添加股票列表组到左侧布局
+            # 添加左侧面板到顶部分割器
             self.left_layout.addWidget(stock_group)
             
             # 创建指标列表组
@@ -656,6 +737,28 @@ class TradingGUI(QMainWindow):
             self.indicator_list = QListWidget()
             self.indicator_list.setSelectionMode(QAbstractItemView.MultiSelection)
             self.indicator_list.itemSelectionChanged.connect(self.on_indicators_changed)
+            
+            # 设置指标列表样式
+            self.indicator_list.setStyleSheet("""
+                QListWidget {
+                    background-color: transparent;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 4px;
+                    padding: 2px;
+                }
+                QListWidget::item {
+                    padding: 5px;
+                    border-bottom: 1px solid #E0E0E0;
+                }
+                QListWidget::item:selected {
+                    background-color: #E3F2FD;
+                    color: #1976D2;
+                }
+                QListWidget::item:hover {
+                    background-color: #F5F5F5;
+                }
+            """)
+            
             indicator_list_scroll = QScrollArea()
             indicator_list_scroll.setWidgetResizable(True)
             indicator_list_scroll.setWidget(self.indicator_list)
@@ -682,41 +785,304 @@ class TradingGUI(QMainWindow):
             self.top_splitter.addWidget(self.left_panel)
             
             self.log_manager.info("左侧面板创建完成")
-            
+                    
         except Exception as e:
             self.log_manager.error(f"创建左侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
 
-    def filter_stock_list(self, text: str):
-        """Filter stock list based on search text"""
+    def show_stock_list_context_menu(self, position):
+        """显示股票列表的右键菜单"""
+        try:
+            # 创建右键菜单
+            menu = QMenu()
+            
+            # 获取选中的项
+            item = self.stock_list.itemAt(position)
+            if item:
+                # 获取股票数据
+                stock_data = item.data(Qt.UserRole)
+                
+                # 添加菜单项
+                view_details_action = menu.addAction("查看详情")
+                add_to_favorites_action = menu.addAction("添加到收藏")
+                remove_from_favorites_action = menu.addAction("从收藏移除")
+                menu.addSeparator()
+                export_data_action = menu.addAction("导出数据")
+                menu.addSeparator()
+                add_to_watchlist_action = menu.addAction("添加到自选股")
+                add_to_portfolio_action = menu.addAction("添加到投资组合")
+                menu.addSeparator()
+                analyze_action = menu.addAction("分析")
+                backtest_action = menu.addAction("回测")
+                
+                # 连接菜单项信号
+                view_details_action.triggered.connect(lambda: self.view_stock_details(item))
+                add_to_favorites_action.triggered.connect(lambda: self.toggle_favorite(item))
+                remove_from_favorites_action.triggered.connect(lambda: self.toggle_favorite(item))
+                export_data_action.triggered.connect(lambda: self.export_stock_data(item))
+                add_to_watchlist_action.triggered.connect(lambda: self.add_to_watchlist(item))
+                add_to_portfolio_action.triggered.connect(lambda: self.add_to_portfolio(item))
+                analyze_action.triggered.connect(lambda: self.analyze_stock(item))
+                backtest_action.triggered.connect(lambda: self.backtest_stock(item))
+                
+                # 显示菜单
+                menu.exec_(self.stock_list.mapToGlobal(position))
+                
+        except Exception as e:
+            self.log_message(f"显示右键菜单失败: {str(e)}", "error")
+
+    def view_stock_details(self, item):
+        """查看股票详情"""
+        try:
+            # 获取股票数据
+            stock_data = item.data(Qt.UserRole)
+            
+            # 创建并显示详情对话框
+            from gui.dialogs.stock_detail_dialog import StockDetailDialog
+            dialog = StockDetailDialog(stock_data, self)
+            dialog.exec_()
+            
+        except Exception as e:
+            self.log_message(f"查看股票详情失败: {str(e)}", "error")
+
+    def export_stock_data(self, item):
+        """导出股票数据"""
+        try:
+            # 获取股票数据
+            stock_data = item.data(Qt.UserRole)
+            
+            # 创建DataFrame
+            data = {
+                '基本信息': pd.DataFrame([
+                    {'项目': '股票代码', '值': stock_data['code']},
+                    {'项目': '股票名称', '值': stock_data['name']},
+                    {'项目': '所属市场', '值': stock_data['market']},
+                    {'项目': '所属行业', '值': stock_data.get('industry', '未知')},
+                    {'项目': '上市日期', '值': stock_data.get('list_date', '未知')},
+                    {'项目': '总股本', '值': stock_data.get('total_shares', 0)},
+                    {'项目': '流通股本', '值': stock_data.get('circulating_shares', 0)},
+                    {'项目': '最新价格', '值': stock_data.get('price', 0)}
+                ]),
+                '历史数据': pd.DataFrame(stock_data.get('history', []))
+            }
+            
+            # 导出到Excel
+            filename = f"stock_{stock_data['code']}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+            with pd.ExcelWriter(filename) as writer:
+                for sheet_name, df in data.items():
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    
+            self.log_message(f"数据已导出到: {filename}", "info")
+            
+        except Exception as e:
+            self.log_message(f"导出股票数据失败: {str(e)}", "error")
+
+    def add_to_watchlist(self, item):
+        """添加到自选股"""
+        try:
+            stock_code = item.text().split()[0]
+            # TODO: 实现添加到自选股的功能
+            self.log_message(f"已添加到自选股: {stock_code}", "info")
+        except Exception as e:
+            self.log_message(f"添加到自选股失败: {str(e)}", "error")
+
+    def add_to_portfolio(self, item):
+        """添加到投资组合"""
+        try:
+            stock_code = item.text().split()[0]
+            # TODO: 实现添加到投资组合的功能
+            self.log_message(f"已添加到投资组合: {stock_code}", "info")
+        except Exception as e:
+            self.log_message(f"添加到投资组合失败: {str(e)}", "error")
+
+    def analyze_stock(self, item):
+        """分析股票"""
+        try:
+            stock_code = item.text().split()[0]
+            # TODO: 实现股票分析功能
+            self.log_message(f"开始分析股票: {stock_code}", "info")
+        except Exception as e:
+            self.log_message(f"分析股票失败: {str(e)}", "error")
+
+    def backtest_stock(self, item):
+        """回测股票"""
+        try:
+            stock_code = item.text().split()[0]
+            # TODO: 实现股票回测功能
+            self.log_message(f"开始回测股票: {stock_code}", "info")
+        except Exception as e:
+            self.log_message(f"回测股票失败: {str(e)}", "error")
+
+    def dragEnterEvent(self, event):
+        """处理拖入事件"""
+        if event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        """处理放置事件"""
+        try:
+            # 获取拖放的数据
+            mime_data = event.mimeData()
+            if mime_data.hasFormat("text/plain"):
+                text = mime_data.text()
+                # 解析拖放的数据
+                if text.startswith("stock:"):
+                    stock_code = text.split(":")[1]
+                    # 添加到自选股
+                    self.add_to_watchlist_by_code(stock_code)
+                elif text.startswith("indicator:"):
+                    indicator_name = text.split(":")[1]
+                    # 添加到指标列表
+                    self.add_indicator(indicator_name)
+                    
+        except Exception as e:
+            self.log_message(f"处理拖放事件失败: {str(e)}", "error")
+
+    def add_to_watchlist_by_code(self, stock_code):
+        """通过股票代码添加到自选股"""
+        try:
+            # TODO: 实现通过代码添加到自选股的功能
+            self.log_message(f"已添加到自选股: {stock_code}", "info")
+        except Exception as e:
+            self.log_message(f"添加到自选股失败: {str(e)}", "error")
+
+    def add_indicator(self, indicator_name):
+        """添加指标"""
+        try:
+            # TODO: 实现添加指标的功能
+            self.log_message(f"已添加指标: {indicator_name}", "info")
+        except Exception as e:
+            self.log_message(f"添加指标失败: {str(e)}", "error")
+
+    def filter_stock_list(self, text: str = ""):
+        """根据搜索文本过滤股票列表"""
         try:
             def filter_list():
                 try:
                     # 获取原始股票列表
                     original_stocks = self.stock_list_cache
-                    self.log_manager.info(f"原始股票列表数量: {len(original_stocks)}")
+                    if not original_stocks:
+                        self.log_manager.warning("股票列表缓存为空，尝试重新加载股票列表")
+                        self.update_stock_list()
+                        return
+
+                    self.log_manager.info(f"开始过滤股票列表，原始数量: {len(original_stocks)}")
+
+                    # 获取筛选条件
+                    market = self.market_combo.currentText()
+                    industry = self.industry_combo.currentText()
+                    search_text = text.lower().strip()
 
                     # 过滤股票
-                    filtered_stocks = [stock for stock in original_stocks if text.lower() in stock.lower()]
-                    self.log_manager.info(f"过滤条件: '{text}'，过滤后股票数量: {len(filtered_stocks)}")
+                    filtered_stocks = []
+                    for stock_text in original_stocks:
+                        try:
+                            stock_info = self.stock_list.findItems(stock_text, Qt.MatchExactly)[0].data(Qt.UserRole)
+                            
+                            # 市场筛选
+                            if market != "全部":
+                                if market == "沪市主板" and not stock_info['code'].startswith('60'):
+                                    continue
+                                elif market == "深市主板" and not stock_info['code'].startswith('00'):
+                                    continue
+                                elif market == "创业板" and not stock_info['code'].startswith('30'):
+                                    continue
+                                elif market == "科创板" and not stock_info['code'].startswith('68'):
+                                    continue
+                                elif market == "北交所" and not stock_info['code'].startswith('8'):
+                                    continue
+                                elif market == "港股通" and not stock_info['code'].startswith('9'):
+                                    continue
+                                elif market == "美股" and not stock_info['code'].startswith('7'):
+                                    continue
+                                elif market == "期货" and not stock_info['code'].startswith('IC'):
+                                    continue
+                                elif market == "期权" and not stock_info['code'].startswith('10'):
+                                    continue
+                            
+                            # 行业筛选
+                            if industry != "全部":
+                                # 处理行业信息缺失的情况
+                                stock_industry = stock_info.get('industry', '其他')
+                                if not stock_industry:
+                                    stock_industry = '其他'
+                                    
+                                # 处理一级行业和二级行业的对应关系
+                                if industry in ["金融", "科技", "医药生物", "消费", "制造", "能源", 
+                                             "材料", "通信", "公用事业", "房地产", "交通运输", 
+                                             "建筑", "农林牧渔"]:
+                                    # 一级行业匹配
+                                    industry_map = {
+                                        "金融": ["银行", "证券", "保险", "多元金融"],
+                                        "科技": ["计算机", "通信", "电子", "传媒", "互联网"],
+                                        "医药生物": ["医药制造", "医疗器械", "生物制品"],
+                                        "消费": ["食品饮料", "家用电器", "纺织服装", "商业贸易"],
+                                        "制造": ["机械设备", "电气设备", "汽车", "国防军工"],
+                                        "能源": ["石油天然气", "煤炭", "电力", "新能源"],
+                                        "材料": ["钢铁", "有色金属", "化工", "建材"]
+                                    }
+                                    if stock_industry not in industry_map.get(industry, []):
+                                        continue
+                                else:
+                                    # 二级行业精确匹配
+                                    if stock_industry != industry:
+                                        continue
+                            
+                            # 搜索文本筛选
+                            if search_text:
+                                if not (search_text in stock_text.lower() or  # 匹配显示文本
+                                    search_text in stock_info['code'].lower() or  # 匹配股票代码
+                                    search_text in stock_info.get('name', '').lower()):  # 匹配股票名称
+                                    continue
+                            
+                            filtered_stocks.append(stock_text)
+                        except Exception as e:
+                            self.log_manager.warning(f"处理股票 {stock_text} 失败: {str(e)}")
+                            continue
 
                     # 更新股票列表
                     self.stock_list.clear()
-                    for stock in filtered_stocks:
-                        item = QListWidgetItem(stock)
-                        if stock.split()[0] in self.favorites:
-                            item.setText(f"★ {stock}")
-                        self.stock_list.addItem(item)
+                    for stock_text in filtered_stocks:
+                        item = QListWidgetItem(stock_text)
+                        
+                        try:
+                            # 恢复原始数据
+                            original_item = self.stock_list.findItems(stock_text, Qt.MatchExactly)[0]
+                            stock_info = original_item.data(Qt.UserRole)
+                            
+                            # 确保行业信息存在
+                            if 'industry' not in stock_info or not stock_info['industry']:
+                                stock_info['industry'] = '其他'
+                                
+                            item.setData(Qt.UserRole, stock_info)
+                            
+                            # 设置工具提示
+                            tooltip = f"代码: {stock_info['code']}\n" \
+                                    f"名称: {stock_info['name']}\n" \
+                                    f"市场: {stock_info.get('market', '未知')}\n" \
+                                    f"行业: {stock_info['industry']}"
+                            item.setToolTip(tooltip)
+                            
+                            # 恢复收藏状态
+                            if stock_info['code'] in self.favorites:
+                                item.setText(f"★ {stock_text}")
+                                
+                            self.stock_list.addItem(item)
+                        except Exception as e:
+                            self.log_manager.warning(f"设置股票项 {stock_text} 失败: {str(e)}")
+                            continue
 
                     # 记录日志
-                    self.log_manager.info(f"已过滤股票列表，显示 {len(filtered_stocks)} 只股票")
+                    self.log_manager.info(f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
+
                 except Exception as e:
                     self.log_manager.error(f"过滤股票列表失败: {str(e)}")
                     self.log_manager.error(traceback.format_exc())
 
             # 使用线程池执行过滤操作
             self.thread_pool.start(filter_list)
+
         except Exception as e:
             self.log_manager.error(f"启动股票列表过滤线程失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1147,8 +1513,8 @@ class TradingGUI(QMainWindow):
             self.right_layout.addWidget(right_scroll)
 
             self.right_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.right_panel.setMinimumWidth(220)
-            self.right_panel.setMaximumWidth(350)
+            self.right_panel.setMinimumWidth(300)
+            self.right_panel.setMaximumWidth(300)
             self.top_splitter.addWidget(self.right_panel)
             self.log_manager.info("右侧面板创建完成")
         except Exception as e:
@@ -1659,15 +2025,36 @@ class TradingGUI(QMainWindow):
             
             # 市场
             market_combo = QComboBox()
-            market_combo.addItems(["全部", "A股", "港股", "美股"])
+            market_combo.addItems([
+                "全部", "沪市主板", "深市主板", "创业板", "科创板", 
+                "北交所", "港股通", "美股", "期货", "期权"
+            ])
             conditions_layout.addRow("市场:", market_combo)
             self.advanced_search_controls["market"] = market_combo
             
             # 行业
             industry_combo = QComboBox()
-            industry_combo.addItems(["全部", "金融", "科技", "消费", "医药", "能源", "工业", "地产"])
+            industry_combo.addItems([
+                "全部", "金融", "科技", "医药", "消费", "制造", 
+                "能源", "材料", "通信", "公用事业", "房地产"
+            ])
             conditions_layout.addRow("行业:", industry_combo)
             self.advanced_search_controls["industry"] = industry_combo
+            
+            # 价格范围
+            price_layout = QHBoxLayout()
+            min_price = QDoubleSpinBox()
+            min_price.setRange(0, 10000)
+            min_price.setSuffix(" 元")
+            max_price = QDoubleSpinBox()
+            max_price.setRange(0, 10000)
+            max_price.setSuffix(" 元")
+            price_layout.addWidget(min_price)
+            price_layout.addWidget(QLabel("至"))
+            price_layout.addWidget(max_price)
+            conditions_layout.addRow("价格范围:", price_layout)
+            self.advanced_search_controls["min_price"] = min_price
+            self.advanced_search_controls["max_price"] = max_price
             
             # 市值范围
             market_cap_layout = QHBoxLayout()
@@ -1683,6 +2070,36 @@ class TradingGUI(QMainWindow):
             conditions_layout.addRow("市值范围:", market_cap_layout)
             self.advanced_search_controls["min_cap"] = min_cap
             self.advanced_search_controls["max_cap"] = max_cap
+            
+            # 成交量范围
+            volume_layout = QHBoxLayout()
+            min_volume = QDoubleSpinBox()
+            min_volume.setRange(0, 1000000)
+            min_volume.setSuffix(" 万手")
+            max_volume = QDoubleSpinBox()
+            max_volume.setRange(0, 1000000)
+            max_volume.setSuffix(" 万手")
+            volume_layout.addWidget(min_volume)
+            volume_layout.addWidget(QLabel("至"))
+            volume_layout.addWidget(max_volume)
+            conditions_layout.addRow("成交量范围:", volume_layout)
+            self.advanced_search_controls["min_volume"] = min_volume
+            self.advanced_search_controls["max_volume"] = max_volume
+            
+            # 换手率范围
+            turnover_layout = QHBoxLayout()
+            min_turnover = QDoubleSpinBox()
+            min_turnover.setRange(0, 100)
+            min_turnover.setSuffix(" %")
+            max_turnover = QDoubleSpinBox()
+            max_turnover.setRange(0, 100)
+            max_turnover.setSuffix(" %")
+            turnover_layout.addWidget(min_turnover)
+            turnover_layout.addWidget(QLabel("至"))
+            turnover_layout.addWidget(max_turnover)
+            conditions_layout.addRow("换手率范围:", turnover_layout)
+            self.advanced_search_controls["min_turnover"] = min_turnover
+            self.advanced_search_controls["max_turnover"] = max_turnover
             
             # 添加条件组到布局
             layout.addWidget(conditions_group)
@@ -1703,8 +2120,14 @@ class TradingGUI(QMainWindow):
                     "name": name_edit.text(),
                     "market": market_combo.currentText(),
                     "industry": industry_combo.currentText(),
+                    "min_price": min_price.value(),
+                    "max_price": max_price.value(),
                     "min_cap": min_cap.value(),
-                    "max_cap": max_cap.value()
+                    "max_cap": max_cap.value(),
+                    "min_volume": min_volume.value(),
+                    "max_volume": max_volume.value(),
+                    "min_turnover": min_turnover.value(),
+                    "max_turnover": max_turnover.value()
                 }
                 
                 # 执行搜索
@@ -1720,42 +2143,103 @@ class TradingGUI(QMainWindow):
             conditions: 搜索条件字典
         """
         try:
-            # 清空当前列表
-            self.stock_list.clear()
-            
             # 获取所有股票
             all_stocks = sm.get_stock_list()
             
             # 过滤股票
             filtered_stocks = []
             for stock in all_stocks:
-                # 检查股票代码
-                if conditions["code"] and conditions["code"] not in stock["code"]:
-                    continue
+                try:
+                    # 获取股票数据
+                    kdata = self.data_manager.get_k_data(stock['code'])
+                    if kdata.empty:
+                        continue
+                        
+                    # 检查股票代码
+                    if conditions["code"] and conditions["code"] not in stock["code"]:
+                        continue
+                        
+                    # 检查股票名称
+                    if conditions["name"] and conditions["name"] not in stock["name"]:
+                        continue
+                        
+                    # 检查市场
+                    if conditions["market"] != "全部":
+                        market_match = False
+                        if conditions["market"] == "沪市主板" and stock["code"].startswith('60'):
+                            market_match = True
+                        elif conditions["market"] == "深市主板" and stock["code"].startswith('00'):
+                            market_match = True
+                        elif conditions["market"] == "创业板" and stock["code"].startswith('30'):
+                            market_match = True
+                        elif conditions["market"] == "科创板" and stock["code"].startswith('68'):
+                            market_match = True
+                        elif conditions["market"] == "北交所" and stock["code"].startswith('8'):
+                            market_match = True
+                        elif conditions["market"] == "港股通" and stock["code"].startswith('9'):
+                            market_match = True
+                        elif conditions["market"] == "美股" and stock["code"].startswith('7'):
+                            market_match = True
+                        elif conditions["market"] == "期货" and stock["code"].startswith('IC'):
+                            market_match = True
+                        elif conditions["market"] == "期权" and stock["code"].startswith('10'):
+                            market_match = True
+                        if not market_match:
+                            continue
+                        
+                    # 检查行业
+                    if conditions["industry"] != "全部" and stock["industry"] != conditions["industry"]:
+                        continue
+                        
+                    # 检查价格范围
+                    latest_price = kdata['close'].iloc[-1]
+                    if latest_price < conditions["min_price"] or latest_price > conditions["max_price"]:
+                        continue
+                        
+                    # 检查市值范围
+                    if stock["market_cap"] < conditions["min_cap"] or stock["market_cap"] > conditions["max_cap"]:
+                        continue
+                        
+                    # 检查成交量范围
+                    latest_volume = kdata['volume'].iloc[-1] / 10000  # 转换为万手
+                    if latest_volume < conditions["min_volume"] or latest_volume > conditions["max_volume"]:
+                        continue
+                        
+                    # 检查换手率范围
+                    if "turnover" in kdata.columns:
+                        latest_turnover = kdata['turnover'].iloc[-1]
+                        if latest_turnover < conditions["min_turnover"] or latest_turnover > conditions["max_turnover"]:
+                            continue
                     
-                # 检查股票名称
-                if conditions["name"] and conditions["name"] not in stock["name"]:
-                    continue
+                    # 添加到结果列表
+                    filtered_stocks.append(stock)
                     
-                # 检查市场
-                if conditions["market"] != "全部" and conditions["market"] != stock["market"]:
+                except Exception as e:
+                    self.log_manager.warning(f"处理股票 {stock['code']} 失败: {str(e)}")
                     continue
-                    
-                # 检查行业
-                if conditions["industry"] != "全部" and conditions["industry"] != stock["industry"]:
-                    continue
-                    
-                # 检查市值
-                if stock["market_cap"] < conditions["min_cap"] or stock["market_cap"] > conditions["max_cap"]:
-                    continue
-                    
-                filtered_stocks.append(stock)
                 
             # 更新股票列表
+            self.stock_list.clear()
             for stock in filtered_stocks:
                 item = QListWidgetItem(f"{stock['code']} {stock['name']}")
-                if stock["code"] in self.favorites:
+                
+                # 设置工具提示
+                tooltip = f"代码: {stock['code']}\n" \
+                         f"名称: {stock['name']}\n" \
+                         f"市场: {stock['market']}\n" \
+                         f"行业: {stock['industry']}\n" \
+                         f"最新价: {kdata['close'].iloc[-1]:.2f}\n" \
+                         f"成交量: {kdata['volume'].iloc[-1]/10000:.2f}万手\n" \
+                         f"市值: {stock['market_cap']:.2f}亿"
+                item.setToolTip(tooltip)
+                
+                # 设置自定义数据
+                item.setData(Qt.UserRole, stock)
+                
+                # 设置收藏状态
+                if stock['code'] in self.favorites:
                     item.setText(f"★ {item.text()}")
+                    
                 self.stock_list.addItem(item)
                 
             self.log_message(f"找到 {len(filtered_stocks)} 只符合条件的股票", "info")
@@ -2106,35 +2590,89 @@ class TradingGUI(QMainWindow):
             self.log_message(f"导出日志失败: {str(e)}", "error")
 
     def update_stock_list(self) -> None:
-        """更新股票列表，优化性能"""
+        """更新股票列表，使用hikyuu框架API"""
         try:
-            # 使用线程池异步更新股票列表
             def update_list():
                 try:
+                    # 使用hikyuu的StockManager获取股票列表
+                    from hikyuu import StockManager
+                    sm = StockManager.instance()
+                    
                     # 获取所有股票
-                    all_stocks = sm.get_stock_list()  # 使用正确的API
+                    all_stocks = []
+                    for stock in sm:
+                        try:
+                            # 获取股票基本信息
+                            stock_info = {
+                                'code': stock.code,
+                                'name': stock.name,
+                                'market': stock.market,
+                                'type': stock.type,
+                                'valid': stock.valid,
+                                'start_date': stock.start_datetime ,
+                                'end_date': stock.last_datetime
+                            }
+                            
+                            # 根据股票类型添加前缀
+                            stock_type = stock.type
+                            if stock_type == 'A':
+                                prefix = 'A股'
+                            elif stock_type == 'H':
+                                prefix = '港股'
+                            elif stock_type == 'US':
+                                prefix = '美股'
+                            else:
+                                prefix = '其他'
+                                
+                            stock_text = f"{prefix} {stock.code} {stock.name}"
+                            all_stocks.append((stock_text, stock_info))
+                            
+                        except Exception as e:
+                            self.log_manager.warning(f"获取股票 {stock.code} 信息失败: {str(e)}")
+                            continue
+
+                    # 清空并更新列表
                     self.stock_list.clear()
                     self.stock_list_cache.clear()
                     
-                    # 更新缓存和列表
-                    for stock in all_stocks:
-                        stock_text = f"{stock['code']} {stock['name']}"
+                    # 按股票类型排序
+                    all_stocks.sort(key=lambda x: x[0])
+                    
+                    # 更新UI
+                    for stock_text, stock_info in all_stocks:
                         self.stock_list_cache.append(stock_text)
                         item = QListWidgetItem(stock_text)
-                        if stock['code'] in self.favorites:
+                        
+                        # 设置工具提示
+                        tooltip = f"代码: {stock_info['code']}\n" \
+                                f"名称: {stock_info['name']}\n" \
+                                f"市场: {stock_info['market']}\n" \
+                                f"类型: {stock_info['type']}\n" \
+                                f"上市日期: {stock_info['start_date']}\n" \
+                                f"状态: {'有效' if stock_info['valid'] else '无效'}"
+                        item.setToolTip(tooltip)
+                        
+                        # 设置自定义数据
+                        item.setData(Qt.UserRole, stock_info)
+                        
+                        # 设置收藏状态
+                        if stock_info['code'] in self.favorites:
                             item.setText(f"★ {stock_text}")
+                            
                         self.stock_list.addItem(item)
                         
-                    self.log_message(f"已更新股票列表，共 {len(all_stocks)} 只股票", "info")
+                    self.log_manager.info(f"已更新股票列表，共 {len(all_stocks)} 只股票")
                     
                 except Exception as e:
-                    self.log_message(f"更新股票列表失败: {str(e)}", "error")
+                    self.log_manager.error(f"更新股票列表失败: {str(e)}")
+                    self.log_manager.error(traceback.format_exc())
                     
             # 使用线程池执行更新
             self.thread_pool.start(update_list)
             
         except Exception as e:
-            self.log_message(f"更新股票列表失败: {str(e)}", "error")
+            self.log_manager.error(f"启动股票列表更新线程失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def export_stock_list(self):
         """导出股票列表到文件"""
@@ -2777,21 +3315,49 @@ class TradingGUI(QMainWindow):
     def preload_data(self):
         """预加载常用数据"""
         try:
-            stocks = self.data_manager.get_stock_list()[:100]  # 限制预加载数量
+            self.log_manager.info("开始预加载数据...")
             
-            def load_stock_data(stock):
-                try:
-                    data = self.data_manager.get_k_data(stock, 'D')
-                    self.data_cache.set(f"{stock}_D", data)
-                except Exception as e:
-                    self.log_message(f"预加载数据失败: {str(e)}", "error")
-                    
-            # 使用线程池并行加载
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                executor.map(load_stock_data, stocks)
+            # 获取股票列表
+            stocks = self.data_manager.get_stock_list()
+            if not stocks:
+                self.log_manager.warning("获取股票列表失败")
+                return
                 
+            # 更新股票列表缓存
+            self.stock_list_cache = []
+            for stock in stocks:
+                try:
+                    stock_text = f"{stock['code']} {stock['name']}"
+                    self.stock_list_cache.append(stock_text)
+                    
+                    # 创建列表项
+                    item = QListWidgetItem(stock_text)
+                    
+                    # 设置工具提示
+                    tooltip = f"代码: {stock['code']}\n" \
+                             f"名称: {stock['name']}\n" \
+                             f"市场: {stock.get('market', '未知')}\n" \
+                             f"行业: {stock.get('industry', '其他')}"
+                    item.setToolTip(tooltip)
+                    
+                    # 设置自定义数据
+                    item.setData(Qt.UserRole, stock)
+                    
+                    # 设置收藏状态
+                    if stock['code'] in self.favorites:
+                        item.setText(f"★ {stock_text}")
+                        
+                    self.stock_list.addItem(item)
+                    
+                except Exception as e:
+                    self.log_manager.warning(f"处理股票 {stock.get('code', 'unknown')} 失败: {str(e)}")
+                    continue
+                    
+            self.log_manager.info(f"数据预加载完成，共加载 {len(self.stock_list_cache)} 只股票")
+            
         except Exception as e:
-            self.log_message(f"预加载数据失败: {str(e)}", "error")
+            self.log_manager.error(f"预加载数据失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def optimize_chart_rendering(self):
         """优化图表渲染性能"""
@@ -2839,7 +3405,7 @@ class TradingGUI(QMainWindow):
             # 如果错误处理本身出错，至少打印到控制台
             print(f"错误处理失败: {str(e)}")
             print(f"原始错误: {str(exception)}")
-            
+
     def update_performance(self, metrics: dict):
         """Update performance metrics and display
         
@@ -3533,6 +4099,23 @@ class TradingGUI(QMainWindow):
             self.log_message("显示设置对话框", "info")
         except Exception as e:
             self.log_message(f"显示设置对话框失败: {str(e)}", "error")
+
+    def dragEnterEvent(self, event):
+        """处理拖入事件"""
+        if event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        """处理放置事件"""
+        try:
+            # 获取拖放的数据
+            mime_data = event.mimeData()
+            if mime_data.hasFormat("text/plain"):
+                text = mime_data.text()
+                # TODO: 处理拖放的数据
+                self.log_message(f"拖放数据: {text}", "info")
+        except Exception as e:
+            self.log_message(f"处理拖放事件失败: {str(e)}", "error")
 
 # 添加全局异常处理
 def global_exception_handler(exctype, value, traceback):

@@ -8,14 +8,29 @@ import pandas as pd
 from typing import Dict, Any, Optional, List
 import hikyuu as hku
 from hikyuu.interactive import *
+from core.logger import LogManager
 
 class DataManager:
     """数据管理器"""
     
-    def __init__(self):
-        """初始化数据管理器"""
+    def __init__(self, log_manager: Optional[LogManager] = None):
+        """初始化数据管理器
+        
+        Args:
+            log_manager: 日志管理器实例，可选
+        """
+        self.log_manager = log_manager or LogManager()
         self.data_cache = {}
         self.stock_list_cache = []
+        
+        try:
+            # 初始化hikyuu
+            self.log_manager.info("正在初始化hikyuu...")
+            # TODO: 添加hikyuu初始化代码
+            self.log_manager.info("hikyuu初始化完成")
+        except Exception as e:
+            self.log_manager.error(f"hikyuu初始化失败: {str(e)}")
+            raise
         
     def get_k_data(self, code: str, period: str = 'D') -> pd.DataFrame:
         """获取K线数据
@@ -63,7 +78,7 @@ class DataManager:
             return df
             
         except Exception as e:
-            print(f"获取K线数据失败: {str(e)}")
+            self.log_manager.error(f"获取K线数据失败: {str(e)}")
             return pd.DataFrame()
             
     def get_stock_list(self) -> List[Dict[str, str]]:
@@ -74,18 +89,62 @@ class DataManager:
         """
         try:
             stocks = []
-            for stock in sm.get_stock_list():
-                stocks.append({
-                    'code': stock['code'],
-                    'name': stock['name'],
-                    'market': stock['market']
-                })
+            sm = hku.StockManager.instance()
+            for stock in sm:
+                try:
+                    stocks.append({
+                        'code': stock.code,
+                        'name': stock.name,
+                        'market': self._get_market_name(stock.market),
+                        'industry': self._get_industry_name(stock),
+                        'valid': stock.valid
+                    })
+                except Exception as e:
+                    self.log_manager.warning(f"处理股票 {stock.code} 信息失败: {str(e)}")
+                    continue
+                    
             return stocks
+            
         except Exception as e:
-            self.logger.error(f"获取股票列表失败: {str(e)}")
+            self.log_manager.error(f"获取股票列表失败: {str(e)}")
             return []
+            
+    def _get_market_name(self, market_code: str) -> str:
+        """获取市场名称
+        
+        Args:
+            market_code: 市场代码
+            
+        Returns:
+            市场名称
+        """
+        market_map = {
+            'SH': '沪市主板',
+            'SZ': '深市主板',
+            'BJ': '北交所',
+            'HK': '港股通',
+            'US': '美股'
+        }
+        return market_map.get(market_code, '未知')
+        
+    def _get_industry_name(self, stock: hku.Stock) -> str:
+        """获取行业名称
+        
+        Args:
+            stock: hikyuu Stock对象
+            
+        Returns:
+            行业名称
+        """
+        try:
+            # TODO: 实现行业名称获取逻辑
+            return '其他'
+        except Exception as e:
+            self.log_manager.warning(f"获取股票 {stock.code} 行业信息失败: {str(e)}")
+            return '其他'
             
     def clear_cache(self):
         """清除缓存"""
         self.data_cache.clear()
-        self.stock_list_cache.clear() 
+        self.stock_list_cache.clear()
+        self.log_manager.info("数据缓存已清除") 
