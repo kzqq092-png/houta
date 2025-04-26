@@ -7,6 +7,7 @@
 import pandas as pd
 from typing import Dict, Any, Optional, List
 import hikyuu as hku
+from hikyuu.interactive import *
 
 class DataManager:
     """数据管理器"""
@@ -69,26 +70,19 @@ class DataManager:
         """获取股票列表
         
         Returns:
-            股票列表，每个元素为包含code和name的字典
+            List[Dict[str, str]]: 股票列表，每个股票包含代码和名称
         """
         try:
-            if self.stock_list_cache:
-                return self.stock_list_cache
-                
-            # 从hikyuu获取股票列表
-            stock_list = []
-            for stock in hku.getStockList():
-                stock_list.append({
-                    'code': stock.code,
-                    'name': stock.name,
-                    'market': stock.market
+            stocks = []
+            for stock in sm.get_stock_list():
+                stocks.append({
+                    'code': stock['code'],
+                    'name': stock['name'],
+                    'market': stock['market']
                 })
-                
-            self.stock_list_cache = stock_list
-            return stock_list
-            
+            return stocks
         except Exception as e:
-            print(f"获取股票列表失败: {str(e)}")
+            self.logger.error(f"获取股票列表失败: {str(e)}")
             return []
             
     def clear_cache(self):

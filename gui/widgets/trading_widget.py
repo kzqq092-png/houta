@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                            QSpinBox, QDoubleSpinBox, QTableWidget,
                            QTableWidgetItem, QGroupBox, QFormLayout, QTextEdit)
 from PyQt5.QtCore import pyqtSignal, Qt
+import traceback
 
 from core.logger import LogManager
 from utils.theme import get_theme_manager
@@ -19,6 +20,7 @@ class TradingWidget(QWidget):
     # 定义信号
     strategy_changed = pyqtSignal(str)  # 策略变更信号
     trade_executed = pyqtSignal(dict)
+    error_occurred = pyqtSignal(str)  # 错误信号
     
     def __init__(self, config_manager: Optional[ConfigManager] = None):
         """初始化交易控件
@@ -34,270 +36,149 @@ class TradingWidget(QWidget):
             self.current_signals = []
             self.current_positions = []
             
+            # 初始化日志管理器
+            self.log_manager = LogManager()
+            
             # 初始化UI
             self.init_ui()
+            
+            # 连接信号
+            self.connect_signals()
             
             # 应用主题
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = get_theme_manager(self.config_manager)
             self.theme_manager.apply_theme(self)
             
+            self.log_manager.info("交易控件初始化完成")
+            
         except Exception as e:
-            LogManager.log(f"初始化交易控件失败: {str(e)}", "error")
-            raise
+            error_msg = f"初始化交易控件失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
             
     def init_ui(self):
         """初始化UI"""
         try:
-            # 创建主布局
             layout = QVBoxLayout(self)
             
-            # 创建标签页
-            tab_widget = QTabWidget()
-            
-            # 添加策略标签页
-            strategy_tab = self.create_strategy_tab()
-            tab_widget.addTab(strategy_tab, "策略")
-            
-            # 添加回测标签页
-            backtest_tab = self.create_backtest_tab()
-            tab_widget.addTab(backtest_tab, "回测")
-            
-            # 添加持仓标签页
-            position_tab = self.create_position_tab()
-            tab_widget.addTab(position_tab, "持仓")
-            
-            # 添加交易记录标签页
-            trade_tab = self.create_trade_tab()
-            tab_widget.addTab(trade_tab, "交易记录")
-            
-            # 添加标签页到布局
-            layout.addWidget(tab_widget)
-            
-        except Exception as e:
-            LogManager.log(f"初始化交易控件UI失败: {str(e)}", "error")
-            raise
-            
-    def create_strategy_tab(self) -> QWidget:
-        """创建策略标签页
-        
-        Returns:
-            策略标签页控件
-        """
-        try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
-            
             # 创建策略选择组
-            strategy_group = QGroupBox("策略选择")
-            strategy_layout = QFormLayout()
+            strategy_group = QGroupBox("交易策略")
+            strategy_layout = QVBoxLayout(strategy_group)
             
-            # 添加策略选择
             self.strategy_combo = QComboBox()
-            self.strategy_combo.addItems(['MA', 'MACD', 'KDJ'])
-            self.strategy_combo.currentTextChanged.connect(self.on_strategy_changed)
-            strategy_layout.addRow("策略:", self.strategy_combo)
-            
-            # 添加MA参数
-            ma_layout = QHBoxLayout()
-            self.ma_short_spin = QSpinBox()
-            self.ma_short_spin.setRange(1, 120)
-            ma_layout.addWidget(QLabel("短期:"))
-            ma_layout.addWidget(self.ma_short_spin)
-            
-            self.ma_long_spin = QSpinBox()
-            self.ma_long_spin.setRange(1, 250)
-            ma_layout.addWidget(QLabel("长期:"))
-            ma_layout.addWidget(self.ma_long_spin)
-            strategy_layout.addRow("MA:", ma_layout)
-            
-            # 添加MACD参数
-            macd_layout = QHBoxLayout()
-            self.macd_short_spin = QSpinBox()
-            self.macd_short_spin.setRange(1, 120)
-            macd_layout.addWidget(QLabel("快线:"))
-            macd_layout.addWidget(self.macd_short_spin)
-            
-            self.macd_long_spin = QSpinBox()
-            self.macd_long_spin.setRange(1, 250)
-            macd_layout.addWidget(QLabel("慢线:"))
-            macd_layout.addWidget(self.macd_long_spin)
-            
-            self.macd_signal_spin = QSpinBox()
-            self.macd_signal_spin.setRange(1, 120)
-            macd_layout.addWidget(QLabel("信号:"))
-            macd_layout.addWidget(self.macd_signal_spin)
-            strategy_layout.addRow("MACD:", macd_layout)
-            
-            # 添加KDJ参数
-            kdj_layout = QHBoxLayout()
-            self.kdj_n_spin = QSpinBox()
-            self.kdj_n_spin.setRange(1, 90)
-            kdj_layout.addWidget(QLabel("N:"))
-            kdj_layout.addWidget(self.kdj_n_spin)
-            
-            self.kdj_m1_spin = QSpinBox()
-            self.kdj_m1_spin.setRange(1, 30)
-            self.kdj_m1_spin.setValue(3)
-            strategy_layout.addRow("KDJ M1:", self.kdj_m1_spin)
-            
-            self.kdj_m2_spin = QSpinBox()
-            self.kdj_m2_spin.setRange(1, 30)
-            self.kdj_m2_spin.setValue(3)
-            strategy_layout.addRow("KDJ M2:", self.kdj_m2_spin)
-            
-            strategy_group.setLayout(strategy_layout)
-            layout.addWidget(strategy_group)
-            
-            # 创建信号列表组
-            signal_group = QGroupBox("信号列表")
-            signal_layout = QVBoxLayout()
-            
-            self.signal_table = QTableWidget()
-            self.signal_table.setColumnCount(5)
-            self.signal_table.setHorizontalHeaderLabels([
-                "时间", "类型", "信号", "价格", "强度"
+            self.strategy_combo.addItems([
+                "均线策略", "MACD策略", "RSI策略", "布林带策略",
+                "KDJ策略", "自定义策略"
             ])
-            signal_layout.addWidget(self.signal_table)
-            
-            signal_group.setLayout(signal_layout)
-            layout.addWidget(signal_group)
-            
-            return widget
-            
-        except Exception as e:
-            LogManager.log(f"创建策略标签页失败: {str(e)}", "error")
-            raise
-            
-    def create_backtest_tab(self) -> QWidget:
-        """创建回测标签页
-        
-        Returns:
-            回测标签页控件
-        """
-        try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
+            strategy_layout.addWidget(self.strategy_combo)
             
             # 创建参数设置组
-            param_group = QGroupBox("参数设置")
-            param_layout = QFormLayout()
+            params_group = QGroupBox("参数设置")
+            params_layout = QFormLayout(params_group)
             
-            # 添加初始资金
-            self.initial_cash_spin = QDoubleSpinBox()
-            self.initial_cash_spin.setDecimals(2)
-            self.initial_cash_spin.setRange(1000.0, 10000000.0)
-            self.initial_cash_spin.setValue(100000.0)
-            self.initial_cash_spin.setSingleStep(1000.0)
-            self.initial_cash_spin.setSuffix(" 元")
-            param_layout.addRow("初始资金:", self.initial_cash_spin)
+            # 添加参数控件
+            self.param_controls = {}
             
-            # 添加手续费率
-            self.commission_spin = QDoubleSpinBox()
-            self.commission_spin.setDecimals(4)
-            self.commission_spin.setRange(0.0, 0.01)
-            self.commission_spin.setValue(0.0003)
-            self.commission_spin.setSingleStep(0.0001)
-            self.commission_spin.setSuffix(" %")
-            param_layout.addRow("手续费率:", self.commission_spin)
+            # 创建交易按钮
+            buttons_layout = QHBoxLayout()
             
-            # 添加滑点率
-            self.slippage_spin = QDoubleSpinBox()
-            self.slippage_spin.setDecimals(4)
-            self.slippage_spin.setRange(0.0, 0.01)
-            self.slippage_spin.setValue(0.0001)
-            self.slippage_spin.setSingleStep(0.0001)
-            self.slippage_spin.setSuffix(" %")
-            param_layout.addRow("滑点率:", self.slippage_spin)
+            self.buy_button = QPushButton("买入")
+            self.buy_button.clicked.connect(self.execute_buy)
+            buttons_layout.addWidget(self.buy_button)
             
-            param_group.setLayout(param_layout)
-            layout.addWidget(param_group)
+            self.sell_button = QPushButton("卖出")
+            self.sell_button.clicked.connect(self.execute_sell)
+            buttons_layout.addWidget(self.sell_button)
             
-            # 创建回测结果组
-            result_group = QGroupBox("回测结果")
-            result_layout = QVBoxLayout()
+            self.cancel_button = QPushButton("撤单")
+            self.cancel_button.clicked.connect(self.cancel_order)
+            buttons_layout.addWidget(self.cancel_button)
             
-            # 添加绩效指标表格
-            self.performance_table = QTableWidget()
-            self.performance_table.setColumnCount(2)
-            self.performance_table.setHorizontalHeaderLabels(["指标", "值"])
-            result_layout.addWidget(self.performance_table)
+            # 添加到布局
+            layout.addWidget(strategy_group)
+            layout.addWidget(params_group)
+            layout.addLayout(buttons_layout)
             
-            # 添加风险指标表格
-            self.risk_table = QTableWidget()
-            self.risk_table.setColumnCount(2)
-            self.risk_table.setHorizontalHeaderLabels(["指标", "值"])
-            result_layout.addWidget(self.risk_table)
-            
-            result_group.setLayout(result_layout)
-            layout.addWidget(result_group)
-            
-            # 添加按钮
-            button_layout = QHBoxLayout()
-            
-            run_button = QPushButton("运行回测")
-            run_button.clicked.connect(self.run_backtest)
-            button_layout.addWidget(run_button)
-            
-            reset_button = QPushButton("重置参数")
-            reset_button.clicked.connect(self.reset_params)
-            button_layout.addWidget(reset_button)
-            
-            layout.addLayout(button_layout)
-            
-            return widget
-            
-        except Exception as e:
-            LogManager.log(f"创建回测标签页失败: {str(e)}", "error")
-            raise
-            
-    def create_position_tab(self) -> QWidget:
-        """创建持仓标签页
-        
-        Returns:
-            持仓标签页控件
-        """
-        try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
-            
-            # 创建持仓列表
+            # 创建持仓信息表格
             self.position_table = QTableWidget()
             self.position_table.setColumnCount(6)
             self.position_table.setHorizontalHeaderLabels([
-                "股票", "数量", "成本", "现价", "盈亏", "止损价"
+                "股票代码", "股票名称", "持仓数量", "持仓成本", "当前价格", "盈亏比例"
             ])
             layout.addWidget(self.position_table)
             
-            return widget
-            
-        except Exception as e:
-            LogManager.log(f"创建持仓标签页失败: {str(e)}", "error")
-            raise
-            
-    def create_trade_tab(self) -> QWidget:
-        """创建交易记录标签页
-        
-        Returns:
-            交易记录标签页控件
-        """
-        try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
-            
-            # 创建交易记录列表
+            # 创建交易记录表格
             self.trade_table = QTableWidget()
             self.trade_table.setColumnCount(7)
             self.trade_table.setHorizontalHeaderLabels([
-                "时间", "股票", "方向", "价格", "数量", "成本", "剩余资金"
+                "时间", "股票代码", "交易类型", "成交价格", "成交数量", "成交金额", "手续费"
             ])
             layout.addWidget(self.trade_table)
             
-            return widget
+            self.log_manager.info("交易控件UI初始化完成")
             
         except Exception as e:
-            LogManager.log(f"创建交易记录标签页失败: {str(e)}", "error")
-            raise
+            error_msg = f"初始化UI失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+            
+    def connect_signals(self):
+        """连接信号"""
+        try:
+            # 连接策略选择信号
+            self.strategy_combo.currentTextChanged.connect(self.on_strategy_changed)
+            
+            # 连接按钮信号
+            self.buy_button.clicked.connect(self.execute_buy)
+            self.sell_button.clicked.connect(self.execute_sell)
+            self.cancel_button.clicked.connect(self.cancel_order)
+            
+            self.log_manager.info("信号连接完成")
+            
+        except Exception as e:
+            error_msg = f"连接信号失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+            
+    def execute_buy(self):
+        """执行买入操作"""
+        try:
+            # TODO: 实现买入逻辑
+            pass
+            
+        except Exception as e:
+            error_msg = f"买入操作失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+            
+    def execute_sell(self):
+        """执行卖出操作"""
+        try:
+            # TODO: 实现卖出逻辑
+            pass
+            
+        except Exception as e:
+            error_msg = f"卖出操作失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+            
+    def cancel_order(self):
+        """撤销订单"""
+        try:
+            # TODO: 实现撤单逻辑
+            pass
+            
+        except Exception as e:
+            error_msg = f"撤单操作失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
             
     def update_stock(self, stock_info: Dict[str, str]):
         """更新股票信息

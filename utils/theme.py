@@ -232,49 +232,74 @@ class ThemeManager(QObject):
             widget: Widget to apply theme to
             theme: Theme to apply, defaults to current theme
         """
-        if theme is None:
-            theme = self.current_theme
-            
         try:
+            if widget is None:
+                return
+                
+            if theme is None:
+                theme = self.current_theme
+                
+            # 获取主题颜色
             colors = self.get_theme_colors(theme)
             
-            # Set widget stylesheet
+            # 创建调色板
+            palette = widget.palette()
+            
+            # 设置基本颜色
+            palette.setColor(QPalette.Window, QColor(colors['background']))
+            palette.setColor(QPalette.WindowText, QColor(colors['text']))
+            palette.setColor(QPalette.Base, QColor(colors['background']))
+            palette.setColor(QPalette.AlternateBase, QColor(colors['hover']))
+            palette.setColor(QPalette.ToolTipBase, QColor(colors['background']))
+            palette.setColor(QPalette.ToolTipText, QColor(colors['text']))
+            palette.setColor(QPalette.Text, QColor(colors['text']))
+            palette.setColor(QPalette.Button, QColor(colors['background']))
+            palette.setColor(QPalette.ButtonText, QColor(colors['text']))
+            palette.setColor(QPalette.Link, QColor(colors['primary']))
+            palette.setColor(QPalette.Highlight, QColor(colors['selected']))
+            palette.setColor(QPalette.HighlightedText, QColor(colors['text']))
+            
+            # 应用调色板
+            widget.setPalette(palette)
+            
+            # 设置样式表
             widget.setStyleSheet(f"""
                 QWidget {{
                     background-color: {colors['background']};
                     color: {colors['text']};
+                    border: 1px solid {colors['border']};
                 }}
                 
                 QPushButton {{
                     background-color: {colors['primary']};
                     color: {colors['background']};
                     border: none;
-                    padding: 5px 10px;
+                    padding: 5px;
                     border-radius: 3px;
                 }}
                 
                 QPushButton:hover {{
-                    background-color: {QColor(colors['primary']).lighter(110).name()};
+                    background-color: {colors['hover']};
                 }}
                 
-                QPushButton:pressed {{
-                    background-color: {QColor(colors['primary']).darker(110).name()};
-                }}
-                
-                QLineEdit, QTextEdit, QPlainTextEdit {{
+                QLineEdit {{
                     background-color: {colors['background']};
                     color: {colors['text']};
                     border: 1px solid {colors['border']};
-                    border-radius: 3px;
                     padding: 5px;
+                    border-radius: 3px;
                 }}
                 
                 QComboBox {{
                     background-color: {colors['background']};
                     color: {colors['text']};
                     border: 1px solid {colors['border']};
-                    border-radius: 3px;
                     padding: 5px;
+                    border-radius: 3px;
+                }}
+                
+                QComboBox:hover {{
+                    border: 1px solid {colors['primary']};
                 }}
                 
                 QComboBox::drop-down {{
@@ -282,7 +307,7 @@ class ThemeManager(QObject):
                 }}
                 
                 QComboBox::down-arrow {{
-                    image: url(resources/down_arrow.png);
+                    image: url(icons/down_arrow.png);
                     width: 12px;
                     height: 12px;
                 }}
@@ -291,26 +316,57 @@ class ThemeManager(QObject):
                     border: none;
                     background: {colors['background']};
                     width: 10px;
-                    margin: 0px;
+                    margin: 0px 0px 0px 0px;
                 }}
                 
                 QScrollBar::handle:vertical {{
-                    background: {colors['primary']};
+                    background: {colors['border']};
                     min-height: 20px;
                     border-radius: 5px;
                 }}
                 
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                QScrollBar::add-line:vertical {{
                     height: 0px;
                 }}
                 
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
-                    background: none;
+                QScrollBar::sub-line:vertical {{
+                    height: 0px;
+                }}
+                
+                QScrollBar:horizontal {{
+                    border: none;
+                    background: {colors['background']};
+                    height: 10px;
+                    margin: 0px 0px 0px 0px;
+                }}
+                
+                QScrollBar::handle:horizontal {{
+                    background: {colors['border']};
+                    min-width: 20px;
+                    border-radius: 5px;
+                }}
+                
+                QScrollBar::add-line:horizontal {{
+                    width: 0px;
+                }}
+                
+                QScrollBar::sub-line:horizontal {{
+                    width: 0px;
                 }}
             """)
             
+            # 递归应用主题到子部件
+            for child in widget.findChildren(QWidget):
+                try:
+                    if child is not None and child.parent() is widget:
+                        self.apply_theme(child, theme)
+                except Exception as e:
+                    print(f"应用主题到子部件失败: {str(e)}")
+                    continue
+                    
         except Exception as e:
             print(f"应用主题失败: {str(e)}")
+            raise
             
     def apply_chart_theme(self, figure, theme: Optional[Theme] = None) -> None:
         """Apply theme to matplotlib figure

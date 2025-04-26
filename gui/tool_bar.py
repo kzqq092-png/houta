@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QDialog, QVBoxLayout,
     QLabel, QPushButton, QLineEdit, QSpinBox, QComboBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QKeySequence
 import os
 
@@ -17,95 +17,122 @@ class MainToolBar(QToolBar):
     """Main tool bar for the trading system"""
     
     def __init__(self, parent=None):
+        """初始化主工具栏
+        
+        Args:
+            parent: 父窗口
+        """
         super().__init__(parent)
+        self.parent = parent
+        self.logger = parent.log_manager if hasattr(parent, 'log_manager') else None
+        
         self.init_ui()
         
     def init_ui(self):
         """Initialize the UI"""
-        self.setMovable(True)
-        self.setFloatable(True)
-        self.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        try:
+            # 设置工具栏属性
+            self.setMovable(False)
+            self.setIconSize(QSize(24, 24))
+            self.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            
+            # File actions
+            self.new_action = QAction(QIcon("icons/new.png"), "新建", self)
+            self.new_action.setStatusTip("创建新的策略")
+            self.addAction(self.new_action)
+            
+            self.open_action = QAction(QIcon("icons/open.png"), "打开", self)
+            self.open_action.setStatusTip("打开策略文件")
+            self.addAction(self.open_action)
+            
+            self.save_action = QAction(QIcon("icons/save.png"), "保存", self)
+            self.save_action.setStatusTip("保存当前策略")
+            self.addAction(self.save_action)
+            
+            self.addSeparator()
+            
+            # Edit actions
+            self.undo_action = QAction(QIcon("icons/undo.png"), "撤销", self)
+            self.undo_action.setShortcut(QKeySequence.Undo)
+            self.undo_action.triggered.connect(self.undo)
+            self.addAction(self.undo_action)
+            
+            self.redo_action = QAction(QIcon("icons/redo.png"), "重做", self)
+            self.redo_action.setShortcut(QKeySequence.Redo)
+            self.redo_action.triggered.connect(self.redo)
+            self.addAction(self.redo_action)
+            
+            self.addSeparator()
+            
+            # Analysis actions
+            self.analyze_action = QAction(QIcon("icons/analyze.png"), "分析", self)
+            self.analyze_action.setStatusTip("分析当前股票")
+            self.addAction(self.analyze_action)
+            
+            self.backtest_action = QAction(QIcon("icons/backtest.png"), "回测", self)
+            self.backtest_action.setStatusTip("回测当前策略")
+            self.addAction(self.backtest_action)
+            
+            self.optimize_action = QAction(QIcon("icons/optimize.png"), "优化", self)
+            self.optimize_action.setStatusTip("优化策略参数")
+            self.addAction(self.optimize_action)
+            
+            self.addSeparator()
+            
+            # View actions
+            self.zoom_in_action = QAction(QIcon("icons/zoom_in.png"), "放大", self)
+            self.zoom_in_action.setStatusTip("放大图表")
+            self.addAction(self.zoom_in_action)
+            
+            self.zoom_out_action = QAction(QIcon("icons/zoom_out.png"), "缩小", self)
+            self.zoom_out_action.setStatusTip("缩小图表")
+            self.addAction(self.zoom_out_action)
+            
+            self.reset_zoom_action = QAction(QIcon("icons/reset_zoom.png"), "重置", self)
+            self.reset_zoom_action.setStatusTip("重置图表缩放")
+            self.addAction(self.reset_zoom_action)
+            
+            self.addSeparator()
+            
+            # Tools actions
+            self.settings_action = QAction(QIcon("icons/settings.png"), "设置", self)
+            self.settings_action.setStatusTip("打开设置对话框")
+            self.addAction(self.settings_action)
+            
+            self.calculator_action = QAction(QIcon("icons/calculator.png"), "计算器", self)
+            self.calculator_action.setStatusTip("打开计算器")
+            self.addAction(self.calculator_action)
+            
+            self.converter_action = QAction(QIcon("icons/converter.png"), "单位转换", self)
+            self.converter_action.setStatusTip("打开单位转换器")
+            self.addAction(self.converter_action)
+            
+            # 添加搜索框
+            self.addSeparator()
+            self.search_box = QLineEdit()
+            self.search_box.setPlaceholderText("搜索股票...")
+            self.search_box.setMaximumWidth(200)
+            self.addWidget(self.search_box)
+            
+            self.log_message("工具栏初始化完成")
+            
+        except Exception as e:
+            self.log_message(f"初始化工具栏失败: {str(e)}", "error")
         
-        # File actions
-        self.new_action = QAction(QIcon("icons/new.png"), "新建", self)
-        self.new_action.setShortcut(QKeySequence.New)
-        self.new_action.triggered.connect(self.new_file)
-        self.addAction(self.new_action)
+    def log_message(self, message: str, level: str = "info"):
+        """记录日志消息
         
-        self.open_action = QAction(QIcon("icons/open.png"), "打开", self)
-        self.open_action.setShortcut(QKeySequence.Open)
-        self.open_action.triggered.connect(self.open_file)
-        self.addAction(self.open_action)
-        
-        self.save_action = QAction(QIcon("icons/save.png"), "保存", self)
-        self.save_action.setShortcut(QKeySequence.Save)
-        self.save_action.triggered.connect(self.save_file)
-        self.addAction(self.save_action)
-        
-        self.addSeparator()
-        
-        # Edit actions
-        self.undo_action = QAction(QIcon("icons/undo.png"), "撤销", self)
-        self.undo_action.setShortcut(QKeySequence.Undo)
-        self.undo_action.triggered.connect(self.undo)
-        self.addAction(self.undo_action)
-        
-        self.redo_action = QAction(QIcon("icons/redo.png"), "重做", self)
-        self.redo_action.setShortcut(QKeySequence.Redo)
-        self.redo_action.triggered.connect(self.redo)
-        self.addAction(self.redo_action)
-        
-        self.addSeparator()
-        
-        # Analysis actions
-        self.analyze_action = QAction(QIcon("icons/analyze.png"), "分析", self)
-        self.analyze_action.setShortcut(QKeySequence("Ctrl+A"))
-        self.analyze_action.triggered.connect(self.analyze)
-        self.addAction(self.analyze_action)
-        
-        self.backtest_action = QAction(QIcon("icons/backtest.png"), "回测", self)
-        self.backtest_action.setShortcut(QKeySequence("Ctrl+B"))
-        self.backtest_action.triggered.connect(self.backtest)
-        self.addAction(self.backtest_action)
-        
-        self.optimize_action = QAction(QIcon("icons/optimize.png"), "优化", self)
-        self.optimize_action.setShortcut(QKeySequence("Ctrl+O"))
-        self.optimize_action.triggered.connect(self.optimize)
-        self.addAction(self.optimize_action)
-        
-        self.addSeparator()
-        
-        # View actions
-        self.zoom_in_action = QAction(QIcon("icons/zoom_in.png"), "放大", self)
-        self.zoom_in_action.setShortcut(QKeySequence.ZoomIn)
-        self.zoom_in_action.triggered.connect(self.zoom_in)
-        self.addAction(self.zoom_in_action)
-        
-        self.zoom_out_action = QAction(QIcon("icons/zoom_out.png"), "缩小", self)
-        self.zoom_out_action.setShortcut(QKeySequence.ZoomOut)
-        self.zoom_out_action.triggered.connect(self.zoom_out)
-        self.addAction(self.zoom_out_action)
-        
-        self.reset_zoom_action = QAction(QIcon("icons/reset_zoom.png"), "重置缩放", self)
-        self.reset_zoom_action.setShortcut(QKeySequence("Ctrl+0"))
-        self.reset_zoom_action.triggered.connect(self.reset_zoom)
-        self.addAction(self.reset_zoom_action)
-        
-        self.addSeparator()
-        
-        # Tools actions
-        self.settings_action = QAction(QIcon("icons/settings.png"), "设置", self)
-        self.settings_action.setShortcut(QKeySequence.Preferences)
-        self.settings_action.triggered.connect(self.show_settings)
-        self.addAction(self.settings_action)
-        
-        self.calculator_action = QAction(QIcon("icons/calculator.png"), "计算器", self)
-        self.calculator_action.triggered.connect(self.show_calculator)
-        self.addAction(self.calculator_action)
-        
-        self.converter_action = QAction(QIcon("icons/converter.png"), "单位转换器", self)
-        self.converter_action.triggered.connect(self.show_converter)
-        self.addAction(self.converter_action)
+        Args:
+            message: 日志消息
+            level: 日志级别，可选值为 info、warning、error
+        """
+        if self.logger:
+            if level == "error":
+                self.logger.error(message)
+            elif level == "warning":
+                self.logger.warning(message)
+            else:
+                self.logger.info(message)
         
     def new_file(self):
         """Create a new file"""

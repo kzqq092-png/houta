@@ -86,7 +86,10 @@
         "performance_log": true,
         "performance_log_file": "performance.log",
         "exception_log": true,
-        "exception_log_file": "exceptions.log"
+        "exception_log_file": "exceptions.log",
+        "async_logging": true,
+        "log_queue_size": 1000,
+        "worker_threads": 2
     },
     "cache": {
         "size": 1000,

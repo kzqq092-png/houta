@@ -1,75 +1,31 @@
 """
-主程序入口
-
-提供交易系统的GUI界面和主要功能
+交易系统主窗口模块
 """
 import sys
-import os
-import json
-import csv
-import time
-import random
-import logging
 import traceback
-import threading
-import weakref
-import gc
-import psutil
-import requests
-from datetime import datetime, timedelta
-from enum import Enum, auto
-import functools
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import pandas as pd
+import numpy as np
+import weakref
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from PyQt5.QtCore import Qt, QDate, pyqtSignal, QTimer, QMutex
+from PyQt5.QtGui import QIcon, QFont
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import mplfinance
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
 
-import hikyuu as hku
-from hikyuu.interactive import *
-from hikyuu.indicator import *
-
-# 导入自定义模块
-from utils import (
-    Theme,
-    ThemeConfig,
-    ChartConfig,
-    TradingConfig,
-    PerformanceConfig,
-    DataConfig,
-    UIConfig,
-    LoggingConfig,
-    ConfigManager,
-    ThemeManager,
-    PerformanceMonitor,
-    ExceptionHandler
-)
+from core.logger import LogManager
+from utils.config_types import LoggingConfig, PerformanceConfig
+from utils.theme import ThemeManager, Theme
 from core.data_manager import DataManager
-from core.logger import LogManager, LogLevel
-from components.market_sentiment import MarketSentimentWidget
-from components.fund_flow import FundFlowWidget
+from utils.config_manager import ConfigManager
 from gui.tool_bar import MainToolBar
 from gui.menu_bar import MainMenuBar
-from components.stock_screener import StockScreenerWidget
-
-from pylab import mpl
-# 设置matplotlib字体
-mpl.rcParams["font.sans-serif"] = [
-    "SimHei"          # 黑体
-]
-mpl.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-mpl.rcParams["font.size"] = 12
-
-# 设置Qt应用程序字体
-QApplication.setFont(QFont("Microsoft YaHei", 10))
+from utils.performance_monitor import PerformanceMonitor
+from utils.exception_handler import ExceptionHandler
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -111,176 +67,386 @@ class TradingGUI(QMainWindow):
     data_updated = pyqtSignal(dict)
     analysis_completed = pyqtSignal(dict)
     performance_updated = pyqtSignal(dict)
+    error_occurred = pyqtSignal(str)
     
     def __init__(self):
         """Initialize trading GUI"""
         super().__init__()
         
-        # 设置字体
-        font = QFont("Microsoft YaHei", 9)  # 使用微软雅黑字体
-        self.setFont(font)
+        try:
+            # 初始化日志管理器
+            self.log_manager = LogManager()
+            
+            # 初始化主题管理器
+            self.theme_manager = ThemeManager()
+            
+            # 初始化数据管理器
+            self.data_manager = DataManager()
+            
+            # 初始化配置管理器
+            self.config_manager = ConfigManager()
+            
+            # 初始化图表相关属性
+            self.main_figure = None
+            self.main_canvas = None
+            self.main_nav_toolbar = None
+            self.volume_figure = None
+            self.volume_canvas = None
+            self.indicator_figure = None
+            self.indicator_canvas = None
+            self.indicator_nav_toolbar = None
+            self.signals_figure = None
+            self.signals_canvas = None
+            self.signals_nav_toolbar = None
+            self.backtest_figure = None
+            self.backtest_canvas = None
+            self.backtest_nav_toolbar = None
+            
+            # 初始化其他属性
+            self.current_stock = None
+            self.current_period = 'D'
+            self.current_chart_type = 'candlestick'
+            self.chart_tabs = None
+            self.main_chart_tab = None
+            self.indicator_chart_tab = None
+            self.signals_chart_tab = None
+            self.backtest_chart_tab = None
+            
+            # 初始化UI
+            self.init_ui()
+            
+            # 连接信号
+            self.connect_signals()
+            
+            # 应用主题
+            self.theme_manager.apply_theme(self)
+            
+            # 初始化性能监控
+            self.init_performance_display()
+            
+            # 启动性能监控
+            self.start_performance_monitoring()
+            
+            self.log_manager.info("交易系统主窗口初始化完成")
+            
+        except Exception as e:
+            error_msg = f"初始化交易系统主窗口失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
         
-        # 设置窗口标题
-        self.setWindowTitle("Hikyuu量化交易系统")
+    def connect_signals(self):
+        """连接所有信号和槽"""
+        try:
+            # 连接主题变更信号
+            self.theme_changed.connect(self.apply_theme)
+            
+            # 连接数据更新信号
+            self.data_updated.connect(self.handle_data_update)
+            
+            # 连接分析完成信号
+            self.analysis_completed.connect(self.handle_analysis_complete)
+            
+            # 连接性能更新信号
+            if hasattr(self, 'performance_updated'):
+                self.performance_updated.connect(self.update_performance)
+            
+            # 连接错误信号
+            self.error_occurred.connect(self.handle_error)
+            
+            self.log_manager.info("信号连接完成")
+            
+        except Exception as e:
+            error_msg = f"连接信号失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def handle_data_request(self, request_data: dict):
+        """处理数据请求
         
-        # 设置窗口大小
-        self.resize(1200, 800)
+        Args:
+            request_data: 请求数据字典
+        """
+        try:
+            if self.data_manager:
+                response_data = self.data_manager.get_data(request_data)
+                self.data_updated.emit(response_data)
+        except Exception as e:
+            self.log_manager.error(f"处理数据请求失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            
+    def update_data(self, data: dict):
+        """更新数据
         
-        # Initialize managers
-        self.config_manager = ConfigManager()
-        self.theme_manager = ThemeManager(self.config_manager)
-        self.log_manager = LogManager(self.config_manager.logging)
-        self.performance_monitor = PerformanceMonitor(
-            config=self.config_manager.performance,
-            log_manager=self.log_manager
-        )
-        self.exception_handler = ExceptionHandler(self.log_manager)
-        self.data_manager = DataManager()
+        Args:
+            data: 数据字典
+        """
+        try:
+            # 更新数据缓存
+            if hasattr(self, 'data_cache'):
+                self.data_cache.update(data)
+            
+            # 更新图表
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.update_chart(data)
+            
+            # 更新分析工具面板
+            if hasattr(self, 'analysis_tools'):
+                self.analysis_tools.update_results(data)
+            
+            # 更新日志
+            self.log_manager.info("数据更新完成")
+            
+        except Exception as e:
+            self.log_manager.error(f"更新数据失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            QMessageBox.critical(self, "错误", f"更新数据失败: {str(e)}")
+
+    def handle_analysis_error(self, error_msg: str):
+        """处理分析错误
         
-        # Initialize attributes
-        self.current_stock = None
-        self.current_period = "D"
-        self.current_strategy = None
-        self.favorites = set()
-        self.param_controls = {}
-        self.settings_controls = {}
+        Args:
+            error_msg: 错误信息
+        """
+        self.log_manager.error(f"分析错误: {error_msg}")
+        QMessageBox.warning(self, "分析错误", error_msg)
         
-        # Initialize mutexes
-        self.data_mutex = QMutex()
-        self.chart_mutex = QMutex()
-        self.indicator_mutex = QMutex()
+    def handle_chart_error(self, error_msg: str):
+        """处理图表错误
         
-        # Initialize caches
-        self.data_cache = {}
-        self.chart_cache = {}
-        self.stock_list_cache = []
+        Args:
+            error_msg: 错误信息
+        """
+        self.log_manager.error(f"图表错误: {error_msg}")
+        QMessageBox.warning(self, "图表错误", error_msg)
         
-        # Initialize thread pool
-        self.thread_pool = QThreadPool()
+    def handle_log_error(self, error_msg: str):
+        """处理日志错误
         
-        # Initialize splitters
-        self.top_splitter = QSplitter(Qt.Horizontal)
-        self.bottom_splitter = QSplitter(Qt.Vertical)
+        Args:
+            error_msg: 错误信息
+        """
+        self.log_manager.error(f"日志错误: {error_msg}")
+        QMessageBox.warning(self, "日志错误", error_msg)
         
-        # Initialize log text
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(150)
-        self.log_text.setLineWrapMode(QTextEdit.NoWrap)
-        self.log_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #f0f0f0;
-                border: 1px solid #cccccc;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 12px;
-            }
-        """)
-        
-        # Initialize UI
-        self.init_ui()
-        
-        # Initialize data
-        self.init_data()
-        
-        # Connect log manager signals
-        self.log_manager.log_added.connect(self.log_message)
-        self.log_manager.log_cleared.connect(self.clear_log)
-        self.log_manager.performance_alert.connect(self.handle_performance_alert)
-        self.log_manager.exception_occurred.connect(self.handle_exception)
-        
-        # Initialize exception handler
-        sys.excepthook = self.exception_handler.handle_gui_exception
-        
-        # 应用全局样式表
-        self.setStyleSheet(GLOBAL_STYLE)
-        
-        # Start performance monitoring
-        self.start_performance_monitoring()
+    def handle_log_clear(self):
+        """处理日志清除"""
+        try:
+            if self.log_manager:
+                self.log_manager.clear()
+        except Exception as e:
+            self.log_manager.error(f"清除日志失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            
+    def update_analysis(self, results):
+        """Update analysis results"""
+        try:
+            if hasattr(self, 'analysis_tools'):
+                self.analysis_tools.update_results(results)
+                
+        except Exception as e:
+            self.log_manager.error(f"更新分析结果失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            
+    def handle_data_update(self, data: dict):
+        """Handle data update signal"""
+        try:
+            # 更新数据缓存
+            self.data_cache.update(data)
+            
+            # 更新UI显示
+            self.update_ui()
+            
+        except Exception as e:
+            self.log_manager.error(f"处理数据更新失败: {str(e)}")
+            
+    def handle_analysis_complete(self, results: dict):
+        """Handle analysis complete signal"""
+        try:
+            # 更新分析结果
+            self.update_metrics(results)
+            
+            # 更新图表
+            self.update_chart()
+            
+        except Exception as e:
+            self.log_manager.error(f"处理分析完成失败: {str(e)}")
+            
+    def update_ui(self):
+        """Update UI components"""
+        try:
+            # 更新股票列表
+            self.update_stock_list()
+            
+            # 更新指标列表
+            self.update_indicators()
+            
+            # 更新图表
+            self.update_chart()
+            
+            # 更新性能指标
+            self.update_performance_metrics()
+            
+        except Exception as e:
+            self.log_manager.error(f"更新UI失败: {str(e)}")
         
     def init_ui(self):
-        """Initialize user interface"""
+        """Initialize the main window UI
+        
+        This method:
+        1. Sets window title and size
+        2. Creates the main layout and splitters
+        3. Creates all panels (left, middle, right, bottom)
+        4. Creates menu bar, toolbar and status bar
+        5. Applies theme to all widgets
+        """
         try:
-            # Create main widget
-            self.central_widget = QWidget()
-            self.setCentralWidget(self.central_widget)
+            # 设置窗口标题和大小
+            self.setWindowTitle("Hikyuu Trading System")
+            self.setGeometry(100, 100, 1200, 800)
             
-            # Create main layout
-            self.main_layout = QVBoxLayout(self.central_widget)
+            # 创建主布局
+            self.main_layout = QVBoxLayout()
+            self.setLayout(self.main_layout)
             
-            # Add splitters to main layout
+            # 创建分割器
+            self.top_splitter = QSplitter(Qt.Horizontal)
+            self.bottom_splitter = QSplitter(Qt.Horizontal)
+            
+            # 设置分割器属性
+            self.top_splitter.setHandleWidth(1)
+            self.bottom_splitter.setHandleWidth(1)
+            self.top_splitter.setChildrenCollapsible(False)
+            self.bottom_splitter.setChildrenCollapsible(False)
+            
+            # 添加分割器到主布局
             self.main_layout.addWidget(self.top_splitter)
             self.main_layout.addWidget(self.bottom_splitter)
             
-            # Create panels
+            # 创建面板
             self.create_left_panel()
             self.create_middle_panel()
             self.create_right_panel()
             self.create_bottom_panel()
             
-            # Create menu bar and status bar
+            # 创建菜单栏和状态栏
             self.create_menubar()
             self.create_statusbar()
             
-            # Create toolbar
+            # 创建工具栏
             self.create_toolbar()
             
-            # Apply theme to all widgets
+            # 应用主题
             self.apply_theme()
             
+            self.log_manager.info("UI初始化完成")
+            
         except Exception as e:
-            self.log_message(f"初始化UI失败: {str(e)}", "error")
-            raise
+            error_msg = f"初始化UI失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
         
     def create_menubar(self):
-        """Create menu bar with all necessary actions"""
+        """创建菜单栏"""
         try:
             self.menu_bar = MainMenuBar(self)
             self.setMenuBar(self.menu_bar)
             
-            # Connect menu actions
-            self.menu_bar.file_menu.aboutToShow.connect(self.update_recent_files)
-            self.menu_bar.edit_menu.aboutToShow.connect(self.update_edit_menu)
-            self.menu_bar.view_menu.aboutToShow.connect(self.update_view_menu)
-            self.menu_bar.tools_menu.aboutToShow.connect(self.update_tools_menu)
-            self.menu_bar.help_menu.aboutToShow.connect(self.update_help_menu)
+            # 连接菜单动作
+            self.menu_bar.new_action.triggered.connect(self.new_file)
+            self.menu_bar.open_action.triggered.connect(self.open_file)
+            self.menu_bar.save_action.triggered.connect(self.save_file)
+            self.menu_bar.exit_action.triggered.connect(self.close)
             
-            # Connect signals
-            self.menu_bar.settings_action.triggered.connect(self.show_settings)
+            self.menu_bar.undo_action.triggered.connect(self.undo)
+            self.menu_bar.redo_action.triggered.connect(self.redo)
+            self.menu_bar.copy_action.triggered.connect(self.copy)
+            self.menu_bar.paste_action.triggered.connect(self.paste)
+            
+            self.menu_bar.toolbar_action.triggered.connect(self.toggle_toolbar)
+            self.menu_bar.statusbar_action.triggered.connect(self.toggle_statusbar)
+            self.menu_bar.light_theme_action.triggered.connect(lambda: self.change_theme('light'))
+            self.menu_bar.dark_theme_action.triggered.connect(lambda: self.change_theme('dark'))
+            
+            self.menu_bar.analyze_action.triggered.connect(self.analyze)
+            self.menu_bar.backtest_action.triggered.connect(self.backtest)
+            self.menu_bar.optimize_action.triggered.connect(self.optimize)
+            
             self.menu_bar.calculator_action.triggered.connect(self.show_calculator)
             self.menu_bar.converter_action.triggered.connect(self.show_converter)
+            self.menu_bar.settings_action.triggered.connect(self.show_settings)
+            
+            self.menu_bar.help_action.triggered.connect(self.show_help)
+            self.menu_bar.update_action.triggered.connect(self.check_update)
             self.menu_bar.about_action.triggered.connect(self.show_about)
             
+            self.log_manager.info("菜单栏创建完成")
+            
         except Exception as e:
-            self.log_message(f"创建菜单栏失败: {str(e)}", "error")
-        
+            self.log_manager.error(f"创建菜单栏失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            
     def create_toolbar(self):
-        """Create the main toolbar with all necessary actions"""
+        """创建工具栏"""
         try:
             self.toolbar = MainToolBar(self)
             self.addToolBar(self.toolbar)
             
-            # Connect toolbar actions
+            # 连接工具栏动作
+            self.toolbar.new_action.triggered.connect(self.new_file)
+            self.toolbar.open_action.triggered.connect(self.open_file)
+            self.toolbar.save_action.triggered.connect(self.save_file)
+            
             self.toolbar.analyze_action.triggered.connect(self.analyze)
             self.toolbar.backtest_action.triggered.connect(self.backtest)
             self.toolbar.optimize_action.triggered.connect(self.optimize)
+            
             self.toolbar.zoom_in_action.triggered.connect(self.zoom_in)
             self.toolbar.zoom_out_action.triggered.connect(self.zoom_out)
             self.toolbar.reset_zoom_action.triggered.connect(self.reset_zoom)
-            self.toolbar.settings_action.triggered.connect(self.show_settings)
+            
             self.toolbar.calculator_action.triggered.connect(self.show_calculator)
             self.toolbar.converter_action.triggered.connect(self.show_converter)
+            self.toolbar.settings_action.triggered.connect(self.show_settings)
             
-            # Add separator
-            self.toolbar.addSeparator()
+            # 连接搜索框
+            self.toolbar.search_box.textChanged.connect(self.filter_stock_list)
             
-            # Add stock search
-            self.stock_search = QLineEdit()
-            self.stock_search.setPlaceholderText("搜索股票...")
-            self.stock_search.textChanged.connect(self.filter_stock_list)
-            self.toolbar.addWidget(self.stock_search)
+            self.log_manager.info("工具栏创建完成")
             
         except Exception as e:
-            self.log_message(f"创建工具栏失败: {str(e)}", "error")
+            self.log_manager.error(f"创建工具栏失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            
+    def toggle_toolbar(self, checked: bool):
+        """切换工具栏显示状态
+        
+        Args:
+            checked: 是否显示
+        """
+        self.toolbar.setVisible(checked)
+        
+    def toggle_statusbar(self, checked: bool):
+        """切换状态栏显示状态
+        
+        Args:
+            checked: 是否显示
+        """
+        self.statusBar().setVisible(checked)
+        
+    def change_theme(self, theme: str):
+        """切换主题
+        
+        Args:
+            theme: 主题名称
+        """
+        try:
+            self.theme_manager.set_theme(theme)
+            self.log_manager.info(f"切换主题: {theme}")
+        except Exception as e:
+            self.log_manager.error(f"切换主题失败: {str(e)}")
         
     def create_statusbar(self):
         """Create the status bar"""
@@ -333,34 +499,47 @@ class TradingGUI(QMainWindow):
         """Apply theme to all widgets"""
         try:
             # Apply theme to main window
-            self.theme_manager.apply_theme(self)
+            if self.theme_manager:
+                self.theme_manager.apply_theme(self)
             
             # Apply theme to charts
-            for figure in [self.figure, self.signals_figure, self.backtest_figure]:
-                if figure is not None:
-                    self.theme_manager.apply_chart_theme(figure)
+            if hasattr(self, 'chart_widget'):
+                self.theme_manager.apply_theme(self.chart_widget)
             
             # Apply theme to all child widgets
             for widget in self.findChildren(QWidget):
-                if widget is not None and not widget.parent() == self:
-                    self.theme_manager.apply_theme(widget)
+                try:
+                    # 获取父窗口，使用更安全的方式
+                    parent = widget.parentWidget()
+                    if widget is not None and parent is not None and parent is not self:
+                        self.theme_manager.apply_theme(widget)
+                except Exception as widget_error:
+                    # 记录单个widget的错误但继续处理其他widget
+                    self.log_manager.warning(f"应用主题到widget失败: {str(widget_error)}")
+                    continue
+            
+            self.log_manager.info("主题应用完成")
             
         except Exception as e:
-            self.log_message(f"应用主题失败: {str(e)}", "error")
-            raise
+            self.log_manager.error(f"应用主题失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def create_left_panel(self):
         """Create left panel with stock list and indicators"""
         try:
-            # Create left panel
+            # 创建左侧面板
             self.left_panel = QWidget()
             self.left_layout = QVBoxLayout(self.left_panel)
+            self.left_layout.setContentsMargins(5, 5, 5, 5)
+            self.left_layout.setSpacing(5)
             
-            # Create stock list group
+            # 创建股票列表组
             stock_group = QGroupBox("股票列表")
             stock_layout = QVBoxLayout(stock_group)
+            stock_layout.setContentsMargins(5, 5, 5, 5)
+            stock_layout.setSpacing(5)
             
-            # Create stock type selector
+            # 创建股票类型选择器
             stock_type_layout = QHBoxLayout()
             stock_type_label = QLabel("市场:")
             self.stock_type_combo = QComboBox()
@@ -370,51 +549,40 @@ class TradingGUI(QMainWindow):
             stock_type_layout.addWidget(self.stock_type_combo)
             stock_layout.addLayout(stock_type_layout)
             
-            # Create stock search box with advanced search
+            # 创建股票搜索框
             search_layout = QHBoxLayout()
             self.stock_search = QLineEdit()
-            self.stock_search.setPlaceholderText("搜索股票(代码/名称/拼音)...")
+            self.stock_search.setPlaceholderText("搜索股票...")
             self.stock_search.textChanged.connect(self.filter_stock_list)
             search_layout.addWidget(self.stock_search)
             
-            # Add advanced search button
+            # 添加高级搜索按钮
             advanced_search_btn = QPushButton("高级搜索")
             advanced_search_btn.clicked.connect(self.show_advanced_search_dialog)
             search_layout.addWidget(advanced_search_btn)
             stock_layout.addLayout(search_layout)
             
-            # Create stock list with custom item widget
+            # 创建股票列表
             self.stock_list = QListWidget()
             self.stock_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self.stock_list.itemSelectionChanged.connect(self.on_stock_selected)
             stock_layout.addWidget(self.stock_list)
             
-            # Create stock list controls
-            stock_controls = QHBoxLayout()
-            refresh_button = QPushButton("刷新")
-            refresh_button.clicked.connect(self.update_stock_list)
-            stock_controls.addWidget(refresh_button)
+            # 添加收藏按钮
+            favorites_btn = QPushButton("收藏")
+            favorites_btn.clicked.connect(self.toggle_favorite)
+            stock_layout.addWidget(favorites_btn)
             
-            # Add favorite button
-            favorite_button = QPushButton("收藏")
-            favorite_button.clicked.connect(self.toggle_favorite)
-            stock_controls.addWidget(favorite_button)
-            
-            # Add export button
-            export_button = QPushButton("导出")
-            export_button.clicked.connect(self.export_stock_list)
-            stock_controls.addWidget(export_button)
-            
-            stock_layout.addLayout(stock_controls)
-            
-            # Add stock group to left layout
+            # 添加股票列表组到左侧布局
             self.left_layout.addWidget(stock_group)
             
-            # Create indicators group
-            indicators_group = QGroupBox("技术指标")
-            indicators_layout = QVBoxLayout(indicators_group)
+            # 创建指标列表组
+            indicator_group = QGroupBox("指标列表")
+            indicator_layout = QVBoxLayout(indicator_group)
+            indicator_layout.setContentsMargins(5, 5, 5, 5)
+            indicator_layout.setSpacing(5)
             
-            # Create indicator type selector
+            # 创建指标类型选择器
             indicator_type_layout = QHBoxLayout()
             indicator_type_label = QLabel("类型:")
             self.indicator_type_combo = QComboBox()
@@ -422,48 +590,45 @@ class TradingGUI(QMainWindow):
             self.indicator_type_combo.currentTextChanged.connect(self.filter_indicator_list)
             indicator_type_layout.addWidget(indicator_type_label)
             indicator_type_layout.addWidget(self.indicator_type_combo)
-            indicators_layout.addLayout(indicator_type_layout)
+            indicator_layout.addLayout(indicator_type_layout)
             
-            # Create indicator search box
-            self.indicator_search = QLineEdit()
-            self.indicator_search.setPlaceholderText("搜索指标...")
-            self.indicator_search.textChanged.connect(self.filter_indicator_list)
-            indicators_layout.addWidget(self.indicator_search)
+            # 创建指标搜索框
+            indicator_search = QLineEdit()
+            indicator_search.setPlaceholderText("搜索指标...")
+            indicator_search.textChanged.connect(self.filter_indicator_list)
+            indicator_layout.addWidget(indicator_search)
             
-            # Create indicator list with custom item widget
+            # 创建指标列表
             self.indicator_list = QListWidget()
             self.indicator_list.setSelectionMode(QAbstractItemView.MultiSelection)
             self.indicator_list.itemSelectionChanged.connect(self.on_indicators_changed)
-            indicators_layout.addWidget(self.indicator_list)
+            indicator_layout.addWidget(self.indicator_list)
             
-            # Create indicator controls
-            indicator_controls = QHBoxLayout()
+            # 添加指标操作按钮
+            indicator_buttons_layout = QHBoxLayout()
+            add_indicator_btn = QPushButton("添加")
+            add_indicator_btn.clicked.connect(self.show_indicator_params_dialog)
+            save_combination_btn = QPushButton("保存组合")
+            save_combination_btn.clicked.connect(self.save_indicator_combination)
+            indicator_buttons_layout.addWidget(add_indicator_btn)
+            indicator_buttons_layout.addWidget(save_combination_btn)
+            indicator_layout.addLayout(indicator_buttons_layout)
             
-            # Add parameter button
-            param_button = QPushButton("参数设置")
-            param_button.clicked.connect(self.show_indicator_params_dialog)
-            indicator_controls.addWidget(param_button)
+            # 添加指标列表组到左侧布局
+            self.left_layout.addWidget(indicator_group)
             
-            # Add clear button
-            clear_button = QPushButton("清除")
-            clear_button.clicked.connect(self.indicator_list.clearSelection)
-            indicator_controls.addWidget(clear_button)
+            # 设置左侧面板的最小宽度
+            self.left_panel.setMinimumWidth(250)
+            self.left_panel.setMaximumWidth(400)
             
-            # Add save button
-            save_button = QPushButton("保存组合")
-            save_button.clicked.connect(self.save_indicator_combination)
-            indicator_controls.addWidget(save_button)
-            
-            indicators_layout.addLayout(indicator_controls)
-            
-            # Add indicators group to left layout
-            self.left_layout.addWidget(indicators_group)
-            
-            # Add to top splitter
+            # 添加左侧面板到顶部分割器
             self.top_splitter.addWidget(self.left_panel)
             
+            self.log_manager.info("左侧面板创建完成")
+            
         except Exception as e:
-            self.log_message(f"创建左侧面板失败: {str(e)}", "error")
+            self.log_manager.error(f"创建左侧面板失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             raise
             
     def filter_stock_list(self, text: str):
@@ -599,149 +764,127 @@ class TradingGUI(QMainWindow):
     def create_middle_panel(self):
         """Create middle panel with charts"""
         try:
-            # Create middle panel
+            # 创建中间面板
             self.middle_panel = QWidget()
             self.middle_layout = QVBoxLayout(self.middle_panel)
+            self.middle_layout.setContentsMargins(5, 5, 5, 5)
+            self.middle_layout.setSpacing(5)
             
-            # Create chart toolbar
-            self.chart_toolbar = QToolBar("图表工具栏")
-            self.chart_toolbar.setMovable(False)
-            self.middle_layout.addWidget(self.chart_toolbar)
+            # 创建工具栏
+            toolbar_layout = QHBoxLayout()
             
-            # Add chart actions
-            self.chart_toolbar.addAction("保存图表", self.save_chart)
-            self.chart_toolbar.addAction("重置视图", self.reset_chart_view)
-            self.chart_toolbar.addAction("切换主题", self.toggle_chart_theme)
-            self.chart_toolbar.addSeparator()
+            # 周期选择
+            period_label = QLabel("周期:")
+            self.period_combo = QComboBox()
+            self.period_combo.addItems(["分时", "5分钟", "15分钟", "30分钟", "60分钟", "日线", "周线", "月线"])
+            self.period_combo.setCurrentText("日线")
+            self.period_combo.currentTextChanged.connect(self.on_period_changed)
+            toolbar_layout.addWidget(period_label)
+            toolbar_layout.addWidget(self.period_combo)
             
-            # Add chart type selector
+            # 图表类型选择
             chart_type_label = QLabel("图表类型:")
             self.chart_type_combo = QComboBox()
-            self.chart_type_combo.addItems([
-                "K线图",
-                "分时图",
-                "成交量图",
-                "MACD图",
-                "RSI图",
-                "布林带图",
-                "波浪分析图",
-                "模式识别图",
-                "风险分析图"
-            ])
-            self.chart_toolbar.addWidget(chart_type_label)
-            self.chart_toolbar.addWidget(self.chart_type_combo)
+            self.chart_type_combo.addItems(["K线图", "分时图", "美国线", "收盘价"])
+            self.chart_type_combo.currentTextChanged.connect(self.on_chart_type_changed)
+            toolbar_layout.addWidget(chart_type_label)
+            toolbar_layout.addWidget(self.chart_type_combo)
             
-            # Create tab widget for different chart types
+            # 添加缩放按钮
+            zoom_in_btn = QPushButton("放大")
+            zoom_in_btn.clicked.connect(self.zoom_in)
+            zoom_out_btn = QPushButton("缩小")
+            zoom_out_btn.clicked.connect(self.zoom_out)
+            reset_zoom_btn = QPushButton("重置")
+            reset_zoom_btn.clicked.connect(self.reset_zoom)
+            
+            toolbar_layout.addWidget(zoom_in_btn)
+            toolbar_layout.addWidget(zoom_out_btn)
+            toolbar_layout.addWidget(reset_zoom_btn)
+            
+            # 添加工具栏到布局
+            self.middle_layout.addLayout(toolbar_layout)
+            
+            # 创建图表标签页
             self.chart_tabs = QTabWidget()
+            self.chart_tabs.setTabPosition(QTabWidget.South)
             
-            # Create main chart tab
+            # 创建主图表标签页
             self.main_chart_tab = QWidget()
-            self.main_chart_layout = QVBoxLayout(self.main_chart_tab)
+            main_chart_layout = QVBoxLayout(self.main_chart_tab)
             
-            # Create main chart figure and canvas
-            self.figure = Figure(figsize=(8, 6))
-            self.canvas = FigureCanvas(self.figure)
-            self.main_chart_layout.addWidget(self.canvas)
+            # 创建主图表
+            self.main_figure = Figure(figsize=(8, 6), dpi=100)
+            self.main_canvas = FigureCanvas(self.main_figure)
+            main_chart_layout.addWidget(self.main_canvas)
             
-            # Add navigation toolbar
-            self.nav_toolbar = NavigationToolbar(self.canvas, self)
-            self.main_chart_layout.addWidget(self.nav_toolbar)
+            # 添加导航工具栏
+            self.main_nav_toolbar = NavigationToolbar(self.main_canvas, self)
+            main_chart_layout.addWidget(self.main_nav_toolbar)
             
-            # Create signals chart tab
+            # 创建成交量图表
+            self.volume_figure = Figure(figsize=(8, 2), dpi=100)
+            self.volume_canvas = FigureCanvas(self.volume_figure)
+            main_chart_layout.addWidget(self.volume_canvas)
+            
+            self.chart_tabs.addTab(self.main_chart_tab, "主图")
+            
+            # 创建技术指标标签页
+            self.indicator_chart_tab = QWidget()
+            indicator_chart_layout = QVBoxLayout(self.indicator_chart_tab)
+            
+            # 创建技术指标图表
+            self.indicator_figure = Figure(figsize=(8, 6), dpi=100)
+            self.indicator_canvas = FigureCanvas(self.indicator_figure)
+            indicator_chart_layout.addWidget(self.indicator_canvas)
+            
+            # 添加导航工具栏
+            self.indicator_nav_toolbar = NavigationToolbar(self.indicator_canvas, self)
+            indicator_chart_layout.addWidget(self.indicator_nav_toolbar)
+            
+            # 创建信号图表标签页
             self.signals_chart_tab = QWidget()
             self.signals_chart_layout = QVBoxLayout(self.signals_chart_tab)
             
-            # Create signals chart figure and canvas
+            # 创建信号图表图形和画布
             self.signals_figure = Figure(figsize=(8, 2))
             self.signals_canvas = FigureCanvas(self.signals_figure)
             self.signals_chart_layout.addWidget(self.signals_canvas)
             
-            # Add navigation toolbar
+            # 添加导航工具栏
             self.signals_nav_toolbar = NavigationToolbar(self.signals_canvas, self)
             self.signals_chart_layout.addWidget(self.signals_nav_toolbar)
             
-            # Create backtest chart tab
+            # 创建回测图表标签页
             self.backtest_chart_tab = QWidget()
             self.backtest_chart_layout = QVBoxLayout(self.backtest_chart_tab)
             
-            # Create backtest chart figure and canvas
+            # 创建回测图表图形和画布
             self.backtest_figure = Figure(figsize=(8, 4))
             self.backtest_canvas = FigureCanvas(self.backtest_figure)
             self.backtest_chart_layout.addWidget(self.backtest_canvas)
             
-            # Add navigation toolbar
+            # 添加导航工具栏
             self.backtest_nav_toolbar = NavigationToolbar(self.backtest_canvas, self)
             self.backtest_chart_layout.addWidget(self.backtest_nav_toolbar)
             
-            # Create pattern recognition tab
-            self.pattern_tab = QWidget()
-            self.pattern_layout = QVBoxLayout(self.pattern_tab)
-            
-            # Create pattern chart figure and canvas
-            self.pattern_figure = Figure(figsize=(8, 4))
-            self.pattern_canvas = FigureCanvas(self.pattern_figure)
-            self.pattern_layout.addWidget(self.pattern_canvas)
-            
-            # Add navigation toolbar
-            self.pattern_nav_toolbar = NavigationToolbar(self.pattern_canvas, self)
-            self.pattern_layout.addWidget(self.pattern_nav_toolbar)
-            
-            # Create wave analysis tab
-            self.wave_tab = QWidget()
-            self.wave_layout = QVBoxLayout(self.wave_tab)
-            
-            # Create wave chart figure and canvas
-            self.wave_figure = Figure(figsize=(8, 4))
-            self.wave_canvas = FigureCanvas(self.wave_figure)
-            self.wave_layout.addWidget(self.wave_canvas)
-            
-            # Add navigation toolbar
-            self.wave_nav_toolbar = NavigationToolbar(self.wave_canvas, self)
-            self.wave_layout.addWidget(self.wave_nav_toolbar)
-            
-            # Create risk analysis tab
-            self.risk_tab = QWidget()
-            self.risk_layout = QVBoxLayout(self.risk_tab)
-            
-            # Create risk chart figure and canvas
-            self.risk_figure = Figure(figsize=(8, 4))
-            self.risk_canvas = FigureCanvas(self.risk_figure)
-            self.risk_layout.addWidget(self.risk_canvas)
-            
-            # Add navigation toolbar
-            self.risk_nav_toolbar = NavigationToolbar(self.risk_canvas, self)
-            self.risk_layout.addWidget(self.risk_nav_toolbar)
-            
-            # Add tabs to tab widget
+            # 添加标签页到图表标签页控件
             self.chart_tabs.addTab(self.main_chart_tab, "主图表")
+            self.chart_tabs.addTab(self.indicator_chart_tab, "技术指标")
             self.chart_tabs.addTab(self.signals_chart_tab, "信号图表")
-            self.chart_tabs.addTab(self.backtest_chart_tab, "回测结果")
-            self.chart_tabs.addTab(self.pattern_tab, "模式识别")
-            self.chart_tabs.addTab(self.wave_tab, "波浪分析")
-            self.chart_tabs.addTab(self.risk_tab, "风险分析")
+            self.chart_tabs.addTab(self.backtest_chart_tab, "回测图表")
             
-            # Add market sentiment widget
-            self.market_sentiment_widget = MarketSentimentWidget(
-                data_manager=self.data_manager,
-                log_manager=self.log_manager
-            )
-            self.chart_tabs.addTab(self.market_sentiment_widget, "市场情绪")
-            
-            # Add fund flow widget
-            self.fund_flow_widget = FundFlowWidget(data_manager=self.data_manager)
-            self.chart_tabs.addTab(self.fund_flow_widget, "资金流向")
-            
-            # Add chart tabs to middle layout
+            # 添加图表标签页到中间布局
             self.middle_layout.addWidget(self.chart_tabs)
             
-            # Add to top splitter
+            # 添加中间面板到顶部分割器
             self.top_splitter.addWidget(self.middle_panel)
             
-            # Set chart style
-            plt.style.use('seaborn-v0_8-whitegrid')
+            self.log_manager.info("中间面板创建完成")
             
         except Exception as e:
-            self.log_message(f"创建中间面板失败: {str(e)}", "error")
+            self.log_manager.error(f"创建中间面板失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             raise
             
     def save_chart(self):
@@ -807,141 +950,143 @@ class TradingGUI(QMainWindow):
     def create_right_panel(self):
         """Create right panel with analysis tools"""
         try:
-            # Create right panel
+            # 创建右侧面板
             self.right_panel = QWidget()
             self.right_layout = QVBoxLayout(self.right_panel)
+            self.right_layout.setContentsMargins(5, 5, 5, 5)
+            self.right_layout.setSpacing(5)
             
-            # Create right tab widget
-            self.right_tab = QTabWidget()
-            self.right_layout.addWidget(self.right_tab)
+            # 创建策略组
+            strategy_group = QGroupBox("策略设置")
+            strategy_layout = QVBoxLayout(strategy_group)
             
-            # Create strategy tab
-            strategy_tab = QWidget()
-            strategy_layout = QVBoxLayout(strategy_tab)
-            
-            # Add strategy combo
-            strategy_label = QLabel("策略:")
+            # 添加策略选择
+            strategy_type_layout = QHBoxLayout()
+            strategy_label = QLabel("策略类型:")
             self.strategy_combo = QComboBox()
             self.strategy_combo.addItems([
                 "均线策略", "MACD策略", "RSI策略", "布林带策略",
                 "KDJ策略", "自定义策略"
             ])
-            strategy_layout.addWidget(strategy_label)
-            strategy_layout.addWidget(self.strategy_combo)
+            self.strategy_combo.currentTextChanged.connect(self.on_strategy_changed)
+            strategy_type_layout.addWidget(strategy_label)
+            strategy_type_layout.addWidget(self.strategy_combo)
+            strategy_layout.addLayout(strategy_type_layout)
             
-            # Add analysis type combo
-            analysis_label = QLabel("分析类型:")
-            self.analysis_type_combo = QComboBox()
-            self.analysis_type_combo.addItems([
-                "技术分析", "基本面分析", "资金流向分析", "市场情绪分析"
-            ])
-            strategy_layout.addWidget(analysis_label)
-            strategy_layout.addWidget(self.analysis_type_combo)
+            # 创建策略参数设置区域
+            self.strategy_params_widget = QWidget()
+            self.strategy_params_layout = QFormLayout(self.strategy_params_widget)
+            strategy_layout.addWidget(self.strategy_params_widget)
             
-            # Add parameter controls
-            self.param_controls = {}  # Reuse existing param_controls
+            # 添加策略组到右侧布局
+            self.right_layout.addWidget(strategy_group)
             
-            # Add backtest parameters
-            backtest_group = QGroupBox("回测参数")
+            # 创建回测设置组
+            backtest_group = QGroupBox("回测设置")
             backtest_layout = QFormLayout(backtest_group)
             
-            # Initialize backtest controls with proper type conversion
+            # 初始资金
             self.initial_capital = QDoubleSpinBox()
             self.initial_capital.setRange(1000.0, 10000000.0)
             self.initial_capital.setValue(100000.0)
             self.initial_capital.setSuffix(" 元")
+            backtest_layout.addRow("初始资金:", self.initial_capital)
             
+            # 手续费率
             self.commission_rate = QDoubleSpinBox()
-            self.commission_rate.setRange(0.0, 0.1)
+            self.commission_rate.setDecimals(4)
+            self.commission_rate.setRange(0.0, 0.01)
             self.commission_rate.setValue(0.0003)
             self.commission_rate.setSuffix(" %")
+            backtest_layout.addRow("手续费率:", self.commission_rate)
             
+            # 滑点设置
             self.slippage = QDoubleSpinBox()
-            self.slippage.setRange(0.0, 0.1)
+            self.slippage.setDecimals(4)
+            self.slippage.setRange(0.0, 0.01)
             self.slippage.setValue(0.0001)
             self.slippage.setSuffix(" %")
-            
-            self.position_combo = QComboBox()
-            self.position_combo.addItems(["固定仓位", "动态仓位"])
-            
-            self.position_size = QDoubleSpinBox()
-            self.position_size.setRange(0.1, 1.0)
-            self.position_size.setValue(0.5)
-            self.position_size.setSuffix(" %")
-            
-            self.stop_loss = QDoubleSpinBox()
-            self.stop_loss.setRange(0.0, 0.2)
-            self.stop_loss.setValue(0.05)
-            self.stop_loss.setSuffix(" %")
-            
-            self.take_profit = QDoubleSpinBox()
-            self.take_profit.setRange(0.0, 0.5)
-            self.take_profit.setValue(0.1)
-            self.take_profit.setSuffix(" %")
-            
-            self.max_drawdown = QDoubleSpinBox()
-            self.max_drawdown.setRange(0.0, 0.5)
-            self.max_drawdown.setValue(0.2)
-            self.max_drawdown.setSuffix(" %")
-            
-            self.risk_free_rate = QDoubleSpinBox()
-            self.risk_free_rate.setRange(0.0, 0.1)
-            self.risk_free_rate.setValue(0.03)
-            self.risk_free_rate.setSuffix(" %")
-            
-            # Add controls to layout
-            backtest_layout.addRow("初始资金:", self.initial_capital)
-            backtest_layout.addRow("手续费率:", self.commission_rate)
             backtest_layout.addRow("滑点:", self.slippage)
-            backtest_layout.addRow("仓位管理:", self.position_combo)
-            backtest_layout.addRow("仓位大小:", self.position_size)
-            backtest_layout.addRow("止损:", self.stop_loss)
-            backtest_layout.addRow("止盈:", self.take_profit)
-            backtest_layout.addRow("最大回撤:", self.max_drawdown)
-            backtest_layout.addRow("无风险利率:", self.risk_free_rate)
             
-            strategy_layout.addWidget(backtest_group)
+            # 回测时间范围
+            date_range_layout = QHBoxLayout()
+            self.start_date = QDateEdit()
+            self.start_date.setCalendarPopup(True)
+            self.start_date.setDate(QDate.currentDate().addYears(-1))
+            self.end_date = QDateEdit()
+            self.end_date.setCalendarPopup(True)
+            self.end_date.setDate(QDate.currentDate())
+            date_range_layout.addWidget(self.start_date)
+            date_range_layout.addWidget(QLabel("至"))
+            date_range_layout.addWidget(self.end_date)
+            backtest_layout.addRow("回测区间:", date_range_layout)
             
-            # Add stock screener
-            self.stock_screener = StockScreenerWidget(
-                data_manager=self.data_manager,
-                log_manager=self.log_manager
-            )
-            strategy_layout.addWidget(self.stock_screener)
+            # 添加回测设置组到右侧布局
+            self.right_layout.addWidget(backtest_group)
             
-            # Add metric labels
-            self.metric_labels = {
-                "收益率": QLabel("0.00%"),
-                "年化收益率": QLabel("0.00%"),
-                "最大回撤": QLabel("0.00%"),
-                "夏普比率": QLabel("0.00"),
-                "胜率": QLabel("0.00%"),
-                "盈亏比": QLabel("0.00")
-            }
+            # 创建风险控制组
+            risk_group = QGroupBox("风险控制")
+            risk_layout = QFormLayout(risk_group)
             
-            # Add metrics to layout
-            metrics_group = QGroupBox("策略指标")
-            metrics_layout = QGridLayout(metrics_group)
-            row = 0
-            col = 0
-            for name, label in self.metric_labels.items():
-                metrics_layout.addWidget(QLabel(name), row, col)
-                metrics_layout.addWidget(label, row, col + 1)
-                col += 2
-                if col >= 4:
-                    col = 0
-                    row += 1
+            # 止损设置
+            self.stop_loss = QDoubleSpinBox()
+            self.stop_loss.setDecimals(2)
+            self.stop_loss.setRange(0.0, 100.0)
+            self.stop_loss.setValue(5.0)
+            self.stop_loss.setSuffix(" %")
+            risk_layout.addRow("止损比例:", self.stop_loss)
             
-            strategy_layout.addWidget(metrics_group)
+            # 止盈设置
+            self.take_profit = QDoubleSpinBox()
+            self.take_profit.setDecimals(2)
+            self.take_profit.setRange(0.0, 100.0)
+            self.take_profit.setValue(10.0)
+            self.take_profit.setSuffix(" %")
+            risk_layout.addRow("止盈比例:", self.take_profit)
             
-            # Add strategy tab to right tab widget
-            self.right_tab.addTab(strategy_tab, "策略")
+            # 最大持仓
+            self.max_position = QSpinBox()
+            self.max_position.setRange(1, 100)
+            self.max_position.setValue(5)
+            self.max_position.setSuffix(" 只")
+            risk_layout.addRow("最大持仓:", self.max_position)
             
-            # Add right panel to top splitter
+            # 添加风险控制组到右侧布局
+            self.right_layout.addWidget(risk_group)
+            
+            # 创建操作按钮组
+            button_layout = QHBoxLayout()
+            
+            # 分析按钮
+            analyze_btn = QPushButton("分析")
+            analyze_btn.clicked.connect(self.analyze)
+            button_layout.addWidget(analyze_btn)
+            
+            # 回测按钮
+            backtest_btn = QPushButton("回测")
+            backtest_btn.clicked.connect(self.backtest)
+            button_layout.addWidget(backtest_btn)
+            
+            # 优化按钮
+            optimize_btn = QPushButton("优化")
+            optimize_btn.clicked.connect(self.optimize)
+            button_layout.addWidget(optimize_btn)
+            
+            # 添加按钮组到右侧布局
+            self.right_layout.addLayout(button_layout)
+            
+            # 设置右侧面板的最小宽度
+            self.right_panel.setMinimumWidth(300)
+            self.right_panel.setMaximumWidth(400)
+            
+            # 添加右侧面板到顶部分割器
             self.top_splitter.addWidget(self.right_panel)
             
+            self.log_manager.info("右侧面板创建完成")
+            
         except Exception as e:
-            self.log_message(f"创建右侧面板失败: {str(e)}", "error")
+            self.log_manager.error(f"创建右侧面板失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             raise
 
     def optimize(self):
@@ -1357,76 +1502,36 @@ class TradingGUI(QMainWindow):
             print(f"记录日志失败: {str(e)}")
 
     def clear_log(self) -> None:
-        """清除日志内容"""
+        """清除日志内容
+        
+        清除日志显示区域的内容，同时清理日志文件，并优化系统性能
+        """
         try:
-            self.log_text.clear()
+            # 清除日志显示区域
+            if hasattr(self, 'log_text'):
+                self.log_text.clear()
+                
+            # 清除日志文件
+            if hasattr(self, 'log_manager'):
+                self.log_manager.clear()
+                
+            # 优化系统性能
+            self.cleanup_memory()
+            
+            # 记录清除操作
             self.log_message("日志已清除", "info")
+            
+            # 更新UI
+            QApplication.processEvents()
+            
         except Exception as e:
             self.log_message(f"清除日志失败: {str(e)}", "error")
+            # 显示错误对话框
+            QMessageBox.critical(self, "错误", f"清除日志失败: {str(e)}")
 
     def handle_performance_alert(self, message: str) -> None:
         """处理性能警告，优化警告处理"""
         try:
-            # 记录警告日志
-            self.log_message(message, "warning")
-            
-            # 显示警告对话框
-            alert_dialog = QMessageBox(self)
-            alert_dialog.setWindowTitle("性能警告")
-            alert_dialog.setIcon(QMessageBox.Warning)
-            alert_dialog.setText("性能警告")
-            alert_dialog.setInformativeText(message)
-            alert_dialog.setStandardButtons(QMessageBox.Ok)
-            alert_dialog.exec_()
-            
-            # 根据警告类型采取相应措施
-            if "CPU" in message:
-                # 降低更新频率
-                if hasattr(self, 'performance_timer'):
-                    self.performance_timer.setInterval(2000)  # 降低到2秒
-            elif "内存" in message:
-                # 清理内存
-                self.cleanup_memory()
-            elif "响应" in message:
-                # 优化UI更新
-                self.optimize_ui_updates()
-            
-        except Exception as e:
-            self.log_message(f"处理性能警告失败: {str(e)}", "error")
-
-    def optimize_ui_updates(self):
-        """优化UI更新性能"""
-        try:
-            # 暂停不必要的更新
-            if hasattr(self, 'chart_widget'):
-                self.chart_widget.setUpdatesEnabled(False)
-                
-            # 批量更新UI
-            QApplication.processEvents()
-            
-            # 恢复更新
-            if hasattr(self, 'chart_widget'):
-                self.chart_widget.setUpdatesEnabled(True)
-                
-            self.log_message("UI更新已优化", "info")
-            
-        except Exception as e:
-            self.log_message(f"优化UI更新失败: {str(e)}", "error")
-
-    def handle_exception(self, exception: Exception) -> None:
-        """处理异常，优化错误处理"""
-        try:
-            # 获取异常详细信息
-            error_type = type(exception).__name__
-            error_message = str(exception)
-            error_traceback = traceback.format_exc()
-            
-            # 记录错误日志
-            self.log_message(f"发生异常: {error_type}", "error")
-            self.log_message(f"错误信息: {error_message}", "error")
-            self.log_message(f"错误堆栈: {error_traceback}", "error")
-            
-            # 显示错误对话框
             error_dialog = QMessageBox(self)
             error_dialog.setWindowTitle("错误")
             error_dialog.setIcon(QMessageBox.Critical)
@@ -1779,69 +1884,63 @@ class TradingGUI(QMainWindow):
             self.log_message(f"显示指标参数设置对话框失败: {str(e)}", "error")
 
     def create_bottom_panel(self):
-        """Create bottom panel with logs and performance"""
+        """Create bottom panel with logs"""
         try:
-            # Create bottom panel
+            # 创建底部面板
             self.bottom_panel = QWidget()
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
             
-            # Create log group
-            log_group = QGroupBox("日志")
+            # 创建日志控件组
+            log_group = QGroupBox("系统日志")
             log_layout = QVBoxLayout(log_group)
             
-            # Add log text to layout
-            log_layout.addWidget(self.log_text)
+            # 创建日志控件
+            controls_layout = QHBoxLayout()
             
-            # Create log controls
-            log_controls = QHBoxLayout()
-            
-            # Add log level selector
+            # 日志级别过滤器
             log_level_label = QLabel("日志级别:")
             self.log_level_combo = QComboBox()
-            self.log_level_combo.addItems(["全部", "信息", "警告", "错误", "调试"])
+            self.log_level_combo.addItems(["全部", "信息", "警告", "错误"])
             self.log_level_combo.currentTextChanged.connect(self.filter_logs)
-            log_controls.addWidget(log_level_label)
-            log_controls.addWidget(self.log_level_combo)
+            controls_layout.addWidget(log_level_label)
+            controls_layout.addWidget(self.log_level_combo)
             
-            # Add log search
-            self.log_search = QLineEdit()
-            self.log_search.setPlaceholderText("搜索日志...")
-            self.log_search.textChanged.connect(self.search_logs)
-            log_controls.addWidget(self.log_search)
+            # 搜索框
+            self.search_box = QLineEdit()
+            self.search_box.setPlaceholderText("搜索日志...")
+            self.search_box.textChanged.connect(self.search_logs)
+            controls_layout.addWidget(self.search_box)
             
-            # Add clear button
+            # 清除按钮
             clear_button = QPushButton("清除")
             clear_button.clicked.connect(self.clear_log)
-            log_controls.addWidget(clear_button)
+            controls_layout.addWidget(clear_button)
             
-            # Add export button
+            # 导出按钮
             export_button = QPushButton("导出")
             export_button.clicked.connect(self.export_logs)
-            log_controls.addWidget(export_button)
+            controls_layout.addWidget(export_button)
             
-            log_layout.addLayout(log_controls)
+            # 添加控件到日志布局
+            log_layout.addLayout(controls_layout)
             
-            # Add log group to bottom layout
+            # 创建日志文本区域
+            self.log_text = QTextEdit()
+            self.log_text.setReadOnly(True)
+            self.log_text.setLineWrapMode(QTextEdit.NoWrap)
+            log_layout.addWidget(self.log_text)
+            
+            # 添加日志组到底部布局
             self.bottom_layout.addWidget(log_group)
             
-            # Create performance group
-            performance_group = QGroupBox("性能监控")
-            performance_layout = QVBoxLayout(performance_group)
-            
-            # Add performance metrics
-            self.performance_text = QTextEdit()
-            self.performance_text.setReadOnly(True)
-            self.performance_text.setMaximumHeight(100)
-            performance_layout.addWidget(self.performance_text)
-            
-            # Add performance group to bottom layout
-            self.bottom_layout.addWidget(performance_group)
-            
-            # Add bottom panel to bottom splitter
+            # 添加底部面板到底部分割器
             self.bottom_splitter.addWidget(self.bottom_panel)
             
+            self.log_manager.info("底部面板创建完成")
+            
         except Exception as e:
-            self.log_message(f"创建底部面板失败: {str(e)}", "error")
+            self.log_manager.error(f"创建底部面板失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             raise
 
     def filter_logs(self, level: str) -> None:
@@ -1926,7 +2025,7 @@ class TradingGUI(QMainWindow):
             def update_list():
                 try:
                     # 获取所有股票
-                    all_stocks = sm.get_stock_list()
+                    all_stocks = sm.get_stock_list()  # 使用正确的API
                     
                     # 使用弱引用避免内存泄漏
                     stock_list_ref = weakref.ref(self.stock_list)
@@ -2150,78 +2249,30 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_message(f"保存指标组合失败: {str(e)}", "error")
 
-    def zoom_in(self) -> None:
+    def zoom_in(self):
         """放大图表"""
         try:
-            # 获取当前图表
-            current_tab = self.chart_tabs.currentWidget()
-            if not hasattr(current_tab, 'canvas'):
-                return
-                
-            # 获取当前坐标轴
-            ax = current_tab.canvas.figure.axes[0]
-            
-            # 计算新的范围
-            x_min, x_max = ax.get_xlim()
-            y_min, y_max = ax.get_ylim()
-            
-            # 缩小20%
-            x_range = x_max - x_min
-            y_range = y_max - y_min
-            ax.set_xlim(x_min + x_range * 0.1, x_max - x_range * 0.1)
-            ax.set_ylim(y_min + y_range * 0.1, y_max - y_range * 0.1)
-            
-            # 更新图表
-            current_tab.canvas.draw()
-            
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.zoom_in()
+                self.log_message("图表已放大", "info")
         except Exception as e:
             self.log_message(f"放大图表失败: {str(e)}", "error")
             
-    def zoom_out(self) -> None:
+    def zoom_out(self):
         """缩小图表"""
         try:
-            # 获取当前图表
-            current_tab = self.chart_tabs.currentWidget()
-            if not hasattr(current_tab, 'canvas'):
-                return
-                
-            # 获取当前坐标轴
-            ax = current_tab.canvas.figure.axes[0]
-            
-            # 计算新的范围
-            x_min, x_max = ax.get_xlim()
-            y_min, y_max = ax.get_ylim()
-            
-            # 放大20%
-            x_range = x_max - x_min
-            y_range = y_max - y_min
-            ax.set_xlim(x_min - x_range * 0.1, x_max + x_range * 0.1)
-            ax.set_ylim(y_min - y_range * 0.1, y_max + y_range * 0.1)
-            
-            # 更新图表
-            current_tab.canvas.draw()
-            
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.zoom_out()
+                self.log_message("图表已缩小", "info")
         except Exception as e:
             self.log_message(f"缩小图表失败: {str(e)}", "error")
             
-    def reset_zoom(self) -> None:
+    def reset_zoom(self):
         """重置图表缩放"""
         try:
-            # 获取当前图表
-            current_tab = self.chart_tabs.currentWidget()
-            if not hasattr(current_tab, 'canvas'):
-                return
-                
-            # 获取当前坐标轴
-            ax = current_tab.canvas.figure.axes[0]
-            
-            # 重置范围
-            ax.relim()
-            ax.autoscale_view()
-            
-            # 更新图表
-            current_tab.canvas.draw()
-            
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.reset_zoom()
+                self.log_message("图表缩放已重置", "info")
         except Exception as e:
             self.log_message(f"重置图表缩放失败: {str(e)}", "error")
 
@@ -2478,146 +2529,1023 @@ class TradingGUI(QMainWindow):
             self.log_message(f"显示单位转换器失败: {str(e)}", "error")
 
     def start_performance_monitoring(self):
-        """Start performance monitoring system with memory leak prevention"""
+        """启动性能监控系统"""
         try:
-            # Initialize performance monitor if not already initialized
+            # 初始化性能监控器
             if not hasattr(self, 'performance_monitor'):
+                # 使用配置管理器中的性能配置
+                if not hasattr(self.config_manager, 'performance'):
+                    # 如果配置管理器中没有性能配置，创建一个默认配置
+                    from utils.config_types import PerformanceConfig
+                    self.config_manager.performance = PerformanceConfig(
+                        cpu_threshold=80,
+                        memory_threshold=80,
+                        disk_threshold=90,
+                        response_threshold=5,
+                        update_interval=1.0,
+                        metrics_history_size=100,
+                        monitor_cpu=True,
+                        monitor_memory=True,
+                        monitor_disk=True,
+                        log_to_file=True
+                    )
+                
+                # 创建性能监控器
                 self.performance_monitor = PerformanceMonitor(
-                    config=self.config_manager.performance,
-                    log_manager=self.log_manager
+                    config=self.config_manager.performance
                 )
                 
-            # Start monitoring with memory leak prevention
+                # 设置日志管理器
+                self.performance_monitor.set_logger(self.log_manager)
+                
+            # 启动监控
             self.performance_monitor.start_monitoring()
             
-            # Create performance update timer with weak reference
-            self.performance_timer = QTimer()
-            self.performance_timer.timeout.connect(self.update_performance_metrics)
-            self.performance_timer.start(1000)  # Update every second
-            
-            # Connect performance signals with weak reference
+            # 连接性能信号
             self.performance_monitor.performance_updated.connect(self.handle_performance_update)
+            self.performance_monitor.alert_triggered.connect(self.handle_performance_alert)
             
-            # Add memory cleanup
+            # 添加内存清理定时器
             self.cleanup_timer = QTimer()
             self.cleanup_timer.timeout.connect(self.cleanup_memory)
-            self.cleanup_timer.start(30000)  # Cleanup every 30 seconds
+            self.cleanup_timer.start(30000)  # 每30秒清理一次内存
             
-            self.log_message("性能监控系统已启动", "info")
-            
-        except Exception as e:
-            self.log_message(f"启动性能监控系统失败: {str(e)}", "error")
-
-    def cleanup_memory(self):
-        """Clean up memory to prevent leaks"""
-        try:
-            # Force garbage collection
-            gc.collect()
-            
-            # Clear unused caches
-            if hasattr(self, 'data_cache'):
-                self.data_cache.clear()
-            if hasattr(self, 'chart_cache'):
-                self.chart_cache.clear()
-                
-            # Log memory usage
-            process = psutil.Process()
-            memory_info = process.memory_info()
-            self.log_message(f"内存使用: {memory_info.rss / 1024 / 1024:.2f} MB", "debug")
+            self.log_manager.info("性能监控系统已启动")
             
         except Exception as e:
-            self.log_message(f"清理内存失败: {str(e)}", "error")
+            self.log_manager.error(f"启动性能监控系统失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def handle_performance_update(self, metrics: dict):
-        """Handle performance metrics update
+        """处理性能指标更新
+        
+        Args:
+            metrics: 性能指标字典
+        """
+        try:
+            # 更新性能显示
+            self.update_performance_metrics(metrics)
+            
+            # 检查性能警告
+            self.check_performance(metrics)
+            
+        except Exception as e:
+            self.log_manager.error(f"处理性能更新失败: {str(e)}")
+            
+    def handle_performance_alert(self, message: str):
+        """处理性能告警
+        
+        Args:
+            message: 告警消息
+        """
+        try:
+            # 显示告警消息
+            self.log_manager.warning(message)
+            
+            # 如果有告警面板，显示告警
+            if hasattr(self, 'warning_area'):
+                current_time = datetime.now().strftime('%H:%M:%S')
+                self.warning_area.append(f"[{current_time}] {message}")
+                
+        except Exception as e:
+            self.log_manager.error(f"处理性能告警失败: {str(e)}")
+            
+    def check_performance(self, metrics: dict):
+        """检查性能指标
+        
+        Args:
+            metrics: 性能指标字典
+        """
+        try:
+            # 检查CPU使用率
+            if metrics['cpu_usage'] > self.config_manager.performance.cpu_threshold:
+                self.handle_performance_alert(
+                    f"CPU使用率过高: {metrics['cpu_usage']:.1f}%"
+                )
+                
+            # 检查内存使用率
+            if metrics['memory_usage'] > self.config_manager.performance.memory_threshold:
+                self.handle_performance_alert(
+                    f"内存使用率过高: {metrics['memory_usage']:.1f}%"
+                )
+                
+            # 检查响应时间
+            for func, time in metrics['response_times'].items():
+                if time > self.config_manager.performance.response_threshold:
+                    self.handle_performance_alert(
+                        f"函数 {func} 响应时间过长: {time:.2f}秒"
+                    )
+                    
+        except Exception as e:
+            self.log_manager.error(f"检查性能指标失败: {str(e)}")
+        
+    def cleanup_memory(self):
+        """清理内存"""
+        try:
+            # 清理图表缓存
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.clear()
+                
+            # 清理数据缓存
+            if hasattr(self, 'data_cache'):
+                self.data_cache.clear()
+                
+            # 清理日志缓存
+            if hasattr(self, 'log_cache'):
+                self.log_cache.clear()
+                
+            # 强制垃圾回收
+            import gc
+            gc.collect()
+            
+        except Exception as e:
+            self.log_manager.error(f"清理内存失败: {str(e)}")
+
+    def update_performance_metrics(self, metrics: dict) -> None:
+        """更新性能指标显示"""
+        try:
+            # 更新总收益率
+            self.total_return_label.setText(f"{metrics['total_return']*100:.2f}%")
+            
+            # 更新年化收益率
+            self.annual_return_label.setText(f"{metrics['annual_return']*100:.2f}%")
+            
+            # 更新最大回撤
+            self.max_drawdown_label.setText(f"{metrics['max_drawdown']*100:.2f}%")
+            
+            # 更新夏普比率
+            self.sharpe_ratio_label.setText(f"{metrics['sharpe_ratio']:.2f}")
+            
+            # 更新胜率
+            self.win_rate_label.setText(f"{metrics['win_rate']*100:.2f}%")
+            
+            # 更新盈亏比
+            self.profit_factor_label.setText(f"{metrics['profit_factor']:.2f}")
+            
+            # 更新总交易次数
+            self.total_trades_label.setText(str(metrics['total_trades']))
+            
+            # 更新平均持仓天数
+            self.avg_hold_days_label.setText(f"{metrics['avg_hold_days']:.2f}")
+            
+            # 更新资金曲线图表
+            self.update_trend_chart(metrics['equity_curve'])
+            
+        except Exception as e:
+            error_msg = f"更新性能指标失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.error_occurred.emit(error_msg)
+            
+    def update_trend_chart(self, equity_curve: list) -> None:
+        """更新资金曲线图表"""
+        try:
+            # 创建图表
+            fig = go.Figure()
+            
+            # 添加资金曲线
+            fig.add_trace(go.Scatter(
+                y=equity_curve,
+                mode='lines',
+                name='资金曲线',
+                line=dict(color='blue')
+            ))
+            
+            # 更新图表布局
+            fig.update_layout(
+                title='资金曲线',
+                xaxis_title='交易日',
+                yaxis_title='资金',
+                showlegend=True,
+                template='plotly_white'
+            )
+            
+            # 更新图表显示
+            self.trend_chart.setHtml(fig.to_html(include_plotlyjs='cdn'))
+            
+        except Exception as e:
+            error_msg = f"更新资金曲线失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.error_occurred.emit(error_msg)
+
+    def preload_data(self):
+        """预加载常用数据"""
+        try:
+            stocks = self.data_manager.get_stock_list()[:100]  # 限制预加载数量
+            
+            def load_stock_data(stock):
+                try:
+                    data = self.data_manager.get_k_data(stock, 'D')
+                    self.data_cache.set(f"{stock}_D", data)
+                except Exception as e:
+                    self.log_message(f"预加载数据失败: {str(e)}", "error")
+                    
+            # 使用线程池并行加载
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                executor.map(load_stock_data, stocks)
+                
+        except Exception as e:
+            self.log_message(f"预加载数据失败: {str(e)}", "error")
+
+    def optimize_chart_rendering(self):
+        """优化图表渲染性能"""
+        try:
+            # 减少重绘
+            self.chart_widget.setUpdatesEnabled(False)
+            
+            # 使用双缓冲
+            self.chart_widget.setAttribute(Qt.WA_PaintOnScreen, False)
+            self.chart_widget.setAttribute(Qt.WA_NoSystemBackground, False)
+            
+            # 启用硬件加速
+            self.chart_widget.setRenderHint(QPainter.Antialiasing)
+            self.chart_widget.setRenderHint(QPainter.SmoothPixmapTransform)
+            
+        except Exception as e:
+            self.log_message(f"优化图表渲染失败: {str(e)}", "error")
+
+    def handle_exception(self, exception: Exception, error_type: str, error_message: str, error_traceback: str) -> None:
+        """处理系统异常
+        
+        Args:
+            exception: 异常对象
+            error_type: 错误类型
+            error_message: 错误消息
+            error_traceback: 错误堆栈跟踪
+        """
+        try:
+            # 创建错误对话框
+            error_dialog = QMessageBox(self)
+            error_dialog.setWindowTitle("错误")
+            error_dialog.setIcon(QMessageBox.Critical)
+            error_dialog.setText(f"发生错误: {error_type}")
+            error_dialog.setInformativeText(error_message)
+            error_dialog.setDetailedText(error_traceback)
+            error_dialog.setStandardButtons(QMessageBox.Ok)
+            error_dialog.exec_()
+            
+            # 如果错误严重，尝试恢复系统状态
+            if isinstance(exception, (MemoryError, SystemError)):
+                self.cleanup_memory()
+                self.log_message("系统已尝试恢复", "info")
+            
+        except Exception as e:
+            # 如果错误处理本身出错，至少打印到控制台
+            print(f"错误处理失败: {str(e)}")
+            print(f"原始错误: {str(exception)}")
+            
+    def update_performance(self, metrics: dict):
+        """Update performance metrics and display
         
         Args:
             metrics: Dictionary containing performance metrics
         """
         try:
-            # Check for performance alerts
-            if metrics['cpu_usage'] > self.config_manager.performance.cpu_threshold:
-                self.log_message(f"CPU使用率过高: {metrics['cpu_usage']:.1f}%", "warning")
-                
-            if metrics['memory_usage'] > self.config_manager.performance.memory_threshold:
-                self.log_message(f"内存使用率过高: {metrics['memory_usage']:.1f}%", "warning")
-                
-            # Update performance display
-            self.update_performance_metrics()
+            # 更新性能指标
+            self.update_metrics(metrics)
             
-        except Exception as e:
-            self.log_message(f"处理性能更新失败: {str(e)}", "error")
-
-    def update_performance_metrics(self):
-        """Update performance metrics display"""
-        try:
-            if not hasattr(self, 'performance_monitor'):
-                return
-                
-            # Get current metrics
-            metrics = self.performance_monitor.get_metrics()
-            
-            # Update performance text display
+            # 更新性能显示
             if hasattr(self, 'performance_text'):
                 self.performance_text.clear()
-                self.performance_text.append(f"CPU使用率: {metrics['cpu_usage']:.1f}%")
-                self.performance_text.append(f"内存使用率: {metrics['memory_usage']:.1f}%")
-                
-                # Add response times
-                if metrics['response_times']:
-                    self.performance_text.append("\n响应时间:")
-                    for func, time in metrics['response_times'].items():
-                        self.performance_text.append(f"{func}: {time:.3f}s")
-                        
-                # Add exception count
-                if metrics['exceptions'] > 0:
-                    self.performance_text.append(f"\n异常数量: {metrics['exceptions']}")
-                    
+                for name, value in metrics.items():
+                    if isinstance(value, float):
+                        formatted_value = f"{value:.2%}" if "率" in name else f"{value:.2f}"
+                    else:
+                        formatted_value = str(value)
+                    self.performance_text.append(f"{name}: {formatted_value}")
+            
+            # 更新图表
+            if hasattr(self, 'chart_widget'):
+                self.chart_widget.update_performance_chart(metrics)
+            
+            # 记录日志
+            self.log_manager.info("性能指标已更新")
+            
         except Exception as e:
-            self.log_message(f"更新性能指标失败: {str(e)}", "error")
+            self.log_manager.error(f"更新性能指标失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            QMessageBox.critical(self, "错误", f"更新性能指标失败: {str(e)}")
+
+    def handle_error(self, error_msg: str) -> None:
+        """处理错误消息
+        
+        Args:
+            error_msg: 错误消息
+        """
+        try:
+            # 记录错误日志
+            self.log_manager.error(error_msg)
+            
+            # 显示错误对话框
+            error_dialog = QMessageBox(self)
+            error_dialog.setWindowTitle("错误")
+            error_dialog.setIcon(QMessageBox.Critical)
+            error_dialog.setText("发生错误")
+            error_dialog.setInformativeText(error_msg)
+            error_dialog.setDetailedText(traceback.format_exc())
+            error_dialog.setStandardButtons(QMessageBox.Ok)
+            error_dialog.exec_()
+            
+            # 如果是严重错误，尝试恢复系统状态
+            if "MemoryError" in error_msg or "SystemError" in error_msg:
+                self.cleanup_memory()
+                self.log_manager.info("系统已尝试恢复")
+                
+        except Exception as e:
+            # 如果错误处理本身出错，至少打印到控制台
+            print(f"错误处理失败: {str(e)}")
+            print(f"原始错误: {error_msg}")
+
+    def init_performance_display(self):
+        """初始化性能指标显示面板"""
+        try:
+            # 创建性能指标面板
+            self.performance_panel = QWidget()
+            self.performance_panel.setObjectName("performancePanel")
+            layout = QVBoxLayout(self.performance_panel)
+            
+            # 创建性能监控组
+            monitor_group = QGroupBox("系统性能监控")
+            monitor_layout = QGridLayout()
+            
+            # CPU使用率
+            self.cpu_label = QLabel("0%")
+            self.cpu_progress = QProgressBar()
+            self.cpu_progress.setRange(0, 100)
+            monitor_layout.addWidget(QLabel("CPU使用率:"), 0, 0)
+            monitor_layout.addWidget(self.cpu_label, 0, 1)
+            monitor_layout.addWidget(self.cpu_progress, 0, 2)
+            
+            # 内存使用率
+            self.memory_label = QLabel("0%")
+            self.memory_progress = QProgressBar()
+            self.memory_progress.setRange(0, 100)
+            monitor_layout.addWidget(QLabel("内存使用率:"), 1, 0)
+            monitor_layout.addWidget(self.memory_label, 1, 1)
+            monitor_layout.addWidget(self.memory_progress, 1, 2)
+            
+            # 磁盘使用率
+            self.disk_label = QLabel("0%")
+            self.disk_progress = QProgressBar()
+            self.disk_progress.setRange(0, 100)
+            monitor_layout.addWidget(QLabel("磁盘使用率:"), 2, 0)
+            monitor_layout.addWidget(self.disk_label, 2, 1)
+            monitor_layout.addWidget(self.disk_progress, 2, 2)
+            
+            # 响应时间
+            self.response_label = QLabel("0ms")
+            monitor_layout.addWidget(QLabel("响应时间:"), 3, 0)
+            monitor_layout.addWidget(self.response_label, 3, 1)
+            
+            monitor_group.setLayout(monitor_layout)
+            layout.addWidget(monitor_group)
+            
+            # 创建告警区域
+            warning_group = QGroupBox("性能告警")
+            warning_layout = QVBoxLayout()
+            self.warning_area = QTextEdit()
+            self.warning_area.setReadOnly(True)
+            self.warning_area.setMaximumHeight(100)
+            warning_layout.addWidget(self.warning_area)
+            warning_group.setLayout(warning_layout)
+            layout.addWidget(warning_group)
+            
+            # 添加到右侧面板
+            if not self.right_panel.layout():
+                self.right_panel.setLayout(QVBoxLayout())
+            self.right_panel.layout().addWidget(self.performance_panel)
+            
+            # 设置样式
+            self.performance_panel.setStyleSheet("""
+                QProgressBar {
+                    border: 1px solid #cccccc;
+                    border-radius: 5px;
+                    text-align: center;
+                }
+                QProgressBar::chunk {
+                    background-color: #4CAF50;
+                }
+                QLabel {
+                    font-size: 12px;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                }
+            """)
+            
+            self.log_manager.info("性能监控面板初始化完成")
+            
+        except Exception as e:
+            self.log_manager.error(f"初始化性能监控面板失败: {str(e)}")
+            
+    def update_performance_metrics(self, metrics: dict):
+        """更新性能指标显示
+        
+        Args:
+            metrics: 性能指标字典
+        """
+        try:
+            # 更新CPU使用率
+            cpu_usage = metrics.get('cpu_usage', 0)
+            self.cpu_label.setText(f"{cpu_usage:.1f}%")
+            self.cpu_progress.setValue(int(cpu_usage))
+            self.cpu_progress.setStyleSheet(self._get_progress_style(cpu_usage))
+            
+            # 更新内存使用率
+            memory_usage = metrics.get('memory_usage', 0)
+            self.memory_label.setText(f"{memory_usage:.1f}%")
+            self.memory_progress.setValue(int(memory_usage))
+            self.memory_progress.setStyleSheet(self._get_progress_style(memory_usage))
+            
+            # 更新磁盘使用率
+            disk_usage = metrics.get('disk_usage', 0)
+            self.disk_label.setText(f"{disk_usage:.1f}%")
+            self.disk_progress.setValue(int(disk_usage))
+            self.disk_progress.setStyleSheet(self._get_progress_style(disk_usage))
+            
+            # 更新响应时间
+            response_time = metrics.get('response_time', 0)
+            self.response_label.setText(f"{response_time*1000:.0f}ms")
+            
+        except Exception as e:
+            self.log_manager.error(f"更新性能指标显示失败: {str(e)}")
+            
+    def _get_progress_style(self, value: float) -> str:
+        """获取进度条样式
+        
+        Args:
+            value: 进度值
+            
+        Returns:
+            样式字符串
+        """
+        if value >= 90:
+            return "QProgressBar::chunk { background-color: #f44336; }"  # 红色
+        elif value >= 70:
+            return "QProgressBar::chunk { background-color: #ff9800; }"  # 橙色
+        else:
+            return "QProgressBar::chunk { background-color: #4CAF50; }"  # 绿色
+
+    def export_performance_data(self):
+        """导出性能监控数据"""
+        try:
+            from datetime import datetime
+            import pandas as pd
+            import os
+            
+            # 获取性能数据
+            data = {
+                'CPU使用率(%)': self.performance_history['cpu'],
+                '内存使用率(%)': self.performance_history['memory'],
+                '磁盘使用率(%)': self.performance_history['disk'],
+                '响应时间(ms)': self.performance_history['response']
+            }
+            
+            # 创建DataFrame
+            df = pd.DataFrame(data)
+            
+            # 生成文件名
+            filename = f"performance_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            # 获取用户桌面路径
+            desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+            filepath = os.path.join(desktop, filename)
+            
+            # 导出数据
+            df.to_csv(filepath, index=False, encoding='utf-8-sig')
+            
+            self.log_manager.info(f"性能数据已导出到: {filepath}")
+            
+        except Exception as e:
+            self.log_manager.error(f"导出性能数据失败: {str(e)}")
+
+    def on_chart_type_changed(self, index: int):
+        """图表类型改变时的处理
+        
+        Args:
+            index: 选中的图表类型索引
+        """
+        try:
+            chart_type = self.chart_type_combo.currentText()
+            self.log_manager.info(f"切换图表类型: {chart_type}")
+            
+            # 更新图表显示
+            if hasattr(self, 'figure') and hasattr(self, 'canvas'):
+                self.figure.clear()
+                
+                if chart_type == 'K线图':
+                    self._plot_kline()
+                elif chart_type == '分时图':
+                    self._plot_timeline()
+                elif chart_type == '成交量':
+                    self._plot_volume()
+                elif chart_type == 'MACD':
+                    self._plot_macd()
+                elif chart_type == 'RSI':
+                    self._plot_rsi()
+                elif chart_type == '布林带':
+                    self._plot_bollinger()
+                elif chart_type == 'KDJ':
+                    self._plot_kdj()
+                    
+                self.canvas.draw()
+                
+            self.log_manager.info("图表类型切换完成")
+            
+        except Exception as e:
+            error_msg = f"切换图表类型失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def update_chart(self) -> None:
+        """更新图表显示"""
+        try:
+            if not hasattr(self, 'current_stock') or not self.current_stock:
+                return
+                
+            # 获取当前股票数据
+            k_data = self.data_manager.get_k_data(
+                self.current_stock, 
+                self.current_period
+            )
+            
+            if k_data.empty:
+                self.log_message(f"获取股票数据失败: {self.current_stock}", "error")
+                return
+                
+            # 清除主图
+            self.main_figure.clear()
+            
+            # 创建主图和成交量子图
+            if self.current_chart_type == 'candlestick':
+                # K线图
+                ax_main = self.main_figure.add_subplot(211)
+                ax_vol = self.main_figure.add_subplot(212)
+                
+                # 绘制K线图
+                mplfinance.plot(
+                    k_data,
+                    type='candle',
+                    style='charles',
+                    ax=ax_main,
+                    volume=ax_vol,
+                    show_nontrading=False
+                )
+                
+            elif self.current_chart_type == 'line':
+                # 分时图
+                ax_main = self.main_figure.add_subplot(211)
+                ax_vol = self.main_figure.add_subplot(212)
+                
+                # 绘制分时图
+                ax_main.plot(k_data.index, k_data['close'])
+                ax_vol.bar(k_data.index, k_data['volume'])
+                
+            elif self.current_chart_type == 'ohlc':
+                # 美国线
+                ax_main = self.main_figure.add_subplot(211)
+                ax_vol = self.main_figure.add_subplot(212)
+                
+                # 绘制美国线
+                mplfinance.plot(
+                    k_data,
+                    type='ohlc',
+                    style='charles',
+                    ax=ax_main,
+                    volume=ax_vol,
+                    show_nontrading=False
+                )
+                
+            elif self.current_chart_type == 'close':
+                # 收盘价
+                ax_main = self.main_figure.add_subplot(211)
+                ax_vol = self.main_figure.add_subplot(212)
+                
+                # 绘制收盘价
+                ax_main.plot(k_data.index, k_data['close'])
+                ax_vol.bar(k_data.index, k_data['volume'])
+                
+            # 设置标题
+            ax_main.set_title(f"{self.current_stock} - {self.period_combo.currentText()}")
+            
+            # 自动调整布局
+            self.main_figure.tight_layout()
+            
+            # 重绘图表
+            self.main_canvas.draw()
+            
+            # 更新技术指标
+            self.update_indicators()
+            
+            self.log_message("图表更新完成")
+            
+        except Exception as e:
+            self.log_message(f"更新图表失败: {str(e)}", "error")
+
+    def analyze(self):
+        """执行分析"""
+        try:
+            if not self.current_stock:
+                self.log_manager.warning("请先选择股票")
+                return
+                
+            # 获取当前策略
+            strategy = self.strategy_combo.currentText()
+            
+            # 获取策略参数
+            params = {}
+            
+            for i in range(self.strategy_params_layout.rowCount()):
+                label = self.strategy_params_layout.itemAt(i, QFormLayout.LabelRole).widget().text()
+                widget = self.strategy_params_layout.itemAt(i, QFormLayout.FieldRole).widget()
+                if isinstance(widget, QSpinBox):
+                    params[label] = widget.value()
+                elif isinstance(widget, QDoubleSpinBox):
+                    params[label] = widget.value()
+                    
+
+            # 记录开始分析
+            self.log_manager.info(f"开始分析 - 策略: {strategy}")
+            
+            # 获取股票数据
+            data = self.data_manager.get_stock_data(
+                self.current_stock,
+                self.current_period,
+                self.start_date.date().toPyDate(),
+                self.end_date.date().toPyDate()
+            )
+            
+            # 执行分析
+            results = self._execute_analysis(strategy, data, params)
+            
+            # 更新图表
+            self.update_chart(results)
+            
+            # 发送分析完成信号
+            self.analysis_completed.emit(results)
+            
+            self.log_manager.info("分析完成")
+            
+        except Exception as e:
+            error_msg = f"分析失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def backtest(self):
+        """执行回测"""
+        try:
+            if not self.current_stock:
+                self.log_manager.warning("请先选择股票")
+                return
+                
+            # 获取当前策略
+            strategy = self.strategy_combo.currentText()
+            
+            # 获取策略参数
+            params = {}
+            for i in range(self.strategy_params_layout.rowCount()):
+                label = self.strategy_params_layout.itemAt(i, QFormLayout.LabelRole).widget().text()
+                widget = self.strategy_params_layout.itemAt(i, QFormLayout.FieldRole).widget()
+                if isinstance(widget, QSpinBox):
+                    params[label] = widget.value()
+                elif isinstance(widget, QDoubleSpinBox):
+                    params[label] = widget.value()
+                    
+            # 记录开始回测
+            self.log_manager.info(f"开始回测 - 策略: {strategy}")
+            
+            # 创建回测实例
+            from improved_backtest import ImprovedBacktest
+            backtester = ImprovedBacktest(params)
+            
+            # 运行回测
+            backtester.run(
+                stock_code=self.current_stock,
+                start_date=self.start_date.date().toPyDate(),
+                end_date=self.end_date.date().toPyDate()
+            )
+            
+            # 获取回测结果
+            metrics = backtester.get_metrics()
+            
+            # 更新UI显示
+            self.update_performance_metrics(metrics)
+            
+            # 发送回测完成信号
+            self.performance_updated.emit(metrics)
+            
+            self.log_manager.info("回测完成")
+            
+        except Exception as e:
+            error_msg = f"回测失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+    
+
+
+    def _execute_analysis(self, strategy: str, data: pd.DataFrame, params: dict) -> dict:
+        """执行分析
+        
+        Args:
+            strategy: 策略名称
+            data: 股票数据
+            params: 策略参数
+            
+        Returns:
+            分析结果
+        """
+        try:
+            results = {}
+            
+            if strategy == "均线策略":
+                # 计算均线
+                ma_short = data['close'].rolling(window=params.get('快线周期', 5)).mean()
+                ma_long = data['close'].rolling(window=params.get('慢线周期', 20)).mean()
+                
+                # 计算信号
+                signals = pd.Series(0, index=data.index)
+                signals[ma_short > ma_long] = 1
+                signals[ma_short < ma_long] = -1
+                
+                results = {
+                    'strategy': strategy,
+                    'signals': signals,
+                    'indicators': {
+                        'MA_short': ma_short,
+                        'MA_long': ma_long
+                    }
+                }
+                
+            elif strategy == "MACD策略":
+                # 计算MACD
+                exp1 = data['close'].ewm(span=params.get('快线周期', 12), adjust=False).mean()
+                exp2 = data['close'].ewm(span=params.get('慢线周期', 26), adjust=False).mean()
+                macd = exp1 - exp2
+                signal = macd.ewm(span=params.get('信号周期', 9), adjust=False).mean()
+                
+                # 计算信号
+                signals = pd.Series(0, index=data.index)
+                signals[macd > signal] = 1
+                signals[macd < signal] = -1
+                
+                results = {
+                    'strategy': strategy,
+                    'signals': signals,
+                    'indicators': {
+                        'MACD': macd,
+                        'Signal': signal
+                    }
+                }
+                
+            elif strategy == "RSI策略":
+                # 计算RSI
+                delta = data['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=params.get('周期', 14)).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=params.get('周期', 14)).mean()
+                rs = gain / loss
+                rsi = 100 - (100 / (1 + rs))
+                
+                # 计算信号
+                signals = pd.Series(0, index=data.index)
+                signals[rsi < params.get('超卖阈值', 30)] = 1
+                signals[rsi > params.get('超买阈值', 70)] = -1
+                
+                results = {
+                    'strategy': strategy,
+                    'signals': signals,
+                    'indicators': {
+                        'RSI': rsi
+                    }
+                }
+                
+            elif strategy == "布林带策略":
+                # 计算布林带
+                ma = data['close'].rolling(window=params.get('周期', 20)).mean()
+                std = data['close'].rolling(window=params.get('周期', 20)).std()
+                upper = ma + params.get('标准差倍数', 2) * std
+                lower = ma - params.get('标准差倍数', 2) * std
+                
+                # 计算信号
+                signals = pd.Series(0, index=data.index)
+                signals[data['close'] < lower] = 1
+                signals[data['close'] > upper] = -1
+                
+                results = {
+                    'strategy': strategy,
+                    'signals': signals,
+                    'indicators': {
+                        'MA': ma,
+                        'Upper': upper,
+                        'Lower': lower
+                    }
+                }
+                
+            elif strategy == "KDJ策略":
+                # 计算KDJ
+                low_min = data['low'].rolling(window=params.get('周期', 9)).min()
+                high_max = data['high'].rolling(window=params.get('周期', 9)).max()
+                rsv = (data['close'] - low_min) / (high_max - low_min) * 100
+                k = rsv.ewm(com=params.get('K平滑', 2)).mean()
+                d = k.ewm(com=params.get('D平滑', 2)).mean()
+                j = 3 * k - 2 * d
+                
+                # 计算信号
+                signals = pd.Series(0, index=data.index)
+                signals[k < params.get('超卖阈值', 20)] = 1
+                signals[k > params.get('超买阈值', 80)] = -1
+                
+                results = {
+                    'strategy': strategy,
+                    'signals': signals,
+                    'indicators': {
+                        'K': k,
+                        'D': d,
+                        'J': j
+                    }
+                }
+                
+            return results
+            
+        except Exception as e:
+            self.log_manager.error(f"执行分析失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            raise
+
+    def new_file(self):
+        """创建新文件"""
+        try:
+            # 重置所有数据
+            self.data_cache.clear()
+            self.chart_cache.clear()
+            self.stock_list_cache.clear()
+            
+            # 重置UI状态
+            self.update_stock_list_ui()
+            self.reset_chart_view()
+            self.clear_log()
+            
+            self.log_message("已创建新文件", "info")
+        except Exception as e:
+            self.log_message(f"创建新文件失败: {str(e)}", "error")
+
+    def open_file(self):
+        """打开文件"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "打开文件",
+                "",
+                "All Files (*);;Python Files (*.py);;Text Files (*.txt)"
+            )
+            
+            if file_path:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # TODO: 处理文件内容
+                self.log_message("文件打开成功", "info")
+                
+        except Exception as e:
+            self.log_message(f"打开文件失败: {str(e)}", "error")
+            
+    def save_file(self):
+        """保存文件"""
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "保存文件",
+                "",
+                "All Files (*);;Python Files (*.py);;Text Files (*.txt)"
+            )
+            
+            if file_path:
+                # TODO: 获取当前内容并保存
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write("")
+                self.log_message("文件保存成功", "info")
+                
+        except Exception as e:
+            self.log_message(f"保存文件失败: {str(e)}", "error")
+            
+    def undo(self):
+        """撤销上一步操作"""
+        # TODO: 实现撤销功能
+        pass
+        
+    def redo(self):
+        """重做上一步操作"""
+        # TODO: 实现重做功能
+        pass
+        
+    def copy(self):
+        """复制选中内容"""
+        # TODO: 实现复制功能
+        pass
+        
+    def paste(self):
+        """粘贴内容"""
+        # TODO: 实现粘贴功能
+        pass
+        
+    def show_help(self):
+        """显示帮助文档"""
+        try:
+            # TODO: 实现帮助文档显示
+            self.log_message("显示帮助文档", "info")
+        except Exception as e:
+            self.log_message(f"显示帮助文档失败: {str(e)}", "error")
+            
+    def check_update(self):
+        """检查更新"""
+        try:
+            # TODO: 实现更新检查
+            self.log_message("检查更新", "info")
+        except Exception as e:
+            self.log_message(f"检查更新失败: {str(e)}", "error")
+            
+    def show_settings(self):
+        """显示设置对话框"""
+        try:
+            # TODO: 实现设置对话框
+            self.log_message("显示设置对话框", "info")
+        except Exception as e:
+            self.log_message(f"显示设置对话框失败: {str(e)}", "error")
+
+# 添加全局异常处理
+def global_exception_handler(exctype, value, traceback):
+    """全局异常处理器"""
+    try:
+        # 记录错误
+        self.log_manager.error(f"未捕获的异常: {exctype.__name__}: {value}")
+        self.log_manager.error(f"堆栈跟踪:\n{''.join(traceback.format_tb(traceback))}")
+        
+        # 显示错误对话框
+        error_dialog = QErrorMessage(self)
+        error_dialog.showMessage(f"发生错误: {value}\n\n请查看日志获取详细信息。")
+        
+        # 尝试恢复
+        self.cleanup_memory()
+        self.reset_chart_view()
+        
+    except Exception as e:
+        print(f"错误处理失败: {e}")
+        
+sys.excepthook = global_exception_handler
 
 def main():
     """Main program entry"""
-    # Create application
-    app = QApplication(sys.argv)
-    
-    # Initialize log manager
-    logger = LogManager(LoggingConfig(
-        level="DEBUG",
-        save_to_file=True,
-        log_file='trading.log',
-        max_bytes=10*1024*1024,  # 10MB
-        backup_count=5,
-        console_output=True,
-        auto_compress=True,
-        max_logs=1000,
-        performance_log=True,
-        performance_log_file='performance.log',
-        exception_log=True,
-        exception_log_file='exceptions.log',
-        async_logging=True,
-        log_queue_size=1000,
-        worker_threads=2
-    ))
-    
+    logger = None
     try:
+        # Create application
+        app = QApplication(sys.argv)
+        
+        # Initialize config manager first
         print("初始化配置管理器")
-        # Initialize config manager
         config_manager = ConfigManager()
         print("初始化配置管理器完成")
+        
+        # Initialize exception handler
+        print("初始化异常处理器")
+        exception_handler = ExceptionHandler()
+        print("初始化异常处理器完成")
+        
+        # Initialize log manager with the correct LoggingConfig
+        print("初始化日志管理器")
+        logger = LogManager(config_manager.logging)
+        exception_handler.set_logger(logger)
+        print("初始化日志管理器完成")
+        
+        # Install exception handler
+        exception_handler.install()
+        
         # Initialize theme manager
+        print("初始化主题管理器")
         theme_manager = ThemeManager(config_manager)
         print("初始化主题管理器完成")
+        
         # Create main window
+        print("创建主窗口")
         window = TradingGUI()
         print("创建主窗口完成")
+        
+        # Show window
         window.show()
         print("显示主窗口完成")
+        
         # Start event loop
-        sys.exit(app.exec_())
+        return app.exec_()
+        
     except Exception as e:
-        logger.error(f"程序启动失败: {str(e)}")
-        sys.exit(1)
+        # 如果logger已经初始化，使用logger记录错误
+        if logger is not None:
+            logger.error(f"程序启动失败: {str(e)}")
+            logger.error(traceback.format_exc())
+        else:
+            # 如果logger未初始化，打印到控制台
+            print(f"程序启动失败: {str(e)}")
+            print(traceback.format_exc())
+        return 1
 
 if __name__ == '__main__':
-    main() 
+    sys.exit(main()) 

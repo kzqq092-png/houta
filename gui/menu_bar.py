@@ -9,182 +9,208 @@ from PyQt5.QtWidgets import (
     QInputDialog, QShortcut
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QIcon
 
 class MainMenuBar(QMenuBar):
-    """Main menu bar for the trading system"""
+    """主菜单栏"""
     
     def __init__(self, parent=None):
+        """初始化主菜单栏
+        
+        Args:
+            parent: 父窗口
+        """
         super().__init__(parent)
-        self.init_ui()
+        self.parent = parent
+        self.logger = parent.log_manager if hasattr(parent, 'log_manager') else None
         
-    def init_ui(self):
-        """Initialize the UI"""
-        # File menu
-        file_menu = self.addMenu("文件")
+        # 创建菜单项
+        self.file_menu = self.addMenu("文件(&F)")
+        self.edit_menu = self.addMenu("编辑(&E)")
+        self.view_menu = self.addMenu("视图(&V)")
+        self.tools_menu = self.addMenu("工具(&T)")
+        self.help_menu = self.addMenu("帮助(&H)")
         
-        new_action = QAction("新建", self)
-        new_action.setShortcut(QKeySequence.New)
-        new_action.triggered.connect(self.new_file)
-        file_menu.addAction(new_action)
+        self.init_file_menu()
+        self.init_edit_menu()
+        self.init_view_menu()
+        self.init_tools_menu()
+        self.init_help_menu()
         
-        open_action = QAction("打开", self)
-        open_action.setShortcut(QKeySequence.Open)
-        open_action.triggered.connect(self.open_file)
-        file_menu.addAction(open_action)
+    def init_file_menu(self):
+        """初始化文件菜单"""
+        try:
+            # 新建
+            self.new_action = QAction(QIcon("icons/new.png"), "新建(&N)", self)
+            self.new_action.setShortcut("Ctrl+N")
+            self.new_action.setStatusTip("创建新的策略")
+            self.file_menu.addAction(self.new_action)
+            
+            # 打开
+            self.open_action = QAction(QIcon("icons/open.png"), "打开(&O)", self)
+            self.open_action.setShortcut("Ctrl+O")
+            self.open_action.setStatusTip("打开策略文件")
+            self.file_menu.addAction(self.open_action)
+            
+            # 保存
+            self.save_action = QAction(QIcon("icons/save.png"), "保存(&S)", self)
+            self.save_action.setShortcut("Ctrl+S")
+            self.save_action.setStatusTip("保存当前策略")
+            self.file_menu.addAction(self.save_action)
+            
+            self.file_menu.addSeparator()
+            
+            # 最近打开的文件
+            self.recent_menu = self.file_menu.addMenu("最近打开的文件")
+            
+            self.file_menu.addSeparator()
+            
+            # 退出
+            self.exit_action = QAction("退出(&X)", self)
+            self.exit_action.setShortcut("Alt+F4")
+            self.exit_action.setStatusTip("退出程序")
+            self.file_menu.addAction(self.exit_action)
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"初始化文件菜单失败: {str(e)}")
+            
+    def init_edit_menu(self):
+        """初始化编辑菜单"""
+        try:
+            # 撤销
+            self.undo_action = QAction(QIcon("icons/undo.png"), "撤销(&U)", self)
+            self.undo_action.setShortcut("Ctrl+Z")
+            self.edit_menu.addAction(self.undo_action)
+            
+            # 重做
+            self.redo_action = QAction(QIcon("icons/redo.png"), "重做(&R)", self)
+            self.redo_action.setShortcut("Ctrl+Y")
+            self.edit_menu.addAction(self.redo_action)
+            
+            self.edit_menu.addSeparator()
+            
+            # 复制
+            self.copy_action = QAction("复制(&C)", self)
+            self.copy_action.setShortcut("Ctrl+C")
+            self.edit_menu.addAction(self.copy_action)
+            
+            # 粘贴
+            self.paste_action = QAction("粘贴(&V)", self)
+            self.paste_action.setShortcut("Ctrl+V")
+            self.edit_menu.addAction(self.paste_action)
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"初始化编辑菜单失败: {str(e)}")
+            
+    def init_view_menu(self):
+        """初始化视图菜单"""
+        try:
+            # 工具栏
+            self.toolbar_action = QAction("工具栏", self)
+            self.toolbar_action.setCheckable(True)
+            self.toolbar_action.setChecked(True)
+            self.view_menu.addAction(self.toolbar_action)
+            
+            # 状态栏
+            self.statusbar_action = QAction("状态栏", self)
+            self.statusbar_action.setCheckable(True)
+            self.statusbar_action.setChecked(True)
+            self.view_menu.addAction(self.statusbar_action)
+            
+            self.view_menu.addSeparator()
+            
+            # 主题
+            self.theme_menu = self.view_menu.addMenu("主题")
+            self.light_theme_action = QAction("浅色", self)
+            self.dark_theme_action = QAction("深色", self)
+            self.theme_menu.addAction(self.light_theme_action)
+            self.theme_menu.addAction(self.dark_theme_action)
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"初始化视图菜单失败: {str(e)}")
+            
+    def init_tools_menu(self):
+        """初始化工具菜单"""
+        try:
+            # 分析
+            self.analyze_action = QAction(QIcon("icons/analyze.png"), "分析", self)
+            self.analyze_action.setStatusTip("分析当前股票")
+            self.tools_menu.addAction(self.analyze_action)
+            
+            # 回测
+            self.backtest_action = QAction(QIcon("icons/backtest.png"), "回测", self)
+            self.backtest_action.setStatusTip("回测当前策略")
+            self.tools_menu.addAction(self.backtest_action)
+            
+            # 优化
+            self.optimize_action = QAction(QIcon("icons/optimize.png"), "优化", self)
+            self.optimize_action.setStatusTip("优化策略参数")
+            self.tools_menu.addAction(self.optimize_action)
+            
+            self.tools_menu.addSeparator()
+            
+            # 计算器
+            self.calculator_action = QAction(QIcon("icons/calculator.png"), "计算器", self)
+            self.calculator_action.setStatusTip("打开计算器")
+            self.tools_menu.addAction(self.calculator_action)
+            
+            # 单位转换
+            self.converter_action = QAction(QIcon("icons/converter.png"), "单位转换", self)
+            self.converter_action.setStatusTip("打开单位转换器")
+            self.tools_menu.addAction(self.converter_action)
+            
+            self.tools_menu.addSeparator()
+            
+            # 设置
+            self.settings_action = QAction(QIcon("icons/settings.png"), "设置", self)
+            self.settings_action.setStatusTip("打开设置对话框")
+            self.tools_menu.addAction(self.settings_action)
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"初始化工具菜单失败: {str(e)}")
+            
+    def init_help_menu(self):
+        """初始化帮助菜单"""
+        try:
+            # 帮助文档
+            self.help_action = QAction("帮助文档", self)
+            self.help_action.setStatusTip("打开帮助文档")
+            self.help_menu.addAction(self.help_action)
+            
+            # 检查更新
+            self.update_action = QAction("检查更新", self)
+            self.update_action.setStatusTip("检查新版本")
+            self.help_menu.addAction(self.update_action)
+            
+            self.help_menu.addSeparator()
+            
+            # 关于
+            self.about_action = QAction("关于", self)
+            self.about_action.setStatusTip("关于本程序")
+            self.help_menu.addAction(self.about_action)
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"初始化帮助菜单失败: {str(e)}")
+                
+    def log_message(self, message: str, level: str = "info"):
+        """记录日志消息
         
-        save_action = QAction("保存", self)
-        save_action.setShortcut(QKeySequence.Save)
-        save_action.triggered.connect(self.save_file)
-        file_menu.addAction(save_action)
-        
-        save_as_action = QAction("另存为", self)
-        save_as_action.setShortcut(QKeySequence.SaveAs)
-        save_as_action.triggered.connect(self.save_file_as)
-        file_menu.addAction(save_as_action)
-        
-        file_menu.addSeparator()
-        
-        import_action = QAction("导入数据", self)
-        import_action.triggered.connect(self.import_data)
-        file_menu.addAction(import_action)
-        
-        export_action = QAction("导出数据", self)
-        export_action.triggered.connect(self.export_data)
-        file_menu.addAction(export_action)
-        
-        file_menu.addSeparator()
-        
-        exit_action = QAction("退出", self)
-        exit_action.setShortcut(QKeySequence.Quit)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # Edit menu
-        edit_menu = self.addMenu("编辑")
-        
-        undo_action = QAction("撤销", self)
-        undo_action.setShortcut(QKeySequence.Undo)
-        undo_action.triggered.connect(self.undo)
-        edit_menu.addAction(undo_action)
-        
-        redo_action = QAction("重做", self)
-        redo_action.setShortcut(QKeySequence.Redo)
-        redo_action.triggered.connect(self.redo)
-        edit_menu.addAction(redo_action)
-        
-        edit_menu.addSeparator()
-        
-        cut_action = QAction("剪切", self)
-        cut_action.setShortcut(QKeySequence.Cut)
-        cut_action.triggered.connect(self.cut)
-        edit_menu.addAction(cut_action)
-        
-        copy_action = QAction("复制", self)
-        copy_action.setShortcut(QKeySequence.Copy)
-        copy_action.triggered.connect(self.copy)
-        edit_menu.addAction(copy_action)
-        
-        paste_action = QAction("粘贴", self)
-        paste_action.setShortcut(QKeySequence.Paste)
-        paste_action.triggered.connect(self.paste)
-        edit_menu.addAction(paste_action)
-        
-        edit_menu.addSeparator()
-        
-        select_all_action = QAction("全选", self)
-        select_all_action.setShortcut(QKeySequence.SelectAll)
-        select_all_action.triggered.connect(self.select_all)
-        edit_menu.addAction(select_all_action)
-        
-        # View menu
-        view_menu = self.addMenu("视图")
-        
-        zoom_in_action = QAction("放大", self)
-        zoom_in_action.setShortcut(QKeySequence.ZoomIn)
-        zoom_in_action.triggered.connect(self.zoom_in)
-        view_menu.addAction(zoom_in_action)
-        
-        zoom_out_action = QAction("缩小", self)
-        zoom_out_action.setShortcut(QKeySequence.ZoomOut)
-        zoom_out_action.triggered.connect(self.zoom_out)
-        view_menu.addAction(zoom_out_action)
-        
-        reset_zoom_action = QAction("重置缩放", self)
-        reset_zoom_action.setShortcut(QKeySequence("Ctrl+0"))
-        reset_zoom_action.triggered.connect(self.reset_zoom)
-        view_menu.addAction(reset_zoom_action)
-        
-        view_menu.addSeparator()
-        
-        fullscreen_action = QAction("全屏", self)
-        fullscreen_action.setShortcut(QKeySequence.FullScreen)
-        fullscreen_action.triggered.connect(self.toggle_fullscreen)
-        view_menu.addAction(fullscreen_action)
-        
-        # Analysis menu
-        analysis_menu = self.addMenu("分析")
-        
-        analyze_action = QAction("分析", self)
-        analyze_action.setShortcut(QKeySequence("Ctrl+A"))
-        analyze_action.triggered.connect(self.analyze)
-        analysis_menu.addAction(analyze_action)
-        
-        backtest_action = QAction("回测", self)
-        backtest_action.setShortcut(QKeySequence("Ctrl+B"))
-        backtest_action.triggered.connect(self.backtest)
-        analysis_menu.addAction(backtest_action)
-        
-        optimize_action = QAction("优化", self)
-        optimize_action.setShortcut(QKeySequence("Ctrl+O"))
-        optimize_action.triggered.connect(self.optimize)
-        analysis_menu.addAction(optimize_action)
-        
-        analysis_menu.addSeparator()
-        
-        pattern_recognition_action = QAction("形态识别", self)
-        pattern_recognition_action.triggered.connect(self.pattern_recognition)
-        analysis_menu.addAction(pattern_recognition_action)
-        
-        wave_analysis_action = QAction("波浪分析", self)
-        wave_analysis_action.triggered.connect(self.wave_analysis)
-        analysis_menu.addAction(wave_analysis_action)
-        
-        risk_analysis_action = QAction("风险分析", self)
-        risk_analysis_action.triggered.connect(self.risk_analysis)
-        analysis_menu.addAction(risk_analysis_action)
-        
-        # Tools menu
-        tools_menu = self.addMenu("工具")
-        
-        settings_action = QAction("设置", self)
-        settings_action.setShortcut(QKeySequence.Preferences)
-        settings_action.triggered.connect(self.show_settings)
-        tools_menu.addAction(settings_action)
-        
-        tools_menu.addSeparator()
-        
-        calculator_action = QAction("计算器", self)
-        calculator_action.triggered.connect(self.show_calculator)
-        tools_menu.addAction(calculator_action)
-        
-        converter_action = QAction("单位转换器", self)
-        converter_action.triggered.connect(self.show_converter)
-        tools_menu.addAction(converter_action)
-        
-        # Help menu
-        help_menu = self.addMenu("帮助")
-        
-        documentation_action = QAction("文档", self)
-        documentation_action.setShortcut(QKeySequence.HelpContents)
-        documentation_action.triggered.connect(self.show_documentation)
-        help_menu.addAction(documentation_action)
-        
-        help_menu.addSeparator()
-        
-        about_action = QAction("关于", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        Args:
+            message: 日志消息
+            level: 日志级别，可选值为 info、warning、error
+        """
+        if self.logger:
+            if level == "error":
+                self.logger.error(message)
+            elif level == "warning":
+                self.logger.warning(message)
+            else:
+                self.logger.info(message)
         
     def new_file(self):
         """Create a new file"""

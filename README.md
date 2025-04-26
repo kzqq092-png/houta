@@ -1,6 +1,129 @@
-# Hikyuu-UI 量化交易系统
+# Hikyuu 量化交易系统
 
-基于 Hikyuu 的量化交易系统图形界面，提供完整的交易分析、回测和实盘功能。
+## 系统概述
+Hikyuu量化交易系统是一个功能完整的量化交易平台，支持策略开发、回测、实盘交易等功能。系统采用Python编写，具有良好的可扩展性和易用性。
+
+## 核心类调用关系
+
+```mermaid
+graph TD
+    A[TradingGUI] --> B[TradingSystem]
+    B --> C[DataManager]
+    B --> D[RiskManager]
+    B --> E[SignalSystem]
+    B --> F[MoneyManager]
+    
+    C --> G[DataLoader]
+    C --> H[DataPreprocessor]
+    
+    D --> I[RiskControl]
+    D --> J[RiskMetrics]
+    
+    E --> K[TechnicalAnalyzer]
+    E --> L[PatternRecognizer]
+    
+    F --> M[PositionManager]
+    F --> N[StopLoss]
+```
+
+### 主要类说明
+
+1. TradingGUI (main.py)
+   - 系统主窗口
+   - 负责UI交互和事件处理
+   - 调用TradingSystem执行交易操作
+
+2. TradingSystem (core/trading_system.py)
+   - 交易系统核心
+   - 协调各个子系统工作
+   - 处理交易逻辑
+
+3. DataManager (core/data_manager.py)
+   - 数据管理
+   - 处理数据获取和存储
+   - 提供数据访问接口
+
+4. RiskManager (core/risk_manager.py)
+   - 风险管理
+   - 执行风险控制
+   - 计算风险指标
+
+5. SignalSystem (core/signal_system.py)
+   - 信号系统
+   - 生成交易信号
+   - 处理信号过滤
+
+### 数据流
+
+1. 数据获取流程
+   ```
+   DataManager -> DataLoader -> DataPreprocessor -> TradingSystem
+   ```
+
+2. 信号生成流程
+   ```
+   TechnicalAnalyzer -> PatternRecognizer -> SignalSystem -> TradingSystem
+   ```
+
+3. 交易执行流程
+   ```
+   TradingSystem -> RiskManager -> MoneyManager -> PositionManager
+   ```
+
+## 配置说明
+
+系统配置文件位于 config/ 目录下：
+- config.json: 主配置文件
+- logging.json: 日志配置
+- theme.json: 主题配置
+- performance.json: 性能监控配置
+
+## 开发指南
+
+详细的开发文档请参考 [docs/development.md](docs/development.md)。
+
+### 开发规范
+
+1. 代码风格
+   - 遵循PEP 8
+   - 使用类型提示
+   - 编写详细的文档字符串
+
+2. 错误处理
+   - 使用异常处理
+   - 记录详细日志
+   - 提供用户友好的错误提示
+
+3. 性能优化
+   - 使用缓存
+   - 优化算法
+   - 监控系统性能
+
+## 依赖项
+
+详见 requirements.txt
+
+## 启动说明
+
+1. 安装依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. 运行程序：
+   ```bash
+   python main.py
+   ```
+
+## 注意事项
+
+1. 首次运行需要初始化配置
+2. 建议使用虚拟环境
+3. 需要Python 3.8+
+
+## 许可证
+
+MIT License
 
 ## 功能特点
 
@@ -132,10 +255,6 @@ hikyuu-ui/
 3. 提交更改
 4. 推送到分支
 5. 创建 Pull Request
-
-## 许可证
-
-MIT License
 
 ## 联系方式
 
@@ -380,4 +499,63 @@ stop_loss = ComponentFactory.create_stoploss({
 - 开发实时交易接口
 - 优化回测性能和报告生成
 - 添加更多市场状态分析指标 
+
+## 功能说明
+
+### 回测功能
+
+系统提供了完整的回测功能，支持以下特性：
+
+1. 策略回测
+   - 支持多种交易策略
+   - 可配置策略参数
+   - 支持止损止盈
+   - 支持最大持仓期限制
+
+2. 性能指标
+   - 总收益率
+   - 年化收益率
+   - 最大回撤
+   - 夏普比率
+   - 胜率
+   - 盈亏比
+   - 总交易次数
+   - 平均持仓天数
+
+3. 可视化
+   - 资金曲线图表
+   - 交易记录表格
+   - 性能指标面板
+
+4. 数据导出
+   - 支持导出回测结果
+   - 支持导出交易记录
+   - 支持导出性能指标
+
+### 使用方法
+
+1. 选择股票
+   - 在左侧股票列表中选择要回测的股票
+   - 支持股票代码搜索和筛选
+
+2. 配置策略
+   - 在策略选择框中选择交易策略
+   - 配置策略参数
+   - 设置回测时间范围
+
+3. 运行回测
+   - 点击"回测"按钮开始回测
+   - 查看回测结果和性能指标
+   - 分析资金曲线和交易记录
+
+4. 导出结果
+   - 点击"导出"按钮保存回测结果
+   - 选择导出格式和保存位置
+
+### 注意事项
+
+1. 回测结果仅供参考，不构成投资建议
+2. 回测结果受数据质量和策略参数影响
+3. 建议进行多周期、多策略的回测对比
+4. 注意控制回测参数，避免过拟合
 
