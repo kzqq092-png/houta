@@ -23,7 +23,7 @@ from datetime import datetime
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import json
-import csv
+import traceback
 
 class StockScreenerWidget(QWidget):
     """选股策略组件"""
@@ -129,7 +129,7 @@ class StockScreenerWidget(QWidget):
             buttons_layout = QHBoxLayout()
             
             screen_button = QPushButton("开始选股")
-            screen_button.clicked.connect(self.start_screening)
+            screen_button.clicked.connect(self.run_screener)
             buttons_layout.addWidget(screen_button)
             
             export_button = QPushButton("导出结果")
@@ -363,123 +363,84 @@ class StockScreenerWidget(QWidget):
         except Exception as e:
             self.log_manager.log(f"添加综合条件失败: {str(e)}", LogLevel.ERROR)
             
-    def start_screening(self):
-        """开始选股过程"""
+    def run_screener(self):
+        """运行选股器"""
         try:
-            # 获取当前策略类型和条件
-            strategy_type = self.strategy_type.currentText()
-            conditions = self.get_current_conditions()
+            # 禁用运行按钮,避免重复点击
+            QTimer.singleShot(0, lambda: self.run_button.setEnabled(False))
             
-            # 显示进度条
-            progress_dialog = QProgressDialog("正在选股...", "取消", 0, 100, self)
-            progress_dialog.setWindowModality(Qt.WindowModal)
-            progress_dialog.setAutoClose(True)
-            progress_dialog.setAutoReset(True)
-            progress_dialog.setWindowTitle("选股进度")
-            
-            # 创建选股线程
-            self.screening_thread = ScreeningThread(
-                self.screener,
-                strategy_type,
-                conditions
-            )
+            # 获取选股条件
+            conditions = self._get_screener_conditions()
+            if not conditions:
+                return
+                
+            # 在新线程中运行选股
+            self.screener_thread = QThread()
+            self.screener_worker = StockScreenerWorker(conditions)
+            self.screener_worker.moveToThread(self.screener_thread)
             
             # 连接信号
-            self.screening_thread.progress_updated.connect(progress_dialog.setValue)
-            self.screening_thread.screening_completed.connect(
-                lambda results: self.on_screening_completed(results, progress_dialog)
-            )
-            self.screening_thread.error_occurred.connect(
-                lambda error: self.on_screening_error(error, progress_dialog)
-            )
+            self.screener_thread.started.connect(self.screener_worker.run)
+            self.screener_worker.finished.connect(self.screener_thread.quit)
+            self.screener_worker.finished.connect(self.screener_worker.deleteLater)
+            self.screener_thread.finished.connect(self.screener_thread.deleteLater)
+            self.screener_worker.progress.connect(self._update_progress)
+            self.screener_worker.result.connect(self._handle_screener_result)
             
-            # 开始选股
-            self.screening_thread.start()
+            # 启动线程
+            self.screener_thread.start()
             
         except Exception as e:
-            self.log_manager.log(f"开始选股失败: {str(e)}", LogLevel.ERROR)
-            QMessageBox.critical(self, "错误", f"开始选股失败: {str(e)}")
+            self.log_manager.log(f"启动选股失败: {e}", LogLevel.ERROR)
+            QTimer.singleShot(0, lambda: self.run_button.setEnabled(True))
             
-    def on_screening_completed(self, results: pd.DataFrame, progress_dialog: QProgressDialog):
-        """处理选股完成事件
+    def _update_progress(self, progress: int):
+        """更新进度条
         
         Args:
-            results: 选股结果DataFrame
-            progress_dialog: 进度对话框
+            progress: 进度值(0-100)
         """
         try:
-            # 关闭进度对话框
-            progress_dialog.close()
+            QTimer.singleShot(0, lambda: self.progress_bar.setValue(progress))
+        except Exception as e:
+            self.log_manager.log(f"更新进度条失败: {e}", LogLevel.ERROR)
             
+    def _handle_screener_result(self, result: dict):
+        """处理选股结果
+        
+        Args:
+            result: 选股结果字典
+        """
+        try:
+            QTimer.singleShot(0, lambda: self._update_ui_safely(result))
+        except Exception as e:
+            self.log_manager.log(f"处理选股结果失败: {e}", LogLevel.ERROR)
+            
+    def _update_ui_safely(self, result: dict):
+        """在主线程中安全地更新UI
+        
+        Args:
+            result: 选股结果字典
+        """
+        try:
             # 更新结果表格
-            self.update_result_table(results)
+            self.update_result_table(result.get('stocks', []))
             
-            # 记录日志
-            self.log_manager.log(f"选股完成，共筛选出{len(results)}只股票", LogLevel.INFO)
+            # 更新统计信息
+            self._update_statistics(result.get('stats', {}))
             
-        except Exception as e:
-            self.log_manager.log(f"处理选股结果失败: {str(e)}", LogLevel.ERROR)
-            
-    def on_screening_error(self, error: str, progress_dialog: QProgressDialog):
-        """处理选股错误事件
-        
-        Args:
-            error: 错误信息
-            progress_dialog: 进度对话框
-        """
-        try:
-            # 关闭进度对话框
-            progress_dialog.close()
-            
-            # 显示错误信息
-            QMessageBox.critical(self, "错误", f"选股过程中发生错误: {error}")
-            
-            # 记录日志
-            self.log_manager.log(f"选股失败: {error}", LogLevel.ERROR)
-            
-        except Exception as e:
-            self.log_manager.log(f"处理选股错误失败: {str(e)}", LogLevel.ERROR)
-            
-    def update_result_table(self, results: pd.DataFrame):
-        """更新结果表格
-        
-        Args:
-            results: 选股结果DataFrame
-        """
-        try:
-            # 清空表格
-            self.result_table.setRowCount(0)
-            
-            # 设置行数
-            self.result_table.setRowCount(len(results))
-            
-            # 填充数据
-            for i, (_, row) in enumerate(results.iterrows()):
-                # 股票代码
-                code_item = QTableWidgetItem(row['code'])
-                self.result_table.setItem(i, 0, code_item)
-                
-                # 股票名称
-                name_item = QTableWidgetItem(row['name'])
-                self.result_table.setItem(i, 1, name_item)
-                
-                # 最新价
-                price_item = QTableWidgetItem(f"{row['close']:.2f}")
-                self.result_table.setItem(i, 2, price_item)
-                
-                # 涨跌幅
-                change_item = QTableWidgetItem(f"{row['change_percent']:.2f}%")
-                self.result_table.setItem(i, 3, change_item)
-                
-                # 筛选得分
-                score_item = QTableWidgetItem(f"{row['score']:.2f}")
-                self.result_table.setItem(i, 4, score_item)
-                
             # 更新图表
-            self.update_chart()
+            self._update_charts(result.get('charts', {}))
+            
+            # 启用运行按钮
+            self.run_button.setEnabled(True)
+            
+            # 重置进度条
+            self.progress_bar.setValue(0)
             
         except Exception as e:
-            self.log_manager.log(f"更新结果表格失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
+            self.run_button.setEnabled(True)
             
     def on_stock_selected(self):
         """Handle stock selection in result table"""
@@ -1204,27 +1165,87 @@ class StockScreenerWidget(QWidget):
             return False
             
     def update_result_table(self, results):
-        """更新结果表格"""
-        self.result_table.setRowCount(len(results))
+        """更新结果表格
         
-        # 按匹配度排序
-        results.sort(key=lambda x: x['match_ratio'], reverse=True)
-        
-        for i, result in enumerate(results):
-            # 设置股票代码
-            code_item = QTableWidgetItem(result['code'])
-            self.result_table.setItem(i, 0, code_item)
+        Args:
+            results: DataFrame or list of dict containing stock screening results
+        """
+        try:
+            # 清空表格
+            self.result_table.setRowCount(0)
             
-            # 设置股票名称
-            name_item = QTableWidgetItem(result['name'])
-            self.result_table.setItem(i, 1, name_item)
+            if isinstance(results, pd.DataFrame):
+                # 如果输入是DataFrame
+                self.result_table.setRowCount(len(results))
+                for i, (_, row) in enumerate(results.iterrows()):
+                    # 设置股票代码
+                    code_item = QTableWidgetItem(str(row['code']))
+                    self.result_table.setItem(i, 0, code_item)
+                    
+                    # 设置股票名称
+                    name_item = QTableWidgetItem(str(row['name']))
+                    self.result_table.setItem(i, 1, name_item)
+                    
+                    # 设置最新价
+                    close_item = QTableWidgetItem(f"{row['close']:.2f}")
+                    close_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.result_table.setItem(i, 2, close_item)
+                    
+                    # 设置涨跌幅
+                    change_item = QTableWidgetItem(f"{row['change_percent']:.2f}%")
+                    change_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    if row['change_percent'] > 0:
+                        change_item.setForeground(QColor("#FF4D4D"))
+                    elif row['change_percent'] < 0:
+                        change_item.setForeground(QColor("#4DB870"))
+                    self.result_table.setItem(i, 3, change_item)
+                    
+                    # 设置筛选得分
+                    score_item = QTableWidgetItem(f"{row['score']:.2f}")
+                    score_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.result_table.setItem(i, 4, score_item)
+            else:
+                # 如果输入是字典列表
+                self.result_table.setRowCount(len(results))
+                for i, result in enumerate(results):
+                    # 设置股票代码
+                    code_item = QTableWidgetItem(str(result['code']))
+                    self.result_table.setItem(i, 0, code_item)
+                    
+                    # 设置股票名称
+                    name_item = QTableWidgetItem(str(result['name']))
+                    self.result_table.setItem(i, 1, name_item)
+                    
+                    # 设置最新价
+                    close_item = QTableWidgetItem(f"{result['close']:.2f}")
+                    close_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.result_table.setItem(i, 2, close_item)
+                    
+                    # 设置涨跌幅
+                    change_item = QTableWidgetItem(f"{result['change_percent']:.2f}%")
+                    change_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    if result['change_percent'] > 0:
+                        change_item.setForeground(QColor("#FF4D4D"))
+                    elif result['change_percent'] < 0:
+                        change_item.setForeground(QColor("#4DB870"))
+                    self.result_table.setItem(i, 3, change_item)
+                    
+                    # 设置筛选得分
+                    score_item = QTableWidgetItem(f"{result['score']:.2f}")
+                    score_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.result_table.setItem(i, 4, score_item)
+                    
+            # 调整列宽
+            self.result_table.resizeColumnsToContents()
             
-            # 设置匹配度
-            match_item = QTableWidgetItem(f"{result['match_ratio']:.2%}")
-            self.result_table.setItem(i, 2, match_item)
+            # 更新状态
+            self.log_manager.info(f"更新选股结果表格完成，共{len(results)}条记录")
             
-        # 调整列宽
-        self.result_table.resizeColumnsToContents()
+        except Exception as e:
+            error_msg = f"更新结果表格失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            QMessageBox.critical(self, "错误", error_msg)
 
     def load_template(self):
         """加载选中的模板"""

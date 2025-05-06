@@ -57,7 +57,7 @@ class ConfigManager(QObject):
         """
         super().__init__()
         
-        self._config_dir = config_dir or os.path.join(os.path.dirname(os.path.dirname(__file__)), ".config")
+        self._config_dir = config_dir or os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
         self._config_name = config_name
         self._format = format.lower()
         self._auto_save = auto_save

@@ -393,54 +393,41 @@ class MarketSentimentWidget(QWidget):
         # TODO: 实现预警设置对话框
         pass
         
-    def update_sentiment_data(self, data: Dict[str, Any]):
+    def update_sentiment_data(self, data: dict):
         """更新市场情绪数据
         
         Args:
-            data: 市场情绪数据
+            data: 市场情绪数据字典
         """
         try:
-            # 1. 更新指标卡片
-            if hasattr(self, 'indicator_cards'):
-                self.update_indicator_cards(data)
-            
-            # 2. 更新情绪指标表格
-            if hasattr(self, 'sentiment_table'):
-                self._update_sentiment_table(data)
-            
-            # 3. 更新情绪图表
-            if hasattr(self, 'sentiment_chart'):
-                self._update_sentiment_chart(data)
-            
-            # 4. 更新市场热度指示器
-            if hasattr(self, 'heat_progress'):
-                self._update_heat_indicator(data)
-            
-            # 5. 检查警报
-            if hasattr(self, '_alerts'):
-                self._check_alerts(data)
-            
-            # 6. 更新状态标签
-            if hasattr(self, 'status_label'):
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                self.status_label.setText(f"数据更新成功 - {current_time}")
-            
-            # 7. 缓存数据
-            if hasattr(self, '_data_cache'):
-                self._data_cache = data
-                current_time = time.time()
-                self._cache_time[current_time] = data
-            
-                # 8. 清理过期缓存（保留最近1小时的数据）
-                self._cache_time = {t: d for t, d in self._cache_time.items() 
-                                  if current_time - t <= 3600}
+            # 使用QTimer.singleShot确保在主线程中更新UI
+            QTimer.singleShot(0, lambda: self._update_ui_safely(data))
             
         except Exception as e:
-            error_msg = f"更新市场情绪数据失败: {str(e)}"
-            self.log_manager.log(error_msg, LogLevel.ERROR)
-            if hasattr(self, 'status_label'):
-                self.status_label.setText(error_msg)
-                self.status_label.setStyleSheet("color: #FF5252;")  # 红色
+            self.log_manager.log(f"更新市场情绪数据失败: {e}", LogLevel.ERROR)
+            
+    def _update_ui_safely(self, data: dict):
+        """在主线程中安全地更新UI
+        
+        Args:
+            data: 市场情绪数据字典
+        """
+        try:
+            # 更新数据缓存
+            self._data_cache.update(data)
+            self._cache_time[datetime.now()] = data
+            
+            # 更新各个指标
+            self._update_sentiment_index(data)
+            self._update_heat_indicator(data)
+            self._update_charts(data)
+            self._update_tables(data)
+            
+            # 检查预警条件
+            self._check_alerts(data)
+            
+        except Exception as e:
+            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
         
     def _update_sentiment_chart(self, data):
         """更新情绪图表

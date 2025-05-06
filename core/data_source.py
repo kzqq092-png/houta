@@ -8,6 +8,7 @@ import logging
 from enum import Enum, auto
 import hikyuu as hku
 
+
 class DataFrequency(Enum):
     """数据频率"""
     TICK = auto()      # 逐笔
@@ -20,6 +21,7 @@ class DataFrequency(Enum):
     WEEK = auto()      # 周线
     MONTH = auto()     # 月线
 
+
 class DataSourceType(Enum):
     """数据源类型"""
     SINA = auto()
@@ -28,16 +30,18 @@ class DataSourceType(Enum):
     LOCAL = auto()
     HIKYUU = auto()  # 添加Hikyuu数据源类型
 
+
 class MarketDataType(Enum):
     """市场数据类型"""
     TICK = auto()      # 逐笔成交
     KLINE = auto()     # K线数据
     DEPTH = auto()     # 深度数据
-    TRANSACTION = auto() # 逐笔委托
+    TRANSACTION = auto()  # 逐笔委托
+
 
 class DataSource(ABC):
     """数据源基类"""
-    
+
     def __init__(self, source_type: DataSourceType):
         self.source_type = source_type
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
@@ -49,7 +53,7 @@ class DataSource(ABC):
     @abstractmethod
     def connect(self) -> bool:
         """连接到数据源
-        
+
         Returns:
             bool: 连接是否成功
         """
@@ -63,11 +67,11 @@ class DataSource(ABC):
     @abstractmethod
     def subscribe(self, symbols: List[str], data_types: List[MarketDataType]) -> bool:
         """订阅数据
-        
+
         Args:
             symbols: 股票代码列表
             data_types: 数据类型列表
-            
+
         Returns:
             bool: 订阅是否成功
         """
@@ -76,11 +80,11 @@ class DataSource(ABC):
     @abstractmethod
     def unsubscribe(self, symbols: List[str], data_types: List[MarketDataType]) -> bool:
         """取消订阅
-        
+
         Args:
             symbols: 股票代码列表
             data_types: 数据类型列表
-            
+
         Returns:
             bool: 取消订阅是否成功
         """
@@ -91,13 +95,13 @@ class DataSource(ABC):
                   start_date: Optional[datetime] = None,
                   end_date: Optional[datetime] = None) -> pd.DataFrame:
         """获取K线数据
-        
+
         Args:
             symbol: 股票代码
             freq: 数据频率
             start_date: 开始日期
             end_date: 结束日期
-            
+
         Returns:
             pd.DataFrame: K线数据，包含以下列:
                 - datetime: 时间
@@ -113,10 +117,10 @@ class DataSource(ABC):
     @abstractmethod
     def get_real_time_quotes(self, symbols: List[str]) -> pd.DataFrame:
         """获取实时行情
-        
+
         Args:
             symbols: 股票代码列表
-            
+
         Returns:
             pd.DataFrame: 实时行情数据，包含以下列:
                 - symbol: 股票代码
@@ -134,7 +138,7 @@ class DataSource(ABC):
 
     def add_subscriber(self, callback):
         """添加订阅者
-        
+
         Args:
             callback: 回调函数，接收数据更新通知
         """
@@ -143,7 +147,7 @@ class DataSource(ABC):
 
     def remove_subscriber(self, callback):
         """移除订阅者
-        
+
         Args:
             callback: 要移除的回调函数
         """
@@ -152,7 +156,7 @@ class DataSource(ABC):
 
     def _notify_subscribers(self, data: Dict[str, Any]):
         """通知所有订阅者
-        
+
         Args:
             data: 要发送的数据
         """
@@ -162,9 +166,10 @@ class DataSource(ABC):
             except Exception as e:
                 self.logger.error(f"通知订阅者失败: {str(e)}")
 
+
 class DataSourceManager:
     """数据源管理器"""
-    
+
     def __init__(self):
         self._sources: Dict[DataSourceType, DataSource] = {}
         self._active_source = None
@@ -186,10 +191,10 @@ class DataSourceManager:
         if source_type not in self._sources:
             self.logger.error(f"数据源 {source_type.value} 不存在")
             return False
-        
+
         if self._active_source:
             self._active_source.disconnect()
-        
+
         self._active_source = self._sources[source_type]
         return self._active_source.connect()
 
@@ -208,7 +213,7 @@ class DataSourceManager:
         return self._active_source.get_real_time_quotes(symbols)
 
     def subscribe(self, symbols: List[str], data_types: List[MarketDataType],
-                 callback) -> bool:
+                  callback) -> bool:
         """订阅数据"""
         if not self._active_source:
             raise RuntimeError("没有设置活动数据源")
@@ -223,9 +228,10 @@ class DataSourceManager:
         self._active_source.remove_subscriber(callback)
         return self._active_source.unsubscribe(symbols, data_types)
 
+
 class HikyuuDataSource(DataSource):
     """Hikyuu数据源"""
-    
+
     def __init__(self):
         super().__init__(DataSourceType.HIKYUU)
         self._connected = False
@@ -258,12 +264,12 @@ class HikyuuDataSource(DataSource):
         try:
             stock = hku.getStock(symbol)
             ktype = self._convert_freq_to_ktype(freq)
-            
+
             if not start_date:
-                start_date = stock.startDatetime
+                start_date = stock.start_datetime
             if not end_date:
-                end_date = stock.lastDatetime
-                
+                end_date = stock.last_datetime
+
             query = hku.Query(start_date, end_date, ktype)
             kdata = stock.getKData(query)
             return self._convert_kdata_to_df(kdata)
@@ -300,4 +306,4 @@ class HikyuuDataSource(DataSource):
             'volume': [k.volume for k in kdata],
             'amount': [k.amount for k in kdata],
         }
-        return pd.DataFrame(data) 
+        return pd.DataFrame(data)

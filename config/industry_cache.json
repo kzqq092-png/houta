@@ -1,0 +1,805 @@
+{
+  "industry_data": {
+    "832876": {
+      "code": "832876",
+      "name": "慧为智能",
+      "csrc_industry": "消费电子",
+      "exchange_industry": "消费电子",
+      "market": "BJ",
+      "industry_standard": "深圳特区,融资融券,专精特新,信创"
+    },
+    "873305": {
+      "code": "873305",
+      "name": "九菱科技",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "BJ",
+      "industry_standard": "稀土永磁,融资融券,专精特新"
+    },
+    "688280": {
+      "code": "688280",
+      "name": "精进电动-UW",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "预盈预增,融资融券,无人驾驶,昨日涨停,昨日连板,新能源车,昨日涨停_含一字,昨日连板_含一字"
+    },
+    "688609": {
+      "code": "688609",
+      "name": "九联科技",
+      "csrc_industry": "通信设备",
+      "exchange_industry": "通信设备",
+      "market": "SH",
+      "industry_standard": "机构重仓,物联网,预盈预增,融资融券,智慧城市,智能家居,沪股通,5G概念,虚拟现实,人工智能,边缘计算,鸿蒙概念,信创,CPO概念,光通信模块,星闪概念"
+    },
+    "301509": {
+      "code": "301509",
+      "name": "金凯生科",
+      "csrc_industry": "生物制品",
+      "exchange_industry": "生物制品",
+      "market": "OTHER",
+      "industry_standard": "QFII重仓,预亏预减,融资融券,创业板综,CRO,专精特新,减肥药"
+    },
+    "300963": {
+      "code": "300963",
+      "name": "中洲特材",
+      "csrc_industry": "有色金属",
+      "exchange_industry": "有色金属",
+      "market": "SZ",
+      "industry_standard": "军工,新材料,核能核电,融资融券,页岩气,3D打印,医疗器械概念,创业板综,中俄贸易概念,超超临界发电"
+    },
+    "300879": {
+      "code": "300879",
+      "name": "大叶股份",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SZ",
+      "industry_standard": "预盈预增,融资融券,创业板综,贬值受益,昨日触板,乡村振兴,机器人概念,减速器,跨境电商"
+    },
+    "300093": {
+      "code": "300093",
+      "name": "*ST金刚",
+      "csrc_industry": "光伏设备",
+      "exchange_industry": "光伏设备",
+      "market": "SZ",
+      "industry_standard": "ST股,新材料,预亏预减,太阳能,西部大开发,创业板综,HIT电池,建筑节能"
+    },
+    "300047": {
+      "code": "300047",
+      "name": "天源迪科",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "SZ",
+      "industry_standard": "军工,深圳特区,云计算,融资融券,大数据,互联金融,网络安全,在线教育,阿里概念,国产软件,创业板综,人工智能,深股通,AI智能体,区块链,百度概念,华为概念,数字货币,智慧政务,车联网(车路云),蚂蚁概念,鸿蒙概念,华为昇腾,华为欧拉,职业教育,数字经济,跨境支付,机器人概念,信创,ChatGPT概念,时空大数据,算力概念,数据要素,财税数字化,智谱AI,DeepSeek概念"
+    },
+    "300918": {
+      "code": "300918",
+      "name": "南山智尚",
+      "csrc_industry": "纺织服装",
+      "exchange_industry": "纺织服装",
+      "market": "SZ",
+      "industry_standard": "融资融券,创业板综,养老金,中俄贸易概念,跨境电商,抗菌面料,人形机器人"
+    },
+    "300884": {
+      "code": "300884",
+      "name": "狄耐克",
+      "csrc_industry": "计算机设备",
+      "exchange_industry": "计算机设备",
+      "market": "SZ",
+      "industry_standard": "预亏预减,融资融券,智慧城市,国家安防,智能家居,人脑工程,创业板综,人工智能,华为概念,边缘计算,鸿蒙概念,专精特新,机器人概念"
+    },
+    "301123": {
+      "code": "301123",
+      "name": "奕东电子",
+      "csrc_industry": "消费电子",
+      "exchange_industry": "消费电子",
+      "market": "OTHER",
+      "industry_standard": "预亏预减,LED,融资融券,创业板综,深股通,小米概念,氢能源,电子烟,储能,铜缆高速连接"
+    },
+    "301082": {
+      "code": "301082",
+      "name": "久盛电气",
+      "csrc_industry": "电网设备",
+      "exchange_industry": "电网设备",
+      "market": "OTHER",
+      "industry_standard": "预亏预减,核能核电,融资融券,创业板综,专精特新,熔盐储能"
+    },
+    "688511": {
+      "code": "688511",
+      "name": "*ST天微",
+      "csrc_industry": "电子元件",
+      "exchange_industry": "电子元件",
+      "market": "SH",
+      "industry_standard": "军工,ST股,预亏预减,西部大开发,军民融合,传感器,专精特新"
+    },
+    "873726": {
+      "code": "873726",
+      "name": "卓兆点胶",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "BJ",
+      "industry_standard": "太阳能,融资融券,苹果概念,新能源车,半导体概念,专精特新,机器人概念"
+    },
+    "833751": {
+      "code": "833751",
+      "name": "惠同新材",
+      "csrc_industry": "钢铁行业",
+      "exchange_industry": "钢铁行业",
+      "market": "BJ",
+      "industry_standard": "节能环保,融资融券,专精特新"
+    },
+    "688077": {
+      "code": "688077",
+      "name": "大地熊",
+      "csrc_industry": "小金属",
+      "exchange_industry": "小金属",
+      "market": "SH",
+      "industry_standard": "机构重仓,预盈预增,稀土永磁,融资融券,专精特新"
+    },
+    "835207": {
+      "code": "835207",
+      "name": "众诚科技",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "BJ",
+      "industry_standard": "融资融券,智慧城市,大数据,在线教育,人工智能,互联医疗,华为概念,智慧政务,专精特新,数字经济,信创,数据要素"
+    },
+    "688722": {
+      "code": "688722",
+      "name": "同益中",
+      "csrc_industry": "化纤行业",
+      "exchange_industry": "化纤行业",
+      "market": "SH",
+      "industry_standard": "军工,新材料,融资融券,央国企改革,专精特新"
+    },
+    "300984": {
+      "code": "300984",
+      "name": "金沃股份",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "SZ",
+      "industry_standard": "融资融券,创业板综"
+    },
+    "836961": {
+      "code": "836961",
+      "name": "西磁科技",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "BJ",
+      "industry_standard": "锂电池,稀土永磁,融资融券,专精特新"
+    },
+    "300870": {
+      "code": "300870",
+      "name": "欧陆通",
+      "csrc_industry": "电源设备",
+      "exchange_industry": "电源设备",
+      "market": "SZ",
+      "industry_standard": "转债标的,深圳特区,预盈预增,融资融券,充电桩,5G概念,创业板综,深股通,贬值受益,华为概念,氢能源,氮化镓,第三代半导体,无线充电,百元股,液冷概念"
+    },
+    "300421": {
+      "code": "300421",
+      "name": "力星股份",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "SZ",
+      "industry_standard": "QFII重仓,风能,创业板综,新能源车,机器人概念,人形机器人"
+    },
+    "301310": {
+      "code": "301310",
+      "name": "鑫宏业",
+      "csrc_industry": "电网设备",
+      "exchange_industry": "电网设备",
+      "market": "OTHER",
+      "industry_standard": "核能核电,太阳能,融资融券,充电桩,创业板综,新能源车,储能,专精特新,机器人概念,高压快充,人形机器人"
+    },
+    "688183": {
+      "code": "688183",
+      "name": "生益电子",
+      "csrc_industry": "电子元件",
+      "exchange_industry": "电子元件",
+      "market": "SH",
+      "industry_standard": "预盈预增,融资融券,沪股通,无人驾驶,华为概念,PCB,AIPC"
+    },
+    "300398": {
+      "code": "300398",
+      "name": "飞凯材料",
+      "csrc_industry": "电子化学品",
+      "exchange_industry": "电子化学品",
+      "market": "SZ",
+      "industry_standard": "新材料,转债标的,预盈预增,融资融券,参股新三板,创业板综,深股通,OLED,富时罗素,光刻机(胶),国产芯片,半导体概念,中芯概念,专精特新,光通信模块"
+    },
+    "301525": {
+      "code": "301525",
+      "name": "儒竞科技",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "OTHER",
+      "industry_standard": "融资融券,创业板综,深股通,新能源车,汽车热管理,机器人概念,新型工业化"
+    },
+    "301137": {
+      "code": "301137",
+      "name": "哈焊华通",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "OTHER",
+      "industry_standard": "军工,核能核电,融资融券,央国企改革,一带一路,创业板综,专精特新,新型工业化"
+    },
+    "300368": {
+      "code": "300368",
+      "name": "ST汇金",
+      "csrc_industry": "计算机设备",
+      "exchange_industry": "计算机设备",
+      "market": "SZ",
+      "industry_standard": "ST股,智慧城市,互联金融,央国企改革,国产软件,创业板综,雄安新区,华为概念,数据中心,信创"
+    },
+    "870199": {
+      "code": "870199",
+      "name": "倍益康",
+      "csrc_industry": "医疗器械",
+      "exchange_industry": "医疗器械",
+      "market": "BJ",
+      "industry_standard": "西部大开发,融资融券,医疗器械概念,昨日涨停,鸿蒙概念,昨日涨停_含一字,机器人概念,谷子经济"
+    },
+    "871396": {
+      "code": "871396",
+      "name": "常辅股份",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "BJ",
+      "industry_standard": "核能核电,融资融券,工业互联"
+    },
+    "301337": {
+      "code": "301337",
+      "name": "亚华电子",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "OTHER",
+      "industry_standard": "预亏预减,融资融券,养老概念,创业板综,互联医疗,鸿蒙概念,专精特新,机器人概念"
+    },
+    "300638": {
+      "code": "300638",
+      "name": "广和通",
+      "csrc_industry": "通信设备",
+      "exchange_industry": "通信设备",
+      "market": "SZ",
+      "industry_standard": "深圳特区,物联网,移动支付,深成500,智能电网,融资融券,5G概念,创业板综,深股通,区块链,边缘计算,富时罗素,车联网(车路云),专精特新,机器人概念,低空经济,DeepSeek概念"
+    },
+    "836807": {
+      "code": "836807",
+      "name": "奔朗新材",
+      "csrc_industry": "非金属材料",
+      "exchange_industry": "非金属材料",
+      "market": "BJ",
+      "industry_standard": "稀土永磁,融资融券,粤港自贸,乡村振兴,半导体概念,碳化硅"
+    },
+    "688299": {
+      "code": "688299",
+      "name": "长阳科技",
+      "csrc_industry": "光学光电子",
+      "exchange_industry": "光学光电子",
+      "market": "SH",
+      "industry_standard": "新材料,机构重仓,预亏预减,LED,太阳能,融资融券,华为概念,PCB,固态电池"
+    },
+    "688719": {
+      "code": "688719",
+      "name": "爱科赛博",
+      "csrc_industry": "电源设备",
+      "exchange_industry": "电源设备",
+      "market": "SH",
+      "industry_standard": "预亏预减,太阳能,西部大开发,融资融券,华为概念,新能源车,储能,液冷概念"
+    },
+    "300031": {
+      "code": "300031",
+      "name": "宝通科技",
+      "csrc_industry": "游戏",
+      "exchange_industry": "游戏",
+      "market": "SZ",
+      "industry_standard": "创投,网络游戏,股权激励,预盈预增,长江三角,融资融券,虚拟现实,创业板综,人工智能,增强现实,无人驾驶,深股通,工业互联,百度概念,富时罗素,光刻机(胶),元宇宙概念,虚拟数字人,机器人概念,谷子经济"
+    },
+    "300423": {
+      "code": "300423",
+      "name": "昇辉科技",
+      "csrc_industry": "电网设备",
+      "exchange_industry": "电网设备",
+      "market": "SZ",
+      "industry_standard": "节能环保,预盈预增,智能电网,智慧城市,国家安防,智能家居,燃料电池,创业板综,冷链物流,氢能源,智慧政务,储能,智慧灯杆"
+    },
+    "300382": {
+      "code": "300382",
+      "name": "斯莱克",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SZ",
+      "industry_standard": "物联网,预亏预减,太阳能,融资融券,创业板综,深股通,新能源车,抖音小店,C2M概念,专精特新"
+    },
+    "300255": {
+      "code": "300255",
+      "name": "常山药业",
+      "csrc_industry": "化学制药",
+      "exchange_industry": "化学制药",
+      "market": "SZ",
+      "industry_standard": "机构重仓,预盈预增,融资融券,创业板综,深股通,雄安新区,医疗美容,肝素概念,化妆品概念,创新药"
+    },
+    "831856": {
+      "code": "831856",
+      "name": "浩淼科技",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "BJ",
+      "industry_standard": "物联网,融资融券,国家安防,无人驾驶,专精特新,机器人概念"
+    },
+    "300695": {
+      "code": "300695",
+      "name": "兆丰股份",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SZ",
+      "industry_standard": "创投,创业板综,新能源车,专精特新,轮毂电机,人形机器人"
+    },
+    "300169": {
+      "code": "300169",
+      "name": "天晟新材",
+      "csrc_industry": "化学制品",
+      "exchange_industry": "化学制品",
+      "market": "SZ",
+      "industry_standard": "参股券商,新材料,预盈预增,风能,医疗器械概念,创业板综,小米概念,OLED,华为概念,新能源车,噪声防治,微盘股,柔性屏(折叠屏)"
+    },
+    "300128": {
+      "code": "300128",
+      "name": "锦富技术",
+      "csrc_industry": "光学光电子",
+      "exchange_industry": "光学光电子",
+      "market": "SZ",
+      "industry_standard": "锂电池,太阳能,融资融券,石墨烯,苹果概念,智能家居,央国企改革,创业板综,深股通,华为概念,英伟达概念"
+    },
+    "688313": {
+      "code": "688313",
+      "name": "仕佳光子",
+      "csrc_industry": "通信设备",
+      "exchange_industry": "通信设备",
+      "market": "SH",
+      "industry_standard": "预盈预增,融资融券,沪股通,5G概念,国产芯片,数据中心,激光雷达,F5G概念,CPO概念"
+    },
+    "835184": {
+      "code": "835184",
+      "name": "国源科技",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "BJ",
+      "industry_standard": "融资融券,大数据,国产软件,人工智能,乡村振兴,数字经济"
+    },
+    "301225": {
+      "code": "301225",
+      "name": "恒勃股份",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "OTHER",
+      "industry_standard": "QFII重仓,融资融券,医疗器械概念,创业板综,氢能源,新能源车,车联网(车路云),汽车芯片,华为汽车,专精特新,汽车热管理"
+    },
+    "300044": {
+      "code": "300044",
+      "name": "ST赛为",
+      "csrc_industry": "互联网服务",
+      "exchange_industry": "互联网服务",
+      "market": "SZ",
+      "industry_standard": "军工,网络游戏,ST股,深圳特区,云计算,智慧城市,大数据,无人机,5G概念,PPP模式,创业板综,人工智能,无人驾驶,数据中心,抖音概念(字节概念),生物识别,机器视觉,低价股,机器人概念,新型工业化,低空经济"
+    },
+    "834407": {
+      "code": "834407",
+      "name": "驰诚股份",
+      "csrc_industry": "仪器仪表",
+      "exchange_industry": "仪器仪表",
+      "market": "BJ",
+      "industry_standard": "节能环保,融资融券,传感器,鸿蒙概念,专精特新"
+    },
+    "301259": {
+      "code": "301259",
+      "name": "艾布鲁",
+      "csrc_industry": "环保行业",
+      "exchange_industry": "环保行业",
+      "market": "OTHER",
+      "industry_standard": "节能环保,预亏预减,融资融券,创业板综,人工智能,乡村振兴,垃圾分类,新型城镇化,算力概念"
+    },
+    "688583": {
+      "code": "688583",
+      "name": "思看科技",
+      "csrc_industry": "仪器仪表",
+      "exchange_industry": "仪器仪表",
+      "market": "SH",
+      "industry_standard": "次新股,融资融券,3D打印,特斯拉,医疗器械概念,大飞机,新能源车,注册制次新股,工程机械概念,专精特新,百元股,机器人概念"
+    },
+    "688595": {
+      "code": "688595",
+      "name": "芯海科技",
+      "csrc_industry": "半导体",
+      "exchange_industry": "半导体",
+      "market": "SH",
+      "industry_standard": "转债标的,深圳特区,物联网,预亏预减,锂电池,融资融券,智能穿戴,智能家居,沪股通,人工智能,电子烟,国产芯片,无线耳机,传感器,鸿蒙概念,汽车芯片,专精特新,荣耀概念"
+    },
+    "300366": {
+      "code": "300366",
+      "name": "创意信息",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "SZ",
+      "industry_standard": "军工,物联网,预亏预减,云计算,智能电网,西部大开发,融资融券,大数据,国产软件,5G概念,创业板综,人工智能,深股通,昨日涨停,华为概念,边缘计算,数字孪生,卫星互联网,数据中心,商业航天,华为昇腾,元宇宙概念,华为欧拉,数据安全,昨日涨停_含一字,信创,毫米波概念,数据要素,DeepSeek概念"
+    },
+    "688159": {
+      "code": "688159",
+      "name": "有方科技",
+      "csrc_industry": "通信设备",
+      "exchange_industry": "通信设备",
+      "market": "SH",
+      "industry_standard": "深圳特区,物联网,移动支付,预盈预增,智能电网,融资融券,水利建设,智慧城市,阿里概念,充电桩,5G概念,无人驾驶,华为概念,车联网(车路云),专精特新"
+    },
+    "301336": {
+      "code": "301336",
+      "name": "趣睡科技",
+      "csrc_industry": "家用轻工",
+      "exchange_industry": "家用轻工",
+      "market": "OTHER",
+      "industry_standard": "西部大开发,融资融券,创业板综,人工智能,小米概念,户外露营,DeepSeek概念"
+    },
+    "300758": {
+      "code": "300758",
+      "name": "七彩化学",
+      "csrc_industry": "化学制品",
+      "exchange_industry": "化学制品",
+      "market": "SZ",
+      "industry_standard": "预盈预增,创业板综,光刻机(胶),钠离子电池,专精特新,钙钛矿电池"
+    },
+    "600396": {
+      "code": "600396",
+      "name": "华电辽能",
+      "csrc_industry": "电力行业",
+      "exchange_industry": "电力行业",
+      "market": "SH",
+      "industry_standard": "新能源,预盈预增,风能,央国企改革,东北振兴,氢能源,绿色电力,低价股"
+    },
+    "600303": {
+      "code": "600303",
+      "name": "曙光股份",
+      "csrc_industry": "汽车整车",
+      "exchange_industry": "汽车整车",
+      "market": "SH",
+      "industry_standard": "军工,预盈预增,参股新三板,燃料电池,氢能源,新能源车"
+    },
+    "002490": {
+      "code": "002490",
+      "name": "山东墨龙",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SZ",
+      "industry_standard": "AH股,预盈预增,海工装备,页岩气,油气设服,央国企改革,股权转让,深股通,天然气,标准普尔"
+    },
+    "000677": {
+      "code": "000677",
+      "name": "恒天海龙",
+      "csrc_industry": "化纤行业",
+      "exchange_industry": "化纤行业",
+      "market": "SZ",
+      "industry_standard": "低空经济"
+    },
+    "600281": {
+      "code": "600281",
+      "name": "华阳新材",
+      "csrc_industry": "小金属",
+      "exchange_industry": "小金属",
+      "market": "SH",
+      "industry_standard": "预盈预增,央国企改革,昨日触板,降解塑料,微盘股"
+    },
+    "002471": {
+      "code": "002471",
+      "name": "中超控股",
+      "csrc_industry": "电网设备",
+      "exchange_industry": "电网设备",
+      "market": "SZ",
+      "industry_standard": "军工,创投,预亏预减,智能电网,融资融券,参股新三板,石墨烯,充电桩,昨日涨停,商业航天,昨日涨停_含一字,低价股,机器人概念"
+    },
+    "002672": {
+      "code": "002672",
+      "name": "东江环保",
+      "csrc_industry": "环保行业",
+      "exchange_industry": "环保行业",
+      "market": "SZ",
+      "industry_standard": "节能环保,AH股,深圳特区,融资融券,央国企改革,深股通,富时罗素,垃圾分类,标准普尔,医废处理,汽车拆解,生物质能发电"
+    },
+    "002195": {
+      "code": "002195",
+      "name": "岩山科技",
+      "csrc_industry": "互联网服务",
+      "exchange_industry": "互联网服务",
+      "market": "SZ",
+      "industry_standard": "创投,网络游戏,深成500,预亏预减,云计算,长江三角,融资融券,大数据,互联金融,网络安全,阿里概念,国产软件,中证500,人脑工程,人工智能,无人驾驶,深股通,AI智能体,百度概念,华为概念,富时罗素,标准普尔,抖音概念(字节概念),鸿蒙概念,华为昇腾,机器人概念,AIGC概念,AI芯片,数据要素,短剧互动游戏,多模态AI,Sora概念,AIPC,AI制药（医疗）,AI语料,首发经济,DeepSeek概念"
+    },
+    "601908": {
+      "code": "601908",
+      "name": "京运通",
+      "csrc_industry": "光伏设备",
+      "exchange_industry": "光伏设备",
+      "market": "SH",
+      "industry_standard": "新能源,节能环保,预亏预减,稀土永磁,太阳能,风能,融资融券,参股保险,上证380,沪股通,标准普尔,半导体概念,第三代半导体,碳交易,碳化硅,专精特新,绿色电力,低价股,破净股"
+    },
+    "002427": {
+      "code": "002427",
+      "name": "尤夫股份",
+      "csrc_industry": "化纤行业",
+      "exchange_industry": "化纤行业",
+      "market": "SZ",
+      "industry_standard": "机构重仓,预盈预增,海洋经济,央国企改革"
+    },
+    "600448": {
+      "code": "600448",
+      "name": "华纺股份",
+      "csrc_industry": "纺织服装",
+      "exchange_industry": "纺织服装",
+      "market": "SH",
+      "industry_standard": "参股银行,融资融券,央国企改革,贬值受益,工业大麻,C2M概念,低价股,抗菌面料,微盘股"
+    },
+    "000565": {
+      "code": "000565",
+      "name": "渝三峡Ａ",
+      "csrc_industry": "化学制品",
+      "exchange_industry": "化学制品",
+      "market": "SZ",
+      "industry_standard": "军工,成渝特区,预盈预增,西部大开发,融资融券,石墨烯,央国企改革,一带一路,昨日涨停,氢能源,昨日涨停_含一字,昨日连板_含一字"
+    },
+    "002355": {
+      "code": "002355",
+      "name": "兴民智通",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SZ",
+      "industry_standard": "预盈预增,融资融券,参股新三板,大数据,无人机,5G概念,人工智能,无人驾驶,百度概念,华为概念,数字孪生,新能源车,车联网(车路云),鸿蒙概念,EDR概念,昨日涨停_含一字,电子后视镜,时空大数据,算力概念,数据要素,低空经济"
+    },
+    "002440": {
+      "code": "002440",
+      "name": "闰土股份",
+      "csrc_industry": "化学制品",
+      "exchange_industry": "化学制品",
+      "market": "SZ",
+      "industry_standard": "预盈预增,融资融券,深股通,富时罗素,标准普尔,破净股"
+    },
+    "605228": {
+      "code": "605228",
+      "name": "神通科技",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "转债标的,预亏预减,特斯拉,无人驾驶,新能源车,毫米波概念"
+    },
+    "603168": {
+      "code": "603168",
+      "name": "莎普爱思",
+      "csrc_industry": "化学制药",
+      "exchange_industry": "化学制药",
+      "market": "SH",
+      "industry_standard": "预亏预减,婴童概念"
+    },
+    "603335": {
+      "code": "603335",
+      "name": "迪生力",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "锂电池,融资融券,贬值受益,新能源车,动力电池回收,汽车一体化压铸,微盘股"
+    },
+    "603300": {
+      "code": "603300",
+      "name": "海南华铁",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SH",
+      "industry_standard": "融资融券,央国企改革,上证380,沪股通,乡村振兴,数字经济,AIGC概念,算力概念,低空经济"
+    },
+    "002860": {
+      "code": "002860",
+      "name": "星帅尔",
+      "csrc_industry": "家电行业",
+      "exchange_industry": "家电行业",
+      "market": "SZ",
+      "industry_standard": "太阳能,长江三角,融资融券,5G概念,昨日触板,垃圾分类,ETC,新能源车,传感器,HIT电池,储能,专精特新,TOPCon电池,光通信模块"
+    },
+    "002255": {
+      "code": "002255",
+      "name": "海陆重工",
+      "csrc_industry": "电源设备",
+      "exchange_industry": "电源设备",
+      "market": "SZ",
+      "industry_standard": "煤化工,节能环保,核能核电,长江三角,充电桩,氢能源,氮化镓,第三代半导体,专精特新,可控核聚变"
+    },
+    "002576": {
+      "code": "002576",
+      "name": "通达动力",
+      "csrc_industry": "电机",
+      "exchange_industry": "电机",
+      "market": "SZ",
+      "industry_standard": "风能,新能源车,发电机概念,机器人概念"
+    },
+    "600800": {
+      "code": "600800",
+      "name": "渤海化学",
+      "csrc_industry": "化学制品",
+      "exchange_industry": "化学制品",
+      "market": "SH",
+      "industry_standard": "化工原料,机构重仓,物联网,滨海新区,预亏预减,融资融券,央国企改革,氢能源"
+    },
+    "002106": {
+      "code": "002106",
+      "name": "莱宝高科",
+      "csrc_industry": "光学光电子",
+      "exchange_industry": "光学光电子",
+      "market": "SZ",
+      "industry_standard": "新材料,深圳特区,太阳能,融资融券,石墨烯,深股通,小米概念,OLED,华为概念,富时罗素,电子纸概念"
+    },
+    "002272": {
+      "code": "002272",
+      "name": "川润股份",
+      "csrc_industry": "工程机械",
+      "exchange_industry": "工程机械",
+      "market": "SZ",
+      "industry_standard": "军工,节能环保,QFII重仓,机构重仓,预亏预减,西部大开发,风能,融资融券,昨日涨停,特高压,储能,工程机械概念,昨日涨停_含一字,超超临界发电,液冷概念"
+    },
+    "603610": {
+      "code": "603610",
+      "name": "麒盛科技",
+      "csrc_industry": "装修建材",
+      "exchange_industry": "装修建材",
+      "market": "SH",
+      "industry_standard": "大数据,养老概念,婴童概念,电商概念,智能家居,人脑工程,贬值受益,工业互联,国产芯片,传感器,鸿蒙概念"
+    },
+    "605068": {
+      "code": "605068",
+      "name": "明新旭腾",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "转债标的,预亏预减,华为汽车"
+    },
+    "600774": {
+      "code": "600774",
+      "name": "汉商集团",
+      "csrc_industry": "商业百货",
+      "exchange_industry": "商业百货",
+      "market": "SH",
+      "industry_standard": "中药概念,婴童概念,医疗器械概念,免疫治疗,新零售,医疗美容,流感,辅助生殖,内贸流通,昨日涨停_含一字,昨日连板_含一字"
+    },
+    "603270": {
+      "code": "603270",
+      "name": "金帝股份",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "SH",
+      "industry_standard": "风能,融资融券,养老金,新能源车,专精特新"
+    },
+    "002544": {
+      "code": "002544",
+      "name": "普天科技",
+      "csrc_industry": "通信服务",
+      "exchange_industry": "通信服务",
+      "market": "SZ",
+      "industry_standard": "军工,物联网,深成500,预盈预增,云计算,融资融券,智慧城市,北斗导航,在线教育,央国企改革,一带一路,5G概念,深股通,雄安新区,华为概念,边缘计算,富时罗素,PCB,标准普尔,IPv6,卫星互联网,数据中心,低空经济"
+    },
+    "600392": {
+      "code": "600392",
+      "name": "盛和资源",
+      "csrc_industry": "小金属",
+      "exchange_industry": "小金属",
+      "market": "SH",
+      "industry_standard": "稀土永磁,西部大开发,融资融券,参股保险,苹果概念,央国企改革,小金属概念,中证500,上证380,沪股通,富时罗素,标准普尔"
+    },
+    "000948": {
+      "code": "000948",
+      "name": "南天信息",
+      "csrc_industry": "软件开发",
+      "exchange_industry": "软件开发",
+      "market": "SZ",
+      "industry_standard": "军工,创投,参股银行,物联网,移动支付,云计算,西部大开发,融资融券,智慧城市,大数据,互联金融,网络安全,在线教育,医疗器械概念,央国企改革,国产软件,深股通,区块链,华为概念,ETC,UWB概念,数字货币,智慧政务,碳交易,NFT概念,机器视觉,数字经济,跨境支付,电子身份证,信创,财税数字化"
+    },
+    "000158": {
+      "code": "000158",
+      "name": "常山北明",
+      "csrc_industry": "综合行业",
+      "exchange_industry": "综合行业",
+      "market": "SZ",
+      "industry_standard": "创投,参股银行,预亏预减,云计算,融资融券,智慧城市,大数据,网络安全,央国企改革,京津冀,国产软件,人工智能,深股通,雄安新区,昨日涨停,区块链,工业互联,百度概念,冷链物流,华为概念,富时罗素,标准普尔,车联网(车路云),数据中心,鸿蒙概念,华为昇腾,NFT概念,国资云概念,昨日涨停_含一字,信创,智谱AI"
+    },
+    "600735": {
+      "code": "600735",
+      "name": "新华锦",
+      "csrc_industry": "纺织服装",
+      "exchange_industry": "纺织服装",
+      "market": "SH",
+      "industry_standard": "QFII重仓,机构重仓,预亏预减,养老概念,婴童概念,医疗器械概念,一带一路,贬值受益,昨日涨停,昨日涨停_含一字"
+    },
+    "001316": {
+      "code": "001316",
+      "name": "润贝航科",
+      "csrc_industry": "贸易行业",
+      "exchange_industry": "贸易行业",
+      "market": "SZ",
+      "industry_standard": "大飞机,昨日涨停,消毒剂,昨日涨停_含一字"
+    },
+    "600410": {
+      "code": "600410",
+      "name": "华胜天成",
+      "csrc_industry": "互联网服务",
+      "exchange_industry": "互联网服务",
+      "market": "SH",
+      "industry_standard": "军工,创投,参股银行,物联网,预盈预增,云计算,融资融券,参股新三板,大数据,网络安全,阿里概念,国产软件,沪股通,人工智能,军民融合,昨日触板,区块链,工业互联,冷链物流,华为概念,标准普尔,智慧政务,国产芯片,无线耳机,信创,时空大数据,新型工业化,DeepSeek概念"
+    },
+    "605288": {
+      "code": "605288",
+      "name": "凯迪股份",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SH",
+      "industry_standard": "机构重仓,物联网,养老概念,智能家居,新能源车"
+    },
+    "603758": {
+      "code": "603758",
+      "name": "秦安股份",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "成渝特区,西部大开发,融资融券,新能源车"
+    },
+    "605133": {
+      "code": "605133",
+      "name": "嵘泰股份",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "特斯拉,昨日涨停,新能源车,工业母机,昨日涨停_含一字"
+    },
+    "603109": {
+      "code": "603109",
+      "name": "神驰机电",
+      "csrc_industry": "通用设备",
+      "exchange_industry": "通用设备",
+      "market": "SH",
+      "industry_standard": "新能源,西部大开发,水利建设,乡村振兴,专精特新,发电机概念"
+    },
+    "603040": {
+      "code": "603040",
+      "name": "新坐标",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "昨日涨停,昨日连板,新能源车,专精特新,昨日涨停_含一字,昨日连板_含一字"
+    },
+    "600259": {
+      "code": "600259",
+      "name": "广晟有色",
+      "csrc_industry": "小金属",
+      "exchange_industry": "小金属",
+      "market": "SH",
+      "industry_standard": "稀缺资源,新材料,预亏预减,稀土永磁,融资融券,央国企改革,小金属概念,沪股通"
+    },
+    "603586": {
+      "code": "603586",
+      "name": "金麒麟",
+      "csrc_industry": "汽车零部件",
+      "exchange_industry": "汽车零部件",
+      "market": "SH",
+      "industry_standard": "昨日涨停,新能源车,昨日涨停_含一字"
+    },
+    "603533": {
+      "code": "603533",
+      "name": "掌阅科技",
+      "csrc_industry": "文化传媒",
+      "exchange_industry": "文化传媒",
+      "market": "SH",
+      "industry_standard": "沪股通,人工智能,知识产权,华为概念,富时罗素,标准普尔,抖音概念(字节概念),鸿蒙概念,数字阅读,短剧互动游戏,Kimi概念,AI语料"
+    },
+    "603416": {
+      "code": "603416",
+      "name": "信捷电气",
+      "csrc_industry": "专用设备",
+      "exchange_industry": "专用设备",
+      "market": "SH",
+      "industry_standard": "融资融券,沪股通,PLC概念"
+    }
+  },
+  "last_update": "2025-05-06T19:59:39.056168"
+}

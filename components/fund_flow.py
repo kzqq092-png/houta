@@ -12,6 +12,7 @@ from matplotlib.figure import Figure
 import seaborn as sns
 import time
 import logging
+from datetime import datetime
 
 from core.stock_screener import DataManager,StockScreener
 from components.stock_screener import StockScreenerWidget
@@ -90,7 +91,7 @@ class FundFlowWidget(QWidget):
         # 启动数据更新线程
         if self.data_manager:
             self.update_thread = DataUpdateThread(self.data_manager)
-            self.update_thread.data_updated.connect(self.update_all)
+            self.update_thread.data_updated.connect(self.update_fund_flow_data)
             self.update_thread.start()
             
     def create_control_buttons(self, layout):
@@ -387,38 +388,40 @@ class FundFlowWidget(QWidget):
         except Exception as e:
             logging.error(f"更新概览卡片失败: {str(e)}")
             
-    def update_all(self, data=None):
-        """更新所有组件数据
+    def update_fund_flow_data(self, data: dict):
+        """更新资金流向数据
         
         Args:
-            data: 资金流向数据
+            data: 资金流向数据字典
         """
         try:
-            if data is None:
-                data = self._get_cached_data('fund_flow')
-                if data is None:
-                    return
-                    
-            # 更新概览卡片
-            self._update_overview_cards(data)
-            
-            # 更新北向资金流向
-            self._update_north_flow(data)
-            
-            # 更新行业资金流向
-            self.update_industry_flow()
-            
-            # 更新概念资金流向
-            self.update_concept_flow()
-            
-            # 更新主力资金分析
-            self.update_main_force_analysis()
-            
-            # 检查预警
-            self._check_alerts(data)
+            # 使用QTimer.singleShot确保在主线程中更新UI
+            QTimer.singleShot(0, lambda: self._update_ui_safely(data))
             
         except Exception as e:
-            logging.error(f"更新资金流向数据失败: {str(e)}")
+            self.log_manager.log(f"更新资金流向数据失败: {e}", LogLevel.ERROR)
+            
+    def _update_ui_safely(self, data: dict):
+        """在主线程中安全地更新UI
+        
+        Args:
+            data: 资金流向数据字典
+        """
+        try:
+            # 更新数据缓存
+            self._data_cache.update(data)
+            self._cache_time[datetime.now()] = data
+            
+            # 更新各个指标
+            self._update_flow_indicators(data)
+            self._update_flow_charts(data)
+            self._update_flow_tables(data)
+            
+            # 检查预警条件
+            self._check_flow_alerts(data)
+            
+        except Exception as e:
+            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
             
     def _update_north_flow(self, data):
         """更新北向资金流向图表"""
