@@ -37,6 +37,7 @@ from hikyuu.indicator import *
 from hikyuu.interactive import *
 from hikyuu import StockManager, Query
 from core.industry_manager import IndustryManager
+from gui.widgets.log_widget import LogWidget
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -216,15 +217,19 @@ class TradingGUI(QMainWindow):
             self.init_ui()
             # 加载收藏的股票
             self.load_favorites()
-
             self.init_data()
-
             # 连接信号
             self.connect_signals()
-
             # 预加载数据
             self.preload_data()
-
+            # 日志信号只连接一次，防止重复
+            try:
+                self.log_manager.log_message.disconnect(
+                    self.log_widget.add_log)
+            except Exception:
+                pass
+            self.log_manager.log_message.connect(self.log_widget.add_log)
+            self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
             self.log_manager.info("TradingGUI初始化完成")
 
         except Exception as e:
@@ -2592,59 +2597,18 @@ class TradingGUI(QMainWindow):
             self.bottom_panel = QWidget()
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
 
-            # 创建日志控件组
-            log_group = QGroupBox("系统日志")
-            log_layout = QVBoxLayout(log_group)
-            log_layout.setContentsMargins(5, 15, 5, 5)
-
-            # 创建日志控件
-            controls_layout = QHBoxLayout()
-
-            # 日志级别过滤器
-            log_level_label = QLabel("日志级别:")
-            self.log_level_combo = QComboBox()
-            self.log_level_combo.addItems(["全部", "信息", "警告", "错误"])
-            self.log_level_combo.currentTextChanged.connect(self.filter_logs)
-            controls_layout.addWidget(log_level_label)
-            controls_layout.addWidget(self.log_level_combo)
-
-            # 搜索框
-            self.search_box = QLineEdit()
-            self.search_box.setPlaceholderText("搜索日志...")
-            self.search_box.textChanged.connect(self.search_logs)
-            controls_layout.addWidget(self.search_box)
-
-            # 清除按钮
-            clear_button = QPushButton("清除")
-            clear_button.clicked.connect(self.clear_log)
-            controls_layout.addWidget(clear_button)
-
-            # 导出按钮
-            export_button = QPushButton("导出")
-            export_button.clicked.connect(self.export_logs)
-            controls_layout.addWidget(export_button)
-
-            # 添加控件到日志布局
-            log_layout.addLayout(controls_layout)
-
-            # 创建日志文本区域
-            self.log_text = QTextEdit()
-            self.log_text.setReadOnly(True)
-            self.log_text.setLineWrapMode(QTextEdit.NoWrap)
-            log_text_scroll = QScrollArea()
-            log_text_scroll.setWidgetResizable(True)
-            log_text_scroll.setWidget(self.log_text)
-            log_layout.addWidget(log_text_scroll)
-
-            # 添加日志组到底部布局
-            self.bottom_layout.addWidget(log_group)
-
-            # 添加底部面板到底部分割器
+            # 用LogWidget替换原有日志控件
+            self.log_widget = LogWidget(self.log_manager)
+            self.bottom_layout.addWidget(self.log_widget)
             self.bottom_splitter.addWidget(self.bottom_panel)
             self.bottom_panel.setMinimumHeight(120)
             self.bottom_panel.setMaximumHeight(300)
             self.bottom_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+            # 连接日志信号
+            self.log_manager.log_message.connect(self.log_widget.add_log)
+            self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
 
             self.log_manager.info("底部面板创建完成")
 
@@ -2652,81 +2616,6 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"创建底部面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
-
-    def filter_logs(self, level: str) -> None:
-        """根据日志级别过滤日志
-
-        Args:
-            level: 日志级别
-        """
-        try:
-            # 获取所有日志内容
-            all_logs = self.log_text.toPlainText().split('\n')
-
-            # 清空日志显示
-            self.log_text.clear()
-
-            # 根据级别过滤日志
-            level_map = {
-                "全部": lambda x: True,
-                "信息": lambda x: "[INFO]" in x,
-                "警告": lambda x: "[WARNING]" in x,
-                "错误": lambda x: "[ERROR]" in x,
-                "调试": lambda x: "[DEBUG]" in x
-            }
-
-            # 显示过滤后的日志
-            for log in all_logs:
-                if level_map[level](log):
-                    self.log_text.append(log)
-
-        except Exception as e:
-            print(f"过滤日志失败: {str(e)}")
-
-    def search_logs(self, text: str) -> None:
-        """搜索日志内容
-
-        Args:
-            text: 搜索文本
-        """
-        try:
-            # 获取所有日志内容
-            all_logs = self.log_text.toPlainText().split('\n')
-
-            # 清空日志显示
-            self.log_text.clear()
-
-            # 显示匹配的日志
-            for log in all_logs:
-                if text.lower() in log.lower():
-                    self.log_text.append(log)
-
-        except Exception as e:
-            print(f"搜索日志失败: {str(e)}")
-
-    def export_logs(self) -> None:
-        """导出日志到文件"""
-        try:
-            # 获取文件路径
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "导出日志",
-                "",
-                "Text Files (*.txt);;All Files (*)"
-            )
-
-            if file_path:
-                # 获取日志内容
-                logs = self.log_text.toPlainText()
-
-                # 写入文件
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(logs)
-
-                self.log_message(f"日志已导出到: {file_path}")
-
-        except Exception as e:
-            self.log_message(f"导出日志失败: {str(e)}", "error")
 
     def update_stock_list(self) -> None:
         """更新股票列表，使用hikyuu框架API"""
@@ -3960,22 +3849,19 @@ class TradingGUI(QMainWindow):
                 self.log_manager.info(message)
 
             # 更新UI显示
-            if hasattr(self, 'log_text'):
+            if hasattr(self, 'log_text') and self.log_text:
                 # 根据日志级别设置文本颜色
                 color = {
                     "ERROR": "#FF0000",  # 红色
                     "WARNING": "#FFA500",  # 橙色
                     "DEBUG": "#808080",   # 灰色
                     "INFO": "#000000"     # 黑色
-                }[level]
-
+                }.get(level, "#000000")
                 # 格式化日志消息
+                from datetime import datetime
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 formatted_message = f'<span style="color:{color}">[{timestamp}] [{level}] {message}</span>'
-
-                # 添加到日志文本框
                 self.log_text.append(formatted_message)
-
                 # 滚动到底部
                 scrollbar = self.log_text.verticalScrollBar()
                 scrollbar.setValue(scrollbar.maximum())
@@ -3987,7 +3873,6 @@ class TradingGUI(QMainWindow):
             # 如果是错误级别，显示错误对话框
             if level == "ERROR":
                 QMessageBox.critical(self, "错误", message)
-
         except Exception as e:
             print(f"记录日志失败: {str(e)}")
             if hasattr(self, 'log_manager'):

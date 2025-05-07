@@ -227,31 +227,24 @@ class MainMenuBar(QMenuBar):
                 self.log_manager.error(f"初始化帮助菜单失败: {str(e)}")
 
     def log_message(self, message: str, level: str = "info") -> None:
-        """记录日志消息
-
-        Args:
-            message: 日志消息
-            level: 日志级别
-        """
+        """记录日志消息，统一调用主窗口或日志管理器"""
         try:
-            # 确保日志管理器存在
-            if not hasattr(self, 'log_manager'):
-                print(f"[ERROR] 日志管理器未初始化: {message}")
-                return
-
-            # 将日志级别转换为大写
-            level = level.upper()
-
-            # 使用日志管理器记录日志
-            if level == "ERROR":
-                self.log_manager.error(message)
-            elif level == "WARNING":
-                self.log_manager.warning(message)
-            elif level == "DEBUG":
-                self.log_manager.debug(message)
+            parent = self.parentWidget()
+            if parent and hasattr(parent, 'log_message'):
+                parent.log_message(message, level)
+            elif hasattr(self, 'log_manager'):
+                # 直接用log_manager
+                level = level.upper()
+                if level == "ERROR":
+                    self.log_manager.error(message)
+                elif level == "WARNING":
+                    self.log_manager.warning(message)
+                elif level == "DEBUG":
+                    self.log_manager.debug(message)
+                else:
+                    self.log_manager.info(message)
             else:
-                self.log_manager.info(message)
-
+                print(f"[LOG][{level}] {message}")
         except Exception as e:
             print(f"记录日志失败: {str(e)}")
             if hasattr(self, 'log_manager'):

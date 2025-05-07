@@ -6,7 +6,7 @@
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QComboBox, QPushButton, QLineEdit, QTextEdit,
-                             QFileDialog, QMessageBox, QScrollArea)
+                             QFileDialog, QMessageBox, QScrollArea, QDialog, QMenu)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QColor, QTextCursor
 from datetime import datetime
@@ -82,6 +82,25 @@ class LogWidget(QWidget):
             # 添加弹性空间
             toolbar_layout.addStretch()
 
+            # 最大化/还原按钮
+            self.maximize_btn = QPushButton("最大化")
+            self.maximize_btn.setFixedWidth(80)
+            self.maximize_btn.clicked.connect(self.toggle_maximize)
+            toolbar_layout.addWidget(self.maximize_btn)
+
+            # 弹窗按钮
+            self.popup_btn = QPushButton("弹窗")
+            self.popup_btn.setFixedWidth(80)
+            self.popup_btn.clicked.connect(self.show_popup)
+            toolbar_layout.addWidget(self.popup_btn)
+
+            # 暂停/恢复滚动按钮
+            self.pause_scroll = False
+            self.pause_btn = QPushButton("暂停滚动")
+            self.pause_btn.setFixedWidth(80)
+            self.pause_btn.clicked.connect(self.toggle_scroll)
+            toolbar_layout.addWidget(self.pause_btn)
+
             # 清除按钮
             self.clear_button = QPushButton("清除")
             self.clear_button.setFixedWidth(80)
@@ -98,6 +117,9 @@ class LogWidget(QWidget):
             self.log_text = QTextEdit()
             self.log_text.setReadOnly(True)
             self.log_text.setLineWrapMode(QTextEdit.NoWrap)
+            self.log_text.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.log_text.customContextMenuRequested.connect(
+                self.show_log_context_menu)
 
             # 创建滚动区域
             scroll = QScrollArea()
@@ -216,9 +238,10 @@ class LogWidget(QWidget):
             formatted_message = f'<span style="color: {color}">[{timestamp}] [{level}] {message}</span>'
             self.log_text.append(formatted_message)
 
-            # 滚动到底部
-            scrollbar = self.log_text.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
+            # 自动滚动到底部（如果未暂停）
+            if not getattr(self, 'pause_scroll', False):
+                scrollbar = self.log_text.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
 
             # 如果是错误消息，闪烁提示
             if level.upper() == "ERROR":
@@ -342,3 +365,82 @@ class LogWidget(QWidget):
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+
+    def show_log_context_menu(self, pos):
+        """日志内容右键菜单：复制、全选、清空、导出"""
+        menu = QMenu(self)
+        copy_action = menu.addAction("复制")
+        select_all_action = menu.addAction("全选")
+        clear_action = menu.addAction("清空")
+        export_action = menu.addAction("导出")
+        action = menu.exec_(self.log_text.mapToGlobal(pos))
+        if action == copy_action:
+            self.log_text.copy()
+        elif action == select_all_action:
+            self.log_text.selectAll()
+        elif action == clear_action:
+            self.clear_logs()
+        elif action == export_action:
+            self.export_logs()
+
+    def toggle_maximize(self):
+        """最大化/全屏/还原日志区"""
+        window = self.window()
+        if hasattr(self, '_is_maximized') and self._is_maximized:
+            # 还原
+            if hasattr(self, '_old_geometry'):
+                self.setGeometry(self._old_geometry)
+            if hasattr(window, 'showNormal'):
+                window.showNormal()
+            self._is_maximized = False
+            self.maximize_btn.setText("最大化")
+        else:
+            # 全屏
+            self._old_geometry = self.geometry()
+            if hasattr(window, 'showFullScreen'):
+                window.showFullScreen()
+            self._is_maximized = True
+            self.maximize_btn.setText("还原")
+
+    def show_popup(self):
+        """弹出独立日志窗口，支持复制/右键菜单"""
+        popup = QDialog(self)
+        popup.setWindowTitle("系统日志弹窗")
+        popup.resize(900, 500)
+        layout = QVBoxLayout(popup)
+        log_text = QTextEdit()
+        log_text.setReadOnly(True)
+        log_text.setLineWrapMode(QTextEdit.NoWrap)
+        log_text.setHtml(self.log_text.toHtml())
+        log_text.setContextMenuPolicy(Qt.CustomContextMenu)
+
+        def popup_context_menu(pos):
+            menu = QMenu(popup)
+            copy_action = menu.addAction("复制")
+            select_all_action = menu.addAction("全选")
+            clear_action = menu.addAction("清空")
+            export_action = menu.addAction("导出")
+            action = menu.exec_(log_text.mapToGlobal(pos))
+            if action == copy_action:
+                log_text.copy()
+            elif action == select_all_action:
+                log_text.selectAll()
+            elif action == clear_action:
+                log_text.clear()
+            elif action == export_action:
+                file_path, _ = QFileDialog.getSaveFileName(
+                    popup, "导出日志", "", "Text Files (*.txt);;Log Files (*.log)")
+                if file_path:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(log_text.toPlainText())
+        log_text.customContextMenuRequested.connect(popup_context_menu)
+        layout.addWidget(log_text)
+        popup.exec_()
+
+    def toggle_scroll(self):
+        """暂停/恢复自动滚动"""
+        self.pause_scroll = not getattr(self, 'pause_scroll', False)
+        if self.pause_scroll:
+            self.pause_btn.setText("恢复滚动")
+        else:
+            self.pause_btn.setText("暂停滚动")
