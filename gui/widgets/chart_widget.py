@@ -20,6 +20,7 @@ from core.logger import LogManager
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
 import traceback
+from core.cache_manager import CacheManager
 
 
 class ChartWidget(QWidget):
@@ -51,14 +52,14 @@ class ChartWidget(QWidget):
             self._zoom_history = []
             self._max_zoom = 5.0
             self._min_zoom = 0.2
+            self.crosshair_enabled = True  # 默认关闭十字线
 
-            # 添加图表缓存
-            self._chart_cache = {}
-            self._cache_size = 100  # 最大缓存数量
+            # 初始化缓存管理器
+            self.cache_manager = CacheManager(max_size=100)  # 图表最多缓存100个
 
             # 启用双缓冲
-            self.setAttribute(Qt.WA_PaintOnScreen, False)
-            self.setAttribute(Qt.WA_NoSystemBackground, False)
+            self.setAttribute(Qt.WA_PaintOnScreen, True)
+            self.setAttribute(Qt.WA_NoSystemBackground, True)
             self.setAutoFillBackground(True)
 
             # 初始化管理器
@@ -104,7 +105,6 @@ class ChartWidget(QWidget):
     def init_ui(self):
         """初始化UI"""
         try:
-            # 创建主布局
             self.setLayout(QVBoxLayout())
             self.layout().setContentsMargins(0, 0, 0, 0)
             self.layout().setSpacing(0)
@@ -199,11 +199,10 @@ class ChartWidget(QWidget):
             self.layout().insertWidget(1, self.toolbar)
 
             # 创建子图
-            self.price_ax = self.figure.add_subplot(211)  # K线图
-            self.volume_ax = self.figure.add_subplot(212)  # 成交量图
-
-            # 调整布局
-            self.figure.tight_layout(rect=[0, 0, 1, 1])
+            self.price_ax = self.figure.add_subplot(211)
+            self.volume_ax = self.figure.add_subplot(212)
+            self.figure.set_tight_layout(True)
+            self.figure.set_constrained_layout(True)
 
             self.log_manager.info("图表控件UI初始化完成")
 
@@ -263,18 +262,48 @@ class ChartWidget(QWidget):
             self._update_queue.append((update_func, args))
 
     def show_loading_dialog(self, stock_code):
-        """弹窗显示数据加载中"""
-        self.loading_dialog = QMessageBox(self)
+        if hasattr(self, 'loading_dialog') and self.loading_dialog:
+            self.loading_dialog.close()
+        self.loading_dialog = QDialog(self)
         self.loading_dialog.setWindowTitle("数据加载中")
-        self.loading_dialog.setText(f"正在加载 {stock_code} 的实时数据，请稍候...")
-        self.loading_dialog.setStandardButtons(QMessageBox.NoButton)
+        layout = QVBoxLayout(self.loading_dialog)
+        self.loading_label = QLabel(f"正在加载 {stock_code} 的实时数据，请稍候...")
+        layout.addWidget(self.loading_label)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        self.progress_label = QLabel("0%")
+        layout.addWidget(self.progress_label)
+        close_btn = QPushButton("取消/关闭")
+        close_btn.clicked.connect(self.close_loading_dialog)
+        layout.addWidget(close_btn)
+        self.loading_dialog.setLayout(layout)
+        self.loading_dialog.setModal(False)
+        self.loading_dialog.setWindowModality(Qt.NonModal)
+        self.loading_dialog.setWindowFlags(
+            self.loading_dialog.windowFlags() | Qt.WindowStaysOnTopHint)
         self.loading_dialog.show()
         QApplication.processEvents()
+
+    def update_loading_progress(self, percent: int, text: str = None):
+        if hasattr(self, 'progress_bar') and self.progress_bar:
+            self.progress_bar.setValue(percent)
+        if hasattr(self, 'progress_label') and self.progress_label:
+            self.progress_label.setText(f"{percent}%")
+        if hasattr(self, 'loading_label') and self.loading_label and text:
+            self.loading_label.setText(text)
 
     def close_loading_dialog(self):
         if hasattr(self, 'loading_dialog') and self.loading_dialog:
             self.loading_dialog.close()
             self.loading_dialog = None
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar = None
+        if hasattr(self, 'progress_label'):
+            self.progress_label = None
+        if hasattr(self, 'loading_label'):
+            self.loading_label = None
 
     def get_stock_theme(self, stock_code):
         """根据股票代码返回专属配色"""
@@ -290,41 +319,107 @@ class ChartWidget(QWidget):
         return color_map.get(stock_code, color_map['default'])
 
     def update_chart(self, data: dict):
-        """更新图表，支持弹窗加载和股票专属配色"""
         stock_code = data.get('stock_code', 'default')
+        time_range = data.get('time_range', '')  # 新增
         self.show_loading_dialog(stock_code)
         try:
+            self.figure.clf()  # 清空所有子图，确保刷新
+            self.update_loading_progress(5, "准备加载...")
             kdata = data.get('kdata')
+            cache_key = self._get_cache_key(data)
+            # 优先用缓存的kdata
+            if cache_key:
+                cached_data = self.cache_manager.get(cache_key)
+                if cached_data is not None and 'kdata' in cached_data:
+                    self.log_manager.info("使用缓存的K线数据")
+                    kdata = cached_data['kdata']
             if kdata is None or kdata.empty:
-                self.log_manager.warning("K线数据为空，无法更新图表")
+                ax1 = self.figure.add_subplot(211)
+                ax2 = self.figure.add_subplot(212, sharex=ax1)
+                ax1.text(0.5, 0.5, "无数据", ha='center', va='center',
+                         fontsize=16, color='gray', transform=ax1.transAxes)
+                ax2.text(0.5, 0.5, "无数据", ha='center', va='center',
+                         fontsize=16, color='gray', transform=ax2.transAxes)
+                self.canvas.draw_idle()
                 self.close_loading_dialog()
                 return
+            self.update_loading_progress(15, "校验数据...")
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             if not all(col in kdata.columns for col in required_columns):
-                self.log_manager.warning(f"K线数据缺少必要的列: {required_columns}")
+                ax1 = self.figure.add_subplot(211)
+                ax2 = self.figure.add_subplot(212, sharex=ax1)
+                ax1.text(0.5, 0.5, "无数据", ha='center', va='center',
+                         fontsize=16, color='gray', transform=ax1.transAxes)
+                ax2.text(0.5, 0.5, "无数据", ha='center', va='center',
+                         fontsize=16, color='gray', transform=ax2.transAxes)
+                self.canvas.draw_idle()
                 self.close_loading_dialog()
                 return
-            # 股票专属配色
-            theme = self.get_stock_theme(stock_code)
-            self.queue_update(self._update_chart_impl, data, theme)
+            self.update_loading_progress(40, "处理K线数据...")
+            df = kdata.copy()
+            if not isinstance(df.index, pd.DatetimeIndex):
+                try:
+                    if hasattr(df.index[0], 'number'):
+                        dates = []
+                        for dt in df.index:
+                            n = int(dt.number)
+                            s = str(n)
+                            dates.append(f"{s[:4]}-{s[4:6]}-{s[6:8]}")
+                        df.index = pd.to_datetime(dates)
+                    else:
+                        df.index = pd.to_datetime(df.index)
+                except Exception as e:
+                    self.log_manager.error(f"转换日期失败: {str(e)}")
+                    self.close_loading_dialog()
+                    return
+            self.update_loading_progress(60, "批量绘制K线...")
+            plot_df = df[['open', 'high', 'low', 'close', 'volume']].copy()
+            plot_df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+            ax1 = self.figure.add_subplot(211)
+            ax2 = self.figure.add_subplot(212, sharex=ax1)
+            mpf.plot(
+                plot_df,
+                type='candle',
+                ax=ax1,
+                volume=ax2,
+                style='yahoo',
+                show_nontrading=True
+            )
+            self.update_loading_progress(95, "刷新画布...")
+            self.figure.set_tight_layout(True)
+            self.figure.set_constrained_layout(True)
+            self.canvas.draw_idle()
+            # 只缓存kdata，不缓存figure
+            if cache_key:
+                self.cache_manager.set(cache_key, {
+                    'kdata': kdata,
+                    'params': {
+                        'stock_code': data.get('stock_code', ''),
+                        'period': data.get('period', ''),
+                        'chart_type': data.get('chart_type', ''),
+                        'time_range': time_range
+                    }
+                })
+            self.log_manager.info("图表更新完成")
+            self.chart_updated.emit(data)
+            self.update_loading_progress(100, "加载完成！")
+            QTimer.singleShot(500, self.close_loading_dialog)
         except Exception as e:
             error_msg = f"更新图表失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
-        finally:
             self.close_loading_dialog()
 
     def _optimize_rendering(self):
         """优化图表渲染性能"""
         try:
-
             # 设置更新策略
             self.setAttribute(Qt.WA_OpaquePaintEvent)
             self.setAttribute(Qt.WA_NoSystemBackground)
 
-            # 设置缓存策略
-            self.canvas.setCacheMode(QGraphicsView.CacheBackground)
+            # 启用双缓冲
+            self.setAutoFillBackground(True)
 
             # 优化 matplotlib 设置
             plt.style.use('fast')
@@ -335,8 +430,30 @@ class ChartWidget(QWidget):
             plt.rcParams['path.simplify_threshold'] = 1.0
             plt.rcParams['agg.path.chunksize'] = 10000
 
+            # 设置更快的渲染器
+            plt.rcParams['figure.facecolor'] = 'white'
+            plt.rcParams['figure.edgecolor'] = 'white'
+            plt.rcParams['axes.facecolor'] = 'white'
+            plt.rcParams['savefig.dpi'] = 100
+            plt.rcParams['figure.dpi'] = 100
+            plt.rcParams['figure.autolayout'] = False
+            plt.rcParams['figure.constrained_layout.use'] = True
+
+            # 优化子图布局
+            self.figure.set_tight_layout(False)
+            self.figure.set_constrained_layout(True)
+
+            # 设置更高效的动画
+            plt.rcParams['animation.html'] = 'jshtml'
+
+            # 优化内存使用
+            plt.rcParams['agg.path.chunksize'] = 20000
+
+            self.log_manager.info("图表渲染优化完成")
+
         except Exception as e:
             self.log_manager.error(f"优化渲染失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def _get_cache_key(self, data: dict) -> str:
         """生成缓存键
@@ -349,121 +466,114 @@ class ChartWidget(QWidget):
         """
         try:
             kdata = data.get('kdata')
-            if kdata is None:
+            if kdata is None or kdata.empty:
                 return None
-
-            # 使用数据的关键特征生成缓存键
             key_parts = [
-                str(kdata.index[0]),
-                str(kdata.index[-1]),
+                data.get('stock_code', ''),
                 data.get('period', ''),
                 data.get('chart_type', ''),
-                str(self._zoom_level)
+                str(data.get('time_range', '')),  # 新增时间范围参数
+                str(getattr(self, '_zoom_level', 1.0))
             ]
             return '_'.join(key_parts)
         except Exception as e:
             self.log_manager.error(f"生成缓存键失败: {str(e)}")
             return None
 
-    def _update_chart_impl(self, data: dict, theme: dict):
-        """实际的图表更新实现，支持自定义配色和高质量布局"""
+    def _optimize_chart_update(self, data: dict) -> None:
+        """优化图表更新性能
+
+        Args:
+            data: 图表数据字典
+        """
         try:
-            with QMutexLocker(self._render_lock):
-                cache_key = self._get_cache_key(data)
-                if cache_key and cache_key in self._chart_cache:
-                    self.log_manager.info("使用缓存的图表数据")
-                    cached_data = self._chart_cache[cache_key]
-                    self.figure = cached_data['figure']
-                    self.canvas.figure = self.figure
-                    self.canvas.draw()
-                    return
-                kdata = data.get('kdata')
-                title = data.get('title', '')
-                self.setUpdatesEnabled(False)
-                self.figure.clf()
-                self.figure.set_dpi(100)
-                df = kdata.copy()
-                if not isinstance(df.index, pd.DatetimeIndex):
-                    df.index = pd.to_datetime(df.index)
-                df = df[['open', 'high', 'low', 'close', 'volume']]
-                df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-                # 东方财富分时风格主图
-                ax_main = self.figure.add_subplot(211)
-                ax_main.set_facecolor(theme['bg'])
-                ax_main.plot(df.index, df['Close'],
-                             color=theme['line'], lw=1.5, label='分时')
-                ma = df['Close'].rolling(30).mean()
-                ax_main.plot(df.index, ma, color=theme['ma'], lw=1, label='均线')
-                ax_main.set_ylabel('价格', color=theme['main'])
-                ax_main.grid(True, color='#e0e0e0', linestyle='--', alpha=0.3)
-                ax_main.legend(loc='upper left', fontsize=9)
-                # 成交量
-                ax_vol = self.figure.add_subplot(212, sharex=ax_main)
-                ax_vol.set_facecolor(theme['bg'])
-                ax_vol.bar(df.index, df['Volume'],
-                           color=theme['vol'], width=0.8)
-                ax_vol.set_ylabel('成交量', color=theme['main'])
-                ax_vol.grid(True, color='#e0e0e0', linestyle='--', alpha=0.3)
-                # 指标区（如RSI等）
-                if 'indicators' in data:
-                    for name, values in data['indicators'].items():
-                        ax_vol.plot(df.index, values, lw=1, label=name)
-                    ax_vol.legend(loc='upper left', fontsize=8)
-                # 高亮指标数值
-                if 'indicator_values' in data:
-                    txt = '  '.join(
-                        [f"{k}: <b style='color:{theme['indicator']}'>{v:.2f}</b>" for k, v in data['indicator_values'].items()])
-                    ax_vol.set_title(txt, fontsize=10,
-                                     color=theme['indicator'])
-                self.price_ax = ax_main
-                self.volume_ax = ax_vol
-                self.canvas.figure = self.figure
-                self.canvas.draw()
-                self.current_kdata = kdata
-                self.chart_updated.emit(data)
-                self.setUpdatesEnabled(True)
-                self.log_manager.info("图表更新完成")
+            # 禁用自动缩放
+            for ax in self.figure.axes:
+                ax.autoscale(enable=False)
+
+            # 使用更高效的数据结构
+            kdata = data.get('kdata')
+            if kdata is not None and not kdata.empty:
+                # 转换为numpy数组以提高性能
+                dates = kdata.index.values
+                prices = kdata[['open', 'high', 'low', 'close']].values
+                volumes = kdata['volume'].values
+
+                # 减少数据点数量（如果数据点过多）
+                if len(dates) > 1000:
+                    step = len(dates) // 1000
+                    dates = dates[::step]
+                    prices = prices[::step]
+                    volumes = volumes[::step]
+
+                # 更新主图数据
+                if hasattr(self, 'price_ax') and self.price_ax is not None:
+                    self.price_ax.clear()
+                    self.price_ax.plot(dates, prices[:, 3], 'b-', linewidth=1)
+
+                # 更新成交量图数据
+                if hasattr(self, 'volume_ax') and self.volume_ax is not None:
+                    self.volume_ax.clear()
+                    self.volume_ax.bar(
+                        dates, volumes, width=0.8, color='g', alpha=0.5)
+
+            # 优化绘图
+            self.figure.set_constrained_layout(True)
+            self.canvas.draw_idle()  # 使用draw_idle代替draw以提高性能
+
+            self.log_manager.info("图表更新优化完成")
+
         except Exception as e:
-            error_msg = f"更新图表实现失败: {str(e)}"
-            self.log_manager.error(error_msg)
+            self.log_manager.error(f"优化图表更新失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-        finally:
-            self.setUpdatesEnabled(True)
 
     def _enable_crosshair(self, ax, df):
-        # 清理旧的 crosshair
-        if hasattr(self, '_crosshair_lines'):
-            for line in self._crosshair_lines:
-                line.remove()
-        self._crosshair_lines = [
-            ax.axhline(color='gray', lw=0.5, ls='--', alpha=0.5),
-            ax.axvline(color='gray', lw=0.5, ls='--', alpha=0.5)
-        ]
-        self._crosshair_text = ax.text(0.02, 0.98, '', transform=ax.transAxes, va='top', ha='left',
-                                       fontsize=9, color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        if not getattr(self, 'crosshair_enabled', False):
+            return
+        # 只创建一次 crosshair
+        if not hasattr(self, '_crosshair_lines') or not self._crosshair_lines:
+            self._crosshair_lines = [
+                ax.axhline(color='gray', lw=0.5, ls='--',
+                           alpha=0.5, visible=False),
+                ax.axvline(color='gray', lw=0.5, ls='--',
+                           alpha=0.5, visible=False)
+            ]
+            self._crosshair_text = ax.text(
+                0.02, 0.98, '', transform=ax.transAxes, va='top', ha='left',
+                fontsize=9, color='black',
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'),
+                visible=False
+            )
 
-        def on_mouse_move(event):
-            if not event.inaxes:
-                self._crosshair_lines[0].set_visible(False)
-                self._crosshair_lines[1].set_visible(False)
-                self._crosshair_text.set_visible(False)
+            def on_mouse_move(event):
+                if not event.inaxes:
+                    for line in self._crosshair_lines:
+                        line.set_visible(False)
+                    self._crosshair_text.set_visible(False)
+                    self.canvas.draw_idle()
+                    return
+                x, y = event.xdata, event.ydata
+                for line in self._crosshair_lines:
+                    line.set_visible(True)
+                self._crosshair_lines[0].set_ydata([y, y])
+                self._crosshair_lines[1].set_xdata([x, x])
+                self._crosshair_text.set_visible(True)
+                # 找到最近的索引
+                idx = int(np.clip(round(x), 0, len(df)-1))
+                row = df.iloc[idx]
+                info = (
+                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
+                    f"开:{row['open']:.2f} 收:{row['close']:.2f}\n"
+                    f"高:{row['high']:.2f} 低:{row['low']:.2f}\n"
+                    f"量:{row['volume']:.0f}"
+                )
+                self._crosshair_text.set_text(info)
                 self.canvas.draw_idle()
-                return
-            x, y = event.xdata, event.ydata
-            self._crosshair_lines[0].set_ydata([y, y])
-            self._crosshair_lines[1].set_xdata([x, x])
-            self._crosshair_lines[0].set_visible(True)
-            self._crosshair_lines[1].set_visible(True)
-            self._crosshair_text.set_visible(True)
-            # 找到最近的索引
-            idx = int(np.clip(round(x), 0, len(df)-1))
-            row = df.iloc[idx]
-            info = f"日期: {row.name.strftime('%Y-%m-%d')}\n开:{row.Open:.2f} 收:{row.Close:.2f}\n高:{row.High:.2f} 低:{row.Low:.2f}\n量:{row.Volume:.0f}"
-            self._crosshair_text.set_text(info)
-            self.canvas.draw_idle()
 
-        self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+            self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+        else:
+            # 已有 crosshair，无需重复创建
+            pass
 
     def add_indicator(self, indicator_data):
         """添加技术指标
@@ -597,10 +707,11 @@ class ChartWidget(QWidget):
             self.current_indicator = None
             if hasattr(self, 'price_ax'):
                 # 保留主图K线，清除其他线条
-                lines = self.price_ax.get_lines()
-                if len(lines) > 0:
-                    for line in lines[1:]:  # 跳过第一条K线
-                        line.remove()
+                # 只需注释或删除相关行即可
+                # lines = self.price_ax.get_lines()
+                # if len(lines) > 0:
+                #     for line in lines[1:]:  # 跳过第一条K线
+                #         line.remove()
 
                 # 更新图例
                 self.price_ax.legend(loc='upper left', fontsize=8)

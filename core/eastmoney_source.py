@@ -8,9 +8,10 @@ import threading
 
 from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
 
+
 class EastMoneyDataSource(DataSource):
     """东方财富数据源"""
-    
+
     def __init__(self):
         super().__init__(DataSourceType.EASTMONEY)
         self._session = requests.Session()
@@ -22,15 +23,15 @@ class EastMoneyDataSource(DataSource):
         self._kline_url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
         self._market_overview_url = "http://push2.eastmoney.com/api/qt/ulist.np/get"
         self._fund_flow_url = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get"
-        
+
         self._market_map = {
             "sh": 1,
             "sz": 0,
             "bj": 2
         }
-        
+
         self._freq_map = {
-            DataFrequency.MIN1: "1",
+            DataFrequency.MIN: "1",
             DataFrequency.MIN5: "5",
             DataFrequency.MIN15: "15",
             DataFrequency.MIN30: "30",
@@ -39,7 +40,7 @@ class EastMoneyDataSource(DataSource):
             DataFrequency.WEEK: "102",
             DataFrequency.MONTH: "103"
         }
-        
+
         self._subscribed_symbols = set()
         self._update_thread = None
         self._stop_event = threading.Event()
@@ -70,7 +71,7 @@ class EastMoneyDataSource(DataSource):
         """订阅数据"""
         try:
             self._subscribed_symbols.update(symbols)
-            
+
             if not self._update_thread or not self._update_thread.is_alive():
                 self._stop_event.clear()
                 self._update_thread = threading.Thread(
@@ -79,7 +80,7 @@ class EastMoneyDataSource(DataSource):
                 )
                 self._update_thread.daemon = True
                 self._update_thread.start()
-            
+
             return True
         except Exception as e:
             self.logger.error(f"订阅数据失败: {str(e)}")
@@ -101,7 +102,7 @@ class EastMoneyDataSource(DataSource):
         try:
             market = self._get_market_code(symbol)
             freq_code = self._freq_map.get(freq, "101")
-            
+
             params = {
                 "secid": f"{market}.{symbol}",
                 "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13",
@@ -111,24 +112,24 @@ class EastMoneyDataSource(DataSource):
                 "beg": start_date.strftime("%Y%m%d") if start_date else "0",
                 "end": end_date.strftime("%Y%m%d") if end_date else "20500101",
             }
-            
+
             response = self._session.get(
                 self._kline_url,
                 params=params,
                 headers=self._headers
             )
-            
+
             if response.status_code != 200:
                 self.logger.error(f"获取K线数据失败: HTTP {response.status_code}")
                 return pd.DataFrame()
-            
+
             data = response.json()
             if data["data"] is None:
                 return pd.DataFrame()
-            
+
             klines = data["data"]["klines"]
             records = []
-            
+
             for line in klines:
                 fields = line.split(",")
                 records.append({
@@ -140,9 +141,9 @@ class EastMoneyDataSource(DataSource):
                     "volume": float(fields[5]),
                     "amount": float(fields[6]),
                 })
-            
+
             return pd.DataFrame(records)
-            
+
         except Exception as e:
             self.logger.error(f"获取K线数据失败: {str(e)}")
             return pd.DataFrame()
@@ -157,20 +158,20 @@ class EastMoneyDataSource(DataSource):
                     "secid": f"{market}.{symbol}",
                     "fields": "f43,f44,f45,f46,f47,f48,f49,f50,f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
                 }
-                
+
                 response = self._session.get(
                     self._quote_url,
                     params=params,
                     headers=self._headers
                 )
-                
+
                 if response.status_code != 200:
                     continue
-                
+
                 data = response.json()
                 if not data or "data" not in data:
                     continue
-                
+
                 quote = data["data"]
                 records.append({
                     "symbol": symbol,
@@ -186,9 +187,9 @@ class EastMoneyDataSource(DataSource):
                     "bid1_volume": quote.get("f51", 0),
                     "ask1_volume": quote.get("f52", 0),
                 })
-            
+
             return pd.DataFrame(records)
-            
+
         except Exception as e:
             self.logger.error(f"获取实时行情失败: {str(e)}")
             return pd.DataFrame()
@@ -199,20 +200,21 @@ class EastMoneyDataSource(DataSource):
             try:
                 if MarketDataType.MARKET_SENTIMENT in data_types:
                     self._update_market_sentiment()
-                
+
                 if MarketDataType.FUND_FLOW in data_types:
                     self._update_fund_flow()
-                
+
                 if self._subscribed_symbols and MarketDataType.TICK in data_types:
-                    quotes = self.get_real_time_quotes(list(self._subscribed_symbols))
+                    quotes = self.get_real_time_quotes(
+                        list(self._subscribed_symbols))
                     if not quotes.empty:
                         self._notify_subscribers({
                             "type": MarketDataType.TICK,
                             "data": quotes
                         })
-                
+
                 time.sleep(2)  # 控制更新频率
-                
+
             except Exception as e:
                 self.logger.error(f"更新数据失败: {str(e)}")
                 time.sleep(5)  # 出错后等待更长时间
@@ -232,21 +234,23 @@ class EastMoneyDataSource(DataSource):
                 "fid": "f3",
                 "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
             }
-            
+
             response = self._session.get(
                 self._market_overview_url,
                 params=params,
                 headers=self._headers
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data and "data" in data:
                     market_data = data["data"]
                     total = market_data["total"]
-                    up_count = sum(1 for item in market_data["diff"] if float(item["f3"]) > 0)
-                    down_count = sum(1 for item in market_data["diff"] if float(item["f3"]) < 0)
-                    
+                    up_count = sum(
+                        1 for item in market_data["diff"] if float(item["f3"]) > 0)
+                    down_count = sum(
+                        1 for item in market_data["diff"] if float(item["f3"]) < 0)
+
                     # 计算市场情绪指标
                     sentiment_data = {
                         "sentiment_index": self._calculate_sentiment_index(up_count, down_count, total),
@@ -263,12 +267,12 @@ class EastMoneyDataSource(DataSource):
                         "fear_index": self._calculate_fear_index(up_count, down_count, total),
                         "timestamp": datetime.now()
                     }
-                    
+
                     self._notify_subscribers({
                         "type": MarketDataType.MARKET_SENTIMENT,
                         "data": sentiment_data
                     })
-                    
+
         except Exception as e:
             self.logger.error(f"更新市场情绪数据失败: {str(e)}")
 
@@ -281,8 +285,10 @@ class EastMoneyDataSource(DataSource):
     def _calculate_volume_ratio(self, market_data):
         """计算成交量比"""
         try:
-            today_volume = sum(float(item["f5"]) for item in market_data["diff"])
-            avg_volume = sum(float(item["f6"]) for item in market_data["diff"]) / len(market_data["diff"])
+            today_volume = sum(float(item["f5"])
+                               for item in market_data["diff"])
+            avg_volume = sum(
+                float(item["f6"]) for item in market_data["diff"]) / len(market_data["diff"])
             return today_volume / avg_volume if avg_volume > 0 else 1.0
         except:
             return 1.0
@@ -336,30 +342,32 @@ class EastMoneyDataSource(DataSource):
                     "klt": "1",
                     "lmt": "20"
                 }
-                
+
                 response = self._session.get(
                     self._fund_flow_url,
                     params=params,
                     headers=self._headers
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     if data and "data" in data:
                         flow_data = {
                             "symbol": symbol,
-                            "main_force_net": float(data["data"].get("f62", 0)),  # 主力净流入
-                            "retail_net": float(data["data"].get("f63", 0)),      # 散户净流入
+                            # 主力净流入
+                            "main_force_net": float(data["data"].get("f62", 0)),
+                            # 散户净流入
+                            "retail_net": float(data["data"].get("f63", 0)),
                             "timestamp": datetime.now()
                         }
-                        
+
                         self._notify_subscribers({
                             "type": MarketDataType.FUND_FLOW,
                             "data": flow_data
                         })
-                
+
                 time.sleep(0.5)  # 控制请求频率
-                
+
         except Exception as e:
             self.logger.error(f"更新资金流向数据失败: {str(e)}")
 
@@ -372,4 +380,4 @@ class EastMoneyDataSource(DataSource):
         elif symbol.startswith("8"):
             return self._market_map["bj"]
         else:
-            raise ValueError(f"无效的股票代码: {symbol}") 
+            raise ValueError(f"无效的股票代码: {symbol}")

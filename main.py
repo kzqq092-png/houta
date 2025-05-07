@@ -19,11 +19,12 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from core.logger import LogManager
+from core.logger import LogManager, BaseLogManager
 from utils.config_types import LoggingConfig, PerformanceConfig
 from utils.theme import ThemeManager, get_theme_manager, Theme
 from core.data_manager import DataManager
 from utils.config_manager import ConfigManager
+from core.cache_manager import CacheManager
 from gui.tool_bar import MainToolBar
 from gui.menu_bar import MainMenuBar
 from gui.widgets.chart_widget import ChartWidget
@@ -131,25 +132,17 @@ class TradingGUI(QMainWindow):
 
     def __init__(self):
         """Initialize the trading system GUI"""
-        super().__init__()
-        self.setWindowTitle("Trading System")
-        self.setGeometry(100, 100, 1200, 800)
-        self.setMinimumSize(800, 600)
-
-        self.market_block_mapping = {
-            "沪市主板": blocksh,
-            "深市主板": blocksz,
-            "创业板": blockg,
-            "科创板": blockstart,
-            "中小板": blockzxb,
-            "上证50": zsbk_sh50,
-            "上证180": zsbk_sh180,
-            "沪深300": zsbk_hs300,
-            "中证100": zsbk_zz100,
-            # ... 其他市场
-        }
-
         try:
+            super().__init__()
+            self.setWindowTitle("Trading System")
+            self.setGeometry(100, 100, 1200, 800)
+            self.setMinimumSize(800, 600)
+
+            # 初始化缓存相关属性
+            self.stock_list_cache = []  # 初始化股票列表缓存
+            self.data_cache = {}  # 初始化数据缓存
+            self.chart_cache = {}  # 初始化图表缓存
+
             # 初始化hikyuu StockManager
             self.sm = StockManager.instance()
 
@@ -163,15 +156,6 @@ class TradingGUI(QMainWindow):
             self.log_manager = LogManager(logging_config)
             self.log_manager.info("TradingGUI初始化开始")
 
-            # 初始化行业管理器
-            self.industry_manager = IndustryManager()
-            self.industry_manager.industry_updated.connect(
-                self._on_industry_data_updated)
-            self.industry_manager.update_error.connect(self.handle_error)
-            self.log_manager.info("初始化行业管理器结束")
-            # 启动行业数据更新
-            self.industry_manager.update_industry_data()
-
             # 初始化数据管理器
             try:
                 self.data_manager = DataManager(self.log_manager)
@@ -180,6 +164,18 @@ class TradingGUI(QMainWindow):
                 self.log_manager.error(f"数据管理器初始化失败: {str(e)}")
                 self.log_manager.error(traceback.format_exc())
                 raise
+
+            # 初始化缓存管理器
+            self.cache_manager = CacheManager(max_size=1000)  # 设置合适的缓存大小
+
+            # 初始化行业管理器
+            self.industry_manager = IndustryManager()
+            self.industry_manager.industry_updated.connect(
+                self._on_industry_data_updated)
+            self.industry_manager.update_error.connect(self.handle_error)
+            self.log_manager.info("初始化行业管理器结束")
+            # 启动行业数据更新
+            self.industry_manager.update_industry_data()
 
             # 初始化主题管理器
             self.theme_manager = get_theme_manager(self.config_manager)
@@ -199,7 +195,6 @@ class TradingGUI(QMainWindow):
 
             # 初始化股票列表模型
             self.stock_list_model = QStringListModel()
-            self.stock_list_cache = []
 
             # 初始化收藏列表
             self.favorites = set()
@@ -513,6 +508,46 @@ class TradingGUI(QMainWindow):
             self.toolbar = MainToolBar(self)
             self.addToolBar(self.toolbar)
 
+            # 添加数据源选择器
+            data_source_label = QLabel("数据源:")
+            data_source_label.setStyleSheet("""
+                QLabel {
+                    margin-left: 10px;
+                    color: #1976d2;
+                    font-weight: bold;
+                }
+            """)
+            self.toolbar.addWidget(data_source_label)
+
+            self.data_source_combo = QComboBox()
+            self.data_source_combo.setFixedWidth(120)
+            self.data_source_combo.setStyleSheet("""
+                QComboBox {
+                    border: 1px solid #bdbdbd;
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    background: #ffffff;
+                    margin-right: 10px;
+                }
+                QComboBox:hover {
+                    border-color: #1976d2;
+                    background: #e3f2fd;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                }
+                QComboBox::down-arrow {
+                    image: url(icons/down_arrow.png);
+                    width: 12px;
+                    height: 12px;
+                }
+            """)
+            # 添加可用的数据源
+            self.data_source_combo.addItems(['Hikyuu', '东方财富', '新浪', '同花顺'])
+            self.data_source_combo.currentTextChanged.connect(
+                self.on_data_source_changed)
+            self.toolbar.addWidget(self.data_source_combo)
+
             # 连接工具栏动作
             self.toolbar.new_action.triggered.connect(self.new_file)
             self.toolbar.open_action.triggered.connect(self.open_file)
@@ -597,29 +632,39 @@ class TradingGUI(QMainWindow):
     def init_data(self):
         """Initialize data"""
         try:
-            print("初始化数据")
-            # Initialize mutexes
+            self.log_manager.info("开始初始化数据...")
+
+            # 初始化互斥锁
             self.data_mutex = QMutex()
             self.chart_mutex = QMutex()
             self.indicator_mutex = QMutex()
-            print("初始化互斥锁完成")
+            self.log_manager.info("互斥锁初始化完成")
 
-            # Initialize caches
-            self.data_cache = {}
-            self.chart_cache = {}
-            self.stock_list_cache = []
-            print("初始化缓存完成")
+            # 确保缓存已初始化
+            if not hasattr(self, 'stock_list_cache'):
+                self.stock_list_cache = []
+            if not hasattr(self, 'data_cache'):
+                self.data_cache = {}
+            if not hasattr(self, 'chart_cache'):
+                self.chart_cache = {}
 
-            # 删除这里的线程池初始化，避免重复
-            # self.thread_pool = QThreadPool()
-            # print("初始化线程池完成")
-
-            # Load settings
+            # 加载配置
             self.settings = self.config_manager.get_all()
-            print("加载配置完成")
+            self.log_manager.info("配置加载完成")
+
+            # 初始化数据源
+            if hasattr(self, 'data_manager'):
+                self.data_manager.clear_cache()
+            self.log_manager.info("数据源初始化完成")
+
+            # 预加载数据
+            self.preload_data()
+            self.log_manager.info("数据初始化完成")
 
         except Exception as e:
-            self.log_message(f"初始化数据失败: {str(e)}", "error")
+            error_msg = f"初始化数据失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
             raise
 
     def apply_theme(self):
@@ -1038,37 +1083,40 @@ class TradingGUI(QMainWindow):
     def filter_stock_list(self, text: str = ""):
         """根据搜索文本过滤股票列表，支持市场、行业、收藏等多条件筛选"""
         try:
-            original_stocks = self.stock_list_cache
-            if not original_stocks:
-                self.log_manager.warning("股票列表缓存为空，尝试重新加载股票列表")
-                QTimer.singleShot(0, self.update_stock_list)
+            # 检查 stock_list_cache 是否存在且非空
+            if not hasattr(self, 'stock_list_cache') or not self.stock_list_cache:
+                self.log_manager.warning("股票列表缓存为空，正在重新加载...")
+                self.preload_data()
                 return
 
-            search_text = text if text else self.stock_search.text() if hasattr(self,
-                                                                                'stock_search') else ""
-            search_text = search_text.lower().strip()
+            # 获取搜索条件
+            search_text = text.lower().strip() if text else self.stock_search.text(
+            ).lower().strip() if hasattr(self, 'stock_search') else ""
             market = self.market_combo.currentText() if hasattr(self, 'market_combo') else "全部"
             industry = self.industry_combo.currentText() if hasattr(
                 self, 'industry_combo') else "全部"
             sub_industry = self.sub_industry_combo.currentText(
             ) if hasattr(self, 'sub_industry_combo') else "全部"
-            only_favorites = self.only_favorites_checkbox.isChecked(
-            ) if hasattr(self, 'only_favorites_checkbox') else False
+            only_favorites = hasattr(
+                self, 'only_favorites_checkbox') and self.only_favorites_checkbox.isChecked()
 
-            # 新增：用block实例获取市场股票代码集合
+            # 获取市场对应的股票代码集合
             block = self.market_block_mapping.get(market)
             block_codes = set()
             if block:
                 block_codes = set(f"{s.market.lower()}{s.code}" for s in block)
 
             filtered_stocks = []
-            for stock_info in original_stocks:
+            for stock_info in self.stock_list_cache:
                 try:
-                    marketCode = stock_info.get('marketCode', '')
+                    # 获取股票信息
+                    market_code = stock_info.get('marketCode', '').lower()
                     name = stock_info.get('name', '')
+
                     # 市场筛选
-                    if block and marketCode not in block_codes:
+                    if block and market_code not in block_codes:
                         continue
+
                     # 行业筛选
                     stock_industry = stock_info.get('industry', '')
                     if industry != "全部":
@@ -1080,35 +1128,58 @@ class TradingGUI(QMainWindow):
                         if sub_industry != "全部":
                             if len(industry_levels) < 2 or industry_levels[1].strip() != sub_industry:
                                 continue
-                    # 只看收藏
-                    if only_favorites and marketCode not in self.favorites:
+
+                    # 收藏筛选
+                    if only_favorites and market_code not in self.favorites:
                         continue
+
                     # 搜索文本筛选
-                    if search_text and not (search_text in marketCode.lower() or search_text in name.lower()):
+                    if search_text and not (search_text in market_code or search_text in name.lower()):
                         continue
+
                     filtered_stocks.append(stock_info)
+
                 except Exception as e:
-                    self.log_manager.warning(f"处理股票 {stock_info} 失败: {str(e)}")
+                    self.log_manager.warning(
+                        f"处理股票 {stock_info} 过滤失败: {str(e)}")
                     continue
 
-            # 更新UI
-            self.stock_list.clear()
-            if not filtered_stocks:
-                no_item = QListWidgetItem("无符合条件的股票")
-                no_item.setFlags(Qt.NoItemFlags)
-                self.stock_list.addItem(no_item)
-            else:
-                for stock_info in filtered_stocks:
-                    display_text = f"{stock_info['marketCode']} {stock_info['name']}"
-                    if stock_info['marketCode'] in self.favorites:
-                        display_text = f"★ {display_text}"
-                    item = QListWidgetItem(display_text)
-                    tooltip = f"代码: {stock_info['marketCode']}\n名称: {stock_info['name']}\n行业: {stock_info.get('industry', '其他')}"
-                    item.setToolTip(tooltip)
-                    item.setData(Qt.UserRole, stock_info)
-                    self.stock_list.addItem(item)
-            self.update_stock_count_label(len(filtered_stocks))
-            self.log_manager.info(f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
+            # 更新股票列表显示
+            if hasattr(self, 'stock_list'):
+                self.stock_list.clear()
+                if not filtered_stocks:
+                    no_item = QListWidgetItem("无符合条件的股票")
+                    no_item.setFlags(Qt.NoItemFlags)
+                    self.stock_list.addItem(no_item)
+                else:
+                    for stock_info in filtered_stocks:
+                        try:
+                            display_text = f"{stock_info['marketCode']} {stock_info['name']}"
+                            if stock_info['marketCode'] in self.favorites:
+                                display_text = f"★ {display_text}"
+
+                            item = QListWidgetItem(display_text)
+
+                            # 设置工具提示
+                            tooltip = (f"代码: {stock_info['marketCode']}\n"
+                                       f"名称: {stock_info['name']}\n"
+                                       f"市场: {stock_info.get('market', '未知')}\n"
+                                       f"行业: {stock_info.get('industry', '未知')}")
+                            item.setToolTip(tooltip)
+
+                            # 设置项数据
+                            item.setData(Qt.UserRole, stock_info)
+
+                            self.stock_list.addItem(item)
+                        except Exception as e:
+                            self.log_manager.warning(f"添加股票项到列表失败: {str(e)}")
+                            continue
+
+                # 更新股票数量显示
+                self.update_stock_count_label(len(filtered_stocks))
+                self.log_manager.info(
+                    f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
+
         except Exception as e:
             self.log_manager.error(f"过滤股票列表失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1179,8 +1250,10 @@ class TradingGUI(QMainWindow):
                 self.log_manager.info(f"时间范围已更改为: {time_range}")
 
         except Exception as e:
-            self.log_manager.error(f"更改时间范围失败: {str(e)}")
+            error_msg = f"更改时间范围失败: {str(e)}"
+            self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
 
     def on_analysis_type_changed(self, analysis_type: str) -> None:
         """处理分析类型变化事件
@@ -1201,10 +1274,13 @@ class TradingGUI(QMainWindow):
             if analysis_type in analysis_type_map:
                 self.current_analysis_type = analysis_type_map[analysis_type]
                 self.update_analysis()
-                self.log_manager.log(f"分析类型已更改为: {analysis_type}", "INFO")
+                self.log_manager.info(f"分析类型已更改为: {analysis_type}")
 
         except Exception as e:
-            self.log_manager.log(f"更改分析类型失败: {str(e)}", "ERROR")
+            error_msg = f"更改分析类型失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
 
     def create_middle_panel(self):
         """Create middle panel with charts"""
@@ -1942,6 +2018,12 @@ class TradingGUI(QMainWindow):
             if not hasattr(self, 'stock_list') or self.stock_list is None:
                 self.log_manager.warning("股票列表控件尚未初始化，跳过UI更新")
                 return
+
+            if not hasattr(self, 'stock_list_cache') or not self.stock_list_cache:
+                self.log_manager.warning("股票列表缓存为空，尝试重新加载数据")
+                self.preload_data()
+                return
+
             # 保存当前选中的股票
             current_item = self.stock_list.currentItem()
             current_text = current_item.text() if current_item else None
@@ -1951,23 +2033,29 @@ class TradingGUI(QMainWindow):
 
             # 重新添加所有股票，并标记收藏状态
             for stock in self.stock_list_cache:
-                display_text = f"{stock['marketCode']} {stock['name']}"
-                if stock['marketCode'] in self.favorites:
-                    display_text = f"★ {display_text}"
+                try:
+                    display_text = f"{stock['marketCode']} {stock['name']}"
+                    if stock['marketCode'] in self.favorites:
+                        display_text = f"★ {display_text}"
 
-                item = QListWidgetItem(display_text)
+                    item = QListWidgetItem(display_text)
 
-                # 设置工具提示
-                tooltip = f"代码: {stock['marketCode']}\n" \
-                    f"名称: {stock['name']}\n" \
-                    f"市场: {stock.get('market', '未知')}\n" \
-                    f"行业: {stock.get('industry', '未知')}"
-                item.setToolTip(tooltip)
+                    # 设置工具提示
+                    tooltip = (f"代码: {stock['marketCode']}\n"
+                               f"名称: {stock['name']}\n"
+                               f"市场: {stock.get('market', '未知')}\n"
+                               f"行业: {stock.get('industry', '未知')}")
+                    item.setToolTip(tooltip)
 
-                # 设置项数据
-                item.setData(Qt.UserRole, stock)
+                    # 设置项数据
+                    item.setData(Qt.UserRole, stock)
 
-                self.stock_list.addItem(item)
+                    self.stock_list.addItem(item)
+
+                except Exception as e:
+                    self.log_manager.warning(
+                        f"添加股票 {stock.get('marketCode', 'unknown')} 到列表失败: {str(e)}")
+                    continue
 
             # 恢复选中状态
             if current_text:
@@ -1979,62 +2067,11 @@ class TradingGUI(QMainWindow):
             # 更新股票数量显示
             self.update_stock_count_label(self.stock_list.count())
 
+            self.log_manager.info(
+                f"股票列表UI更新完成，显示 {self.stock_list.count()} 只股票")
+
         except Exception as e:
             self.log_manager.error(f"更新股票列表显示失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
-
-    def log_message(self, message: str, level: str = "INFO") -> None:
-        """记录日志消息
-
-        Args:
-            message: 日志消息
-            level: 日志级别，可选值为 "info", "warning", "error", "debug"
-        """
-        try:
-            # 将日志级别转换为大写
-            level = level.upper()
-
-            # 根据日志级别设置文本颜色
-            if level == "ERROR":
-                color = "#FF0000"  # 红色
-            elif level == "WARNING":
-                color = "#FFA500"  # 橙色
-            elif level == "DEBUG":
-                color = "#808080"  # 灰色
-            else:
-                color = "#000000"  # 黑色
-
-            # 格式化日志消息
-            timestamp = safe_strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-            formatted_message = f'<span style="color:{color}">[{timestamp}] [{level}] {message}</span>'
-
-            # 将消息添加到日志文本框
-            if hasattr(self, 'log_text'):
-                self.log_text.append(formatted_message)
-
-                # 滚动到底部
-                self.log_text.verticalScrollBar().setValue(
-                    self.log_text.verticalScrollBar().maximum()
-                )
-            else:
-                print(f"[{timestamp}] [{level}] {message}")
-
-            # 如果有日志管理器，也记录到日志管理器
-            if hasattr(self, 'log_manager'):
-                if level == "ERROR":
-                    self.log_manager.error(message)
-                elif level == "WARNING":
-                    self.log_manager.warning(message)
-                elif level == "DEBUG":
-                    self.log_manager.debug(message)
-                else:
-                    self.log_manager.info(message)
-
-            # 如果日志级别为错误，显示错误对话框
-            if level == "ERROR":
-                QMessageBox.critical(self, "错误", message)
-
-        except Exception as e:
             print(f"记录日志失败: {str(e)}")
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"记录日志失败: {str(e)}")
@@ -2323,13 +2360,13 @@ class TradingGUI(QMainWindow):
                 item = QListWidgetItem(f"{stock['code']} {stock['name']}")
 
                 # 设置工具提示
-                tooltip = f"代码: {stock['code']}\n" \
-                    f"名称: {stock['name']}\n" \
-                    f"市场: {stock['market']}\n" \
-                    f"行业: {stock['industry']}\n" \
-                    f"最新价: {kdata['close'].iloc[-1]:.2f}\n" \
-                    f"成交量: {kdata['volume'].iloc[-1]/10000:.2f}万手\n" \
-                    f"市值: {stock['market_cap']:.2f}亿"
+                tooltip = f"代码: {stock['code']}\n"
+                f"名称: {stock['name']}\n"
+                f"市场: {stock['market']}\n"
+                f"行业: {stock['industry']}\n"
+                f"最新价: {kdata['close'].iloc[-1]:.2f}\n"
+                f"成交量: {kdata['volume'].iloc[-1]/10000:.2f}万手\n"
+                f"市值: {stock['market_cap']:.2f}亿"
                 item.setToolTip(tooltip)
 
                 # 设置自定义数据
@@ -2370,10 +2407,11 @@ class TradingGUI(QMainWindow):
             self.update_indicators()
 
             # 记录日志
-            self.log_message(f"已选择股票: {stock_code}")
+            self.log_manager.info(f"已选择股票: {stock_code}")
 
         except Exception as e:
-            self.log_message(f"处理股票选择事件失败: {str(e)}", "error")
+            self.log_manager.error(f"处理股票选择事件失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def on_indicators_changed(self) -> None:
         """处理指标变化事件"""
@@ -2390,10 +2428,11 @@ class TradingGUI(QMainWindow):
             self.update_chart()
 
             # 记录日志
-            self.log_message("指标已更新")
+            self.log_manager.info("指标已更新")
 
         except Exception as e:
-            self.log_message(f"处理指标变化事件失败: {str(e)}", "error")
+            self.log_manager.error(f"处理指标变化事件失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def show_indicator_params_dialog(self) -> None:
         """显示指标参数设置对话框，优化性能和用户体验"""
@@ -2773,24 +2812,60 @@ class TradingGUI(QMainWindow):
         """获取股票行业名称
 
         Args:
-            stock: hikyuu Stock对象
+            stock: 股票信息字典或hikyuu Stock对象
 
         Returns:
             行业名称
         """
         try:
-            if not stock:
+            if stock is None:
                 return '其他'
 
-            # 从行业管理器获取行业信息
-            industry_info = self.industry_manager.get_industry(stock['code'])
-            if industry_info:
-                # 优先使用证监会行业分类
-                if industry_info.get('csrc_industry'):
-                    return industry_info['csrc_industry']
-                # 其次使用交易所行业分类
-                if industry_info.get('exchange_industry'):
-                    return industry_info['exchange_industry']
+            # 如果是hikyuu Stock对象
+            if hasattr(stock, 'industry'):
+                industry = getattr(stock, 'industry', None)
+                return industry if industry else '其他'
+
+            # 如果是字典对象
+            if isinstance(stock, dict):
+                # 尝试从行业管理器获取行业信息
+                code = stock.get('code')
+                if code:
+                    industry_info = self.industry_manager.get_industry(code)
+                    if industry_info:
+                        # 优先使用证监会行业分类
+                        if industry_info.get('csrc_industry'):
+                            return industry_info['csrc_industry']
+                        # 其次使用交易所行业分类
+                        if industry_info.get('exchange_industry'):
+                            return industry_info['exchange_industry']
+                        # 最后使用其他行业分类
+                        if industry_info.get('industry'):
+                            return industry_info['industry']
+
+                # 如果字典中直接包含行业信息
+                if 'industry' in stock:
+                    industry = stock.get('industry')
+                    return industry if industry else '其他'
+
+            # 如果是pandas Series对象
+            if isinstance(stock, pd.Series):
+                if 'industry' in stock.index:
+                    industry = stock['industry']
+                    return industry if pd.notna(industry) else '其他'
+                if 'code' in stock.index:
+                    industry_info = self.industry_manager.get_industry(
+                        stock['code'])
+                    if industry_info:
+                        # 优先使用证监会行业分类
+                        if industry_info.get('csrc_industry'):
+                            return industry_info['csrc_industry']
+                        # 其次使用交易所行业分类
+                        if industry_info.get('exchange_industry'):
+                            return industry_info['exchange_industry']
+                        # 最后使用其他行业分类
+                        if industry_info.get('industry'):
+                            return industry_info['industry']
 
             return '其他'
 
@@ -3352,42 +3427,57 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"清理内存失败: {str(e)}")
 
-    def update_performance_metrics(self, metrics: dict) -> None:
-        """更新性能指标显示"""
+    def update_performance_metrics(self, metrics: dict):
+        """更新性能指标显示
+
+        Args:
+            metrics: 性能指标字典
+        """
         try:
-            # 更新总收益率
-            self.total_return_label.setText(
-                f"{metrics['total_return']*100:.2f}%")
+            # 更新CPU使用率
+            cpu_usage = metrics.get('cpu_usage', 0)
+            self.cpu_label.setText(f"{cpu_usage:.1f}%")
+            self.cpu_progress.setValue(int(cpu_usage))
+            self.cpu_progress.setStyleSheet(
+                self._get_progress_style(cpu_usage))
 
-            # 更新年化收益率
-            self.annual_return_label.setText(
-                f"{metrics['annual_return']*100:.2f}%")
+            # 更新内存使用率
+            memory_usage = metrics.get('memory_usage', 0)
+            self.memory_label.setText(f"{memory_usage:.1f}%")
+            self.memory_progress.setValue(int(memory_usage))
+            self.memory_progress.setStyleSheet(
+                self._get_progress_style(memory_usage))
 
-            # 更新最大回撤
-            self.max_drawdown_label.setText(
-                f"{metrics['max_drawdown']*100:.2f}%")
+            # 更新磁盘使用率
+            disk_usage = metrics.get('disk_usage', 0)
+            self.disk_label.setText(f"{disk_usage:.1f}%")
+            self.disk_progress.setValue(int(disk_usage))
+            self.disk_progress.setStyleSheet(
+                self._get_progress_style(disk_usage))
 
-            # 更新夏普比率
-            self.sharpe_ratio_label.setText(f"{metrics['sharpe_ratio']:.2f}")
+            # 更新响应时间
+            response_time = metrics.get('response_time', 0)
+            self.response_label.setText(f"{response_time:.1f}ms")
 
-            # 更新胜率
-            self.win_rate_label.setText(f"{metrics['win_rate']*100:.2f}%")
+            # 更新线程池状态
+            active_threads = metrics.get('active_threads', 0)
+            self.threadpool_label.setText(str(active_threads))
 
-            # 更新盈亏比
-            self.profit_factor_label.setText(f"{metrics['profit_factor']:.2f}")
+            # 更新缓存状态
+            cache_status = metrics.get('cache_status', '0/0')
+            self.cache_label.setText(cache_status)
 
-            # 更新总交易次数
-            self.total_trades_label.setText(str(metrics['total_trades']))
+            # 更新渲染时间
+            render_time = metrics.get('render_time', 0)
+            self.render_time_label.setText(f"{render_time:.1f}ms")
 
-            # 更新平均持仓天数
-            self.avg_hold_days_label.setText(f"{metrics['avg_hold_days']:.2f}")
-
-            # 更新资金曲线图表
-            self.update_trend_chart(metrics['equity_curve'])
+            # 检查性能阈值并显示警告
+            self._check_performance_thresholds(metrics)
 
         except Exception as e:
             error_msg = f"更新性能指标失败: {str(e)}"
             self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def update_trend_chart(self, equity_curve: list) -> None:
@@ -3425,47 +3515,72 @@ class TradingGUI(QMainWindow):
         """预加载常用数据"""
         try:
             self.log_manager.info("开始预加载数据...")
-            stocks = self.data_manager.get_stock_list()
-            if not stocks:
+
+            # 使用数据管理器获取股票列表
+            stocks_df = self.data_manager.get_stock_list()
+            if not stocks_df.empty:
+                self.stock_list_cache = []  # 确保清空旧数据
+                industry_set = set()
+                sub_industry_map = {}
+
+                for _, stock in stocks_df.iterrows():
+                    try:
+                        # 生成标准code格式
+                        code = f"{stock['market'].lower()}{stock['code']}"
+
+                        # 获取行业信息
+                        industry = stock.get('industry', None)
+                        if not industry:
+                            industry = self._get_industry_name(stock)
+
+                        # 处理行业层级
+                        if industry and isinstance(industry, str):
+                            levels = industry.split('/')
+                            if len(levels) >= 1:
+                                main_industry = levels[0].strip()
+                                industry_set.add(main_industry)
+                                if len(levels) >= 2:
+                                    sub_industry = levels[1].strip()
+                                    if main_industry not in sub_industry_map:
+                                        sub_industry_map[main_industry] = set()
+                                    sub_industry_map[main_industry].add(
+                                        sub_industry)
+
+                        # 构建股票信息
+                        stock_info = {
+                            'code': code,
+                            'name': stock['name'],
+                            'market': stock['market'],
+                            'marketCode': code,
+                            'type': stock.get('type', '其他'),
+                            'industry': industry or '其他',
+                            'valid': stock.get('valid', True),
+                            'start_date': stock.get('start_date', None),
+                            'end_date': stock.get('end_date', None)
+                        }
+
+                        # 只添加有效的股票
+                        if stock_info['valid']:
+                            self.stock_list_cache.append(stock_info)
+
+                    except Exception as e:
+                        self.log_manager.warning(
+                            f"处理股票 {stock.get('code', 'unknown')} 失败: {str(e)}")
+                        continue
+
+                # 更新行业映射
+                self.industry_mapping = {main: {sub: [] for sub in sorted(sub_industry_map.get(main, []))}
+                                         for main in sorted(industry_set)}
+
+                self.log_manager.info(
+                    f"数据预加载完成，共加载 {len(self.stock_list_cache)} 只股票")
+
+                # 使用 QTimer 确保在主线程中更新 UI
+                QTimer.singleShot(0, self._refresh_industry_combos)
+                QTimer.singleShot(0, self.filter_stock_list)
+            else:
                 self.log_manager.warning("获取股票列表失败")
-                return
-            self.stock_list_cache = []
-            industry_set = set()
-            sub_industry_map = {}
-            for stock in stocks:
-                try:
-                    code = f"{stock['code']}"
-                    industry = stock.get(
-                        'industry', None) or self._get_industry_name(stock)
-                    if industry:
-                        levels = industry.split('/')
-                        if len(levels) >= 1:
-                            industry_set.add(levels[0].strip())
-                            if len(levels) >= 2:
-                                main = levels[0].strip()
-                                sub = levels[1].strip()
-                                if main not in sub_industry_map:
-                                    sub_industry_map[main] = set()
-                                sub_industry_map[main].add(sub)
-                    stock_info = {
-                        'code': code,
-                        'name': stock['name'],
-                        'market': stock.get('market', '未知'),
-                        'marketCode': stock.get('marketCode').lower(),
-                        'type': stock.get('type', '其他'),
-                        'industry': industry
-                    }
-                    self.stock_list_cache.append(stock_info)
-                except Exception as e:
-                    self.log_manager.warning(
-                        f"处理股票 {stock.get('code', 'unknown')} 失败: {str(e)}")
-                    continue
-            self.industry_mapping = {main: {sub: [] for sub in sorted(
-                sub_industry_map.get(main, []))} for main in sorted(industry_set)}
-            self.log_manager.info(
-                f"数据预加载完成，共加载 {len(self.stock_list_cache)} 只股票")
-            QTimer.singleShot(0, self._refresh_industry_combos)
-            QTimer.singleShot(0, self.filter_stock_list)
+
         except Exception as e:
             self.log_manager.error(f"预加载数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -3812,68 +3927,72 @@ class TradingGUI(QMainWindow):
             self.disk_progress.setValue(int(disk_usage))
             self.disk_progress.setStyleSheet(
                 self._get_progress_style(disk_usage))
-
-            # 更新响应时间
-            response_time = metrics.get('response_time', 0)
-            self.response_label.setText(f"{response_time*1000:.0f}ms")
-
-            # 更新线程池状态
-            if hasattr(self, 'thread_pool'):
-                self.threadpool_label.setText(
-                    str(self.thread_pool.activeThreadCount()))
-
-            # 更新图表缓存状态
-            if hasattr(self, 'chart_widget') and hasattr(self.chart_widget, '_chart_cache'):
-                cache_size = len(self.chart_widget._chart_cache)
-                max_cache = self.chart_widget._cache_size
-                self.cache_label.setText(f"{cache_size}/{max_cache}")
-
-            # 更新渲染时间
-            render_time = metrics.get('render_time', 0)
-            self.render_time_label.setText(f"{render_time*1000:.0f}ms")
-
-            # 检查性能问题并更新优化建议
-            self._update_optimization_suggestions(metrics)
-
         except Exception as e:
-            self.log_manager.error(f"更新性能指标显示失败: {str(e)}")
+            print(f"更新性能指标: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"更新性能指标: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-    def _update_optimization_suggestions(self, metrics: dict):
-        """更新性能优化建议
+    def log_message(self, message: str, level: str = "INFO") -> None:
+        """记录日志消息并更新UI显示
 
         Args:
-            metrics: 性能指标字典
+            message: 日志消息
+            level: 日志级别，可选值为 "info", "warning", "error", "debug"
         """
         try:
-            suggestions = []
+            # 确保日志管理器存在
+            if not hasattr(self, 'log_manager'):
+                print(f"[ERROR] 日志管理器未初始化: {message}")
+                return
 
-            # CPU使用率检查
-            if metrics.get('cpu_usage', 0) > 80:
-                suggestions.append("- CPU使用率过高，建议减少并发任务数量")
+            # 将日志级别转换为大写
+            level = level.upper()
 
-            # 内存使用率检查
-            if metrics.get('memory_usage', 0) > 80:
-                suggestions.append("- 内存使用率过高，建议清理缓存或减少数据加载量")
-
-            # 响应时间检查
-            if metrics.get('response_time', 0) > 1.0:
-                suggestions.append("- 响应时间较长，建议优化数据处理逻辑")
-
-            # 缓存使用检查
-            if hasattr(self, 'chart_widget') and hasattr(self.chart_widget, '_chart_cache'):
-                cache_size = len(self.chart_widget._chart_cache)
-                max_cache = self.chart_widget._cache_size
-                if cache_size >= max_cache * 0.9:
-                    suggestions.append("- 图表缓存接近上限，建议增加缓存大小或清理旧缓存")
-
-            # 更新建议文本
-            if suggestions:
-                self.optimization_area.setPlainText("\n".join(suggestions))
+            # 使用日志管理器记录日志
+            if level == "ERROR":
+                self.log_manager.error(message)
+            elif level == "WARNING":
+                self.log_manager.warning(message)
+            elif level == "DEBUG":
+                self.log_manager.debug(message)
             else:
-                self.optimization_area.setPlainText("系统性能正常，无需优化")
+                self.log_manager.info(message)
+
+            # 更新UI显示
+            if hasattr(self, 'log_text'):
+                # 根据日志级别设置文本颜色
+                color = {
+                    "ERROR": "#FF0000",  # 红色
+                    "WARNING": "#FFA500",  # 橙色
+                    "DEBUG": "#808080",   # 灰色
+                    "INFO": "#000000"     # 黑色
+                }[level]
+
+                # 格式化日志消息
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                formatted_message = f'<span style="color:{color}">[{timestamp}] [{level}] {message}</span>'
+
+                # 添加到日志文本框
+                self.log_text.append(formatted_message)
+
+                # 滚动到底部
+                scrollbar = self.log_text.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
+
+                # 如果是错误消息，闪烁提示
+                if level == "ERROR":
+                    self.flash_log_tab()
+
+            # 如果是错误级别，显示错误对话框
+            if level == "ERROR":
+                QMessageBox.critical(self, "错误", message)
 
         except Exception as e:
-            self.log_manager.error(f"更新性能优化建议失败: {str(e)}")
+            print(f"记录日志失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"记录日志失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
     def _get_progress_style(self, value: float) -> str:
         """获取进度条样式
@@ -3884,57 +4003,158 @@ class TradingGUI(QMainWindow):
         Returns:
             样式字符串
         """
-        if value >= 90:
-            return """
-                QProgressBar::chunk {
-                    background-color: #f44336;  /* 红色 */
-                }
-            """
-        elif value >= 70:
-            return """
-                QProgressBar::chunk {
-                    background-color: #ff9800;  /* 橙色 */
-                }
-            """
-        else:
-            return """
-                QProgressBar::chunk {
-                    background-color: #4CAF50;  /* 绿色 */
-                }
-            """
-
-    def export_performance_data(self):
-        """导出性能监控数据"""
         try:
-            from datetime import datetime
-            import pandas as pd
-            import os
+            if value >= 90:
+                color = "#FF0000"  # 红色
+            elif value >= 70:
+                color = "#FFA500"  # 橙色
+            elif value >= 50:
+                color = "#FFD700"  # 金色
+            else:
+                color = "#4CAF50"  # 绿色
 
-            # 获取性能数据
-            data = {
-                'CPU使用率(%)': self.performance_history['cpu'],
-                '内存使用率(%)': self.performance_history['memory'],
-                '磁盘使用率(%)': self.performance_history['disk'],
-                '响应时间(ms)': self.performance_history['response']
-            }
+            return f"""
+                QProgressBar::chunk {{
+                    background-color: {color};
+                    border-radius: 4px;
+                }}
+            """
+        except Exception as e:
+            self.log_manager.error(f"获取进度条样式失败: {str(e)}")
+            return ""
 
-            # 创建DataFrame
-            df = pd.DataFrame(data)
+    def _check_performance_thresholds(self, metrics: dict) -> None:
+        """检查性能阈值并显示警告
 
-            # 生成文件名
-            filename = f"performance_data_{safe_strftime(datetime.now(), '%Y%m%d_%H%M%S')}.csv"
+        Args:
+            metrics: 性能指标字典
+        """
+        try:
+            warnings = []
 
-            # 获取用户桌面路径
-            desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
-            filepath = os.path.join(desktop, filename)
+            # 检查CPU使用率
+            cpu_usage = metrics.get('cpu_usage', 0)
+            if cpu_usage >= 90:
+                warnings.append(f"CPU使用率过高: {cpu_usage:.1f}%")
+            elif cpu_usage >= 70:
+                warnings.append(f"CPU使用率较高: {cpu_usage:.1f}%")
 
-            # 导出数据
-            df.to_csv(filepath, index=False, encoding='utf-8-sig')
+            # 检查内存使用率
+            memory_usage = metrics.get('memory_usage', 0)
+            if memory_usage >= 90:
+                warnings.append(f"内存使用率过高: {memory_usage:.1f}%")
+            elif memory_usage >= 70:
+                warnings.append(f"内存使用率较高: {memory_usage:.1f}%")
 
-            self.log_manager.info(f"性能数据已导出到: {filepath}")
+            # 检查磁盘使用率
+            disk_usage = metrics.get('disk_usage', 0)
+            if disk_usage >= 90:
+                warnings.append(f"磁盘使用率过高: {disk_usage:.1f}%")
+            elif disk_usage >= 70:
+                warnings.append(f"磁盘使用率较高: {disk_usage:.1f}%")
+
+            # 检查响应时间
+            response_time = metrics.get('response_time', 0)
+            if response_time >= 1000:
+                warnings.append(f"响应时间过长: {response_time:.1f}ms")
+            elif response_time >= 500:
+                warnings.append(f"响应时间较长: {response_time:.1f}ms")
+
+            # 更新警告区域
+            if warnings and hasattr(self, 'warning_area'):
+                timestamp = datetime.now().strftime("%H:%M:%S")
+                for warning in warnings:
+                    self.warning_area.append(f"[{timestamp}] {warning}")
+
+                # 添加优化建议
+                if hasattr(self, 'optimization_area'):
+                    suggestions = self._get_optimization_suggestions(metrics)
+                    self.optimization_area.clear()
+                    for suggestion in suggestions:
+                        self.optimization_area.append(suggestion)
 
         except Exception as e:
-            self.log_manager.error(f"导出性能数据失败: {str(e)}")
+            self.log_manager.error(f"检查性能阈值失败: {str(e)}")
+
+    def _get_optimization_suggestions(self, metrics: dict) -> list:
+        """获取性能优化建议
+
+        Args:
+            metrics: 性能指标字典
+
+        Returns:
+            建议列表
+        """
+        try:
+            suggestions = []
+
+            # CPU优化建议
+            cpu_usage = metrics.get('cpu_usage', 0)
+            if cpu_usage >= 70:
+                suggestions.append("- 考虑减少后台任务数量")
+                suggestions.append("- 优化数据处理和计算逻辑")
+                suggestions.append("- 使用多线程处理耗时操作")
+
+            # 内存优化建议
+            memory_usage = metrics.get('memory_usage', 0)
+            if memory_usage >= 70:
+                suggestions.append("- 清理不必要的数据缓存")
+                suggestions.append("- 优化大数据集的处理方式")
+                suggestions.append("- 考虑使用数据流式处理")
+
+            # 磁盘优化建议
+            disk_usage = metrics.get('disk_usage', 0)
+            if disk_usage >= 70:
+                suggestions.append("- 清理临时文件和日志")
+                suggestions.append("- 优化数据存储结构")
+                suggestions.append("- 考虑使用数据压缩")
+
+            # 响应时间优化建议
+            response_time = metrics.get('response_time', 0)
+            if response_time >= 500:
+                suggestions.append("- 优化数据查询逻辑")
+                suggestions.append("- 增加必要的数据缓存")
+                suggestions.append("- 考虑使用异步处理")
+
+            return suggestions
+
+        except Exception as e:
+            self.log_manager.error(f"获取优化建议失败: {str(e)}")
+            return []
+
+    def _on_industry_data_updated(self):
+        """处理行业数据更新事件"""
+        try:
+            # 更新行业下拉框
+            self._refresh_industry_combos()
+            # 更新股票列表
+            self.filter_stock_list()
+            self.log_manager.info("行业数据更新完成")
+        except Exception as e:
+            self.log_manager.error(f"处理行业数据更新失败: {str(e)}")
+
+    def on_industry_changed(self, industry: str):
+        """处理行业选择变化
+
+        Args:
+            industry: 选中的行业
+        """
+        try:
+            self.sub_industry_combo.clear()
+            self.sub_industry_combo.addItem("全部")
+
+            if industry != "全部" and industry in self.industry_mapping:
+                sub_industries = list(self.industry_mapping[industry].keys())
+                self.sub_industry_combo.addItems(sub_industries)
+                self.sub_industry_combo.setVisible(True)
+            else:
+                self.sub_industry_combo.setVisible(False)
+
+            # 触发股票列表过滤
+            self.filter_stock_list()
+
+        except Exception as e:
+            self.log_manager.error(f"处理行业选择变化失败: {str(e)}")
 
     def on_chart_type_changed(self, index: int):
         """图表类型改变时的处理
@@ -3975,33 +4195,39 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def update_chart(self, data: dict = None):
-        """更新图表显示，兼容无参数调用"""
+    def update_chart(self):
+        """更新图表显示"""
         try:
-            if data is None:
-                # 自动组装当前股票的data
-                if not hasattr(self, 'current_stock') or not self.current_stock:
-                    self.log_manager.warning("没有选中的股票，无法更新图表")
-                    return
-                k_data = self.get_kdata(self.current_stock)
-                if k_data is None or k_data.empty:
-                    self.log_manager.warning(
-                        f"获取股票 {self.current_stock} 的K线数据为空")
-                    return
-                stock = self.sm[self.current_stock]
-                title = f"{stock.name}({self.current_stock}) - {self.current_period}线"
-                data = {
-                    'stock_code': self.current_stock,
-                    'kdata': k_data,
-                    'title': title,
-                    'period': self.current_period,
-                    'chart_type': self.current_chart_type
-                }
+            if not hasattr(self, 'current_stock') or not self.current_stock:
+                self.log_manager.warning("没有选中的股票，无法更新图表")
+                return
+
+            # 获取K线数据
+            k_data = self.get_kdata(self.current_stock)
+            if k_data is None or k_data.empty:
+                self.log_manager.warning(f"获取股票 {self.current_stock} 的K线数据为空")
+                return
+
+            # 获取股票名称
+            stock = self.sm[self.current_stock]
+            title = f"{stock.name}({self.current_stock}) - {self.current_period}线"
+
+            # 准备图表数据
+            data = {
+                'stock_code': self.current_stock,
+                'kdata': k_data,
+                'title': title,
+                'period': self.current_period,
+                'chart_type': self.current_chart_type
+            }
+
+            # 更新图表
             if hasattr(self, 'chart_widget'):
                 self.chart_widget.update_chart(data)
-                self.log_manager.info(f"成功更新{data.get('stock_code', '')}的图表显示")
+                self.log_manager.info(f"成功更新{self.current_stock}的图表显示")
             else:
                 self.log_manager.warning("图表控件未初始化")
+
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -4442,7 +4668,19 @@ class TradingGUI(QMainWindow):
     def init_market_industry_mapping(self):
         """初始化行业映射（不再初始化市场映射）"""
         try:
-            # 只保留行业映射部分
+            # 初始化市场板块映射
+            self.market_block_mapping = {
+                "沪市主板": blocksh,
+                "深市主板": blocksz,
+                "创业板": blockg,
+                "科创板": blockstart,
+                "中小板": blockzxb,
+                "上证50": zsbk_sh50,
+                "上证180": zsbk_sh180,
+                "沪深300": zsbk_hs300,
+                "中证100": zsbk_zz100,
+            }
+
             # 从行业管理器获取行业数据
             industries = self.industry_manager.get_all_industries()
             self.industry_mapping = {}
@@ -4467,301 +4705,124 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"初始化行业映射失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
 
-    def _get_dynamic_industry_mapping(self) -> dict:
-        """从Hikyuu动态获取行业映射"""
-        try:
-            from hikyuu import StockManager
-            sm = StockManager.instance()
-
-            # 获取所有行业
-            industries = {}
-            for stock in sm:
-                if not stock.industry:
-                    continue
-
-                # 解析行业层级
-                industry_levels = stock.industry.split('/')
-                if len(industry_levels) >= 2:
-                    main_industry = industry_levels[0].strip()
-                    sub_industry = industry_levels[1].strip()
-
-                    if main_industry not in industries:
-                        industries[main_industry] = {}
-
-                    if sub_industry not in industries[main_industry]:
-                        industries[main_industry][sub_industry] = []
-
-                    if len(industry_levels) > 2:
-                        detail_industry = industry_levels[2].strip()
-                        if detail_industry not in industries[main_industry][sub_industry]:
-                            industries[main_industry][sub_industry].append(
-                                detail_industry)
-
-            return industries
-
-        except Exception as e:
-            self.log_manager.warning(f"动态获取行业映射失败: {str(e)}")
-            return {}
-
-    def on_industry_changed(self, industry: str):
-        """处理行业选择变化
+    def on_data_source_changed(self, source: str) -> None:
+        """处理数据源变更事件
 
         Args:
-            industry: 选中的行业
+            source: 数据源名称
         """
         try:
-            self.sub_industry_combo.clear()
-            self.sub_industry_combo.addItem("全部")
+            self.log_manager.info(f"切换数据源: {source}")
 
-            if industry != "全部" and industry in self.industry_mapping:
-                sub_industries = list(self.industry_mapping[industry].keys())
-                self.sub_industry_combo.addItems(sub_industries)
-                self.sub_industry_combo.setVisible(True)
-            else:
-                self.sub_industry_combo.setVisible(False)
+            # 保存当前选中的股票
+            current_stock = self.current_stock
 
-            # 触发股票列表过滤
-            self.filter_stock_list()
+            # 清除缓存
+            self.cache_manager.clear()
+            self.stock_list_cache.clear()
 
-        except Exception as e:
-            self.log_manager.error(f"处理行业选择变化失败: {str(e)}")
+            # 更新数据源
+            if source == "东方财富":
+                self.data_manager.set_data_source("eastmoney")
+            elif source == "新浪":
+                self.data_manager.set_data_source("sina")
+            elif source == "同花顺":
+                self.data_manager.set_data_source("tonghuashun")
+            else:  # 默认使用 Hikyuu
+                self.data_manager.set_data_source("hikyuu")
 
-    def get_kdata(self, stock_code: str, ktype: str = None) -> pd.DataFrame:
-        """获取K线数据，包含数据检查和友好提示"""
-        try:
-            if ktype is None:
-                ktype = self.current_period
+            # 重新加载数据
+            self.preload_data()
 
-            # 转换K线类型
-            ktype_map = {
-                'D': Query.DAY, 'W': Query.WEEK, 'M': Query.MONTH,
-                '60': Query.MIN60, '30': Query.MIN30, '15': Query.MIN15,
-                '5': Query.MIN5, '1': Query.MIN
-            }
-            query_ktype = ktype_map.get(ktype, Query.DAY)
+            # 恢复之前选中的股票
+            if current_stock:
+                items = self.stock_list.findItems(
+                    current_stock, Qt.MatchContains)
+                if items:
+                    self.stock_list.setCurrentItem(items[0])
+                    self.on_stock_selected()
 
-            # 获取股票对象，增加异常处理
-            try:
-                stock = self.sm[stock_code]
-            except Exception as e:
-                self.log_manager.error(f"未找到股票: {stock_code}，错误: {e}")
-                QMessageBox.warning(self, "提示", f"未找到股票: {stock_code}")
-                return pd.DataFrame()
-
-            if not getattr(stock, "valid", True):
-                self.log_manager.warning(f"股票 {stock_code} 无效，可能已退市")
-                QMessageBox.warning(self, "提示", f"股票 {stock_code} 无效，可能已退市")
-                return pd.DataFrame()
-
-            # 获取数据时间范围
-            start_date = getattr(stock, "start_datetime", None)
-            end_date = getattr(stock, "last_datetime", None)
-
-            def format_date(date):
-                if date is None:
-                    return "未知"
-                try:
-                    if hasattr(date, 'year'):
-                        from datetime import datetime
-                        return datetime(date.year, date.month, date.day).strftime("%Y-%m-%d")
-                    elif isinstance(date, datetime):
-                        return date.strftime("%Y-%m-%d")
-                    return "未知"
-                except:
-                    return "未知"
-
-            start_str = format_date(start_date)
-            end_str = format_date(end_date)
-
-            # 合理的时间范围
-            days = abs(
-                self.current_time_range) if self.current_time_range < 0 else 1825
-            if self.current_time_range == 0:
-                days = 1825  # 全部默认5年
-            try:
-                k_data = stock.get_kdata(Query(-days, ktype=query_ktype))
-                if hasattr(k_data, "to_df"):
-                    k_data = k_data.to_df()
-            except Exception as e:
-                self.log_manager.error(f"获取K线数据异常: {e}")
-                QMessageBox.critical(self, "错误", f"获取K线数据异常: {e}")
-                return pd.DataFrame()
-
-            if k_data is None or k_data.empty:
-                msg = (f"股票 {stock_code} 在所选时间范围内无K线数据\n"
-                       f"数据起止日期: {start_str} 至 {end_str}\n"
-                       f"当前周期: {ktype}")
-                self.log_manager.warning(msg)
-                reply = QMessageBox.question(
-                    self, "数据缺失提示",
-                    f"{msg}\n是否要同步数据？",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-                )
-                if reply == QMessageBox.Yes:
-                    self.sync_stock_data(stock_code)
-                return pd.DataFrame()
-
-            # 日志记录实际数据范围
-            if not k_data.empty:
-                data_start = safe_strftime(k_data.index[0], '%Y-%m-%d')
-                data_end = safe_strftime(k_data.index[-1], '%Y-%m-%d')
-                self.log_manager.info(
-                    f"成功获取股票 {stock_code} 的K线数据，"
-                    f"时间范围: {data_start} 至 {data_end}，共 {len(k_data)} 条记录"
-                )
-            return k_data
+            self.log_manager.info(f"数据源切换完成: {source}")
 
         except Exception as e:
-            error_msg = f"获取股票 {stock_code} 的K线数据失败: {str(e)}"
+            error_msg = f"切换数据源失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
-            QMessageBox.critical(self, "错误", error_msg)
+            self.error_occurred.emit(error_msg)
+
+    def get_kdata(self, code: str) -> pd.DataFrame:
+        """获取股票K线数据
+
+        Args:
+            code: 股票代码
+
+        Returns:
+            pd.DataFrame: K线数据
+        """
+        try:
+            if not hasattr(self, 'data_manager'):
+                self.log_manager.error("数据管理器未初始化")
+                return pd.DataFrame()
+
+            # 使用data_manager获取K线数据
+            kdata = self.data_manager.get_k_data(
+                code=code,
+                freq=self.current_period,
+                start_date=None,  # 使用默认的时间范围
+                end_date=None
+            )
+
+            if kdata is None or kdata.empty:
+                self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
+                return pd.DataFrame()
+
+            return kdata
+
+        except Exception as e:
+            self.log_manager.error(f"获取K线数据失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             return pd.DataFrame()
 
-    def sync_stock_data(self, stock_code: str) -> None:
-        """同步指定股票的K线数据
+    def _enable_crosshair(self, ax, df):
+        # 只创建一次 crosshair
+        if not hasattr(self, '_crosshair_lines') or not self._crosshair_lines:
+            self._crosshair_lines = [
+                ax.axhline(color='gray', lw=0.5, ls='--',
+                           alpha=0.5, visible=False),
+                ax.axvline(color='gray', lw=0.5, ls='--',
+                           alpha=0.5, visible=False)
+            ]
+            self._crosshair_text = ax.text(
+                0.02, 0.98, '', transform=ax.transAxes, va='top', ha='left',
+                fontsize=9, color='black',
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'),
+                visible=False
+            )
 
-        Args:
-            stock_code: 股票代码
-        """
-        try:
-            self.log_manager.info(f"开始同步股票 {stock_code} 的数据...")
-
-            # 创建进度对话框
-            progress_dialog = QProgressDialog("正在同步数据...", "取消", 0, 100, self)
-            progress_dialog.setWindowTitle("数据同步")
-            progress_dialog.setWindowModality(Qt.WindowModal)
-            progress_dialog.setAutoClose(True)
-            progress_dialog.setAutoReset(True)
-
-            def update_progress(progress: int, msg: str):
-                if progress_dialog.wasCanceled():
-                    return False
-                progress_dialog.setValue(progress)
-                progress_dialog.setLabelText(msg)
-                QApplication.processEvents()
-                return True
-
-            # 获取股票对象
-            stock = self.sm[stock_code]
-
-            # 更新进度 - 开始
-            if not update_progress(10, "正在检查数据状态..."):
-                return
-
-            # 获取当前数据范围
-            start_date = stock.start_datetime.strftime(
-                "%Y-%m-%d") if stock.start_datetime else "未知"
-            end_date = stock.last_datetime.strftime(
-                "%Y-%m-%d") if stock.last_datetime else "未知"
-
-            # 更新进度 - 数据检查完成
-            if not update_progress(30, "正在准备数据同步..."):
-                return
-
-            try:
-                # 尝试同步数据
-                self.sm.sync()
-
-                # 更新进度 - 同步完成
-                if not update_progress(90, "数据同步完成，正在刷新..."):
+            def on_mouse_move(event):
+                if not event.inaxes:
+                    for line in self._crosshair_lines:
+                        line.set_visible(False)
+                    self._crosshair_text.set_visible(False)
+                    self.canvas.draw_idle()
                     return
+                x, y = event.xdata, event.ydata
+                for line in self._crosshair_lines:
+                    line.set_visible(True)
+                self._crosshair_lines[0].set_ydata([y, y])
+                self._crosshair_lines[1].set_xdata([x, x])
+                self._crosshair_text.set_visible(True)
+                # 找到最近的索引
+                idx = int(np.clip(round(x), 0, len(df)-1))
+                row = df.iloc[idx]
+                info = f"日期: {row.name.strftime('%Y-%m-%d')}\n开:{row.open:.2f} 收:{row.close:.2f}\n高:{row.high:.2f} 低:{row.low:.2f}\n量:{row.volume:.0f}"
+                self._crosshair_text.set_text(info)
+                self.canvas.draw_idle()
 
-                # 刷新数据
-                stock.refresh()
-
-                # 更新进度 - 完成
-                progress_dialog.setValue(100)
-
-                # 获取更新后的数据范围
-                new_start_date = stock.start_datetime.strftime(
-                    "%Y-%m-%d") if stock.start_datetime else "未知"
-                new_end_date = stock.last_datetime.strftime(
-                    "%Y-%m-%d") if stock.last_datetime else "未知"
-
-                # 记录同步结果
-                self.log_manager.info(
-                    f"股票 {stock_code} 数据同步完成\n"
-                    f"原数据范围: {start_date} 至 {end_date}\n"
-                    f"新数据范围: {new_start_date} 至 {new_end_date}"
-                )
-
-                # 显示成功消息
-                QMessageBox.information(
-                    self,
-                    "同步完成",
-                    f"股票 {stock_code} 数据同步完成\n"
-                    f"数据范围: {new_start_date} 至 {new_end_date}"
-                )
-
-                # 刷新图表
-                self.update_chart()
-
-            except Exception as sync_error:
-                error_msg = f"数据同步失败: {str(sync_error)}"
-                self.log_manager.error(error_msg)
-                QMessageBox.critical(self, "同步失败", error_msg)
-
-        except Exception as e:
-            error_msg = f"同步股票 {stock_code} 数据失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            QMessageBox.critical(self, "错误", error_msg)
-
-    def _on_industry_data_updated(self):
-        """处理行业数据更新事件"""
-        try:
-            # 更新行业下拉框
-            self._refresh_industry_combos()
-            # 更新股票列表
-            self.filter_stock_list()
-            self.log_manager.info("行业数据更新完成")
-        except Exception as e:
-            self.log_manager.error(f"处理行业数据更新失败: {str(e)}")
-
-    def toggle_theme(self):
-        if self.current_theme == 'light':
-            self.apply_dark_theme()
-            self.current_theme = 'dark'
-            self.theme_toggle_btn.setText('☀️ 浅色模式')
+            self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
         else:
-            self.apply_light_theme()
-            self.current_theme = 'light'
-            self.theme_toggle_btn.setText('🌙 暗色模式')
-
-    def apply_light_theme(self):
-        # 全局蓝色极简风格QSS
-        qss = open('qss/light_theme.qss', encoding='utf-8').read()
-        self.setStyleSheet(qss)
-        # 图表区等也切换为浅色配色
-        if hasattr(self, 'chart_widget'):
-            self.chart_widget.apply_chart_theme('light')
-
-    def apply_dark_theme(self):
-        # 全局暗色风格QSS
-        qss = open('qss/dark_theme.qss', encoding='utf-8').read()
-        self.setStyleSheet(qss)
-        # 图表区等也切换为暗色配色
-        if hasattr(self, 'chart_widget'):
-            self.chart_widget.apply_chart_theme('dark')
-
-    # 在主窗口 showEvent 中添加淡入动画
-    def showEvent(self, event):
-        from PyQt5.QtCore import QPropertyAnimation, QTimer
-        self.setWindowOpacity(0)
-        anim = QPropertyAnimation(self, b'windowOpacity')
-        anim.setDuration(400)
-        anim.setStartValue(0)
-        anim.setEndValue(1)
-        anim.start()
-
-        def ensure_visible():
-            self.setWindowOpacity(1)
-            self.setWindowState(Qt.WindowNoState)
-            self.activateWindow()
-            self.raise_()
-        QTimer.singleShot(450, ensure_visible)
-        super().showEvent(event)
+            # 已有 crosshair，无需重复创建
+            pass
 
 # 修改全局异常处理器
 
@@ -4852,6 +4913,11 @@ def main():
         print("初始化异常处理器")
         exception_handler = ExceptionHandler()
         print("初始化异常处理器完成")
+
+        # Initialize base logger first
+        print("初始化基础日志管理器")
+        base_logger = BaseLogManager()
+        print("初始化基础日志管理器完成")
 
         # Initialize log manager with the correct LoggingConfig
         print("初始化日志管理器")

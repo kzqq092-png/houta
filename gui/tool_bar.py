@@ -13,23 +13,38 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon, QKeySequence
 import os
+import traceback
 
 
 class MainToolBar(QToolBar):
     """Main tool bar for the trading system"""
 
     def __init__(self, parent=None):
-        """初始化主工具栏
+        """初始化工具栏
 
         Args:
             parent: 父窗口
         """
-        super().__init__(parent)
-        self.parent = parent
-        self.logger = parent.log_manager if hasattr(
-            parent, 'log_manager') else None
+        try:
+            super().__init__(parent)
 
-        self.init_ui()
+            # 初始化日志管理器
+            if hasattr(parent, 'log_manager'):
+                self.log_manager = parent.log_manager
+            else:
+                from core.logger import LogManager
+                self.log_manager = LogManager()
+
+            # 初始化UI
+            self.init_ui()
+
+            self.log_manager.info("工具栏初始化完成")
+
+        except Exception as e:
+            print(f"初始化工具栏失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"初始化工具栏失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
     def init_ui(self):
         """Initialize the UI"""
@@ -149,25 +164,40 @@ class MainToolBar(QToolBar):
             self.theme_combo.setMaximumWidth(100)
             self.addWidget(self.theme_combo)
 
-            self.log_message("工具栏初始化完成")
-
         except Exception as e:
             self.log_message(f"初始化工具栏失败: {str(e)}", "error")
 
-    def log_message(self, message: str, level: str = "info"):
+    def log_message(self, message: str, level: str = "info") -> None:
         """记录日志消息
 
         Args:
             message: 日志消息
-            level: 日志级别，可选值为 info、warning、error
+            level: 日志级别
         """
-        if self.logger:
-            if level == "error":
-                self.logger.error(message)
-            elif level == "warning":
-                self.logger.warning(message)
+        try:
+            # 确保日志管理器存在
+            if not hasattr(self, 'log_manager'):
+                print(f"[ERROR] 日志管理器未初始化: {message}")
+                return
+
+            # 将日志级别转换为大写
+            level = level.upper()
+
+            # 使用日志管理器记录日志
+            if level == "ERROR":
+                self.log_manager.error(message)
+            elif level == "WARNING":
+                self.log_manager.warning(message)
+            elif level == "DEBUG":
+                self.log_manager.debug(message)
             else:
-                self.logger.info(message)
+                self.log_manager.info(message)
+
+        except Exception as e:
+            print(f"记录日志失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"记录日志失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
     def new_file(self):
         """Create a new file"""

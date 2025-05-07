@@ -10,21 +10,42 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
+import traceback
 
 
 class MainMenuBar(QMenuBar):
     """主菜单栏"""
 
     def __init__(self, parent=None):
-        """初始化主菜单栏
+        """初始化菜单栏
 
         Args:
             parent: 父窗口
         """
-        super().__init__(parent)
-        self.parent = parent
-        self.logger = parent.log_manager if hasattr(
-            parent, 'log_manager') else None
+        try:
+            super().__init__(parent)
+
+            # 初始化日志管理器
+            if hasattr(parent, 'log_manager'):
+                self.log_manager = parent.log_manager
+            else:
+                from core.logger import LogManager
+                self.log_manager = LogManager()
+
+            # 初始化UI
+            self.init_ui()
+
+            self.log_manager.info("菜单栏初始化完成")
+
+        except Exception as e:
+            print(f"初始化菜单栏失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"初始化菜单栏失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
+
+    def init_ui(self):
+        """初始化菜单栏"""
+        self.parent = self.parentWidget()
 
         # 创建菜单项
         self.file_menu = self.addMenu("文件(&F)")
@@ -74,8 +95,8 @@ class MainMenuBar(QMenuBar):
             self.file_menu.addAction(self.exit_action)
 
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"初始化文件菜单失败: {str(e)}")
+            if self.log_manager:
+                self.log_manager.error(f"初始化文件菜单失败: {str(e)}")
 
     def init_edit_menu(self):
         """初始化编辑菜单"""
@@ -103,8 +124,8 @@ class MainMenuBar(QMenuBar):
             self.edit_menu.addAction(self.paste_action)
 
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"初始化编辑菜单失败: {str(e)}")
+            if self.log_manager:
+                self.log_manager.error(f"初始化编辑菜单失败: {str(e)}")
 
     def init_view_menu(self):
         """初始化视图菜单"""
@@ -131,8 +152,8 @@ class MainMenuBar(QMenuBar):
             self.theme_menu.addAction(self.dark_theme_action)
 
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"初始化视图菜单失败: {str(e)}")
+            if self.log_manager:
+                self.log_manager.error(f"初始化视图菜单失败: {str(e)}")
 
     def init_tools_menu(self):
         """初始化工具菜单"""
@@ -178,8 +199,8 @@ class MainMenuBar(QMenuBar):
             self.tools_menu.addAction(self.settings_action)
 
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"初始化工具菜单失败: {str(e)}")
+            if self.log_manager:
+                self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
 
     def init_help_menu(self):
         """初始化帮助菜单"""
@@ -202,23 +223,40 @@ class MainMenuBar(QMenuBar):
             self.help_menu.addAction(self.about_action)
 
         except Exception as e:
-            if self.logger:
-                self.logger.error(f"初始化帮助菜单失败: {str(e)}")
+            if self.log_manager:
+                self.log_manager.error(f"初始化帮助菜单失败: {str(e)}")
 
-    def log_message(self, message: str, level: str = "info"):
+    def log_message(self, message: str, level: str = "info") -> None:
         """记录日志消息
 
         Args:
             message: 日志消息
-            level: 日志级别，可选值为 info、warning、error
+            level: 日志级别
         """
-        if self.logger:
-            if level == "error":
-                self.logger.error(message)
-            elif level == "warning":
-                self.logger.warning(message)
+        try:
+            # 确保日志管理器存在
+            if not hasattr(self, 'log_manager'):
+                print(f"[ERROR] 日志管理器未初始化: {message}")
+                return
+
+            # 将日志级别转换为大写
+            level = level.upper()
+
+            # 使用日志管理器记录日志
+            if level == "ERROR":
+                self.log_manager.error(message)
+            elif level == "WARNING":
+                self.log_manager.warning(message)
+            elif level == "DEBUG":
+                self.log_manager.debug(message)
             else:
-                self.logger.info(message)
+                self.log_manager.info(message)
+
+        except Exception as e:
+            print(f"记录日志失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"记录日志失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
     def new_file(self):
         """Create a new file"""

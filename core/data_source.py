@@ -12,7 +12,7 @@ import hikyuu as hku
 class DataFrequency(Enum):
     """数据频率"""
     TICK = auto()      # 逐笔
-    MIN1 = auto()      # 1分钟
+    MIN = auto()      # 1分钟
     MIN5 = auto()      # 5分钟
     MIN15 = auto()     # 15分钟
     MIN30 = auto()     # 30分钟
@@ -284,7 +284,7 @@ class HikyuuDataSource(DataSource):
     def _convert_freq_to_ktype(self, freq: DataFrequency) -> int:
         """转换频率到Hikyuu的KType"""
         freq_map = {
-            DataFrequency.MIN1: hku.Query.MIN,
+            DataFrequency.MIN: hku.Query.MIN,
             DataFrequency.MIN5: hku.Query.MIN5,
             DataFrequency.MIN15: hku.Query.MIN15,
             DataFrequency.MIN30: hku.Query.MIN30,

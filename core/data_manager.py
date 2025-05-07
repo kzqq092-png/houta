@@ -8,50 +8,46 @@ import pandas as pd
 from typing import Dict, Any, Optional, List, Set
 import hikyuu as hku
 from hikyuu.interactive import *
-from core.logger import LogManager
+from core.base_logger import BaseLogManager
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
+from core.eastmoney_source import EastMoneyDataSource
+from core.sina_source import SinaDataSource
+from core.tonghuashun_source import TongHuaShunDataSource
+from core.cache_manager import CacheManager
+import numpy as np
 # import ptvsd
 
 
 class DataManager:
     """数据管理器"""
 
-    def __init__(self, log_manager: Optional[LogManager] = None):
+    def __init__(self, log_manager: Optional[BaseLogManager] = None):
         """初始化数据管理器
 
         Args:
             log_manager: 日志管理器实例，可选
         """
-        self.log_manager = log_manager or LogManager()
-
-        # 数据缓存
-        self._data_cache = {}  # K线数据缓存
-        self._cache_size = 1000  # 最大缓存条目数
-        self._cache_ttl = 300  # 缓存有效期（秒）
-
-        # 股票列表缓存
-        self._stock_list_cache = []
-        self._stock_list_timestamp = None
-        self._stock_list_ttl = 3600  # 股票列表缓存有效期（秒）
-
-        # 市场和行业数据缓存
-        self._market_cache = {}  # 市场数据缓存
-        self._industry_cache = {}  # 行业数据缓存
-        self._market_stocks = {}  # 每个市场包含的股票
-        self._industry_stocks = {}  # 每个行业包含的股票
-
-        # 添加缓存统计
-        self._cache_hits = 0
-        self._cache_misses = 0
-        self._last_cleanup = datetime.now()
-        self._cleanup_interval = 3600  # 清理间隔（秒）
-
         try:
-            # 初始化hikyuu
-            self.log_manager.info("正在初始化hikyuu...")
-            self.sm = hku.StockManager.instance()
-            self.log_manager.info("hikyuu初始化完成")
+            self.log_manager = log_manager or BaseLogManager()
+
+            # 初始化 StockManager
+            try:
+                from hikyuu.interactive import sm
+                self.sm = sm
+                self.log_manager.info("StockManager初始化成功")
+            except Exception as e:
+                self.log_manager.error(f"StockManager初始化失败: {str(e)}")
+                self.sm = None
+
+            # 初始化缓存管理器
+            self.cache_manager = CacheManager(
+                max_size=1000, default_ttl=300)  # 默认缓存5分钟
+
+            # 初始化数据源
+            self._data_sources = {}
+            self._current_source = 'hikyuu'  # 默认使用 Hikyuu 数据源
+            self._init_data_sources()
 
             # 初始化行业管理器
             from core.industry_manager import IndustryManager
@@ -64,98 +60,33 @@ class DataManager:
             # 初始化市场和行业数据
             self._init_market_industry_data()
 
-            # 启动定期清理任务
-            self._start_cleanup_timer()
+            self.log_manager.info("数据管理器初始化完成")
 
         except Exception as e:
-            self.log_manager.error(f"初始化失败: {str(e)}")
+            self.log_manager.error(f"初始化数据管理器失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
-
-    def _start_cleanup_timer(self):
-        """启动定期清理定时器"""
-        try:
-            from PyQt5.QtCore import QTimer
-            self._cleanup_timer = QTimer()
-            self._cleanup_timer.timeout.connect(self._cleanup_cache)
-            self._cleanup_timer.start(self._cleanup_interval * 1000)
-            self.log_manager.info("缓存清理定时器已启动")
-        except Exception as e:
-            self.log_manager.error(f"启动清理定时器失败: {str(e)}")
-
-    def _cleanup_cache(self):
-        """清理过期缓存"""
-        try:
-            now = datetime.now()
-
-            # 清理K线数据缓存
-            expired_keys = []
-            for key, cache_item in self._data_cache.items():
-                if (now - cache_item['timestamp']).total_seconds() > self._cache_ttl:
-                    expired_keys.append(key)
-            for key in expired_keys:
-                del self._data_cache[key]
-
-            # 如果缓存太大，删除最旧的条目
-            if len(self._data_cache) > self._cache_size:
-                sorted_items = sorted(self._data_cache.items(),
-                                      key=lambda x: x[1]['timestamp'])
-                num_to_remove = len(self._data_cache) - self._cache_size
-                for key, _ in sorted_items[:num_to_remove]:
-                    del self._data_cache[key]
-
-            # 检查股票列表缓存是否过期
-            if self._stock_list_timestamp:
-                if (now - self._stock_list_timestamp).total_seconds() > self._stock_list_ttl:
-                    self._stock_list_cache = []
-                    self._stock_list_timestamp = None
-
-            self.log_manager.info(f"缓存清理完成，当前缓存大小: {len(self._data_cache)}")
-
-        except Exception as e:
-            self.log_manager.error(f"清理缓存失败: {str(e)}")
-
-    def get_cache_stats(self) -> Dict[str, Any]:
-        """获取缓存统计信息
-
-        Returns:
-            缓存统计信息字典
-        """
-        try:
-            total_requests = self._cache_hits + self._cache_misses
-            hit_rate = self._cache_hits / total_requests if total_requests > 0 else 0
-
-            return {
-                'cache_size': len(self._data_cache),
-                'max_cache_size': self._cache_size,
-                'cache_hits': self._cache_hits,
-                'cache_misses': self._cache_misses,
-                'hit_rate': hit_rate,
-                'last_cleanup': self._last_cleanup,
-                'cleanup_interval': self._cleanup_interval
-            }
-        except Exception as e:
-            self.log_manager.error(f"获取缓存统计失败: {str(e)}")
-            return {}
 
     def _init_market_industry_data(self):
         """初始化市场和行业数据"""
         try:
             # 初始化市场映射
-            self._market_cache = {
+            market_data = {
                 'SH': {'name': '上海证券交易所', 'code': 'SH', 'prefix': ['600', '601', '603', '605', '688']},
                 'SZ': {'name': '深圳证券交易所', 'code': 'SZ', 'prefix': ['000', '001', '002', '003', '300']},
                 'BJ': {'name': '北京证券交易所', 'code': 'BJ', 'prefix': ['8', '430']},
                 'HK': {'name': '港股通', 'code': 'HK', 'prefix': ['9']},
                 'US': {'name': '美股', 'code': 'US', 'prefix': ['7']}
             }
+            self.cache_manager.set('market_data', market_data)
 
             # 初始化市场和行业股票集合
-            for market in self._market_cache:
-                self._market_stocks[market] = set()
+            market_stocks = {}
+            industry_stocks = {}
+            industry_data = {}
 
             # 遍历所有股票，更新市场和行业数据
-            for stock in self.sm:
+            for stock in sm:
                 try:
                     if not stock.valid:
                         continue
@@ -164,8 +95,9 @@ class DataManager:
                     code = stock.code
 
                     # 更新市场股票集合
-                    if market in self._market_stocks:
-                        self._market_stocks[market].add(code)
+                    if market not in market_stocks:
+                        market_stocks[market] = set()
+                    market_stocks[market].add(code)
 
                     # 从行业管理器获取行业信息
                     try:
@@ -182,21 +114,23 @@ class DataManager:
                                     if level:
                                         # 创建行业层级结构
                                         if i == 0:  # 主行业
-                                            if level not in self._industry_cache:
-                                                self._industry_cache[level] = {
-                                                    'sub_industries': set(), 'stocks': set()}
-                                            self._industry_cache[level]['stocks'].add(
+                                            if level not in industry_data:
+                                                industry_data[level] = {
+                                                    'sub_industries': set(),
+                                                    'stocks': set()
+                                                }
+                                            industry_data[level]['stocks'].add(
                                                 code)
                                         elif i == 1:  # 子行业
                                             main_industry = industry_levels[0].strip(
                                             )
-                                            if main_industry in self._industry_cache:
-                                                self._industry_cache[main_industry]['sub_industries'].add(
+                                            if main_industry in industry_data:
+                                                industry_data[main_industry]['sub_industries'].add(
                                                     level)
-                                                if level not in self._industry_stocks:
-                                                    self._industry_stocks[level] = set(
+                                                if level not in industry_stocks:
+                                                    industry_stocks[level] = set(
                                                     )
-                                                self._industry_stocks[level].add(
+                                                industry_stocks[level].add(
                                                     code)
                     except Exception as e:
                         self.log_manager.warning(
@@ -207,8 +141,13 @@ class DataManager:
                     self.log_manager.warning(f"处理股票数据失败: {code} - {str(e)}")
                     continue
 
+            # 缓存市场和行业数据
+            self.cache_manager.set('market_stocks', market_stocks)
+            self.cache_manager.set('industry_stocks', industry_stocks)
+            self.cache_manager.set('industry_data', industry_data)
+
             self.log_manager.info(
-                f"市场和行业数据初始化完成: {len(self._market_cache)} 个市场, {len(self._industry_cache)} 个行业")
+                f"市场和行业数据初始化完成: {len(market_data)} 个市场, {len(industry_data)} 个行业")
 
         except Exception as e:
             self.log_manager.error(f"初始化市场和行业数据失败: {str(e)}")
@@ -220,7 +159,7 @@ class DataManager:
         Returns:
             市场数据字典
         """
-        return self._market_cache.copy()
+        return self.cache_manager.get('market_data') or {}
 
     def get_industries(self) -> Dict[str, Dict]:
         """获取所有行业数据
@@ -228,7 +167,7 @@ class DataManager:
         Returns:
             行业数据字典
         """
-        return self._industry_cache.copy()
+        return self.cache_manager.get('industry_data') or {}
 
     def get_market_stocks(self, market: str) -> Set[str]:
         """获取指定市场的所有股票
@@ -239,7 +178,8 @@ class DataManager:
         Returns:
             股票代码集合
         """
-        return self._market_stocks.get(market, set()).copy()
+        market_stocks = self.cache_manager.get('market_stocks') or {}
+        return market_stocks.get(market, set()).copy()
 
     def get_industry_stocks(self, industry: str) -> Set[str]:
         """获取指定行业的所有股票
@@ -250,7 +190,8 @@ class DataManager:
         Returns:
             股票代码集合
         """
-        return self._industry_stocks.get(industry, set()).copy()
+        industry_stocks = self.cache_manager.get('industry_stocks') or {}
+        return industry_stocks.get(industry, set()).copy()
 
     def get_sub_industries(self, main_industry: str) -> Set[str]:
         """获取主行业的所有子行业
@@ -261,165 +202,191 @@ class DataManager:
         Returns:
             子行业名称集合
         """
-        industry_info = self._industry_cache.get(main_industry, {})
+        industry_data = self.cache_manager.get('industry_data') or {}
+        industry_info = industry_data.get(main_industry, {})
         return industry_info.get('sub_industries', set()).copy()
 
-    def get_k_data(self, code: str, period: str = 'D') -> pd.DataFrame:
+    def _convert_hikyuu_datetime(self, dt) -> str:
+        """转换Hikyuu的Datetime对象为标准日期字符串
+
+        Args:
+            dt: Hikyuu的Datetime对象
+
+        Returns:
+            str: 标准日期字符串，格式：YYYY-MM-DD
+        """
+        try:
+            if hasattr(dt, 'number'):
+                n = int(dt.number)
+                if n == 0:
+                    return None
+                s = str(n)
+                return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+            elif isinstance(dt, (datetime, pd.Timestamp)):
+                return dt.strftime('%Y-%m-%d')
+            return str(dt)
+        except Exception as e:
+            self.log_manager.warning(f"转换日期失败: {str(e)}")
+            return None
+
+    def get_k_data(self, code: str, freq: str = 'D',
+                   start_date: Optional[str] = None,
+                   end_date: Optional[str] = None,
+                   **kwargs) -> pd.DataFrame:
         """获取K线数据
 
         Args:
             code: 股票代码
-            period: 周期，如 D=日线，W=周线，M=月线，m5=5分钟线，m15=15分钟线，m30=30分钟线，m60=60分钟线
+            freq: K线周期 ('D':日线, 'W':周线, 'M':月线, '60':60分钟, '30':30分钟, '15':15分钟, '5':5分钟)
+            start_date: 开始日期，格式：YYYY-MM-DD
+            end_date: 结束日期，格式：YYYY-MM-DD
+            **kwargs: 其他参数
 
         Returns:
-            K线数据DataFrame
+            pd.DataFrame: K线数据
         """
         try:
-            # 验证参数
+            # 检查股票代码格式
             if not code:
-                raise ValueError("股票代码不能为空")
+                self.log_manager.error("股票代码不能为空")
+                return pd.DataFrame()
 
-            # 验证周期参数
-            valid_periods = {'D', 'W', 'M', 'm5', 'm15', 'm30', 'm60'}
-            if period not in valid_periods:
-                raise ValueError(
-                    f"不支持的周期类型: {period}，支持的周期类型: {', '.join(valid_periods)}")
+            # 标准化股票代码格式
+            if not code.startswith(('sh', 'sz', 'bj')):
+                if code.startswith('6'):
+                    code = f'sh{code}'
+                elif code.startswith(('0', '3')):
+                    code = f'sz{code}'
+                elif code.startswith('8'):
+                    code = f'bj{code}'
 
             # 生成缓存键
-            cache_key = f"{code}_{period}"
+            cache_key = f"kdata_{code}_{freq}_{start_date}_{end_date}"
 
-            # 检查缓存
-            if cache_key in self._data_cache:
-                cache_item = self._data_cache[cache_key]
-                if (datetime.now() - cache_item['timestamp']).total_seconds() <= self._cache_ttl:
-                    self._cache_hits += 1
-                    return cache_item['data'].copy()  # 返回副本避免修改缓存
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                if not cached_data.empty:
+                    return cached_data
                 else:
-                    # 缓存过期，删除
-                    del self._data_cache[cache_key]
+                    self.log_manager.warning(f"缓存中的K线数据为空: {code}")
 
-            self._cache_misses += 1
+            # 根据当前数据源获取数据
+            df = pd.DataFrame()
 
-            # 从hikyuu获取数据
             try:
-                stock = self.sm[code]
-                if not stock:
-                    raise ValueError(f"无法获取股票: {code}")
+                if self._current_source == 'hikyuu':
+                    stock = self.sm[code]
+                    if not stock.valid:
+                        self.log_manager.warning(f"股票 {code} 无效")
+                        return pd.DataFrame()
 
-                # 根据周期获取数据
-                if period == 'D':
-                    kdata = stock.getKData(hku.KQuery(-1000))  # 获取最近1000条日线数据
-                elif period == 'W':
-                    kdata = stock.getWeekKData(
-                        hku.KQuery(-200))  # 获取最近200条周线数据
-                elif period == 'M':
-                    kdata = stock.getMonthKData(
-                        hku.KQuery(-100))  # 获取最近100条月线数据
-                elif period.startswith('m'):
-                    minutes = int(period[1:])
-                    kdata = stock.getMinKData(
-                        minutes, hku.KQuery(-1000))  # 获取最近1000条分钟线数据
-                else:
-                    raise ValueError(f"不支持的周期类型: {period}")
-
-                # 验证数据
-                if not kdata or len(kdata) == 0:
-                    self.log_manager.warning(f"股票 {code} 获取到的K线数据为空")
-                    return pd.DataFrame()
-
-                try:
-                    # 获取各字段数据
-                    date_list = kdata.getDatetimeList()
-                    open_list = kdata.getOpenList()
-                    high_list = kdata.getHighList()
-                    low_list = kdata.getLowList()
-                    close_list = kdata.getCloseList()
-                    volume_list = kdata.getVolumeList()
-                    amount_list = kdata.getAmountList()
-
-                    # 检查所有字段长度一致且大于0
-                    field_lengths = {
-                        'date': len(date_list),
-                        'open': len(open_list),
-                        'high': len(high_list),
-                        'low': len(low_list),
-                        'close': len(close_list),
-                        'volume': len(volume_list),
-                        'amount': len(amount_list)
+                    # 转换周期格式
+                    freq_map = {
+                        'D': Query.DAY,
+                        'W': Query.WEEK,
+                        'M': Query.MONTH,
+                        '60': Query.MIN60,
+                        '30': Query.MIN30,
+                        '15': Query.MIN15,
+                        '5': Query.MIN5,
+                        '1': Query.MIN
                     }
+                    ktype = freq_map.get(freq, Query.DAY)
 
-                    # 检查长度是否一致
-                    lengths = list(field_lengths.values())
-                    if len(set(lengths)) != 1:
-                        self.log_manager.warning(
-                            f"股票 {code} K线数据字段长度不一致: {field_lengths}"
-                        )
+                    # 构建查询条件
+                    if start_date and end_date:
+                        query = Query(start_date, end_date, ktype)
+                    elif start_date:
+                        query = Query(
+                            start_date, datetime.now().strftime('%Y-%m-%d'), ktype)
+                    elif end_date:
+                        query = Query(-9999, end_date, ktype)
+                    else:
+                        query = Query(-365, ktype=ktype)  # 默认获取一年数据
+
+                    kdata = stock.get_kdata(query)
+                    if kdata is None or len(kdata) == 0:
+                        self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
                         return pd.DataFrame()
 
-                    # 检查是否有数据
-                    if lengths[0] == 0:
-                        self.log_manager.warning(f"股票 {code} K线数据为空")
-                        return pd.DataFrame()
-
-                    # 转换为DataFrame
+                    # 转换Hikyuu的K线数据
+                    dates = [self._convert_hikyuu_datetime(
+                        k.datetime) for k in kdata]
                     df = pd.DataFrame({
-                        'date': date_list,
-                        'open': open_list,
-                        'high': high_list,
-                        'low': low_list,
-                        'close': close_list,
-                        'volume': volume_list,
-                        'amount': amount_list
+                        'datetime': dates,
+                        'open': [float(k.open) for k in kdata],
+                        'high': [float(k.high) for k in kdata],
+                        'low': [float(k.low) for k in kdata],
+                        'close': [float(k.close) for k in kdata],
+                        'volume': [float(k.volume) for k in kdata],
+                        'amount': [float(k.amount) for k in kdata]
                     })
 
-                    # 验证数据类型
-                    try:
-                        # 设置日期索引
-                        df.set_index('date', inplace=True)
+                    # 移除无效日期
+                    df = df.dropna(subset=['datetime'])
+                    df['datetime'] = pd.to_datetime(df['datetime'])
+                    df.set_index('datetime', inplace=True)
 
-                        # 验证数值列
-                        numeric_cols = ['open', 'high', 'low',
-                                        'close', 'volume', 'amount']
-                        for col in numeric_cols:
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                elif self._current_source == 'eastmoney':
+                    df = self._data_sources['eastmoney'].get_kdata(
+                        code, freq, start_date, end_date)
 
-                        # 检查是否有全为NaN的列
-                        null_cols = df.columns[df.isnull().all()].tolist()
-                        if null_cols:
-                            self.log_manager.warning(
-                                f"股票 {code} 以下列全为空值: {null_cols}"
-                            )
-                            return pd.DataFrame()
+                elif self._current_source == 'sina':
+                    df = self._data_sources['sina'].get_kdata(
+                        code, freq, start_date, end_date)
 
-                        # 处理异常值
-                        df = self._handle_data_anomalies(df)
+                elif self._current_source == 'tonghuashun':
+                    df = self._data_sources['tonghuashun'].get_kdata(
+                        code, freq, start_date, end_date)
 
-                        # 更新缓存
-                        if len(self._data_cache) >= self._cache_size:
-                            # 删除最旧的缓存
-                            oldest_key = min(self._data_cache.keys(),
-                                             key=lambda k: self._data_cache[k]['timestamp'])
-                            del self._data_cache[oldest_key]
-
-                        self._data_cache[cache_key] = {
-                            'data': df,
-                            'timestamp': datetime.now()
-                        }
-
-                        return df.copy()  # 返回副本避免修改缓存
-
-                    except Exception as e:
-                        self.log_manager.error(
-                            f"处理股票 {code} 数据类型转换失败: {str(e)}")
-                        return pd.DataFrame()
-
-                except Exception as e:
-                    self.log_manager.error(f"获取股票 {code} K线数据字段失败: {str(e)}")
+                # 验证数据完整性
+                if df is None or df.empty:
+                    self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
                     return pd.DataFrame()
 
-            except Exception as e:
-                self.log_manager.error(f"获取股票 {code} 数据失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+                required_columns = ['open', 'high', 'low', 'close', 'volume']
+                missing_columns = [
+                    col for col in required_columns if col not in df.columns]
+                if missing_columns:
+                    self.log_manager.warning(
+                        f"股票 {code} 的K线数据缺少必要列: {missing_columns}")
+                    return pd.DataFrame()
+
+                # 数据清洗
+                df = df.replace([np.inf, -np.inf], np.nan)
+                df = df.dropna(subset=['close'])  # 至少要有收盘价
+
+                # 缓存数据
+                self.cache_manager.set(cache_key, df)
+
+                # 记录数据范围
+                if not df.empty:
+                    self.log_manager.info(
+                        f"成功获取股票 {code} 的K线数据，"
+                        f"时间范围: {df.index[0]} 至 {df.index[-1]}，"
+                        f"共 {len(df)} 条记录"
+                    )
+
+                return df
+
+            except Exception as source_error:
+                self.log_manager.error(
+                    f"从数据源 {self._current_source} 获取K线数据失败: {str(source_error)}")
+                # 尝试切换到备用数据源
+                for source in self.get_available_sources():
+                    if source != self._current_source:
+                        try:
+                            self.log_manager.info(f"尝试使用备用数据源 {source}")
+                            old_source = self._current_source
+                            self._current_source = source
+                            df = self.get_k_data(
+                                code, freq, start_date, end_date)
+                            if not df.empty:
+                                return df
+                            self._current_source = old_source
+                        except:
+                            continue
                 return pd.DataFrame()
 
         except Exception as e:
@@ -427,219 +394,414 @@ class DataManager:
             self.log_manager.error(traceback.format_exc())
             return pd.DataFrame()
 
-    def _handle_data_anomalies(self, df: pd.DataFrame) -> pd.DataFrame:
-        """处理数据异常值
+    def get_stock_list(self, market: str = 'all') -> pd.DataFrame:
+        """获取股票列表
 
         Args:
-            df: 原始数据DataFrame
+            market: 市场类型 ('all', 'sh', 'sz', 'bj')
 
         Returns:
-            处理后的DataFrame
+            pd.DataFrame: 股票列表数据
         """
         try:
-            if df.empty:
-                return df
+            cache_key = f"stock_list_{market}"
 
-            # 处理缺失值
-            df = df.fillna(method='ffill')  # 用前值填充
-            df = df.fillna(method='bfill')  # 用后值填充
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
 
-            # 处理异常值
-            for col in ['open', 'high', 'low', 'close']:
-                # 计算3倍标准差范围
-                mean = df[col].mean()
-                std = df[col].std()
-                lower_bound = mean - 3 * std
-                upper_bound = mean + 3 * std
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                stocks = []
+                for stock in sm:
+                    if not stock.valid:
+                        continue
 
-                # 将超出范围的值替换为边界值
-                df.loc[df[col] < lower_bound, col] = lower_bound
-                df.loc[df[col] > upper_bound, col] = upper_bound
+                    # 根据market参数过滤
+                    if market != 'all':
+                        if market.lower() != stock.market.lower():
+                            continue
 
-            # 确保OHLC逻辑关系
-            df['high'] = df[['high', 'open', 'close']].max(axis=1)
-            df['low'] = df[['low', 'open', 'close']].min(axis=1)
+                    # 获取行业信息
+                    industry = getattr(stock, 'industry', None)
+                    if not industry:
+                        try:
+                            industry_info = self.industry_manager.get_industry(
+                                stock.code)
+                            if industry_info:
+                                industry = (industry_info.get('csrc_industry') or
+                                            industry_info.get('exchange_industry') or
+                                            industry_info.get('industry'))
+                        except Exception as e:
+                            self.log_manager.warning(
+                                f"获取股票 {stock.code} 行业信息失败: {str(e)}")
+
+                    stock_info = {
+                        'code': stock.code,
+                        'name': stock.name,
+                        'market': stock.market,
+                        'type': stock.type,
+                        'valid': stock.valid,
+                        'start_date': str(stock.start_datetime) if stock.start_datetime else None,
+                        'end_date': str(stock.last_datetime) if stock.last_datetime else None,
+                        'industry': industry or '其他'
+                    }
+                    stocks.append(stock_info)
+
+                df = pd.DataFrame(stocks)
+
+            elif self._current_source == 'eastmoney':
+                df = self._data_sources['eastmoney'].get_stock_list(market)
+                # 补充行业信息
+                if not df.empty and 'code' in df.columns:
+                    df['industry'] = df.apply(
+                        lambda x: self._get_industry(x['code']), axis=1)
+
+            elif self._current_source == 'sina':
+                df = self._data_sources['sina'].get_stock_list(market)
+                # 补充行业信息
+                if not df.empty and 'code' in df.columns:
+                    df['industry'] = df.apply(
+                        lambda x: self._get_industry(x['code']), axis=1)
+
+            elif self._current_source == 'tonghuashun':
+                df = self._data_sources['tonghuashun'].get_stock_list(market)
+                # 补充行业信息
+                if not df.empty and 'code' in df.columns:
+                    df['industry'] = df.apply(
+                        lambda x: self._get_industry(x['code']), axis=1)
+
+            # 确保行业列存在
+            if not df.empty and 'industry' not in df.columns:
+                df['industry'] = '其他'
+
+            # 缓存数据
+            self.cache_manager.set(cache_key, df)
 
             return df
 
         except Exception as e:
-            self.log_manager.warning(f"处理数据异常值失败: {str(e)}")
-            return df  # 如果处理失败，返回原始数据
-
-    def get_stock_list(self) -> List[Dict[str, Any]]:
-        """获取股票列表
-
-        Returns:
-            股票信息列表
-        """
-        try:
-            # 检查缓存是否有效
-            if self._stock_list_cache and self._stock_list_timestamp:
-                if (datetime.now() - self._stock_list_timestamp).total_seconds() <= self._stock_list_ttl:
-                    return self._stock_list_cache.copy()
-
-            # 重新获取股票列表
-            stock_list = []
-            for stock in self.sm:
-                try:
-                    if not stock.valid:
-                        continue
-
-                    # 获取基本信息
-                    info = {
-                        'code': stock.code,
-                        'name': stock.name,
-                        'market': stock.market,
-                        'marketCode': stock.market_code,
-                        'type': stock.type,
-                        'valid': stock.valid,
-                        'start_date': str(stock.start_datetime) if stock.start_datetime else None,
-                        'end_date': str(stock.last_datetime) if stock.last_datetime else None
-                    }
-
-                    # 获取行业信息
-                    try:
-                        industry_info = self.industry_manager.get_industry(
-                            stock.code)
-                        if industry_info:
-                            info['industry'] = industry_info.get(
-                                'csrc_industry', '') or industry_info.get('exchange_industry', '')
-                    except Exception as e:
-                        self.log_manager.warning(
-                            f"获取股票 {stock.code} 行业信息失败: {str(e)}")
-                        info['industry'] = ''
-
-                    stock_list.append(info)
-
-                except Exception as e:
-                    self.log_manager.warning(
-                        f"处理股票 {stock.code} 信息失败: {str(e)}")
-                    continue
-
-            # 更新缓存
-            self._stock_list_cache = stock_list
-            self._stock_list_timestamp = datetime.now()
-
-            return stock_list.copy()
-
-        except Exception as e:
             self.log_manager.error(f"获取股票列表失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
-            return []
+            return pd.DataFrame()
 
-    def clear_cache(self):
-        """清除所有缓存"""
-        try:
-            self._data_cache.clear()
-            self._stock_list_cache = []
-            self._stock_list_timestamp = None
-            self._cache_hits = 0
-            self._cache_misses = 0
-            self.log_manager.info("缓存已清除")
-        except Exception as e:
-            self.log_manager.error(f"清除缓存失败: {str(e)}")
-
-    def get_stock_data(self, stock, query):
-        """获取股票数据"""
-        try:
-            kdata = stock.get_kdata(query)
-            if len(kdata) == 0:
-                raise ValueError("无法获取股票数据")
-            return kdata
-        except Exception as e:
-            self.log_manager.error(f"获取股票数据失败: {str(e)}")
-            raise
-
-    def get_sector_data(self, sector):
-        """获取板块数据"""
-        try:
-            stocks = sector.get_stocks()
-            if len(stocks) == 0:
-                raise ValueError("无法获取板块数据")
-            return stocks
-        except Exception as e:
-            self.log_manager.error(f"获取板块数据失败: {str(e)}")
-            raise
-
-    def filter_stock_list(self,
-                          market: Optional[str] = None,
-                          main_industry: Optional[str] = None,
-                          sub_industry: Optional[str] = None,
-                          keyword: Optional[str] = None) -> List[Dict[str, Any]]:
-        """过滤股票列表
+    def _get_industry(self, code: str) -> str:
+        """获取股票行业信息
 
         Args:
-            market: 市场，如 'SH', 'SZ' 等
-            main_industry: 主行业
-            sub_industry: 子行业
-            keyword: 搜索关键词，可匹配代码或名称
+            code: 股票代码
 
         Returns:
-            过滤后的股票列表
+            行业名称
         """
         try:
-            # 获取原始股票列表
-            stock_list = self.get_stock_list()
-            if not stock_list:
-                return []
+            industry_info = self.industry_manager.get_industry(code)
+            if industry_info:
+                return (industry_info.get('csrc_industry') or
+                        industry_info.get('exchange_industry') or
+                        industry_info.get('industry') or
+                        '其他')
+            return '其他'
+        except Exception as e:
+            self.log_manager.warning(f"获取股票 {code} 行业信息失败: {str(e)}")
+            return '其他'
 
-            # 应用过滤条件
-            filtered_stocks = stock_list
+    def get_realtime_quotes(self, codes: List[str]) -> pd.DataFrame:
+        """获取实时行情
 
-            # 按市场过滤
-            if market:
-                market = market.upper()
-                filtered_stocks = [
-                    stock for stock in filtered_stocks
-                    if stock['market'] == market
-                ]
+        Args:
+            codes: 股票代码列表
 
-            # 按主行业过滤
-            if main_industry:
-                filtered_stocks = [
-                    stock for stock in filtered_stocks
-                    if stock['industry'] == main_industry
-                ]
+        Returns:
+            pd.DataFrame: 实时行情数据
+        """
+        try:
+            cache_key = f"realtime_{'_'.join(codes)}"
 
-            # 按子行业过滤
-            if sub_industry:
-                filtered_stocks = [
-                    stock for stock in filtered_stocks
-                    if stock['industry'] == sub_industry
-                ]
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
 
-            # 按关键词过滤
-            if keyword:
-                keyword = keyword.lower()
-                filtered_stocks = [
-                    stock for stock in filtered_stocks
-                    if (keyword in stock['code'].lower() or
-                        keyword in stock['name'].lower() or
-                        keyword in stock['industry'].lower())
-                ]
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                quotes = [hku.Stock(code).get_realtime_quote()
+                          for code in codes]
+                df = pd.DataFrame(quotes)
 
-            # 记录过滤结果
-            self.log_manager.info(
-                f"股票过滤完成: 市场={market}, 主行业={main_industry}, "
-                f"子行业={sub_industry}, 关键词={keyword}, "
-                f"结果数量={len(filtered_stocks)}"
-            )
+            elif self._current_source == 'eastmoney':
+                df = self._data_sources['eastmoney'].get_realtime_quotes(codes)
 
-            return filtered_stocks
+            elif self._current_source == 'sina':
+                df = self._data_sources['sina'].get_realtime_quotes(codes)
+
+            elif self._current_source == 'tonghuashun':
+                df = self._data_sources['tonghuashun'].get_realtime_quotes(
+                    codes)
+
+            # 缓存数据（实时行情缓存时间较短）
+            self.cache_manager.set(cache_key, df, ttl=60)  # 60秒缓存
+
+            return df
 
         except Exception as e:
-            self.log_manager.error(f"过滤股票列表失败: {str(e)}")
+            self.log_manager.error(f"获取实时行情失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_index_list(self) -> pd.DataFrame:
+        """获取指数列表
+
+        Returns:
+            pd.DataFrame: 指数列表数据
+        """
+        try:
+            cache_key = "index_list"
+
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                indices = hku.get_index_list()
+                df = pd.DataFrame({
+                    'code': [i.code for i in indices],
+                    'name': [i.name for i in indices]
+                })
+
+            elif self._current_source == 'eastmoney':
+                df = self._data_sources['eastmoney'].get_index_list()
+
+            elif self._current_source == 'sina':
+                df = self._data_sources['sina'].get_index_list()
+
+            elif self._current_source == 'tonghuashun':
+                df = self._data_sources['tonghuashun'].get_index_list()
+
+            # 缓存数据
+            self.cache_manager.set(cache_key, df)
+
+            return df
+
+        except Exception as e:
+            self.log_manager.error(f"获取指数列表失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_industry_list(self) -> pd.DataFrame:
+        """获取行业列表
+
+        Returns:
+            pd.DataFrame: 行业列表数据
+        """
+        try:
+            cache_key = "industry_list"
+
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                industries = hku.get_industry_list()
+                df = pd.DataFrame({
+                    'code': [i.code for i in industries],
+                    'name': [i.name for i in industries]
+                })
+
+            elif self._current_source == 'eastmoney':
+                df = self._data_sources['eastmoney'].get_industry_list()
+
+            elif self._current_source == 'sina':
+                df = self._data_sources['sina'].get_industry_list()
+
+            elif self._current_source == 'tonghuashun':
+                df = self._data_sources['tonghuashun'].get_industry_list()
+
+            # 缓存数据
+            self.cache_manager.set(cache_key, df)
+
+            return df
+
+        except Exception as e:
+            self.log_manager.error(f"获取行业列表失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_concept_list(self) -> pd.DataFrame:
+        """获取概念列表
+
+        Returns:
+            pd.DataFrame: 概念列表数据
+        """
+        try:
+            cache_key = "concept_list"
+
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                concepts = hku.get_concept_list()
+                df = pd.DataFrame({
+                    'code': [c.code for c in concepts],
+                    'name': [c.name for c in concepts]
+                })
+
+            elif self._current_source == 'eastmoney':
+                df = self._data_sources['eastmoney'].get_concept_list()
+
+            elif self._current_source == 'sina':
+                df = self._data_sources['sina'].get_concept_list()
+
+            elif self._current_source == 'tonghuashun':
+                df = self._data_sources['tonghuashun'].get_concept_list()
+
+            # 缓存数据
+            self.cache_manager.set(cache_key, df)
+
+            return df
+
+        except Exception as e:
+            self.log_manager.error(f"获取概念列表失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_info(self, code: str) -> Dict[str, Any]:
+        """获取股票基本信息
+
+        Args:
+            code: 股票代码
+
+        Returns:
+            Dict[str, Any]: 股票基本信息
+        """
+        try:
+            cache_key = f"stock_info_{code}"
+
+            # 尝试从缓存获取数据
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu':
+                stock = hku.Stock(code)
+                info = {
+                    'code': stock.code,
+                    'name': stock.name,
+                    'market': stock.market,
+                    'type': stock.type,
+                    'valid': stock.valid,
+                    'start_date': stock.start_datetime,
+                    'last_date': stock.last_datetime
+                }
+
+            elif self._current_source == 'eastmoney':
+                info = self._data_sources['eastmoney'].get_stock_info(code)
+
+            elif self._current_source == 'sina':
+                info = self._data_sources['sina'].get_stock_info(code)
+
+            elif self._current_source == 'tonghuashun':
+                info = self._data_sources['tonghuashun'].get_stock_info(code)
+
+            # 缓存数据
+            self.cache_manager.set(cache_key, info)
+
+            return info
+
+        except Exception as e:
+            self.log_manager.error(f"获取股票基本信息失败: {str(e)}")
+            return {}
+
+    def set_data_source(self, source: str) -> None:
+        """设置数据源
+
+        Args:
+            source: 数据源名称 ("hikyuu", "eastmoney", "sina", "tonghuashun")
+        """
+        try:
+            self.log_manager.info(f"设置数据源: {source}")
+
+            # 清除缓存
+            self.clear_cache()
+
+            # 更新数据源
+            self._current_source = source
+
+            # 重新初始化数据源相关配置
+            if source == "eastmoney":
+                from .eastmoney_source import EastMoneyDataSource
+                self._data_sources['eastmoney'] = EastMoneyDataSource()
+            elif source == "sina":
+                from .sina_source import SinaDataSource
+                self._data_sources['sina'] = SinaDataSource()
+            elif source == "tonghuashun":
+                from .tonghuashun_source import TongHuaShunDataSource
+                self._data_sources['tonghuashun'] = TongHuaShunDataSource()
+            else:  # 默认使用 Hikyuu
+                from data_source import HikyuuDataSource
+                self._data_sources['hikyuu'] = HikyuuDataSource()
+
+            # 初始化数据源
+            self._data_sources[source].init()
+
+            self.log_manager.info(f"数据源设置完成: {source}")
+
+        except Exception as e:
+            error_msg = f"设置数据源失败: {str(e)}"
+            self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
-            return []
+            raise
+
+    def clear_cache(self) -> None:
+        """清除所有缓存数据"""
+        try:
+            self.cache_manager.clear()
+            self.log_manager.info("缓存已清除")
+        except Exception as e:
+            error_msg = f"清除缓存失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            raise
+
+    def get_current_source(self) -> str:
+        """获取当前数据源类型"""
+        return self._current_source
+
+    def get_available_sources(self) -> List[str]:
+        """获取所有可用的数据源类型"""
+        try:
+            # 检查每个数据源是否可用
+            available_sources = []
+            for source_type, source in self._data_sources.items():
+                try:
+                    if source_type == 'hikyuu':
+                        if source is not None:
+                            test_data = source.Stock(
+                                'sh000001').get_kdata(Query(-1))
+                            if test_data is not None:
+                                available_sources.append(source_type)
+                    else:
+                        if source is not None:
+                            test_data = source.get_stock_list()
+                            if test_data is not None:
+                                available_sources.append(source_type)
+                except:
+                    continue
+            return available_sources
+        except Exception as e:
+            self.log_manager.error(f"获取可用数据源失败: {str(e)}")
+            return list(self._data_sources.keys())
 
     def _on_industry_data_updated(self):
         """处理行业数据更新事件"""
         try:
             # 清除缓存
-            self._stock_list_cache = []
-            self._stock_list_timestamp = None
-            self._industry_cache.clear()
-            self._industry_stocks.clear()
+            self.cache_manager.clear()
 
             # 重新初始化市场和行业数据
             self._init_market_industry_data()
@@ -649,3 +811,86 @@ class DataManager:
         except Exception as e:
             self.log_manager.error(f"处理行业数据更新失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+
+    def _init_data_sources(self) -> None:
+        """初始化所有数据源"""
+        try:
+            # 初始化 Hikyuu 数据源
+            try:
+                from data_source import HikyuuDataSource
+                self._data_sources['hikyuu'] = HikyuuDataSource()
+                self.log_manager.info("Hikyuu数据源初始化成功")
+            except Exception as e:
+                self.log_manager.warning(f"Hikyuu数据源初始化失败: {str(e)}")
+
+            # 初始化东方财富数据源
+            try:
+                from .eastmoney_source import EastMoneyDataSource
+                self._data_sources['eastmoney'] = EastMoneyDataSource()
+                self.log_manager.info("东方财富数据源初始化成功")
+            except Exception as e:
+                self.log_manager.warning(f"东方财富数据源初始化失败: {str(e)}")
+
+            # 初始化新浪数据源
+            try:
+                from .sina_source import SinaDataSource
+                self._data_sources['sina'] = SinaDataSource()
+                self.log_manager.info("新浪数据源初始化成功")
+            except Exception as e:
+                self.log_manager.warning(f"新浪数据源初始化失败: {str(e)}")
+
+            # 初始化同花顺数据源
+            try:
+                from .tonghuashun_source import TongHuaShunDataSource
+                self._data_sources['tonghuashun'] = TongHuaShunDataSource()
+                self.log_manager.info("同花顺数据源初始化成功")
+            except Exception as e:
+                self.log_manager.warning(f"同花顺数据源初始化失败: {str(e)}")
+
+        except Exception as e:
+            self.log_manager.error(f"初始化数据源失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+
+    def _test_data_source(self, source_name: str) -> bool:
+        """测试数据源是否可用
+
+        Args:
+            source_name: 数据源名称
+
+        Returns:
+            bool: 数据源是否可用
+        """
+        try:
+            source = self._data_sources.get(source_name)
+            if not source:
+                return False
+
+            # 尝试获取上证指数数据
+            if source_name == 'hikyuu':
+                test_data = source.Stock('sh000001').get_kdata(Query(-1))
+                return test_data is not None and not test_data.empty
+            else:
+                test_data = source.get_kdata('sh000001', 'D')
+                return test_data is not None and not test_data.empty
+
+        except Exception as e:
+            self.log_manager.warning(f"测试数据源 {source_name} 失败: {str(e)}")
+            return False
+
+    def _get_backup_source(self) -> Optional[str]:
+        """获取备用数据源
+
+        Returns:
+            str: 备用数据源名称，如果没有可用的备用数据源则返回 None
+        """
+        try:
+            # 按优先级尝试不同的数据源
+            priority_list = ['hikyuu', 'eastmoney', 'sina', 'tonghuashun']
+            for source_name in priority_list:
+                if source_name != self._current_source and self._test_data_source(source_name):
+                    return source_name
+            return None
+
+        except Exception as e:
+            self.log_manager.error(f"获取备用数据源失败: {str(e)}")
+            return None

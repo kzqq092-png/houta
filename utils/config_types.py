@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from .theme_types import Theme
 from PyQt5.QtCore import QObject, pyqtSignal
 
+
 @dataclass
 class ThemeConfig:
     """Theme configuration settings"""
@@ -17,7 +18,8 @@ class ThemeConfig:
     background_color: str = "#FFFFFF"
     text_color: str = "#000000"
     grid_color: str = "#E0E0E0"
-    chart_colors: List[str] = field(default_factory=lambda: ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"])
+    chart_colors: List[str] = field(default_factory=lambda: [
+                                    "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"])
     custom_colors: Dict[str, str] = field(default_factory=dict)
     font_family: str = "Arial"
     font_size: int = 12
@@ -25,7 +27,7 @@ class ThemeConfig:
     def __hash__(self):
         """Make ThemeConfig hashable by using theme name as hash"""
         return hash(self.theme.name)
-        
+
     def __eq__(self, other):
         """Compare ThemeConfig objects by their theme"""
         if not isinstance(other, ThemeConfig):
@@ -34,7 +36,7 @@ class ThemeConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -53,10 +55,10 @@ class ThemeConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ThemeConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             ThemeConfig instance
         """
@@ -66,11 +68,13 @@ class ThemeConfig:
             background_color=data.get("background_color", "#FFFFFF"),
             text_color=data.get("text_color", "#000000"),
             grid_color=data.get("grid_color", "#E0E0E0"),
-            chart_colors=data.get("chart_colors", ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"]),
+            chart_colors=data.get(
+                "chart_colors", ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"]),
             custom_colors=data.get("custom_colors", {}),
             font_family=data.get("font_family", "Arial"),
             font_size=data.get("font_size", 12)
         )
+
 
 @dataclass
 class ChartConfig:
@@ -85,13 +89,14 @@ class ChartConfig:
     auto_update: bool = True
     update_interval: int = 5
     default_period: str = "D"
-    default_indicators: list[str] = field(default_factory=lambda: ["MA", "MACD", "RSI"])
+    default_indicators: list[str] = field(
+        default_factory=lambda: ["MA", "MACD", "RSI"])
     font_family: str = "Microsoft YaHei"
     font_size: int = 12
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -114,10 +119,10 @@ class ChartConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ChartConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             ChartConfig instance
         """
@@ -132,10 +137,12 @@ class ChartConfig:
             auto_update=data.get("auto_update", True),
             update_interval=data.get("update_interval", 5),
             default_period=data.get("default_period", "D"),
-            default_indicators=data.get("default_indicators", ["MA", "MACD", "RSI"]),
+            default_indicators=data.get(
+                "default_indicators", ["MA", "MACD", "RSI"]),
             font_family=data.get("font_family", "Microsoft YaHei"),
             font_size=data.get("font_size", 12)
         )
+
 
 @dataclass
 class TradingConfig:
@@ -155,7 +162,7 @@ class TradingConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -177,10 +184,10 @@ class TradingConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'TradingConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             TradingConfig instance
         """
@@ -199,53 +206,58 @@ class TradingConfig:
             time_stop=data.get("time_stop", 5)
         )
 
+
 class PerformanceConfig:
     """性能监控配置"""
-    
+
     def __init__(self, **kwargs):
         # 性能监控阈值
         self.cpu_threshold = kwargs.get('cpu_threshold', 80)  # CPU使用率阈值(%)
-        self.memory_threshold = kwargs.get('memory_threshold', 80)  # 内存使用率阈值(%)
+        self.memory_threshold = kwargs.get(
+            'memory_threshold', 80)  # 内存使用率阈值(%)
         self.disk_threshold = kwargs.get('disk_threshold', 90)  # 磁盘使用率阈值(%)
-        self.response_threshold = kwargs.get('response_threshold', 1.0)  # 响应时间阈值(秒)
-        
+        self.response_threshold = kwargs.get(
+            'response_threshold', 1.0)  # 响应时间阈值(秒)
+
         # CPU监控配置
         self.cpu_interval = kwargs.get('cpu_interval', 1.0)  # CPU采样间隔(秒)
-        self.cpu_average_window = kwargs.get('cpu_average_window', 5)  # CPU使用率平均窗口大小
+        self.cpu_average_window = kwargs.get(
+            'cpu_average_window', 5)  # CPU使用率平均窗口大小
         self.cpu_per_core = kwargs.get('cpu_per_core', False)  # 是否按每个核心监控
-        
+
         # 监控配置
         self.update_interval = kwargs.get('update_interval', 1.0)  # 更新间隔(秒)
-        self.metrics_history_size = kwargs.get('metrics_history_size', 100)  # 历史数据大小
+        self.metrics_history_size = kwargs.get(
+            'metrics_history_size', 100)  # 历史数据大小
         self.monitor_cpu = kwargs.get('monitor_cpu', True)  # 是否监控CPU
         self.monitor_memory = kwargs.get('monitor_memory', True)  # 是否监控内存
         self.monitor_disk = kwargs.get('monitor_disk', True)  # 是否监控磁盘
         self.log_to_file = kwargs.get('log_to_file', True)  # 是否记录日志到文件
-        
+
     def get(self, key: str, default=None):
         """获取配置项
-        
+
         Args:
             key: 配置项名称
             default: 默认值
-            
+
         Returns:
             配置项值
         """
         return getattr(self, key, default)
-        
+
     def set(self, key: str, value):
         """设置配置项
-        
+
         Args:
             key: 配置项名称
             value: 配置项值
         """
         setattr(self, key, value)
-        
+
     def to_dict(self) -> dict:
         """转换为字典
-        
+
         Returns:
             配置字典
         """
@@ -264,14 +276,14 @@ class PerformanceConfig:
             'monitor_disk': self.monitor_disk,
             'log_to_file': self.log_to_file
         }
-        
+
     @classmethod
     def from_dict(cls, data: dict) -> 'PerformanceConfig':
         """从字典创建配置
-        
+
         Args:
             data: 配置字典
-            
+
         Returns:
             PerformanceConfig实例
         """
@@ -291,6 +303,7 @@ class PerformanceConfig:
             log_to_file=data.get('log_to_file', True)
         )
 
+
 @dataclass
 class AppConfig:
     """Application configuration container"""
@@ -301,7 +314,7 @@ class AppConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -315,10 +328,10 @@ class AppConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'AppConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             AppConfig instance
         """
@@ -326,13 +339,14 @@ class AppConfig:
         chart_data = data.get("chart", {})
         trading_data = data.get("trading", {})
         performance_data = data.get("performance", {})
-        
+
         return cls(
             theme=ThemeConfig.from_dict(theme_data),
             chart=ChartConfig.from_dict(chart_data),
             trading=TradingConfig.from_dict(trading_data),
             performance=PerformanceConfig.from_dict(performance_data)
         )
+
 
 @dataclass
 class DataConfig:
@@ -346,7 +360,7 @@ class DataConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -362,10 +376,10 @@ class DataConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DataConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             DataConfig instance
         """
@@ -377,6 +391,7 @@ class DataConfig:
             data_source=data.get("data_source", 'local'),
             backup_enabled=data.get("backup_enabled", True)
         )
+
 
 @dataclass
 class UIConfig:
@@ -394,7 +409,7 @@ class UIConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
-        
+
         Returns:
             Dictionary representation of config
         """
@@ -410,10 +425,10 @@ class UIConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'UIConfig':
         """Create config from dictionary
-        
+
         Args:
             data: Dictionary containing config data
-            
+
         Returns:
             UIConfig instance
         """
@@ -426,21 +441,22 @@ class UIConfig:
             window_size=data.get("window_size", {'width': 1200, 'height': 800})
         )
 
+
 @dataclass
 class LoggingConfig(QObject):
     """日志配置类"""
-    
+
     # 定义信号
     config_changed = pyqtSignal(object)  # 配置变更信号
-    
+
     def __init__(self, **kwargs):
         """初始化日志配置
-        
+
         Args:
             **kwargs: 配置参数
         """
         super().__init__()
-        
+
         # 设置默认值
         self.level = kwargs.get("level", "INFO")
         self.save_to_file = kwargs.get("save_to_file", True)
@@ -451,16 +467,18 @@ class LoggingConfig(QObject):
         self.auto_compress = kwargs.get("auto_compress", True)
         self.max_logs = kwargs.get("max_logs", 1000)
         self.performance_log = kwargs.get("performance_log", True)
-        self.performance_log_file = kwargs.get("performance_log_file", "performance.log")
+        self.performance_log_file = kwargs.get(
+            "performance_log_file", "performance.log")
         self.exception_log = kwargs.get("exception_log", True)
-        self.exception_log_file = kwargs.get("exception_log_file", "exceptions.log")
+        self.exception_log_file = kwargs.get(
+            "exception_log_file", "exceptions.log")
         self.async_logging = kwargs.get("async_logging", True)
         self.log_queue_size = kwargs.get("log_queue_size", 1000)
         self.worker_threads = kwargs.get("worker_threads", 2)
 
     def validate(self) -> tuple[bool, str]:
         """验证配置是否有效
-        
+
         Returns:
             tuple[bool, str]: (是否有效, 错误信息)
         """
@@ -468,41 +486,41 @@ class LoggingConfig(QObject):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if self.level not in valid_levels:
             return False, f"无效的日志级别: {self.level}，必须是 {', '.join(valid_levels)} 之一"
-            
+
         # 验证工作线程数
         if self.worker_threads <= 0:
             return False, "工作线程数必须大于0"
-            
+
         # 验证日志队列大小
         if self.log_queue_size <= 0:
             return False, "日志队列大小必须大于0"
-            
+
         # 验证文件路径
         if self.save_to_file:
             if not self.log_file:
                 return False, "日志文件名不能为空"
             if not self.log_file.endswith('.log'):
                 return False, "日志文件必须以.log结尾"
-                
+
         # 验证性能日志配置
         if self.performance_log:
             if not self.performance_log_file:
                 return False, "性能日志文件名不能为空"
             if not self.performance_log_file.endswith('.log'):
                 return False, "性能日志文件必须以.log结尾"
-                
+
         # 验证异常日志配置
         if self.exception_log:
             if not self.exception_log_file:
                 return False, "异常日志文件名不能为空"
             if not self.exception_log_file.endswith('.log'):
                 return False, "异常日志文件必须以.log结尾"
-                
+
         return True, "配置验证通过"
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典
-        
+
         Returns:
             配置字典
         """
@@ -527,15 +545,15 @@ class LoggingConfig(QObject):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'LoggingConfig':
         """从字典创建配置
-        
+
         Args:
             data: 配置字典
-            
+
         Returns:
             LoggingConfig实例
         """
         config = cls()
-        
+
         # 更新配置
         config.level = data.get("level", "INFO")
         config.save_to_file = data.get("save_to_file", True)
@@ -546,30 +564,33 @@ class LoggingConfig(QObject):
         config.auto_compress = data.get("auto_compress", True)
         config.max_logs = data.get("max_logs", 1000)
         config.performance_log = data.get("performance_log", True)
-        config.performance_log_file = data.get("performance_log_file", "performance.log")
+        config.performance_log_file = data.get(
+            "performance_log_file", "performance.log")
         config.exception_log = data.get("exception_log", True)
-        config.exception_log_file = data.get("exception_log_file", "exceptions.log")
+        config.exception_log_file = data.get(
+            "exception_log_file", "exceptions.log")
         config.async_logging = data.get("async_logging", True)
         config.log_queue_size = data.get("log_queue_size", 1000)
         config.worker_threads = data.get("worker_threads", 2)
-        
+
         return config
-        
+
     def update(self, **kwargs):
         """更新配置
-        
+
         Args:
             **kwargs: 要更新的配置项
         """
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-                
+
         # 发送配置变更信号
         self.config_changed.emit(self)
+
 
 class UIStyleConfig:
     """UI样式配置"""
     font_family: str = "Microsoft YaHei"  # 默认使用微软雅黑
     font_size: int = 10
-    # ... existing code ... 
+    # ... existing code ...
