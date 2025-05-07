@@ -1986,7 +1986,7 @@ class TradingGUI(QMainWindow):
         """
         try:
             # 获取要操作的股票项
-            if item is None:
+            if item is None or isinstance(item, bool):
                 selected_items = self.stock_list.selectedItems()
                 if not selected_items:
                     self.log_manager.warning("请先选择一只股票")
@@ -2596,7 +2596,6 @@ class TradingGUI(QMainWindow):
             # 创建底部面板
             self.bottom_panel = QWidget()
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
-
             # 用LogWidget替换原有日志控件
             self.log_widget = LogWidget(self.log_manager)
             self.bottom_layout.addWidget(self.log_widget)
@@ -2605,13 +2604,8 @@ class TradingGUI(QMainWindow):
             self.bottom_panel.setMaximumHeight(300)
             self.bottom_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-            # 连接日志信号
-            self.log_manager.log_message.connect(self.log_widget.add_log)
-            self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
-
+            # 不再在这里连接日志信号，全部在__init__中统一连接
             self.log_manager.info("底部面板创建完成")
-
         except Exception as e:
             self.log_manager.error(f"创建底部面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
