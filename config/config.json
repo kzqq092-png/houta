@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "theme": {
-        "theme": "system",
+        "theme": "deepblue",
         "name": "light",
         "background_color": "#FFFFFF",
         "text_color": "#000000",
@@ -36,7 +36,9 @@
             "MA",
             "MACD",
             "RSI"
-        ]
+        ],
+        "font_family": "Microsoft YaHei",
+        "font_size": 12
     },
     "trading": {
         "default_symbol": "000001",
@@ -53,13 +55,19 @@
         "time_stop": 5
     },
     "performance": {
-        "enable_monitoring": true,
         "cpu_threshold": 80.0,
         "memory_threshold": 80.0,
+        "disk_threshold": 90,
         "response_threshold": 1.0,
+        "cpu_interval": 1.0,
+        "cpu_average_window": 5,
+        "cpu_per_core": false,
+        "update_interval": 1.0,
         "metrics_history_size": 1000,
-        "log_to_file": true,
-        "log_file": "performance.log"
+        "monitor_cpu": true,
+        "monitor_memory": true,
+        "monitor_disk": true,
+        "log_to_file": true
     },
     "data": {
         "enable_cache": true,
@@ -72,7 +80,13 @@
     "ui": {
         "font_size": 12,
         "language": "zh_CN",
-        "show_tooltips": true
+        "show_tooltips": true,
+        "confirm_exit": true,
+        "layout": "default",
+        "window_size": {
+            "width": 1200,
+            "height": 800
+        }
     },
     "logging": {
         "level": "INFO",
@@ -90,15 +104,5 @@
         "async_logging": true,
         "log_queue_size": 1000,
         "worker_threads": 2
-    },
-    "cache": {
-        "size": 1000,
-        "expire_minutes": 30,
-        "cleanup_interval": 5
-    },
-    "system": {
-        "max_threads": 4,
-        "update_interval": 1000,
-        "log_level": "INFO"
     }
 }

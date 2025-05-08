@@ -13,7 +13,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 @dataclass
 class ThemeConfig:
     """Theme configuration settings"""
-    theme: Theme = Theme.SYSTEM
+    theme: Theme = Theme.DEEPBLUE
     name: str = "light"
     background_color: str = "#FFFFFF"
     text_color: str = "#000000"

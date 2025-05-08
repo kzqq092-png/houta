@@ -1,7 +1,7 @@
 """
 图表控件模块
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -15,12 +15,17 @@ import pandas as pd
 import mplfinance as mpf
 import mplcursors
 from datetime import datetime
+import matplotlib.dates as mdates
 
 from core.logger import LogManager
-from utils.theme import get_theme_manager
+from utils.theme import get_theme_manager, Theme
 from utils.config_manager import ConfigManager
 import traceback
 from core.cache_manager import CacheManager
+from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
+from concurrent.futures import ThreadPoolExecutor
+from .async_data_processor import AsyncDataProcessor
+from .chart_renderer import ChartRenderer
 
 
 class ChartWidget(QWidget):
@@ -33,12 +38,14 @@ class ChartWidget(QWidget):
     error_occurred = pyqtSignal(str)  # 错误信号
     zoom_changed = pyqtSignal(float)  # 缩放变更信号
 
-    def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None):
+    def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None, theme_manager=None, log_manager=None):
         """初始化图表控件
 
         Args:
             parent: Parent widget
             config_manager: Optional ConfigManager instance to use
+            theme_manager: Optional theme manager to use
+            log_manager: Optional log manager to use
         """
         try:
             super().__init__(parent)
@@ -64,11 +71,11 @@ class ChartWidget(QWidget):
 
             # 初始化管理器
             self.config_manager = config_manager or ConfigManager()
-            self.theme_manager = get_theme_manager(self.config_manager)
-            self.theme_manager.theme_changed.connect(self.apply_theme)
+            self.theme_manager = theme_manager or get_theme_manager(
+                self.config_manager)
 
             # 初始化日志管理器
-            self.log_manager = LogManager()
+            self.log_manager = log_manager or LogManager()
 
             # 初始化数据更新锁
             self._update_lock = QMutex()
@@ -80,9 +87,6 @@ class ChartWidget(QWidget):
             # 连接信号
             self.connect_signals()
 
-            # 应用主题
-            self.apply_theme()
-
             # 创建更新定时器
             self._update_timer = QTimer()
             self._update_timer.timeout.connect(self._process_update_queue)
@@ -93,6 +97,24 @@ class ChartWidget(QWidget):
 
             # 添加渲染优化
             self._optimize_rendering()
+
+            # 初始化异步数据处理器
+            self.data_processor = AsyncDataProcessor()
+            self.data_processor.calculation_progress.connect(
+                self._on_calculation_progress)
+            self.data_processor.calculation_complete.connect(
+                self._on_calculation_complete)
+            self.data_processor.calculation_error.connect(
+                self._on_calculation_error)
+
+            # 初始化渲染器
+            self.renderer = ChartRenderer()
+            self.renderer.render_progress.connect(self._on_render_progress)
+            self.renderer.render_complete.connect(self._on_render_complete)
+            self.renderer.render_error.connect(self._on_render_error)
+
+            # 应用初始主题
+            self._apply_initial_theme()
 
             self.log_manager.info("图表控件初始化完成")
 
@@ -116,7 +138,7 @@ class ChartWidget(QWidget):
             toolbar_widget.setLayout(toolbar_layout)
             toolbar_widget.setStyleSheet('''
                 QWidget {
-                    background: #f7fafd;
+                    background: transparent;
                 }
                 QLabel {
                     font-family: 'Microsoft YaHei', 'Arial', sans-serif;
@@ -179,30 +201,25 @@ class ChartWidget(QWidget):
             self.clear_button = QPushButton("清除指标")
             toolbar_layout.addWidget(self.clear_button)
 
+            # 添加主题切换按钮
+            theme_label = QLabel("主题:")
+            self.theme_button = QPushButton()
+            self.theme_button.setFixedSize(32, 32)
+            self.theme_button.setIconSize(QSize(24, 24))
+            self.theme_button.clicked.connect(self._toggle_theme)
+            self._update_theme_button()
+            toolbar_layout.addWidget(theme_label)
+            toolbar_layout.addWidget(self.theme_button)
+
             # 添加工具栏到主布局
             self.layout().addWidget(toolbar_widget)
 
-            # 创建图表
-            self.figure = Figure(figsize=(8, 6))
-            self.canvas = FigureCanvas(self.figure)
-            self.canvas.setSizePolicy(
-                QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.canvas.setStyleSheet('''
-                background: #ffffff;
-                border-radius: 10px;
-                border: 1px solid #e0e0e0;
-            ''')
-            self.layout().addWidget(self.canvas)
+            # 初始化图表布局
+            self._init_figure_layout()
 
             # 创建matplotlib工具栏（只创建一次）
             self.toolbar = NavigationToolbar(self.canvas, self)
             self.layout().insertWidget(1, self.toolbar)
-
-            # 创建子图
-            self.price_ax = self.figure.add_subplot(211)
-            self.volume_ax = self.figure.add_subplot(212)
-            self.figure.set_tight_layout(True)
-            self.figure.set_constrained_layout(True)
 
             self.log_manager.info("图表控件UI初始化完成")
 
@@ -261,49 +278,28 @@ class ChartWidget(QWidget):
         with QMutexLocker(self._update_lock):
             self._update_queue.append((update_func, args))
 
-    def show_loading_dialog(self, stock_code):
-        if hasattr(self, 'loading_dialog') and self.loading_dialog:
-            self.loading_dialog.close()
-        self.loading_dialog = QDialog(self)
-        self.loading_dialog.setWindowTitle("数据加载中")
-        layout = QVBoxLayout(self.loading_dialog)
-        self.loading_label = QLabel(f"正在加载 {stock_code} 的实时数据，请稍候...")
-        layout.addWidget(self.loading_label)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
-        self.progress_label = QLabel("0%")
-        layout.addWidget(self.progress_label)
-        close_btn = QPushButton("取消/关闭")
-        close_btn.clicked.connect(self.close_loading_dialog)
-        layout.addWidget(close_btn)
-        self.loading_dialog.setLayout(layout)
-        self.loading_dialog.setModal(False)
-        self.loading_dialog.setWindowModality(Qt.NonModal)
-        self.loading_dialog.setWindowFlags(
-            self.loading_dialog.windowFlags() | Qt.WindowStaysOnTopHint)
-        self.loading_dialog.show()
-        QApplication.processEvents()
+    def show_loading_dialog(self):
+        """显示加载进度对话框"""
+        # if not hasattr(self, 'loading_dialog'):
+        #     self.loading_dialog = QProgressDialog(self)
+        #     self.loading_dialog.setWindowTitle("正在加载")
+        #     self.loading_dialog.setLabelText("正在更新图表...")
+        #     self.loading_dialog.setRange(0, 100)
+        #     self.loading_dialog.setWindowModality(Qt.WindowModal)
+        #     self.loading_dialog.setAutoClose(True)
+        # self.loading_dialog.show()
 
-    def update_loading_progress(self, percent: int, text: str = None):
-        if hasattr(self, 'progress_bar') and self.progress_bar:
-            self.progress_bar.setValue(percent)
-        if hasattr(self, 'progress_label') and self.progress_label:
-            self.progress_label.setText(f"{percent}%")
-        if hasattr(self, 'loading_label') and self.loading_label and text:
-            self.loading_label.setText(text)
+    def update_loading_progress(self, value: int, message: str = None):
+        """更新加载进度"""
+        if hasattr(self, 'loading_dialog'):
+            self.loading_dialog.setValue(value)
+            if message:
+                self.loading_dialog.setLabelText(message)
 
     def close_loading_dialog(self):
-        if hasattr(self, 'loading_dialog') and self.loading_dialog:
+        """关闭加载进度对话框"""
+        if hasattr(self, 'loading_dialog'):
             self.loading_dialog.close()
-            self.loading_dialog = None
-        if hasattr(self, 'progress_bar'):
-            self.progress_bar = None
-        if hasattr(self, 'progress_label'):
-            self.progress_label = None
-        if hasattr(self, 'loading_label'):
-            self.loading_label = None
 
     def get_stock_theme(self, stock_code):
         """根据股票代码返回专属配色"""
@@ -319,261 +315,877 @@ class ChartWidget(QWidget):
         return color_map.get(stock_code, color_map['default'])
 
     def update_chart(self, data: dict):
-        stock_code = data.get('stock_code', 'default')
-        time_range = data.get('time_range', '')  # 新增
-        self.show_loading_dialog(stock_code)
+        """更新图表"""
         try:
-            self.figure.clf()  # 清空所有子图，确保刷新
-            self.update_loading_progress(5, "准备加载...")
-            kdata = data.get('kdata')
-            cache_key = self._get_cache_key(data)
-            # 优先用缓存的kdata
-            if cache_key:
-                cached_data = self.cache_manager.get(cache_key)
-                if cached_data is not None and 'kdata' in cached_data:
-                    self.log_manager.info("使用缓存的K线数据")
-                    kdata = cached_data['kdata']
-            if kdata is None or kdata.empty:
-                ax1 = self.figure.add_subplot(211)
-                ax2 = self.figure.add_subplot(212, sharex=ax1)
-                ax1.text(0.5, 0.5, "无数据", ha='center', va='center',
-                         fontsize=16, color='gray', transform=ax1.transAxes)
-                ax2.text(0.5, 0.5, "无数据", ha='center', va='center',
-                         fontsize=16, color='gray', transform=ax2.transAxes)
-                self.canvas.draw_idle()
-                self.close_loading_dialog()
+            if not data or 'kdata' not in data:
                 return
-            self.update_loading_progress(15, "校验数据...")
-            required_columns = ['open', 'high', 'low', 'close', 'volume']
-            if not all(col in kdata.columns for col in required_columns):
-                ax1 = self.figure.add_subplot(211)
-                ax2 = self.figure.add_subplot(212, sharex=ax1)
-                ax1.text(0.5, 0.5, "无数据", ha='center', va='center',
-                         fontsize=16, color='gray', transform=ax1.transAxes)
-                ax2.text(0.5, 0.5, "无数据", ha='center', va='center',
-                         fontsize=16, color='gray', transform=ax2.transAxes)
-                self.canvas.draw_idle()
-                self.close_loading_dialog()
-                return
-            self.update_loading_progress(40, "处理K线数据...")
-            df = kdata.copy()
-            if not isinstance(df.index, pd.DatetimeIndex):
-                try:
-                    if hasattr(df.index[0], 'number'):
-                        dates = []
-                        for dt in df.index:
-                            n = int(dt.number)
-                            s = str(n)
-                            dates.append(f"{s[:4]}-{s[4:6]}-{s[6:8]}")
-                        df.index = pd.to_datetime(dates)
-                    else:
-                        df.index = pd.to_datetime(df.index)
-                except Exception as e:
-                    self.log_manager.error(f"转换日期失败: {str(e)}")
-                    self.close_loading_dialog()
-                    return
-            self.update_loading_progress(60, "批量绘制K线...")
-            plot_df = df[['open', 'high', 'low', 'close', 'volume']].copy()
-            plot_df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-            ax1 = self.figure.add_subplot(211)
-            ax2 = self.figure.add_subplot(212, sharex=ax1)
-            mpf.plot(
-                plot_df,
-                type='candle',
-                ax=ax1,
-                volume=ax2,
-                style='yahoo',
-                show_nontrading=True
-            )
-            self.update_loading_progress(95, "刷新画布...")
-            self.figure.set_tight_layout(True)
-            self.figure.set_constrained_layout(True)
+
+            kdata = data['kdata']
+            self.current_kdata = kdata
+
+            # 显示加载进度
+            self.show_loading_dialog()
+
+            # 清除现有图表内容
+            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                ax.clear()
+
+            # 获取主题样式
+            style = self._get_chart_style()
+
+            # 渲染K线图
+            self.renderer.render_candlesticks(self.price_ax, kdata, style)
+
+            # 渲染成交量
+            self.renderer.render_volume(self.volume_ax, kdata, style)
+
+            # 渲染指标
+            self._render_indicators(kdata)
+
+            # 优化显示
+            self._optimize_display()
+
+            # 更新画布
             self.canvas.draw_idle()
-            # 只缓存kdata，不缓存figure
-            if cache_key:
-                self.cache_manager.set(cache_key, {
-                    'kdata': kdata,
-                    'params': {
-                        'stock_code': data.get('stock_code', ''),
-                        'period': data.get('period', ''),
-                        'chart_type': data.get('chart_type', ''),
-                        'time_range': time_range
-                    }
-                })
-            self.log_manager.info("图表更新完成")
-            self.chart_updated.emit(data)
-            self.update_loading_progress(100, "加载完成！")
-            QTimer.singleShot(500, self.close_loading_dialog)
-        except Exception as e:
-            error_msg = f"更新图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+
+            # 关闭加载进度
             self.close_loading_dialog()
 
-    def _optimize_rendering(self):
-        """优化图表渲染性能"""
+        except Exception as e:
+            self.error_occurred.emit(f"更新图表失败: {str(e)}")
+            self.close_loading_dialog()
+
+    def _render_indicators(self, kdata: pd.DataFrame):
+        """渲染技术指标"""
         try:
-            # 设置更新策略
+            # 获取当前选中的指标
+            indicators = self._get_active_indicators()
+            if not indicators:
+                return
+
+            # 计算并渲染每个指标
+            for indicator in indicators:
+                style = self._get_indicator_style(indicator)
+
+                if indicator.startswith('MA'):
+                    period = int(indicator[2:])
+                    ma = kdata['close'].rolling(period).mean()
+                    self.renderer.render_line(self.price_ax, ma, style)
+
+                elif indicator == 'MACD':
+                    macd, signal, hist = self._calculate_macd(kdata)
+                    self.renderer.render_line(self.indicator_ax, macd,
+                                              self._get_indicator_style('MACD', 0))
+                    self.renderer.render_line(self.indicator_ax, signal,
+                                              self._get_indicator_style('MACD', 1))
+                    # 绘制柱状图
+                    dates = mdates.date2num(kdata.index.to_pydatetime())
+                    colors = ['red' if h >= 0 else 'green' for h in hist]
+                    self.indicator_ax.bar(dates, hist, color=colors, alpha=0.5)
+
+                elif indicator == 'RSI':
+                    rsi = self._calculate_rsi(kdata)
+                    self.renderer.render_line(self.indicator_ax, rsi, style)
+
+                elif indicator == 'BOLL':
+                    mid, upper, lower = self._calculate_boll(kdata)
+                    self.renderer.render_line(self.price_ax, mid,
+                                              self._get_indicator_style('BOLL', 0))
+                    self.renderer.render_line(self.price_ax, upper,
+                                              self._get_indicator_style('BOLL', 1))
+                    self.renderer.render_line(self.price_ax, lower,
+                                              self._get_indicator_style('BOLL', 2))
+
+        except Exception as e:
+            self.error_occurred.emit(f"渲染指标失败: {str(e)}")
+
+    def _get_chart_style(self) -> Dict[str, Any]:
+        """获取图表样式"""
+        try:
+            colors = self.theme_manager.get_theme_colors()
+
+            return {
+                'up_color': colors.get('k_up', '#e60000'),
+                'down_color': colors.get('k_down', '#1dbf60'),
+                'edge_color': colors.get('k_edge', '#2c3140'),
+                'volume_up_color': colors.get('volume_up', '#e60000'),
+                'volume_down_color': colors.get('volume_down', '#1dbf60'),
+                'volume_alpha': 0.5,
+                'grid_color': colors.get('chart_grid', '#2c3140'),
+                'background_color': colors.get('chart_background', '#181c24'),
+                'text_color': colors.get('chart_text', '#b0b8c1'),
+                'axis_color': colors.get('chart_grid', '#2c3140'),
+                'label_color': colors.get('chart_text', '#b0b8c1'),
+                'border_color': colors.get('chart_grid', '#2c3140'),
+            }
+
+        except Exception as e:
+            self.log_manager.error(f"获取图表样式失败: {str(e)}")
+            return {}
+
+    def _get_indicator_style(self, name: str, index: int = 0) -> Dict[str, Any]:
+        """获取指标样式"""
+        colors = ['#fbc02d', '#ab47bc', '#1976d2', '#43a047',
+                  '#e53935', '#00bcd4', '#ff9800']
+        return {
+            'color': colors[index % len(colors)],
+            'linewidth': 1.2,
+            'alpha': 0.85,
+            'label': name
+        }
+
+    def _optimize_rendering(self):
+        """优化渲染性能"""
+        try:
+            # 启用双缓冲
             self.setAttribute(Qt.WA_OpaquePaintEvent)
             self.setAttribute(Qt.WA_NoSystemBackground)
-
-            # 启用双缓冲
             self.setAutoFillBackground(True)
 
-            # 优化 matplotlib 设置
+            # 优化matplotlib设置
             plt.style.use('fast')
-            self.figure.set_dpi(100)  # 降低DPI以提高性能
+            self.figure.set_dpi(100)
 
             # 禁用不必要的特性
             plt.rcParams['path.simplify'] = True
             plt.rcParams['path.simplify_threshold'] = 1.0
-            plt.rcParams['agg.path.chunksize'] = 10000
+            plt.rcParams['agg.path.chunksize'] = 20000
 
-            # 设置更快的渲染器
-            plt.rcParams['figure.facecolor'] = 'white'
-            plt.rcParams['figure.edgecolor'] = 'white'
-            plt.rcParams['axes.facecolor'] = 'white'
-            plt.rcParams['savefig.dpi'] = 100
-            plt.rcParams['figure.dpi'] = 100
-            plt.rcParams['figure.autolayout'] = False
-            plt.rcParams['figure.constrained_layout.use'] = True
-
-            # 优化子图布局
+            # 优化布局
             self.figure.set_tight_layout(False)
             self.figure.set_constrained_layout(True)
 
-            # 设置更高效的动画
-            plt.rcParams['animation.html'] = 'jshtml'
-
-            # 优化内存使用
-            plt.rcParams['agg.path.chunksize'] = 20000
-
-            self.log_manager.info("图表渲染优化完成")
-
         except Exception as e:
-            self.log_manager.error(f"优化渲染失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(f"优化渲染失败: {str(e)}")
 
-    def _get_cache_key(self, data: dict) -> str:
-        """生成缓存键
+    def _on_render_progress(self, progress: int, message: str):
+        """处理渲染进度"""
+        self.update_loading_progress(progress, message)
 
-        Args:
-            data: 图表数据字典
+    def _on_render_complete(self):
+        """处理渲染完成"""
+        self.close_loading_dialog()
 
-        Returns:
-            缓存键字符串
-        """
+    def _on_render_error(self, error: str):
+        """处理渲染错误"""
+        self.error_occurred.emit(error)
+        self.close_loading_dialog()
+
+    def _calculate_macd(self, data: pd.DataFrame) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """计算MACD指标"""
+        close = data['close']
+        exp1 = close.ewm(span=12, adjust=False).mean()
+        exp2 = close.ewm(span=26, adjust=False).mean()
+        macd = exp1 - exp2
+        signal = macd.ewm(span=9, adjust=False).mean()
+        hist = macd - signal
+        return macd, signal, hist
+
+    def _calculate_rsi(self, data: pd.DataFrame, period: int = 14) -> pd.Series:
+        """计算RSI指标"""
+        delta = data['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
+
+    def _calculate_boll(self, data: pd.DataFrame, n: int = 20, k: float = 2) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """计算布林带指标"""
+        mid = data['close'].rolling(n).mean()
+        std = data['close'].rolling(n).std()
+        upper = mid + k * std
+        lower = mid - k * std
+        return mid, upper, lower
+
+    def _get_active_indicators(self) -> List[str]:
+        """获取当前激活的指标列表"""
+        active = []
+        if hasattr(self, 'indicator_list'):
+            for item in self.indicator_list.selectedItems():
+                active.append(item.text())
+        return active
+
+    def _on_calculation_progress(self, progress: int, message: str):
+        """处理计算进度"""
+        self.update_loading_progress(progress, message)
+
+    def _on_calculation_complete(self, results: dict):
+        """处理计算完成"""
         try:
-            kdata = data.get('kdata')
-            if kdata is None or kdata.empty:
-                return None
-            key_parts = [
-                data.get('stock_code', ''),
-                data.get('period', ''),
-                data.get('chart_type', ''),
-                str(data.get('time_range', '')),  # 新增时间范围参数
-                str(getattr(self, '_zoom_level', 1.0))
-            ]
-            return '_'.join(key_parts)
+            # 更新图表数据
+            self._update_chart_with_results(results)
+
         except Exception as e:
-            self.log_manager.error(f"生成缓存键失败: {str(e)}")
-            return None
+            self.error_occurred.emit(f"更新图表数据失败: {str(e)}")
 
-    def _optimize_chart_update(self, data: dict) -> None:
-        """优化图表更新性能
+    def _on_calculation_error(self, error: str):
+        """处理计算错误"""
+        self.error_occurred.emit(error)
+        self.close_loading_dialog()
 
-        Args:
-            data: 图表数据字典
-        """
+    def _update_chart_with_results(self, results: dict):
+        """使用计算结果更新图表"""
         try:
-            # 禁用自动缩放
-            for ax in self.figure.axes:
-                ax.autoscale(enable=False)
+            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
+                return
 
-            # 使用更高效的数据结构
-            kdata = data.get('kdata')
-            if kdata is not None and not kdata.empty:
-                # 转换为numpy数组以提高性能
-                dates = kdata.index.values
-                prices = kdata[['open', 'high', 'low', 'close']].values
-                volumes = kdata['volume'].values
+            # 清除现有图表
+            self.figure.clear()
 
-                # 减少数据点数量（如果数据点过多）
-                if len(dates) > 1000:
-                    step = len(dates) // 1000
-                    dates = dates[::step]
-                    prices = prices[::step]
-                    volumes = volumes[::step]
+            # 创建子图
+            gs = self.figure.add_gridspec(
+                3, 1, height_ratios=[3, 1, 1], hspace=0.05)
+            price_ax = self.figure.add_subplot(gs[0])
+            volume_ax = self.figure.add_subplot(gs[1], sharex=price_ax)
+            indicator_ax = self.figure.add_subplot(gs[2], sharex=price_ax)
 
-                # 更新主图数据
-                if hasattr(self, 'price_ax') and self.price_ax is not None:
-                    self.price_ax.clear()
-                    self.price_ax.plot(dates, prices[:, 3], 'b-', linewidth=1)
+            # 使用优化的渲染器绘制图表
+            self.renderer.render_candlesticks(
+                price_ax, self.current_kdata, self._get_style())
+            self.renderer.render_volume(
+                volume_ax, self.current_kdata, self._get_style())
 
-                # 更新成交量图数据
-                if hasattr(self, 'volume_ax') and self.volume_ax is not None:
-                    self.volume_ax.clear()
-                    self.volume_ax.bar(
-                        dates, volumes, width=0.8, color='g', alpha=0.5)
+            # 绘制指标
+            for name, data in results.items():
+                if isinstance(data, tuple):
+                    for i, series in enumerate(data):
+                        self.renderer.render_line(
+                            indicator_ax,
+                            series,
+                            self._get_indicator_style(name, i)
+                        )
+                else:
+                    self.renderer.render_line(
+                        indicator_ax,
+                        data,
+                        self._get_indicator_style(name)
+                    )
 
-            # 优化绘图
-            self.figure.set_constrained_layout(True)
-            self.canvas.draw_idle()  # 使用draw_idle代替draw以提高性能
-
-            self.log_manager.info("图表更新优化完成")
-
-        except Exception as e:
-            self.log_manager.error(f"优化图表更新失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
-
-    def _enable_crosshair(self, ax, df):
-        if not getattr(self, 'crosshair_enabled', False):
-            return
-        # 只创建一次 crosshair
-        if not hasattr(self, '_crosshair_lines') or not self._crosshair_lines:
-            self._crosshair_lines = [
-                ax.axhline(color='gray', lw=0.5, ls='--',
-                           alpha=0.5, visible=False),
-                ax.axvline(color='gray', lw=0.5, ls='--',
-                           alpha=0.5, visible=False)
-            ]
-            self._crosshair_text = ax.text(
-                0.02, 0.98, '', transform=ax.transAxes, va='top', ha='left',
-                fontsize=9, color='black',
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'),
-                visible=False
+            # 优化布局
+            self.figure.tight_layout(rect=[0, 0, 1, 1])
+            self.figure.subplots_adjust(
+                left=0.01, right=0.99, top=0.99, bottom=0.06, hspace=0.00
             )
 
-            def on_mouse_move(event):
-                if not event.inaxes:
-                    for line in self._crosshair_lines:
-                        line.set_visible(False)
-                    self._crosshair_text.set_visible(False)
-                    self.canvas.draw_idle()
-                    return
-                x, y = event.xdata, event.ydata
-                for line in self._crosshair_lines:
-                    line.set_visible(True)
-                self._crosshair_lines[0].set_ydata([y, y])
-                self._crosshair_lines[1].set_xdata([x, x])
-                self._crosshair_text.set_visible(True)
-                # 找到最近的索引
-                idx = int(np.clip(round(x), 0, len(df)-1))
-                row = df.iloc[idx]
-                info = (
-                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
-                    f"开:{row['open']:.2f} 收:{row['close']:.2f}\n"
-                    f"高:{row['high']:.2f} 低:{row['low']:.2f}\n"
-                    f"量:{row['volume']:.0f}"
-                )
-                self._crosshair_text.set_text(info)
-                self.canvas.draw_idle()
+            # 更新画布
+            self.canvas.draw_idle()
 
-            self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
-        else:
-            # 已有 crosshair，无需重复创建
-            pass
+            # 关闭加载对话框
+            self.close_loading_dialog()
+
+        except Exception as e:
+            self.error_occurred.emit(f"更新图表显示失败: {str(e)}")
+
+    def _get_style(self) -> Dict[str, Any]:
+        """获取当前主题样式"""
+        theme_colors = self.theme_manager.get_theme_colors()
+        return {
+            'up_color': theme_colors.get('k_up', '#e60000'),
+            'down_color': theme_colors.get('k_down', '#1dbf60'),
+            'edge_color': theme_colors.get('k_edge', '#2c3140'),
+            'volume_alpha': 0.5,
+            'grid_color': theme_colors.get('chart_grid', '#2c3140'),
+            'background_color': theme_colors.get('chart_background', '#181c24')
+        }
+
+    def on_period_changed(self, period: str):
+        """处理周期变更事件
+
+        Args:
+            period: 周期名称
+        """
+        try:
+            # 转换周期
+            period_map = {
+                '日线': 'D',
+                '周线': 'W',
+                '月线': 'M',
+                '60分钟': '60',
+                '30分钟': '30',
+                '15分钟': '15',
+                '5分钟': '5'
+            }
+
+            if period in period_map:
+                self.current_period = period_map[period]
+                self.period_changed.emit(self.current_period)
+
+        except Exception as e:
+            error_msg = f"处理周期变更失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def on_indicator_changed(self, indicator: str):
+        """处理指标变更事件
+
+        Args:
+            indicator: 指标名称
+        """
+        try:
+            self.indicator_changed.emit(indicator)
+            self.add_indicator(indicator)
+
+        except Exception as e:
+            error_msg = f"处理指标变更失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def clear_chart(self):
+        """Clear chart data"""
+        try:
+            # 清除图表数据
+            if hasattr(self, 'figure'):
+                self.figure.clear()
+
+            # 重置当前数据
+            self.current_kdata = None
+            self.current_signals = []
+            self.current_indicator = None
+
+            # 重新创建子图
+            if hasattr(self, 'figure'):
+                self.price_ax = self.figure.add_subplot(211)  # K线图
+                self.volume_ax = self.figure.add_subplot(212)  # 成交量图
+
+                # 调整布局
+                self.figure.tight_layout()
+
+                # 更新画布
+                QTimer.singleShot(0, self.canvas.draw)
+
+            self.log_manager.info("图表已清除")
+
+        except Exception as e:
+            error_msg = f"清除图表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def _apply_initial_theme(self):
+        """应用初始主题"""
+        try:
+            theme = self.theme_manager.current_theme
+            colors = self.theme_manager.get_theme_colors(theme)
+
+            # 设置图表背景色
+            self.figure.patch.set_facecolor(
+                colors.get('chart_background', '#181c24'))
+
+            # 设置子图样式
+            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                if ax is not None:
+                    ax.set_facecolor(colors.get('chart_background', '#181c24'))
+                    ax.grid(True, color=colors.get('chart_grid',
+                            '#2c3140'), linestyle='--', alpha=0.3)
+                    ax.tick_params(colors=colors.get('chart_text', '#b0b8c1'))
+
+                    for spine in ax.spines.values():
+                        spine.set_color(colors.get('chart_grid', '#2c3140'))
+
+            # 设置画布样式
+            self.canvas.setStyleSheet(
+                f"background: {colors.get('chart_background', '#181c24')}; "
+                f"border-radius: 10px; "
+                f"border: 1px solid {colors.get('chart_grid', '#2c3140')};"
+            )
+
+            # 设置工具栏样式
+            if hasattr(self, 'toolbar'):
+                self.toolbar.setStyleSheet(
+                    f"background: {colors.get('chart_background', '#181c24')}; "
+                    f"color: {colors.get('chart_text', '#b0b8c1')}; "
+                    f"border: none;"
+                )
+
+            # 更新布局
+            self.figure.subplots_adjust(
+                left=0.08, right=0.92,
+                top=0.95, bottom=0.05,
+                hspace=0.1
+            )
+
+            # 刷新画布
+            self.canvas.draw_idle()
+
+        except Exception as e:
+            self.log_manager.error(f"应用初始主题失败: {str(e)}")
+
+    def _toggle_theme(self):
+        """切换主题"""
+        try:
+            # 获取当前主题
+            current_theme = self.theme_manager.current_theme
+
+            # 切换主题
+            new_theme = Theme.DEEPBLUE if current_theme == Theme.LIGHT else Theme.LIGHT
+
+            # 更新主题
+            self._update_chart_theme(new_theme)
+
+            # 更新按钮图标
+            self._update_theme_button()
+
+            self.log_manager.info(f"主题已切换为: {new_theme.name}")
+
+        except Exception as e:
+            self.log_manager.error(f"切换主题失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+
+    def _update_theme_button(self):
+        """更新主题按钮图标"""
+        try:
+            current_theme = self.theme_manager.current_theme
+            icon_path = "icons/theme_dark.png" if current_theme == Theme.LIGHT else "icons/theme_light.png"
+            self.theme_button.setIcon(QIcon(icon_path))
+            self.theme_button.setToolTip(
+                "切换到深色主题" if current_theme == Theme.LIGHT else "切换到浅色主题")
+        except Exception as e:
+            self.log_manager.error(f"更新主题按钮失败: {str(e)}")
+
+    def _update_chart_theme(self, theme: Theme):
+        """更新图表主题样式
+
+        Args:
+            theme: 主题枚举值
+        """
+        try:
+            # 设置主题
+            self.theme_manager.set_theme(theme)
+
+            # 获取主题颜色
+            colors = self.theme_manager.get_theme_colors(theme)
+
+            # 更新图表背景色
+            self.figure.patch.set_facecolor(
+                colors.get('chart_background', '#181c24'))
+
+            # 更新子图样式
+            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                if ax is not None:
+                    # 设置背景色和网格
+                    ax.set_facecolor(colors.get('chart_background', '#181c24'))
+                    ax.grid(True, color=colors.get('chart_grid',
+                            '#2c3140'), linestyle='--', alpha=0.3)
+
+                    # 设置刻度颜色
+                    ax.tick_params(colors=colors.get('chart_text', '#b0b8c1'))
+
+                    # 设置边框颜色
+                    for spine in ax.spines.values():
+                        spine.set_color(colors.get('chart_grid', '#2c3140'))
+
+            # 更新画布样式
+            self.canvas.setStyleSheet(
+                f"background: {colors.get('chart_background', '#181c24')}; "
+                f"border-radius: 10px; "
+                f"border: 1px solid {colors.get('chart_grid', '#2c3140')};"
+            )
+
+            # 更新工具栏样式
+            if hasattr(self, 'toolbar'):
+                self.toolbar.setStyleSheet(
+                    f"background: {colors.get('chart_background', '#181c24')}; "
+                    f"color: {colors.get('chart_text', '#b0b8c1')}; "
+                    f"border: none;"
+                )
+
+            # 更新布局
+            self.figure.subplots_adjust(
+                left=0.08, right=0.92,
+                top=0.95, bottom=0.05,
+                hspace=0.1
+            )
+
+            # 刷新画布
+            self.canvas.draw_idle()
+
+        except Exception as e:
+            self.log_manager.error(f"更新图表主题失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+
+    def update_performance_chart(self, metrics: dict):
+        """更新性能图表
+
+        Args:
+            metrics: 性能指标字典
+        """
+        try:
+            # 清除现有图表
+            self.figure.clear()
+
+            # 创建子图
+            gs = self.figure.add_gridspec(2, 2)
+
+            # 月度收益热力图
+            ax1 = self.figure.add_subplot(gs[0, 0])
+            if 'monthly_returns' in metrics:
+                monthly_returns = metrics['monthly_returns']
+                sns.heatmap(monthly_returns, ax=ax1, cmap='RdYlGn',
+                            center=0, annot=True, fmt='.1%')
+                ax1.set_title('月度收益热力图')
+
+            # 收益分布直方图
+            ax2 = self.figure.add_subplot(gs[0, 1])
+            if 'daily_returns' in metrics:
+                sns.histplot(metrics['daily_returns'], ax=ax2,
+                             bins=50, kde=True)
+                ax2.set_title('收益分布')
+
+            # 滚动收益
+            ax3 = self.figure.add_subplot(gs[1, 0])
+            if 'rolling_returns' in metrics:
+                ax3.plot(metrics['rolling_returns'])
+                ax3.set_title('滚动收益')
+
+            # 滚动波动率
+            ax4 = self.figure.add_subplot(gs[1, 1])
+            if 'rolling_volatility' in metrics:
+                ax4.plot(metrics['rolling_volatility'])
+                ax4.set_title('滚动波动率')
+
+            # 调整布局
+            self.figure.tight_layout()
+
+            # 更新画布
+            self.canvas.draw()
+
+            self.log_manager.info("性能图表更新完成")
+
+        except Exception as e:
+            error_msg = f"更新性能图表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def closeEvent(self, event):
+        """关闭事件处理"""
+        try:
+            # 停止更新定时器
+            if hasattr(self, '_update_timer'):
+                self._update_timer.stop()
+
+            # 清理资源
+            self.clear_indicators()
+            self.figure.clear()
+
+            super().closeEvent(event)
+
+        except Exception as e:
+            self.log_manager.error(f"关闭事件处理失败: {str(e)}")
+
+    def plot_kline(self, ax, kdata):
+        """绘制K线图（支持hikyuu KData或DataFrame）"""
+        try:
+            if hasattr(kdata, 'get_datetime_list'):
+                dates = kdata.get_datetime_list()
+                opens = kdata.get_open()
+                closes = kdata.get_close()
+                highs = kdata.get_high()
+                lows = kdata.get_low()
+            else:
+                dates = kdata.index
+                opens = kdata['open']
+                closes = kdata['close']
+                highs = kdata['high']
+                lows = kdata['low']
+            colors = ['red' if c >= o else 'green' for o,
+                      c in zip(opens, closes)]
+            for i in range(len(dates)):
+                ax.bar(dates[i], closes[i] - opens[i],
+                       bottom=opens[i], width=0.6, color=colors[i])
+                ax.plot([dates[i], dates[i]], [lows[i], highs[i]],
+                        color=colors[i], linewidth=1)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.grid(True, linestyle='--', alpha=0.5)
+        except Exception as e:
+            print(f"绘制K线图失败: {str(e)}")
+
+    def plot_volume(self, ax, kdata):
+        try:
+            if hasattr(kdata, 'get_datetime_list'):
+                dates = kdata.get_datetime_list()
+                volumes = kdata.get_volume()
+                closes = kdata.get_close()
+                opens = kdata.get_open()
+            else:
+                dates = kdata.index
+                volumes = kdata['volume']
+                closes = kdata['close']
+                opens = kdata['open']
+            colors = ['red' if c >= o else 'green' for o,
+                      c in zip(opens, closes)]
+            ax.bar(dates, volumes, color=colors, alpha=0.5)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.grid(True, linestyle='--', alpha=0.5)
+        except Exception as e:
+            print(f"绘制成交量图失败: {str(e)}")
+
+    def plot_ma(self, ax, kdata, n_list=[5, 10, 20, 60]):
+        try:
+            close = kdata['close'] if isinstance(
+                kdata, pd.DataFrame) else kdata.get_close()
+            idx = kdata.index if isinstance(
+                kdata, pd.DataFrame) else kdata.get_datetime_list()
+            with ThreadPoolExecutor() as pool:
+                results = list(
+                    pool.map(lambda n: (n, calc_ma(close, n)), n_list))
+            for n, ma in results:
+                ax.plot(idx, ma, label=f'MA{n}', linewidth=1)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制MA失败: {str(e)}")
+
+    def plot_macd(self, ax, kdata, fast_n=12, slow_n=26, signal_n=9):
+        try:
+            close = kdata['close'] if isinstance(
+                kdata, pd.DataFrame) else kdata.get_close()
+            idx = kdata.index if isinstance(
+                kdata, pd.DataFrame) else kdata.get_datetime_list()
+            macd, signal, hist = calc_macd(close, fast_n, slow_n, signal_n)
+            ax.plot(idx, macd, label='MACD', color='blue')
+            ax.plot(idx, signal, label='Signal', color='red')
+            colors = ['red' if h < 0 else 'green' for h in hist]
+            ax.bar(idx, hist, color=colors, alpha=0.5, label='Histogram')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制MACD失败: {str(e)}")
+
+    def plot_rsi(self, ax, kdata, n=14):
+        try:
+            close = kdata['close'] if isinstance(
+                kdata, pd.DataFrame) else kdata.get_close()
+            idx = kdata.index if isinstance(
+                kdata, pd.DataFrame) else kdata.get_datetime_list()
+            rsi = calc_rsi(close, n)
+            ax.plot(idx, rsi, label=f'RSI({n})', color='purple')
+            ax.axhline(y=70, color='r', linestyle='--', label='超买线')
+            ax.axhline(y=30, color='g', linestyle='--', label='超卖线')
+            ax.set_ylim(0, 100)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制RSI失败: {str(e)}")
+
+    def plot_kdj(self, ax, kdata, n=9, m1=3, m2=3):
+        try:
+            df = kdata if isinstance(kdata, pd.DataFrame) else kdata.to_df()
+            idx = df.index
+            k, d, j = calc_kdj(df, n, m1, m2)
+            ax.plot(idx, k, label='K', color='blue')
+            ax.plot(idx, d, label='D', color='red')
+            ax.plot(idx, j, label='J', color='green')
+            ax.axhline(y=80, color='r', linestyle='--', label='超买线')
+            ax.axhline(y=20, color='g', linestyle='--', label='超卖线')
+            ax.set_ylim(0, 100)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制KDJ失败: {str(e)}")
+
+    def plot_boll(self, ax, kdata, n=20, p=2):
+        try:
+            close = kdata['close'] if isinstance(
+                kdata, pd.DataFrame) else kdata.get_close()
+            idx = kdata.index if isinstance(
+                kdata, pd.DataFrame) else kdata.get_datetime_list()
+            mid, upper, lower = calc_boll(close, n, p)
+            ax.plot(idx, mid, label='中轨', color='blue')
+            ax.plot(idx, upper, label='上轨', color='red', linestyle='--')
+            ax.plot(idx, lower, label='下轨', color='green', linestyle='--')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制布林带失败: {str(e)}")
+
+    def plot_atr(self, ax, kdata, n=14):
+        try:
+            df = kdata if isinstance(kdata, pd.DataFrame) else kdata.to_df()
+            idx = df.index
+            atr = calc_atr(df, n)
+            ax.plot(idx, atr, label=f'ATR({n})', color='blue')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制ATR失败: {str(e)}")
+
+    def plot_obv(self, ax, kdata):
+        try:
+            df = kdata if isinstance(kdata, pd.DataFrame) else kdata.to_df()
+            idx = df.index
+            obv = calc_obv(df)
+            ax.plot(idx, obv, label='OBV', color='purple')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制OBV失败: {str(e)}")
+
+    def plot_cci(self, ax, kdata, n=14):
+        try:
+            df = kdata if isinstance(kdata, pd.DataFrame) else kdata.to_df()
+            idx = df.index
+            cci = calc_cci(df, n)
+            ax.plot(idx, cci, label=f'CCI({n})', color='blue')
+            ax.axhline(y=100, color='r', linestyle='--', label='超买线')
+            ax.axhline(y=-100, color='g', linestyle='--', label='超卖线')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制CCI失败: {str(e)}")
+
+    def plot_profit_curve(self, ax, tm, dates):
+        try:
+            profit_curve = tm.get_profit_curve(dates)
+            ax.plot(dates, profit_curve, label='收益曲线', color='blue')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制收益曲线失败: {str(e)}")
+
+    def plot_drawdown(self, ax, tm, dates):
+        try:
+            drawdown = tm.get_drawdown(dates)
+            ax.plot(dates, drawdown, label='回撤曲线', color='red')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制回撤曲线失败: {str(e)}")
+
+    def plot_position(self, ax, tm, dates):
+        try:
+            position = tm.get_position(dates)
+            ax.plot(dates, position, label='持仓曲线', color='green')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.legend()
+        except Exception as e:
+            print(f"绘制持仓曲线失败: {str(e)}")
+
+    def plot_trade_points(self, ax, tm, kdata):
+        try:
+            dates = kdata.get_datetime_list() if hasattr(
+                kdata, 'get_datetime_list') else kdata.index
+            closes = kdata.get_close() if hasattr(
+                kdata, 'get_close') else kdata['close']
+            trades = tm.get_trade_list()
+            buy_dates = [
+                t.datetime for t in trades if t.business == BUSINESS.BUY]
+            buy_prices = [
+                t.price for t in trades if t.business == BUSINESS.BUY]
+            if buy_dates:
+                ax.scatter(buy_dates, buy_prices, color='red',
+                           marker='^', label='买入点', s=100)
+            sell_dates = [
+                t.datetime for t in trades if t.business == BUSINESS.SELL]
+            sell_prices = [
+                t.price for t in trades if t.business == BUSINESS.SELL]
+            if sell_dates:
+                ax.scatter(sell_dates, sell_prices, color='green',
+                           marker='v', label='卖出点', s=100)
+            ax.legend()
+        except Exception as e:
+            print(f"绘制交易点失败: {str(e)}")
+
+    def zoom_in(self):
+        """放大图表"""
+        try:
+            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
+                return
+            ax = self.figure.gca()
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            self._zoom_history.append((xlim, ylim))
+            # 放大10%
+            ax.set_xlim(xlim[0] + (xlim[1] - xlim[0]) * 0.1,
+                        xlim[1] - (xlim[1] - xlim[0]) * 0.1)
+            ax.set_ylim(ylim[0] + (ylim[1] - ylim[0]) * 0.1,
+                        ylim[1] - (ylim[1] - ylim[0]) * 0.1)
+            self.canvas.draw()
+            self._zoom_level = min(self._zoom_level * 1.1, self._max_zoom)
+            self.zoom_changed.emit(self._zoom_level)
+            self.log_manager.info(f"图表已放大，当前缩放级别: {self._zoom_level:.2f}")
+        except Exception as e:
+            error_msg = f"放大图表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def zoom_out(self):
+        """缩小图表"""
+        try:
+            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
+                return
+            ax = self.figure.gca()
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            self._zoom_history.append((xlim, ylim))
+            # 缩小10%
+            ax.set_xlim(xlim[0] - (xlim[1] - xlim[0]) * 0.1,
+                        xlim[1] + (xlim[1] - xlim[0]) * 0.1)
+            ax.set_ylim(ylim[0] - (ylim[1] - ylim[0]) * 0.1,
+                        ylim[1] + (ylim[1] - ylim[0]) * 0.1)
+            self.canvas.draw()
+            self._zoom_level = max(self._zoom_level / 1.1, self._min_zoom)
+            self.zoom_changed.emit(self._zoom_level)
+            self.log_manager.info(f"图表已缩小，当前缩放级别: {self._zoom_level:.2f}")
+        except Exception as e:
+            error_msg = f"缩小图表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def reset_zoom(self):
+        """重置图表缩放"""
+        try:
+            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
+                return
+            self._zoom_level = 1.0
+            self._zoom_history.clear()
+            self.zoom_changed.emit(self._zoom_level)
+            self.figure.tight_layout(rect=[0, 0, 1, 1])
+            for ax in self.figure.axes:
+                ax.autoscale()
+            self.canvas.draw()
+            self.log_manager.info("图表缩放已重置")
+        except Exception as e:
+            error_msg = f"重置图表缩放失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def undo_zoom(self):
+        """撤销上一次缩放操作"""
+        try:
+            if not self._zoom_history:
+                return
+            xlim, ylim = self._zoom_history.pop()
+            ax = self.figure.gca()
+            ax.set_xlim(xlim)
+            ax.set_ylim(ylim)
+            self._zoom_level = max(self._zoom_level / 1.1, self._min_zoom)
+            self.zoom_changed.emit(self._zoom_level)
+            self.canvas.draw()
+            self.log_manager.info("已撤销上一次缩放操作")
+        except Exception as e:
+            error_msg = f"撤销缩放操作失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.error_occurred.emit(error_msg)
+
+    def resizeEvent(self, event):
+        """处理窗口大小变化"""
+        super().resizeEvent(event)
+        if hasattr(self, 'canvas'):
+            self.canvas.resize(self.size())
+            # 重新设置固定边距
+            self.figure.subplots_adjust(
+                left=0.08, right=0.92,
+                top=0.95, bottom=0.05,
+                hspace=0.1
+            )
+            self.canvas.draw_idle()
 
     def add_indicator(self, indicator_data):
         """添加技术指标
@@ -595,35 +1207,22 @@ class ChartWidget(QWidget):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def _add_indicator_impl(self, indicator_data):
-        """实际的添加指标实现
-
-        Args:
-            indicator_data: 指标数据
-        """
+    def _add_indicator_impl(self, indicator_data, indicator_colors: list = None):
         try:
-            # 保存当前指标
             self.current_indicator = indicator_data
-
-            # 在K线图上绘制指标
             if hasattr(self, 'price_ax'):
-                # 获取指标数据
-                dates = indicator_data.index
-                values = indicator_data.values
-
-                # 绘制指标线
-                self.price_ax.plot(range(len(dates)), values,
-                                   label=indicator_data.name,
-                                   linewidth=1)
-
-                # 更新图例
-                self.price_ax.legend(loc='upper left', fontsize=8)
-
-                # 更新画布
+                color_map = indicator_colors or [
+                    '#fbc02d', '#ab47bc', '#1976d2', '#43a047', '#e53935', '#00bcd4', '#ff9800']
+                for i, (name, series) in enumerate(indicator_data.items()):
+                    self.price_ax.plot(
+                        series.index, series.values,
+                        color=color_map[i % len(color_map)],
+                        linewidth=2.2, alpha=0.85, label=name, solid_capstyle='round'
+                    )
+                self.price_ax.legend(
+                    loc='upper left', fontsize=9, frameon=False)
                 QTimer.singleShot(0, self.canvas.draw)
-
             self.log_manager.info(f"添加指标 {indicator_data.name} 完成")
-
         except Exception as e:
             error_msg = f"添加指标实现失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -727,367 +1326,69 @@ class ChartWidget(QWidget):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def on_period_changed(self, period: str):
-        """处理周期变更事件
-
-        Args:
-            period: 周期名称
-        """
+    def _init_figure_layout(self):
+        """初始化图表布局"""
         try:
-            # 转换周期
-            period_map = {
-                '日线': 'D',
-                '周线': 'W',
-                '月线': 'M',
-                '60分钟': '60',
-                '30分钟': '30',
-                '15分钟': '15',
-                '5分钟': '5'
-            }
+            # 创建图表和画布，禁用所有自动布局
+            self.figure = Figure(figsize=(8, 6), dpi=100,
+                                 constrained_layout=False,
+                                 tight_layout=False)
+            self.canvas = FigureCanvas(self.figure)
+            self.canvas.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-            if period in period_map:
-                self.current_period = period_map[period]
-                self.period_changed.emit(self.current_period)
+            # 创建子图，使用 GridSpec
+            self.gs = self.figure.add_gridspec(3, 1, height_ratios=[3, 1, 1])
+            self.price_ax = self.figure.add_subplot(self.gs[0])
+            self.volume_ax = self.figure.add_subplot(
+                self.gs[1], sharex=self.price_ax)
+            self.indicator_ax = self.figure.add_subplot(
+                self.gs[2], sharex=self.price_ax)
+
+            # 隐藏不需要的刻度标签
+            self.volume_ax.set_xticklabels([])
+            self.price_ax.set_xticklabels([])
+
+            # 设置固定边距
+            self.figure.subplots_adjust(
+                left=0.08, right=0.92,
+                top=0.95, bottom=0.05,
+                hspace=0.1
+            )
+
+            # 添加到布局
+            self.layout().addWidget(self.canvas)
 
         except Exception as e:
-            error_msg = f"处理周期变更失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+            self.log_manager.error(f"初始化图表布局失败: {str(e)}")
 
-    def on_indicator_changed(self, indicator: str):
-        """处理指标变更事件
-
-        Args:
-            indicator: 指标名称
-        """
+    def _optimize_display(self):
+        """优化显示"""
         try:
-            self.indicator_changed.emit(indicator)
-            self.add_indicator(indicator)
+            # 优化matplotlib设置
+            plt.style.use('fast')
+            self.figure.set_dpi(100)
+
+            # 禁用不必要的特性
+            plt.rcParams['path.simplify'] = True
+            plt.rcParams['path.simplify_threshold'] = 1.0
+            plt.rcParams['agg.path.chunksize'] = 20000
+
+            # 统一使用 subplots_adjust 进行布局管理
+            self.figure.set_tight_layout(False)
+            self.figure.set_constrained_layout(False)
+
+            # 设置固定边距
+            self.figure.subplots_adjust(
+                left=0.08, right=0.92,
+                top=0.95, bottom=0.05,
+                hspace=0.1
+            )
+
+            # 优化网格显示
+            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                ax.grid(True, linestyle='--', alpha=0.3)
+                ax.tick_params(axis='both', which='major', labelsize=8)
 
         except Exception as e:
-            error_msg = f"处理指标变更失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def clear_chart(self):
-        """Clear chart data"""
-        try:
-            # 清除图表数据
-            if hasattr(self, 'figure'):
-                self.figure.clear()
-
-            # 重置当前数据
-            self.current_kdata = None
-            self.current_signals = []
-            self.current_indicator = None
-
-            # 重新创建子图
-            if hasattr(self, 'figure'):
-                self.price_ax = self.figure.add_subplot(211)  # K线图
-                self.volume_ax = self.figure.add_subplot(212)  # 成交量图
-
-                # 调整布局
-                self.figure.tight_layout()
-
-                # 更新画布
-                QTimer.singleShot(0, self.canvas.draw)
-
-            self.log_manager.info("图表已清除")
-
-        except Exception as e:
-            error_msg = f"清除图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def apply_theme(self):
-        """应用主题到图表"""
-        try:
-            # 获取当前主题颜色
-            colors = self.theme_manager.get_theme_colors()
-
-            # 设置图表背景色
-            self.figure.patch.set_facecolor(
-                colors.get('chart_background', '#ffffff'))
-
-            # 设置子图背景色和网格颜色
-            for ax in [self.price_ax, self.volume_ax]:
-                if ax is None:
-                    continue
-
-                # 设置背景色
-                ax.set_facecolor(colors.get('chart_background', '#ffffff'))
-
-                # 设置网格
-                ax.grid(True, color=colors.get('chart_grid', '#e0e0e0'),
-                        linestyle='--', alpha=0.3)
-
-                # 设置轴线颜色
-                for spine in ax.spines.values():
-                    spine.set_color(colors.get('chart_grid', '#e0e0e0'))
-
-                # 设置文本颜色
-                text_color = colors.get('chart_text', '#333333')
-                ax.tick_params(colors=text_color)
-                ax.xaxis.label.set_color(text_color)
-                ax.yaxis.label.set_color(text_color)
-                if ax.get_title():
-                    ax.title.set_color(text_color)
-
-                # 设置刻度标签颜色
-                for label in ax.get_xticklabels() + ax.get_yticklabels():
-                    label.set_color(text_color)
-
-            # 设置图例样式
-            for ax in [self.price_ax, self.volume_ax]:
-                if ax is None:
-                    continue
-                legend = ax.get_legend()
-                if legend:
-                    legend.set_facecolor(colors.get(
-                        'chart_background', '#ffffff'))
-                    for text in legend.get_texts():
-                        text.set_color(colors.get('chart_text', '#333333'))
-
-            # 设置工具栏样式
-            if hasattr(self, 'toolbar'):
-                toolbar_style = f"""
-                    QToolBar {{
-                        background-color: {colors.get('background', '#ffffff')};
-                        border: none;
-                        spacing: 5px;
-                        padding: 2px;
-                    }}
-                    QToolButton {{
-                        background-color: {colors.get('background', '#ffffff')};
-                        border: 1px solid {colors.get('border', '#e0e0e0')};
-                        padding: 6px;
-                        border-radius: 4px;
-                        color: {colors.get('text', '#333333')};
-                    }}
-                    QToolButton:hover {{
-                        background-color: {colors.get('hover', '#f5f5f5')};
-                        border-color: {colors.get('primary', '#1976d2')};
-                    }}
-                    QToolButton:pressed {{
-                        background-color: {colors.get('selected', '#e3f2fd')};
-                    }}
-                    QToolButton:checked {{
-                        background-color: {colors.get('selected', '#e3f2fd')};
-                        border-color: {colors.get('primary', '#1976d2')};
-                    }}
-                """
-                self.toolbar.setStyleSheet(toolbar_style)
-
-            # 重绘图表
-            self.canvas.draw()
-
-            self.log_manager.info("主题应用完成")
-
-        except Exception as e:
-            error_msg = f"应用主题失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def update_performance_chart(self, metrics: dict):
-        """更新性能图表
-
-        Args:
-            metrics: 性能指标字典
-        """
-        try:
-            # 清除现有图表
-            self.figure.clear()
-
-            # 创建子图
-            gs = self.figure.add_gridspec(2, 2)
-
-            # 月度收益热力图
-            ax1 = self.figure.add_subplot(gs[0, 0])
-            if 'monthly_returns' in metrics:
-                monthly_returns = metrics['monthly_returns']
-                sns.heatmap(monthly_returns, ax=ax1, cmap='RdYlGn',
-                            center=0, annot=True, fmt='.1%')
-                ax1.set_title('月度收益热力图')
-
-            # 收益分布直方图
-            ax2 = self.figure.add_subplot(gs[0, 1])
-            if 'daily_returns' in metrics:
-                sns.histplot(metrics['daily_returns'], ax=ax2,
-                             bins=50, kde=True)
-                ax2.set_title('收益分布')
-
-            # 滚动收益
-            ax3 = self.figure.add_subplot(gs[1, 0])
-            if 'rolling_returns' in metrics:
-                ax3.plot(metrics['rolling_returns'])
-                ax3.set_title('滚动收益')
-
-            # 滚动波动率
-            ax4 = self.figure.add_subplot(gs[1, 1])
-            if 'rolling_volatility' in metrics:
-                ax4.plot(metrics['rolling_volatility'])
-                ax4.set_title('滚动波动率')
-
-            # 调整布局
-            self.figure.tight_layout()
-
-            # 更新画布
-            self.canvas.draw()
-
-            self.log_manager.info("性能图表更新完成")
-
-        except Exception as e:
-            error_msg = f"更新性能图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def closeEvent(self, event):
-        """关闭事件处理"""
-        try:
-            # 停止更新定时器
-            if hasattr(self, '_update_timer'):
-                self._update_timer.stop()
-
-            # 清理资源
-            self.clear_indicators()
-            self.figure.clear()
-
-            super().closeEvent(event)
-
-        except Exception as e:
-            self.log_manager.error(f"关闭事件处理失败: {str(e)}")
-
-    def plot_kline(self, ax, kdata):
-        pass
-
-    def plot_volume(self, ax, kdata):
-        pass
-
-    def zoom_in(self):
-        """放大图表"""
-        try:
-            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
-                return
-            ax = self.figure.gca()
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            self._zoom_history.append((xlim, ylim))
-            # 放大10%
-            ax.set_xlim(xlim[0] + (xlim[1] - xlim[0]) * 0.1,
-                        xlim[1] - (xlim[1] - xlim[0]) * 0.1)
-            ax.set_ylim(ylim[0] + (ylim[1] - ylim[0]) * 0.1,
-                        ylim[1] - (ylim[1] - ylim[0]) * 0.1)
-            self.canvas.draw()
-            self._zoom_level = min(self._zoom_level * 1.1, self._max_zoom)
-            self.zoom_changed.emit(self._zoom_level)
-            self.log_manager.info(f"图表已放大，当前缩放级别: {self._zoom_level:.2f}")
-        except Exception as e:
-            error_msg = f"放大图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def zoom_out(self):
-        """缩小图表"""
-        try:
-            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
-                return
-            ax = self.figure.gca()
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            self._zoom_history.append((xlim, ylim))
-            # 缩小10%
-            ax.set_xlim(xlim[0] - (xlim[1] - xlim[0]) * 0.1,
-                        xlim[1] + (xlim[1] - xlim[0]) * 0.1)
-            ax.set_ylim(ylim[0] - (ylim[1] - ylim[0]) * 0.1,
-                        ylim[1] + (ylim[1] - ylim[0]) * 0.1)
-            self.canvas.draw()
-            self._zoom_level = max(self._zoom_level / 1.1, self._min_zoom)
-            self.zoom_changed.emit(self._zoom_level)
-            self.log_manager.info(f"图表已缩小，当前缩放级别: {self._zoom_level:.2f}")
-        except Exception as e:
-            error_msg = f"缩小图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def reset_zoom(self):
-        """重置图表缩放"""
-        try:
-            if not hasattr(self, 'figure') or not hasattr(self, 'canvas'):
-                return
-            self._zoom_level = 1.0
-            self._zoom_history.clear()
-            self.zoom_changed.emit(self._zoom_level)
-            self.figure.tight_layout(rect=[0, 0, 1, 1])
-            for ax in self.figure.axes:
-                ax.autoscale()
-            self.canvas.draw()
-            self.log_manager.info("图表缩放已重置")
-        except Exception as e:
-            error_msg = f"重置图表缩放失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def undo_zoom(self):
-        """撤销上一次缩放操作"""
-        try:
-            if not self._zoom_history:
-                return
-            xlim, ylim = self._zoom_history.pop()
-            ax = self.figure.gca()
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
-            self._zoom_level = max(self._zoom_level / 1.1, self._min_zoom)
-            self.zoom_changed.emit(self._zoom_level)
-            self.canvas.draw()
-            self.log_manager.info("已撤销上一次缩放操作")
-        except Exception as e:
-            error_msg = f"撤销缩放操作失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def apply_chart_theme(self, theme: str):
-        """根据主题切换图表配色"""
-        if theme == 'dark':
-            self.figure.patch.set_facecolor('#181c24')
-            for ax in [self.price_ax, self.volume_ax]:
-                if ax:
-                    ax.set_facecolor('#181c24')
-                    ax.tick_params(colors='#b0b8c1')
-                    ax.xaxis.label.set_color('#b0b8c1')
-                    ax.yaxis.label.set_color('#b0b8c1')
-                    if ax.get_title():
-                        ax.title.set_color('#b0b8c1')
-                    for spine in ax.spines.values():
-                        spine.set_color('#2c3140')
-                    for label in ax.get_xticklabels() + ax.get_yticklabels():
-                        label.set_color('#b0b8c1')
-                    ax.grid(True, color='#2c3140', linestyle='--', alpha=0.3)
-            self.canvas.setStyleSheet(
-                'background: #181c24; border-radius: 10px; border: 1px solid #2c3140;')
-        else:
-            self.figure.patch.set_facecolor('#ffffff')
-            for ax in [self.price_ax, self.volume_ax]:
-                if ax:
-                    ax.set_facecolor('#ffffff')
-                    ax.tick_params(colors='#333333')
-                    ax.xaxis.label.set_color('#333333')
-                    ax.yaxis.label.set_color('#333333')
-                    if ax.get_title():
-                        ax.title.set_color('#333333')
-                    for spine in ax.spines.values():
-                        spine.set_color('#e0e0e0')
-                    for label in ax.get_xticklabels() + ax.get_yticklabels():
-                        label.set_color('#333333')
-                    ax.grid(True, color='#e0e0e0', linestyle='--', alpha=0.3)
-            self.canvas.setStyleSheet(
-                'background: #ffffff; border-radius: 10px; border: 1px solid #e0e0e0;')
-        self.canvas.draw()
+            self.error_occurred.emit(f"优化显示失败: {str(e)}")
