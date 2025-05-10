@@ -14,11 +14,11 @@ import traceback
 class CacheManager:
     """缓存管理器类"""
 
-    def __init__(self, max_size: int = 1000, default_ttl: int = 300):
+    def __init__(self, max_size: int = 10000, default_ttl: int = 300):
         """初始化缓存管理器
 
         Args:
-            max_size: 最大缓存条目数，默认1000
+            max_size: 最大缓存条目数，默认10000
             default_ttl: 默认缓存有效期（秒），默认300秒
         """
         self.log_manager = LogManager()

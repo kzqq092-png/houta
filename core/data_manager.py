@@ -232,6 +232,7 @@ class DataManager:
     def get_k_data(self, code: str, freq: str = 'D',
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
+                   query: Optional[Any] = None,
                    **kwargs) -> pd.DataFrame:
         """获取K线数据
 
@@ -240,6 +241,7 @@ class DataManager:
             freq: K线周期 ('D':日线, 'W':周线, 'M':月线, '60':60分钟, '30':30分钟, '15':15分钟, '5':5分钟)
             start_date: 开始日期，格式：YYYY-MM-DD
             end_date: 结束日期，格式：YYYY-MM-DD
+            query: 可选，hikyuu的Query对象或负数天数（如-7表示最近7天）
             **kwargs: 其他参数
 
         Returns:
@@ -261,7 +263,7 @@ class DataManager:
                     code = f'bj{code}'
 
             # 生成缓存键
-            cache_key = f"kdata_{code}_{freq}_{start_date}_{end_date}"
+            cache_key = f"kdata_{code}_{freq}_{start_date}_{end_date}_{str(query)}"
 
             # 尝试从缓存获取数据
             cached_data = self.cache_manager.get(cache_key)
@@ -294,18 +296,23 @@ class DataManager:
                     }
                     ktype = freq_map.get(freq, Query.DAY)
 
-                    # 构建查询条件
-                    if start_date and end_date:
-                        query = Query(start_date, end_date, ktype)
+                    # 兼容hikyuu Query对象或负数天数
+                    if query is not None:
+                        if isinstance(query, int) and query < 0:
+                            query_obj = Query(query, ktype=ktype)
+                        else:
+                            query_obj = query
+                    elif start_date and end_date:
+                        query_obj = Query(start_date, end_date, ktype)
                     elif start_date:
-                        query = Query(
+                        query_obj = Query(
                             start_date, datetime.now().strftime('%Y-%m-%d'), ktype)
                     elif end_date:
-                        query = Query(-9999, end_date, ktype)
+                        query_obj = Query(-9999, end_date, ktype)
                     else:
-                        query = Query(-365, ktype=ktype)  # 默认获取一年数据
+                        query_obj = Query(-365, ktype=ktype)  # 默认获取一年数据
 
-                    kdata = stock.get_kdata(query)
+                    kdata = stock.get_kdata(query_obj)
                     if kdata is None or len(kdata) == 0:
                         self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
                         return pd.DataFrame()
@@ -381,7 +388,7 @@ class DataManager:
                             old_source = self._current_source
                             self._current_source = source
                             df = self.get_k_data(
-                                code, freq, start_date, end_date)
+                                code, freq, start_date, end_date, query=query)
                             if not df.empty:
                                 return df
                             self._current_source = old_source

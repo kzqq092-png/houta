@@ -18,6 +18,8 @@ import mplfinance
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+from PyQt5.QtGui import QColor
 
 from core.logger import LogManager, BaseLogManager
 from utils.config_types import LoggingConfig, PerformanceConfig
@@ -38,6 +40,8 @@ from hikyuu.interactive import *
 from hikyuu import StockManager, Query
 from core.industry_manager import IndustryManager
 from gui.widgets.log_widget import LogWidget
+from gui.widgets.multi_chart_panel import MultiChartPanel
+from gui.ui_components import StatusBar
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -50,7 +54,7 @@ QGroupBox {
     border-radius: 10px;
     margin-top: 10px;
     background: #ffffff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    /* box-shadow: 0 2px 8px rgba(0,0,0,0.04); */
     padding: 8px;
 }
 QGroupBox::title {
@@ -222,14 +226,6 @@ class TradingGUI(QMainWindow):
             self.connect_signals()
             # 预加载数据
             self.preload_data()
-            # 日志信号只连接一次，防止重复
-            try:
-                self.log_manager.log_message.disconnect(
-                    self.log_widget.add_log)
-            except Exception:
-                pass
-            self.log_manager.log_message.connect(self.log_widget.add_log)
-            self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
             self.log_manager.info("TradingGUI初始化完成")
 
         except Exception as e:
@@ -405,7 +401,7 @@ class TradingGUI(QMainWindow):
         1. Sets window title and size
         2. Creates the main layout and splitters
         3. Creates all panels (left, middle, right, bottom)
-        4. Creates menu bar, toolbar and status bar
+        4. Creates menu bar, status bar
         5. Applies theme to all widgets
         """
         try:
@@ -448,13 +444,18 @@ class TradingGUI(QMainWindow):
             self.create_menubar()
             self.create_statusbar()
 
-            # 创建工具栏
-            self.create_toolbar()
-
             # 应用主题
             self.apply_theme()
 
             self.log_manager.info("UI初始化完成")
+
+            # 下拉框宽度自适应
+            if hasattr(self, 'time_range_combo'):
+                self.adjust_combobox_width(self.time_range_combo)
+            if hasattr(self, 'period_combo'):
+                self.adjust_combobox_width(self.period_combo)
+            if hasattr(self, 'chart_type_combo'):
+                self.adjust_combobox_width(self.chart_type_combo)
 
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
@@ -463,40 +464,46 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def create_menubar(self):
-        """创建菜单栏"""
+        """创建菜单栏（包含所有原工具栏和数据源切换功能，按功能分类）"""
         try:
             self.menu_bar = MainMenuBar(self)
             self.setMenuBar(self.menu_bar)
 
-            # 连接菜单动作
+            # 文件菜单
             self.menu_bar.new_action.triggered.connect(self.new_file)
             self.menu_bar.open_action.triggered.connect(self.open_file)
             self.menu_bar.save_action.triggered.connect(self.save_file)
             self.menu_bar.exit_action.triggered.connect(self.close)
 
+            # 编辑菜单
             self.menu_bar.undo_action.triggered.connect(self.undo)
             self.menu_bar.redo_action.triggered.connect(self.redo)
             self.menu_bar.copy_action.triggered.connect(self.copy)
             self.menu_bar.paste_action.triggered.connect(self.paste)
 
-            self.menu_bar.toolbar_action.triggered.connect(self.toggle_toolbar)
-            self.menu_bar.statusbar_action.triggered.connect(
-                self.toggle_statusbar)
-            self.menu_bar.light_theme_action.triggered.connect(
-                lambda: self.change_theme('light'))
-            self.menu_bar.dark_theme_action.triggered.connect(
-                lambda: self.change_theme('dark'))
-
+            # 分析菜单
             self.menu_bar.analyze_action.triggered.connect(self.analyze)
             self.menu_bar.backtest_action.triggered.connect(self.backtest)
             self.menu_bar.optimize_action.triggered.connect(self.optimize)
 
+            # 工具菜单
             self.menu_bar.calculator_action.triggered.connect(
                 self.show_calculator)
             self.menu_bar.converter_action.triggered.connect(
                 self.show_converter)
             self.menu_bar.settings_action.triggered.connect(self.show_settings)
 
+            # 数据菜单（数据源切换）
+            self.menu_bar.data_source_hikyuu.triggered.connect(
+                lambda: self.on_data_source_changed("Hikyuu"))
+            self.menu_bar.data_source_eastmoney.triggered.connect(
+                lambda: self.on_data_source_changed("东方财富"))
+            self.menu_bar.data_source_sina.triggered.connect(
+                lambda: self.on_data_source_changed("新浪"))
+            self.menu_bar.data_source_tonghuashun.triggered.connect(
+                lambda: self.on_data_source_changed("同花顺"))
+
+            # 帮助菜单
             self.menu_bar.help_action.triggered.connect(self.show_help)
             self.menu_bar.update_action.triggered.connect(self.check_update)
             self.menu_bar.about_action.triggered.connect(self.show_about)
@@ -507,132 +514,161 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"创建菜单栏失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
 
-    def create_toolbar(self):
-        """创建工具栏"""
-        try:
-            self.toolbar = MainToolBar(self)
-            self.addToolBar(self.toolbar)
-
-            # 添加数据源选择器
-            data_source_label = QLabel("数据源:")
-            data_source_label.setStyleSheet("""
-                QLabel {
-                    margin-left: 10px;
-                    color: #1976d2;
-                    font-weight: bold;
-                }
-            """)
-            self.toolbar.addWidget(data_source_label)
-
-            self.data_source_combo = QComboBox()
-            self.data_source_combo.setFixedWidth(120)
-            self.data_source_combo.setStyleSheet("""
-                QComboBox {
-                    border: 1px solid #bdbdbd;
-                    border-radius: 4px;
-                    padding: 4px 8px;
-                    background: #ffffff;
-                    margin-right: 10px;
-                }
-                QComboBox:hover {
-                    border-color: #1976d2;
-                    background: #e3f2fd;
-                }
-                QComboBox::drop-down {
-                    border: none;
-                }
-                QComboBox::down-arrow {
-                    image: url(icons/down_arrow.png);
-                    width: 12px;
-                    height: 12px;
-                }
-            """)
-            # 添加可用的数据源
-            self.data_source_combo.addItems(['Hikyuu', '东方财富', '新浪', '同花顺'])
-            self.data_source_combo.currentTextChanged.connect(
-                self.on_data_source_changed)
-            self.toolbar.addWidget(self.data_source_combo)
-
-            # 连接工具栏动作
-            self.toolbar.new_action.triggered.connect(self.new_file)
-            self.toolbar.open_action.triggered.connect(self.open_file)
-            self.toolbar.save_action.triggered.connect(self.save_file)
-
-            self.toolbar.analyze_action.triggered.connect(self.analyze)
-            self.toolbar.backtest_action.triggered.connect(self.backtest)
-            self.toolbar.optimize_action.triggered.connect(self.optimize)
-
-            # 连接缩放相关动作
-            self.toolbar.zoom_in_action.triggered.connect(
-                lambda: self.chart_widget.zoom_in() if hasattr(self, 'chart_widget') else None)
-            self.toolbar.zoom_out_action.triggered.connect(
-                lambda: self.chart_widget.zoom_out() if hasattr(self, 'chart_widget') else None)
-            self.toolbar.reset_zoom_action.triggered.connect(
-                lambda: self.chart_widget.reset_zoom() if hasattr(self, 'chart_widget') else None)
-            self.toolbar.undo_zoom_action.triggered.connect(
-                lambda: self.chart_widget.undo_zoom() if hasattr(self, 'chart_widget') else None)
-
-            self.toolbar.calculator_action.triggered.connect(
-                self.show_calculator)
-            self.toolbar.converter_action.triggered.connect(
-                self.show_converter)
-            self.toolbar.settings_action.triggered.connect(self.show_settings)
-
-            # 连接搜索框
-            self.toolbar.search_box.textChanged.connect(self.filter_stock_list)
-
-            self.log_manager.info("工具栏创建完成")
-
-        except Exception as e:
-            self.log_manager.error(f"创建工具栏失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
-
-    def toggle_toolbar(self, checked: bool):
-        """切换工具栏显示状态
-
-        Args:
-            checked: 是否显示
-        """
-        self.toolbar.setVisible(checked)
-
-    def toggle_statusbar(self, checked: bool):
-        """切换状态栏显示状态
-
-        Args:
-            checked: 是否显示
-        """
-        self.statusBar().setVisible(checked)
-
-    def change_theme(self, theme: str):
-        """切换主题
-
-        Args:
-            theme: 主题名称
-        """
-        try:
-            self.theme_manager.set_theme(theme)
-            self.log_manager.info(f"切换主题: {theme}")
-        except Exception as e:
-            self.log_manager.error(f"切换主题失败: {str(e)}")
-
     def create_statusbar(self):
-        """Create the status bar"""
+        """创建自定义状态栏，合并所有状态栏功能，放到底部右下角，并添加日志按钮"""
         try:
-            self.statusBar().showMessage("就绪")
+            self.status_bar = StatusBar(self)
+            self.status_bar.setFixedHeight(25)
+            self.setStatusBar(self.status_bar)
+            self.status_bar.set_status("就绪")
+            # 日志显示按钮
+            self.log_btn = QPushButton("显示日志")
+            self.log_btn.setFixedWidth(80)
+            self.log_btn.clicked.connect(self.toggle_log_panel)
+            self.status_bar.addPermanentWidget(self.log_btn)
         except Exception as e:
-            self.log_message(f"显示帮助文档失败: {str(e)}", "error")
+            self.log_manager.error(f"显示状态栏失败: {str(e)}")
+
+    def center_dialog(self, dialog, parent=None, offset_y=50):
+        """将弹窗居中到父窗口或屏幕，并尽量靠近上部
+
+        Args:
+            dialog: 要居中的对话框
+            parent: 父窗口，如果为None则使用屏幕
+            offset_y: 距离顶部的偏移量
+        """
+        try:
+            if parent and parent.isVisible():
+                # 相对于父窗口居中
+                parent_geom = parent.geometry()
+                dialog_geom = dialog.frameGeometry()
+                x = parent_geom.center().x() - dialog_geom.width() // 2
+                y = parent_geom.top() + offset_y
+
+                # 确保弹窗不会超出父窗口边界
+                x = max(parent_geom.left(), min(
+                    x, parent_geom.right() - dialog_geom.width()))
+                y = max(parent_geom.top(), min(
+                    y, parent_geom.bottom() - dialog_geom.height()))
+            else:
+                # 相对于屏幕居中
+                screen = dialog.screen() or dialog.parentWidget().screen()
+                if screen:
+                    screen_geom = screen.geometry()
+                    dialog_geom = dialog.frameGeometry()
+                    x = screen_geom.center().x() - dialog_geom.width() // 2
+                    y = screen_geom.top() + offset_y
+
+                    # 确保弹窗不会超出屏幕边界
+                    x = max(screen_geom.left(), min(
+                        x, screen_geom.right() - dialog_geom.width()))
+                    y = max(screen_geom.top(), min(
+                        y, screen_geom.bottom() - dialog_geom.height()))
+
+            dialog.move(x, y)
+        except Exception as e:
+            self.log_manager.error(f"设置弹窗位置失败: {str(e)}")
 
     def show_about(self):
         """显示关于对话框"""
         try:
-            QMessageBox.about(self, "关于",
-                              "Hikyuu量化交易系统\n"
-                              "版本: 1.0.0\n"
-                              "作者: Your Name\n"
-                              "版权所有 © 2024"
-                              )
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("关于")
+            dialog.setText("Hikyuu量化交易系统\n"
+                           "版本: 1.0.0\n"
+                           "作者: Your Name\n"
+                           "版权所有 © 2024")
+            dialog.setIcon(QMessageBox.Information)
+            dialog.setStandardButtons(QMessageBox.Ok)
+
+            # 显示对话框并居中
+            dialog.show()
+            self.center_dialog(dialog, self)
+            dialog.exec_()
         except Exception as e:
-            self.log_message(f"显示关于对话框失败: {str(e)}", "error")
+            self.log_manager.error(f"显示关于对话框失败: {str(e)}")
+
+    def show_help(self):
+        """显示帮助对话框"""
+        try:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("帮助")
+            dialog.setMinimumSize(800, 600)
+
+            layout = QVBoxLayout(dialog)
+
+            # 添加帮助内容
+            help_text = QTextEdit()
+            help_text.setReadOnly(True)
+            help_text.setHtml("""
+                <h2>Hikyuu量化交易系统使用帮助</h2>
+                <h3>基本操作</h3>
+                <ul>
+                    <li>选择股票：在左侧面板输入股票代码或名称</li>
+                    <li>查看图表：在中间面板显示K线和技术指标</li>
+                    <li>交易操作：在右侧面板进行买入、卖出等操作</li>
+                </ul>
+                <h3>快捷键</h3>
+                <ul>
+                    <li>Ctrl+Q：退出程序</li>
+                    <li>Ctrl+S：保存设置</li>
+                    <li>F1：显示帮助</li>
+                </ul>
+            """)
+            layout.addWidget(help_text)
+
+            # 添加关闭按钮
+            close_button = QPushButton("关闭")
+            close_button.clicked.connect(dialog.accept)
+            layout.addWidget(close_button)
+
+            # 显示对话框并居中
+            dialog.show()
+            self.center_dialog(dialog, self)
+            dialog.exec_()
+        except Exception as e:
+            self.log_manager.error(f"显示帮助对话框失败: {str(e)}")
+
+    def show_settings(self):
+        """显示设置对话框"""
+        try:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("设置")
+            dialog.setMinimumSize(600, 400)
+
+            layout = QVBoxLayout(dialog)
+
+            # 添加设置选项
+            settings_group = QGroupBox("基本设置")
+            settings_layout = QFormLayout(settings_group)
+
+            # 主题设置
+            theme_combo = QComboBox()
+            theme_combo.addItems(["浅色", "深色", "系统"])
+            settings_layout.addRow("主题:", theme_combo)
+
+            # 字体大小
+            font_size = QSpinBox()
+            font_size.setRange(8, 24)
+            font_size.setValue(12)
+            settings_layout.addRow("字体大小:", font_size)
+
+            layout.addWidget(settings_group)
+
+            # 添加按钮
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            )
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            # 显示对话框并居中
+            dialog.show()
+            self.center_dialog(dialog, self)
+            dialog.exec_()
+        except Exception as e:
+            self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 
     def init_data(self):
         """Initialize data"""
@@ -681,12 +717,12 @@ class TradingGUI(QMainWindow):
 
             # 应用主题到主窗口
             theme = self.theme_manager.current_theme
-            colors = self.theme_manager.get_theme_colors(theme)
+            colors = self.theme_manager.get_theme_colors()
 
             # 设置主窗口样式
             self.setStyleSheet(f"""
                 QMainWindow {{
-                    background-color: {colors['background']};
+                    background-color: {colors['background_color']};
                     color: {colors['text']};
                 }}
             """)
@@ -703,9 +739,337 @@ class TradingGUI(QMainWindow):
 
             self.log_manager.info("主题应用完成")
 
+            # 在apply_theme中自动调用
+            self.apply_global_styles()
+
         except Exception as e:
             self.log_manager.error(f"应用主题失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+
+    def apply_global_styles(self):
+        """批量应用全局UI优化样式，菜单栏及下方按钮统一为弹框风格，日志区修复自动滚动底部，整体风格更一致，弹窗/自定义控件/分割线风格统一"""
+        theme = self.theme_manager.get_theme_colors()
+        panel_bg = theme.get('background', '#23293a')
+        panel_border = theme.get('border', '#5e35b1')
+        button_bg = theme.get('button_bg', '#23293a')
+        button_hover = theme.get('button_hover', '#1976d2')
+        button_pressed = theme.get('button_pressed', '#1565c0')
+        button_text = theme.get('button_text', '#e0e6ed')
+        button_border = theme.get('button_border', '#1976d2')
+        font_family = "'Microsoft YaHei', 'Roboto', 'Arial', sans-serif"
+        button_height = 14
+        font_size = 12
+        radius = 5
+        # 统一按钮、输入框、下拉框、日志区、主内容区、菜单栏样式
+        panel_style = f"""
+            QWidget, QGroupBox, QFrame {{
+                background: {panel_bg};
+                border: 1.5px solid {panel_border};
+                border-radius: {radius}px;
+                font-family: {font_family};
+                font-size: {font_size}px;
+                padding: 10px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 6px 0 6px;
+                background: {panel_border};
+                border-radius: 6px;
+                color: {button_hover};
+                font-weight: bold;
+            }}
+            QFrame[frameShape="4"] {{ /* HLine */
+                border-top: 2px solid {panel_border};
+                border-bottom: none;
+                border-left: none;
+                border-right: none;
+                margin-top: 8px;
+                margin-bottom: 8px;
+            }}
+            QFrame[frameShape="5"] {{ /* VLine */
+                border-left: 2px solid {panel_border};
+                border-top: none;
+                border-bottom: none;
+                border-right: none;
+                margin-left: 8px;
+                margin-right: 8px;
+            }}
+        """
+        # 弹框按钮风格（菜单栏下所有主按钮、弹框按钮、工具栏按钮）
+        dialog_button_style = f"""
+            QPushButton, QToolButton, .DialogButton {{
+                background: {button_bg};
+                color: {button_text};
+                border: 1.5px solid {button_border};
+                border-radius: {radius}px;
+                font-weight: bold;
+                font-size: {font_size}px;
+                min-height: {button_height}px;
+                max-height: {button_height}px;
+                min-width: 60px;
+                padding: 0 16px;
+                margin: 0 4px;
+            }}
+            QPushButton:hover, QToolButton:hover, .DialogButton:hover {{
+                background: {button_hover};
+                color: #ffd600;
+            }}
+            QPushButton:pressed, QToolButton:pressed, .DialogButton:pressed {{
+                background: {button_pressed};
+                color: #ffd600;
+            }}
+        """
+        input_style = f"""
+            QLineEdit, QComboBox, QTextEdit, QPlainTextEdit {{
+                background: {panel_bg};
+                color: {button_text};
+                border: 1.5px solid {button_border};
+                border-radius: {radius}px;
+                font-size: {font_size}px;
+                min-height: {button_height}px;
+                max-height: {button_height}px;
+                padding: 0 12px;
+                margin: 0 4px;
+            }}
+        """
+        # 日志区样式
+        log_text = "#ffd600" if button_text.lower(
+        ) in ["#e0e6ed", "#f5f5f5"] else "#23293a"
+        log_style = f"""
+            QTextEdit, QPlainTextEdit {{
+                background: {panel_bg};
+                color: {log_text};
+                border: 1.5px solid {button_border};
+                border-radius: {radius}px;
+                font-size: {font_size}px;
+                padding: 8px 12px;
+                margin: 0;
+            }}
+        """
+        toolbar_style = f"""
+            QToolBar {{
+                background: {panel_bg};
+                border-bottom: 2px solid {panel_border};
+                spacing: 8px;
+                padding: 4px 8px;
+            }}
+            QToolButton {{
+                background: transparent;
+                color: {button_text};
+                border-radius: {radius}px;
+                font-size: {font_size}px;
+                min-height: {button_height}px;
+                max-height: {button_height}px;
+                min-width: 40px;
+                padding: 0 16px;
+                margin: 0 4px;
+            }}
+            QToolButton:hover {{
+                background: {button_hover};
+                color: #ffd600;
+            }}
+            QToolButton:pressed {{
+                background: {button_pressed};
+                color: #ffd600;
+            }}
+        """
+        chart_style = f"""
+            QWidget#ChartWidget {{
+                background: {panel_bg};
+                border-radius: {radius}px;
+                border: 1.5px solid {panel_border};
+            }}
+        """
+        # 菜单栏样式
+        menubar_style = f"""
+            QMenuBar {{
+                background: #f7f9fa;
+                color: #23293a;
+                border-bottom: 1.5px solid #e0e0e0;
+                font-weight: bold;
+                font-size: 14px;
+                min-height: 26px;
+                padding: 2px 8px 2px 8px;
+            }}
+            QMenuBar::item {{
+                background: transparent;
+                color: #23293a;
+                padding: 3px 16px 3px 16px;
+                margin: 0 2px;
+                border-radius: 4px 4px 0 0;
+                min-height: 20px;
+            }}
+            QMenuBar::item:selected {{
+                background: #e3f2fd;
+                color: #1976d2;
+            }}
+            QMenuBar::item:pressed {{
+                background: #bbdefb;
+                color: #1976d2;
+            }}
+            QMenu {{
+                background: #f7f9fa;
+                color: #23293a;
+                border: 1.5px solid #e0e0e0;
+                font-size: 13px;
+                padding: 4px 0;
+            }}
+            QMenu::item {{
+                padding: 5px 32px 5px 24px;
+                min-height: 22px;
+            }}
+            QMenu::item:selected {{
+                background: #e3f2fd;
+                color: #1976d2;
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: #e0e0e0;
+                margin: 2px 8px;
+            }}
+        """
+        # 列表控件风格建议
+        list_style = f"""
+            QListWidget, QTableWidget, QTreeWidget {{
+                background: {panel_bg};
+                color: {button_text};
+                border: 1.5px solid {panel_border};
+                border-radius: {radius}px;
+                font-size: {font_size}px;
+                padding: 10px;
+            }}
+            QListWidget::item:selected, QTableWidget::item:selected, QTreeWidget::item:selected {{
+                background: {button_hover};
+                color: #ffd600;
+                border-radius: {radius}px;
+            }}
+        """
+        # 弹窗/表单风格统一
+        dialog_style = f"""
+            QDialog, QMessageBox, QInputDialog, QDialogButtonBox, QFormLayout, QGroupBox {{
+                background: {panel_bg};
+                border: 1.5px solid {panel_border};
+                border-radius: {radius}px;
+                font-family: {font_family};
+                font-size: {font_size}px;
+                color: {button_text};
+                padding: 12px;
+            }}
+            QDialog QLabel, QDialog QLineEdit, QDialog QComboBox, QDialog QPushButton {{
+                font-size: {font_size}px;
+                border-radius: {radius}px;
+            }}
+            QDialog QPushButton {{
+                min-height: {button_height}px;
+                font-weight: bold;
+            }}
+        """
+        # 自定义控件风格统一
+        custom_style = f"""
+            QWidget#CustomChart, QWidget#SpecialPanel {{
+                background: {panel_bg};
+                border: 1.5px solid {panel_border};
+                border-radius: {radius}px;
+            }}
+        """
+        # 新增/增强主内容区、图表区、日志区、分割线、侧栏、弹窗等QSS，提升层次感和聚焦感
+        main_content_bg = theme.get('main_content_bg', panel_bg)
+        chart_panel_bg = theme.get('chart_panel_bg', panel_bg)
+        log_bg = theme.get('log_bg', panel_bg)
+        divider = theme.get('divider', panel_border)
+        shadow = theme.get('shadow', 'rgba(0,0,0,0.06)')
+        focus = theme.get('focus', button_hover)
+        sidebar_bg = theme.get('sidebar_bg', panel_bg)
+        sidebar_border = theme.get('sidebar_border', panel_border)
+        dialog_bg = theme.get('dialog_bg', panel_bg)
+        dialog_border = theme.get('dialog_border', panel_border)
+        dialog_shadow = theme.get('dialog_shadow', shadow)
+
+        # 主内容区/图表区/日志区聚焦
+        main_content_style = f"""
+            QWidget#MainContent {{
+                background: {main_content_bg};
+                border-radius: {radius}px;
+                border: 1.5px solid {panel_border};
+                /* box-shadow: 0 2px 12px 0 {shadow}; */
+            }}
+            QWidget#ChartWidget {{
+                background: {chart_panel_bg};
+                border-radius: {radius}px;
+                border: 1.5px solid {panel_border};
+                /* box-shadow: 0 2px 12px 0 {shadow}; */
+            }}
+            /* QWidget#LogPanel 已移除 */
+        """
+        # 分割线/阴影增强
+        divider_style = f"""
+            QFrame[frameShape="4"], QFrame[frameShape="5"] {{
+                border-top: 2px solid {divider};
+                border-left: 2px solid {divider};
+                opacity: 0.8;
+            }}
+        """
+        # 侧栏风格
+        sidebar_style = f"""
+            QWidget#SidebarPanel {{
+                background: {sidebar_bg};
+                border: 1.5px solid {sidebar_border};
+                border-radius: {radius}px;
+            }}
+        """
+        # 弹窗/表单风格增强
+        dialog_style = f"""
+            QDialog, QMessageBox, QInputDialog, QDialogButtonBox, QFormLayout, QGroupBox {{
+                background: {dialog_bg};
+                border: 1.5px solid {dialog_border};
+                border-radius: {radius}px;
+                /* box-shadow: 0 4px 24px 0 {dialog_shadow}; */
+                font-family: {font_family};
+                font-size: {font_size}px;
+                color: {button_text};
+                padding: 12px;
+            }}
+        """
+        # 列表控件高亮增强
+        list_style = f"""
+            QListWidget, QTableWidget, QTreeWidget {{
+                background: {panel_bg};
+                color: {button_text};
+                border: 1.5px solid {panel_border};
+                border-radius: {radius}px;
+                font-size: {font_size}px;
+                padding: 4px;
+            }}
+            QListWidget::item:selected, QTableWidget::item:selected, QTreeWidget::item:selected {{
+                background: {focus};
+                color: #ffd600;
+                border-radius: {radius}px;
+            }}
+            QListWidget::item:hover, QTableWidget::item:hover, QTreeWidget::item:hover {{
+                background: {button_hover};
+                color: #ffd600;
+            }}
+        """
+        # 其余QSS片段保持不变，合并所有风格
+        self.setStyleSheet(panel_style + dialog_button_style + input_style +
+                           log_style + toolbar_style + chart_style + menubar_style + list_style + dialog_style + custom_style +
+                           main_content_style + divider_style + sidebar_style)
+        # 菜单栏
+        if hasattr(self, 'menu_bar'):
+            self.menu_bar.apply_theme(self.theme_manager)
+        # 工具栏
+        if hasattr(self, 'toolbar'):
+            self.toolbar.setStyleSheet(toolbar_style)
+        # 移除所有按钮icon（只保留文字）
+        for widget in self.findChildren((QPushButton, QToolButton)):
+            if hasattr(widget, 'setIcon'):
+                widget.setIcon(QIcon())
+        # 日志区自动滚动到底部（已移除，交由LogWidget自身控制）
+        # for widget in self.findChildren((QTextEdit, QPlainTextEdit)):
+        #     if hasattr(widget, 'verticalScrollBar'):
+        #         sb = widget.verticalScrollBar()
+        #         sb.setValue(sb.maximum())
 
     def create_left_panel(self):
         """Create left panel with stock list and indicators"""
@@ -905,6 +1269,7 @@ class TradingGUI(QMainWindow):
             self.top_splitter.addWidget(self.left_panel)
 
             self.log_manager.info("左侧面板创建完成")
+            add_shadow(self.left_panel)
 
         except Exception as e:
             self.log_manager.error(f"创建左侧面板失败: {str(e)}")
@@ -958,7 +1323,7 @@ class TradingGUI(QMainWindow):
                 menu.exec_(self.stock_list.mapToGlobal(position))
 
         except Exception as e:
-            self.log_message(f"显示右键菜单失败: {str(e)}", "error")
+            self.log_manager.error(f"显示右键菜单失败: {str(e)}")
 
     def view_stock_details(self, item):
         """查看股票详情"""
@@ -972,7 +1337,7 @@ class TradingGUI(QMainWindow):
             dialog.exec_()
 
         except Exception as e:
-            self.log_message(f"查看股票详情失败: {str(e)}", "error")
+            self.log_manager.error(f"查看股票详情失败: {str(e)}")
 
     def export_stock_data(self, item):
         """导出股票数据"""
@@ -1002,46 +1367,46 @@ class TradingGUI(QMainWindow):
                 for sheet_name, df in data.items():
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-            self.log_message(f"数据已导出到: {filename}", "info")
+            self.log_manager.info(f"数据已导出到: {filename}")
 
         except Exception as e:
-            self.log_message(f"导出股票数据失败: {str(e)}", "error")
+            self.log_manager.error(f"导出股票数据失败: {str(e)}")
 
     def add_to_watchlist(self, item):
         """添加到自选股"""
         try:
             stock_code = item.text().split()[0]
             # TODO: 实现添加到自选股的功能
-            self.log_message(f"已添加到自选股: {stock_code}", "info")
+            self.log_manager.info(f"已添加到自选股: {stock_code}")
         except Exception as e:
-            self.log_message(f"添加到自选股失败: {str(e)}", "error")
+            self.log_manager.error(f"添加到自选股失败: {str(e)}")
 
     def add_to_portfolio(self, item):
         """添加到投资组合"""
         try:
             stock_code = item.text().split()[0]
             # TODO: 实现添加到投资组合的功能
-            self.log_message(f"已添加到投资组合: {stock_code}", "info")
+            self.log_manager.info(f"已添加到投资组合: {stock_code}")
         except Exception as e:
-            self.log_message(f"添加到投资组合失败: {str(e)}", "error")
+            self.log_manager.error(f"添加到投资组合失败: {str(e)}")
 
     def analyze_stock(self, item):
         """分析股票"""
         try:
             stock_code = item.text().split()[0]
             # TODO: 实现股票分析功能
-            self.log_message(f"开始分析股票: {stock_code}", "info")
+            self.log_manager.info(f"开始分析股票: {stock_code}")
         except Exception as e:
-            self.log_message(f"分析股票失败: {str(e)}", "error")
+            self.log_manager.error(f"分析股票失败: {str(e)}")
 
     def backtest_stock(self, item):
         """回测股票"""
         try:
             stock_code = item.text().split()[0]
             # TODO: 实现股票回测功能
-            self.log_message(f"开始回测股票: {stock_code}", "info")
+            self.log_manager.info(f"开始回测股票: {stock_code}")
         except Exception as e:
-            self.log_message(f"回测股票失败: {str(e)}", "error")
+            self.log_manager.error(f"回测股票失败: {str(e)}")
 
     def dragEnterEvent(self, event):
         """处理拖入事件"""
@@ -1066,23 +1431,23 @@ class TradingGUI(QMainWindow):
                     self.add_indicator(indicator_name)
 
         except Exception as e:
-            self.log_message(f"处理拖放事件失败: {str(e)}", "error")
+            self.log_manager.error(f"处理拖放事件失败: {str(e)}")
 
     def add_to_watchlist_by_code(self, stock_code):
         """通过股票代码添加到自选股"""
         try:
             # TODO: 实现通过代码添加到自选股的功能
-            self.log_message(f"已添加到自选股: {stock_code}", "info")
+            self.log_manager.info(f"已添加到自选股: {stock_code}")
         except Exception as e:
-            self.log_message(f"添加到自选股失败: {str(e)}", "error")
+            self.log_manager.error(f"添加到自选股失败: {str(e)}")
 
     def add_indicator(self, indicator_name):
         """添加指标"""
         try:
             # TODO: 实现添加指标的功能
-            self.log_message(f"已添加指标: {indicator_name}", "info")
+            self.log_manager.info(f"已添加指标: {indicator_name}")
         except Exception as e:
-            self.log_message(f"添加指标失败: {str(e)}", "error")
+            self.log_manager.error(f"添加指标失败: {str(e)}")
 
     @pyqtSlot()
     def filter_stock_list(self, text: str = ""):
@@ -1180,10 +1545,10 @@ class TradingGUI(QMainWindow):
                             self.log_manager.warning(f"添加股票项到列表失败: {str(e)}")
                             continue
 
-                # 更新股票数量显示
-                self.update_stock_count_label(len(filtered_stocks))
-                self.log_manager.info(
-                    f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
+            # 更新股票数量显示
+            self.update_stock_count_label(len(filtered_stocks))
+            self.log_manager.info(
+                f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
 
         except Exception as e:
             self.log_manager.error(f"过滤股票列表失败: {str(e)}")
@@ -1226,7 +1591,7 @@ class TradingGUI(QMainWindow):
                     item.setHidden(False)
 
         except Exception as e:
-            self.log_message(f"过滤指标列表失败: {str(e)}", "error")
+            self.log_manager.error(f"过滤指标列表失败: {str(e)}")
 
     def on_time_range_changed(self, time_range: str) -> None:
         """处理时间范围变化事件
@@ -1237,20 +1602,20 @@ class TradingGUI(QMainWindow):
         try:
             # 时间范围映射
             time_range_map = {
-                '最近7天': 7,
-                '最近30天': 30,
-                '最近90天': 90,
-                '最近180天': 180,
-                '最近1年': 365,
-                '最近2年': 730,
-                '最近3年': 1095,
-                '最近5年': 1825,
+                '最近7天': -7,
+                '最近30天': -30,
+                '最近90天': -90,
+                '最近180天': -180,
+                '最近1年': -365,
+                '最近2年': -730,
+                '最近3年': -1095,
+                '最近5年': -1825,
                 '全部': 0  # 0表示获取全部数据
             }
 
             if time_range in time_range_map:
-                self.current_time_range = - \
-                    time_range_map[time_range]  # 负数表示向前N天
+                # 负数表示向前N天
+                self.current_time_range = time_range_map[time_range]
                 self.update_chart()
                 self.log_manager.info(f"时间范围已更改为: {time_range}")
 
@@ -1288,7 +1653,7 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def create_middle_panel(self):
-        """Create middle panel with charts"""
+        """Create middle panel with charts (只暴露 self.chart_widget，分屏仅在 multi_chart_panel 内部管理)"""
         try:
             # 创建中间面板
             self.middle_panel = QWidget()
@@ -1296,21 +1661,17 @@ class TradingGUI(QMainWindow):
             self.middle_layout.setContentsMargins(5, 5, 5, 5)
             self.middle_layout.setSpacing(5)
 
-            # 创建工具栏
+            # 创建工具栏（周期、时间范围、图表类型等控件）
             toolbar_layout = QHBoxLayout()
-
-            # 周期选择
             period_label = QLabel("周期:")
             self.period_combo = QComboBox()
-            self.period_combo.addItems(
-                ["分时", "5分钟", "15分钟", "30分钟", "60分钟", "日线", "周线", "月线"])
+            self.period_combo.addItems([
+                "分时", "5分钟", "15分钟", "30分钟", "60分钟", "日线", "周线", "月线"])
             self.period_combo.setCurrentText("日线")
             self.period_combo.currentTextChanged.connect(
                 self.on_period_changed)
             toolbar_layout.addWidget(period_label)
             toolbar_layout.addWidget(self.period_combo)
-
-            # 添加时间范围选择
             time_range_label = QLabel("时间范围:")
             self.time_range_combo = QComboBox()
             self.time_range_combo.addItems([
@@ -1322,8 +1683,6 @@ class TradingGUI(QMainWindow):
                 self.on_time_range_changed)
             toolbar_layout.addWidget(time_range_label)
             toolbar_layout.addWidget(self.time_range_combo)
-
-            # 图表类型选择
             chart_type_label = QLabel("图表类型:")
             self.chart_type_combo = QComboBox()
             self.chart_type_combo.addItems(["K线图", "分时图", "美国线", "收盘价"])
@@ -1331,72 +1690,23 @@ class TradingGUI(QMainWindow):
                 self.on_chart_type_changed)
             toolbar_layout.addWidget(chart_type_label)
             toolbar_layout.addWidget(self.chart_type_combo)
-
-            # 添加缩放按钮组
-            zoom_group = QHBoxLayout()
-            zoom_in_btn = QPushButton()
-            zoom_in_btn.setIcon(QIcon("icons/zoom_in.png"))
-            zoom_in_btn.setToolTip("放大")
-            zoom_in_btn.clicked.connect(
-                lambda: self.chart_widget.zoom_in() if hasattr(self, 'chart_widget') else None)
-
-            zoom_out_btn = QPushButton()
-            zoom_out_btn.setIcon(QIcon("icons/zoom_out.png"))
-            zoom_out_btn.setToolTip("缩小")
-            zoom_out_btn.clicked.connect(
-                lambda: self.chart_widget.zoom_out() if hasattr(self, 'chart_widget') else None)
-
-            reset_zoom_btn = QPushButton()
-            reset_zoom_btn.setIcon(QIcon("icons/reset_zoom.png"))
-            reset_zoom_btn.setToolTip("重置缩放")
-            reset_zoom_btn.clicked.connect(lambda: self.chart_widget.reset_zoom(
-            ) if hasattr(self, 'chart_widget') else None)
-
-            undo_zoom_btn = QPushButton()
-            undo_zoom_btn.setIcon(QIcon("icons/undo.png"))
-            undo_zoom_btn.setToolTip("撤销缩放")
-            undo_zoom_btn.clicked.connect(lambda: self.chart_widget.undo_zoom(
-            ) if hasattr(self, 'chart_widget') else None)
-
-            # 设置按钮样式
-            zoom_button_style = """
-                QPushButton {
-                    border: none;
-                    padding: 5px;
-                    border-radius: 3px;
-                    background-color: transparent;
-                }
-                QPushButton:hover {
-                    background-color: #e0e0e0;
-                }
-                QPushButton:pressed {
-                    background-color: #d0d0d0;
-                }
-            """
-            for btn in [zoom_in_btn, zoom_out_btn, reset_zoom_btn, undo_zoom_btn]:
-                btn.setStyleSheet(zoom_button_style)
-                btn.setFixedSize(28, 28)
-                zoom_group.addWidget(btn)
-
-            toolbar_layout.addLayout(zoom_group)
             toolbar_layout.addStretch()
-
-            # 添加工具栏到布局
             self.middle_layout.addLayout(toolbar_layout)
 
-            # 创建图表控件
-            self.chart_widget = ChartWidget(self, self.config_manager)
-            self.chart_widget.error_occurred.connect(self.handle_error)
-            self.chart_widget.zoom_changed.connect(self.on_zoom_changed)
-            self.middle_layout.addWidget(self.chart_widget)
-
-            # 添加中间面板到顶部分割器
+            # 集成多图表分屏控件（外部只暴露 self.chart_widget，分屏仅在 multi_chart_panel 内部管理）
+            self.multi_chart_panel = MultiChartPanel(
+                self, self.config_manager, self.theme_manager, self.log_manager, rows=3, cols=3)
+            self.middle_layout.addWidget(self.multi_chart_panel)
             self.top_splitter.addWidget(self.middle_panel)
-
-            self.log_manager.info("中间面板创建完成")
-
+            # 关键：主窗口 self.chart_widget 始终指向单屏 ChartWidget 实例
+            self.chart_widget = self.multi_chart_panel.single_chart
+            self.log_manager.info("中间面板(多图表分屏)创建完成")
+            add_shadow(self.middle_panel, blur_radius=24,
+                       x_offset=0, y_offset=8)
+            self.middle_panel.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
         except Exception as e:
-            self.log_manager.error(f"创建中间面板失败: {str(e)}")
+            self.log_manager.error(f"创建中间面板(多图表分屏)失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
 
@@ -1408,70 +1718,66 @@ class TradingGUI(QMainWindow):
         """
         try:
             # 更新状态栏显示缩放级别
-            self.statusBar().showMessage(f"缩放级别: {zoom_level:.1f}x")
+            self.status_bar.set_status(f"缩放级别: {zoom_level:.1f}x")
         except Exception as e:
             self.log_manager.error(f"更新缩放级别显示失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
 
     def save_chart(self):
-        """Save current chart to file"""
+        """保存当前图表到文件"""
         try:
-            # Get current tab
-            current_tab = self.chart_tabs.currentWidget()
-            if not hasattr(current_tab, 'canvas'):
+            # 直接操作self.chart_widget
+            if not hasattr(self, 'chart_widget') or self.chart_widget is None:
+                QMessageBox.warning(self, "提示", "当前没有可保存的图表！")
                 return
-
-            # Get file path
+            # 获取文件路径
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "保存图表",
                 "",
                 "PNG Files (*.png);;JPEG Files (*.jpg);;PDF Files (*.pdf)"
             )
-
             if file_path:
-                # Save chart
-                current_tab.canvas.figure.savefig(file_path)
-                self.log_message(f"图表已保存到: {file_path}")
-
+                # 保存图表
+                if hasattr(self.chart_widget, 'canvas') and hasattr(self.chart_widget, 'figure'):
+                    self.chart_widget.figure.savefig(file_path)
+                    self.log_manager.info(f"图表已保存到: {file_path}")
+                else:
+                    QMessageBox.warning(self, "提示", "当前图表控件不支持保存！")
         except Exception as e:
-            self.log_message(f"保存图表失败: {str(e)}", "error")
+            self.log_manager.error(f"保存图表失败: {str(e)}")
 
     def reset_chart_view(self):
-        """Reset chart view to default"""
+        """重置图表视图到默认"""
         try:
-            # Get current tab
-            current_tab = self.chart_tabs.currentWidget()
-            if not hasattr(current_tab, 'canvas'):
+            if not hasattr(self, 'chart_widget') or self.chart_widget is None:
+                QMessageBox.warning(self, "提示", "当前没有可重置的图表！")
                 return
-
-            # Reset view
-            current_tab.canvas.figure.tight_layout()
-            current_tab.canvas.draw()
-
+            if hasattr(self.chart_widget, 'canvas') and hasattr(self.chart_widget, 'figure'):
+                self.chart_widget.figure.tight_layout()
+                self.chart_widget.canvas.draw()
+            else:
+                QMessageBox.warning(self, "提示", "当前图表控件不支持重置！")
         except Exception as e:
-            self.log_message(f"重置图表视图失败: {str(e)}", "error")
+            self.log_manager.error(f"重置图表视图失败: {str(e)}")
 
     def toggle_chart_theme(self):
-        """Toggle between light and dark chart theme"""
+        """切换图表主题（明亮/暗色）"""
         try:
-            # Get current style
-            current_style = plt.style.available[0] if plt.style.available else 'default'
-
-            # Toggle style
-            if current_style == 'seaborn':
-                plt.style.use('dark_background')
-            else:
-                plt.style.use('seaborn-v0_8-whitegrid')
-
-            # Redraw all charts
-            for i in range(self.chart_tabs.count()):
-                tab = self.chart_tabs.widget(i)
-                if hasattr(tab, 'canvas'):
-                    tab.canvas.draw()
-
+            # 只操作self.chart_widget
+            if not hasattr(self, 'chart_widget') or self.chart_widget is None:
+                QMessageBox.warning(self, "提示", "当前没有可切换主题的图表！")
+                return
+            # 获取当前matplotlib样式
+            import matplotlib.pyplot as plt
+            current_style = plt.get_backend()
+            # 这里可根据实际需求切换matplotlib主题
+            # 例如：plt.style.use('dark_background') 或 plt.style.use('seaborn-v0_8-whitegrid')
+            # 重新绘制
+            if hasattr(self.chart_widget, 'canvas'):
+                self.chart_widget.canvas.draw()
         except Exception as e:
-            self.log_message(f"切换图表主题失败: {str(e)}", "error")
+            self.log_manager.error(f"切换图表主题失败: {str(e)}")
 
     def create_right_panel(self):
         """Create right panel with analysis tools"""
@@ -1630,6 +1936,8 @@ class TradingGUI(QMainWindow):
             self.right_panel.setMaximumWidth(300)
             self.top_splitter.addWidget(self.right_panel)
             self.log_manager.info("右侧面板创建完成")
+            add_shadow(self.right_panel, blur_radius=18,
+                       x_offset=0, y_offset=6)
         except Exception as e:
             self.log_manager.error(f"创建右侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1687,14 +1995,14 @@ class TradingGUI(QMainWindow):
             # Show dialog
             if dialog.exec_() == QDialog.Accepted:
                 # Start optimization
-                self.log_message("开始参数优化...")
+                self.log_manager.info("开始参数优化...")
 
                 # TODO: Implement optimization logic
 
-                self.log_message("参数优化完成")
+                self.log_manager.info("参数优化完成")
 
         except Exception as e:
-            self.log_message(f"参数优化失败: {str(e)}", "error")
+            self.log_manager.error(f"参数优化失败: {str(e)}")
 
     def update_metrics(self, metrics: dict):
         """Update performance metrics display
@@ -1710,7 +2018,7 @@ class TradingGUI(QMainWindow):
                     else:
                         self.metric_labels[name].setText(str(value))
         except Exception as e:
-            self.log_message(f"更新性能指标失败: {str(e)}", "error")
+            self.log_manager.error(f"更新性能指标失败: {str(e)}")
 
     def create_controls(self, layout):
         """Create control buttons"""
@@ -1829,7 +2137,7 @@ class TradingGUI(QMainWindow):
             layout.addWidget(risk_group)
 
         except Exception as e:
-            self.log_message(f"创建控制按钮失败: {str(e)}", "error")
+            self.log_manager.error(f"创建控制按钮失败: {str(e)}")
             raise
 
     def on_period_changed(self, period: str):
@@ -1856,10 +2164,10 @@ class TradingGUI(QMainWindow):
                 # 更新图表
                 self.update_chart()
                 # 记录日志
-                self.log_message(f"已切换周期为: {period}")
+                self.log_manager.info(f"已切换周期为: {period}")
 
         except Exception as e:
-            self.log_message(f"切换周期失败: {str(e)}", "error")
+            self.log_manager.error(f"切换周期失败: {str(e)}")
 
     def on_strategy_changed(self, strategy: str) -> None:
         """处理策略变化事件
@@ -1883,46 +2191,15 @@ class TradingGUI(QMainWindow):
                 self.log_manager.log(f"策略已更改为: {strategy}", "INFO")
 
         except Exception as e:
-            self.log_manager.log(f"更改策略失败: {str(e)}", "ERROR")
+            self.log_manager.error(f"更改策略失败: {str(e)}")
 
     def update_strategy(self) -> None:
-        """更新当前策略"""
+        """更新当前策略（已废弃，统一由ChartWidget处理）"""
         try:
             if not self.current_stock:
                 return
-
-            # 获取当前股票数据，使用hikyuu标准接口
-            ktype_map = {
-                'D': Query.DAY, 'W': Query.WEEK, 'M': Query.MONTH,
-                '60': Query.MIN60, '30': Query.MIN30, '15': Query.MIN15,
-                '5': Query.MIN5, '1': Query.MIN
-            }
-            ktype = ktype_map.get(self.current_period, Query.DAY)
-
-            # 获取股票对象并查询K线数据
-            stock = self.sm[self.current_stock]
-            k_data = stock.get_kdata(Query(-365, ktype=ktype))  # 默认获取最近一年数据
-
-            if k_data.empty:
-                self.log_manager.log(
-                    f"获取股票数据失败: {self.current_stock}", "ERROR")
-                return
-
-            # 根据当前策略更新图表
-            if self.current_strategy == 'ma_strategy':
-                self.update_ma_strategy(k_data)
-            elif self.current_strategy == 'macd_strategy':
-                self.update_macd_strategy(k_data)
-            elif self.current_strategy == 'rsi_strategy':
-                self.update_rsi_strategy(k_data)
-            elif self.current_strategy == 'boll_strategy':
-                self.update_boll_strategy(k_data)
-            elif self.current_strategy == 'kdj_strategy':
-                self.update_kdj_strategy(k_data)
-
-            # 更新图表
+            # 直接刷新图表即可，指标渲染由ChartWidget内部处理
             self.update_chart()
-
         except Exception as e:
             self.log_manager.log(f"更新策略失败: {str(e)}", "ERROR")
 
@@ -2088,8 +2365,8 @@ class TradingGUI(QMainWindow):
         """
         try:
             # 清除日志显示区域
-            if hasattr(self, 'log_text'):
-                self.log_text.clear()
+            if hasattr(self, 'log_widget') and self.log_widget:
+                self.log_widget.clear_logs()
 
             # 清除日志文件
             if hasattr(self, 'log_manager'):
@@ -2099,14 +2376,14 @@ class TradingGUI(QMainWindow):
             self.cleanup_memory()
 
             # 记录清除操作
-            self.log_message("日志已清除", "info")
+            self.log_manager.info("日志已清除")
 
             # 更新UI
             QApplication.processEvents()
 
         except Exception as e:
-            self.log_message(f"清除日志失败: {str(e)}", "error")
-            # 显示错误对话框
+            self.log_manager.error(f"清除日志失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             QMessageBox.critical(self, "错误", f"清除日志失败: {str(e)}")
 
     def handle_performance_alert(self, message: str) -> None:
@@ -2130,7 +2407,7 @@ class TradingGUI(QMainWindow):
             # 如果是严重的性能问题，尝试优化
             if "内存使用率" in message or "CPU使用率" in message:
                 self.cleanup_memory()
-                self.log_message("系统已尝试优化性能", "info")
+                self.log_manager.info("系统已尝试优化性能")
 
         except Exception as e:
             self.log_manager.error(f"处理性能警告失败: {str(e)}")
@@ -2273,7 +2550,7 @@ class TradingGUI(QMainWindow):
                 self.perform_advanced_search(search_conditions)
 
         except Exception as e:
-            self.log_message(f"显示高级搜索对话框失败: {str(e)}", "error")
+            self.log_manager.error(f"显示高级搜索对话框失败: {str(e)}")
 
     def perform_advanced_search(self, conditions: dict) -> None:
         """执行高级搜索
@@ -2383,10 +2660,11 @@ class TradingGUI(QMainWindow):
 
                 self.stock_list.addItem(item)
 
-            self.log_message(f"找到 {len(filtered_stocks)} 只符合条件的股票", "info")
+            self.log_manager.info(
+                f"找到 {len(filtered_stocks)} 只符合条件的股票")
 
         except Exception as e:
-            self.log_message(f"执行高级搜索失败: {str(e)}", "error")
+            self.log_manager.error(f"执行高级搜索失败: {str(e)}")
 
     def on_stock_selected(self) -> None:
         """处理股票选择事件"""
@@ -2445,7 +2723,7 @@ class TradingGUI(QMainWindow):
             # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
-                self.log_message("请先选择指标", "warning")
+                self.log_manager.warning("请先选择指标")
                 return
 
             # 创建对话框
@@ -2588,24 +2866,29 @@ class TradingGUI(QMainWindow):
                 self.update_indicators()
 
         except Exception as e:
-            self.log_message(f"显示指标参数设置对话框失败: {str(e)}", "error")
+            self.log_manager.error(
+                f"显示指标参数设置对话框失败: {str(e)}")
 
     def create_bottom_panel(self):
-        """Create bottom panel with logs"""
+        """Create bottom panel with logs，支持日志区动态显示/隐藏"""
         try:
-            # 创建底部面板
             self.bottom_panel = QWidget()
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
-            # 用LogWidget替换原有日志控件
             self.log_widget = LogWidget(self.log_manager)
+            self.log_widget.setVisible(False)  # 默认隐藏
+            self.log_widget.log_added.connect(self.show_log_panel)
             self.bottom_layout.addWidget(self.log_widget)
             self.bottom_splitter.addWidget(self.bottom_panel)
             self.bottom_panel.setMinimumHeight(120)
             self.bottom_panel.setMaximumHeight(300)
             self.bottom_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # 不再在这里连接日志信号，全部在__init__中统一连接
             self.log_manager.info("底部面板创建完成")
+            add_shadow(self.bottom_panel, blur_radius=12,
+                       x_offset=0, y_offset=4)
+            # 日志信号连接，确保log_widget已初始化
+            self.log_manager.log_message.connect(self.log_widget.add_log)
+            self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
         except Exception as e:
             self.log_manager.error(f"创建底部面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -2799,10 +3082,10 @@ class TradingGUI(QMainWindow):
                         f.write(
                             f"{stock['代码']}\t{stock['名称']}\t{stock['收藏']}\n")
 
-            self.log_message(f"股票列表已导出到: {file_path}")
+            self.log_manager.info(f"股票列表已导出到: {file_path}")
 
         except Exception as e:
-            self.log_message(f"导出股票列表失败: {str(e)}", "error")
+            self.log_manager.error(f"导出股票列表失败: {str(e)}")
 
     def update_indicators(self) -> None:
         """更新指标参数并刷新图表，优化性能"""
@@ -2851,16 +3134,16 @@ class TradingGUI(QMainWindow):
 
                     # 刷新图表
                     self.chart_widget.update_chart()
-                    self.log_message("指标参数已更新", "info")
+                    self.log_manager.info("指标参数已更新")
 
                 except Exception as e:
-                    self.log_message(f"更新指标参数失败: {str(e)}", "error")
+                    self.log_manager.error(f"更新指标参数失败: {str(e)}")
 
             # 使用线程池执行更新
             self.thread_pool.start(update_indicators_async)
 
         except Exception as e:
-            self.log_message(f"更新指标参数失败: {str(e)}", "error")
+            self.log_manager.error(f"更新指标参数失败: {str(e)}")
 
     def save_indicator_combination(self) -> None:
         """保存当前选中的指标组合
@@ -2871,7 +3154,7 @@ class TradingGUI(QMainWindow):
             # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
-                self.log_message("请先选择要保存的指标", "warning")
+                self.log_manager.warning("请先选择要保存的指标")
                 return
 
             # 获取组合名称
@@ -2943,10 +3226,10 @@ class TradingGUI(QMainWindow):
             with open(combinations_file, 'w', encoding='utf-8') as f:
                 json.dump(combinations, f, ensure_ascii=False, indent=2)
 
-            self.log_message(f"已保存指标组合: {name}")
+            self.log_manager.info(f"已保存指标组合: {name}")
 
         except Exception as e:
-            self.log_message(f"保存指标组合失败: {str(e)}", "error")
+            self.log_manager.error(f"保存指标组合失败: {str(e)}")
 
     def show_calculator(self) -> None:
         """显示计算器，优化UI和功能"""
@@ -3026,10 +3309,11 @@ class TradingGUI(QMainWindow):
             grid.addWidget(backspace_button, 4, 2, 1, 2)
 
             # 显示对话框
+            add_shadow(dialog, blur_radius=32, x_offset=0, y_offset=12)
             dialog.exec_()
 
         except Exception as e:
-            self.log_message(f"显示计算器失败: {str(e)}", "error")
+            self.log_manager.error(f"显示计算器失败: {str(e)}")
 
     def calculator_button_clicked(self, text: str, display: QLineEdit) -> None:
         """处理计算器按钮点击事件
@@ -3051,7 +3335,7 @@ class TradingGUI(QMainWindow):
                 display.insert(text)
 
         except Exception as e:
-            self.log_message(f"计算器操作失败: {str(e)}", "error")
+            self.log_manager.error(f"计算器操作失败: {str(e)}")
 
     def show_converter(self) -> None:
         """显示单位转换器，优化UI和功能"""
@@ -3102,7 +3386,6 @@ class TradingGUI(QMainWindow):
             output_unit = QComboBox()
             output_layout.addWidget(output_value)
             output_layout.addWidget(output_unit)
-            layout.addWidget(QLabel("="))
             layout.addLayout(output_layout)
 
             # 更新单位列表
@@ -3199,7 +3482,7 @@ class TradingGUI(QMainWindow):
             dialog.exec_()
 
         except Exception as e:
-            self.log_message(f"显示单位转换器失败: {str(e)}", "error")
+            self.log_manager.error(f"显示单位转换器失败: {str(e)}")
 
     def start_performance_monitoring(self):
         """启动性能监控"""
@@ -3398,15 +3681,19 @@ class TradingGUI(QMainWindow):
         """预加载常用数据"""
         try:
             self.log_manager.info("开始预加载数据...")
+            if hasattr(self, 'status_bar'):
+                self.status_bar.show_progress(True)
+                self.status_bar.set_progress(0)
 
             # 使用数据管理器获取股票列表
             stocks_df = self.data_manager.get_stock_list()
+            total = len(stocks_df) if not stocks_df.empty else 0
             if not stocks_df.empty:
                 self.stock_list_cache = []  # 确保清空旧数据
                 industry_set = set()
                 sub_industry_map = {}
 
-                for _, stock in stocks_df.iterrows():
+                for idx, (_, stock) in enumerate(stocks_df.iterrows()):
                     try:
                         # 生成标准code格式
                         code = f"{stock['market'].lower()}{stock['code']}"
@@ -3446,6 +3733,11 @@ class TradingGUI(QMainWindow):
                         if stock_info['valid']:
                             self.stock_list_cache.append(stock_info)
 
+                        # 动态更新进度条
+                        if hasattr(self, 'status_bar') and total > 0:
+                            percent = int((idx + 1) / total * 100)
+                            self.status_bar.set_progress(percent)
+
                     except Exception as e:
                         self.log_manager.warning(
                             f"处理股票 {stock.get('code', 'unknown')} 失败: {str(e)}")
@@ -3467,6 +3759,9 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"预加载数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+        finally:
+            if hasattr(self, 'status_bar'):
+                self.status_bar.show_progress(False)
 
     def _refresh_industry_combos(self):
         """根据实际股票数据动态刷新行业和子行业下拉框"""
@@ -3500,7 +3795,7 @@ class TradingGUI(QMainWindow):
             self.chart_widget.setRenderHint(QPainter.SmoothPixmapTransform)
 
         except Exception as e:
-            self.log_message(f"优化图表渲染失败: {str(e)}", "error")
+            self.log_manager.error(f"优化图表渲染失败: {str(e)}")
 
     def handle_exception(self, exception: Exception, error_type: str, error_message: str, error_traceback: str) -> None:
         """处理系统异常
@@ -3525,7 +3820,7 @@ class TradingGUI(QMainWindow):
             # 如果错误严重，尝试恢复系统状态
             if isinstance(exception, (MemoryError, SystemError)):
                 self.cleanup_memory()
-                self.log_message("系统已尝试恢复", "info")
+                self.log_manager.info("系统已尝试恢复")
 
         except Exception as e:
             # 如果错误处理本身出错，至少打印到控制台
@@ -3816,62 +4111,52 @@ class TradingGUI(QMainWindow):
                 self.log_manager.error(f"更新性能指标: {str(e)}")
                 self.log_manager.error(traceback.format_exc())
 
-    def log_message(self, message: str, level: str = "INFO") -> None:
-        """记录日志消息并更新UI显示
+    def show_log_panel(self, *args, **kwargs):
+        """显示日志区"""
+        if not hasattr(self, 'log_btn') or self.log_btn is None:
+            self.create_statusbar()
+        if hasattr(self, 'log_widget') and self.log_widget:
+            self.log_widget.setVisible(True)
+        if hasattr(self, 'bottom_panel'):
+            self.bottom_panel.setVisible(True)
+        if hasattr(self, 'bottom_splitter'):
+            self.bottom_splitter.setSizes([8, 2])
+        if hasattr(self, 'main_layout'):
+            self.main_layout.setStretch(0, 8)  # top_splitter
+            self.main_layout.setStretch(1, 2)  # bottom_splitter
+            self.main_layout.update()
+            self.main_layout.activate()
+        self.update()
+        if hasattr(self, 'log_btn') and self.log_btn:
+            self.log_btn.setText("隐藏日志")
 
-        Args:
-            message: 日志消息
-            level: 日志级别，可选值为 "info", "warning", "error", "debug"
-        """
-        try:
-            # 确保日志管理器存在
-            if not hasattr(self, 'log_manager'):
-                print(f"[ERROR] 日志管理器未初始化: {message}")
-                return
+    def hide_log_panel(self):
+        """隐藏日志区"""
+        if not hasattr(self, 'log_btn') or self.log_btn is None:
+            self.create_statusbar()
+        if hasattr(self, 'log_widget') and self.log_widget:
+            self.log_widget.setVisible(False)
+        if hasattr(self, 'bottom_panel'):
+            self.bottom_panel.setVisible(False)
+        if hasattr(self, 'bottom_splitter'):
+            self.bottom_splitter.setSizes([1, 0])
+        if hasattr(self, 'main_layout'):
+            self.main_layout.setStretch(0, 1)  # top_splitter
+            self.main_layout.setStretch(1, 0)  # bottom_splitter
+            self.main_layout.update()
+            self.main_layout.activate()
+        self.update()
+        if hasattr(self, 'log_btn') and self.log_btn:
+            self.log_btn.setText("显示日志")
 
-            # 将日志级别转换为大写
-            level = level.upper()
-
-            # 使用日志管理器记录日志
-            if level == "ERROR":
-                self.log_manager.error(message)
-            elif level == "WARNING":
-                self.log_manager.warning(message)
-            elif level == "DEBUG":
-                self.log_manager.debug(message)
-            else:
-                self.log_manager.info(message)
-
-            # 更新UI显示
-            if hasattr(self, 'log_text') and self.log_text:
-                # 根据日志级别设置文本颜色
-                color = {
-                    "ERROR": "#FF0000",  # 红色
-                    "WARNING": "#FFA500",  # 橙色
-                    "DEBUG": "#808080",   # 灰色
-                    "INFO": "#000000"     # 黑色
-                }.get(level, "#000000")
-                # 格式化日志消息
-                from datetime import datetime
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                formatted_message = f'<span style="color:{color}">[{timestamp}] [{level}] {message}</span>'
-                self.log_text.append(formatted_message)
-                # 滚动到底部
-                scrollbar = self.log_text.verticalScrollBar()
-                scrollbar.setValue(scrollbar.maximum())
-
-                # 如果是错误消息，闪烁提示
-                if level == "ERROR":
-                    self.flash_log_tab()
-
-            # 如果是错误级别，显示错误对话框
-            if level == "ERROR":
-                QMessageBox.critical(self, "错误", message)
-        except Exception as e:
-            print(f"记录日志失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"记录日志失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+    def toggle_log_panel(self):
+        """切换日志区显示/隐藏"""
+        if not hasattr(self, 'log_btn') or self.log_btn is None:
+            self.create_statusbar()
+        if hasattr(self, 'log_widget') and self.log_widget.isVisible():
+            self.hide_log_panel()
+        elif hasattr(self, 'log_widget') and self.log_widget:
+            self.show_log_panel()
 
     def _get_progress_style(self, value: float) -> str:
         """获取进度条样式
@@ -4074,17 +4359,21 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def update_chart(self):
-        """更新图表显示"""
+    def update_chart(self, results=None):
+        """更新图表显示，支持外部传入分析结果"""
         try:
             if not hasattr(self, 'current_stock') or not self.current_stock:
                 self.log_manager.warning("没有选中的股票，无法更新图表")
+                if hasattr(self, 'chart_widget'):
+                    self.chart_widget.show_no_data("请先选择股票")
                 return
 
-            # 获取K线数据
+            # 获取K线数据，自动根据时间范围
             k_data = self.get_kdata(self.current_stock)
             if k_data is None or k_data.empty:
                 self.log_manager.warning(f"获取股票 {self.current_stock} 的K线数据为空")
+                if hasattr(self, 'chart_widget'):
+                    self.chart_widget.show_no_data("当前时间范围无数据")
                 return
 
             # 获取股票名称
@@ -4099,6 +4388,8 @@ class TradingGUI(QMainWindow):
                 'period': self.current_period,
                 'chart_type': self.current_chart_type
             }
+            if results is not None:
+                data['analysis'] = results
 
             # 更新图表
             if hasattr(self, 'chart_widget'):
@@ -4422,21 +4713,32 @@ class TradingGUI(QMainWindow):
             raise
 
     def new_file(self):
-        """创建新文件"""
+        """创建新文件（修复日志区布局错乱问题）"""
         try:
-            # 重置所有数据
+            # 清空数据缓存
             self.data_cache.clear()
             self.chart_cache.clear()
             self.stock_list_cache.clear()
 
-            # 重置UI状态
+            # 清空日志内容，但不销毁日志控件
+            if hasattr(self, 'log_widget') and self.log_widget:
+                self.log_widget.clear_logs()
+
+            # 强制刷新日志区和底部面板布局，防止布局错乱
+            if hasattr(self, 'bottom_layout') and self.bottom_layout:
+                self.bottom_layout.update()
+            if hasattr(self, 'bottom_panel') and self.bottom_panel:
+                self.bottom_panel.update()
+            if hasattr(self, 'log_widget') and self.log_widget:
+                self.log_widget.update()
+
+            # 其他UI状态重置
             self.update_stock_list_ui()
             self.reset_chart_view()
-            self.clear_log()
 
-            self.log_message("已创建新文件", "info")
+            self.log_manager.info("已创建新文件")
         except Exception as e:
-            self.log_message(f"创建新文件失败: {str(e)}", "error")
+            self.log_manager.error(f"创建新文件失败: {str(e)}")
 
     def open_file(self):
         """打开文件"""
@@ -4452,10 +4754,10 @@ class TradingGUI(QMainWindow):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 # TODO: 处理文件内容
-                self.log_message("文件打开成功", "info")
+                self.log_manager.info("文件打开成功")
 
         except Exception as e:
-            self.log_message(f"打开文件失败: {str(e)}", "error")
+            self.log_manager.error(f"打开文件失败: {str(e)}")
 
     def save_file(self):
         """保存文件"""
@@ -4471,10 +4773,10 @@ class TradingGUI(QMainWindow):
                 # TODO: 获取当前内容并保存
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write("")
-                self.log_message("文件保存成功", "info")
+                self.log_manager.info("文件保存成功")
 
         except Exception as e:
-            self.log_message(f"保存文件失败: {str(e)}", "error")
+            self.log_manager.error(f"保存文件失败: {str(e)}")
 
     def undo(self):
         """撤销上一步操作"""
@@ -4497,28 +4799,94 @@ class TradingGUI(QMainWindow):
         pass
 
     def show_help(self):
-        """显示帮助文档"""
+        """显示帮助对话框"""
         try:
-            # TODO: 实现帮助文档显示
-            self.log_message("显示帮助文档", "info")
+            dialog = QDialog()
+            dialog.setWindowTitle("帮助")
+            dialog.setMinimumSize(800, 600)
+
+            layout = QVBoxLayout(dialog)
+
+            # 添加帮助内容
+            help_text = QTextEdit()
+            help_text.setReadOnly(True)
+            help_text.setHtml("""
+                <h2>Hikyuu量化交易系统使用帮助</h2>
+                <h3>基本操作</h3>
+                <ul>
+                    <li>选择股票：在左侧面板输入股票代码或名称</li>
+                    <li>查看图表：在中间面板显示K线和技术指标</li>
+                    <li>交易操作：在右侧面板进行买入、卖出等操作</li>
+                </ul>
+                <h3>快捷键</h3>
+                <ul>
+                    <li>Ctrl+Q：退出程序</li>
+                    <li>Ctrl+S：保存设置</li>
+                    <li>F1：显示帮助</li>
+                </ul>
+            """)
+            layout.addWidget(help_text)
+
+            # 添加关闭按钮
+            close_button = QPushButton("关闭")
+            close_button.clicked.connect(dialog.accept)
+            layout.addWidget(close_button)
+
+            # 显示对话框并居中
+            dialog.show()
+            self.center_dialog(dialog, self)
+            dialog.exec_()
         except Exception as e:
-            self.log_message(f"显示帮助文档失败: {str(e)}", "error")
+            self.log_manager.error(f"显示帮助对话框失败: {str(e)}")
 
     def check_update(self):
         """检查更新"""
         try:
             # TODO: 实现更新检查
-            self.log_message("检查更新", "info")
+            self.log_manager.info("检查更新")
         except Exception as e:
-            self.log_message(f"检查更新失败: {str(e)}", "error")
+            self.log_manager.error(f"检查更新失败: {str(e)}")
 
     def show_settings(self):
         """显示设置对话框"""
         try:
-            # TODO: 实现设置对话框
-            self.log_message("显示设置对话框", "info")
+            dialog = QDialog(self)
+            dialog.setWindowTitle("设置")
+            dialog.setMinimumSize(600, 400)
+
+            layout = QVBoxLayout(dialog)
+
+            # 添加设置选项
+            settings_group = QGroupBox("基本设置")
+            settings_layout = QFormLayout(settings_group)
+
+            # 主题设置
+            theme_combo = QComboBox()
+            theme_combo.addItems(["浅色", "深色", "系统"])
+            settings_layout.addRow("主题:", theme_combo)
+
+            # 字体大小
+            font_size = QSpinBox()
+            font_size.setRange(8, 24)
+            font_size.setValue(12)
+            settings_layout.addRow("字体大小:", font_size)
+
+            layout.addWidget(settings_group)
+
+            # 添加按钮
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            )
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            # 显示对话框并居中
+            dialog.show()
+            self.center_dialog(dialog, self)
+            dialog.exec_()
         except Exception as e:
-            self.log_message(f"显示设置对话框失败: {str(e)}", "error")
+            self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 
     def dragEnterEvent(self, event):
         """处理拖入事件"""
@@ -4533,9 +4901,9 @@ class TradingGUI(QMainWindow):
             if mime_data.hasFormat("text/plain"):
                 text = mime_data.text()
                 # TODO: 处理拖放的数据
-                self.log_message(f"拖放数据: {text}", "info")
+                self.log_manager.info(f"拖放数据: {text}")
         except Exception as e:
-            self.log_message(f"处理拖放事件失败: {str(e)}", "error")
+            self.log_manager.error(f"处理拖放事件失败: {str(e)}")
 
     def update_stock_count_label(self, count: int):
         """更新股票数量标签，线程安全"""
@@ -4630,7 +4998,7 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def get_kdata(self, code: str) -> pd.DataFrame:
-        """获取股票K线数据
+        """获取股票K线数据，支持时间范围
 
         Args:
             code: 股票代码
@@ -4643,12 +5011,19 @@ class TradingGUI(QMainWindow):
                 self.log_manager.error("数据管理器未初始化")
                 return pd.DataFrame()
 
-            # 使用data_manager获取K线数据
+            # 根据self.current_time_range设置Query
+            if hasattr(self, 'current_time_range') and self.current_time_range is not None:
+                if self.current_time_range < 0:
+                    query = Query(self.current_time_range, ktype=Query.DAY)
+                else:
+                    query = Query()  # 全部
+            else:
+                query = Query()
+
             kdata = self.data_manager.get_k_data(
                 code=code,
                 freq=self.current_period,
-                start_date=None,  # 使用默认的时间范围
-                end_date=None
+                query=query
             )
 
             if kdata is None or kdata.empty:
@@ -4702,6 +5077,18 @@ class TradingGUI(QMainWindow):
         else:
             # 已有 crosshair，无需重复创建
             pass
+
+    def adjust_combobox_width(self, combobox: QComboBox):
+        """根据内容自动调整下拉框宽度"""
+        font_metrics = combobox.fontMetrics()
+        max_width = 0
+        for i in range(combobox.count()):
+            text = combobox.itemText(i)
+            width = font_metrics.width(text)
+            if width > max_width:
+                max_width = width
+        # 额外加上icon、箭头、padding等空间
+        combobox.setMinimumWidth(max_width + 35)
 
 # 修改全局异常处理器
 
@@ -4774,6 +5161,22 @@ def safe_strftime(dt, fmt='%Y-%m-%d'):
     elif hasattr(dt, 'strftime'):
         return dt.strftime(fmt)
     return str(dt) if dt else "未知"
+
+
+def add_shadow(widget, blur_radius=20, x_offset=0, y_offset=4, color=QColor(0, 0, 0, 80)):
+    """
+    为指定控件添加阴影效果。
+    :param widget: 需要添加阴影的控件
+    :param blur_radius: 阴影模糊半径
+    :param x_offset: 阴影X方向偏移
+    :param y_offset: 阴影Y方向偏移
+    :param color: 阴影颜色
+    """
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(blur_radius)
+    shadow.setOffset(x_offset, y_offset)
+    shadow.setColor(color)
+    widget.setGraphicsEffect(shadow)
 
 
 def main():

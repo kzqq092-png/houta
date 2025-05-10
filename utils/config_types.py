@@ -13,14 +13,8 @@ from PyQt5.QtCore import QObject, pyqtSignal
 @dataclass
 class ThemeConfig:
     """Theme configuration settings"""
-    theme: Theme = Theme.DEEPBLUE
+    theme: Theme = Theme.LIGHT
     name: str = "light"
-    background_color: str = "#FFFFFF"
-    text_color: str = "#000000"
-    grid_color: str = "#E0E0E0"
-    chart_colors: List[str] = field(default_factory=lambda: [
-                                    "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"])
-    custom_colors: Dict[str, str] = field(default_factory=dict)
     font_family: str = "Arial"
     font_size: int = 12
 
@@ -43,11 +37,6 @@ class ThemeConfig:
         return {
             "theme": self.theme.name.lower(),
             "name": self.name,
-            "background_color": self.background_color,
-            "text_color": self.text_color,
-            "grid_color": self.grid_color,
-            "chart_colors": self.chart_colors,
-            "custom_colors": self.custom_colors,
             "font_family": self.font_family,
             "font_size": self.font_size
         }
@@ -63,14 +52,8 @@ class ThemeConfig:
             ThemeConfig instance
         """
         return cls(
-            theme=Theme.from_str(data.get("theme", "system")),
+            theme=Theme.from_str(data.get("theme", "light")),
             name=data.get("name", "light"),
-            background_color=data.get("background_color", "#FFFFFF"),
-            text_color=data.get("text_color", "#000000"),
-            grid_color=data.get("grid_color", "#E0E0E0"),
-            chart_colors=data.get(
-                "chart_colors", ["#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"]),
-            custom_colors=data.get("custom_colors", {}),
             font_family=data.get("font_family", "Arial"),
             font_size=data.get("font_size", 12)
         )

@@ -482,112 +482,6 @@ class AnalysisToolsPanel(QWidget):
             self.error_occurred.emit(error_msg)
 
 
-class LogPanel(QWidget):
-    """Log panel for displaying system logs"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-
-    def init_ui(self):
-        """Initialize the UI"""
-        layout = QVBoxLayout(self)
-
-        # Log controls
-        controls_layout = QHBoxLayout()
-
-        # Log level filter
-        log_level_label = QLabel("日志级别:")
-        self.log_level_combo = QComboBox()
-        self.log_level_combo.addItems(["全部", "信息", "警告", "错误"])
-        self.log_level_combo.currentTextChanged.connect(self.filter_logs)
-        controls_layout.addWidget(log_level_label)
-        controls_layout.addWidget(self.log_level_combo)
-
-        # Search box
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("搜索日志...")
-        self.search_box.textChanged.connect(self.search_logs)
-        controls_layout.addWidget(self.search_box)
-
-        # Clear button
-        clear_button = QPushButton("清除")
-        clear_button.clicked.connect(self.clear_logs)
-        controls_layout.addWidget(clear_button)
-
-        # Export button
-        export_button = QPushButton("导出")
-        export_button.clicked.connect(self.export_logs)
-        controls_layout.addWidget(export_button)
-
-        layout.addLayout(controls_layout)
-
-        # Log text area
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setLineWrapMode(QTextEdit.NoWrap)
-        layout.addWidget(self.log_text)
-
-        self.setLayout(layout)
-
-    def log_message(self, message: str, level: str = "info") -> None:
-        """记录日志消息，统一调用主窗口或日志管理器"""
-        try:
-            parent = self.parentWidget()
-            if parent and hasattr(parent, 'log_message'):
-                parent.log_message(message, level)
-            elif hasattr(self, 'log_manager'):
-                level = level.upper()
-                if level == "ERROR":
-                    self.log_manager.error(message)
-                elif level == "WARNING":
-                    self.log_manager.warning(message)
-                elif level == "DEBUG":
-                    self.log_manager.debug(message)
-                else:
-                    self.log_manager.info(message)
-            else:
-                print(f"[LOG][{level}] {message}")
-        except Exception as e:
-            print(f"记录日志失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"记录日志失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
-
-    def filter_logs(self, level):
-        """Filter logs by level"""
-        # TODO: Implement log filtering
-        pass
-
-    def search_logs(self, text):
-        """Search logs"""
-        # TODO: Implement log searching
-        pass
-
-    def clear_logs(self):
-        """Clear all logs"""
-        self.log_text.clear()
-
-    def export_logs(self):
-        """Export logs to file"""
-        try:
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "导出日志",
-                "",
-                "Text Files (*.txt);;Log Files (*.log)"
-            )
-
-            if file_path:
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(self.log_text.toPlainText())
-
-                QMessageBox.information(self, "成功", "日志已导出")
-
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
-
-
 class StatusBar(QStatusBar):
     """Custom status bar with system information"""
 
@@ -616,7 +510,7 @@ class StatusBar(QStatusBar):
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximumWidth(200)
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setVisible(True)
         self.addPermanentWidget(self.progress_bar)
 
         # Start update timer

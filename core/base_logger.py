@@ -43,13 +43,14 @@ class BaseLogManager(QObject):
         self.logger = logging.getLogger('TradingSystem')
         self.logger.setLevel(logging.INFO)
 
-        # 添加控制台处理器
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        ))
-        self.logger.addHandler(console_handler)
+        # 只添加一次控制台处理器，避免重复日志
+        if not any(isinstance(h, logging.StreamHandler) for h in self.logger.handlers):
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(logging.Formatter(
+                "%(asctime)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S"
+            ))
+            self.logger.addHandler(console_handler)
 
     def debug(self, message: str):
         """记录调试日志"""
@@ -86,7 +87,7 @@ class BaseLogManager(QObject):
                         open(handler.baseFilename, 'w').close()
             self.log_cleared.emit()
         except Exception as e:
-            print(f"清除日志失败: {str(e)}")
+            self.logger(f"清除日志失败: {str(e)}")
 
     def handle_exception(self, e: Exception):
         """处理异常"""
@@ -95,4 +96,4 @@ class BaseLogManager(QObject):
             self.error(error_msg)
             self.exception_occurred.emit(e)
         except Exception as ex:
-            print(f"处理异常失败: {str(ex)}")
+            self.logger(f"处理异常失败: {str(ex)}")

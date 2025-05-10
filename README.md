@@ -559,3 +559,102 @@ stop_loss = ComponentFactory.create_stoploss({
 3. 建议进行多周期、多策略的回测对比
 4. 注意控制回测参数，避免过拟合
 
+## 主题配置说明
+
+系统使用 `config/theme.json` 统一管理所有界面颜色配置,支持以下主题:
+
+### 1. 浅色主题 (light)
+- 主窗口背景: 明亮灰白 (#f7f9fa)
+- 主文本色: 深灰蓝 (#222b45)
+- K线颜色: 阳线红 (#FF5252), 阴线绿 (#4CAF50)
+- 图表网格: 浅灰 (#e0e0e0)
+- 按钮和控件: Material Design 风格
+
+### 2. 深色主题 (dark)
+- 主窗口背景: 深蓝黑 (#181c24)
+- 主文本色: 浅灰蓝 (#b0b8c1)
+- K线颜色: 同浅色主题
+- 图表网格: 深灰 (#2c3140)
+- 按钮和控件: 暗色风格
+
+### 3. 渐变主题 (gradient)
+- 主窗口背景: 蓝紫渐变
+- 主文本色: 浅灰白 (#f5f5f5)
+- K线颜色: 渐变红 (#FF6B81), 渐变蓝绿 (#4DD0E1)
+- 图表网格: 浅紫 (#b39ddb)
+- 按钮和控件: 渐变风格
+
+### 颜色项说明
+
+1. 基础颜色
+- background: 主窗口背景色
+- text: 主文本颜色
+- border: 边框颜色
+
+2. K线图相关
+- k_up: K线阳线颜色
+- k_down: K线阴线颜色
+- k_edge: K线边框颜色
+- volume_up: 成交量阳线颜色
+- volume_down: 成交量阴线颜色
+- volume_alpha: 成交量透明度
+- alpha: K线透明度
+
+3. 图表相关
+- chart_grid: 图表网格颜色
+- chart_background: 图表背景色
+- chart_text: 图表文字颜色
+- indicator_colors: 指标线颜色列表
+
+4. 控件相关
+- button_bg: 按钮背景色
+- button_hover: 按钮悬停色
+- button_pressed: 按钮按下色
+- button_text: 按钮文字色
+- button_border: 按钮边框色
+- selected_bg: 选中背景色
+- selected_text: 选中文字色
+- hover_bg: 悬停背景色
+
+5. 表格相关
+- table_header_bg: 表头背景色
+- table_header_text: 表头文字色
+
+6. 状态相关
+- highlight: 高亮色
+- warning: 警告色
+- error: 错误色
+- success: 成功色
+- info: 信息色
+- progress_chunk: 进度条颜色
+
+7. 热度相关
+- heat_red: 热度红色
+- heat_green: 热度绿色
+- heat_gray: 热度灰色
+- heat_orange: 热度橙色
+
+### 使用说明
+
+1. 主题切换
+- 系统默认使用浅色主题
+- 主题配置在 `config/theme.json` 中统一管理
+- 支持在配置文件中添加注释,便于维护
+
+2. 自定义主题
+- 可在 `theme.json` 中添加新的主题配置
+- 需要包含所有必要的颜色项
+- 建议参考现有主题进行自定义
+
+3. 注意事项
+- 修改配置文件后需要重启程序生效
+- 建议使用标准16进制颜色值
+- 可以使用 rgba 或渐变色值
+- 注释仅用于说明,不影响配置文件解析
+
+## 其他配置说明
+
+```
+
+</rewritten_file>
+

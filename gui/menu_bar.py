@@ -51,13 +51,18 @@ class MainMenuBar(QMenuBar):
         self.file_menu = self.addMenu("文件(&F)")
         self.edit_menu = self.addMenu("编辑(&E)")
         self.view_menu = self.addMenu("视图(&V)")
+        self.analysis_menu = self.addMenu("分析(&A)")
+        self.data_menu = self.addMenu("数据(&D)")
         self.tools_menu = self.addMenu("工具(&T)")
+        self.debug_menu = self.addMenu("调试(&G)")
         self.help_menu = self.addMenu("帮助(&H)")
-
         self.init_file_menu()
         self.init_edit_menu()
         self.init_view_menu()
+        self.init_analysis_menu()
+        self.init_data_menu()
         self.init_tools_menu()
+        self.init_debug_menu()
         self.init_help_menu()
 
     def init_file_menu(self):
@@ -148,36 +153,67 @@ class MainMenuBar(QMenuBar):
             self.theme_menu = self.view_menu.addMenu("主题")
             self.light_theme_action = QAction("浅色", self)
             self.dark_theme_action = QAction("深色", self)
+            self.gradient_theme_action = QAction("渐变", self)
             self.theme_menu.addAction(self.light_theme_action)
             self.theme_menu.addAction(self.dark_theme_action)
+            self.theme_menu.addAction(self.gradient_theme_action)
+
+            # 绑定切换主题逻辑
+            self.light_theme_action.triggered.connect(
+                lambda: self.parent.set_theme_by_menu('light'))
+            self.dark_theme_action.triggered.connect(
+                lambda: self.parent.set_theme_by_menu('dark'))
+            self.gradient_theme_action.triggered.connect(
+                lambda: self.parent.set_theme_by_menu('gradient'))
 
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化视图菜单失败: {str(e)}")
 
-    def init_tools_menu(self):
-        """初始化工具菜单"""
+    def init_analysis_menu(self):
+        """初始化分析菜单"""
         try:
             # 分析
             self.analyze_action = QAction(
                 QIcon("icons/analyze.png"), "分析", self)
             self.analyze_action.setStatusTip("分析当前股票")
-            self.tools_menu.addAction(self.analyze_action)
+            self.analysis_menu.addAction(self.analyze_action)
 
             # 回测
             self.backtest_action = QAction(
                 QIcon("icons/backtest.png"), "回测", self)
             self.backtest_action.setStatusTip("回测当前策略")
-            self.tools_menu.addAction(self.backtest_action)
+            self.analysis_menu.addAction(self.backtest_action)
 
             # 优化
             self.optimize_action = QAction(
                 QIcon("icons/optimize.png"), "优化", self)
             self.optimize_action.setStatusTip("优化策略参数")
-            self.tools_menu.addAction(self.optimize_action)
+            self.analysis_menu.addAction(self.optimize_action)
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化分析菜单失败: {str(e)}")
 
-            self.tools_menu.addSeparator()
+    def init_data_menu(self):
+        """初始化数据菜单（含数据源切换）"""
+        try:
+            # 数据源子菜单
+            self.data_source_menu = self.data_menu.addMenu("数据源切换")
+            self.data_source_hikyuu = QAction("Hikyuu", self)
+            self.data_source_eastmoney = QAction("东方财富", self)
+            self.data_source_sina = QAction("新浪", self)
+            self.data_source_tonghuashun = QAction("同花顺", self)
+            self.data_source_menu.addAction(self.data_source_hikyuu)
+            self.data_source_menu.addAction(self.data_source_eastmoney)
+            self.data_source_menu.addAction(self.data_source_sina)
+            self.data_source_menu.addAction(self.data_source_tonghuashun)
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化数据菜单失败: {str(e)}")
 
+    def init_tools_menu(self):
+        """初始化工具菜单"""
+        try:
             # 计算器
             self.calculator_action = QAction(
                 QIcon("icons/calculator.png"), "计算器", self)
@@ -197,10 +233,21 @@ class MainMenuBar(QMenuBar):
                 QIcon("icons/settings.png"), "设置", self)
             self.settings_action.setStatusTip("打开设置对话框")
             self.tools_menu.addAction(self.settings_action)
-
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
+
+    def init_debug_menu(self):
+        """初始化调试菜单，添加显示/隐藏日志菜单项"""
+        try:
+            self.toggle_log_action = QAction("显示/隐藏日志", self)
+            self.toggle_log_action.setStatusTip("显示或隐藏日志输出区")
+            self.toggle_log_action.triggered.connect(
+                lambda: self.parent.toggle_log_panel())
+            self.debug_menu.addAction(self.toggle_log_action)
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化调试菜单失败: {str(e)}")
 
     def init_help_menu(self):
         """初始化帮助菜单"""
@@ -426,3 +473,48 @@ class MainMenuBar(QMenuBar):
             "使用PyQt5构建用户界面\n"
             "使用hikyuu框架进行量化分析"
         )
+
+    def apply_theme(self, theme_manager):
+        """根据主题优化菜单栏样式"""
+        colors = theme_manager.get_theme_colors()
+        menu_bg = colors.get('background', '#181c24')
+        menu_text = colors.get('text', '#e0e6ed')
+        menu_selected = colors.get('highlight', '#1976d2')
+        menu_hover = colors.get('hover_bg', '#23293a')
+        menu_border = colors.get('border', '#23293a')
+        self.setStyleSheet(f'''
+            QMenuBar {{
+                background: {menu_bg};
+                color: {menu_text};
+                border-bottom: 2px solid {menu_border};
+                font-weight: bold;
+                font-size: 14px;
+            }}
+            QMenuBar::item {{
+                background: transparent;
+                color: {menu_text};
+                padding: 6px 18px;
+                border-radius: 6px 6px 0 0;
+            }}
+            QMenuBar::item:selected {{
+                background: {menu_selected};
+                color: #ffd600;
+            }}
+            QMenuBar::item:pressed {{
+                background: {menu_selected};
+                color: #ffd600;
+            }}
+            QMenu {{
+                background: {menu_bg};
+                color: {menu_text};
+                border: 1.5px solid {menu_border};
+                font-size: 13px;
+            }}
+            QMenu::item:selected {{
+                background: {menu_selected};
+                color: #ffd600;
+            }}
+            QMenu::item:disabled {{
+                color: #888;
+            }}
+        ''')

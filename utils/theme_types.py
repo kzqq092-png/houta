@@ -8,12 +8,13 @@ from typing import Dict, Any
 class Theme(Enum):
     """主题枚举类型"""
     LIGHT = auto()  # 浅色主题
-    DEEPBLUE = auto()   # 深蓝色主题
+    DARK = auto()   # 深色主题
+    GRADIENT = auto()  # 渐变主题
 
     @property
     def is_dark(self) -> bool:
         """是否是深色主题"""
-        return self == Theme.DEEPBLUE
+        return self in [Theme.DARK, Theme.GRADIENT]
 
     @property
     def is_light(self) -> bool:
@@ -35,9 +36,11 @@ class Theme(Enum):
         """
         theme_map = {
             'light': Theme.LIGHT,
-            'dark': Theme.DEEPBLUE,
+            'dark': Theme.DARK,
+            'gradient': Theme.GRADIENT,
             '浅色': Theme.LIGHT,
-            '深色': Theme.DEEPBLUE
+            '深色': Theme.DARK,
+            '渐变': Theme.GRADIENT
         }
 
         theme_str = theme_str.lower()

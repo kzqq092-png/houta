@@ -1,18 +1,8 @@
 {
     "version": "1.0.0",
     "theme": {
-        "theme": "deepblue",
+        "theme": "light",
         "name": "light",
-        "background_color": "#FFFFFF",
-        "text_color": "#000000",
-        "grid_color": "#E0E0E0",
-        "chart_colors": [
-            "#1F77B4",
-            "#FF7F0E",
-            "#2CA02C",
-            "#D62728"
-        ],
-        "custom_colors": {},
         "font_family": "Arial",
         "font_size": 12
     },
@@ -55,15 +45,15 @@
         "time_stop": 5
     },
     "performance": {
-        "cpu_threshold": 80.0,
-        "memory_threshold": 80.0,
+        "cpu_threshold": 80,
+        "memory_threshold": 80,
         "disk_threshold": 90,
         "response_threshold": 1.0,
         "cpu_interval": 1.0,
         "cpu_average_window": 5,
         "cpu_per_core": false,
         "update_interval": 1.0,
-        "metrics_history_size": 1000,
+        "metrics_history_size": 100,
         "monitor_cpu": true,
         "monitor_memory": true,
         "monitor_disk": true,

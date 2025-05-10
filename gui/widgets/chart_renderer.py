@@ -95,7 +95,7 @@ class ChartRenderer(QObject):
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         edge_color = style.get('edge_color', '#000000')
-        alpha = style.get('alpha', 0.8)
+        alpha = style.get('alpha', 1.0)
 
         # 转换日期为数值
         dates = mdates.date2num(data.index.to_pydatetime())

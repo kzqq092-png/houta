@@ -7,6 +7,7 @@ multiple themes, dynamic theme switching, and theme customization.
 
 import json
 import os
+import re
 from typing import Dict, Any, Optional, Union
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QColor, QPalette
@@ -15,12 +16,27 @@ from .config_manager import ConfigManager
 from .theme_types import Theme
 from .config_types import ThemeConfig
 from core.base_logger import BaseLogManager
+from utils.theme_utils import load_theme_json_with_comments
 # Global theme manager instance
 _theme_manager_instance: Optional['ThemeManager'] = None
 
 
+def load_theme_json_with_comments(path: str) -> dict:
+    """读取带注释的JSON文件，自动去除注释"""
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    # 去除 // 注释
+    content = re.sub(r'//.*', '', content)
+    # 去除 /* ... */ 注释（如有）
+    content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+    # 去除多余空行
+    content = '\n'.join(
+        [line for line in content.splitlines() if line.strip()])
+    return json.loads(content)
+
+
 class ThemeManager(QObject):
-    """主题管理器类"""
+    """主题管理器类，统一从config/theme.json读取所有配色"""
 
     # 主题变更信号
     theme_changed = pyqtSignal(Theme)
@@ -36,89 +52,24 @@ class ThemeManager(QObject):
         # 初始化配置管理器
         self.config_manager = config_manager or ConfigManager()
 
-        # 加载主题配置
-        self._load_theme_config()
-
-        # 初始化主题颜色映射
-        self._init_theme_colors()
-
         # 初始化主题缓存
         self._theme_cache = {}
 
-    def _load_theme_config(self):
-        """加载主题配置"""
+        # 加载主题配置
+        self._theme_json_path = os.path.join(os.path.dirname(
+            os.path.dirname(__file__)), 'config', 'theme.json')
+        self._theme_data = {}
+        self._current_theme = Theme.LIGHT
+        self._load_theme_json()
+
+    def _load_theme_json(self):
+        """加载主题配置文件"""
         try:
-            # 从配置管理器获取主题配置
-            theme_config = self.config_manager.theme
-
-            # 设置当前主题
-            self._current_theme = theme_config.theme
-
+            self._theme_data = load_theme_json_with_comments(
+                self._theme_json_path)
         except Exception as e:
-            print(f"加载主题配置失败: {str(e)}")
-            # 使用默认主题
-            self._current_theme = Theme.LIGHT
-
-    def _init_theme_colors(self):
-        """初始化主题颜色映射"""
-        # 浅色主题
-        self._light_colors = {
-            'background': '#ffffff',
-            'text': '#000000',
-            'border': '#d0d0d0',
-            'chart_background': '#ffffff',
-            'chart_grid': '#e0e0e0',
-            'chart_text': '#333333',
-            'k_up': '#e60000',
-            'k_down': '#1dbf60',
-            'k_edge': '#2c3140',
-            'volume_up': '#e60000',
-            'volume_down': '#1dbf60',
-            'indicator_1': '#1976d2',
-            'indicator_2': '#e53935',
-            'indicator_3': '#43a047',
-            'indicator_4': '#fb8c00',
-            'indicator_5': '#8e24aa',
-            'highlight': '#1976d2',
-            'warning': '#ff9800',
-            'ma5': '#fbc02d',
-            'ma10': '#ab47bc',
-            'ma20': '#1976d2',
-            'ma60': '#43a047',
-            'macd_dif': '#1976d2',
-            'macd_dea': '#e53935',
-            'macd_hist_up': '#e60000',
-            'macd_hist_down': '#1dbf60',
-        }
-        # 专业交易软件深色主题
-        self._dark_colors = {
-            'background': '#181c24',         # 主背景色
-            'text': '#b0b8c1',               # 主文字色
-            'border': '#2c3140',             # 分割线/边框
-            'chart_background': '#181c24',   # 图表背景
-            'chart_grid': '#2c3140',         # 网格线
-            'chart_text': '#b0b8c1',         # 图表文字
-            'k_up': '#e60000',               # K线阳线/上涨
-            'k_down': '#1dbf60',             # K线阴线/下跌
-            'k_edge': '#ffffff',             # K线边框
-            'volume_up': '#e60000',          # 成交量上涨
-            'volume_down': '#1dbf60',        # 成交量下跌
-            'macd_dif': '#ffff00',           # MACD DIF线
-            'macd_dea': '#ff00ff',           # MACD DEA线
-            'macd_hist_up': '#e60000',       # MACD柱状图正
-            'macd_hist_down': '#00ffff',     # MACD柱状图负
-            'highlight': '#1976d2',          # 选中高亮
-            'warning': '#ff9800',            # 警告/提示
-            'ma5': '#fbc02d',                # MA5 黄色
-            'ma10': '#ab47bc',               # MA10 紫色
-            'ma20': '#1976d2',               # MA20 蓝色
-            'ma60': '#43a047',               # MA60 绿色
-            'indicator_1': '#42a5f5',
-            'indicator_2': '#ef5350',
-            'indicator_3': '#66bb6a',
-            'indicator_4': '#ffa726',
-            'indicator_5': '#ab47bc',
-        }
+            print(f"加载theme.json失败: {str(e)}")
+            self._theme_data = {}
 
     @property
     def current_theme(self) -> Theme:
@@ -142,7 +93,7 @@ class ThemeManager(QObject):
             # 发送主题变更信号
             self.theme_changed.emit(theme)
 
-    def get_theme_colors(self, theme: Optional[Theme] = None) -> Dict[str, str]:
+    def get_theme_colors(self, theme: Optional[Theme] = None) -> Dict[str, Any]:
         """获取主题颜色
 
         Args:
@@ -152,108 +103,27 @@ class ThemeManager(QObject):
             主题颜色字典
         """
         theme = theme or self._current_theme
-
-        # 检查缓存
-        if theme in self._theme_cache:
-            return self._theme_cache[theme].copy()
-
-        # 获取颜色
-        colors = self._light_colors.copy() if theme == Theme.LIGHT else self._dark_colors.copy()
-
-        # 缓存结果
-        self._theme_cache[theme] = colors.copy()
-
+        theme_key = theme.name.lower() if hasattr(
+            theme, 'name') else str(theme).lower()
+        if theme_key in self._theme_cache:
+            return self._theme_cache[theme_key].copy()
+        colors = self._theme_data.get(theme_key, {})
+        self._theme_cache[theme_key] = colors.copy()
         return colors
 
-    def get_widget_style(self, theme: Optional[Theme] = None) -> str:
-        """获取部件样式
+    def get_color(self, name: str, theme: Optional[Theme] = None, default: str = None) -> Any:
+        """Get color by name
 
         Args:
-            theme: 可选的主题，默认使用当前主题
+            name: Color name
+            theme: Theme to get color from, defaults to current theme
+            default: Default color if not found
 
         Returns:
-            样式表字符串
+            Color value
         """
-        theme = theme or self._current_theme
         colors = self.get_theme_colors(theme)
-
-        return f"""
-            QWidget {{
-                background-color: {colors['background']};
-                color: {colors['text']};
-            }}
-            
-            QGroupBox {{
-                border: 1px solid {colors['border']};
-                border-radius: 6px;
-                margin-top: 6px;
-                padding: 6px;
-            }}
-            
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 7px;
-                padding: 0px 5px 0px 5px;
-            }}
-            
-            QPushButton {{
-                background-color: {colors['background']};
-                border: 1px solid {colors['border']};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-            
-            QPushButton:hover {{
-                background-color: {colors['chart_grid']};
-            }}
-            
-            QLineEdit, QTextEdit, QPlainTextEdit {{
-                background-color: {colors['background']};
-                border: 1px solid {colors['border']};
-                border-radius: 4px;
-                padding: 2px;
-            }}
-            
-            QComboBox {{
-                background-color: {colors['background']};
-                border: 1px solid {colors['border']};
-                border-radius: 4px;
-                padding: 2px;
-            }}
-            
-            QComboBox::drop-down {{
-                border: none;
-            }}
-            
-            QComboBox::down-arrow {{
-                image: url(icons/down_arrow_{theme.name.lower()}.png);
-                width: 12px;
-                height: 12px;
-            }}
-            
-            QScrollBar:vertical {{
-                border: none;
-                background: {colors['background']};
-                width: 10px;
-                margin: 0px;
-            }}
-            
-            QScrollBar::handle:vertical {{
-                background: {colors['border']};
-                min-height: 20px;
-                border-radius: 5px;
-            }}
-            
-            QScrollBar::add-line:vertical {{
-                border: none;
-                background: none;
-            }}
-            
-            QScrollBar::sub-line:vertical {{
-                border: none;
-                background: none;
-            }}
-        """
+        return colors.get(name, default)
 
     def apply_theme(self, widget: QWidget, theme: Optional[Theme] = None) -> None:
         """应用主题到指定部件
@@ -263,11 +133,96 @@ class ThemeManager(QObject):
             theme: 可选的主题，默认使用当前主题
         """
         try:
-            # 获取样式表
-            style_sheet = self.get_widget_style(theme)
+            theme = theme or self._current_theme
+            colors = self.get_theme_colors(theme)
 
-            # 应用样式表
-            widget.setStyleSheet(style_sheet)
+            # 基础样式
+            style = f"""
+                QWidget {{
+                    background-color: {colors.get('background', '#f7f9fa')};
+                    color: {colors.get('text', '#222b45')};
+                }}
+                
+                QGroupBox {{
+                    border: 1px solid {colors.get('border', '#e0e0e0')};
+                    border-radius: 6px;
+                    margin-top: 6px;
+                    padding: 6px;
+                }}
+                
+                QPushButton {{
+                    background-color: {colors.get('button_bg', '#e3f2fd')};
+                    color: {colors.get('button_text', '#1565c0')};
+                    border: 1px solid {colors.get('button_border', '#90caf9')};
+                    border-radius: 4px;
+                    padding: 4px;
+                }}
+                
+                QPushButton:hover {{
+                    background-color: {colors.get('button_hover', '#90caf9')};
+                }}
+                
+                QPushButton:pressed {{
+                    background-color: {colors.get('button_pressed', '#64b5f6')};
+                }}
+                
+                QLineEdit, QTextEdit, QPlainTextEdit {{
+                    background-color: {colors.get('background', '#f7f9fa')};
+                    color: {colors.get('text', '#222b45')};
+                    border: 1px solid {colors.get('border', '#e0e0e0')};
+                    border-radius: 4px;
+                    padding: 2px;
+                }}
+                
+                QComboBox {{
+                    background-color: {colors.get('background', '#f7f9fa')};
+                    color: {colors.get('text', '#222b45')};
+                    border: 1px solid {colors.get('border', '#e0e0e0')};
+                    border-radius: 4px;
+                    padding: 2px;
+                }}
+                
+                QTableView {{
+                    background-color: {colors.get('background', '#f7f9fa')};
+                    color: {colors.get('text', '#222b45')};
+                    border: 1px solid {colors.get('border', '#e0e0e0')};
+                    gridline-color: {colors.get('border', '#e0e0e0')};
+                }}
+                
+                QTableView::item:selected {{
+                    background-color: {colors.get('selected_bg', '#E3F2FD')};
+                    color: {colors.get('selected_text', '#1976D2')};
+                }}
+                
+                QHeaderView::section {{
+                    background-color: {colors.get('table_header_bg', '#2196F3')};
+                    color: {colors.get('table_header_text', '#ffffff')};
+                    padding: 4px;
+                    border: none;
+                }}
+                
+                QScrollBar:vertical {{
+                    border: none;
+                    background: {colors.get('background', '#f7f9fa')};
+                    width: 10px;
+                    margin: 0px;
+                }}
+                
+                QScrollBar::handle:vertical {{
+                    background: {colors.get('border', '#e0e0e0')};
+                    min-height: 20px;
+                    border-radius: 5px;
+                }}
+            """
+
+            # 如果是渐变主题,添加渐变背景
+            if theme == Theme.GRADIENT:
+                style = style.replace(
+                    f"background-color: {colors.get('background', '#f7f9fa')};",
+                    f"background: {colors.get('background', 'linear-gradient(135deg, #3a8dde 0%, #7b1fa2 100%)')};"
+                )
+
+            widget.setStyleSheet(style)
 
         except Exception as e:
             print(f"应用主题到部件失败: {str(e)}")
@@ -286,28 +241,32 @@ class ThemeManager(QObject):
             colors = self.get_theme_colors(theme)
 
             # Set figure facecolor
-            figure.set_facecolor(colors['chart_background'])
+            figure.set_facecolor(colors.get('chart_background', '#ffffff'))
 
             # Set axes colors
             for ax in figure.get_axes():
-                ax.set_facecolor(colors['chart_background'])
-                ax.tick_params(colors=colors['chart_text'])
-                ax.spines['bottom'].set_color(colors['chart_grid'])
-                ax.spines['top'].set_color(colors['chart_grid'])
-                ax.spines['right'].set_color(colors['chart_grid'])
-                ax.spines['left'].set_color(colors['chart_grid'])
-                ax.title.set_color(colors['chart_text'])
-                ax.xaxis.label.set_color(colors['chart_text'])
-                ax.yaxis.label.set_color(colors['chart_text'])
+                ax.set_facecolor(colors.get('chart_background', '#ffffff'))
+                ax.tick_params(colors=colors.get('chart_text', '#222b45'))
+                ax.spines['bottom'].set_color(
+                    colors.get('chart_grid', '#e0e0e0'))
+                ax.spines['top'].set_color(colors.get('chart_grid', '#e0e0e0'))
+                ax.spines['right'].set_color(
+                    colors.get('chart_grid', '#e0e0e0'))
+                ax.spines['left'].set_color(
+                    colors.get('chart_grid', '#e0e0e0'))
+                ax.title.set_color(colors.get('chart_text', '#222b45'))
+                ax.xaxis.label.set_color(colors.get('chart_text', '#222b45'))
+                ax.yaxis.label.set_color(colors.get('chart_text', '#222b45'))
 
                 # Set grid color
-                ax.grid(True, color=colors['chart_grid'], alpha=0.3)
+                ax.grid(True, color=colors.get(
+                    'chart_grid', '#e0e0e0'), alpha=0.3)
 
                 # Set tick colors
                 for tick in ax.get_xticklabels():
-                    tick.set_color(colors['chart_text'])
+                    tick.set_color(colors.get('chart_text', '#222b45'))
                 for tick in ax.get_yticklabels():
-                    tick.set_color(colors['chart_text'])
+                    tick.set_color(colors.get('chart_text', '#222b45'))
 
             # Draw figure
             figure.canvas.draw()
@@ -315,26 +274,13 @@ class ThemeManager(QObject):
         except Exception as e:
             print(f"应用图表主题失败: {str(e)}")
 
-    def get_color(self, name: str, default: str = None) -> str:
-        """Get color by name
-
-        Args:
-            name: Color name
-            default: Default color if not found
-
-        Returns:
-            Color value
-        """
-        colors = self.get_theme_colors()
-        return colors.get(name, default)
-
     def is_dark_theme(self) -> bool:
         """Check if current theme is dark
 
         Returns:
             True if current theme is dark
         """
-        return self.current_theme in [Theme.DEEPBLUE]
+        return self.current_theme.is_dark
 
 
 def get_theme_manager(config_manager: Optional[ConfigManager] = None) -> ThemeManager:
