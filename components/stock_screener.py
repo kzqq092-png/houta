@@ -436,7 +436,7 @@ class StockScreenerWidget(QWidget):
             self._update_statistics(result.get('stats', {}))
 
             # 更新图表
-            self._update_charts(result.get('charts', {}))
+            self._update_distribution_chart()
 
             # 启用运行按钮
             self.run_button.setEnabled(True)
@@ -949,7 +949,8 @@ class StockScreenerWidget(QWidget):
                 "涨跌幅分布图",
                 "价格分布图"
             ])
-            self.chart_type.currentTextChanged.connect(self.update_chart)
+            self.chart_type.currentTextChanged.connect(
+                self.update_distribution_chart)
             chart_type_layout.addWidget(self.chart_type)
 
             chart_layout.addLayout(chart_type_layout)
@@ -963,17 +964,16 @@ class StockScreenerWidget(QWidget):
             self.result_group.layout().addWidget(chart_group)
 
             # 初始化图表
-            self.update_chart()
+            self.update_distribution_chart()
 
         except Exception as e:
             self.log_manager.log(f"添加图表功能失败: {str(e)}", LogLevel.ERROR)
 
-    def update_chart(self):
-        """更新图表显示"""
+    def update_distribution_chart(self):
+        """更新分布图/直方图，仅用于选股器等非K线业务"""
         try:
             # 清空图表
             self.figure.clear()
-
             # 获取当前数据
             data = []
             for row in range(self.result_table.rowCount()):
@@ -984,16 +984,12 @@ class StockScreenerWidget(QWidget):
                     'change_percent': float(self.result_table.item(row, 3).text().rstrip('%')),
                     'score': float(self.result_table.item(row, 4).text())
                 })
-
             if not data:
                 return
-
             # 转换为DataFrame
             df = pd.DataFrame(data)
-
             # 创建子图
             ax = self.figure.add_subplot(111)
-
             # 根据图表类型绘制
             chart_type = self.chart_type.currentText()
             if chart_type == "得分分布图":
@@ -1011,15 +1007,12 @@ class StockScreenerWidget(QWidget):
                 ax.set_xlabel('最新价')
                 ax.set_ylabel('股票数量')
                 ax.set_title('价格分布')
-
             # 调整布局
             self.figure.tight_layout()
-
             # 更新画布
             self.canvas.draw()
-
         except Exception as e:
-            self.log_manager.log(f"更新图表失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"更新分布图失败: {str(e)}", LogLevel.ERROR)
 
     def screen_stocks(self):
         """执行股票筛选"""

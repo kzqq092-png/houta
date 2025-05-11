@@ -23,7 +23,7 @@ from utils.config_manager import ConfigManager
 import traceback
 from core.cache_manager import CacheManager
 from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .async_data_processor import AsyncDataProcessor
 from .chart_renderer import ChartRenderer
 
@@ -143,26 +143,10 @@ class ChartWidget(QWidget):
             self.log_manager.error(f"初始化UI失败: {str(e)}")
 
     def connect_signals(self):
-        """连接信号"""
-        try:
-            # 连接周期选择信号
-            self.period_combo.currentTextChanged.connect(
-                self.on_period_changed)
-
-            # 连接指标选择信号
-            self.indicator_combo.currentTextChanged.connect(
-                self.on_indicator_changed)
-
-            # 连接清除按钮信号
-            self.clear_button.clicked.connect(self.clear_indicators)
-
-            self.log_manager.info("信号连接完成")
-
-        except Exception as e:
-            error_msg = f"连接信号失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+        """连接信号（ChartWidget只负责自身信号定义和发射，不直接连接外部UI控件）"""
+        # 此处不再连接period_combo、indicator_combo、clear_button等UI控件的信号
+        # 这些控件应由主窗口负责创建和信号连接
+        self.log_manager.info("ChartWidget信号连接完成（无UI控件连接）")
 
     def _process_update_queue(self):
         """处理更新队列中的任务"""
@@ -227,16 +211,33 @@ class ChartWidget(QWidget):
         }
         return color_map.get(stock_code, color_map['default'])
 
+    def _downsample_kdata(self, kdata, max_points=1200):
+        """对K线数据做降采样，提升渲染性能"""
+        if len(kdata) <= max_points:
+            return kdata
+        idx = np.linspace(0, len(kdata)-1, max_points).astype(int)
+        return kdata.iloc[idx]
+
     def update_chart(self, data: dict):
-        """更新图表，自动开启十字光标"""
+        """唯一K线渲染实现，负责降采样、UI刷新、指标、十字光标等。"""
         try:
             if not data or 'kdata' not in data:
                 return
             kdata = data['kdata']
+            # 新增：降采样，最多1200个点
+            kdata = self._downsample_kdata(kdata)
             self.current_kdata = kdata
+            # 新增：保存y轴最大最小值
+            if not kdata.empty:
+                self._ymin = float(kdata['low'].min())
+                self._ymax = float(kdata['high'].max())
+            else:
+                self._ymin = 0
+                self._ymax = 1
             self.show_loading_dialog()
+            # 只clear数据，不重建axes
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
-                ax.clear()
+                ax.cla()
             style = self._get_chart_style()
             self.renderer.render_candlesticks(self.price_ax, kdata, style)
             self.renderer.render_volume(self.volume_ax, kdata, style)
@@ -246,11 +247,13 @@ class ChartWidget(QWidget):
             if not kdata.empty:
                 for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                     ax.set_xlim(kdata.index[0], kdata.index[-1])
-            self.canvas.draw_idle()
+                # 新增：自动设置y轴边界
+                self.price_ax.set_ylim(self._ymin, self._ymax)
             self.close_loading_dialog()
             # 自动开启十字光标
             self.crosshair_enabled = True
-            self.enable_crosshair()
+            self.enable_crosshair()  # 强制每次刷新后都激活十字线
+            self.canvas.draw_idle()  # 只刷新一次
         except Exception as e:
             self.error_occurred.emit(f"更新图表失败: {str(e)}")
             self.close_loading_dialog()
@@ -603,48 +606,94 @@ class ChartWidget(QWidget):
             self.log_manager.error(f"应用初始主题失败: {str(e)}")
 
     def enable_crosshair(self):
-        """启用十字光标和详细信息显示，alpha始终为1.0"""
-        if not hasattr(self, 'canvas') or not hasattr(self, 'price_ax'):
-            return
-        if not hasattr(self, '_crosshair_cid') or self._crosshair_cid is None:
-            self._crosshair_cid = self.canvas.mpl_connect(
-                'motion_notify_event', self._on_mouse_move_crosshair)
-        if not hasattr(self, '_crosshair_lines') or not self._crosshair_lines:
+        """自动启用十字线，竖线、横线、信息框随鼠标移动，且只绑定一次事件，x轴与K线对齐"""
+        import matplotlib.dates as mdates
+        if not hasattr(self, '_crosshair_initialized') or not self._crosshair_initialized:
+            # 创建竖线、横线
             self._crosshair_lines = [
-                self.price_ax.axhline(
-                    color='gray', lw=0.5, ls='--', alpha=1.0, visible=False),
                 self.price_ax.axvline(
-                    color='gray', lw=0.5, ls='--', alpha=1.0, visible=False)
+                    color='#1976d2', lw=1.2, ls='--', alpha=0.55, visible=False, zorder=100),
+                self.price_ax.axhline(
+                    color='#1976d2', lw=1.2, ls='--', alpha=0.55, visible=False, zorder=100)
             ]
+            # 信息框（浮窗）
             self._crosshair_text = self.price_ax.text(
-                0.02, 0.98, '', transform=self.price_ax.transAxes, va='top', ha='left',
-                fontsize=9, color='black',
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'),
-                visible=False
+                0, 0, '', transform=self.price_ax.transData, va='top', ha='left',
+                fontsize=8, color='#23293a',
+                bbox=dict(facecolor='#fff', alpha=0.5, edgecolor='#1976d2',
+                          boxstyle='round,pad=0.5', linewidth=0.8),
+                visible=False, zorder=200
             )
 
-    def _on_mouse_move_crosshair(self, event):
-        if not self.crosshair_enabled or not event.inaxes:
-            if hasattr(self, '_crosshair_lines'):
-                for line in self._crosshair_lines:
-                    line.set_visible(False)
-            if hasattr(self, '_crosshair_text'):
-                self._crosshair_text.set_visible(False)
-            self.canvas.draw_idle()
+            def on_mouse_move(event):
+                if not event.inaxes or self.current_kdata is None or len(self.current_kdata) == 0 or event.xdata is None:
+                    for line in self._crosshair_lines:
+                        line.set_visible(False)
+                    self._crosshair_text.set_visible(False)
+                    self.canvas.draw_idle()
+                    return
+                kdata = self.current_kdata
+                x_array = mdates.date2num(kdata.index.to_pydatetime())
+                # 找到最近的K线索引
+                idx = int(np.argmin(np.abs(x_array - event.xdata)))
+                row = kdata.iloc[idx]
+                x_val = x_array[idx]
+                y_val = row.close
+                # 竖线x，横线y
+                self._crosshair_lines[0].set_xdata([x_val, x_val])
+                self._crosshair_lines[0].set_visible(True)
+                self._crosshair_lines[1].set_ydata([y_val, y_val])
+                self._crosshair_lines[1].set_visible(True)
+                # 信息内容（多行详细信息）
+                info = (
+                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
+                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
+                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"成交量: {row.volume:.0f}"
+                )
+                # 信息框位置：在十字点右上角偏移一点
+                ax = event.inaxes
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                dx = 0.03 * (xlim[1] - xlim[0])
+                dy = 0.03 * (ylim[1] - ylim[0])
+                x_text = x_val + \
+                    dx if x_val < (xlim[0] + xlim[1]) / 2 else x_val - dx
+                y_text = y_val + \
+                    dy if y_val < (ylim[0] + ylim[1]) / 2 else y_val - dy
+                # 防止超出边界
+                x_text = min(max(x_text, xlim[0] + dx), xlim[1] - dx)
+                y_text = min(max(y_text, ylim[0] + dy), ylim[1] - dy)
+                self._crosshair_text.set_position((x_text, y_text))
+                self._crosshair_text.set_ha('left' if x_val < (
+                    xlim[0] + xlim[1]) / 2 else 'right')
+                self._crosshair_text.set_va(
+                    'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
+                self._crosshair_text.set_text(info)
+                self._crosshair_text.set_visible(True)
+                self.canvas.draw_idle()
+            self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+            self._crosshair_initialized = True
+        else:
+            for line in self._crosshair_lines:
+                line.set_visible(True)
+            self._crosshair_text.set_visible(True)
+
+    def _limit_xlim(self):
+        """限制x轴范围在数据区间内，防止拖动/缩放出现空白"""
+        if self.current_kdata is None or len(self.current_kdata) == 0:
             return
-        x, y = event.xdata, event.ydata
-        for line in self._crosshair_lines:
-            line.set_visible(True)
-        self._crosshair_lines[0].set_ydata([y, y])
-        self._crosshair_lines[1].set_xdata([x, x])
-        self._crosshair_text.set_visible(True)
-        # 找到最近的索引
-        if self.current_kdata is not None and len(self.current_kdata) > 0:
-            idx = int(np.clip(round(x), 0, len(self.current_kdata)-1))
-            row = self.current_kdata.iloc[idx]
-            info = f"日期: {row.name.strftime('%Y-%m-%d')}\n开:{row.open:.2f} 收:{row.close:.2f}\n高:{row.high:.2f} 低:{row.low:.2f}\n量:{row.volume:.0f}"
-            self._crosshair_text.set_text(info)
-        self.canvas.draw_idle()
+        import matplotlib.dates as mdates
+        xmin = mdates.date2num(self.current_kdata.index[0])
+        xmax = mdates.date2num(self.current_kdata.index[-1])
+        cur_xlim = self.price_ax.get_xlim()
+        new_left = max(cur_xlim[0], xmin)
+        new_right = min(cur_xlim[1], xmax)
+        # 保证区间不反转
+        if new_right - new_left < 1:
+            new_left = xmin
+            new_right = xmax
+        self.price_ax.set_xlim(new_left, new_right)
 
     def _init_figure_layout(self):
         """初始化图表布局"""
@@ -788,13 +837,16 @@ class ChartWidget(QWidget):
                 # 获取当前K线数据的时间索引
                 dates = self.current_kdata.index
                 dates_dict = {str(date): i for i, date in enumerate(dates)}
-
+                ymin = getattr(self, '_ymin', None)
+                ymax = getattr(self, '_ymax', None)
                 # 绘制信号
                 for signal in signals:
                     if str(signal['date']) in dates_dict:
                         idx = dates_dict[str(signal['date'])]
                         price = signal['price']
-
+                        # 限制price在ymin~ymax
+                        if ymin is not None and ymax is not None:
+                            price = max(ymin, min(price, ymax))
                         if signal['type'] == 'buy':
                             marker = '^'
                             color = 'r'
@@ -803,22 +855,17 @@ class ChartWidget(QWidget):
                             marker = 'v'
                             color = 'g'
                             label = '卖出'
-
                         self.price_ax.plot(idx, price, marker=marker,
                                            color=color, markersize=8,
                                            label=label)
-
                 # 更新图例
                 handles, labels = self.price_ax.get_legend_handles_labels()
                 by_label = dict(zip(labels, handles))
                 self.price_ax.legend(by_label.values(), by_label.keys(),
                                      loc='upper left', fontsize=8)
-
                 # 更新画布
                 QTimer.singleShot(0, self.canvas.draw)
-
             self.log_manager.info("绘制信号完成")
-
         except Exception as e:
             error_msg = f"绘制信号实现失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -895,10 +942,12 @@ class ChartWidget(QWidget):
             self.log_manager.error(f"应用主题到主图和缩略图失败: {str(e)}")
 
     def _init_zoom_interaction(self):
-        """自定义鼠标缩放交互，支持多级缩放、右键还原、滚轮缩放"""
+        """自定义鼠标缩放交互，支持多级缩放、右键还原、滚轮缩放，优化流畅性"""
         self._zoom_press_x = None
         self._zoom_rect = None
         self._zoom_history = []  # 多级缩放历史
+        self._last_motion_time = 0
+        self._motion_interval_ms = 16  # 约60fps
         self.canvas.mpl_connect('button_press_event', self._on_zoom_press)
         self.canvas.mpl_connect('motion_notify_event', self._on_zoom_motion)
         self.canvas.mpl_connect('button_release_event', self._on_zoom_release)
@@ -910,18 +959,27 @@ class ChartWidget(QWidget):
         if event.inaxes != self.price_ax or event.button != 1:
             return
         self._zoom_press_x = event.xdata
-        if self._zoom_rect:
+        # 删除旧的rect，重新创建新的
+        if self._zoom_rect is not None:
             self._zoom_rect.remove()
+            self._zoom_rect = None
         self._zoom_rect = self.price_ax.axvspan(
             event.xdata, event.xdata, color='blue', alpha=0.18)
         self.canvas.draw_idle()
 
     def _on_zoom_motion(self, event):
+        import time
         if self._zoom_press_x is None or event.inaxes != self.price_ax or event.button != 1:
             return
+        now = int(time.time() * 1000)
+        if now - self._last_motion_time < self._motion_interval_ms:
+            return
+        self._last_motion_time = now
         x0, x1 = self._zoom_press_x, event.xdata
-        if self._zoom_rect:
+        # 删除旧的rect，重新创建新的
+        if self._zoom_rect is not None:
             self._zoom_rect.remove()
+            self._zoom_rect = None
         self._zoom_rect = self.price_ax.axvspan(
             x0, x1, color='blue', alpha=0.18)
         self.canvas.draw_idle()
@@ -941,6 +999,11 @@ class ChartWidget(QWidget):
             # 左→右：放大
             self._zoom_history.append(self.price_ax.get_xlim())
             self.price_ax.set_xlim(x0, x1)
+            # 新增：缩放后强制y轴范围
+            ymin = getattr(self, '_ymin', None)
+            ymax = getattr(self, '_ymax', None)
+            if ymin is not None and ymax is not None:
+                self.price_ax.set_ylim(ymin, ymax)
         else:
             # 右→左：还原到上一级
             if self._zoom_history:
@@ -948,6 +1011,12 @@ class ChartWidget(QWidget):
                 self.price_ax.set_xlim(prev_xlim)
             else:
                 self.price_ax.set_xlim(auto=True)
+            # 新增：还原后强制y轴范围
+            ymin = getattr(self, '_ymin', None)
+            ymax = getattr(self, '_ymax', None)
+            if ymin is not None and ymax is not None:
+                self.price_ax.set_ylim(ymin, ymax)
+        self._limit_xlim()
         self._zoom_press_x = None
         self.canvas.draw_idle()
 
@@ -959,6 +1028,7 @@ class ChartWidget(QWidget):
                 self.price_ax.set_xlim(prev_xlim)
             else:
                 self.price_ax.set_xlim(auto=True)
+            self._limit_xlim()
             self.canvas.draw_idle()
 
     def _on_zoom_scroll(self, event):
@@ -972,4 +1042,33 @@ class ChartWidget(QWidget):
         right = xdata + (cur_xlim[1] - xdata) * scale_factor
         self._zoom_history.append(cur_xlim)
         self.price_ax.set_xlim(left, right)
+        self._limit_xlim()
         self.canvas.draw_idle()
+
+    def async_update_chart(self, data: dict, n_segments: int = 10):
+        """唯一K线多线程分段预处理实现，最后仍调用update_chart。"""
+        if not data or 'kdata' not in data:
+            return
+        kdata = data['kdata']
+        if len(kdata) <= 100 or n_segments <= 1:
+            # 数据量小直接渲染
+            QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}))
+            return
+        # 分段
+        segments = np.array_split(kdata, n_segments)
+
+        def process_segment(segment):
+            # 这里可以做降采样、指标等预处理
+            return self._downsample_kdata(segment, max_points=400)
+        results = [None] * n_segments
+        with ThreadPoolExecutor(max_workers=n_segments) as executor:
+            futures = {executor.submit(
+                process_segment, seg): i for i, seg in enumerate(segments)}
+            for f in as_completed(futures):
+                idx = futures[f]
+                results[idx] = f.result()
+        merged = np.concatenate(results)
+        # 合并为DataFrame
+        merged_df = kdata.iloc[merged] if isinstance(
+            merged[0], (int, np.integer)) else pd.concat(results)
+        QTimer.singleShot(0, lambda: self.update_chart({'kdata': merged_df}))

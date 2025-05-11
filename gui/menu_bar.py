@@ -46,7 +46,7 @@ class MainMenuBar(QMenuBar):
     def init_ui(self):
         """初始化菜单栏"""
         self.parent = self.parentWidget()
-
+        self.parent.setWindowIcon(QIcon("icons/logo.png"))
         # 创建菜单项
         self.file_menu = self.addMenu("文件(&F)")
         self.edit_menu = self.addMenu("编辑(&E)")

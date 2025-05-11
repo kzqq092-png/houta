@@ -1,47 +1,50 @@
 """
 交易系统主窗口模块
 """
+from gui.ui_components import StatusBar
+from gui.widgets.multi_chart_panel import MultiChartPanel
+from gui.widgets.log_widget import LogWidget
+from core.industry_manager import IndustryManager
+from hikyuu import StockManager, Query
+from hikyuu.interactive import *
+from hikyuu.indicator import *
+from hikyuu.data import *
+from hikyuu import *
+from utils.exception_handler import ExceptionHandler
+from utils.performance_monitor import PerformanceMonitor
+from gui.widgets.chart_widget import ChartWidget
+from gui.menu_bar import MainMenuBar
+from gui.tool_bar import MainToolBar
+from core.cache_manager import CacheManager
+from utils.config_manager import ConfigManager
+from core.data_manager import DataManager
+from utils.theme import ThemeManager, get_theme_manager, Theme
+from utils.config_types import LoggingConfig, PerformanceConfig
+from core.logger import LogManager, BaseLogManager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
+import matplotlib.pyplot as plt
+import mplfinance
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+from PyQt5.QtWebEngineWidgets import *
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+import ptvsd
+import numpy as np
+import pandas as pd
 import sys
 import os
 import json
 import traceback
-import pandas as pd
-import numpy as np
-import ptvsd
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-from PyQt5.QtWebEngineWidgets import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-import mplfinance
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-from PyQt5.QtWidgets import QGraphicsDropShadowEffect
-from PyQt5.QtGui import QColor
+import warnings
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, message=".*swapaxes*")
 
-from core.logger import LogManager, BaseLogManager
-from utils.config_types import LoggingConfig, PerformanceConfig
-from utils.theme import ThemeManager, get_theme_manager, Theme
-from core.data_manager import DataManager
-from utils.config_manager import ConfigManager
-from core.cache_manager import CacheManager
-from gui.tool_bar import MainToolBar
-from gui.menu_bar import MainMenuBar
-from gui.widgets.chart_widget import ChartWidget
-from utils.performance_monitor import PerformanceMonitor
-from utils.exception_handler import ExceptionHandler
-
-from hikyuu import *
-from hikyuu.data import *
-from hikyuu.indicator import *
-from hikyuu.interactive import *
-from hikyuu import StockManager, Query
-from core.industry_manager import IndustryManager
-from gui.widgets.log_widget import LogWidget
-from gui.widgets.multi_chart_panel import MultiChartPanel
-from gui.ui_components import StatusBar
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -121,6 +124,32 @@ QTabBar::tab {
 QTabBar::tab:selected {
     background: #1976d2;
     color: #fff;
+}
+/* 全局滚动条美化：取消横向滚动条，竖向滚动条变窄 */
+QScrollBar:horizontal {
+    height: 0px;
+    max-height: 0px;
+    min-height: 0px;
+    background: transparent;
+}
+QScrollBar:vertical {
+    width: 6px;
+    background: #f0f0f0;
+    margin: 0px;
+    border-radius: 3px;
+}
+QScrollBar::handle:vertical {
+    background: #b0b0b0;
+    min-height: 20px;
+    border-radius: 3px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: none;
+    border: none;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
 }
 """
 
@@ -305,6 +334,34 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"更新数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             QMessageBox.critical(self, "错误", f"更新数据失败: {str(e)}")
+
+    def async_update_chart(self, data: dict, n_segments: int = 10):
+        """分段多线程预处理K线数据，处理完后主线程渲染"""
+        if not data or 'kdata' not in data:
+            return
+        kdata = data['kdata']
+        if len(kdata) <= 200 or n_segments <= 1:
+            # 数据量小直接渲染
+            QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}))
+            return
+        # 分段
+        segments = np.array_split(kdata, n_segments)
+
+        def process_segment(segment):
+            # 这里可以做降采样、指标等预处理
+            return self._downsample_kdata(segment, max_points=400)
+        results = [None] * n_segments
+        with ThreadPoolExecutor(max_workers=n_segments) as executor:
+            futures = {executor.submit(
+                process_segment, seg): i for i, seg in enumerate(segments)}
+            for f in as_completed(futures):
+                idx = futures[f]
+                results[idx] = f.result()
+        merged = np.concatenate(results)
+        # 合并为DataFrame
+        merged_df = kdata.iloc[merged] if isinstance(
+            merged[0], (int, np.integer)) else pd.concat(results)
+        QTimer.singleShot(0, lambda: self.update_chart({'kdata': merged_df}))
 
     def handle_analysis_error(self, error_msg: str):
         """处理分析错误
@@ -1270,6 +1327,53 @@ class TradingGUI(QMainWindow):
 
             self.log_manager.info("左侧面板创建完成")
             add_shadow(self.left_panel)
+
+            # 自动美化股票列表和指标列表QSS
+            stock_list_style = """
+            QListWidget {
+                border: 1.5px solid #90caf9;
+                border-radius: 6px;
+                background: #fff;
+            }
+            QScrollBar:horizontal {
+                height: 0px;
+                max-height: 0px;
+                min-height: 0px;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 6px;
+                background: #f0f0f0;
+                margin: 0px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background: #b0b0b0;
+                min-height: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+                background: none;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+            """
+            if hasattr(self, 'stock_list') and self.stock_list:
+                self.stock_list.setStyleSheet(stock_list_style)
+            if hasattr(self, 'indicator_list') and self.indicator_list:
+                self.indicator_list.setStyleSheet(stock_list_style)
+
+            # 强制隐藏横向滚动条，彻底去除横向滚动条空间
+            self.stock_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.indicator_list.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarAlwaysOff)
+            stock_list_scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarAlwaysOff)
+            indicator_list_scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarAlwaysOff)
 
         except Exception as e:
             self.log_manager.error(f"创建左侧面板失败: {str(e)}")
@@ -2874,12 +2978,16 @@ class TradingGUI(QMainWindow):
         try:
             self.bottom_panel = QWidget()
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
+            self.bottom_layout.setContentsMargins(0, 0, 0, 0)
+            self.bottom_layout.setSpacing(0)
             self.log_widget = LogWidget(self.log_manager)
+            self.log_widget.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.log_widget.setVisible(False)  # 默认隐藏
             self.log_widget.log_added.connect(self.show_log_panel)
             self.bottom_layout.addWidget(self.log_widget)
             self.bottom_splitter.addWidget(self.bottom_panel)
-            self.bottom_panel.setMinimumHeight(120)
+            self.bottom_panel.setMinimumHeight(60)
             self.bottom_panel.setMaximumHeight(300)
             self.bottom_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -3870,7 +3978,7 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(error_msg)
 
             # 显示错误对话框
-            error_dialog = QMessageBox(self)
+            error_dialog = QMessageBox()
             error_dialog.setWindowTitle("错误")
             error_dialog.setIcon(QMessageBox.Critical)
             error_dialog.setText("发生错误")
@@ -4360,14 +4468,13 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def update_chart(self, results=None):
-        """更新图表显示，支持外部传入分析结果"""
+        """唯一主业务入口，负责K线数据准备、自动分发到ChartWidget/MultiChartPanel。"""
         try:
             if not hasattr(self, 'current_stock') or not self.current_stock:
                 self.log_manager.warning("没有选中的股票，无法更新图表")
                 if hasattr(self, 'chart_widget'):
                     self.chart_widget.show_no_data("请先选择股票")
                 return
-
             # 获取K线数据，自动根据时间范围
             k_data = self.get_kdata(self.current_stock)
             if k_data is None or k_data.empty:
@@ -4375,11 +4482,9 @@ class TradingGUI(QMainWindow):
                 if hasattr(self, 'chart_widget'):
                     self.chart_widget.show_no_data("当前时间范围无数据")
                 return
-
             # 获取股票名称
             stock = self.sm[self.current_stock]
             title = f"{stock.name}({self.current_stock}) - {self.current_period}线"
-
             # 准备图表数据
             data = {
                 'stock_code': self.current_stock,
@@ -4390,14 +4495,15 @@ class TradingGUI(QMainWindow):
             }
             if results is not None:
                 data['analysis'] = results
-
-            # 更新图表
+            # 自动判断数据量，自动选择异步或同步渲染
             if hasattr(self, 'chart_widget'):
-                self.chart_widget.update_chart(data)
+                if len(k_data) > 100:
+                    self.chart_widget.async_update_chart(data)
+                else:
+                    self.chart_widget.update_chart(data)
                 self.log_manager.info(f"成功更新{self.current_stock}的图表显示")
             else:
                 self.log_manager.warning("图表控件未初始化")
-
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -5036,47 +5142,6 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"获取K线数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             return pd.DataFrame()
-
-    def _enable_crosshair(self, ax, df):
-        # 只创建一次 crosshair
-        if not hasattr(self, '_crosshair_lines') or not self._crosshair_lines:
-            self._crosshair_lines = [
-                ax.axhline(color='gray', lw=0.5, ls='--',
-                           alpha=0.5, visible=False),
-                ax.axvline(color='gray', lw=0.5, ls='--',
-                           alpha=0.5, visible=False)
-            ]
-            self._crosshair_text = ax.text(
-                0.02, 0.98, '', transform=ax.transAxes, va='top', ha='left',
-                fontsize=9, color='black',
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'),
-                visible=False
-            )
-
-            def on_mouse_move(event):
-                if not event.inaxes:
-                    for line in self._crosshair_lines:
-                        line.set_visible(False)
-                    self._crosshair_text.set_visible(False)
-                    self.canvas.draw_idle()
-                    return
-                x, y = event.xdata, event.ydata
-                for line in self._crosshair_lines:
-                    line.set_visible(True)
-                self._crosshair_lines[0].set_ydata([y, y])
-                self._crosshair_lines[1].set_xdata([x, x])
-                self._crosshair_text.set_visible(True)
-                # 找到最近的索引
-                idx = int(np.clip(round(x), 0, len(df)-1))
-                row = df.iloc[idx]
-                info = f"日期: {row.name.strftime('%Y-%m-%d')}\n开:{row.open:.2f} 收:{row.close:.2f}\n高:{row.high:.2f} 低:{row.low:.2f}\n量:{row.volume:.0f}"
-                self._crosshair_text.set_text(info)
-                self.canvas.draw_idle()
-
-            self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
-        else:
-            # 已有 crosshair，无需重复创建
-            pass
 
     def adjust_combobox_width(self, combobox: QComboBox):
         """根据内容自动调整下拉框宽度"""

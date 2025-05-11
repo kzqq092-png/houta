@@ -31,11 +31,6 @@ class MultiChartPanel(QWidget):
         self.switch_btn = QPushButton("切换多屏")
         self.switch_btn.clicked.connect(self.toggle_mode)
         btn_layout.addWidget(self.switch_btn)
-        self.sync_btn = QPushButton("同步十字线:开")
-        self.sync_btn.setCheckable(True)
-        self.sync_btn.setChecked(True)
-        self.sync_btn.clicked.connect(self.toggle_sync)
-        btn_layout.addWidget(self.sync_btn)
         self.layout.addLayout(btn_layout)
         # 单屏区
         self.single_chart = ChartWidget(
@@ -93,10 +88,6 @@ class MultiChartPanel(QWidget):
                     self.chart_widgets[r][c].update_chart(data)
                 idx += 1
 
-    def toggle_sync(self):
-        self.sync_mode = not self.sync_mode
-        self.sync_btn.setText(f"同步十字线:{'开' if self.sync_mode else '关'}")
-
     def _on_period_changed(self, period):
         if self.sync_mode:
             for row in self.chart_widgets:
@@ -129,15 +120,15 @@ class MultiChartPanel(QWidget):
                 idx += 1
 
     def update_chart(self, data):
-        """统一更新图表，自动适配单屏/多屏"""
+        """统一更新图表，自动适配单屏/多屏。只分发到ChartWidget，仅用于K线/分屏业务。"""
         if self.is_multi:
             for row in self.chart_widgets:
                 for chart in row:
                     if chart:
-                        chart.update_chart(data)
+                        chart.update_chart(data)  # 分发到ChartWidget
         else:
             if hasattr(self, 'single_chart') and self.single_chart:
-                self.single_chart.update_chart(data)
+                self.single_chart.update_chart(data)  # 分发到ChartWidget
 
     def apply_theme(self):
         """统一应用主题，自动适配单屏/多屏"""
