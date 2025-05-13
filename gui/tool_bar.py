@@ -291,7 +291,7 @@ class MainToolBar(QToolBar):
             # 字体大小
             font_size = QSpinBox()
             font_size.setRange(8, 24)
-            font_size.setValue(12)
+            font_size.setValue(8)
             settings_layout.addRow("字体大小:", font_size)
 
             layout.addWidget(settings_group)

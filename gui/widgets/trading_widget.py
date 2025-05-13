@@ -426,7 +426,7 @@ class TradingWidget(QWidget):
             # 重置策略参数
             self.ma_short_spin.setValue(5)
             self.ma_long_spin.setValue(10)
-            self.macd_short_spin.setValue(12)
+            self.macd_short_spin.setValue(7)
             self.macd_long_spin.setValue(26)
             self.macd_signal_spin.setValue(9)
             self.kdj_n_spin.setValue(9)

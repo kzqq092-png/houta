@@ -374,7 +374,7 @@ class StrategyWidget(QWidget):
             # 快线周期
             fast_period = QSpinBox()
             fast_period.setRange(5, 50)
-            fast_period.setValue(12)
+            fast_period.setValue(7)
             self.params_layout.addRow("快线周期:", fast_period)
             self.param_controls["fast_period"] = fast_period
 

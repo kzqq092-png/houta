@@ -131,7 +131,7 @@ class AnalysisWidget(QWidget):
             # 添加MACD参数
             self.macd_short = QSpinBox()
             self.macd_short.setRange(1, 50)
-            self.macd_short.setValue(12)
+            self.macd_short.setValue(7)
             indicator_layout.addRow("MACD快线:", self.macd_short)
 
             self.macd_long = QSpinBox()
@@ -3344,7 +3344,7 @@ class AnalysisWidget(QWidget):
         macd_layout = QHBoxLayout()
         self.macd_short = QSpinBox()
         self.macd_short.setRange(1, 50)
-        self.macd_short.setValue(12)
+        self.macd_short.setValue(7)
         macd_layout.addWidget(QLabel("快线:"))
         macd_layout.addWidget(self.macd_short)
 

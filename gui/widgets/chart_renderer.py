@@ -94,7 +94,7 @@ class ChartRenderer(QObject):
         # 获取样式
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
-        edge_color = style.get('edge_color', '#000000')
+        # edge_color = style.get('edge_color', '#000000')  # 不再使用黑色边框
         alpha = style.get('alpha', 1.0)
 
         # 转换日期为数值
@@ -103,9 +103,9 @@ class ChartRenderer(QObject):
         # 创建K线实体
         verts_up = []
         verts_down = []
-
         # 创建影线
-        segments = []
+        segments_up = []
+        segments_down = []
 
         for i, (date, row) in enumerate(data.iterrows()):
             open_price = row['open']
@@ -125,6 +125,7 @@ class ChartRenderer(QObject):
                     (right, close),
                     (right, open_price)
                 ])
+                segments_up.append([(dates[i], low), (dates[i], high)])
             else:
                 verts_down.append([
                     (left, open_price),
@@ -132,41 +133,46 @@ class ChartRenderer(QObject):
                     (right, close),
                     (right, open_price)
                 ])
-
-            # 影线
-            segments.append([(dates[i], low), (dates[i], high)])
+                segments_down.append([(dates[i], low), (dates[i], high)])
 
         # 绘制上涨K线
         if verts_up:
             collection_up = PolyCollection(
                 verts_up,
                 facecolor=up_color,
-                edgecolor=edge_color,
+                edgecolor=up_color,  # 边框色与实体色一致
                 linewidth=0.5,
                 alpha=alpha
             )
             ax.add_collection(collection_up)
-
         # 绘制下跌K线
         if verts_down:
             collection_down = PolyCollection(
                 verts_down,
                 facecolor=down_color,
-                edgecolor=edge_color,
+                edgecolor=down_color,  # 边框色与实体色一致
                 linewidth=0.5,
                 alpha=alpha
             )
             ax.add_collection(collection_down)
-
-        # 绘制影线
-        collection_shadow = LineCollection(
-            segments,
-            colors=edge_color,
-            linewidth=0.5,
-            alpha=alpha
-        )
-        ax.add_collection(collection_shadow)
-
+        # 绘制上涨影线
+        if segments_up:
+            collection_shadow_up = LineCollection(
+                segments_up,
+                colors=up_color,
+                linewidth=0.5,
+                alpha=alpha
+            )
+            ax.add_collection(collection_shadow_up)
+        # 绘制下跌影线
+        if segments_down:
+            collection_shadow_down = LineCollection(
+                segments_down,
+                colors=down_color,
+                linewidth=0.5,
+                alpha=alpha
+            )
+            ax.add_collection(collection_shadow_down)
         # 设置轴范围
         ax.autoscale_view()
 

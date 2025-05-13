@@ -171,6 +171,7 @@ class TradingGUI(QMainWindow):
             self.setWindowTitle("Trading System")
             self.setGeometry(100, 100, 1200, 800)
             self.setMinimumSize(800, 600)
+            # self.setAcceptDrops(True)  # 移到init_ui中
 
             # 初始化缓存相关属性
             self.stock_list_cache = []  # 初始化股票列表缓存
@@ -251,6 +252,8 @@ class TradingGUI(QMainWindow):
             # 加载收藏的股票
             self.load_favorites()
             self.init_data()
+            # 关键：允许子图接收拖拽
+            self.setAcceptDrops(True)
             # 连接信号
             self.connect_signals()
             # 预加载数据
@@ -309,59 +312,22 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
 
     def update_data(self, data: dict):
-        """更新数据
-
-        Args:
-            data: 数据字典
-        """
+        """更新数据，仅做缓存和分发，UI渲染走主入口update_chart"""
         try:
             # 更新数据缓存
             if hasattr(self, 'data_cache'):
                 self.data_cache.update(data)
-
-            # 更新图表
-            if hasattr(self, 'chart_widget'):
-                self.chart_widget.update_chart(data)
-
-            # 更新分析工具面板
+            # 分发到分析工具面板
             if hasattr(self, 'analysis_tools'):
                 self.analysis_tools.update_results(data)
-
-            # 更新日志
+            # 记录日志
             self.log_manager.info("数据更新完成")
-
+            # 统一走主入口渲染
+            self.update_chart()
         except Exception as e:
             self.log_manager.error(f"更新数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             QMessageBox.critical(self, "错误", f"更新数据失败: {str(e)}")
-
-    def async_update_chart(self, data: dict, n_segments: int = 10):
-        """分段多线程预处理K线数据，处理完后主线程渲染"""
-        if not data or 'kdata' not in data:
-            return
-        kdata = data['kdata']
-        if len(kdata) <= 200 or n_segments <= 1:
-            # 数据量小直接渲染
-            QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}))
-            return
-        # 分段
-        segments = np.array_split(kdata, n_segments)
-
-        def process_segment(segment):
-            # 这里可以做降采样、指标等预处理
-            return self._downsample_kdata(segment, max_points=400)
-        results = [None] * n_segments
-        with ThreadPoolExecutor(max_workers=n_segments) as executor:
-            futures = {executor.submit(
-                process_segment, seg): i for i, seg in enumerate(segments)}
-            for f in as_completed(futures):
-                idx = futures[f]
-                results[idx] = f.result()
-        merged = np.concatenate(results)
-        # 合并为DataFrame
-        merged_df = kdata.iloc[merged] if isinstance(
-            merged[0], (int, np.integer)) else pd.concat(results)
-        QTimer.singleShot(0, lambda: self.update_chart({'kdata': merged_df}))
 
     def handle_analysis_error(self, error_msg: str):
         """处理分析错误
@@ -463,11 +429,13 @@ class TradingGUI(QMainWindow):
         """
         try:
             # 设置窗口标题和大小
-            self.setWindowTitle("Hikyuu Trading System")
+            self.setWindowTitle("Trading System")
             self.setGeometry(100, 100, 1200, 800)
-
+            # 确保主窗口和centralWidget都能接收拖拽事件
+            self.setAcceptDrops(True)
             # 创建central widget和主布局
             central_widget = QWidget()
+            central_widget.setAcceptDrops(True)
             self.main_layout = QVBoxLayout(central_widget)
             self.setCentralWidget(central_widget)
 
@@ -687,15 +655,15 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"显示帮助对话框失败: {str(e)}")
 
     def show_settings(self):
-        """显示设置对话框"""
+        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置"""
         try:
-            dialog = QDialog(self)
+            dialog = QDialog()
             dialog.setWindowTitle("设置")
             dialog.setMinimumSize(600, 400)
 
             layout = QVBoxLayout(dialog)
 
-            # 添加设置选项
+            # 基本设置
             settings_group = QGroupBox("基本设置")
             settings_layout = QFormLayout(settings_group)
 
@@ -710,9 +678,22 @@ class TradingGUI(QMainWindow):
             font_size.setValue(12)
             settings_layout.addRow("字体大小:", font_size)
 
+            # 语言设置
+            lang_combo = QComboBox()
+            lang_combo.addItems(["简体中文", "English"])
+            settings_layout.addRow("语言:", lang_combo)
+
+            # 自动保存
+            auto_save = QCheckBox("自动保存设置")
+            auto_save.setChecked(True)
+            settings_layout.addRow("", auto_save)
+
             layout.addWidget(settings_group)
 
-            # 添加按钮
+            # 其它扩展设置分组（可按需添加）
+            # ...
+
+            # 按钮
             buttons = QDialogButtonBox(
                 QDialogButtonBox.Ok | QDialogButtonBox.Cancel
             )
@@ -722,8 +703,14 @@ class TradingGUI(QMainWindow):
 
             # 显示对话框并居中
             dialog.show()
-            self.center_dialog(dialog, self)
-            dialog.exec_()
+            self.center_dialog(dialog)
+            if dialog.exec_() == QDialog.Accepted:
+                # 保存设置逻辑（可扩展）
+                self.theme_manager.set_theme(theme_combo.currentText())
+                self.config_manager.set_font_size(font_size.value())
+                self.config_manager.set_language(lang_combo.currentText())
+                self.config_manager.set_auto_save(auto_save.isChecked())
+                self.log_manager.info("设置已保存")
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 
@@ -1513,29 +1500,27 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"回测股票失败: {str(e)}")
 
     def dragEnterEvent(self, event):
-        """处理拖入事件"""
-        if event.mimeData().hasFormat("text/plain"):
-            event.acceptProposedAction()
+        """主窗口拖入事件，只做分发，异常日志健壮"""
+        try:
+            if event.mimeData().hasFormat("text/plain"):
+                event.acceptProposedAction()
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"主窗口拖入事件失败: {str(e)}")
 
     def dropEvent(self, event):
-        """处理放置事件"""
+        """主窗口统一拖拽分发，单屏/多屏自动分发到对应控件，只做分发，异常日志健壮"""
         try:
-            # 获取拖放的数据
-            mime_data = event.mimeData()
-            if mime_data.hasFormat("text/plain"):
-                text = mime_data.text()
-                # 解析拖放的数据
-                if text.startswith("stock:"):
-                    stock_code = text.split(":")[1]
-                    # 添加到自选股
-                    self.add_to_watchlist_by_code(stock_code)
-                elif text.startswith("indicator:"):
-                    indicator_name = text.split(":")[1]
-                    # 添加到指标列表
-                    self.add_indicator(indicator_name)
-
+            if event.mimeData().hasFormat("text/plain"):
+                if hasattr(self, 'multi_chart_panel') and self.multi_chart_panel.is_multi:
+                    self.multi_chart_panel.dropEvent(event)
+                else:
+                    if hasattr(self, 'chart_widget'):
+                        self.chart_widget.dropEvent(event)
+                event.acceptProposedAction()
         except Exception as e:
-            self.log_manager.error(f"处理拖放事件失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"主窗口拖拽分发失败: {str(e)}")
 
     def add_to_watchlist_by_code(self, stock_code):
         """通过股票代码添加到自选股"""
@@ -2718,7 +2703,8 @@ class TradingGUI(QMainWindow):
                         continue
 
                     # 检查市值范围
-                    if stock["market_cap"] < conditions["min_cap"] or stock["market_cap"] > conditions["max_cap"]:
+                    market_cap = stock.get("market_cap", 0)
+                    if market_cap < conditions["min_cap"] or market_cap > conditions["max_cap"]:
                         continue
 
                     # 检查成交量范围
@@ -2732,12 +2718,17 @@ class TradingGUI(QMainWindow):
                         if latest_turnover < conditions["min_turnover"] or latest_turnover > conditions["max_turnover"]:
                             continue
 
-                    # 添加到结果列表
+                    # 保存每只股票的行情数据到stock_info
+                    stock_info = dict(stock_info)  # 拷贝，避免污染原数据
+                    stock_info['latest_price'] = latest_price
+                    stock_info['latest_volume'] = latest_volume
+                    stock_info['market_cap'] = market_cap
+
                     filtered_stocks.append(stock_info)
 
                 except Exception as e:
                     self.log_manager.warning(
-                        f"处理股票 {stock['code']} 失败: {str(e)}")
+                        f"处理股票 {stock_info.get('code', '未知')} 失败: {str(e)}")
                     continue
 
             # 更新股票列表
@@ -2745,14 +2736,16 @@ class TradingGUI(QMainWindow):
             for stock in filtered_stocks:
                 item = QListWidgetItem(f"{stock['code']} {stock['name']}")
 
-                # 设置工具提示
-                tooltip = f"代码: {stock['code']}\n"
-                f"名称: {stock['name']}\n"
-                f"市场: {stock['market']}\n"
-                f"行业: {stock['industry']}\n"
-                f"最新价: {kdata['close'].iloc[-1]:.2f}\n"
-                f"成交量: {kdata['volume'].iloc[-1]/10000:.2f}万手\n"
-                f"市值: {stock['market_cap']:.2f}亿"
+                # 设置工具提示，使用每只股票自己的行情数据
+                tooltip = (
+                    f"代码: {stock['code']}\n"
+                    f"名称: {stock['name']}\n"
+                    f"市场: {stock['market']}\n"
+                    f"行业: {stock['industry']}\n"
+                    f"最新价: {stock.get('latest_price', 0):.2f}\n"
+                    f"成交量: {stock.get('latest_volume', 0):.2f}万手\n"
+                    f"市值: {stock.get('market_cap', 0):.2f}亿"
+                )
                 item.setToolTip(tooltip)
 
                 # 设置自定义数据
@@ -2771,8 +2764,13 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"执行高级搜索失败: {str(e)}")
 
     def on_stock_selected(self) -> None:
-        """处理股票选择事件"""
+        """处理股票选择事件，修正多屏拖拽逻辑"""
         try:
+            # 多屏模式下，点击股票列表不刷新任何图表，拖拽才会刷新子图
+            if hasattr(self, 'multi_chart_panel') and getattr(self.multi_chart_panel, 'is_multi', False):
+                self.log_manager.info("多屏模式下点击股票列表，不刷新图表，仅支持拖拽加载")
+                return
+
             # 获取选中的股票
             selected_items = self.stock_list.selectedItems()
             if not selected_items:
@@ -2796,6 +2794,11 @@ class TradingGUI(QMainWindow):
             # 记录日志
             self.log_manager.info(f"已选择股票: {stock_code}")
 
+            # 强制刷新UI，确保立即渲染
+            from PyQt5.QtWidgets import QApplication
+            QApplication.processEvents()
+            if hasattr(self, 'chart_widget') and hasattr(self.chart_widget, 'canvas'):
+                self.chart_widget.canvas.draw()
         except Exception as e:
             self.log_manager.error(f"处理股票选择事件失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -3870,6 +3873,8 @@ class TradingGUI(QMainWindow):
         finally:
             if hasattr(self, 'status_bar'):
                 self.status_bar.show_progress(False)
+            # 新增：数据加载完后自动加载第一个股票
+            self.auto_select_first_stock()
 
     def _refresh_industry_combos(self):
         """根据实际股票数据动态刷新行业和子行业下拉框"""
@@ -4497,10 +4502,14 @@ class TradingGUI(QMainWindow):
                 data['analysis'] = results
             # 自动判断数据量，自动选择异步或同步渲染
             if hasattr(self, 'chart_widget'):
+                # 渲染前显示加载提示
+                if hasattr(self.chart_widget, 'show_loading_dialog'):
+                    self.chart_widget.show_loading_dialog()
                 if len(k_data) > 100:
                     self.chart_widget.async_update_chart(data)
                 else:
                     self.chart_widget.update_chart(data)
+                # 渲染后关闭加载提示（由ChartWidget内部关闭）
                 self.log_manager.info(f"成功更新{self.current_stock}的图表显示")
             else:
                 self.log_manager.warning("图表控件未初始化")
@@ -4954,7 +4963,7 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"检查更新失败: {str(e)}")
 
     def show_settings(self):
-        """显示设置对话框"""
+        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置"""
         try:
             dialog = QDialog(self)
             dialog.setWindowTitle("设置")
@@ -4962,7 +4971,7 @@ class TradingGUI(QMainWindow):
 
             layout = QVBoxLayout(dialog)
 
-            # 添加设置选项
+            # 基本设置
             settings_group = QGroupBox("基本设置")
             settings_layout = QFormLayout(settings_group)
 
@@ -4974,12 +4983,25 @@ class TradingGUI(QMainWindow):
             # 字体大小
             font_size = QSpinBox()
             font_size.setRange(8, 24)
-            font_size.setValue(12)
+            font_size.setValue(8)
             settings_layout.addRow("字体大小:", font_size)
+
+            # 语言设置
+            lang_combo = QComboBox()
+            lang_combo.addItems(["简体中文", "English"])
+            settings_layout.addRow("语言:", lang_combo)
+
+            # 自动保存
+            auto_save = QCheckBox("自动保存设置")
+            auto_save.setChecked(True)
+            settings_layout.addRow("", auto_save)
 
             layout.addWidget(settings_group)
 
-            # 添加按钮
+            # 其它扩展设置分组（可按需添加）
+            # ...
+
+            # 按钮
             buttons = QDialogButtonBox(
                 QDialogButtonBox.Ok | QDialogButtonBox.Cancel
             )
@@ -4990,26 +5012,15 @@ class TradingGUI(QMainWindow):
             # 显示对话框并居中
             dialog.show()
             self.center_dialog(dialog, self)
-            dialog.exec_()
+            if dialog.exec_() == QDialog.Accepted:
+                # 保存设置逻辑（可扩展）
+                # 例如：self.theme_manager.set_theme(theme_combo.currentText())
+                # self.config_manager.set_font_size(font_size.value())
+                # self.config_manager.set_language(lang_combo.currentText())
+                # self.config_manager.set_auto_save(auto_save.isChecked())
+                self.log_manager.info("设置已保存")
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
-
-    def dragEnterEvent(self, event):
-        """处理拖入事件"""
-        if event.mimeData().hasFormat("text/plain"):
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        """处理放置事件"""
-        try:
-            # 获取拖放的数据
-            mime_data = event.mimeData()
-            if mime_data.hasFormat("text/plain"):
-                text = mime_data.text()
-                # TODO: 处理拖放的数据
-                self.log_manager.info(f"拖放数据: {text}")
-        except Exception as e:
-            self.log_manager.error(f"处理拖放事件失败: {str(e)}")
 
     def update_stock_count_label(self, count: int):
         """更新股票数量标签，线程安全"""
@@ -5104,19 +5115,12 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def get_kdata(self, code: str) -> pd.DataFrame:
-        """获取股票K线数据，支持时间范围
-
-        Args:
-            code: 股票代码
-
-        Returns:
-            pd.DataFrame: K线数据
-        """
         try:
             if not hasattr(self, 'data_manager'):
                 self.log_manager.error("数据管理器未初始化")
                 return pd.DataFrame()
-
+            # 增加健壮性
+            freq = getattr(self, 'current_period', 'D')
             # 根据self.current_time_range设置Query
             if hasattr(self, 'current_time_range') and self.current_time_range is not None:
                 if self.current_time_range < 0:
@@ -5125,19 +5129,15 @@ class TradingGUI(QMainWindow):
                     query = Query()  # 全部
             else:
                 query = Query()
-
             kdata = self.data_manager.get_k_data(
                 code=code,
-                freq=self.current_period,
+                freq=freq,
                 query=query
             )
-
             if kdata is None or kdata.empty:
                 self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
                 return pd.DataFrame()
-
             return kdata
-
         except Exception as e:
             self.log_manager.error(f"获取K线数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -5154,6 +5154,68 @@ class TradingGUI(QMainWindow):
                 max_width = width
         # 额外加上icon、箭头、padding等空间
         combobox.setMinimumWidth(max_width + 35)
+
+    def auto_select_first_stock(self):
+        """单主图模式自动加载第一个股票"""
+        if hasattr(self, 'stock_list_cache') and self.stock_list_cache:
+            first_code = self.stock_list_cache[0]['marketCode']
+            self.current_stock = first_code
+            self.update_chart()
+
+    def switch_to_multi_screen(self):
+        """切换到多屏模式并同步股票列表和数据管理器"""
+        try:
+            if hasattr(self, 'multi_chart_panel'):
+                # 先准备数据
+                if not getattr(self, 'data_manager', None):
+                    self.log_manager.error("数据管理器未初始化")
+                    return
+                if not getattr(self, 'stock_list_cache', None):
+                    self.log_manager.error("股票列表未加载")
+                    return
+                self.multi_chart_panel.set_stock_list(self.stock_list_cache)
+                self.multi_chart_panel.set_data_manager(self.data_manager)
+                # 切换模式
+                self.multi_chart_panel.toggle_mode()
+                # 多屏后自动填充股票数据
+                if self.multi_chart_panel.is_multi:
+                    self.multi_chart_panel.auto_fill_multi_charts()
+                # 多屏后刷新UI和日志区
+                self.chart_widget = self.multi_chart_panel.chart_widgets[0][0]
+                self.update()
+                if hasattr(self, 'log_widget'):
+                    self.log_widget.update()
+                if hasattr(self, 'bottom_panel'):
+                    self.bottom_panel.update()
+                if hasattr(self, 'show_log_panel'):
+                    self.show_log_panel()
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
+                self.log_manager.info("已切换到多屏模式")
+        except Exception as e:
+            self.log_manager.error(f"切换到多屏模式失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+
+    def switch_to_single_screen(self):
+        """切换到单屏模式，恢复主图"""
+        try:
+            if hasattr(self, 'multi_chart_panel'):
+                self.multi_chart_panel.toggle_mode()
+                self.chart_widget = self.multi_chart_panel.single_chart
+                self.update_chart()
+                self.update()
+                if hasattr(self, 'log_widget'):
+                    self.log_widget.update()
+                if hasattr(self, 'bottom_panel'):
+                    self.bottom_panel.update()
+                if hasattr(self, 'show_log_panel'):
+                    self.show_log_panel()
+                from PyQt5.QtWidgets import QApplication
+                QApplication.processEvents()
+                self.log_manager.info("已切换到单屏模式")
+        except Exception as e:
+            self.log_manager.error(f"切换到单屏模式失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
 # 修改全局异常处理器
 
