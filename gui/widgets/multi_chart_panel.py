@@ -2,10 +2,26 @@
 多图表分屏控件 MultiChartPanel
 支持3x3分屏，每个区块为ChartWidget，支持同步、mini map、主题自适应
 """
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QSizePolicy
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 from gui.widgets.chart_widget import ChartWidget
 from utils.theme import get_theme_manager
+
+
+class DraggableWidget(QWidget):
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain") or event.mimeData().hasFormat("text/application/x-qabstractitemmodeldatalist"):
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain") or event.mimeData().hasFormat("text/application/x-qabstractitemmodeldatalist"):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        # 直接调用父控件的dropEvent分发
+        if self.parent() and hasattr(self.parent(), 'dropEvent'):
+            self.parent().dropEvent(event)
 
 
 class MultiChartPanel(QWidget):
@@ -28,7 +44,7 @@ class MultiChartPanel(QWidget):
         self.layout.setSpacing(4)
         # 分屏切换按钮
         btn_layout = QHBoxLayout()
-        self.switch_btn = QPushButton("切换多屏")
+        self.switch_btn = QPushButton("切换九宫格")
         self.switch_btn.clicked.connect(self.toggle_mode)
         btn_layout.addWidget(self.switch_btn)
         self.layout.addLayout(btn_layout)
@@ -55,11 +71,10 @@ class MultiChartPanel(QWidget):
                 row_widgets.append(chart)
             self.chart_widgets.append(row_widgets)
         # 默认只显示单屏
-        self.grid_widget = QWidget()
+        self.grid_widget = DraggableWidget(self)
         self.grid_widget.setLayout(self.grid)
         self.grid_widget.setVisible(False)
         self.grid_widget.setAcceptDrops(True)
-        self.grid_widget.dragMoveEvent = self._grid_drag_move_event
         self.layout.addWidget(self.grid_widget)
         self.setLayout(self.layout)
         self.setAcceptDrops(True)
@@ -226,18 +241,17 @@ class MultiChartPanel(QWidget):
                 self.log_manager.error(f"清除图表失败: {str(e)}")
 
     def dragEnterEvent(self, event):
-        """支持拖拽股票代码到多屏任意子图表，只做分发，异常日志健壮"""
-        try:
-            if event.mimeData().hasFormat("text/plain") or event.mimeData().hasText():
-                event.acceptProposedAction()
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"多屏拖入事件失败: {str(e)}")
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
 
     def dropEvent(self, event):
         """多屏面板只做分发，根据鼠标位置分发event到对应ChartWidget，不做数据处理，异常日志健壮"""
         try:
-            if event.mimeData().hasFormat("text/plain") or event.mimeData().hasText():
+            if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
                 pos = event.pos()
                 target_chart = None
                 for r, row in enumerate(self.chart_widgets):
@@ -251,18 +265,20 @@ class MultiChartPanel(QWidget):
                 if not target_chart:
                     target_chart = self.chart_widgets[0][0]
                 if target_chart:
-                    target_chart.dropEvent(event)
+                    # 构造新的QDropEvent，pos为ChartWidget本地坐标
+                    new_event = QDropEvent(
+                        chart.mapFromParent(pos),
+                        event.dropAction(),
+                        event.mimeData(),
+                        event.mouseButtons(),
+                        event.keyboardModifiers(),
+                        event.type()
+                    )
+                    if hasattr(target_chart, 'handle_external_drop_event'):
+                        target_chart.handle_external_drop_event(new_event)
+                    else:
+                        target_chart.dropEvent(new_event)
                 event.acceptProposedAction()
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"多屏拖拽分发失败: {str(e)}")
-
-    def dragMoveEvent(self, event):
-        """多屏面板拖拽移动事件，确保鼠标样式为可放开"""
-        if event.mimeData().hasFormat("text/plain") or event.mimeData().hasText():
-            event.acceptProposedAction()
-
-    def _grid_drag_move_event(self, event):
-        """多屏grid_widget拖拽移动事件，确保鼠标样式为可放开"""
-        if event.mimeData().hasFormat("text/plain") or event.mimeData().hasText():
-            event.acceptProposedAction()

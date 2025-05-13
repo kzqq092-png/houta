@@ -1183,7 +1183,7 @@ class TradingGUI(QMainWindow):
             stock_layout.addLayout(search_layout)
 
             # 创建股票列表
-            self.stock_list = QListWidget()
+            self.stock_list = StockListWidget()
             self.stock_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self.stock_list.itemSelectionChanged.connect(
                 self.on_stock_selected)
@@ -1501,26 +1501,23 @@ class TradingGUI(QMainWindow):
 
     def dragEnterEvent(self, event):
         """主窗口拖入事件，只做分发，异常日志健壮"""
-        try:
-            if event.mimeData().hasFormat("text/plain"):
-                event.acceptProposedAction()
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"主窗口拖入事件失败: {str(e)}")
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        """主窗口拖拽移动事件，确保鼠标样式为可放开"""
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
 
     def dropEvent(self, event):
         """主窗口统一拖拽分发，单屏/多屏自动分发到对应控件，只做分发，异常日志健壮"""
-        try:
-            if event.mimeData().hasFormat("text/plain"):
-                if hasattr(self, 'multi_chart_panel') and self.multi_chart_panel.is_multi:
-                    self.multi_chart_panel.dropEvent(event)
-                else:
-                    if hasattr(self, 'chart_widget'):
-                        self.chart_widget.dropEvent(event)
-                event.acceptProposedAction()
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"主窗口拖拽分发失败: {str(e)}")
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain") or event.mimeData().hasFormat("text/application/x-qabstractitemmodeldatalist"):
+            if hasattr(self, 'multi_chart_panel') and self.multi_chart_panel.is_multi:
+                self.multi_chart_panel.dropEvent(event)
+            else:
+                if hasattr(self, 'chart_widget'):
+                    self.chart_widget.dropEvent(event)
+            event.acceptProposedAction()
 
     def add_to_watchlist_by_code(self, stock_code):
         """通过股票代码添加到自选股"""
@@ -5216,6 +5213,27 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"切换到单屏模式失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+
+    def dragMoveEvent(self, event):
+        """主窗口拖拽移动事件，确保鼠标样式为可放开"""
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain") or event.mimeData().hasFormat("text/application/x-qabstractitemmodeldatalist"):
+            event.acceptProposedAction()
+
+
+class StockListWidget(QListWidget):
+    def startDrag(self, supportedActions):
+        item = self.currentItem()
+        if item is None:
+            return
+        drag = QDrag(self)
+        mimeData = QMimeData()
+        text = item.text()
+        if text.startswith("★"):
+            text = text[1:].strip()
+        mimeData.setText(text)
+        drag.setMimeData(mimeData)
+        drag.exec_(supportedActions)
+
 
 # 修改全局异常处理器
 

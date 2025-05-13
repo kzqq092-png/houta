@@ -1181,12 +1181,12 @@ class ChartWidget(QWidget):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
-        """ChartWidget唯一数据处理入口，负责获取数据并渲染"""
         try:
-            code = event.mimeData().text().strip()
-            # 优先使用自身的data_manager
+            code, raw_text = self.parse_dragged_stock_code(event)
+            if not code:
+                self.show_no_data("拖拽内容无效")
+                return
             data_manager = getattr(self, 'data_manager', None)
-            # 递归查找data_manager
             if not data_manager:
                 parent = self.parent()
                 p = parent
@@ -1201,20 +1201,40 @@ class ChartWidget(QWidget):
                     self.log_manager.info(
                         f"[ChartWidget拖拽] 股票: {code}, kdata行数: {len(kdata) if kdata is not None else 'None'}")
                 if kdata is not None and not kdata.empty:
-                    data = {'stock_code': code, 'kdata': kdata, 'title': code,
+                    data = {'stock_code': code, 'kdata': kdata, 'title': raw_text,
                             'period': 'D', 'chart_type': 'candlestick'}
                     self.update_chart(data)
                 else:
                     self.show_no_data("当前股票无数据")
                 event.acceptProposedAction()
             else:
-                # 没有找到data_manager，弹窗提示
                 QMessageBox.warning(self, "数据错误", "未能获取数据管理器，无法加载股票数据。请联系管理员。")
                 if hasattr(self, 'log_manager'):
                     self.log_manager.error("ChartWidget拖拽失败：未找到data_manager")
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"ChartWidget拖拽渲染失败: {str(e)}")
+
+    def handle_external_drop_event(self, event):
+        self.dropEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
+            event.acceptProposedAction()
+
+    @staticmethod
+    def parse_dragged_stock_code(event):
+        """解析拖拽事件中的股票代码"""
+        raw_text = ""
+        if event.mimeData().hasText():
+            raw_text = event.mimeData().text().strip()
+        elif event.mimeData().hasFormat("text/plain"):
+            raw_text = str(event.mimeData().data(
+                "text/plain"), encoding="utf-8").strip()
+        if raw_text.startswith("★"):
+            raw_text = raw_text[1:].strip()
+        code = raw_text.split()[0] if raw_text else ""
+        return code, raw_text
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1272,8 +1292,3 @@ class ChartWidget(QWidget):
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"显示无数据提示失败: {str(e)}")
-
-    def dragMoveEvent(self, event):
-        """拖拽移动事件，确保鼠标样式为可放开"""
-        if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
-            event.acceptProposedAction()
