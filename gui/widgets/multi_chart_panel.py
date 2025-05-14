@@ -36,6 +36,9 @@ class MultiChartPanel(QWidget):
         self.stock_list = stock_list or []
         self.sync_mode = True  # 是否同步分屏
         self.is_multi = False  # 默认单屏
+        self._resize_timer = QTimer(self)  # 新增：防抖定时器
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._on_debounced_resize)
         self._init_ui()
 
     def _init_ui(self):
@@ -282,3 +285,27 @@ class MultiChartPanel(QWidget):
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"多屏拖拽分发失败: {str(e)}")
+
+    def resizeEvent(self, event):
+        # 新增：防抖处理，避免频繁刷新
+        if self._resize_timer.isActive():
+            self._resize_timer.stop()
+        self._resize_timer.start(150)  # 150ms后触发实际刷新
+        super().resizeEvent(event)
+
+    def _on_debounced_resize(self):
+        # 新增：实际执行所有子图的布局和刷新
+        try:
+            if self.is_multi:
+                for row in self.chart_widgets:
+                    for chart in row:
+                        if hasattr(chart, 'resizeEvent'):
+                            chart.resizeEvent(QResizeEvent(
+                                chart.size(), chart.size()))
+            else:
+                if hasattr(self, 'single_chart') and hasattr(self.single_chart, 'resizeEvent'):
+                    self.single_chart.resizeEvent(QResizeEvent(
+                        self.single_chart.size(), self.single_chart.size()))
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"多图表区防抖刷新失败: {str(e)}")

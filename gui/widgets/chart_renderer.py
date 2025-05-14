@@ -59,213 +59,118 @@ class ChartRenderer(QObject):
 
         return gs, [price_ax, volume_ax, indicator_ax]
 
-    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None):
-        """高性能K线绘制，使用collections批量渲染
-
+    def render_candlesticks(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
+        """高性能K线绘制，支持等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: K线数据
             style: 样式字典
+            x: 可选，等距序号X轴
         """
         try:
-            # 获取当前视图范围内的数据
             view_data = self._get_view_data(data)
-
-            # 降采样
             plot_data = self._downsample_data(view_data)
-
-            # 使用collections批量渲染
-            self._render_candlesticks_efficient(ax, plot_data, style or {})
-
-            # 优化显示
+            self._render_candlesticks_efficient(ax, plot_data, style or {}, x)
             self._optimize_display(ax)
-
         except Exception as e:
             self.render_error.emit(f"绘制K线失败: {str(e)}")
 
-    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any]):
-        """使用collections高效渲染K线
-
-        Args:
-            ax: matplotlib轴对象
-            data: K线数据
-            style: 样式字典
-        """
-        # 获取样式
+    def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
+        """使用collections高效渲染K线，支持等距序号X轴"""
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
-        # edge_color = style.get('edge_color', '#000000')  # 不再使用黑色边框
         alpha = style.get('alpha', 1.0)
-
-        # 转换日期为数值
-        dates = mdates.date2num(data.index.to_pydatetime())
-
-        # 创建K线实体
-        verts_up = []
-        verts_down = []
-        # 创建影线
-        segments_up = []
-        segments_down = []
-
-        for i, (date, row) in enumerate(data.iterrows()):
+        # 横坐标
+        if x is not None:
+            xvals = x
+        else:
+            xvals = mdates.date2num(data.index.to_pydatetime())
+        verts_up, verts_down, segments_up, segments_down = [], [], [], []
+        for i, (idx, row) in enumerate(data.iterrows()):
             open_price = row['open']
             close = row['close']
             high = row['high']
             low = row['low']
-
-            # K线实体
-            left = dates[i] - 0.3
-            right = dates[i] + 0.3
-
-            # 根据涨跌分别添加到不同列表
+            left = xvals[i] - 0.3
+            right = xvals[i] + 0.3
             if close >= open_price:
                 verts_up.append([
-                    (left, open_price),
-                    (left, close),
-                    (right, close),
-                    (right, open_price)
+                    (left, open_price), (left, close), (right,
+                                                        close), (right, open_price)
                 ])
-                segments_up.append([(dates[i], low), (dates[i], high)])
+                segments_up.append([(xvals[i], low), (xvals[i], high)])
             else:
                 verts_down.append([
-                    (left, open_price),
-                    (left, close),
-                    (right, close),
-                    (right, open_price)
+                    (left, open_price), (left, close), (right,
+                                                        close), (right, open_price)
                 ])
-                segments_down.append([(dates[i], low), (dates[i], high)])
-
-        # 绘制上涨K线
+                segments_down.append([(xvals[i], low), (xvals[i], high)])
         if verts_up:
             collection_up = PolyCollection(
-                verts_up,
-                facecolor=up_color,
-                edgecolor=up_color,  # 边框色与实体色一致
-                linewidth=0.5,
-                alpha=alpha
-            )
+                verts_up, facecolor=up_color, edgecolor=up_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_up)
-        # 绘制下跌K线
         if verts_down:
             collection_down = PolyCollection(
-                verts_down,
-                facecolor=down_color,
-                edgecolor=down_color,  # 边框色与实体色一致
-                linewidth=0.5,
-                alpha=alpha
-            )
+                verts_down, facecolor=down_color, edgecolor=down_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_down)
-        # 绘制上涨影线
         if segments_up:
             collection_shadow_up = LineCollection(
-                segments_up,
-                colors=up_color,
-                linewidth=0.5,
-                alpha=alpha
-            )
+                segments_up, colors=up_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_shadow_up)
-        # 绘制下跌影线
         if segments_down:
             collection_shadow_down = LineCollection(
-                segments_down,
-                colors=down_color,
-                linewidth=0.5,
-                alpha=alpha
-            )
+                segments_down, colors=down_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_shadow_down)
-        # 设置轴范围
         ax.autoscale_view()
 
-    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None):
-        """高性能成交量绘制
-
+    def render_volume(self, ax, data: pd.DataFrame, style: Dict[str, Any] = None, x: np.ndarray = None):
+        """高性能成交量绘制，支持等距序号X轴
         Args:
             ax: matplotlib轴对象
             data: 成交量数据
             style: 样式字典
+            x: 可选，等距序号X轴
         """
         try:
-            # 获取当前视图范围内的数据
             view_data = self._get_view_data(data)
-
-            # 降采样
             plot_data = self._downsample_data(view_data)
-
-            # 使用collections批量渲染
-            self._render_volume_efficient(ax, plot_data, style or {})
-
-            # 优化显示
+            self._render_volume_efficient(ax, plot_data, style or {}, x)
             self._optimize_display(ax)
-
         except Exception as e:
             self.render_error.emit(f"绘制成交量失败: {str(e)}")
 
-    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any]):
-        """使用collections高效渲染成交量
-
-        Args:
-            ax: matplotlib轴对象
-            data: 成交量数据
-            style: 样式字典
-        """
-        # 获取样式
+    def _render_volume_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
+        """使用collections高效渲染成交量，支持等距序号X轴"""
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('volume_alpha', 0.5)
-
-        # 转换日期为数值
-        dates = mdates.date2num(data.index.to_pydatetime())
-
-        # 创建柱状图顶点
-        verts_up = []
-        verts_down = []
-
-        for i, (date, row) in enumerate(data.iterrows()):
+        if x is not None:
+            xvals = x
+        else:
+            xvals = mdates.date2num(data.index.to_pydatetime())
+        verts_up, verts_down = [], []
+        for i, (idx, row) in enumerate(data.iterrows()):
             volume = row['volume']
             close = row['close']
             open_price = row['open']
-
-            # 柱状图顶点
-            left = dates[i] - 0.3
-            right = dates[i] + 0.3
-
-            # 根据涨跌分别添加到不同列表
+            left = xvals[i] - 0.3
+            right = xvals[i] + 0.3
             if close >= open_price:
                 verts_up.append([
-                    (left, 0),
-                    (left, volume),
-                    (right, volume),
-                    (right, 0)
+                    (left, 0), (left, volume), (right, volume), (right, 0)
                 ])
             else:
                 verts_down.append([
-                    (left, 0),
-                    (left, volume),
-                    (right, volume),
-                    (right, 0)
+                    (left, 0), (left, volume), (right, volume), (right, 0)
                 ])
-
-        # 绘制上涨成交量
         if verts_up:
             collection_up = PolyCollection(
-                verts_up,
-                facecolor=up_color,
-                edgecolor='none',
-                alpha=alpha
-            )
+                verts_up, facecolor=up_color, edgecolor='none', alpha=alpha)
             ax.add_collection(collection_up)
-
-        # 绘制下跌成交量
         if verts_down:
             collection_down = PolyCollection(
-                verts_down,
-                facecolor=down_color,
-                edgecolor='none',
-                alpha=alpha
-            )
+                verts_down, facecolor=down_color, edgecolor='none', alpha=alpha)
             ax.add_collection(collection_down)
-
-        # 设置轴范围
         ax.autoscale_view()
 
     def render_line(self, ax, data: pd.Series, style: Dict[str, Any] = None):

@@ -167,6 +167,7 @@ class TradingGUI(QMainWindow):
     def __init__(self):
         """Initialize the trading system GUI"""
         try:
+            self._is_initializing = True  # 新增：初始化标志
             super().__init__()
             self.setWindowTitle("Trading System")
             self.setGeometry(100, 100, 1200, 800)
@@ -249,16 +250,14 @@ class TradingGUI(QMainWindow):
 
             # 初始化UI
             self.init_ui()
-            # 加载收藏的股票
             self.load_favorites()
             self.init_data()
-            # 关键：允许子图接收拖拽
             self.setAcceptDrops(True)
-            # 连接信号
             self.connect_signals()
-            # 预加载数据
             self.preload_data()
             self.log_manager.info("TradingGUI初始化完成")
+            self._is_initializing = False  # 新增：初始化结束
+            self.filter_stock_list()       # 新增：只在最后刷新一次
 
         except Exception as e:
             # 确保即使在初始化失败时也能记录错误
@@ -1193,6 +1192,8 @@ class TradingGUI(QMainWindow):
             self.stock_list.setAcceptDrops(True)
             self.stock_list.setDropIndicatorShown(True)
             self.stock_list.setDragDropMode(QAbstractItemView.InternalMove)
+            # 性能优化：启用统一项高度，提升大数据量时的滚动和重绘效率
+            self.stock_list.setUniformItemSizes(True)
 
             # 设置自定义样式
             self.stock_list.setStyleSheet("""
@@ -1537,108 +1538,119 @@ class TradingGUI(QMainWindow):
 
     @pyqtSlot()
     def filter_stock_list(self, text: str = ""):
-        """根据搜索文本过滤股票列表，支持市场、行业、收藏等多条件筛选"""
+        if getattr(self, '_is_initializing', False):
+            return  # 初始化阶段不刷新，最后统一刷新
+        """根据搜索文本过滤股票列表，支持市场、行业、收藏等多条件筛选（性能优化版）"""
         try:
-            # 检查 stock_list_cache 是否存在且非空
-            if not hasattr(self, 'stock_list_cache') or not self.stock_list_cache:
-                self.log_manager.warning("股票列表缓存为空，正在重新加载...")
+            # 1. 提前缓存控件和条件，减少重复属性访问
+            stock_list_cache = getattr(self, 'stock_list_cache', None)
+            stock_list = getattr(self, 'stock_list', None)
+            stock_search = getattr(self, 'stock_search', None)
+            market_combo = getattr(self, 'market_combo', None)
+            industry_combo = getattr(self, 'industry_combo', None)
+            sub_industry_combo = getattr(self, 'sub_industry_combo', None)
+            only_favorites_checkbox = getattr(
+                self, 'only_favorites_checkbox', None)
+            favorites = getattr(self, 'favorites', set())
+            log_manager = getattr(self, 'log_manager', None)
+
+            if not stock_list_cache:
+                if log_manager:
+                    log_manager.warning("股票列表缓存为空，正在重新加载...")
                 self.preload_data()
                 return
 
-            # 获取搜索条件
-            search_text = text.lower().strip() if text else self.stock_search.text(
-            ).lower().strip() if hasattr(self, 'stock_search') else ""
-            market = self.market_combo.currentText() if hasattr(self, 'market_combo') else "全部"
-            industry = self.industry_combo.currentText() if hasattr(
-                self, 'industry_combo') else "全部"
-            sub_industry = self.sub_industry_combo.currentText(
-            ) if hasattr(self, 'sub_industry_combo') else "全部"
-            only_favorites = hasattr(
-                self, 'only_favorites_checkbox') and self.only_favorites_checkbox.isChecked()
+            # 2. 获取筛选条件，提前处理字符串
+            search_text = text.lower().strip() if text else (
+                stock_search.text().lower().strip() if stock_search else "")
+            market = market_combo.currentText() if market_combo else "全部"
+            industry = industry_combo.currentText() if industry_combo else "全部"
+            sub_industry = sub_industry_combo.currentText() if sub_industry_combo else "全部"
+            only_favorites = only_favorites_checkbox.isChecked(
+            ) if only_favorites_checkbox else False
 
-            # 获取市场对应的股票代码集合
-            block = self.market_block_mapping.get(market)
-            block_codes = set()
-            if block:
-                block_codes = set(f"{s.market.lower()}{s.code}" for s in block)
+            # 3. 市场股票代码集合提前生成
+            block = self.market_block_mapping.get(market, None)
+            block_codes = set(
+                f"{s.market.lower()}{s.code}" for s in block) if block else None
+
+            # 4. UI 批量更新时禁用刷新
+            if stock_list:
+                stock_list.setUpdatesEnabled(False)
+                stock_list.clear()
 
             filtered_stocks = []
-            for stock_info in self.stock_list_cache:
+            for stock_info in stock_list_cache:
                 try:
-                    # 获取股票信息
                     market_code = stock_info.get('marketCode', '').lower()
                     name = stock_info.get('name', '')
+                    industry_str = stock_info.get('industry', '')
 
                     # 市场筛选
-                    if block and market_code not in block_codes:
+                    if block_codes is not None and market_code not in block_codes:
                         continue
 
                     # 行业筛选
-                    stock_industry = stock_info.get('industry', '')
                     if industry != "全部":
-                        if not stock_industry:
+                        if not industry_str:
                             continue
-                        industry_levels = stock_industry.split('/')
-                        if len(industry_levels) < 1 or industry_levels[0].strip() != industry:
+                        industry_levels = industry_str.split('/')
+                        if not industry_levels or industry_levels[0].strip() != industry:
                             continue
                         if sub_industry != "全部":
                             if len(industry_levels) < 2 or industry_levels[1].strip() != sub_industry:
                                 continue
 
                     # 收藏筛选
-                    if only_favorites and market_code not in self.favorites:
+                    if only_favorites and stock_info.get('marketCode') not in favorites:
                         continue
 
                     # 搜索文本筛选
-                    if search_text and not (search_text in market_code or search_text in name.lower()):
+                    if search_text and (search_text not in market_code and search_text not in name.lower()):
                         continue
 
                     filtered_stocks.append(stock_info)
-
                 except Exception as e:
-                    self.log_manager.warning(
-                        f"处理股票 {stock_info} 过滤失败: {str(e)}")
+                    if log_manager:
+                        log_manager.warning(
+                            f"处理股票 {stock_info} 过滤失败: {str(e)}")
                     continue
 
-            # 更新股票列表显示
-            if hasattr(self, 'stock_list'):
-                self.stock_list.clear()
-                if not filtered_stocks:
-                    no_item = QListWidgetItem("无符合条件的股票")
-                    no_item.setFlags(Qt.NoItemFlags)
-                    self.stock_list.addItem(no_item)
-                else:
-                    for stock_info in filtered_stocks:
-                        try:
-                            display_text = f"{stock_info['marketCode']} {stock_info['name']}"
-                            if stock_info['marketCode'] in self.favorites:
-                                display_text = f"★ {display_text}"
+            # 5. 批量添加到UI，最后启用刷新
+            # if stock_list:
+            if not filtered_stocks:
+                no_item = QListWidgetItem("无符合条件的股票")
+                no_item.setFlags(Qt.NoItemFlags)
+                stock_list.addItem(no_item)
+            else:
+                for stock_info in filtered_stocks:
+                    try:
+                        display_text = f"{stock_info['marketCode']} {stock_info['name']}"
+                        if stock_info['marketCode'] in favorites:
+                            display_text = f"★ {display_text}"
+                        item = QListWidgetItem(display_text)
+                        tooltip = (f"代码: {stock_info['marketCode']}\n"
+                                   f"名称: {stock_info['name']}\n"
+                                   f"市场: {stock_info.get('market', '未知')}\n"
+                                   f"行业: {stock_info.get('industry', '未知')}")
+                        item.setToolTip(tooltip)
+                        item.setData(Qt.UserRole, stock_info)
+                        stock_list.addItem(item)
+                    except Exception as e:
+                        if log_manager:
+                            log_manager.warning(f"添加股票项到列表失败: {str(e)}")
+                        continue
+            stock_list.setUpdatesEnabled(True)
 
-                            item = QListWidgetItem(display_text)
-
-                            # 设置工具提示
-                            tooltip = (f"代码: {stock_info['marketCode']}\n"
-                                       f"名称: {stock_info['name']}\n"
-                                       f"市场: {stock_info.get('market', '未知')}\n"
-                                       f"行业: {stock_info.get('industry', '未知')}")
-                            item.setToolTip(tooltip)
-
-                            # 设置项数据
-                            item.setData(Qt.UserRole, stock_info)
-
-                            self.stock_list.addItem(item)
-                        except Exception as e:
-                            self.log_manager.warning(f"添加股票项到列表失败: {str(e)}")
-                            continue
-
-            # 更新股票数量显示
+            # 6. 更新股票数量显示
             self.update_stock_count_label(len(filtered_stocks))
-            self.log_manager.info(
-                f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
+            if log_manager:
+                log_manager.info(f"股票列表过滤完成，显示 {len(filtered_stocks)} 只股票")
 
         except Exception as e:
-            self.log_manager.error(f"过滤股票列表失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"过滤股票列表失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
     def filter_indicator_list(self, text: str) -> None:
         """过滤指标列表
@@ -2316,7 +2328,7 @@ class TradingGUI(QMainWindow):
             else:
                 self.favorites = set()
                 self.log_manager.info("未找到收藏列表，已创建新的收藏集")
-            self.update_stock_list_ui()
+            # self.update_stock_list_ui()  # 删除多余调用，初始化后统一刷新
         except Exception as e:
             self.favorites = set()
             self.log_manager.error(f"加载收藏列表失败: {str(e)}")
@@ -3018,11 +3030,9 @@ class TradingGUI(QMainWindow):
                     for stock in sm:
                         total_stocks += 1
                         try:
-                            # 生成标准code格式
                             code = f"{stock.market.lower()}{stock.code}"
                             industry = getattr(
                                 stock, 'industry', None) or self._get_industry_name(stock)
-                            # 收集行业信息
                             if industry:
                                 levels = industry.split('/')
                                 if len(levels) >= 1:
@@ -3067,13 +3077,12 @@ class TradingGUI(QMainWindow):
                             continue
                     all_stocks.sort(key=lambda x: (x['type'], x['code']))
                     self.stock_list_cache = all_stocks
-                    # 动态生成行业映射
                     self.industry_mapping = {main: {sub: [] for sub in sorted(
                         sub_industry_map.get(main, []))} for main in sorted(industry_set)}
                     self.log_manager.info(
                         f"股票列表更新完成，共处理 {total_stocks} 只股票，成功 {len(all_stocks)} 只，失败 {failed_stocks} 只")
                     QTimer.singleShot(0, self._refresh_industry_combos)
-                    QTimer.singleShot(0, self.filter_stock_list)
+                    # QTimer.singleShot(0, self.filter_stock_list)  # 删除多余调用
                 except Exception as e:
                     self.log_manager.error(f"更新股票列表失败: {str(e)}")
                     self.log_manager.error(traceback.format_exc())
@@ -3792,26 +3801,18 @@ class TradingGUI(QMainWindow):
             if hasattr(self, 'status_bar'):
                 self.status_bar.show_progress(True)
                 self.status_bar.set_progress(0)
-
-            # 使用数据管理器获取股票列表
             stocks_df = self.data_manager.get_stock_list()
             total = len(stocks_df) if not stocks_df.empty else 0
             if not stocks_df.empty:
-                self.stock_list_cache = []  # 确保清空旧数据
+                self.stock_list_cache = []
                 industry_set = set()
                 sub_industry_map = {}
-
                 for idx, (_, stock) in enumerate(stocks_df.iterrows()):
                     try:
-                        # 生成标准code格式
                         code = f"{stock['market'].lower()}{stock['code']}"
-
-                        # 获取行业信息
                         industry = stock.get('industry', None)
                         if not industry:
                             industry = self._get_industry_name(stock)
-
-                        # 处理行业层级
                         if industry and isinstance(industry, str):
                             levels = industry.split('/')
                             if len(levels) >= 1:
@@ -3823,8 +3824,6 @@ class TradingGUI(QMainWindow):
                                         sub_industry_map[main_industry] = set()
                                     sub_industry_map[main_industry].add(
                                         sub_industry)
-
-                        # 构建股票信息
                         stock_info = {
                             'code': code,
                             'name': stock['name'],
@@ -3836,57 +3835,43 @@ class TradingGUI(QMainWindow):
                             'start_date': stock.get('start_date', None),
                             'end_date': stock.get('end_date', None)
                         }
-
-                        # 只添加有效的股票
                         if stock_info['valid']:
                             self.stock_list_cache.append(stock_info)
-
-                        # 动态更新进度条
                         if hasattr(self, 'status_bar') and total > 0:
                             percent = int((idx + 1) / total * 100)
                             self.status_bar.set_progress(percent)
-
                     except Exception as e:
                         self.log_manager.warning(
                             f"处理股票 {stock.get('code', 'unknown')} 失败: {str(e)}")
                         continue
-
-                # 更新行业映射
                 self.industry_mapping = {main: {sub: [] for sub in sorted(sub_industry_map.get(main, []))}
                                          for main in sorted(industry_set)}
-
                 self.log_manager.info(
                     f"数据预加载完成，共加载 {len(self.stock_list_cache)} 只股票")
-
-                # 使用 QTimer 确保在主线程中更新 UI
                 QTimer.singleShot(0, self._refresh_industry_combos)
-                QTimer.singleShot(0, self.filter_stock_list)
+                # QTimer.singleShot(0, self.filter_stock_list)  # 删除多余调用
             else:
                 self.log_manager.warning("获取股票列表失败")
-
         except Exception as e:
             self.log_manager.error(f"预加载数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
         finally:
             if hasattr(self, 'status_bar'):
                 self.status_bar.show_progress(False)
-            # 新增：数据加载完后自动加载第一个股票
             self.auto_select_first_stock()
 
     def _refresh_industry_combos(self):
-        """根据实际股票数据动态刷新行业和子行业下拉框"""
         try:
-            # 主行业
             self.industry_combo.blockSignals(True)
             self.industry_combo.clear()
             self.industry_combo.addItem("全部")
             for main in sorted(self.industry_mapping.keys()):
                 self.industry_combo.addItem(main)
             self.industry_combo.blockSignals(False)
-            # 子行业
             self.sub_industry_combo.clear()
             self.sub_industry_combo.addItem("全部")
             self.sub_industry_combo.setVisible(False)
+            # 不再调用 self.filter_stock_list() 由初始化流程统一刷新
         except Exception as e:
             self.log_manager.warning(f"刷新行业下拉框失败: {str(e)}")
 
