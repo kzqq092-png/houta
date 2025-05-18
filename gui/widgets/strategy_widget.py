@@ -9,8 +9,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QDoubleSpinBox, QFormLayout, QGroupBox,
                              QScrollArea, QMessageBox)
 from PyQt5.QtCore import Qt, pyqtSignal
-from core.logger import LogManager
+from core.logger import LogManager, LogLevel
 import traceback
+from gui.widgets.log_widget import LogWidget
 
 
 class StrategyWidget(QWidget):
@@ -55,46 +56,6 @@ class StrategyWidget(QWidget):
                 self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def center_dialog(self, dialog, parent=None, offset_y=50):
-        """将弹窗居中到父窗口或屏幕，并尽量靠近上部
-
-        Args:
-            dialog: 要居中的对话框
-            parent: 父窗口，如果为None则使用屏幕
-            offset_y: 距离顶部的偏移量
-        """
-        try:
-            if parent and parent.isVisible():
-                # 相对于父窗口居中
-                parent_geom = parent.geometry()
-                dialog_geom = dialog.frameGeometry()
-                x = parent_geom.center().x() - dialog_geom.width() // 2
-                y = parent_geom.top() + offset_y
-
-                # 确保弹窗不会超出父窗口边界
-                x = max(parent_geom.left(), min(
-                    x, parent_geom.right() - dialog_geom.width()))
-                y = max(parent_geom.top(), min(
-                    y, parent_geom.bottom() - dialog_geom.height()))
-            else:
-                # 相对于屏幕居中
-                screen = dialog.screen() or dialog.parentWidget().screen()
-                if screen:
-                    screen_geom = screen.geometry()
-                    dialog_geom = dialog.frameGeometry()
-                    x = screen_geom.center().x() - dialog_geom.width() // 2
-                    y = screen_geom.top() + offset_y
-
-                    # 确保弹窗不会超出屏幕边界
-                    x = max(screen_geom.left(), min(
-                        x, screen_geom.right() - dialog_geom.width()))
-                    y = max(screen_geom.top(), min(
-                        y, screen_geom.bottom() - dialog_geom.height()))
-
-            dialog.move(x, y)
-        except Exception as e:
-            self.log_manager.error(f"设置弹窗位置失败: {str(e)}")
-
     def show_error(self, message: str):
         """显示错误对话框
 
@@ -110,7 +71,7 @@ class StrategyWidget(QWidget):
 
             # 显示对话框并居中
             dialog.show()
-            self.center_dialog(dialog, self)
+            LogWidget().center_dialog(dialog, self)
             dialog.exec_()
 
         except Exception as e:
@@ -131,7 +92,7 @@ class StrategyWidget(QWidget):
 
             # 显示对话框并居中
             dialog.show()
-            self.center_dialog(dialog, self)
+            LogWidget().center_dialog(dialog, self)
             dialog.exec_()
 
         except Exception as e:
@@ -152,7 +113,7 @@ class StrategyWidget(QWidget):
 
             # 显示对话框并居中
             dialog.show()
-            self.center_dialog(dialog, self)
+            LogWidget().center_dialog(dialog, self)
             dialog.exec_()
 
         except Exception as e:

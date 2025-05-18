@@ -486,9 +486,9 @@ class MainMenuBar(QMenuBar):
             QMenuBar {{
                 background: {menu_bg};
                 color: {menu_text};
-                border-bottom: 2px solid {menu_border};
+                border-bottom: 1px solid {menu_border};
                 font-weight: bold;
-                font-size: 14px;
+                font-size: 12px;
             }}
             QMenuBar::item {{
                 background: transparent;
@@ -507,7 +507,7 @@ class MainMenuBar(QMenuBar):
             QMenu {{
                 background: {menu_bg};
                 color: {menu_text};
-                border: 1.5px solid {menu_border};
+                border: 1px solid {menu_border};
                 font-size: 13px;
             }}
             QMenu::item:selected {{

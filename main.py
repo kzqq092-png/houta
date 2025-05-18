@@ -20,7 +20,7 @@ from utils.config_manager import ConfigManager
 from core.data_manager import DataManager
 from utils.theme import ThemeManager, get_theme_manager, Theme
 from utils.config_types import LoggingConfig, PerformanceConfig
-from core.logger import LogManager, BaseLogManager
+from core.logger import LogManager, BaseLogManager, LogLevel
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect
@@ -542,7 +542,7 @@ class TradingGUI(QMainWindow):
         """创建自定义状态栏，合并所有状态栏功能，放到底部右下角，并添加日志按钮"""
         try:
             self.status_bar = StatusBar(self)
-            self.status_bar.setFixedHeight(25)
+            self.status_bar.setFixedHeight(27)
             self.setStatusBar(self.status_bar)
             self.status_bar.set_status("就绪")
             # 日志显示按钮
@@ -1104,15 +1104,6 @@ class TradingGUI(QMainWindow):
         # 工具栏
         if hasattr(self, 'toolbar'):
             self.toolbar.setStyleSheet(toolbar_style)
-        # 移除所有按钮icon（只保留文字）
-        for widget in self.findChildren((QPushButton, QToolButton)):
-            if hasattr(widget, 'setIcon'):
-                widget.setIcon(QIcon())
-        # 日志区自动滚动到底部（已移除，交由LogWidget自身控制）
-        # for widget in self.findChildren((QTextEdit, QPlainTextEdit)):
-        #     if hasattr(widget, 'verticalScrollBar'):
-        #         sb = widget.verticalScrollBar()
-        #         sb.setValue(sb.maximum())
 
     def create_left_panel(self):
         """Create left panel with stock list and indicators"""
@@ -1240,32 +1231,37 @@ class TradingGUI(QMainWindow):
             indicator_layout.setContentsMargins(5, 15, 5, 5)
             indicator_layout.setSpacing(5)
 
-            # 创建指标类型选择器
+            # --- 创建指标类型选择器 ---
             indicator_type_layout = QHBoxLayout()
             indicator_type_label = QLabel("类型:")
             self.indicator_type_combo = QComboBox()
-            self.indicator_type_combo.addItems(
-                ["全部", "趋势类", "震荡类", "成交量类", "自定义"])
+            # --- 动态生成指标分类（只用后端ta-lib分类，确保一致）---
+            from indicators_algo import get_all_indicators_by_category
+            category_map = get_all_indicators_by_category()
+            type_list = ["全部"] + sorted(category_map.keys()) + ["自定义"]
+            self.indicator_type_combo.clear()
+            self.indicator_type_combo.addItems(type_list)
             self.indicator_type_combo.currentTextChanged.connect(
-                self.filter_indicator_list)
+                lambda _: self.filter_indicator_list(
+                    self.indicator_search.text())
+            )
             indicator_type_layout.addWidget(indicator_type_label)
             indicator_type_layout.addWidget(self.indicator_type_combo)
             indicator_layout.addLayout(indicator_type_layout)
 
             # 创建指标搜索框
-            indicator_search = QLineEdit()
-            indicator_search.setPlaceholderText("搜索指标...")
-            indicator_search.textChanged.connect(self.filter_indicator_list)
-            indicator_layout.addWidget(indicator_search)
+            self.indicator_search = QLineEdit()
+            self.indicator_search.setPlaceholderText("搜索指标...")
+            self.indicator_search.textChanged.connect(
+                self.filter_indicator_list)
+            indicator_layout.addWidget(self.indicator_search)
 
-            # 创建指标列表
+            # --- 创建指标列表控件（必须在所有操作前）---
             self.indicator_list = QListWidget()
             self.indicator_list.setSelectionMode(
                 QAbstractItemView.MultiSelection)
             self.indicator_list.itemSelectionChanged.connect(
                 self.on_indicators_changed)
-
-            # 设置指标列表样式
             self.indicator_list.setStyleSheet("""
                 QListWidget {
                     background-color: transparent;
@@ -1285,30 +1281,42 @@ class TradingGUI(QMainWindow):
                     background-color: #F5F5F5;
                 }
             """)
-
             indicator_list_scroll = QScrollArea()
             indicator_list_scroll.setWidgetResizable(True)
             indicator_list_scroll.setWidget(self.indicator_list)
             indicator_layout.addWidget(indicator_list_scroll)
 
+            # --- 填充指标列表（只用后端分类）---
+            self.indicator_list.clear()
+            for cat, names in category_map.items():
+                for name in names:
+                    item = QListWidgetItem(str(name))
+                    item.setData(Qt.UserRole, str(cat))
+                    self.indicator_list.addItem(item)
+
             # 添加指标操作按钮
             indicator_buttons_layout = QHBoxLayout()
-            add_indicator_btn = QPushButton("添加")
-            add_indicator_btn.clicked.connect(
+            indicator_buttons_layout.setSpacing(2)
+            manage_indicator_btn = QPushButton("管理指标")
+            manage_indicator_btn.clicked.connect(
                 self.show_indicator_params_dialog)
             save_combination_btn = QPushButton("保存组合")
             save_combination_btn.clicked.connect(
                 self.save_indicator_combination)
-            indicator_buttons_layout.addWidget(add_indicator_btn)
+            indicator_buttons_layout.addWidget(manage_indicator_btn)
             indicator_buttons_layout.addWidget(save_combination_btn)
+
+            clear_all_btn = QPushButton("取消指标")
+            clear_all_btn.clicked.connect(self.clear_all_selected_indicators)
+            indicator_buttons_layout.addWidget(clear_all_btn)
+
             indicator_layout.addLayout(indicator_buttons_layout)
 
             # 添加指标列表组到左侧布局
             self.left_layout.addWidget(indicator_group)
 
             # 设置左侧面板的最小宽度
-            self.left_panel.setMinimumWidth(200)
-            self.left_panel.setMaximumWidth(320)
+            self.left_panel.setFixedWidth(210)
 
             # 添加左侧面板到顶部分割器
             self.top_splitter.addWidget(self.left_panel)
@@ -1319,7 +1327,7 @@ class TradingGUI(QMainWindow):
             # 自动美化股票列表和指标列表QSS
             stock_list_style = """
             QListWidget {
-                border: 1.5px solid #90caf9;
+                border: 0.5px solid #90caf9;
                 border-radius: 6px;
                 background: #fff;
             }
@@ -1362,6 +1370,33 @@ class TradingGUI(QMainWindow):
                 Qt.ScrollBarAlwaysOff)
             indicator_list_scroll.setHorizontalScrollBarPolicy(
                 Qt.ScrollBarAlwaysOff)
+
+            # 在__init__或create_left_panel中，初始化指标列表
+            self.builtin_indicators = [
+                {"name": "MA", "type": "趋势类"},
+                {"name": "MACD", "type": "趋势类"},
+                {"name": "BOLL", "type": "趋势类"},
+                {"name": "RSI", "type": "震荡类"},
+                {"name": "KDJ", "type": "震荡类"},
+                {"name": "CCI", "type": "震荡类"},
+                {"name": "OBV", "type": "成交量类"},
+            ]
+            from indicators_algo import get_talib_indicator_list
+            self.talib_indicators = [{"name": n, "type": "ta-lib"}
+                                     for n in get_talib_indicator_list()]
+            self.custom_indicators = []  # 预留自定义
+            self.all_indicators = self.builtin_indicators + \
+                self.talib_indicators + self.custom_indicators
+            # 初始化指标列表，确保类型正确设置
+            self.indicator_list.clear()
+            for ind in self.all_indicators:
+                item = QListWidgetItem(ind["name"])
+                # 统一用分类名，防止筛选时类型对比异常
+                item.setData(Qt.UserRole, str(ind["type"]))
+                self.indicator_list.addItem(item)
+                # 默认只选中MA
+                if ind["name"] == "MA":
+                    item.setSelected(True)
 
         except Exception as e:
             self.log_manager.error(f"创建左侧面板失败: {str(e)}")
@@ -1653,43 +1688,43 @@ class TradingGUI(QMainWindow):
                 self.log_manager.error(traceback.format_exc())
 
     def filter_indicator_list(self, text: str) -> None:
-        """过滤指标列表
-
-        Args:
-            text: 过滤文本
-        """
+        """过滤指标列表，支持ta-lib分类，增强健壮性，防止多次添加"无可用指标"项"""
         try:
-            # 获取指标类型
-            indicator_type = self.indicator_type_combo.currentText()
-
-            # 遍历指标列表
+            indicator_type = str(self.indicator_type_combo.currentText())
+            # 先移除所有"无可用指标"项，防止重复
+            for i in reversed(range(self.indicator_list.count())):
+                item = self.indicator_list.item(i)
+                if item.text() == "无可用指标":
+                    self.indicator_list.takeItem(i)
+            # 先全部设为可见
+            for i in range(self.indicator_list.count()):
+                self.indicator_list.item(i).setHidden(False)
+            visible_count = 0
             for i in range(self.indicator_list.count()):
                 item = self.indicator_list.item(i)
                 indicator = item.text()
-
-                # 检查指标类型
-                if indicator_type != "全部":
-                    if indicator_type == "趋势类" and not any(x in indicator for x in ["MA", "MACD", "BOLL"]):
+                ind_type = str(item.data(Qt.UserRole))
+                # 分类筛选
+                if indicator_type != "全部" and indicator_type != "自定义":
+                    if ind_type != indicator_type:
                         item.setHidden(True)
                         continue
-                    elif indicator_type == "震荡类" and not any(x in indicator for x in ["RSI", "KDJ", "CCI"]):
-                        item.setHidden(True)
-                        continue
-                    elif indicator_type == "成交量类" and not any(x in indicator for x in ["VOL", "OBV"]):
-                        item.setHidden(True)
-                        continue
-                    elif indicator_type == "自定义" and not any(x in indicator for x in ["自定义"]):
-                        item.setHidden(True)
-                        continue
-
-                # 检查搜索文本
+                # 搜索文本筛选
                 if text and text.lower() not in indicator.lower():
                     item.setHidden(True)
-                else:
-                    item.setHidden(False)
-
+                if not item.isHidden():
+                    visible_count += 1
+            # 只在没有可见项时添加"无可用指标"且只添加一次
+            if visible_count == 0 and self.indicator_list.count() == 0 or all(self.indicator_list.item(i).isHidden() for i in range(self.indicator_list.count())):
+                no_item = QListWidgetItem("无可用指标")
+                no_item.setFlags(Qt.NoItemFlags)
+                self.indicator_list.addItem(no_item)
+            self.log_manager.info(
+                f"筛选分类: {indicator_type}，可见指标数: {visible_count}")
         except Exception as e:
-            self.log_manager.error(f"过滤指标列表失败: {str(e)}")
+            import traceback
+            self.log_manager.error(
+                f"过滤指标列表失败: {str(e)}\n{traceback.format_exc()}")
 
     def on_time_range_changed(self, time_range: str) -> None:
         """处理时间范围变化事件
@@ -1882,9 +1917,10 @@ class TradingGUI(QMainWindow):
         try:
             # 创建右侧面板
             self.right_panel = QWidget()
+
             self.right_layout = QVBoxLayout(self.right_panel)
             self.right_layout.setContentsMargins(5, 5, 5, 5)
-            self.right_layout.setSpacing(5)
+            self.right_layout.setSpacing(0)
 
             # 右侧内容widget（用于滚动）
             right_content = QWidget()
@@ -1911,10 +1947,12 @@ class TradingGUI(QMainWindow):
             strategy_layout.addLayout(strategy_type_layout)
 
             # 创建策略参数设置区域
-            self.strategy_params_widget = QWidget()
+            self.strategy_params_group = QGroupBox("策略参数")
             self.strategy_params_layout = QFormLayout(
-                self.strategy_params_widget)
-            strategy_layout.addWidget(self.strategy_params_widget)
+                self.strategy_params_group)
+            self.strategy_params_layout.setContentsMargins(5, 15, 5, 5)
+            self.strategy_params_layout.setSpacing(8)
+            strategy_layout.addWidget(self.strategy_params_group)
 
             # 添加策略组到右侧布局
             right_content_layout.addWidget(strategy_group)
@@ -2023,10 +2061,10 @@ class TradingGUI(QMainWindow):
             right_content_layout.addLayout(button_layout)
 
             # 滚动区域包裹右侧内容
-            right_scroll = QScrollArea()
-            right_scroll.setWidgetResizable(True)
-            right_scroll.setWidget(right_content)
-            self.right_layout.addWidget(right_scroll)
+            # right_scroll = QScrollArea()
+            # right_scroll.setWidgetResizable(True)
+            # right_scroll.setWidget(right_content)
+            self.right_layout.addWidget(right_content)
 
             self.right_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -2036,10 +2074,120 @@ class TradingGUI(QMainWindow):
             self.log_manager.info("右侧面板创建完成")
             add_shadow(self.right_panel, blur_radius=18,
                        x_offset=0, y_offset=6)
+            # 新增：初始化参数控件
+            self.refresh_strategy_params()
         except Exception as e:
             self.log_manager.error(f"创建右侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
+
+    def refresh_strategy_params(self):
+        """根据当前策略类型动态生成参数控件"""
+        # 清空原有控件
+        for i in reversed(range(self.strategy_params_layout.count())):
+            widget = self.strategy_params_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        self.param_controls = {}
+        strategy = self.strategy_combo.currentText()
+        if strategy == "均线策略":
+            fast = QSpinBox()
+            fast.setRange(1, 120)
+            fast.setValue(5)
+            fast.setFixedHeight(25)
+            slow = QSpinBox()
+            slow.setRange(5, 250)
+            slow.setValue(20)
+            slow.setFixedHeight(25)
+            self.strategy_params_layout.addRow("快线周期:", fast)
+            self.strategy_params_layout.addRow("慢线周期:", slow)
+            self.param_controls["fast_period"] = fast
+            self.param_controls["slow_period"] = slow
+        elif strategy == "MACD策略":
+            fast = QSpinBox()
+            fast.setRange(5, 50)
+            fast.setValue(12)
+            fast.setFixedHeight(25)
+            slow = QSpinBox()
+            slow.setRange(10, 100)
+            slow.setValue(26)
+            slow.setFixedHeight(25)
+            signal = QSpinBox()
+            signal.setRange(2, 20)
+            signal.setValue(9)
+            signal.setFixedHeight(25)
+            self.strategy_params_layout.addRow("快线周期:", fast)
+            self.strategy_params_layout.addRow("慢线周期:", slow)
+            self.strategy_params_layout.addRow("信号线周期:", signal)
+            self.param_controls["fast_period"] = fast
+            self.param_controls["slow_period"] = slow
+            self.param_controls["signal_period"] = signal
+        elif strategy == "RSI策略":
+            period = QSpinBox()
+            period.setRange(5, 30)
+            period.setValue(14)
+            period.setFixedHeight(25)
+            overbought = QDoubleSpinBox()
+            overbought.setRange(50, 90)
+            overbought.setValue(70)
+            overbought.setFixedHeight(25)
+            oversold = QDoubleSpinBox()
+            oversold.setRange(10, 50)
+            oversold.setValue(30)
+            oversold.setFixedHeight(25)
+            self.strategy_params_layout.addRow("RSI周期:", period)
+            self.strategy_params_layout.addRow("超买阈值:", overbought)
+            self.strategy_params_layout.addRow("超卖阈值:", oversold)
+            self.param_controls["period"] = period
+            self.param_controls["overbought"] = overbought
+            self.param_controls["oversold"] = oversold
+        elif strategy == "布林带策略":
+            period = QSpinBox()
+            period.setRange(5, 60)
+            period.setValue(20)
+            period.setFixedHeight(25)
+            std = QDoubleSpinBox()
+            std.setRange(1.0, 3.0)
+            std.setValue(2.0)
+            std.setSingleStep(0.1)
+            std.setFixedHeight(25)
+            self.strategy_params_layout.addRow("周期:", period)
+            self.strategy_params_layout.addRow("标准差倍数:", std)
+            self.param_controls["period"] = period
+            self.param_controls["std"] = std
+        elif strategy == "KDJ策略":
+            period = QSpinBox()
+            period.setRange(5, 30)
+            period.setValue(9)
+            period.setFixedHeight(25)
+            k_factor = QDoubleSpinBox()
+            k_factor.setRange(0.1, 1.0)
+            k_factor.setValue(0.33)
+            k_factor.setSingleStep(0.01)
+            k_factor.setFixedHeight(25)
+            d_factor = QDoubleSpinBox()
+            d_factor.setRange(0.1, 1.0)
+            d_factor.setValue(0.33)
+            d_factor.setSingleStep(0.01)
+            d_factor.setFixedHeight(25)
+            self.strategy_params_layout.addRow("周期:", period)
+            self.strategy_params_layout.addRow("K值平滑因子:", k_factor)
+            self.strategy_params_layout.addRow("D值平滑因子:", d_factor)
+            self.param_controls["period"] = period
+            self.param_controls["k_factor"] = k_factor
+            self.param_controls["d_factor"] = d_factor
+        elif strategy == "自定义策略":
+            name = QLineEdit()
+            name.setFixedHeight(25)
+            value = QLineEdit()
+            value.setFixedHeight(25)
+            self.strategy_params_layout.addRow("参数名称:", name)
+            self.strategy_params_layout.addRow("参数值:", value)
+            self.param_controls["name"] = name
+            self.param_controls["value"] = value
+        else:
+            label = QLabel("请选择策略")
+            self.strategy_params_layout.addRow(label)
 
     def optimize(self):
         """Optimize strategy parameters"""
@@ -2267,29 +2415,9 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"切换周期失败: {str(e)}")
 
-    def on_strategy_changed(self, strategy: str) -> None:
-        """处理策略变化事件
-
-        Args:
-            strategy: 策略名称
-        """
-        try:
-            # 策略映射
-            strategy_map = {
-                '均线策略': 'ma_strategy',
-                'MACD策略': 'macd_strategy',
-                'RSI策略': 'rsi_strategy',
-                '布林带策略': 'boll_strategy',
-                'KDJ策略': 'kdj_strategy'
-            }
-
-            if strategy in strategy_map:
-                self.current_strategy = strategy_map[strategy]
-                self.update_strategy()
-                self.log_manager.log(f"策略已更改为: {strategy}", "INFO")
-
-        except Exception as e:
-            self.log_manager.error(f"更改策略失败: {str(e)}")
+    def on_strategy_changed(self, strategy: str):
+        self.refresh_strategy_params()
+        # 其他逻辑...
 
     def update_strategy(self) -> None:
         """更新当前策略（已废弃，统一由ChartWidget处理）"""
@@ -2299,7 +2427,7 @@ class TradingGUI(QMainWindow):
             # 直接刷新图表即可，指标渲染由ChartWidget内部处理
             self.update_chart()
         except Exception as e:
-            self.log_manager.log(f"更新策略失败: {str(e)}", "ERROR")
+            self.log_manager.log(f"更新策略失败: {str(e)}", LogLevel.ERROR)
 
     def load_favorites(self):
         """加载收藏的股票列表，自动修复空文件或损坏文件"""
@@ -2813,177 +2941,113 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
 
     def on_indicators_changed(self) -> None:
-        """处理指标变化事件"""
+        """处理指标变化事件，只刷新图表，不弹窗"""
         try:
             # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
                 return
-
-            # 更新指标参数
-            self.show_indicator_params_dialog()
-
-            # 更新图表
+            # 多屏同步：传递所有激活指标
+            if hasattr(self, 'multi_chart_panel') and self.multi_chart_panel.is_multi:
+                indicators = [item.text() for item in selected_items]
+                self.multi_chart_panel._on_indicator_changed(indicators)
+            # 只刷新图表
             self.update_chart()
-
             # 记录日志
             self.log_manager.info("指标已更新")
-
         except Exception as e:
             self.log_manager.error(f"处理指标变化事件失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
 
     def show_indicator_params_dialog(self) -> None:
-        """显示指标参数设置对话框，优化性能和用户体验"""
+        """显示指标参数设置对话框，支持ta-lib参数动态生成"""
         try:
-            # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
-                self.log_manager.warning("请先选择指标")
+                QMessageBox.warning(self, "提示", "请先选择指标")
                 return
-
-            # 创建对话框
             dialog = QDialog(self)
             dialog.setWindowTitle("指标参数设置")
-            dialog.setStyleSheet("""
-                QDialog {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    background-color: #f0f0f0;
-                }
-                QGroupBox {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 14px;
-                    background-color: white;
-                    border: 1px solid #cccccc;
-                    border-radius: 5px;
-                    margin-top: 10px;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 3px 0 3px;
-                }
-                QSpinBox, QDoubleSpinBox {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 14px;
-                    padding: 5px;
-                    background-color: white;
-                    border: 1px solid #cccccc;
-                    border-radius: 5px;
-                }
-                QLabel {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 14px;
-                }
-                QPushButton {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 14px;
-                    padding: 5px 10px;
-                    background-color: #e0e0e0;
-                    border: 1px solid #cccccc;
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #d0d0d0;
-                }
-                QPushButton:pressed {
-                    background-color: #c0c0c0;
-                }
-            """)
-
             layout = QVBoxLayout(dialog)
-
-            # 创建滚动区域
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll_content = QWidget()
             scroll_layout = QVBoxLayout(scroll_content)
-
-            # 存储参数控件
+            # --- 修复：确保param_controls存在 ---
             self.param_controls = {}
-
-            # 为每个选中的指标创建参数设置
+            import inspect
+            from indicators_algo import calc_talib_indicator
             for item in selected_items:
                 indicator = item.text()
-
-                # 创建指标组
+                ind_type = item.data(Qt.UserRole)
                 group = QGroupBox(indicator)
                 group_layout = QFormLayout(group)
-
-                # 根据指标类型添加参数控件
-                if "MA" in indicator:
-                    # MA参数
-                    ma_period = QSpinBox()
-                    ma_period.setRange(5, 250)
-                    ma_period.setValue(20)
-                    group_layout.addRow("周期:", ma_period)
-                    self.param_controls[f"{indicator}_period"] = ma_period
-
-                elif "MACD" in indicator:
-                    # MACD参数
-                    fast_period = QSpinBox()
-                    fast_period.setRange(5, 50)
-                    fast_period.setValue(12)
-                    group_layout.addRow("快线周期:", fast_period)
-                    self.param_controls[f"{indicator}_fast"] = fast_period
-
-                    slow_period = QSpinBox()
-                    slow_period.setRange(10, 100)
-                    slow_period.setValue(26)
-                    group_layout.addRow("慢线周期:", slow_period)
-                    self.param_controls[f"{indicator}_slow"] = slow_period
-
-                    signal_period = QSpinBox()
-                    signal_period.setRange(2, 20)
-                    signal_period.setValue(9)
-                    group_layout.addRow("信号线周期:", signal_period)
-                    self.param_controls[f"{indicator}_signal"] = signal_period
-
-                elif "RSI" in indicator:
-                    # RSI参数
-                    rsi_period = QSpinBox()
-                    rsi_period.setRange(5, 30)
-                    rsi_period.setValue(14)
-                    group_layout.addRow("周期:", rsi_period)
-                    self.param_controls[f"{indicator}_period"] = rsi_period
-
-                elif "BOLL" in indicator:
-                    # 布林带参数
-                    boll_period = QSpinBox()
-                    boll_period.setRange(10, 100)
-                    boll_period.setValue(20)
-                    group_layout.addRow("周期:", boll_period)
-                    self.param_controls[f"{indicator}_period"] = boll_period
-
-                    boll_std = QDoubleSpinBox()
-                    boll_std.setRange(1.0, 3.0)
-                    boll_std.setValue(2.0)
-                    boll_std.setDecimals(1)
-                    group_layout.addRow("标准差倍数:", boll_std)
-                    self.param_controls[f"{indicator}_std"] = boll_std
-
+                if ind_type == "ta-lib":
+                    import talib
+                    func = getattr(talib, indicator)
+                    sig = inspect.signature(func)
+                    for k, v in sig.parameters.items():
+                        if k in ["open", "high", "low", "close", "volume"]:
+                            continue
+                        if v.default is not inspect.Parameter.empty:
+                            spin = QSpinBox() if isinstance(v.default, int) else QDoubleSpinBox()
+                            spin.setValue(v.default)
+                            group_layout.addRow(f"{k}:", spin)
+                            self.param_controls[f"{indicator}_{k}"] = spin
+                else:
+                    if "MA" in indicator:
+                        ma_period = QSpinBox()
+                        ma_period.setRange(5, 250)
+                        ma_period.setValue(20)
+                        group_layout.addRow("周期:", ma_period)
+                        self.param_controls[f"{indicator}_period"] = ma_period
+                    elif "MACD" in indicator:
+                        fast_period = QSpinBox()
+                        fast_period.setRange(5, 50)
+                        fast_period.setValue(12)
+                        group_layout.addRow("快线周期:", fast_period)
+                        self.param_controls[f"{indicator}_fast"] = fast_period
+                        slow_period = QSpinBox()
+                        slow_period.setRange(10, 100)
+                        slow_period.setValue(26)
+                        group_layout.addRow("慢线周期:", slow_period)
+                        self.param_controls[f"{indicator}_slow"] = slow_period
+                        signal_period = QSpinBox()
+                        signal_period.setRange(2, 20)
+                        signal_period.setValue(9)
+                        group_layout.addRow("信号线周期:", signal_period)
+                        self.param_controls[f"{indicator}_signal"] = signal_period
+                    elif "RSI" in indicator:
+                        rsi_period = QSpinBox()
+                        rsi_period.setRange(5, 30)
+                        rsi_period.setValue(14)
+                        group_layout.addRow("周期:", rsi_period)
+                        self.param_controls[f"{indicator}_period"] = rsi_period
+                    elif "BOLL" in indicator:
+                        boll_period = QSpinBox()
+                        boll_period.setRange(10, 100)
+                        boll_period.setValue(20)
+                        group_layout.addRow("周期:", boll_period)
+                        self.param_controls[f"{indicator}_period"] = boll_period
+                        boll_std = QDoubleSpinBox()
+                        boll_std.setRange(1.0, 3.0)
+                        boll_std.setValue(2.0)
+                        boll_std.setDecimals(1)
+                        group_layout.addRow("标准差倍数:", boll_std)
+                        self.param_controls[f"{indicator}_std"] = boll_std
                 scroll_layout.addWidget(group)
-
-            # 设置滚动区域内容
             scroll.setWidget(scroll_content)
             layout.addWidget(scroll)
-
-            # 添加按钮
             buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-            )
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             buttons.accepted.connect(dialog.accept)
             buttons.rejected.connect(dialog.reject)
             layout.addWidget(buttons)
-
-            # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
-                # 更新指标参数
                 self.update_indicators()
-
         except Exception as e:
-            self.log_manager.error(
-                f"显示指标参数设置对话框失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"显示指标参数设置对话框失败: {str(e)}")
+            self.log_manager.error(f"显示指标参数设置对话框失败: {str(e)}")
 
     def create_bottom_panel(self):
         """Create bottom panel with logs，支持日志区动态显示/隐藏"""
@@ -2992,23 +3056,33 @@ class TradingGUI(QMainWindow):
             self.bottom_layout = QVBoxLayout(self.bottom_panel)
             self.bottom_layout.setContentsMargins(0, 0, 0, 0)
             self.bottom_layout.setSpacing(0)
+            # 日志内容区自适应高度
             self.log_widget = LogWidget(self.log_manager)
             self.log_widget.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.log_widget.setVisible(False)  # 默认隐藏
             self.log_widget.log_added.connect(self.show_log_panel)
-            self.bottom_layout.addWidget(self.log_widget)
-            self.bottom_splitter.addWidget(self.bottom_panel)
-            self.bottom_panel.setMinimumHeight(60)
-            self.bottom_panel.setMaximumHeight(300)
+            self.bottom_layout.addWidget(self.log_widget, stretch=1)
+            # 分割线
+            line = QFrame()
+            line.setFrameShape(QFrame.HLine)
+            line.setFrameShadow(QFrame.Sunken)
+            line.setObjectName("line")
+            line.setFixedHeight(2)
+            self.bottom_layout.addWidget(line)
             self.bottom_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.bottom_splitter.addWidget(self.bottom_panel)
+            self.bottom_splitter.setStretchFactor(0, 1)
             self.log_manager.info("底部面板创建完成")
             add_shadow(self.bottom_panel, blur_radius=12,
                        x_offset=0, y_offset=4)
             # 日志信号连接，确保log_widget已初始化
             self.log_manager.log_message.connect(self.log_widget.add_log)
             self.log_manager.log_cleared.connect(self.log_widget.clear_logs)
+            # 优化分割器初始比例，日志区最大化
+            if hasattr(self, 'bottom_splitter'):
+                self.bottom_splitter.setSizes([0, 1])
         except Exception as e:
             self.log_manager.error(f"创建底部面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -3211,54 +3285,9 @@ class TradingGUI(QMainWindow):
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
                 return
-
-            # 使用线程池异步更新指标
-            def update_indicators_async():
-                try:
-                    # 更新每个指标的参数
-                    for item in selected_items:
-                        indicator = item.text()
-
-                        if "MA" in indicator:
-                            # 更新MA参数
-                            period = self.param_controls[f"{indicator}_period"].value(
-                            )
-                            self.chart_widget.update_ma(period)
-
-                        elif "MACD" in indicator:
-                            # 更新MACD参数
-                            fast = self.param_controls[f"{indicator}_fast"].value(
-                            )
-                            slow = self.param_controls[f"{indicator}_slow"].value(
-                            )
-                            signal = self.param_controls[f"{indicator}_signal"].value(
-                            )
-                            self.chart_widget.update_macd(fast, slow, signal)
-
-                        elif "RSI" in indicator:
-                            # 更新RSI参数
-                            period = self.param_controls[f"{indicator}_period"].value(
-                            )
-                            self.chart_widget.update_rsi(period)
-
-                        elif "BOLL" in indicator:
-                            # 更新布林带参数
-                            period = self.param_controls[f"{indicator}_period"].value(
-                            )
-                            std = self.param_controls[f"{indicator}_std"].value(
-                            )
-                            self.chart_widget.update_boll(period, std)
-
-                    # 刷新图表
-                    self.chart_widget.update_chart()
-                    self.log_manager.info("指标参数已更新")
-
-                except Exception as e:
-                    self.log_manager.error(f"更新指标参数失败: {str(e)}")
-
-            # 使用线程池执行更新
-            self.thread_pool.start(update_indicators_async)
-
+            # 只刷新图表，所有指标渲染由ChartWidget自动同步主窗口get_current_indicators
+            self.chart_widget.update_chart()
+            self.log_manager.info("指标参数已更新")
         except Exception as e:
             self.log_manager.error(f"更新指标参数失败: {str(e)}")
 
@@ -4212,10 +4241,15 @@ class TradingGUI(QMainWindow):
             self.create_statusbar()
         if hasattr(self, 'log_widget') and self.log_widget:
             self.log_widget.setVisible(True)
+            self.log_widget.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
         if hasattr(self, 'bottom_panel'):
             self.bottom_panel.setVisible(True)
+            self.bottom_panel.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
         if hasattr(self, 'bottom_splitter'):
-            self.bottom_splitter.setSizes([8, 2])
+            # 日志区分割比例最大化
+            self.bottom_splitter.setSizes([0, 1])
         if hasattr(self, 'main_layout'):
             self.main_layout.setStretch(0, 8)  # top_splitter
             self.main_layout.setStretch(1, 2)  # bottom_splitter
@@ -4471,7 +4505,8 @@ class TradingGUI(QMainWindow):
                 return
             # 获取股票名称
             stock = self.sm[self.current_stock]
-            title = f"{stock.name}({self.current_stock}) - {self.current_period}线"
+            # 新增：title 和 stock_code 字段，title 格式为"股票代码 股票名称"
+            title = f"{self.current_stock} {stock.name}"
             # 准备图表数据
             data = {
                 'stock_code': self.current_stock,
@@ -5203,6 +5238,66 @@ class TradingGUI(QMainWindow):
         """主窗口拖拽移动事件，确保鼠标样式为可放开"""
         if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain") or event.mimeData().hasFormat("text/application/x-qabstractitemmodeldatalist"):
             event.acceptProposedAction()
+
+    def get_current_indicators(self):
+        """
+        获取当前激活的所有指标及其参数，兼容ta-lib、自有、自定义，修复无指标问题
+        Returns:
+            List[dict]: [{"name": 指标名, "params": 参数字典, "type": 类型, "group": 分组}, ...]
+        """
+        indicators = []
+        from indicators_algo import get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+        talib_list = get_talib_indicator_list()
+        category_map = get_all_indicators_by_category()
+        if not talib_list or not category_map:
+            import logging
+            logging.error("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
+            return []
+        selected_items = self.indicator_list.selectedItems()
+        if not hasattr(self, 'param_controls') or self.param_controls is None:
+            self.param_controls = {}
+        for item in selected_items:
+            indicator = item.text()
+            ind_type = item.data(Qt.UserRole)
+            params = {}
+            group = "builtin"
+            if ind_type == "ta-lib" or ind_type == "形态识别" or ind_type == "其他":
+                group = "talib"
+                import inspect
+                import talib
+                func = getattr(talib, indicator, None)
+                if func:
+                    sig = inspect.signature(func)
+                    for k in sig.parameters:
+                        if k in self.param_controls:
+                            params[k] = self.param_controls[k].value()
+            indicators.append({
+                "name": indicator,
+                "params": params,
+                "type": get_talib_category(indicator),
+                "group": group
+            })
+        return indicators
+
+    def update_indicator_list(self):
+        """
+        整理指标筛选列表，确保与ta-lib分类一一映射，筛选功能正常，只展示有指标的分类
+        """
+        from indicators_algo import get_all_indicators_by_category
+        category_map = get_all_indicators_by_category()
+        self.indicator_list.clear()
+        for cat, names in category_map.items():
+            for name in names:
+                item = QListWidgetItem(str(name))
+                item.setData(Qt.UserRole, str(cat))
+                self.indicator_list.addItem(item)
+
+    def clear_all_selected_indicators(self):
+        """
+        一键取消所有所选指标，UI联动
+        """
+        self.indicator_list.clearSelection()
+        self.update_indicators()
 
 
 class StockListWidget(QListWidget):

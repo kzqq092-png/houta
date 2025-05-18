@@ -138,13 +138,19 @@ class LogManager(BaseLogManager):
         except Exception as e:
             print(f"日志记录错误: {str(e)}")
 
-    def log(self, message: str, level: LogLevel = LogLevel.INFO):
+    def log(self, message: str, level: 'LogLevel | str' = LogLevel.INFO):
         """记录日志
 
         Args:
             message: 日志消息
-            level: 日志级别
+            level: 日志级别（可为LogLevel或字符串）
         """
+        # 兼容字符串类型
+        if isinstance(level, str):
+            try:
+                level = LogLevel[level.upper()]
+            except Exception:
+                level = LogLevel.INFO
         if self.config.async_logging:
             self._async_log(message, level)
         else:

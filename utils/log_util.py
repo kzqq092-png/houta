@@ -1,4 +1,4 @@
-from core.logger import LogManager
+from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
 
 _log_manager = None

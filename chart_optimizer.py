@@ -168,7 +168,7 @@ class ChartOptimizer:
             for period, color in zip(periods, colors):
                 ma = data.close.rolling(period).mean()
                 ax.plot(data.index, ma, color=color,
-                        label=f'MA{period}', linewidth=1)
+                        label=f'MA{period}', linewidth=0.7)
 
         elif indicator_type == 'BOLL':
             period = params.get('period', 20)

@@ -24,6 +24,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import json
 import traceback
+from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
 
 
 class StockScreenerWidget(QWidget):
@@ -1098,33 +1099,66 @@ class StockScreenerWidget(QWidget):
             QMessageBox.critical(self, "错误", f"筛选过程中发生错误: {str(e)}")
 
     def check_technical_condition(self, stock_data, condition_params):
-        """检查技术指标条件"""
+        """检查技术指标条件，支持多种指标"""
         try:
-            # 解析条件参数
-            # 示例：MA5>MA10
-            parts = condition_params.split('>')
-            if len(parts) != 2:
+            # 支持表达式如：MA5>MA10, MACD>0, RSI<70, BOLL>close, OBV>10000
+            import re
+            # 解析条件，支持 > < =
+            match = re.match(
+                r"([A-Z]+\d*)([><=])([A-Z]+\d*|\d+\.?\d*)", condition_params.replace(' ', ''))
+            if not match:
                 return False
+            ind1, op, ind2 = match.groups()
+            # 计算第一个指标
 
-            indicator1 = parts[0].strip()
-            indicator2 = parts[1].strip()
-
-            # 计算指标值
-            if indicator1.startswith('MA'):
-                period1 = int(indicator1[2:])
-                ma1 = stock_data['close'].rolling(window=period1).mean()
-            else:
+            def get_value(ind):
+                # 优先支持ta-lib指标
+                talib_list = get_talib_indicator_list()
+                if ind in talib_list:
+                    try:
+                        from indicators_algo import calc_talib_indicator
+                        df = stock_data.copy()
+                        res = calc_talib_indicator(ind, df)
+                        if isinstance(res, pd.DataFrame):
+                            return res.iloc[-1, 0]
+                        else:
+                            return res.iloc[-1]
+                    except Exception:
+                        return None
+                # 内置指标全部用ta-lib封装
+                if ind.startswith('MA'):
+                    period = int(ind[2:]) if len(
+                        ind) > 2 and ind[2:].isdigit() else 5
+                    return calc_ma(stock_data['close'], period).iloc[-1]
+                if ind == 'MACD':
+                    macd, _, _ = calc_macd(stock_data['close'])
+                    return macd.iloc[-1]
+                if ind == 'RSI':
+                    return calc_rsi(stock_data['close']).iloc[-1]
+                if ind == 'KDJ':
+                    k, d, j = calc_kdj(stock_data)
+                    return j.iloc[-1]
+                if ind == 'BOLL':
+                    _, upper, lower = calc_boll(stock_data['close'])
+                    return upper.iloc[-1]
+                if ind == 'ATR':
+                    return calc_atr(stock_data).iloc[-1]
+                if ind == 'OBV':
+                    return calc_obv(stock_data).iloc[-1]
+                if ind == 'CCI':
+                    return calc_cci(stock_data).iloc[-1]
+                return None
+            v1 = get_value(ind1)
+            v2 = get_value(ind2)
+            if v1 is None or v2 is None:
                 return False
-
-            if indicator2.startswith('MA'):
-                period2 = int(indicator2[2:])
-                ma2 = stock_data['close'].rolling(window=period2).mean()
-            else:
-                return False
-
-            # 检查条件
-            return ma1.iloc[-1] > ma2.iloc[-1]
-
+            if op == '>':
+                return v1 > v2
+            elif op == '<':
+                return v1 < v2
+            elif op == '=':
+                return v1 == v2
+            return False
         except Exception:
             return False
 
@@ -1353,104 +1387,56 @@ class StockScreenerWidget(QWidget):
         except Exception as e:
             self.log_manager.log(f"设置弹窗位置失败: {str(e)}", LogLevel.ERROR)
 
+    def get_available_indicators(self):
+        """获取所有可用指标分类及其指标列表，确保与后端ta-lib分类一致"""
+        from indicators_algo import get_all_indicators_by_category
+        categories = get_all_indicators_by_category()
+        # 强制所有分类名和指标名为str类型，防止类型对比异常
+        categories = {str(cat): [str(ind) for ind in inds]
+                      for cat, inds in categories.items()}
+        for cat, inds in categories.items():
+            self.log_manager.log(
+                f"筛选分类: {cat}，可见指标数: {len(inds)}", LogLevel.INFO)
+        return categories
 
-class ScreeningThread(QThread):
-    """选股线程"""
-
-    # 定义信号
-    progress_updated = pyqtSignal(int)
-    screening_completed = pyqtSignal(pd.DataFrame)
-    error_occurred = pyqtSignal(str)
-
-    def __init__(self, screener: 'StockScreener', strategy_type: str, conditions: dict):
-        """初始化选股线程
-
-        Args:
-            screener: 选股器实例
-            strategy_type: 策略类型
-            conditions: 选股条件
-        """
-        super().__init__()
-        self.screener = screener
-        self.strategy_type = strategy_type
-        self.conditions = conditions
-
-    def run(self):
-        """运行选股线程"""
-        try:
-            # 获取股票列表
-            stocks = self.screener.data_manager.get_stock_list()
-            total_stocks = len(stocks)
-
-            # 初始化结果列表
-            results = []
-
-            # 遍历股票列表
-            for i, stock in enumerate(stocks):
-                try:
-                    # 更新进度
-                    progress = int((i + 1) / total_stocks * 100)
-                    self.progress_updated.emit(progress)
-
-                    # 获取股票数据
-                    data = self.screener.data_manager.get_stock_data(
-                        stock['code'])
-                    if data is None or data.empty:
-                        continue
-
-                    # 根据策略类型筛选股票
-                    if self.strategy_type == "技术指标选股":
-                        if self.screener.check_technical_conditions(data, self.conditions):
-                            results.append({
-                                'code': stock['code'],
-                                'name': stock['name'],
-                                'close': data['close'].iloc[-1],
-                                'change_percent': data['change_percent'].iloc[-1],
-                                'score': self.screener.calculate_technical_score(data, self.conditions)
-                            })
-                    elif self.strategy_type == "基本面选股":
-                        if self.screener.check_fundamental_conditions(data, self.conditions):
-                            results.append({
-                                'code': stock['code'],
-                                'name': stock['name'],
-                                'close': data['close'].iloc[-1],
-                                'change_percent': data['change_percent'].iloc[-1],
-                                'score': self.screener.calculate_fundamental_score(data, self.conditions)
-                            })
-                    elif self.strategy_type == "资金面选股":
-                        if self.screener.check_capital_conditions(data, self.conditions):
-                            results.append({
-                                'code': stock['code'],
-                                'name': stock['name'],
-                                'close': data['close'].iloc[-1],
-                                'change_percent': data['change_percent'].iloc[-1],
-                                'score': self.screener.calculate_capital_score(data, self.conditions)
-                            })
-                    else:  # 综合选股
-                        score = self.screener.calculate_comprehensive_score(
-                            data, self.conditions)
-                        if score > 0:
-                            results.append({
-                                'code': stock['code'],
-                                'name': stock['name'],
-                                'close': data['close'].iloc[-1],
-                                'change_percent': data['change_percent'].iloc[-1],
-                                'score': score
-                            })
-
-                except Exception as e:
-                    self.screener.log_manager.log(
-                        f"处理股票 {stock['code']} 失败: {str(e)}", LogLevel.ERROR)
+    def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
+        """技术指标筛选，全部用ta-lib封装，分类、筛选用统一接口"""
+        results = []
+        categories = self.get_available_indicators()
+        # 示例：遍历所有分类和指标，实际可按params指定分类/指标筛选
+        for stock in stock_list:
+            try:
+                kdata = self.data_manager.get_kdata(stock)
+                if kdata.empty:
                     continue
-
-            # 转换为DataFrame并排序
-            results_df = pd.DataFrame(results)
-            if not results_df.empty:
-                results_df = results_df.sort_values('score', ascending=False)
-
-            # 发送完成信号
-            self.screening_completed.emit(results_df)
-
-        except Exception as e:
-            # 发送错误信号
-            self.error_occurred.emit(str(e))
+                for cat, inds in categories.items():
+                    for ind in inds:
+                        try:
+                            from indicators_algo import calc_talib_indicator
+                            res = calc_talib_indicator(ind, kdata)
+                        except Exception:
+                            continue
+                # ...原有条件判断和结果收集逻辑...
+                ma_short = calc_ma(kdata['close'], params.get('ma_short', 5))
+                ma_long = calc_ma(kdata['close'], params.get('ma_long', 20))
+                macd, _, _ = calc_macd(kdata['close'])
+                rsi = calc_rsi(kdata['close'])
+                if ma_short.iloc[-1] > ma_long.iloc[-1] and macd.iloc[-1] > 0 and rsi.iloc[-1] > params.get('rsi_value', 50):
+                    info = self.data_manager.get_stock_info(stock)
+                    results.append({
+                        'code': stock,
+                        'name': info['name'],
+                        'industry': info['industry'],
+                        'price': kdata['close'].iloc[-1],
+                        'change': (kdata['close'].iloc[-1] / kdata['close'].iloc[-2] - 1) * 100,
+                        'pe': info['pe'],
+                        'pb': info['pb'],
+                        'roe': info['roe'],
+                        'main_force': self.get_main_force(stock),
+                        'north_money': self.get_north_money(stock)
+                    })
+            except Exception as e:
+                self.log_manager.log(
+                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                continue
+        return pd.DataFrame(results)

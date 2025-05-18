@@ -22,7 +22,7 @@ from utils.theme import get_theme_manager, Theme
 from utils.config_manager import ConfigManager
 import traceback
 from core.cache_manager import CacheManager
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
+from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, calc_talib_indicator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .async_data_processor import AsyncDataProcessor
 from .chart_renderer import ChartRenderer
@@ -62,6 +62,7 @@ class ChartWidget(QWidget):
             self._max_zoom = 5.0
             self._min_zoom = 0.2
             self.crosshair_enabled = True  # 默认开启十字线
+            self.active_indicators = []  # 当前激活的指标列表，初始化为空，仅通过外部信号设置
 
             # 初始化缓存管理器
             self.cache_manager = CacheManager(max_size=100)  # 图表最多缓存100个
@@ -85,6 +86,11 @@ class ChartWidget(QWidget):
             # 初始化数据更新锁
             self._update_lock = QMutex()
             self._render_lock = QMutex()
+
+            # 新增：合并指标栏UI引用
+            self.indicator_bar = None  # 合并后的指标栏
+            self.volume_bar = None     # 成交量栏
+            self.macd_bar = None      # MACD栏
 
             # 初始化UI
             self.init_ui()
@@ -130,12 +136,21 @@ class ChartWidget(QWidget):
             self.error_occurred.emit(error_msg)
 
     def init_ui(self):
-        """初始化UI，移除十字光标按钮，默认开启十字光标"""
+        """初始化UI，移除十字光标按钮，默认开启十字光标。主图类型下拉框由主窗口统一管理，不在ChartWidget中定义。"""
         try:
-            self.setLayout(QVBoxLayout())
-            self.layout().setContentsMargins(0, 0, 0, 0)
-            self.layout().setSpacing(0)
+            # 先设置主布局，确保self.layout()不为None
+            if self.layout() is None:
+                layout = QVBoxLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.setSpacing(0)
+                self.setLayout(layout)
+            else:
+                layout = self.layout()
+            # 图表区
             self._init_figure_layout()
+            # 移除底部指标栏（indicator_bar）相关代码
+            # self.indicator_bar = None
+            # layout.addWidget(self.indicator_bar)
             self._init_zoom_interaction()  # 新增：自定义缩放交互
             self._optimize_display()  # 保证初始化后也显示网格和刻度
         except Exception as e:
@@ -240,6 +255,14 @@ class ChartWidget(QWidget):
             x = np.arange(len(kdata))  # 用等距序号做X轴
             self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
             self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
+            # 修复：自动同步主窗口指标
+            if hasattr(self, 'parentWidget') and callable(getattr(self, 'parentWidget', None)):
+                main_window = self.parentWidget()
+                while main_window and not hasattr(main_window, 'get_current_indicators'):
+                    main_window = main_window.parentWidget() if hasattr(
+                        main_window, 'parentWidget') else None
+                if main_window and hasattr(main_window, 'get_current_indicators'):
+                    self.active_indicators = main_window.get_current_indicators()
             self._render_indicators(kdata, x=x)
             self._optimize_display()
             if not kdata.empty:
@@ -255,9 +278,6 @@ class ChartWidget(QWidget):
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=30, fontsize=8)
             self.close_loading_dialog()
-            # 移除清空X轴刻度的代码，始终显示
-            # self.price_ax.set_xticklabels([])
-            # self.volume_ax.set_xticklabels([])
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.yaxis.set_tick_params(direction='in', pad=0)
                 ax.yaxis.set_label_position('left')
@@ -266,11 +286,25 @@ class ChartWidget(QWidget):
             self.enable_crosshair(force_rebind=True)
             # 左上角显示股票名称和代码
             if hasattr(self, '_stock_info_text') and self._stock_info_text:
-                self._stock_info_text.remove()
+                try:
+                    if self._stock_info_text in self.price_ax.texts:
+                        self._stock_info_text.remove()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"移除股票信息文本失败: {str(e)}")
                 self._stock_info_text = None
-            stock_name = data.get('title', '')
-            stock_code = data.get('stock_code', '')
-            info_str = f"{stock_name} ({stock_code})" if stock_code else stock_name
+            stock_name = data.get('title') or getattr(
+                self, 'current_stock', '')
+            stock_code = data.get('stock_code') or getattr(
+                self, 'current_stock', '')
+            if stock_name and stock_code and stock_code not in stock_name:
+                info_str = f"{stock_name} ({stock_code})"
+            elif stock_name:
+                info_str = stock_name
+            elif stock_code:
+                info_str = stock_code
+            else:
+                info_str = ''
             colors = self.theme_manager.get_theme_colors()
             text_color = colors.get('chart_text', '#222b45')
             bg_color = colors.get('chart_background', '#ffffff')
@@ -278,7 +312,7 @@ class ChartWidget(QWidget):
                 0.01, 0.98, info_str,
                 transform=self.price_ax.transAxes,
                 va='top', ha='left',
-                fontsize=7,
+                fontsize=8,
                 color=text_color,
                 bbox=dict(facecolor=bg_color, alpha=0.7,
                           edgecolor='none', boxstyle='round,pad=0.2'),
@@ -292,53 +326,222 @@ class ChartWidget(QWidget):
                 ax.xaxis.label.set_fontsize(8)
                 ax.yaxis.label.set_fontsize(8)
             self._optimize_display()  # 保证每次刷新后都恢复网格和刻度
+            # --- 十字光标X轴日期标签固定在X轴下方 ---
+            # 在 on_mouse_move 事件中，x_text 固定为X轴下方边界
+            # ...找到 on_mouse_move ...
+
+            def on_mouse_move(event):
+                import time
+                now = int(time.time() * 1000)
+                if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
+                    return
+                self._last_crosshair_update_time = now
+                colors = self.theme_manager.get_theme_colors(
+                ) if hasattr(self, 'theme_manager') else {}
+                primary_color = colors.get('primary', '#1976d2')
+                if not event.inaxes or self.current_kdata is None or len(self.current_kdata) == 0 or event.xdata is None:
+                    for line in self._crosshair_lines:
+                        line.set_visible(False)
+                    self._crosshair_text.set_visible(False)
+                    # 清除indicator_ax上的十字线覆盖（如果有）
+                    if hasattr(self, '_crosshair_xtext') and self._crosshair_xtext:
+                        self._crosshair_xtext.set_visible(False)
+                    if hasattr(self, '_crosshair_ytext') and self._crosshair_ytext:
+                        self._crosshair_ytext.set_visible(False)
+                    self.canvas.draw_idle()
+                    return
+                kdata = self.current_kdata
+                x_array = np.arange(len(kdata))  # 等距序号X轴
+                idx = int(np.clip(round(event.xdata), 0, len(kdata)-1))
+                row = kdata.iloc[idx]
+                x_val = x_array[idx]
+                y_val = row.close
+                # 竖线x，横线y
+                # 让竖线穿透所有子图
+                for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                    vlines = [l for l in getattr(
+                        self, '_crosshair_lines', []) if l.axes == ax and l.get_linestyle() == '--']
+                    if not vlines:
+                        vline = ax.axvline(
+                            x_val, color=primary_color, lw=1.2, ls='--', alpha=0.55, visible=True, zorder=100)
+                        self._crosshair_lines.append(vline)
+                    else:
+                        vlines[0].set_xdata([x_val, x_val])
+                        vlines[0].set_visible(True)
+                # 横线只在主图
+                self._crosshair_lines[1].set_ydata([y_val, y_val])
+                self._crosshair_lines[1].set_visible(True)
+                # 信息内容（多行详细信息）
+                info = (
+                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
+                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
+                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"成交量: {row.volume:.0f}"
+                )
+                # 信息框位置：在十字点右上角偏移一点
+                ax = event.inaxes
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                dx = 0.03 * (xlim[1] - xlim[0])
+                dy = 0.03 * (ylim[1] - ylim[0])
+                x_text = x_val + \
+                    dx if x_val < (xlim[0] + xlim[1]) / 2 else x_val - dx
+                y_text = y_val + \
+                    dy if y_val < (ylim[0] + ylim[1]) / 2 else y_val - dy
+                x_text = min(max(x_text, xlim[0] + dx), xlim[1] - dx)
+                y_text = min(max(y_text, ylim[0] + dy), ylim[1] - dy)
+                self._crosshair_text.set_position((x_text, y_text))
+                self._crosshair_text.set_ha('left' if x_val < (
+                    xlim[0] + xlim[1]) / 2 else 'right')
+                self._crosshair_text.set_va(
+                    'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
+                self._crosshair_text.set_text(info)
+                self._crosshair_text.set_visible(True)
+                # --- X轴交点数字覆盖 ---
+                # 固定在X轴上方，不随窗口缩放
+                if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
+                    self._crosshair_xtext = self.indicator_ax.text(
+                        x_val, self.indicator_ax.get_ylim(
+                        )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
+                        row.name.strftime('%Y-%m-%d'),
+                        ha='center', va='top', fontsize=8, color=primary_color,
+                        bbox=dict(facecolor='#fff', edgecolor='none',
+                                  alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
+                        zorder=350, clip_on=False
+                    )
+                else:
+                    self._crosshair_xtext.set_x(x_val)
+                    self._crosshair_xtext.set_text(
+                        row.name.strftime('%Y-%m-%d'))
+                    self._crosshair_xtext.set_visible(True)
+                    self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
+                                                1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
+                self._crosshair_xtext.set_color(primary_color)
+                self._crosshair_xtext.set_bbox(dict(
+                    facecolor='#fff', edgecolor='none', alpha=0.85, boxstyle='round,pad=0.15', linewidth=0))
+                # --- Y轴交点数字覆盖 ---
+                # 在price_ax左侧动态覆盖当前y_val位置的Y轴刻度（半透明白底，数字在上方）
+                if not hasattr(self, '_crosshair_ytext') or self._crosshair_ytext is None:
+                    self._crosshair_ytext = self.price_ax.text(
+                        -0.5, y_val, f'{y_val:.2f}',
+                        ha='right', va='center', fontsize=8, color=primary_color,
+                        bbox=dict(facecolor='#fff', edgecolor='none',
+                                  alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
+                        zorder=350, clip_on=False
+                    )
+                else:
+                    self._crosshair_ytext.set_y(y_val)
+                    self._crosshair_ytext.set_text(f'{y_val:.2f}')
+                    self._crosshair_ytext.set_visible(True)
+                self._crosshair_ytext.set_color(primary_color)
+                self._crosshair_ytext.set_bbox(dict(
+                    facecolor='#fff', edgecolor='none', alpha=0.85, boxstyle='round,pad=0.15', linewidth=0))
+                self.canvas.draw_idle()
+            self._crosshair_cid = self.canvas.mpl_connect(
+                'motion_notify_event', on_mouse_move)
+            self._crosshair_initialized = True
+            # --- 图例左对齐固定在主图X轴下方，支持点击隐藏/显示 ---
+            lines = self.price_ax.get_lines()
+            labels = [l.get_label() for l in lines]
+            if lines and labels and any(l.get_visible() for l in lines):
+                self.price_ax.legend(loc='upper left', fontsize=8)
+            if not self.current_kdata.empty:
+                step = max(1, len(self.current_kdata)//8)
+                xticks = np.arange(0, len(self.current_kdata), step)
+                xticklabels = [self.current_kdata.index[i].strftime(
+                    '%Y-%m-%d') for i in xticks]
+                self.indicator_ax.set_xticks(xticks)
+                self.indicator_ax.set_xticklabels(
+                    xticklabels, rotation=0, fontsize=7)
+
         except Exception as e:
-            self.error_occurred.emit(f"更新图表失败: {str(e)}")
+            self.log_manager.error(f"更新图表失败: {str(e)}")
             self.close_loading_dialog()
 
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
         """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
         try:
-            indicators = self._get_active_indicators()
+            indicators = getattr(self, 'active_indicators', [])
             if not indicators:
                 return
             if x is None:
                 x = np.arange(len(kdata))
-            for indicator in indicators:
-                style = self._get_indicator_style(indicator)
-                if indicator.startswith('MA'):
-                    period = int(indicator[2:])
+            for i, indicator in enumerate(indicators):
+                name = indicator.get('name', '')
+                group = indicator.get('group', '')
+                params = indicator.get('params', {})
+                formula = indicator.get('formula', None)
+                style = self._get_indicator_style(name, i)
+                # 内置MA
+                if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
+                    period = int(params.get('n', name[2:]) or 5)
                     ma = kdata['close'].rolling(period).mean().dropna()
                     self.price_ax.plot(x[-len(ma):], ma.values, color=style['color'],
-                                       linewidth=style['linewidth'], alpha=style['alpha'], label=indicator)
-                elif indicator == 'MACD':
-                    macd, signal, hist = self._calculate_macd(kdata)
+                                       linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+                elif name == 'MACD' and group == 'builtin':
+                    macd, sig, hist = self._calculate_macd(kdata)
                     macd = macd.dropna()
-                    signal = signal.dropna()
+                    sig = sig.dropna()
                     hist = hist.dropna()
-                    self.indicator_ax.plot(x[-len(macd):], macd.values, color=self._get_indicator_style(
-                        'MACD', 0)['color'], linewidth=1.2, alpha=0.85, label='MACD')
-                    self.indicator_ax.plot(x[-len(signal):], signal.values, color=self._get_indicator_style(
-                        'MACD', 1)['color'], linewidth=1.2, alpha=0.85, label='Signal')
+                    self.indicator_ax.plot(x[-len(macd):], macd.values, color=self._get_indicator_style('MACD', i)['color'],
+                                           linewidth=0.7, alpha=0.85, label='MACD')
+                    self.indicator_ax.plot(x[-len(sig):], sig.values, color=self._get_indicator_style('MACD-Signal', i+1)['color'],
+                                           linewidth=0.7, alpha=0.85, label='Signal')
                     if not hist.empty:
                         colors = ['red' if h >= 0 else 'green' for h in hist]
                         self.indicator_ax.bar(
                             x[-len(hist):], hist.values, color=colors, alpha=0.5)
-                elif indicator == 'RSI':
-                    rsi = self._calculate_rsi(kdata).dropna()
+                elif name == 'RSI' and group == 'builtin':
+                    period = int(params.get('n', 14))
+                    rsi = self._calculate_rsi(kdata, period).dropna()
                     self.indicator_ax.plot(x[-len(rsi):], rsi.values, color=style['color'],
                                            linewidth=style['linewidth'], alpha=style['alpha'], label='RSI')
-                elif indicator == 'BOLL':
-                    mid, upper, lower = self._calculate_boll(kdata)
+                elif name == 'BOLL' and group == 'builtin':
+                    n = int(params.get('n', 20))
+                    p = float(params.get('p', 2))
+                    mid, upper, lower = self._calculate_boll(kdata, n, p)
                     mid = mid.dropna()
                     upper = upper.dropna()
                     lower = lower.dropna()
-                    self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style(
-                        'BOLL', 0)['color'], linewidth=1.2, alpha=0.85, label='BOLL-Mid')
-                    self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style(
-                        'BOLL', 1)['color'], linewidth=1.2, alpha=0.85, label='BOLL-Upper')
-                    self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style(
-                        'BOLL', 2)['color'], linewidth=1.2, alpha=0.85, label='BOLL-Lower')
+                    self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style('BOLL-Mid', i)['color'],
+                                       linewidth=0.7, alpha=0.85, label='BOLL-Mid')
+                    self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style('BOLL-Upper', i+1)['color'],
+                                       linewidth=0.7, alpha=0.85, label='BOLL-Upper')
+                    self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style('BOLL-Lower', i+2)['color'],
+                                       linewidth=0.7, alpha=0.85, label='BOLL-Lower')
+                elif group == 'talib':
+                    try:
+                        import talib
+                        func = getattr(talib, name)
+                        # 只传递非空参数
+                        func_params = {k: v for k,
+                                       v in params.items() if v != ''}
+                        # 传递收盘价等
+                        result = func(
+                            kdata['close'].values, **{k: float(v) if v else None for k, v in func_params.items()})
+                        if isinstance(result, tuple):
+                            for j, arr in enumerate(result):
+                                arr = np.asarray(arr)
+                                arr = arr[~np.isnan(arr)]
+                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(name, i+j)['color'],
+                                                       linewidth=0.7, alpha=0.85, label=f'{name}-{j}')
+                        else:
+                            arr = np.asarray(result)
+                            arr = arr[~np.isnan(arr)]
+                            self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
+                                                   linewidth=0.7, alpha=0.85, label=name)
+                    except Exception as e:
+                        self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
+                elif group == 'custom' and formula:
+                    try:
+                        # 安全地用pandas.eval计算表达式
+                        local_vars = {col: kdata[col] for col in kdata.columns}
+                        arr = pd.eval(formula, local_dict=local_vars)
+                        arr = arr.dropna()
+                        self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
+                                           linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+                    except Exception as e:
+                        self.error_occurred.emit(f"自定义公式渲染失败: {str(e)}")
         except Exception as e:
             self.error_occurred.emit(f"渲染指标失败: {str(e)}")
 
@@ -371,7 +574,7 @@ class ChartWidget(QWidget):
             '#fbc02d', '#ab47bc', '#1976d2', '#43a047', '#e53935', '#00bcd4', '#ff9800'])
         return {
             'color': indicator_colors[index % len(indicator_colors)],
-            'linewidth': 1.2,
+            'linewidth': 0.7,
             'alpha': 0.85,
             'label': name
         }
@@ -446,13 +649,25 @@ class ChartWidget(QWidget):
         lower = mid - k * std
         return mid, upper, lower
 
-    def _get_active_indicators(self) -> List[str]:
-        """获取当前激活的指标列表"""
-        active = []
-        if hasattr(self, 'indicator_list'):
-            for item in self.indicator_list.selectedItems():
-                active.append(item.text())
-        return active
+    def _get_active_indicators(self) -> list:
+        """
+        统一通过主窗口接口获取当前激活的所有指标及参数
+        Returns:
+            List[dict]: [{"name": 指标名, "params": 参数字典}, ...]
+        """
+        main_window = self.parentWidget()
+        while main_window and not hasattr(main_window, 'get_current_indicators'):
+            main_window = main_window.parentWidget() if hasattr(
+                main_window, 'parentWidget') else None
+        if main_window and hasattr(main_window, 'get_current_indicators'):
+            return main_window.get_current_indicators()
+        # 兜底：如果未找到主窗口接口，返回默认指标
+        return [
+            {"name": "MA20", "params": {"period": 20}},
+            {"name": "MACD", "params": {"fast": 12, "slow": 26, "signal": 9}},
+            {"name": "RSI", "params": {"period": 14}},
+            {"name": "BOLL", "params": {"period": 20, "std": 2.0}}
+        ]
 
     def _on_calculation_progress(self, progress: int, message: str):
         """处理计算进度"""
@@ -520,8 +735,139 @@ class ChartWidget(QWidget):
             # 关闭加载对话框
             self.close_loading_dialog()
 
+            # --- 十字光标X轴日期标签固定在X轴下方 ---
+            # 在 on_mouse_move 事件中，x_text 固定为X轴下方边界
+            # ...找到 on_mouse_move ...
+            def on_mouse_move(event):
+                import time
+                now = int(time.time() * 1000)
+                if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
+                    return
+                self._last_crosshair_update_time = now
+                colors = self.theme_manager.get_theme_colors(
+                ) if hasattr(self, 'theme_manager') else {}
+                primary_color = colors.get('primary', '#1976d2')
+                if not event.inaxes or self.current_kdata is None or len(self.current_kdata) == 0 or event.xdata is None:
+                    for line in self._crosshair_lines:
+                        line.set_visible(False)
+                    self._crosshair_text.set_visible(False)
+                    # 清除indicator_ax上的十字线覆盖（如果有）
+                    if hasattr(self, '_crosshair_xtext') and self._crosshair_xtext:
+                        self._crosshair_xtext.set_visible(False)
+                    if hasattr(self, '_crosshair_ytext') and self._crosshair_ytext:
+                        self._crosshair_ytext.set_visible(False)
+                    self.canvas.draw_idle()
+                    return
+                kdata = self.current_kdata
+                x_array = np.arange(len(kdata))  # 等距序号X轴
+                idx = int(np.clip(round(event.xdata), 0, len(kdata)-1))
+                row = kdata.iloc[idx]
+                x_val = x_array[idx]
+                y_val = row.close
+                # 竖线x，横线y
+                # 让竖线穿透所有子图
+                for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                    vlines = [l for l in getattr(
+                        self, '_crosshair_lines', []) if l.axes == ax and l.get_linestyle() == '--']
+                    if not vlines:
+                        vline = ax.axvline(
+                            x_val, color=primary_color, lw=1.2, ls='--', alpha=0.55, visible=True, zorder=100)
+                        self._crosshair_lines.append(vline)
+                    else:
+                        vlines[0].set_xdata([x_val, x_val])
+                        vlines[0].set_visible(True)
+                # 横线只在主图
+                self._crosshair_lines[1].set_ydata([y_val, y_val])
+                self._crosshair_lines[1].set_visible(True)
+                # 信息内容（多行详细信息）
+                info = (
+                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
+                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
+                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"成交量: {row.volume:.0f}"
+                )
+                # 信息框位置：在十字点右上角偏移一点
+                ax = event.inaxes
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                dx = 0.03 * (xlim[1] - xlim[0])
+                dy = 0.03 * (ylim[1] - ylim[0])
+                x_text = x_val + \
+                    dx if x_val < (xlim[0] + xlim[1]) / 2 else x_val - dx
+                y_text = y_val + \
+                    dy if y_val < (ylim[0] + ylim[1]) / 2 else y_val - dy
+                x_text = min(max(x_text, xlim[0] + dx), xlim[1] - dx)
+                y_text = min(max(y_text, ylim[0] + dy), ylim[1] - dy)
+                self._crosshair_text.set_position((x_text, y_text))
+                self._crosshair_text.set_ha('left' if x_val < (
+                    xlim[0] + xlim[1]) / 2 else 'right')
+                self._crosshair_text.set_va(
+                    'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
+                self._crosshair_text.set_text(info)
+                self._crosshair_text.set_visible(True)
+                # --- X轴交点数字覆盖 ---
+                # 固定在X轴上方，不随窗口缩放
+                if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
+                    self._crosshair_xtext = self.indicator_ax.text(
+                        x_val, self.indicator_ax.get_ylim(
+                        )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
+                        row.name.strftime('%Y-%m-%d'),
+                        ha='center', va='top', fontsize=8, color=primary_color,
+                        bbox=dict(facecolor='#fff', edgecolor='none',
+                                  alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
+                        zorder=350, clip_on=False
+                    )
+                else:
+                    self._crosshair_xtext.set_x(x_val)
+                    self._crosshair_xtext.set_text(
+                        row.name.strftime('%Y-%m-%d'))
+                    self._crosshair_xtext.set_visible(True)
+                    self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
+                                                1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
+                self._crosshair_xtext.set_color(primary_color)
+                self._crosshair_xtext.set_bbox(dict(
+                    facecolor='#fff', edgecolor='none', alpha=0.85, boxstyle='round,pad=0.15', linewidth=0))
+                # --- Y轴交点数字覆盖 ---
+                # 在price_ax左侧动态覆盖当前y_val位置的Y轴刻度（半透明白底，数字在上方）
+                if not hasattr(self, '_crosshair_ytext') or self._crosshair_ytext is None:
+                    self._crosshair_ytext = self.price_ax.text(
+                        -0.5, y_val, f'{y_val:.2f}',
+                        ha='right', va='center', fontsize=8, color=primary_color,
+                        bbox=dict(facecolor='#fff', edgecolor='none',
+                                  alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
+                        zorder=350, clip_on=False
+                    )
+                else:
+                    self._crosshair_ytext.set_y(y_val)
+                    self._crosshair_ytext.set_text(f'{y_val:.2f}')
+                    self._crosshair_ytext.set_visible(True)
+                self._crosshair_ytext.set_color(primary_color)
+                self._crosshair_ytext.set_bbox(dict(
+                    facecolor='#fff', edgecolor='none', alpha=0.85, boxstyle='round,pad=0.15', linewidth=0))
+                self.canvas.draw_idle()
+            self._crosshair_cid = self.canvas.mpl_connect(
+                'motion_notify_event', on_mouse_move)
+            self._crosshair_initialized = True
+            # --- 图例左对齐固定在主图X轴下方，支持点击隐藏/显示 ---
+            lines = self.price_ax.get_lines()
+            labels = [l.get_label() for l in lines]
+            if lines and labels and any(l.get_visible() for l in lines):
+                self.price_ax.legend(loc='upper left', fontsize=8)
+            if not self.current_kdata.empty:
+                step = max(1, len(self.current_kdata)//8)
+                xticks = np.arange(0, len(self.current_kdata), step)
+                xticklabels = [self.current_kdata.index[i].strftime(
+                    '%Y-%m-%d') for i in xticks]
+                self.indicator_ax.set_xticks(xticks)
+                self.indicator_ax.set_xticklabels(
+                    xticklabels, rotation=0, fontsize=7)
+            # 移除底部指标栏相关刷新
+            # self._update_combined_indicator_bar(kdata)
+            # self._update_volume_bar(kdata)
+            # self._update_macd_bar(kdata)
         except Exception as e:
-            self.error_occurred.emit(f"更新图表显示失败: {str(e)}")
+            self.log_manager.error(f"更新图表失败: {str(e)}")
+            self.close_loading_dialog()
 
     def _get_style(self) -> Dict[str, Any]:
         """获取当前主题样式"""
@@ -681,6 +1027,14 @@ class ChartWidget(QWidget):
             self._orig_ytick_color = None
 
             def on_mouse_move(event):
+                import time
+                now = int(time.time() * 1000)
+                if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
+                    return
+                self._last_crosshair_update_time = now
+                colors = self.theme_manager.get_theme_colors(
+                ) if hasattr(self, 'theme_manager') else {}
+                primary_color = colors.get('primary', '#1976d2')
                 if not event.inaxes or self.current_kdata is None or len(self.current_kdata) == 0 or event.xdata is None:
                     for line in self._crosshair_lines:
                         line.set_visible(False)
@@ -740,17 +1094,13 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_text(info)
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
-                # 保证X轴刻度水平显示
-                self.indicator_ax.set_xticklabels(
-                    [label.get_text()
-                     for label in self.indicator_ax.get_xticklabels()],
-                    rotation=0, fontsize=8
-                )
-                # 在indicator_ax底部动态覆盖当前x_val位置的X轴刻度（半透明白底，数字在上方）
+                # 固定在X轴上方，不随窗口缩放
                 if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
                     self._crosshair_xtext = self.indicator_ax.text(
-                        x_val, -0.05, row.name.strftime('%Y-%m-%d'),
-                        ha='center', va='top', fontsize=8, color=primary_color,
+                        x_val, self.indicator_ax.get_ylim(
+                        )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
+                        row.name.strftime('%Y-%m-%d'),
+                        ha='center', va='bottom', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
                         zorder=350, clip_on=False
@@ -760,6 +1110,8 @@ class ChartWidget(QWidget):
                     self._crosshair_xtext.set_text(
                         row.name.strftime('%Y-%m-%d'))
                     self._crosshair_xtext.set_visible(True)
+                    self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
+                                                1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
                 self._crosshair_xtext.set_color(primary_color)
                 self._crosshair_xtext.set_bbox(dict(
                     facecolor='#fff', edgecolor='none', alpha=0.85, boxstyle='round,pad=0.15', linewidth=0))
@@ -828,11 +1180,10 @@ class ChartWidget(QWidget):
                 axis='x', which='both', bottom=False, top=False, labelbottom=False)
             # indicator_ax保留X轴
             self.figure.subplots_adjust(
-                left=0.05, right=0.98,
-                top=0.98, bottom=0.06,
-                hspace=0.03  # 缩小子图间距
-            )
-            self.layout().addWidget(self.canvas)
+                left=0.05, right=0.98, top=0.98, bottom=0.06, hspace=0.03)
+            # 修正：只有在self.layout()存在时才addWidget
+            if self.layout() is not None:
+                self.layout().addWidget(self.canvas)
             self._optimize_display()  # 保证布局初始化后也显示网格和刻度
         except Exception as e:
             self.log_manager.error(f"初始化图表布局失败: {str(e)}")
@@ -885,10 +1236,14 @@ class ChartWidget(QWidget):
                     self.price_ax.plot(
                         series.index, series.values,
                         color=color_map[i % len(color_map)],
-                        linewidth=2.2, alpha=0.85, label=name, solid_capstyle='round'
+                        linewidth=0.7, alpha=0.85, label=name, solid_capstyle='round'
                     )
-                self.price_ax.legend(
-                    loc='upper left', fontsize=9, frameon=False)
+                # 添加指标后更新图例
+                lines = self.price_ax.get_lines()
+                labels = [l.get_label() for l in lines]
+                if lines and labels and any(l.get_visible() for l in lines):
+                    self.price_ax.legend(
+                        loc='upper left', fontsize=9, frameon=False)
                 QTimer.singleShot(0, self.canvas.draw)
             self.log_manager.info(f"添加指标 {indicator_data.name} 完成")
         except Exception as e:
@@ -941,9 +1296,11 @@ class ChartWidget(QWidget):
                         idx, price, marker=marker, color=color, markersize=8, label=label)
                 handles, labels = self.price_ax.get_legend_handles_labels()
                 by_label = dict(zip(labels, handles))
-                self.price_ax.legend(
-                    by_label.values(), by_label.keys(), loc='upper left', fontsize=8)
-                QTimer.singleShot(0, self.canvas.draw)
+                lines = self.price_ax.get_lines()
+                labels = [l.get_label() for l in lines]
+                if lines and labels and any(l.get_visible() for l in lines):
+                    self.price_ax.legend(
+                        by_label.values(), by_label.keys(), loc='upper left', fontsize=8)
             self.log_manager.info("绘制信号完成")
         except Exception as e:
             error_msg = f"绘制信号实现失败: {str(e)}"
@@ -1007,6 +1364,11 @@ class ChartWidget(QWidget):
             # 原有主题应用逻辑
             self._apply_initial_theme()
             self._optimize_display()  # 保证主题切换后也显示网格和刻度
+            # 新增：主题切换时同步刷新指标栏颜色
+            if self.current_kdata is not None:
+                self._update_combined_indicator_bar(self.current_kdata)
+                self._update_volume_bar(self.current_kdata)
+                self._update_macd_bar(self.current_kdata)
         except Exception as e:
             self.log_manager.error(f"应用主题到主图和缩略图失败: {str(e)}")
 
@@ -1016,7 +1378,7 @@ class ChartWidget(QWidget):
         self._zoom_rect = None
         self._zoom_history = []  # 多级缩放历史
         self._last_motion_time = 0
-        self._motion_interval_ms = 16  # 约60fps
+        self._motion_interval_ms = 100  # 约60fps
         self.canvas.mpl_connect('button_press_event', self._on_zoom_press)
         self.canvas.mpl_connect('motion_notify_event', self._on_zoom_motion)
         self.canvas.mpl_connect('button_release_event', self._on_zoom_release)
@@ -1068,11 +1430,21 @@ class ChartWidget(QWidget):
             # 左→右：放大
             self._zoom_history.append(self.price_ax.get_xlim())
             self.price_ax.set_xlim(x0, x1)
-            # 新增：缩放后强制y轴范围
+            # 新增：缩放后纵向自适应（不超出边界，自动居中）
             ymin = getattr(self, '_ymin', None)
             ymax = getattr(self, '_ymax', None)
             if ymin is not None and ymax is not None:
-                self.price_ax.set_ylim(ymin, ymax)
+                kdata = self.current_kdata
+                left_idx = int(max(0, round(x0)))
+                right_idx = int(min(len(kdata)-1, round(x1)))
+                if right_idx > left_idx:
+                    sub = kdata.iloc[left_idx:right_idx+1]
+                    y1 = float(sub['low'].min())
+                    y2 = float(sub['high'].max())
+                    pad = (y2 - y1) * 0.08
+                    self.price_ax.set_ylim(y1 - pad, y2 + pad)
+                else:
+                    self.price_ax.set_ylim(ymin, ymax)
         else:
             # 右→左：还原到上一级
             if self._zoom_history:
@@ -1080,7 +1452,7 @@ class ChartWidget(QWidget):
                 self.price_ax.set_xlim(prev_xlim)
             else:
                 self.price_ax.set_xlim(auto=True)
-            # 新增：还原后强制y轴范围
+            # 新增：还原后纵向自适应
             ymin = getattr(self, '_ymin', None)
             ymax = getattr(self, '_ymax', None)
             if ymin is not None and ymax is not None:
@@ -1091,16 +1463,48 @@ class ChartWidget(QWidget):
         self._optimize_display()  # 保证缩放后也恢复网格和刻度
 
     def _on_zoom_right_click(self, event):
-        # 右键单击还原到上一级
+        # 右键单击支持K线拖拽和平移，右键双击还原初始状态
         if event.inaxes == self.price_ax and event.button == 3:
-            if self._zoom_history:
-                prev_xlim = self._zoom_history.pop()
-                self.price_ax.set_xlim(prev_xlim)
+            import time
+            if not hasattr(self, '_last_right_click_time'):
+                self._last_right_click_time = 0
+            now = time.time()
+            # 双击判定（0.35秒内两次）
+            if hasattr(self, '_last_right_click_pos') and abs(event.x - self._last_right_click_pos) < 5 and (now - self._last_right_click_time) < 0.35:
+                # 右键双击：还原初始状态
+                self.price_ax.set_xlim(0, len(self.current_kdata)-1)
+                ymin = getattr(self, '_ymin', None)
+                ymax = getattr(self, '_ymax', None)
+                if ymin is not None and ymax is not None:
+                    self.price_ax.set_ylim(ymin, ymax)
+                self._zoom_history.clear()
+                self.canvas.draw_idle()
+                self._optimize_display()
+                self._last_right_click_time = 0
+                return
+            # 记录本次点击
+            self._last_right_click_time = now
+            self._last_right_click_pos = event.x
+            # 右键单击：拖拽平移
+            if not hasattr(self, '_drag_start_x') or self._drag_start_x is None:
+                self._drag_start_x = event.xdata
+                self._drag_start_xlim = self.price_ax.get_xlim()
+                self.canvas.mpl_connect(
+                    'motion_notify_event', self._on_drag_move)
             else:
-                self.price_ax.set_xlim(auto=True)
-            self._limit_xlim()
-            self.canvas.draw_idle()
-            self._optimize_display()  # 保证还原后也恢复网格和刻度
+                self._drag_start_x = None
+                self._drag_start_xlim = None
+
+    def _on_drag_move(self, event):
+        if event.inaxes != self.price_ax or event.button != 3:
+            return
+        if not hasattr(self, '_drag_start_x') or self._drag_start_x is None:
+            return
+        dx = event.xdata - self._drag_start_x
+        left, right = self._drag_start_xlim
+        self.price_ax.set_xlim(left - dx, right - dx)
+        self._limit_xlim()
+        self.canvas.draw_idle()
 
     def _on_zoom_scroll(self, event):
         # 滚轮缩放，鼠标为中心放大/缩小
@@ -1150,7 +1554,11 @@ class ChartWidget(QWidget):
         merged_df = kdata.iloc[merged] if isinstance(
             merged[0], (int, np.integer)) else pd.concat(results)
         # 渲染后关闭进度对话框由update_chart内部完成
-        QTimer.singleShot(0, lambda: self.update_chart({'kdata': merged_df}))
+        # 新增：补充 title 和 stock_code 字段，优先从 data 拷贝
+        title = data.get('title', '')
+        stock_code = data.get('stock_code', '')
+        QTimer.singleShot(0, lambda: self.update_chart(
+            {'kdata': merged_df, 'title': title, 'stock_code': stock_code}))
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):
@@ -1271,3 +1679,12 @@ class ChartWidget(QWidget):
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"显示无数据提示失败: {str(e)}")
+
+    def on_indicator_selected(self, indicators: list):
+        """接收指标选择结果，更新active_indicators并刷新图表"""
+        self.active_indicators = indicators
+        self.update_chart()
+
+    def _on_indicator_changed(self, indicators):
+        """多屏同步所有激活指标，仅同步选中项（已废弃，自动同步主窗口get_current_indicators）"""
+        self.update_chart()

@@ -28,7 +28,7 @@ def render_candlesticks(self, ax, kdata, style):
     for i in x:
         color = color_up if closes[i] >= opens[i] else color_down
         ax.plot([i, i], [lows[i], highs[i]],
-                color=color, linewidth=1.0, zorder=1)
+                color=color, linewidth=0.7, zorder=1)
         rect = Rectangle(
             (i - 0.3, min(opens[i], closes[i])),
             0.6,
@@ -208,7 +208,7 @@ def render_candlesticks(self, ax, kdata, style):
     def _render_line_efficient(self, ax, data: pd.Series, style: Dict[str, Any]):
         """使用LineCollection高效渲染线图，x轴用DatetimeIndex，节假日无数据自动跳过"""
         color = style.get('color', 'blue')
-        linewidth = style.get('linewidth', 1.0)
+        linewidth = style.get('linewidth', 0.7)
         alpha = style.get('alpha', 0.8)
         label = style.get('label', '')
         if isinstance(data.index, pd.DatetimeIndex):

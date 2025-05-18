@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QComboBox, QPushButton, QLineEdit, QTextEdit,
                              QFileDialog, QMessageBox, QScrollArea, QDialog, QMenu, QSizePolicy, QFrame)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QColor, QTextCursor
+from PyQt5.QtGui import QTextBlock, QColor, QTextCursor
 from datetime import datetime
 from core.logger import LogManager, LogLevel
 import traceback
@@ -30,6 +30,9 @@ class LogWidget(QWidget):
             parent: 父窗口
         """
         try:
+            # 避免self作为parent导致布局错乱，parent只允许为None或QWidget实例且不能为self
+            if parent is not None and (parent is self or not isinstance(parent, QWidget)):
+                parent = None
             super().__init__(parent)
             self.log_text = None  # 确保属性总是存在
 
@@ -61,80 +64,104 @@ class LogWidget(QWidget):
             self.error_occurred.emit(error_msg)
 
     def init_ui(self):
-        """初始化UI"""
+        """初始化UI（风格与策略设置区一致）"""
         try:
             # 创建主布局
             layout = QVBoxLayout(self)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
+            layout.setAlignment(Qt.AlignTop)
 
-            # 创建工具栏
             toolbar_layout = QHBoxLayout()
-            toolbar_layout.setContentsMargins(0, 0, 0, 0)
-            toolbar_layout.setSpacing(5)
+            toolbar_layout.setContentsMargins(-2, -2, -2, -2)
+            toolbar_layout.setSpacing(0)
+            toolbar_layout.setAlignment(Qt.AlignTop)
 
             # 日志级别过滤器
-            level_label = QLabel("日志级别:")
+            level_label = QLabel("日志筛选:")
+            level_label.setFixedWidth(80)
+            level_label.setAlignment(Qt.AlignLeft)
+            level_label.setStyleSheet(
+                "color: #1376d2; font-size: 12px; background: none; border: none; font-weight: normal; min-height: 20px; max-height: 20px; line-height: 20px;")
             self.level_combo = QComboBox()
             self.level_combo.addItems(["全部", "信息", "警告", "错误", "调试"])
-            self.level_combo.setFixedWidth(100)
+            self.level_combo.setFixedWidth(80)
+            self.level_combo.setFixedHeight(15)
             toolbar_layout.addWidget(level_label)
             toolbar_layout.addWidget(self.level_combo)
 
             # 搜索框
             self.search_box = QLineEdit()
             self.search_box.setPlaceholderText("搜索日志...")
-            self.search_box.setFixedWidth(200)
+            self.search_box.setFixedWidth(180)
+            self.search_box.setFixedHeight(15)
             toolbar_layout.addWidget(self.search_box)
 
             # 添加弹性空间
-            toolbar_layout.addStretch()
+            toolbar_layout.addStretch(0)
 
             # 状态提示
             self.scroll_status_label = QLabel("自动滚动中")
-            self.scroll_status_label.setFixedHeight(50)
-            self.scroll_status_label.setFixedWidth(70)
+            self.scroll_status_label.setFixedWidth(100)
+            self.scroll_status_label.setAlignment(Qt.AlignLeft)
+            self.scroll_status_label.setStyleSheet(
+                "color: #1376d2; font-size: 12px; background: none; border: none; font-weight: normal; min-height: 20px; max-height: 20px; line-height: 20px;")
             toolbar_layout.addWidget(self.scroll_status_label)
 
             # 最大化/还原按钮
             self.maximize_btn = QPushButton("最大化")
-            self.maximize_btn.setFixedWidth(80)
+            self.maximize_btn.setFixedWidth(70)
+            self.maximize_btn.setFixedHeight(15)
             self.maximize_btn.clicked.connect(self.toggle_maximize)
             toolbar_layout.addWidget(self.maximize_btn)
 
             # 弹窗按钮
             self.popup_btn = QPushButton("弹窗")
-            self.popup_btn.setFixedWidth(80)
+            self.popup_btn.setFixedWidth(70)
+            self.popup_btn.setFixedHeight(15)
             self.popup_btn.clicked.connect(self.show_popup)
             toolbar_layout.addWidget(self.popup_btn)
 
             # 暂停/恢复滚动按钮
             self.pause_btn = QPushButton("暂停滚动")
             self.pause_btn.setFixedWidth(80)
+            self.pause_btn.setFixedHeight(15)
             self.pause_btn.clicked.connect(self.toggle_scroll)
             toolbar_layout.addWidget(self.pause_btn)
 
             # 清除按钮
             self.clear_button = QPushButton("清除")
-            self.clear_button.setFixedWidth(80)
+            self.clear_button.setFixedWidth(60)
+            self.clear_button.setFixedHeight(15)
             toolbar_layout.addWidget(self.clear_button)
 
             # 导出按钮
             self.export_button = QPushButton("导出")
-            self.export_button.setFixedWidth(80)
+            self.export_button.setFixedWidth(60)
+            self.export_button.setFixedHeight(15)
             toolbar_layout.addWidget(self.export_button)
 
+            # 工具栏直接加到主布局
             layout.addLayout(toolbar_layout)
+
+            # 工具栏和分割线之间增加弹性空间
+            layout.addSpacing(4)
 
             # 插入分割线
             line = QFrame()
             line.setFrameShape(QFrame.HLine)
             line.setFrameShadow(QFrame.Sunken)
             line.setObjectName("line")
+            line.setFixedHeight(1)
+            line.setStyleSheet("margin-top: 0px; margin-bottom: 0px;")
             layout.addWidget(line)
 
-            # 创建日志文本框（不再嵌套QScrollArea）
-            self.log_text = QTextEdit()
+            # 分割线和日志区之间增加弹性空间
+            layout.addSpacing(0)
+
+            # 创建日志文本框（风格与策略区一致）
+            if self.log_text is None:
+                self.log_text = QTextEdit()
             self.log_text.setReadOnly(True)
             self.log_text.setLineWrapMode(QTextEdit.WidgetWidth)
             self.log_text.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -142,20 +169,41 @@ class LogWidget(QWidget):
                 self.show_log_context_menu)
             self.log_text.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # 极简风格由全局QSS控制
-            layout.addWidget(self.log_text, 1)  # 让内容区自动填满剩余空间
+            # 不设置最小/最大高度，完全自适应父容器
+            self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.log_text.setStyleSheet(
+                "margin-top: 0px; margin-bottom: 0px; font-size: 12px; line-height: 1.4; padding: 10px 16px; font-family: 'Consolas', 'Microsoft YaHei', monospace;")
+            layout.addWidget(self.log_text, 1)
 
             # 自动检测用户手动滚动，切换自动滚动状态
             self.log_text.verticalScrollBar().valueChanged.connect(
                 self._on_scrollbar_value_changed)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.apply_style()  # 强制应用样式
+            self.update()
+            self.adjustSize()
 
             self.log_manager.info("日志控件UI初始化完成")
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
-            self.log_text = None
+            if self.log_text is None:
+                self.log_text = QTextEdit()
+                self.log_text.setReadOnly(True)
+                self.log_text.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.log_text.setHorizontalScrollBarPolicy(
+                    Qt.ScrollBarAlwaysOff)
+                self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                self.layout().addWidget(self.log_text, 1)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.apply_style()
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+            self.setVisible(True)
+            self.update()
+            self.adjustSize()
 
     def connect_signals(self):
         """连接控件信号（不再连接log_manager信号，信号连接只在主窗口进行）"""
@@ -176,69 +224,94 @@ class LogWidget(QWidget):
             self.error_occurred.emit(error_msg)
 
     def apply_style(self):
-        """应用样式"""
+        """应用样式（与策略设置区风格完全一致，支持主题切换，统一高度）"""
         try:
-            # 判断主题（可根据主窗口theme_manager或自定义属性）
-            dark = True
-            if hasattr(self, 'theme_manager'):
-                dark = getattr(self.theme_manager, 'is_dark', True)
-            bg = "#181c24" if dark else "#fff"
-            fg = "#e0e6ed" if dark else "#23293a"
-            border = "#23293a" if dark else "#bdbdbd"
-            hover = "#1976d2"
+            dark = False
+            if hasattr(self, 'theme_manager') and self.theme_manager is not self:
+                dark = getattr(self.theme_manager, 'is_dark', False)
+            bg = "#f7f9fa" if not dark else "#23293a"
+            fg = "#23293a" if not dark else "#e0e6ed"
+            border = "#bdbdbd" if not dark else "#444a5a"
+            line_color = "#e0e0e0" if not dark else "#444a5a"
+            btn_bg = "#1976d2"
+            btn_fg = "white"
+            btn_hover = "#1565c0"
+            btn_pressed = "#0d47a1"
+            input_bg = "white" if not dark else "#23293a"
+            input_fg = fg
             highlight = "#ffd600"
-            line_color = "#444a5a" if dark else "#e0e0e0"
+            font_size = 12
+            height = 14  # 工具栏所有控件高度统一为12px
             self.setStyleSheet(f"""
                 QWidget {{
                     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
                     font-size: 12px;
+                    background: {bg};
+                    border-radius: 4px;
                 }}
                 QLabel {{
                     color: #1976d2;
+                    font-weight: normal;
+                    font-size: {font_size}px;
+                    min-height: {height}px;
+                    max-height: {height}px;
+                    line-height: {height}px;
+                    background: none;
+                    border: none;
                 }}
                 QComboBox, QLineEdit {{
-                    border: 1.5px solid {border};
+                    border: 1px solid {border};
                     border-radius: 4px;
-                    padding: 4px;
-                    background: {bg};
-                    color: {fg};
+                    padding: 2px 8px;
+                    background: {input_bg};
+                    color: {input_fg};
+                    min-height: {height}px;
+                    max-height: {height}px;
+                    font-size: {font_size}px;
                 }}
                 QComboBox:hover, QLineEdit:hover {{
-                    background: {hover};
-                    color: {highlight};
+                    border-color: #1976d2;
                 }}
                 QComboBox:focus, QLineEdit:focus {{
-                    border-color: {hover};
+                    border-color: #1976d2;
                 }}
                 QPushButton {{
                     border: none;
                     border-radius: 4px;
-                    padding: 6px 12px;
-                    background: {hover};
-                    color: white;
+                    padding: 2px 8px;
+                    background: {btn_bg};
+                    color: {btn_fg};
+                    font-weight: bold;
+                    min-width: 60px;
+                    min-height: {height}px;
+                    max-height: {height}px;
+                    font-size: 12px;
                 }}
                 QPushButton:hover {{
-                    background: {border};
-                    color: {highlight};
+                    background: {btn_hover};
                 }}
                 QPushButton:pressed {{
-                    background: #0d47a1;
+                    background: {btn_pressed};
                 }}
                 QTextEdit, QPlainTextEdit {{
-                    border: none;
-                    padding: 0;
+                    border: 1px solid {border};
+                    border-radius: 4px;
+                    padding: 10px 16px;
                     margin: 0;
-                    background: {bg};
-                    color: {fg};
+                    background: {input_bg};
+                    color: {input_fg};
                     font-family: 'Consolas', 'Microsoft YaHei', monospace;
-                    font-size: 13px;
+                    font-size: {font_size}px;
+                    line-height: 1.4;
+                    min-height: 120px;
+                    max-height: 777215px;
                 }}
                 QTextEdit:focus, QPlainTextEdit:focus {{
-                    outline: 1.5px solid {hover};
+                    outline: 1px solid #1976d2;
                 }}
                 QFrame#line {{
-                    border-top: 1.5px solid {line_color};
-                    margin: 6px 0;
+                    border-top: 1px solid {line_color};
+                    margin: 6px 0 6px 0;
                 }}
                 QScrollArea {{
                     border: none;
@@ -247,7 +320,7 @@ class LogWidget(QWidget):
                     padding: 0;
                 }}
                 QScrollBar:vertical {{
-                    background: #23293a;
+                    background: {input_bg};
                     width: 10px;
                     margin: 0;
                     border-radius: 5px;
@@ -261,7 +334,7 @@ class LogWidget(QWidget):
                     height: 0;
                 }}
                 QScrollBar:horizontal {{
-                    background: #23293a;
+                    background: {input_bg};
                     height: 10px;
                     margin: 0;
                     border-radius: 5px;
@@ -275,31 +348,54 @@ class LogWidget(QWidget):
                     width: 0;
                 }}
             """)
+            self.update()
+            self.adjustSize()
         except Exception as e:
             error_msg = f"应用样式失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+            self.update()
+            self.adjustSize()
 
     def add_log(self, message: str, level: str = "INFO"):
         """添加日志，增加去重逻辑，并修复自动滚动逻辑"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            # 简单去重：如果上一条日志内容、级别、时间完全一致则不添加
             if self._all_logs and self._all_logs[-1] == (message, level, timestamp):
                 return
             self._all_logs.append((message, level, timestamp))
-            # 判断当前是否自动滚动
             self.refresh_display(scroll_to_end=not self.pause_scroll)
-            # 错误消息闪烁
             if level.upper() == "ERROR":
                 self.flash_error()
             self.log_added.emit(message, level)
+            # 日志内容变更后强制刷新UI
+            self.setVisible(True)
+            self.apply_style()
+            self.update()
+            self.adjustSize()
+            if self.log_text is not None:
+                QTimer.singleShot(
+                    0, lambda: self.log_text.moveCursor(QTextCursor.End))
         except Exception as e:
             error_msg = f"添加日志失败: {str(e)}"
+            if self.log_text is None:
+                self.log_text = QTextEdit()
+                self.log_text.setReadOnly(True)
+                self.log_text.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.log_text.setHorizontalScrollBarPolicy(
+                    Qt.ScrollBarAlwaysOff)
+                self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                self.layout().addWidget(self.log_text, 1)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.apply_style()
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+            self.setVisible(True)
+            self.update()
+            self.adjustSize()
 
     def flash_error(self):
         """闪烁错误提示"""
@@ -337,16 +433,35 @@ class LogWidget(QWidget):
     def clear_logs(self):
         """清除日志"""
         try:
-            self._all_logs.clear()  # 清空日志缓存
+            self._all_logs.clear()
             if self.log_text is not None:
                 self.log_text.clear()
             self.log_cleared.emit()
             self.log_manager.info("日志已清除")
+            # 清除后强制刷新UI
+            self.setVisible(True)
+            self.apply_style()
+            self.update()
+            self.adjustSize()
         except Exception as e:
             error_msg = f"清除日志失败: {str(e)}"
+            if self.log_text is None:
+                self.log_text = QTextEdit()
+                self.log_text.setReadOnly(True)
+                self.log_text.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.log_text.setHorizontalScrollBarPolicy(
+                    Qt.ScrollBarAlwaysOff)
+                self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                self.layout().addWidget(self.log_text, 1)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.apply_style()
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+            self.setVisible(True)
+            self.update()
+            self.adjustSize()
 
     def export_logs(self):
         """导出日志到文件"""
@@ -444,10 +559,10 @@ class LogWidget(QWidget):
 
             # 日志级别过滤
             level_label = QLabel("日志级别1:")
-            level_label.setFixedWidth(100)
+            level_label.setFixedWidth(60)
             level_label.setFixedHeight(45)
             level_label.setAlignment(Qt.AlignCenter)
-            level_label.setStyleSheet("color: #1976d2;")
+            level_label.setStyleSheet("color: #1376d2;")
             level_combo = QComboBox()
             toolbar_layout.addWidget(level_label)
             level_combo.addItems(["全部", "信息", "警告", "错误", "调试"])
@@ -609,8 +724,7 @@ class LogWidget(QWidget):
 
             # 显示弹窗并设置位置
             self.popup_dialog.show()
-            QTimer.singleShot(0, lambda: self.center_dialog(
-                self.popup_dialog, self.window(), offset_y=50))
+            self.center_dialog(self.popup_dialog, self.window(), offset_y=50)
             self.popup_dialog.raise_()
             self.popup_dialog.activateWindow()
 
@@ -704,7 +818,7 @@ class LogWidget(QWidget):
             QTimer.singleShot(0, restore)
 
     def refresh_display(self, scroll_to_end: bool = False):
-        """根据当前过滤和搜索条件刷新日志显示（主日志区和弹窗统一HTML渲染）"""
+        """根据当前过滤和搜索条件刷新日志显示，确保所有日志完整展示，主日志区和弹窗统一HTML渲染"""
         level_text = self.level_combo.currentText()
         search_text = self.search_box.text().strip().lower()
         html_logs = []
@@ -728,16 +842,19 @@ class LogWidget(QWidget):
             }.get(lvl.upper(), "#000000")
             html_logs.append(
                 f'<div style="text-align:left;color:{color};word-break:break-all;white-space:pre-wrap;width:100%;">[{ts}] [{lvl}] {msg}</div>')
-
+        if not html_logs:
+            html_logs = [
+                '<div style="color:#888;text-align:center;margin-top:40px;">暂无日志内容</div>']
         # 记录当前滚动条比例
         scrollbar = self.log_text.verticalScrollBar()
         old_value = scrollbar.value()
         old_max = scrollbar.maximum()
         self._last_scroll_ratio = old_value / old_max if old_max > 0 else 1.0
-
-        self.log_text.setHtml("".join(html_logs))
-        self.restore_scroll_position(scroll_to_end)
-        # 更新UI状态提示
-        if hasattr(self, 'scroll_status_label'):
-            self.scroll_status_label.setText(
-                "自动滚动中" if not self.pause_scroll else "已暂停滚动")
+        if self.log_text is not None:
+            self.log_text.setHtml("".join(html_logs))
+            if scroll_to_end or not self.pause_scroll:
+                QTimer.singleShot(
+                    0, lambda: self.log_text.moveCursor(QTextCursor.End))
+            self.apply_style()
+            self.update()
+            self.adjustSize()

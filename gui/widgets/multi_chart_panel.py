@@ -42,9 +42,14 @@ class MultiChartPanel(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(4)
+        # 先设置主布局，确保self.layout()不为None
+        if self.layout() is None:
+            self.layout = QVBoxLayout(self)
+            self.layout.setContentsMargins(0, 0, 0, 0)
+            self.layout.setSpacing(4)
+            self.setLayout(self.layout)
+        else:
+            self.layout = self.layout()
         # 分屏切换按钮
         btn_layout = QHBoxLayout()
         self.switch_btn = QPushButton("切换九宫格")
@@ -79,7 +84,6 @@ class MultiChartPanel(QWidget):
         self.grid_widget.setVisible(False)
         self.grid_widget.setAcceptDrops(True)
         self.layout.addWidget(self.grid_widget)
-        self.setLayout(self.layout)
         self.setAcceptDrops(True)
 
     def set_stock_list(self, stock_list):
@@ -154,11 +158,11 @@ class MultiChartPanel(QWidget):
                     chart.current_period = period
                     chart.update_chart()
 
-    def _on_indicator_changed(self, indicator):
+    def _on_indicator_changed(self, indicators):
+        """多屏同步所有激活指标，仅同步选中项（不再直接赋值active_indicators，自动同步主窗口get_current_indicators）"""
         if self.sync_mode:
             for row in self.chart_widgets:
                 for chart in row:
-                    chart.current_indicator = indicator
                     chart.update_chart()
 
     def _on_chart_updated(self, data):
