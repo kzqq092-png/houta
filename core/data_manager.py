@@ -901,3 +901,145 @@ class DataManager:
         except Exception as e:
             self.log_manager.error(f"获取备用数据源失败: {str(e)}")
             return None
+
+    def get_market_sentiment(self) -> dict:
+        """
+        获取市场情绪数据，优先调用当前数据源的get_market_sentiment方法。
+        Returns:
+            dict: 市场情绪数据，若数据源不支持则返回空dict
+        """
+        try:
+            if self._current_source in self._data_sources:
+                source = self._data_sources[self._current_source]
+                if hasattr(source, 'get_market_sentiment'):
+                    data = source.get_market_sentiment()
+                    # 兜底处理，确保返回dict且有sentiment_index字段
+                    if not isinstance(data, dict):
+                        self.log_manager.warning("市场情绪数据返回类型异常，已自动修正为空dict")
+                        return {'sentiment_index': None, 'detail': {}}
+                    if 'sentiment_index' not in data:
+                        self.log_manager.warning("市场情绪数据为空或无sentiment_index字段")
+                        data['sentiment_index'] = None
+                    return data
+            else:
+                self.log_manager.warning(
+                    f"当前数据源 {self._current_source} 不支持获取市场情绪数据，使用默认东财数据")
+                data = self._data_sources['eastmoney'].get_market_sentiment()
+                if not isinstance(data, dict):
+                    self.log_manager.warning("市场情绪数据返回类型异常，已自动修正为空dict")
+                    return {'sentiment_index': None, 'detail': {}}
+                if 'sentiment_index' not in data:
+                    self.log_manager.warning("市场情绪数据为空或无sentiment_index字段")
+                    data['sentiment_index'] = None
+                return data
+        except Exception as e:
+            self.log_manager.error(f"获取市场情绪数据失败: {str(e)}")
+            return {'sentiment_index': None, 'detail': {}}
+
+    def get_market_sentiment_history(self, days: int = 30, code: str = "000001", industry: str = None, concept: str = None, custom_stocks: list = None) -> list:
+        """
+        获取历史市场情绪数据，支持指数、行业、概念或自选股。
+        Args:
+            days: 获取的天数，默认30天
+            code: 指数代码，默认上证指数
+            industry: 行业名称，优先生效
+            concept: 概念板块名称，优先生效
+            custom_stocks: 自选股代码列表，优先生效
+        Returns:
+            list: 历史市场情绪数据，每项为dict，包含date和sentiment_index等
+        """
+        try:
+            if self._current_source in self._data_sources:
+                source = self._data_sources[self._current_source]
+                if hasattr(source, 'get_market_sentiment_history'):
+                    data = source.get_market_sentiment_history(
+                        days=days, code=code, industry=industry, concept=concept, custom_stocks=custom_stocks)
+                    # 兜底处理，确保为list且每项有sentiment_index
+                    if not isinstance(data, list):
+                        self.log_manager.warning("历史市场情绪数据返回类型异常，已自动修正为空list")
+                        return []
+                    for item in data:
+                        if not isinstance(item, dict):
+                            continue
+                        if 'sentiment_index' not in item:
+                            self.log_manager.warning(
+                                "历史市场情绪数据项无sentiment_index字段，已补None")
+                            item['sentiment_index'] = None
+                    return data
+            return []
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"获取历史市场情绪数据失败: {str(e)}")
+            return []
+
+    def get_custom_stocks(self) -> list:
+        """
+        获取自选股代码列表（可根据实际存储方式调整）
+        Returns:
+            list: 自选股代码
+        """
+        # TODO: 实现自选股存储与读取，这里用演示数据
+        return ["000001", "600519", "300750"]
+
+    def get_market_day_info(self, date, code=None, industry=None, concept=None, custom_stocks=None) -> dict:
+        """
+        获取指定日期的行情摘要（自选股/指数/行业/概念）
+        Args:
+            date: 日期
+            code: 指数代码
+            industry: 行业名称
+            concept: 概念板块名称
+            custom_stocks: 自选股代码列表
+        Returns:
+            dict: 行情摘要
+        """
+        try:
+            if custom_stocks:
+                # 获取自选股当日行情
+                result = {}
+                for code_ in custom_stocks:
+                    df = self.get_k_data(code_, start_date=str(date)[
+                                         :10], end_date=str(date)[:10])
+                    if not df.empty:
+                        row = df.iloc[0]
+                        result[code_] = {"close": row["close"], "pct_chg": (
+                            row["close"]-row["open"])/row["open"]*100}
+                return result
+            elif concept:
+                # 获取概念成分股当日行情
+                from core.data_manager import DataManager
+                dm = DataManager()
+                stock_list = list(dm.get_concept_stocks(concept))
+                result = {}
+                for code_ in stock_list:
+                    df = self.get_k_data(code_, start_date=str(date)[
+                                         :10], end_date=str(date)[:10])
+                    if not df.empty:
+                        row = df.iloc[0]
+                        result[code_] = {"close": row["close"], "pct_chg": (
+                            row["close"]-row["open"])/row["open"]*100}
+                return result
+            elif industry:
+                from core.data_manager import DataManager
+                dm = DataManager()
+                stock_list = list(dm.get_industry_stocks(industry))
+                result = {}
+                for code_ in stock_list:
+                    df = self.get_k_data(code_, start_date=str(date)[
+                                         :10], end_date=str(date)[:10])
+                    if not df.empty:
+                        row = df.iloc[0]
+                        result[code_] = {"close": row["close"], "pct_chg": (
+                            row["close"]-row["open"])/row["open"]*100}
+                return result
+            elif code:
+                df = self.get_k_data(code, start_date=str(
+                    date)[:10], end_date=str(date)[:10])
+                if not df.empty:
+                    row = df.iloc[0]
+                    return {code: {"close": row["close"], "pct_chg": (row["close"]-row["open"])/row["open"]*100}}
+            return {}
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"获取行情摘要失败: {str(e)}")
+            return {}

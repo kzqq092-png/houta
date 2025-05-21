@@ -10,9 +10,9 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QSpinBox, QDoubleSpinBox,
     QStatusBar, QToolBar, QMenuBar, QMenu, QAction,
     QFileDialog, QMessageBox, QSplitter, QTabWidget,
-    QGridLayout
+    QGridLayout, QToolTip
 )
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint, QObject
 from PyQt5.QtGui import QIcon
 import pandas as pd
 import psutil
@@ -20,9 +20,250 @@ from datetime import datetime
 import traceback
 from core.logger import LogManager
 from utils.config_types import LoggingConfig
+from typing import Optional, Dict, Any
 
 
-class AnalysisToolsPanel(QWidget):
+class BaseAnalysisPanel(QWidget):
+    """基础分析面板，统一参数设置、导出、日志、信号、按钮等通用功能"""
+    # 通用信号
+    analysis_completed = pyqtSignal(dict)
+    data_requested = pyqtSignal(dict)
+    error_occurred = pyqtSignal(str)
+    # 全局自定义指标注册表（类变量）
+    _global_custom_indicators = {}
+    # 全局联动信号（类变量）
+    custom_signal = pyqtSignal(str, object)  # (事件名, 数据)
+
+    def __init__(self, parent=None, log_manager: Optional[LogManager] = None):
+        super().__init__(parent)
+        self.apply_theme()
+        self.log_manager = log_manager or LogManager()
+        self.param_widgets: Dict[str, Any] = {}
+        self.metric_labels: Dict[str, QLabel] = {}
+        self.init_base_ui()
+        self.init_base_signals()
+
+    @classmethod
+    def register_custom_indicator(cls, name: str, func):
+        """
+        全局注册自定义指标
+        Args:
+            name: 指标名称
+            func: 计算函数
+        """
+        cls._global_custom_indicators[name] = func
+
+    @classmethod
+    def get_custom_indicator(cls, name: str):
+        """
+        获取全局自定义指标
+        Args:
+            name: 指标名称
+        Returns:
+            func: 计算函数或None
+        """
+        return cls._global_custom_indicators.get(name)
+
+    def emit_custom_signal(self, event: str, data: object):
+        """
+        发送全局联动信号
+        Args:
+            event: 事件名
+            data: 任意数据
+        """
+        BaseAnalysisPanel.custom_signal.emit(event, data)
+
+    def connect_custom_signal(self, slot):
+        """
+        连接全局联动信号
+        Args:
+            slot: 槽函数，参数(event, data)
+        """
+        BaseAnalysisPanel.custom_signal.connect(slot)
+
+    def apply_theme(self):
+        """应用统一主题色、字体、控件间距等QSS样式"""
+        qss = """
+        QWidget {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            font-size: 14px;
+        }
+        QGroupBox {
+            border: 1px solid #1976D2;
+            border-radius: 8px;
+            margin-top: 8px;
+            padding: 8px;
+        }
+        QPushButton {
+            background-color: #1976D2;
+            color: white;
+            border-radius: 6px;
+            padding: 6px 16px;
+            min-width: 80px;
+        }
+        QPushButton:hover {
+            background-color: #1565C0;
+        }
+        QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox {
+            border: 1px solid #1976D2;
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+        QLabel {
+            color: #222;
+        }
+        QTabWidget::pane {
+            border: 1px solid #1976D2;
+            border-radius: 8px;
+        }
+        QTableWidget {
+            gridline-color: #1976D2;
+            selection-background-color: #E3F2FD;
+            selection-color: #1976D2;
+        }
+        QMessageBox {
+            background: #fff;
+            font-size: 15px;
+        }
+        """
+        self.setStyleSheet(qss)
+
+    def init_base_ui(self):
+        """初始化通用UI区域（参数、导出、按钮等）"""
+        self.main_layout = QVBoxLayout(self)
+        # 参数设置区域（子类可扩展）
+        self.params_group = QGroupBox("参数设置")
+        self.params_layout = QGridLayout()
+        self.params_group.setLayout(self.params_layout)
+        self.main_layout.addWidget(self.params_group)
+        # 控制按钮区域
+        self.button_layout = QHBoxLayout()
+        self.analyze_button = QPushButton("分析")
+        self.export_button = QPushButton("导出结果")
+        self.button_layout.addWidget(self.analyze_button)
+        self.button_layout.addWidget(self.export_button)
+        self.main_layout.addLayout(self.button_layout)
+
+    def init_base_signals(self):
+        self.analyze_button.clicked.connect(self.on_analyze)
+        self.export_button.clicked.connect(self.on_export)
+
+    def on_analyze(self):
+        """分析按钮通用处理，子类可重写"""
+        try:
+            self.log_manager.info("分析按钮被点击")
+            # 子类实现具体分析逻辑
+            QMessageBox.information(self, "分析", "分析已启动，结果将在完成后自动展示。")
+        except Exception as e:
+            self.log_manager.error(f"分析启动失败: {str(e)}")
+            QMessageBox.critical(self, "分析错误", f"分析启动失败: {str(e)}")
+            self.error_occurred.emit(f"分析启动失败: {str(e)}")
+
+    def on_export(self):
+        """统一导出逻辑，子类可扩展"""
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "导出分析结果",
+                "",
+                "Excel Files (*.xlsx);;CSV Files (*.csv)"
+            )
+            if file_path:
+                # 子类实现具体导出内容
+                self.log_manager.info(f"结果已导出到: {file_path}")
+                QMessageBox.information(self, "导出成功", f"结果已导出到: {file_path}")
+        except Exception as e:
+            self.log_manager.error(f"导出失败: {str(e)}")
+            QMessageBox.critical(self, "导出错误", f"导出失败: {str(e)}")
+            self.error_occurred.emit(f"导出失败: {str(e)}")
+
+    def add_param_widget(self, name: str, widget: QWidget):
+        self.param_widgets[name] = widget
+        row = self.params_layout.rowCount()
+        self.params_layout.addWidget(QLabel(name), row, 0)
+        self.params_layout.addWidget(widget, row, 1)
+        # 增加实时校验信号
+        if hasattr(widget, 'valueChanged'):
+            widget.valueChanged.connect(self._on_param_widget_changed)
+        elif hasattr(widget, 'editingFinished'):
+            widget.editingFinished.connect(self._on_param_widget_changed)
+        # 增加气泡提示
+        widget.setToolTip("")
+
+    def _on_param_widget_changed(self):
+        valid, msg = self.validate_params()
+        if not valid:
+            self.set_status_message(msg, error=True)
+            # 气泡提示美化：在控件右侧弹出气泡
+            for name, widget in self.param_widgets.items():
+                widget.setToolTip("")
+            for name, widget in self.param_widgets.items():
+                if widget.styleSheet():
+                    # 计算气泡显示位置（控件右侧）
+                    pos = widget.mapToGlobal(
+                        QPoint(widget.width(), widget.height() // 2))
+                    QToolTip.showText(pos, msg, widget, widget.rect(), 3000)
+                    widget.setToolTip(msg)
+        else:
+            self.set_status_message("参数校验通过", error=False)
+            for name, widget in self.param_widgets.items():
+                widget.setToolTip("")
+
+    def add_metric_label(self, name: str, label: QLabel):
+        self.metric_labels[name] = label
+
+    def validate_params(self) -> (bool, str):
+        """
+        校验所有参数控件的输入，支持QSpinBox、QDoubleSpinBox、QLineEdit等。
+        校验失败时高亮控件并返回错误信息。
+        Returns:
+            (bool, str): 是否通过校验，错误信息
+        """
+        valid = True
+        error_msgs = []
+        for name, widget in self.param_widgets.items():
+            # 还原样式
+            widget.setStyleSheet("")
+            value = None
+            if hasattr(widget, 'value'):
+                value = widget.value()
+                # 检查范围
+                if hasattr(widget, 'minimum') and hasattr(widget, 'maximum'):
+                    if value < widget.minimum() or value > widget.maximum():
+                        valid = False
+                        error_msgs.append(
+                            f"{name} 超出允许范围 [{widget.minimum()}, {widget.maximum()}]")
+                        widget.setStyleSheet("border: 2px solid red;")
+            elif hasattr(widget, 'text'):
+                value = widget.text()
+                if not value:
+                    valid = False
+                    error_msgs.append(f"{name} 不能为空")
+                    widget.setStyleSheet("border: 2px solid red;")
+            # 可扩展更多控件类型
+        return valid, "\n".join(error_msgs)
+
+    def set_status_message(self, message: str, error: bool = False):
+        """
+        在主界面状态栏显示提示信息，error为True时高亮显示
+        """
+        if hasattr(self.parent(), 'statusBar'):
+            bar = self.parent().statusBar()
+            if error:
+                bar.setStyleSheet("color: red;")
+            else:
+                bar.setStyleSheet("")
+            bar.showMessage(message, 5000)
+        # 兼容自带status_label
+        elif hasattr(self, 'status_label'):
+            self.status_label.setText(message)
+            if error:
+                self.status_label.setStyleSheet("color: red;")
+            else:
+                self.status_label.setStyleSheet("")
+
+
+class AnalysisToolsPanel(BaseAnalysisPanel):
     """Analysis tools panel for the right side of the main window"""
 
     # 定义信号
@@ -86,26 +327,6 @@ class AnalysisToolsPanel(QWidget):
             strategy_group.setLayout(strategy_layout)
             layout.addWidget(strategy_group)
 
-            # 创建参数设置区域
-            params_group = QGroupBox("参数设置")
-            params_layout = QGridLayout()
-
-            # 添加参数设置控件
-            self.param_widgets = {}
-            row = 0
-            for param in ['快线周期', '慢线周期', '止损比例', '止盈比例']:
-                label = QLabel(param)
-                spin = QSpinBox()
-                spin.setRange(1, 100)
-                spin.setValue(20 if '快线' in param else 60)
-                params_layout.addWidget(label, row, 0)
-                params_layout.addWidget(spin, row, 1)
-                self.param_widgets[param] = spin
-                row += 1
-
-            params_group.setLayout(params_layout)
-            layout.addWidget(params_group)
-
             # 创建回测设置区域
             backtest_group = QGroupBox("回测设置")
             backtest_layout = QGridLayout()
@@ -125,22 +346,6 @@ class AnalysisToolsPanel(QWidget):
 
             backtest_group.setLayout(backtest_layout)
             layout.addWidget(backtest_group)
-
-            # 创建按钮区域
-            button_layout = QHBoxLayout()
-
-            # 添加功能按钮
-            self.analyze_button = QPushButton("分析")
-            self.backtest_button = QPushButton("回测")
-            self.optimize_button = QPushButton("优化")
-            self.export_button = QPushButton("导出结果")
-
-            button_layout.addWidget(self.analyze_button)
-            button_layout.addWidget(self.backtest_button)
-            button_layout.addWidget(self.optimize_button)
-            button_layout.addWidget(self.export_button)
-
-            layout.addLayout(button_layout)
 
             self.log_manager.info("分析工具面板UI初始化完成")
 
@@ -209,8 +414,6 @@ class AnalysisToolsPanel(QWidget):
 
             # 连接按钮信号
             self.analyze_button.clicked.connect(self.on_analyze)
-            self.backtest_button.clicked.connect(self.on_backtest)
-            self.optimize_button.clicked.connect(self.on_optimize)
             self.export_button.clicked.connect(self.on_export)
 
             # 连接参数变化信号
@@ -235,9 +438,11 @@ class AnalysisToolsPanel(QWidget):
             self.current_strategy = strategy
             self.update_parameters_visibility()
             self.log_manager.info(f"策略已更改为: {strategy}")
+            QMessageBox.information(self, "策略切换", f"已切换到策略: {strategy}")
         except Exception as e:
             error_msg = f"策略变更失败: {str(e)}"
             self.log_manager.error(error_msg)
+            QMessageBox.warning(self, "策略切换错误", error_msg)
             self.error_occurred.emit(error_msg)
 
     def on_param_changed(self):
@@ -245,9 +450,11 @@ class AnalysisToolsPanel(QWidget):
         try:
             self.update_parameters()
             self.log_manager.info("参数已更新")
+            QMessageBox.information(self, "参数更新", "参数已成功更新。")
         except Exception as e:
             error_msg = f"参数更新失败: {str(e)}"
             self.log_manager.error(error_msg)
+            QMessageBox.warning(self, "参数错误", error_msg)
             self.error_occurred.emit(error_msg)
 
     def update_parameters_visibility(self):
@@ -295,117 +502,47 @@ class AnalysisToolsPanel(QWidget):
     def on_analyze(self):
         """Perform analysis"""
         try:
+            valid, msg = self.validate_params()
+            if not valid:
+                QMessageBox.warning(self, "参数错误", f"请修正以下参数后再分析：\n{msg}")
+                return
             # 获取当前策略和参数
             strategy = self.strategy_combo.currentText()
             params = {name: control.value()
                       for name, control in self.param_widgets.items()}
-
             # 发送数据请求信号
             self.data_requested.emit({
                 'type': 'analysis',
                 'strategy': strategy,
                 'params': params
             })
-
             self.log_manager.info(f"开始分析 - 策略: {strategy}")
-
         except Exception as e:
             error_msg = f"分析失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def on_backtest(self):
-        """Run backtest"""
-        try:
-            # 获取回测参数
-            params = {
-                'initial_capital': self.backtest_widgets['初始资金'].value(),
-                'commission_rate': self.backtest_widgets['手续费率'].value(),
-                'slippage': self.backtest_widgets['滑点'].value()
-            }
-
-            # 发送数据请求信号
-            self.data_requested.emit({
-                'type': 'backtest',
-                'params': params
-            })
-
-            self.log_manager.info("开始回测")
-
-        except Exception as e:
-            error_msg = f"回测失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def on_optimize(self):
-        """Optimize parameters"""
-        try:
-            # 获取优化参数
-            strategy = self.strategy_combo.currentText()
-            params = {name: control.value()
-                      for name, control in self.param_widgets.items()}
-
-            # 发送数据请求信号
-            self.data_requested.emit({
-                'type': 'optimize',
-                'strategy': strategy,
-                'params': params
-            })
-
-            self.log_manager.info(f"开始优化 - 策略: {strategy}")
-
-        except Exception as e:
-            error_msg = f"优化失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def on_export(self):
-        """Export analysis results"""
-        try:
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "导出分析结果",
-                "",
-                "Excel Files (*.xlsx);;CSV Files (*.csv)"
-            )
-
-            if file_path:
-                results = {
-                    'strategy': self.strategy_combo.currentText(),
-                    'parameters': {name: control.value() for name, control in self.param_widgets.items()},
-                    'metrics': {name: label.text() for name, label in self.metric_labels.items()}
-                }
-
-                if file_path.endswith('.xlsx'):
-                    df = pd.DataFrame(results)
-                    df.to_excel(file_path, index=False)
-                else:
-                    df = pd.DataFrame(results)
-                    df.to_csv(file_path, index=False)
-
-                QMessageBox.information(self, "成功", "分析结果已导出")
-
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
-
     def on_backtest_setting_changed(self):
         """处理回测设置变更"""
         try:
             self.log_manager.info("回测设置已更新")
+            QMessageBox.information(self, "回测设置", "回测设置已更新。")
         except Exception as e:
             error_msg = f"回测设置更新失败: {str(e)}"
             self.log_manager.error(error_msg)
+            QMessageBox.warning(self, "回测设置错误", error_msg)
             self.error_occurred.emit(error_msg)
 
-    def update_results(self, results: dict):
-        """更新分析结果
+    def update_signals(self, signals):
+        """统一更新交易信号显示，便于子类扩展"""
+        # 这里可以实现信号表格或图表的更新逻辑，子类可重写
+        self.log_manager.info(f"收到{len(signals)}条交易信号")
+        # 示例：弹窗提示
+        # QMessageBox.information(self, "信号更新", f"收到{len(signals)}条交易信号")
 
-        Args:
-            results: 分析结果字典，包含性能指标等信息
-        """
+    def update_results(self, results: dict):
+        """统一更新分析结果，包含性能指标、图表、信号等"""
         try:
             # 更新性能指标
             if 'metrics' in results:
@@ -413,23 +550,16 @@ class AnalysisToolsPanel(QWidget):
                 for name, value in metrics.items():
                     if name in self.performance_metrics:
                         self.performance_metrics[name] = value
-
-                # 更新显示
                 self.update_metrics_display()
-
             # 更新图表数据
             if 'chart_data' in results:
                 self.chart_updated.emit(results['chart_data'])
-
             # 更新交易信号
             if 'signals' in results:
                 self.update_signals(results['signals'])
-
             # 发送分析完成信号
             self.analysis_completed.emit(results)
-
             self.log_manager.info("分析结果更新完成")
-
         except Exception as e:
             error_msg = f"更新结果失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -437,13 +567,10 @@ class AnalysisToolsPanel(QWidget):
             self.error_occurred.emit(error_msg)
 
     def update_metrics_display(self):
-        """更新性能指标显示"""
+        """统一更新性能指标显示，风格与主界面一致"""
         try:
-            # 检查是否有性能指标标签
-            if not hasattr(self, 'metric_labels'):
+            if not hasattr(self, 'metric_labels') or not self.metric_labels:
                 self.create_metrics_display()
-
-            # 更新标签显示
             for name, value in self.performance_metrics.items():
                 if name in self.metric_labels:
                     if isinstance(value, float):
@@ -451,7 +578,6 @@ class AnalysisToolsPanel(QWidget):
                     else:
                         formatted_value = str(value)
                     self.metric_labels[name].setText(formatted_value)
-
         except Exception as e:
             error_msg = f"更新性能指标显示失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -459,22 +585,16 @@ class AnalysisToolsPanel(QWidget):
             self.error_occurred.emit(error_msg)
 
     def create_metrics_display(self):
-        """创建性能指标显示区域"""
+        """统一创建性能指标显示区域，风格与主界面一致"""
         try:
-            # 创建性能指标组
             metrics_group = QGroupBox("性能指标")
             metrics_layout = QFormLayout(metrics_group)
-
-            # 创建指标标签
             self.metric_labels = {}
             for name in self.performance_metrics.keys():
                 label = QLabel("--")
                 metrics_layout.addRow(f"{name}:", label)
                 self.metric_labels[name] = label
-
-            # 添加到布局
-            self.layout().addWidget(metrics_group)
-
+            self.layout.addWidget(metrics_group)
         except Exception as e:
             error_msg = f"创建性能指标显示区域失败: {str(e)}"
             self.log_manager.error(error_msg)

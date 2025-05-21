@@ -1,9 +1,7 @@
 """
 股票详情对话框模块
 """
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QTableWidget, QTableWidgetItem,
-                             QTabWidget, QWidget, QScrollArea)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 import pandas as pd

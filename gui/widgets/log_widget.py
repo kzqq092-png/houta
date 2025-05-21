@@ -4,9 +4,7 @@
 提供日志显示和管理功能
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QComboBox, QPushButton, QLineEdit, QTextEdit,
-                             QFileDialog, QMessageBox, QScrollArea, QDialog, QMenu, QSizePolicy, QFrame)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QTextBlock, QColor, QTextCursor
 from datetime import datetime
@@ -144,21 +142,6 @@ class LogWidget(QWidget):
             # 工具栏直接加到主布局
             layout.addLayout(toolbar_layout)
 
-            # 工具栏和分割线之间增加弹性空间
-            layout.addSpacing(4)
-
-            # 插入分割线
-            line = QFrame()
-            line.setFrameShape(QFrame.HLine)
-            line.setFrameShadow(QFrame.Sunken)
-            line.setObjectName("line")
-            line.setFixedHeight(1)
-            line.setStyleSheet("margin-top: 0px; margin-bottom: 0px;")
-            layout.addWidget(line)
-
-            # 分割线和日志区之间增加弹性空间
-            layout.addSpacing(0)
-
             # 创建日志文本框（风格与策略区一致）
             if self.log_text is None:
                 self.log_text = QTextEdit()
@@ -186,7 +169,7 @@ class LogWidget(QWidget):
 
             self.log_manager.info("日志控件UI初始化完成")
         except Exception as e:
-            error_msg = f"初始化UI失败: {str(e)}"
+            error_msg = f"初始化UI失败,加载默认日志控件: {str(e)}"
             if self.log_text is None:
                 self.log_text = QTextEdit()
                 self.log_text.setReadOnly(True)
@@ -369,11 +352,8 @@ class LogWidget(QWidget):
             if level.upper() == "ERROR":
                 self.flash_error()
             self.log_added.emit(message, level)
-            # 日志内容变更后强制刷新UI
             self.setVisible(True)
-            self.apply_style()
             self.update()
-            self.adjustSize()
             if self.log_text is not None:
                 QTimer.singleShot(
                     0, lambda: self.log_text.moveCursor(QTextCursor.End))
@@ -398,19 +378,13 @@ class LogWidget(QWidget):
             self.adjustSize()
 
     def flash_error(self):
-        """闪烁错误提示"""
+        """只让日志文本区闪烁红色背景，不影响整体布局"""
         try:
-            def flash():
-                self.setStyleSheet("""
-                    QWidget {
-                        background-color: #ffebee;
-                    }
-                """)
-                QTimer.singleShot(500, lambda: self.apply_style())
-
-            flash()
-            QTimer.singleShot(1000, flash)
-
+            orig_style = self.log_text.styleSheet() if self.log_text else ""
+            self.log_text.setStyleSheet(
+                orig_style + "background-color: #ffebee;")
+            QTimer.singleShot(
+                500, lambda: self.log_text.setStyleSheet(orig_style))
         except Exception as e:
             self.log_manager.error(f"闪烁错误提示失败: {str(e)}")
 

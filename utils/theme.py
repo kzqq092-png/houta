@@ -11,7 +11,7 @@ import re
 from typing import Dict, Any, Optional, Union
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QColor, QPalette
-from PyQt5.QtWidgets import QApplication, QStyleFactory, QMainWindow, QWidget
+from PyQt5.QtWidgets import *
 from .config_manager import ConfigManager
 from .theme_types import Theme
 from .config_types import ThemeConfig

@@ -40,7 +40,7 @@ class BaseLogManager(QObject):
         os.makedirs('logs', exist_ok=True)
 
         # 配置基本日志记录器
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("TradingSystem")
         self.logger.setLevel(logging.INFO)
 
         # 只添加一次控制台处理器，避免重复日志

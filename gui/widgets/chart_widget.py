@@ -1622,28 +1622,12 @@ class ChartWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        w, h = self.width(), self.height()
-        min_margin = 0.01  # 最小边距比例，防止极端情况
-        if w <= 0 or h <= 0:
-            return
-        left = max(30 / w, min_margin)
-        right = min(1 - 10 / w, 1 - min_margin)
-        top = min(1 - 10 / h, 1 - min_margin)
-        bottom = max(20 / h, min_margin)
-        if bottom >= top:
-            bottom = max(top - min_margin, min_margin)
-            top = min(top, 0.99)
-        if left >= right:
-            left = max(right - min_margin, min_margin)
-            right = min(right, 0.99)
-        try:
-            self.figure.subplots_adjust(
-                left=left, right=right, top=top, bottom=bottom, hspace=0.08)
-        except Exception as e:
-            self.figure.subplots_adjust(
-                left=0.03, right=0.98, top=0.98, bottom=0.04, hspace=0.08)
-        self.canvas.draw()
-        self._optimize_display()  # 保证每次缩放后都恢复网格和刻度
+        # 只在尺寸变化幅度较大时重绘
+        if event.oldSize().width() > 0 and event.oldSize().height() > 0:
+            if abs(event.oldSize().width() - event.size().width()) < 10 and abs(event.oldSize().height() - event.size().height()) < 10:
+                return  # 跳过微小变化
+        QTimer.singleShot(0, self.canvas.draw_idle)
+        self._optimize_display()
 
     def show_no_data(self, message: str = "无数据"):
         """无数据时清空图表并显示提示信息，所有字体统一为8号，健壮处理异常，始终显示网格和XY轴刻度"""

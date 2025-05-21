@@ -4,10 +4,7 @@
 提供策略配置和管理功能
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QComboBox, QPushButton, QLineEdit, QSpinBox,
-                             QDoubleSpinBox, QFormLayout, QGroupBox,
-                             QScrollArea, QMessageBox)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, pyqtSignal
 from core.logger import LogManager, LogLevel
 import traceback

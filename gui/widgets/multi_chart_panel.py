@@ -44,22 +44,22 @@ class MultiChartPanel(QWidget):
     def _init_ui(self):
         # 先设置主布局，确保self.layout()不为None
         if self.layout() is None:
-            self.layout = QVBoxLayout(self)
-            self.layout.setContentsMargins(0, 0, 0, 0)
-            self.layout.setSpacing(4)
-            self.setLayout(self.layout)
+            self.main_layout = QVBoxLayout(self)
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.main_layout.setSpacing(4)
+            self.setLayout(self.main_layout)
         else:
-            self.layout = self.layout()
+            self.main_layout = self.layout()
         # 分屏切换按钮
         btn_layout = QHBoxLayout()
         self.switch_btn = QPushButton("切换九宫格")
         self.switch_btn.clicked.connect(self.toggle_mode)
         btn_layout.addWidget(self.switch_btn)
-        self.layout.addLayout(btn_layout)
+        self.main_layout.addLayout(btn_layout)
         # 单屏区
         self.single_chart = ChartWidget(
             self, self.config_manager, self.theme_manager, self.log_manager, data_manager=self.data_manager)
-        self.layout.addWidget(self.single_chart)
+        self.main_layout.addWidget(self.single_chart)
         # 多屏区
         self.grid = QGridLayout()
         self.grid.setSpacing(4)
@@ -83,7 +83,7 @@ class MultiChartPanel(QWidget):
         self.grid_widget.setLayout(self.grid)
         self.grid_widget.setVisible(False)
         self.grid_widget.setAcceptDrops(True)
-        self.layout.addWidget(self.grid_widget)
+        self.main_layout.addWidget(self.grid_widget)
         self.setAcceptDrops(True)
 
     def set_stock_list(self, stock_list):
@@ -313,3 +313,24 @@ class MultiChartPanel(QWidget):
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"多图表区防抖刷新失败: {str(e)}")
+
+    def refresh_all_charts(self):
+        """
+        批量刷新所有子图，分批处理，避免UI卡顿。
+        """
+        if self.is_multi:
+            charts = [chart for row in self.chart_widgets for chart in row]
+        else:
+            charts = [self.single_chart] if hasattr(
+                self, 'single_chart') else []
+        self._refresh_chart_batch(charts, 0)
+
+    def _refresh_chart_batch(self, charts, idx, batch_size=2):
+        if idx >= len(charts):
+            return
+        for i in range(idx, min(idx+batch_size, len(charts))):
+            chart = charts[i]
+            if hasattr(chart, 'resizeEvent'):
+                chart.resizeEvent(QResizeEvent(chart.size(), chart.size()))
+        QTimer.singleShot(30, lambda: self._refresh_chart_batch(
+            charts, idx+batch_size, batch_size))

@@ -2,10 +2,7 @@
 交易控件模块
 """
 from typing import Dict, Any, List, Optional
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-                             QLabel, QLineEdit, QComboBox, QPushButton,
-                             QSpinBox, QDoubleSpinBox, QTableWidget,
-                             QTableWidgetItem, QGroupBox, QFormLayout, QTextEdit)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import pyqtSignal, Qt
 import traceback
 

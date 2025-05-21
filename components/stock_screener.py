@@ -4,15 +4,9 @@
 提供多种选股策略，包括技术指标筛选、基本面筛选、资金流向筛选等
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QTableWidget, QTableWidgetItem, QPushButton,
-                             QFrame, QGridLayout, QProgressBar, QFileDialog,
-                             QGroupBox, QSplitter, QComboBox, QSpinBox,
-                             QDoubleSpinBox, QCheckBox, QFormLayout, QInputDialog,
-                             QMessageBox, QProgressDialog, QListWidget, QAbstractItemView,
-                             QLineEdit)
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QPalette, QPainter, QFont
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, List, Union
@@ -25,10 +19,91 @@ from matplotlib.figure import Figure
 import json
 import traceback
 from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
+from components.template_manager import TemplateManager
 
 
-class StockScreenerWidget(QWidget):
-    """选股策略组件"""
+class PagedTableWidget(QWidget):
+    def __init__(self, columns, page_size=100, parent=None):
+        super().__init__(parent)
+        self.page_size = page_size
+        self.current_page = 1
+        self.data = []
+        self.columns = columns
+        self.layout = QVBoxLayout(self)
+        self.table = QTableWidget()
+        self.table.setColumnCount(len(columns))
+        self.table.setHorizontalHeaderLabels(columns)
+        self.layout.addWidget(self.table)
+        nav_layout = QHBoxLayout()
+        self.prev_btn = QPushButton("上一页")
+        self.next_btn = QPushButton("下一页")
+        self.page_label = QLabel()
+        nav_layout.addWidget(self.prev_btn)
+        nav_layout.addWidget(self.page_label)
+        nav_layout.addWidget(self.next_btn)
+        self.layout.addLayout(nav_layout)
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.next_btn.clicked.connect(self.next_page)
+
+    def set_data(self, data):
+        self.data = data
+        self.current_page = 1
+        self.update_page()
+
+    def update_page(self):
+        start = (self.current_page - 1) * self.page_size
+        end = start + self.page_size
+        page_data = self.data[start:end]
+        self.table.setRowCount(len(page_data))
+        for i, row in enumerate(page_data):
+            for j, value in enumerate(row):
+                self.table.setItem(i, j, QTableWidgetItem(str(value)))
+        total_pages = max(
+            1, (len(self.data) + self.page_size - 1) // self.page_size)
+        self.page_label.setText(f"第 {self.current_page} / {total_pages} 页")
+        self.prev_btn.setEnabled(self.current_page > 1)
+        self.next_btn.setEnabled(self.current_page < total_pages)
+
+    def next_page(self):
+        total_pages = max(
+            1, (len(self.data) + self.page_size - 1) // self.page_size)
+        if self.current_page < total_pages:
+            self.current_page += 1
+            self.update_page()
+
+    def prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.update_page()
+
+
+class ScreeningWorker(QThread):
+    """选股工作线程（多线程筛选支持）"""
+    finished = pyqtSignal(pd.DataFrame)
+    error = pyqtSignal(str)
+
+    def __init__(self, screener, params):
+        super().__init__()
+        self.screener = screener
+        self.params = params
+
+    def run(self):
+        try:
+            results = self.screener.screen_stocks(
+                strategy_type=self.params['strategy_type'],
+                template=self.params['template'],
+                technical_params=self.params['technical'],
+                fundamental_params=self.params['fundamental'],
+                capital_params=self.params['capital']
+            )
+            self.finished.emit(results)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class StockScreenerWidget(BaseAnalysisPanel):
+    """选股策略组件，继承统一分析面板基类"""
 
     def __init__(self, parent=None, data_manager=None, log_manager=None):
         """初始化选股策略组件
@@ -39,27 +114,35 @@ class StockScreenerWidget(QWidget):
             log_manager: 日志管理器实例
         """
         super().__init__(parent)
-        self.setFont(QFont("Microsoft YaHei", 10))  # 设置默认字体为微软雅黑
-
-        # 初始化数据管理器
         self.data_manager = data_manager
-        self.log_manager = log_manager or LogManager()
-        self.screener = StockScreener(data_manager, log_manager)
-
-        # 初始化UI
-        self.init_ui()
-
-        # 初始化条件和模板
+        self.log_manager = log_manager
+        # 先初始化所有依赖属性
+        self.template_manager = TemplateManager(
+            template_dir="templates/stock_screener")
         self.conditions = []
         self.templates = {}
+        # 再初始化UI和加载模板
+        self.init_ui()
         self.load_templates()
+        # 主动拉取一次股票列表并刷新结果表，确保初始有数据展示
+        if self.data_manager and hasattr(self.data_manager, 'get_stock_list'):
+            try:
+                df = self.data_manager.get_stock_list()
+                if not df.empty:
+                    # 只显示前100条
+                    data = df.head(100).values.tolist()
+                    self.paged_table.set_data(data)
+            except Exception as e:
+                if self.log_manager:
+                    self.log_manager.warning(f"初始化拉取股票列表失败: {str(e)}")
 
     def init_ui(self):
         """Initialize UI components"""
         try:
             # Create main layout
-            layout = QVBoxLayout(self)
-
+            self.main_layout = QVBoxLayout()
+            if self.layout() is None:
+                self.setLayout(self.main_layout)
             # Create strategy selection group
             strategy_group = QGroupBox("选股策略")
             strategy_layout = QVBoxLayout(strategy_group)
@@ -101,28 +184,22 @@ class StockScreenerWidget(QWidget):
             strategy_layout.addLayout(template_layout)
 
             # Add to main layout
-            layout.addWidget(strategy_group)
+            self.main_layout.addWidget(strategy_group)
 
             # Create condition settings group
             self.condition_group = QGroupBox("选股条件")
             self.condition_layout = QVBoxLayout(self.condition_group)
-            layout.addWidget(self.condition_group)
+            self.main_layout.addWidget(self.condition_group)
 
             # Create result display group
             self.result_group = QGroupBox("选股结果")
             result_layout = QVBoxLayout(self.result_group)
 
             # Add result table first
-            self.result_table = QTableWidget()
-            self.result_table.setColumnCount(5)
-            self.result_table.setHorizontalHeaderLabels([
-                "股票代码", "股票名称", "最新价", "涨跌幅", "筛选得分"
-            ])
-            self.result_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.result_table.setSelectionMode(QTableWidget.SingleSelection)
-            self.result_table.itemSelectionChanged.connect(
-                self.on_stock_selected)
-            result_layout.addWidget(self.result_table)
+            self.paged_table = PagedTableWidget(
+                columns=["股票代码", "股票名称", "最新价", "涨跌幅", "筛选得分"], page_size=100)
+            self.paged_table.table.setToolTip("分页显示大数据量选股结果，支持排序和筛选")
+            result_layout.addWidget(self.paged_table)
 
             # Add sorting functions after result table is created
             self.add_sorting_functions()
@@ -134,19 +211,31 @@ class StockScreenerWidget(QWidget):
             buttons_layout = QHBoxLayout()
 
             screen_button = QPushButton("开始选股")
-            screen_button.clicked.connect(self.run_screener)
+            screen_button.clicked.connect(self.start_screening)
+            screen_button.setToolTip("点击开始选股")
             buttons_layout.addWidget(screen_button)
+            self.run_button = screen_button  # 记录引用，便于多线程控制
 
             export_button = QPushButton("导出结果")
             export_button.clicked.connect(self.export_results)
+            export_button.setToolTip("导出当前筛选结果到Excel或CSV文件")
             buttons_layout.addWidget(export_button)
 
             save_button = QPushButton("保存策略")
             save_button.clicked.connect(self.save_strategy)
             buttons_layout.addWidget(save_button)
 
+            # 增加模板管理按钮
+            manage_button = QPushButton("模板管理")
+            manage_button.clicked.connect(self.show_template_manager_dialog)
+            buttons_layout.addWidget(manage_button)
+
+            batch_export_button = QPushButton("批量导出分析结果")
+            batch_export_button.clicked.connect(self.export_batch_results)
+            buttons_layout.addWidget(batch_export_button)
+
             result_layout.addLayout(buttons_layout)
-            layout.addWidget(self.result_group)
+            self.main_layout.addWidget(self.result_group)
 
             # Initialize condition settings
             self.on_strategy_changed(self.strategy_type.currentText())
@@ -157,8 +246,36 @@ class StockScreenerWidget(QWidget):
             # Add chart functions
             self.add_chart_functions()
 
+            # 新增：连接条件控件信号
+            self._connect_condition_signals()
+
+            # 批量股票代码输入区
+            self.batch_input = QLineEdit()
+            self.batch_input.setPlaceholderText("输入多个股票代码，用逗号分隔，或点击导入文件")
+            self.main_layout.addWidget(self.batch_input)
+            import_button = QPushButton("导入股票代码文件")
+            import_button.clicked.connect(self.import_stock_codes)
+            self.main_layout.addWidget(import_button)
+            # 多策略对比入口
+            self.strategy_checkboxes = []
+            for strategy in ["双均线", "MACD", "KDJ", "RSI", "BOLL"]:
+                cb = QCheckBox(strategy)
+                self.main_layout.addWidget(cb)
+                self.strategy_checkboxes.append(cb)
+            compare_button = QPushButton("多策略对比分析")
+            compare_button.clicked.connect(self.compare_strategies)
+            self.main_layout.addWidget(compare_button)
+            # 结果展示表格
+            self.compare_table = QTableWidget()
+            self.compare_table.setColumnCount(3)
+            self.compare_table.setHorizontalHeaderLabels(
+                ["股票代码", "策略", "分析结果"])
+            self.compare_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.main_layout.addWidget(self.compare_table)
+
         except Exception as e:
-            self.log_manager.log(f"初始化UI失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.error(f"初始化UI失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
             raise
 
     def on_strategy_changed(self, strategy_type: str):
@@ -368,97 +485,64 @@ class StockScreenerWidget(QWidget):
         except Exception as e:
             self.log_manager.log(f"添加综合条件失败: {str(e)}", LogLevel.ERROR)
 
-    def run_screener(self):
-        """运行选股器"""
+    def start_screening(self):
+        """多线程启动筛选"""
         try:
-            # 禁用运行按钮,避免重复点击
-            QTimer.singleShot(0, lambda: self.run_button.setEnabled(False))
-
-            # 获取选股条件
-            conditions = self._get_screener_conditions()
-            if not conditions:
+            valid, msg = self.validate_params()
+            if not valid:
+                QMessageBox.warning(self, "参数错误", f"请修正以下参数后再筛选：\n{msg}")
                 return
-
-            # 在新线程中运行选股
-            self.screener_thread = QThread()
-            self.screener_worker = StockScreenerWorker(conditions)
-            self.screener_worker.moveToThread(self.screener_thread)
-
-            # 连接信号
-            self.screener_thread.started.connect(self.screener_worker.run)
-            self.screener_worker.finished.connect(self.screener_thread.quit)
-            self.screener_worker.finished.connect(
-                self.screener_worker.deleteLater)
-            self.screener_thread.finished.connect(
-                self.screener_thread.deleteLater)
-            self.screener_worker.progress.connect(self._update_progress)
-            self.screener_worker.result.connect(self._handle_screener_result)
-
-            # 启动线程
-            self.screener_thread.start()
-
+            params = {
+                'strategy_type': self.strategy_type.currentText(),
+                'template': self.template_combo.currentText(),
+                'technical': self.get_technical_params(),
+                'fundamental': self.get_fundamental_params(),
+                'capital': self.get_capital_params()
+            }
+            self.screening_worker = ScreeningWorker(self.screener, params)
+            self.screening_worker.finished.connect(self.on_screening_finished)
+            self.screening_worker.error.connect(self.on_screening_error)
+            self.screening_worker.start()
+            # 禁用按钮防止重复点击
+            self.run_button.setEnabled(False)
         except Exception as e:
-            self.log_manager.log(f"启动选股失败: {e}", LogLevel.ERROR)
-            QTimer.singleShot(0, lambda: self.run_button.setEnabled(True))
+            self.log_manager.error(f"启动筛选失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"启动筛选失败: {str(e)}")
 
-    def _update_progress(self, progress: int):
-        """更新进度条
+    def on_screening_finished(self, results):
+        """筛选完成回调"""
+        self.update_result_table(results)
+        self.run_button.setEnabled(True)
+        QMessageBox.information(self, "完成", f"筛选完成，共{len(results)}条记录")
 
-        Args:
-            progress: 进度值(0-100)
-        """
-        try:
-            QTimer.singleShot(0, lambda: self.progress_bar.setValue(progress))
-        except Exception as e:
-            self.log_manager.log(f"更新进度条失败: {e}", LogLevel.ERROR)
+    def on_screening_error(self, error):
+        """筛选错误回调"""
+        self.run_button.setEnabled(True)
+        self.log_manager.error(f"筛选失败: {error}")
+        QMessageBox.critical(self, "错误", f"筛选失败: {error}")
 
-    def _handle_screener_result(self, result: dict):
-        """处理选股结果
+    def get_technical_params(self):
+        # TODO: 从UI获取技术指标参数
+        return {}
 
-        Args:
-            result: 选股结果字典
-        """
-        try:
-            QTimer.singleShot(0, lambda: self._update_ui_safely(result))
-        except Exception as e:
-            self.log_manager.log(f"处理选股结果失败: {e}", LogLevel.ERROR)
+    def get_fundamental_params(self):
+        # TODO: 从UI获取基本面参数
+        return {}
 
-    def _update_ui_safely(self, result: dict):
-        """在主线程中安全地更新UI
-
-        Args:
-            result: 选股结果字典
-        """
-        try:
-            # 更新结果表格
-            self.update_result_table(result.get('stocks', []))
-
-            # 更新统计信息
-            self._update_statistics(result.get('stats', {}))
-
-            # 更新图表
-            self._update_distribution_chart()
-
-            # 启用运行按钮
-            self.run_button.setEnabled(True)
-
-            # 重置进度条
-            self.progress_bar.setValue(0)
-
-        except Exception as e:
-            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
-            self.run_button.setEnabled(True)
+    def get_capital_params(self):
+        # TODO: 从UI获取资金流向参数
+        return {}
 
     def on_stock_selected(self):
         """Handle stock selection in result table"""
         try:
             # Get selected row
-            selected_items = self.result_table.selectedItems()
+            selected_items = self.paged_table.table.selectedIndexes()
             if not selected_items:
                 return
 
             # Get stock code
-            stock_code = selected_items[0].text()
+            stock_code = selected_items[0].data()
 
             # Emit signal to parent
             if hasattr(self.parent(), 'on_stock_selected'):
@@ -472,13 +556,13 @@ class StockScreenerWidget(QWidget):
         try:
             # 获取当前数据
             data = []
-            for row in range(self.result_table.rowCount()):
+            for row in range(self.paged_table.table.rowCount()):
                 data.append({
-                    'code': self.result_table.item(row, 0).text(),
-                    'name': self.result_table.item(row, 1).text(),
-                    'close': float(self.result_table.item(row, 2).text()),
-                    'change_percent': float(self.result_table.item(row, 3).text().rstrip('%')),
-                    'score': float(self.result_table.item(row, 4).text())
+                    'code': self.paged_table.table.item(row, 0).text(),
+                    'name': self.paged_table.table.item(row, 1).text(),
+                    'close': float(self.paged_table.table.item(row, 2).text()),
+                    'change_percent': float(self.paged_table.table.item(row, 3).text().rstrip('%')),
+                    'score': float(self.paged_table.table.item(row, 4).text())
                 })
 
             if not data:
@@ -513,36 +597,16 @@ class StockScreenerWidget(QWidget):
     def save_strategy(self):
         """保存当前选股策略"""
         try:
-            # 获取当前策略设置
             strategy_type = self.strategy_type.currentText()
             conditions = self.get_current_conditions()
-
-            # 获取保存路径
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "保存选股策略",
-                f"选股策略_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                "JSON Files (*.json)"
-            )
-
-            if file_path:
-                # 构建策略数据
-                strategy_data = {
-                    'strategy_type': strategy_type,
-                    'conditions': conditions,
-                    'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-
-                # 保存到文件
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(strategy_data, f, ensure_ascii=False, indent=4)
-
-                self.log_manager.log(f"选股策略已保存到: {file_path}", LogLevel.INFO)
-                QMessageBox.information(self, "成功", "选股策略保存成功")
-
+            name, ok = QInputDialog.getText(
+                self, "保存模板", "模板名称:", text=f"{strategy_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            if ok and name:
+                self.template_manager.save_template(name, conditions)
+                QMessageBox.information(self, "成功", "模板保存成功")
         except Exception as e:
-            self.log_manager.log(f"保存选股策略失败: {str(e)}", LogLevel.ERROR)
-            QMessageBox.critical(self, "错误", f"保存选股策略失败: {str(e)}")
+            self.log_manager.log(f"保存模板失败: {str(e)}", LogLevel.ERROR)
+            QMessageBox.critical(self, "错误", f"保存模板失败: {str(e)}")
 
     def load_strategy(self):
         """加载选股策略"""
@@ -645,13 +709,9 @@ class StockScreenerWidget(QWidget):
     def load_templates(self):
         """加载策略模板列表"""
         try:
-            # 清空模板列表
             self.template_combo.clear()
-
-            # 获取模板列表
-            templates = self.screener.list_templates()
-            self.template_combo.addItems(templates)
-
+            for name in self.template_manager.list_templates():
+                self.template_combo.addItem(name)
         except Exception as e:
             self.log_manager.log(f"加载模板列表失败: {str(e)}", LogLevel.ERROR)
 
@@ -664,19 +724,8 @@ class StockScreenerWidget(QWidget):
         try:
             if not template_name:
                 return
-
-            # 加载模板
-            strategy_type, conditions = self.screener.load_strategy(
-                template_name)
-            if strategy_type and conditions:
-                # 更新策略类型
-                index = self.strategy_type.findText(strategy_type)
-                if index >= 0:
-                    self.strategy_type.setCurrentIndex(index)
-
-                # 更新条件设置
-                self.update_conditions(conditions)
-
+            params = self.template_manager.load_template(template_name)
+            self.update_conditions(params)
         except Exception as e:
             self.log_manager.log(f"加载模板失败: {str(e)}", LogLevel.ERROR)
 
@@ -774,8 +823,7 @@ class StockScreenerWidget(QWidget):
                 conditions = self.get_current_conditions()
 
                 # 保存模板
-                self.screener.save_strategy(
-                    strategy_type, conditions, template_name)
+                self.template_manager.save_template(template_name, conditions)
 
                 # 重新加载模板列表
                 self.load_templates()
@@ -801,7 +849,7 @@ class StockScreenerWidget(QWidget):
 
             if reply == QMessageBox.Yes:
                 # 删除模板
-                self.screener.delete_template(template_name)
+                self.template_manager.delete_templates([template_name])
 
                 # 重新加载模板列表
                 self.load_templates()
@@ -813,7 +861,7 @@ class StockScreenerWidget(QWidget):
         """添加排序功能"""
         try:
             # 设置表格可排序
-            self.result_table.setSortingEnabled(True)
+            self.paged_table.table.setSortingEnabled(True)
 
             # 添加排序按钮
             sort_layout = QHBoxLayout()
@@ -853,13 +901,13 @@ class StockScreenerWidget(QWidget):
 
             # 获取当前数据
             data = []
-            for row in range(self.result_table.rowCount()):
+            for row in range(self.paged_table.table.rowCount()):
                 data.append({
-                    'code': self.result_table.item(row, 0).text(),
-                    'name': self.result_table.item(row, 1).text(),
-                    'close': float(self.result_table.item(row, 2).text()),
-                    'change_percent': float(self.result_table.item(row, 3).text().rstrip('%')),
-                    'score': float(self.result_table.item(row, 4).text())
+                    'code': self.paged_table.table.item(row, 0).text(),
+                    'name': self.paged_table.table.item(row, 1).text(),
+                    'close': float(self.paged_table.table.item(row, 2).text()),
+                    'change_percent': float(self.paged_table.table.item(row, 3).text().rstrip('%')),
+                    'score': float(self.paged_table.table.item(row, 4).text())
                 })
 
             # 转换为DataFrame并排序
@@ -909,13 +957,13 @@ class StockScreenerWidget(QWidget):
 
             # 获取当前数据
             data = []
-            for row in range(self.result_table.rowCount()):
+            for row in range(self.paged_table.table.rowCount()):
                 data.append({
-                    'code': self.result_table.item(row, 0).text(),
-                    'name': self.result_table.item(row, 1).text(),
-                    'close': float(self.result_table.item(row, 2).text()),
-                    'change_percent': float(self.result_table.item(row, 3).text().rstrip('%')),
-                    'score': float(self.result_table.item(row, 4).text())
+                    'code': self.paged_table.table.item(row, 0).text(),
+                    'name': self.paged_table.table.item(row, 1).text(),
+                    'close': float(self.paged_table.table.item(row, 2).text()),
+                    'change_percent': float(self.paged_table.table.item(row, 3).text().rstrip('%')),
+                    'score': float(self.paged_table.table.item(row, 4).text())
                 })
 
             # 转换为DataFrame并筛选
@@ -977,13 +1025,13 @@ class StockScreenerWidget(QWidget):
             self.figure.clear()
             # 获取当前数据
             data = []
-            for row in range(self.result_table.rowCount()):
+            for row in range(self.paged_table.table.rowCount()):
                 data.append({
-                    'code': self.result_table.item(row, 0).text(),
-                    'name': self.result_table.item(row, 1).text(),
-                    'close': float(self.result_table.item(row, 2).text()),
-                    'change_percent': float(self.result_table.item(row, 3).text().rstrip('%')),
-                    'score': float(self.result_table.item(row, 4).text())
+                    'code': self.paged_table.table.item(row, 0).text(),
+                    'name': self.paged_table.table.item(row, 1).text(),
+                    'close': float(self.paged_table.table.item(row, 2).text()),
+                    'change_percent': float(self.paged_table.table.item(row, 3).text().rstrip('%')),
+                    'score': float(self.paged_table.table.item(row, 4).text())
                 })
             if not data:
                 return
@@ -1236,25 +1284,25 @@ class StockScreenerWidget(QWidget):
         """
         try:
             # 清空表格
-            self.result_table.setRowCount(0)
+            self.paged_table.table.setRowCount(0)
 
             if isinstance(results, pd.DataFrame):
                 # 如果输入是DataFrame
-                self.result_table.setRowCount(len(results))
+                self.paged_table.table.setRowCount(len(results))
                 for i, (_, row) in enumerate(results.iterrows()):
                     # 设置股票代码
                     code_item = QTableWidgetItem(str(row['code']))
-                    self.result_table.setItem(i, 0, code_item)
+                    self.paged_table.table.setItem(i, 0, code_item)
 
                     # 设置股票名称
                     name_item = QTableWidgetItem(str(row['name']))
-                    self.result_table.setItem(i, 1, name_item)
+                    self.paged_table.table.setItem(i, 1, name_item)
 
                     # 设置最新价
                     close_item = QTableWidgetItem(f"{row['close']:.2f}")
                     close_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
-                    self.result_table.setItem(i, 2, close_item)
+                    self.paged_table.table.setItem(i, 2, close_item)
 
                     # 设置涨跌幅
                     change_item = QTableWidgetItem(
@@ -1265,30 +1313,30 @@ class StockScreenerWidget(QWidget):
                         change_item.setForeground(QColor("#FF4D4D"))
                     elif row['change_percent'] < 0:
                         change_item.setForeground(QColor("#4DB870"))
-                    self.result_table.setItem(i, 3, change_item)
+                    self.paged_table.table.setItem(i, 3, change_item)
 
                     # 设置筛选得分
                     score_item = QTableWidgetItem(f"{row['score']:.2f}")
                     score_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
-                    self.result_table.setItem(i, 4, score_item)
+                    self.paged_table.table.setItem(i, 4, score_item)
             else:
                 # 如果输入是字典列表
-                self.result_table.setRowCount(len(results))
+                self.paged_table.table.setRowCount(len(results))
                 for i, result in enumerate(results):
                     # 设置股票代码
                     code_item = QTableWidgetItem(str(result['code']))
-                    self.result_table.setItem(i, 0, code_item)
+                    self.paged_table.table.setItem(i, 0, code_item)
 
                     # 设置股票名称
                     name_item = QTableWidgetItem(str(result['name']))
-                    self.result_table.setItem(i, 1, name_item)
+                    self.paged_table.table.setItem(i, 1, name_item)
 
                     # 设置最新价
                     close_item = QTableWidgetItem(f"{result['close']:.2f}")
                     close_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
-                    self.result_table.setItem(i, 2, close_item)
+                    self.paged_table.table.setItem(i, 2, close_item)
 
                     # 设置涨跌幅
                     change_item = QTableWidgetItem(
@@ -1299,16 +1347,16 @@ class StockScreenerWidget(QWidget):
                         change_item.setForeground(QColor("#FF4D4D"))
                     elif result['change_percent'] < 0:
                         change_item.setForeground(QColor("#4DB870"))
-                    self.result_table.setItem(i, 3, change_item)
+                    self.paged_table.table.setItem(i, 3, change_item)
 
                     # 设置筛选得分
                     score_item = QTableWidgetItem(f"{result['score']:.2f}")
                     score_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
-                    self.result_table.setItem(i, 4, score_item)
+                    self.paged_table.table.setItem(i, 4, score_item)
 
             # 调整列宽
-            self.result_table.resizeColumnsToContents()
+            self.paged_table.table.resizeColumnsToContents()
 
             # 更新状态
             self.log_manager.info(f"更新选股结果表格完成，共{len(results)}条记录")
@@ -1440,3 +1488,254 @@ class StockScreenerWidget(QWidget):
                     f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
                 continue
         return pd.DataFrame(results)
+
+    def show_screener_guide(self):
+        """显示选股器操作引导"""
+        QMessageBox.information(
+            self,
+            "选股操作引导",
+            "【选股操作步骤】\n"
+            "1. 选择策略类型和条件，支持技术、基本面、资金面等多维度筛选。\n"
+            "2. 点击\"开始选股\"按钮，系统将自动筛选并分页展示结果。\n"
+            "3. 可导出结果、保存/加载策略模板。\n"
+            "4. 鼠标悬停在各控件上可查看详细说明。"
+        )
+
+    def validate_params(self) -> (bool, str):
+        """
+        校验所有选股条件控件的输入，支持QSpinBox、QDoubleSpinBox、QLineEdit等。
+        校验失败时高亮控件并返回错误信息。
+        Returns:
+            (bool, str): 是否通过校验，错误信息
+        """
+        valid = True
+        error_msgs = []
+        # 技术指标条件
+        if hasattr(self, 'rsi_period'):
+            w = self.rsi_period
+            w.setStyleSheet("")
+            v = w.value()
+            if v < w.minimum() or v > w.maximum():
+                valid = False
+                error_msgs.append(f"RSI周期超出范围 [{w.minimum()}, {w.maximum()}]")
+                w.setStyleSheet("border: 2px solid red;")
+        # 基本面条件
+        for attr in ['pe_min', 'pe_max', 'pb_min', 'pb_max', 'roe_min']:
+            if hasattr(self, attr):
+                w = getattr(self, attr)
+                w.setStyleSheet("")
+                v = w.value()
+                if v < w.minimum() or v > w.maximum():
+                    valid = False
+                    error_msgs.append(
+                        f"{attr.upper()} 超出范围 [{w.minimum()}, {w.maximum()}]")
+                    w.setStyleSheet("border: 2px solid red;")
+        # 资金面条件
+        for attr in ['inflow_min', 'volume_min']:
+            if hasattr(self, attr):
+                w = getattr(self, attr)
+                w.setStyleSheet("")
+                v = w.value()
+                if v < w.minimum() or v > w.maximum():
+                    valid = False
+                    error_msgs.append(
+                        f"{attr.upper()} 超出范围 [{w.minimum()}, {w.maximum()}]")
+                    w.setStyleSheet("border: 2px solid red;")
+        # 综合权重
+        for attr in ['tech_weight', 'fund_weight', 'cap_weight']:
+            if hasattr(self, attr):
+                w = getattr(self, attr)
+                w.setStyleSheet("")
+                v = w.value()
+                if v < w.minimum() or v > w.maximum():
+                    valid = False
+                    error_msgs.append(
+                        f"{attr.upper()} 超出范围 [{w.minimum()}, {w.maximum()}]")
+                    w.setStyleSheet("border: 2px solid red;")
+        return valid, "\n".join(error_msgs)
+
+    def _connect_condition_signals(self):
+        """为所有条件控件增加实时校验信号"""
+        for attr in ['rsi_period', 'pe_min', 'pe_max', 'pb_min', 'pb_max', 'roe_min',
+                     'inflow_min', 'volume_min', 'tech_weight', 'fund_weight', 'cap_weight']:
+            if hasattr(self, attr):
+                w = getattr(self, attr)
+                if hasattr(w, 'valueChanged'):
+                    w.valueChanged.connect(self._on_condition_changed)
+                elif hasattr(w, 'editingFinished'):
+                    w.editingFinished.connect(self._on_condition_changed)
+
+    def _on_condition_changed(self):
+        valid, msg = self.validate_params()
+        # 实时高亮错误，无需弹窗
+        # 可扩展为状态栏提示
+
+    def show_template_manager_dialog(self):
+        """弹出批量模板管理对话框"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("批量模板管理")
+        layout = QVBoxLayout(dialog)
+        list_widget = QListWidget()
+        list_widget.setSelectionMode(QListWidget.MultiSelection)
+        # 加载模板列表
+        for name in self.template_manager.list_templates():
+            list_widget.addItem(name)
+        layout.addWidget(list_widget)
+        # 按钮区
+        btn_layout = QHBoxLayout()
+        import_btn = QPushButton("导入")
+        export_btn = QPushButton("导出")
+        delete_btn = QPushButton("删除")
+        rename_btn = QPushButton("重命名")
+        apply_btn = QPushButton("应用")
+        btn_layout.addWidget(import_btn)
+        btn_layout.addWidget(export_btn)
+        btn_layout.addWidget(delete_btn)
+        btn_layout.addWidget(rename_btn)
+        btn_layout.addWidget(apply_btn)
+        layout.addLayout(btn_layout)
+        # 事件绑定
+        import_btn.clicked.connect(lambda: self._import_templates(list_widget))
+        export_btn.clicked.connect(lambda: self._export_templates(list_widget))
+        delete_btn.clicked.connect(lambda: self._delete_templates(list_widget))
+        rename_btn.clicked.connect(lambda: self._rename_template(list_widget))
+        apply_btn.clicked.connect(
+            lambda: self._apply_template(list_widget, dialog))
+        dialog.exec_()
+
+    def _import_templates(self, list_widget):
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "导入模板", "", "JSON Files (*.json)")
+        if files:
+            self.template_manager.import_templates(files)
+            list_widget.clear()
+            for name in self.template_manager.list_templates():
+                list_widget.addItem(name)
+
+    def _export_templates(self, list_widget):
+        selected = [item.text() for item in list_widget.selectedItems()]
+        if not selected:
+            QMessageBox.warning(self, "提示", "请先选择要导出的模板")
+            return
+        dir_path = QFileDialog.getExistingDirectory(self, "选择导出目录")
+        if dir_path:
+            self.template_manager.export_templates(selected, dir_path)
+            QMessageBox.information(self, "成功", "模板导出成功")
+
+    def _delete_templates(self, list_widget):
+        selected = [item.text() for item in list_widget.selectedItems()]
+        if not selected:
+            QMessageBox.warning(self, "提示", "请先选择要删除的模板")
+            return
+        self.template_manager.delete_templates(selected)
+        for item in list_widget.selectedItems():
+            list_widget.takeItem(list_widget.row(item))
+        QMessageBox.information(self, "成功", "模板删除成功")
+
+    def _rename_template(self, list_widget):
+        selected = list_widget.selectedItems()
+        if len(selected) != 1:
+            QMessageBox.warning(self, "提示", "请只选择一个模板进行重命名")
+            return
+        old_name = selected[0].text()
+        new_name, ok = QInputDialog.getText(
+            self, "重命名模板", "新模板名:", text=old_name)
+        if ok and new_name and new_name != old_name:
+            params = self.template_manager.load_template(old_name)
+            self.template_manager.save_template(new_name, params)
+            self.template_manager.delete_templates([old_name])
+            selected[0].setText(new_name)
+            QMessageBox.information(self, "成功", "模板重命名成功")
+
+    def _apply_template(self, list_widget, dialog):
+        selected = list_widget.selectedItems()
+        if len(selected) != 1:
+            QMessageBox.warning(self, "提示", "请只选择一个模板进行应用")
+            return
+        name = selected[0].text()
+        params = self.template_manager.load_template(name)
+        # 这里假设params结构与get_current_conditions一致
+        self.update_conditions(params)
+        QMessageBox.information(self, "成功", f"模板 {name} 已应用")
+        dialog.accept()
+
+    def import_stock_codes(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "导入股票代码", "", "Text Files (*.txt)")
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                codes = f.read().replace('\n', ',')
+                self.batch_input.setText(codes)
+
+    def compare_strategies(self):
+        codes = [c.strip()
+                 for c in self.batch_input.text().split(',') if c.strip()]
+        strategies = [cb.text()
+                      for cb in self.strategy_checkboxes if cb.isChecked()]
+        if not codes or not strategies:
+            QMessageBox.warning(self, "参数错误", "请至少输入一个股票代码并选择一个策略")
+            return
+        self.compare_table.setRowCount(0)
+        for code in codes:
+            for strategy in strategies:
+                # 这里应调用实际分析逻辑，示例用占位符
+                result = f"{strategy}分析结果"
+                row = self.compare_table.rowCount()
+                self.compare_table.insertRow(row)
+                self.compare_table.setItem(row, 0, QTableWidgetItem(code))
+                self.compare_table.setItem(row, 1, QTableWidgetItem(strategy))
+                self.compare_table.setItem(row, 2, QTableWidgetItem(result))
+
+    def export_batch_results(self):
+        """
+        批量导出分析结果，支持多选导出和批量导出所有策略/股票结果
+        """
+        try:
+            # 导出compare_table中的所有结果
+            row_count = self.compare_table.rowCount()
+            if row_count == 0:
+                QMessageBox.warning(self, "警告", "没有可导出的对比分析结果")
+                return
+            data = []
+            for row in range(row_count):
+                code = self.compare_table.item(row, 0).text()
+                strategy = self.compare_table.item(row, 1).text()
+                result = self.compare_table.item(row, 2).text()
+                data.append({
+                    'code': code,
+                    'strategy': strategy,
+                    'result': result
+                })
+            df = pd.DataFrame(data)
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "批量导出分析结果",
+                f"批量分析结果_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                "Excel Files (*.xlsx);;CSV Files (*.csv)"
+            )
+            if file_path:
+                if file_path.endswith('.xlsx'):
+                    df.to_excel(file_path, index=False)
+                else:
+                    df.to_csv(file_path, index=False)
+                QMessageBox.information(self, "成功", "批量分析结果导出成功")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"批量导出失败: {str(e)}")
+
+    # 多面板联动和自定义指标预留接口
+
+    def link_with_other_panels(self, panel_refs: dict):
+        """
+        多面板联动接口，panel_refs为其他面板实例的引用字典
+        """
+        self._linked_panels = panel_refs
+        # 示例：可通过self._linked_panels['fund_flow']等访问其他面板
+
+    def add_custom_indicator(self, name: str, func):
+        """
+        注册自定义指标，func为计算函数，name为指标名
+        """
+        if not hasattr(self, '_custom_indicators'):
+            self._custom_indicators = {}
+        self._custom_indicators[name] = func
+        # 可在筛选/对比分析时调用自定义指标

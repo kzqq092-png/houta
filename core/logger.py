@@ -10,6 +10,7 @@ from typing import Optional
 from PyQt5.QtCore import pyqtSignal
 from utils.config_types import LoggingConfig
 from .base_logger import BaseLogManager, LogLevel
+import inspect
 
 
 class LogManager(BaseLogManager):
@@ -57,7 +58,8 @@ class LogManager(BaseLogManager):
             file_handler = logging.handlers.RotatingFileHandler(
                 os.path.join('logs', self.config.log_file),
                 maxBytes=self.config.max_bytes,
-                backupCount=self.config.backup_count
+                backupCount=self.config.backup_count,
+                encoding='utf-8'  # 强制UTF-8编码
             )
             file_handler.setFormatter(logging.Formatter(
                 "%(asctime)s - %(levelname)s - %(message)s",
@@ -70,7 +72,8 @@ class LogManager(BaseLogManager):
                 perf_handler = logging.handlers.RotatingFileHandler(
                     os.path.join('logs', self.config.performance_log_file),
                     maxBytes=self.config.max_bytes,
-                    backupCount=self.config.backup_count
+                    backupCount=self.config.backup_count,
+                    encoding='utf-8'
                 )
                 perf_handler.setFormatter(logging.Formatter(
                     "%(asctime)s - PERFORMANCE - %(message)s",
@@ -83,7 +86,8 @@ class LogManager(BaseLogManager):
                 exc_handler = logging.handlers.RotatingFileHandler(
                     os.path.join('logs', self.config.exception_log_file),
                     maxBytes=self.config.max_bytes,
-                    backupCount=self.config.backup_count
+                    backupCount=self.config.backup_count,
+                    encoding='utf-8'
                 )
                 exc_handler.setFormatter(logging.Formatter(
                     "%(asctime)s - EXCEPTION - %(message)s",
@@ -120,6 +124,22 @@ class LogManager(BaseLogManager):
             level: 日志级别
         """
         try:
+            # 获取调用者class和函数名
+            frame = inspect.currentframe()
+            outer_frames = inspect.getouterframes(frame)
+            # 默认
+            class_name = "Global"
+            func_name = ""
+            for record in outer_frames:
+                if record.function not in ("_write_log", "log", "_async_log"):
+                    func_name = record.function
+                    # 尝试获取self
+                    if 'self' in record.frame.f_locals:
+                        class_name = type(
+                            record.frame.f_locals['self']).__name__
+                    break
+            prefix = f"[{class_name}.{func_name}]"
+            message = f"{prefix} {message}"
             # 发送信号
             self.log_message.emit(message, level.value)
 

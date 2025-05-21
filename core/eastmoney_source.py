@@ -381,3 +381,245 @@ class EastMoneyDataSource(DataSource):
             return self._market_map["bj"]
         else:
             raise ValueError(f"无效的股票代码: {symbol}")
+
+    def get_market_sentiment_history(self, days: int = 30, code: str = "000001", industry: str = None, concept: str = None, custom_stocks: list = None) -> list:
+        """
+        获取近N天的市场情绪历史数据（情绪指数），支持指数、行业、概念或自选股。
+        Args:
+            days: 天数，默认30天
+            code: 指数代码，默认上证指数
+            industry: 行业名称，优先生效
+            concept: 概念板块名称，优先生效
+            custom_stocks: 自选股代码列表，优先生效
+        Returns:
+            list: 每项为dict，包含date和sentiment_index
+        """
+        try:
+            if custom_stocks:
+                # 合成自选股K线（取均值）
+                kdata_list = []
+                for code_ in custom_stocks:
+                    df = self.get_kdata(code_, DataFrequency.DAY)
+                    if df is not None and not df.empty:
+                        kdata_list.append(df)
+                if not kdata_list:
+                    return []
+                import pandas as pd
+                df_all = pd.concat(kdata_list)
+                df_group = df_all.groupby('date').mean(
+                    numeric_only=True).reset_index()
+                from features.basic_indicators import calculate_market_sentiment
+                df_group = calculate_market_sentiment(df_group)
+                df_group = df_group.tail(days)
+                result = []
+                for idx, row in df_group.iterrows():
+                    result.append(
+                        {"date": row["date"], "sentiment_index": row["sentiment_index"]})
+                # 在所有result生成后，兜底补sentiment_index字段
+                for item in result:
+                    if 'sentiment_index' not in item:
+                        self.logger.warning(
+                            "历史市场情绪数据项无sentiment_index字段，已补None")
+                        item['sentiment_index'] = None
+                return result
+            elif concept:
+                # 获取概念成分股列表
+                from core.data_manager import DataManager
+                dm = DataManager()
+                stock_list = list(dm.get_concept_stocks(concept))
+                if not stock_list:
+                    return []
+                # 合成概念K线（取均值）
+                kdata_list = []
+                for code_ in stock_list:
+                    df = self.get_kdata(code_, DataFrequency.DAY)
+                    if df is not None and not df.empty:
+                        kdata_list.append(df)
+                if not kdata_list:
+                    return []
+                import pandas as pd
+                df_all = pd.concat(kdata_list)
+                df_group = df_all.groupby('date').mean(
+                    numeric_only=True).reset_index()
+                from features.basic_indicators import calculate_market_sentiment
+                df_group = calculate_market_sentiment(df_group)
+                df_group = df_group.tail(days)
+                result = []
+                for idx, row in df_group.iterrows():
+                    result.append(
+                        {"date": row["date"], "sentiment_index": row["sentiment_index"]})
+                # 在所有result生成后，兜底补sentiment_index字段
+                for item in result:
+                    if 'sentiment_index' not in item:
+                        self.logger.warning(
+                            "历史市场情绪数据项无sentiment_index字段，已补None")
+                        item['sentiment_index'] = None
+                return result
+            elif industry:
+                # 获取行业成分股列表
+                from core.data_manager import DataManager
+                dm = DataManager()
+                stock_list = list(dm.get_industry_stocks(industry))
+                if not stock_list:
+                    return []
+                # 合成行业K线（取均值）
+                kdata_list = []
+                for code_ in stock_list:
+                    df = self.get_kdata(code_, DataFrequency.DAY)
+                    if df is not None and not df.empty:
+                        kdata_list.append(df)
+                if not kdata_list:
+                    return []
+                import pandas as pd
+                df_all = pd.concat(kdata_list)
+                df_group = df_all.groupby('date').mean(
+                    numeric_only=True).reset_index()
+                from features.basic_indicators import calculate_market_sentiment
+                df_group = calculate_market_sentiment(df_group)
+                df_group = df_group.tail(days)
+                result = []
+                for idx, row in df_group.iterrows():
+                    result.append(
+                        {"date": row["date"], "sentiment_index": row["sentiment_index"]})
+                # 在所有result生成后，兜底补sentiment_index字段
+                for item in result:
+                    if 'sentiment_index' not in item:
+                        self.logger.warning(
+                            "历史市场情绪数据项无sentiment_index字段，已补None")
+                        item['sentiment_index'] = None
+                return result
+            else:
+                # 指数情绪
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=days*2)
+                df = self.get_kdata(code, DataFrequency.DAY,
+                                    start_date, end_date)
+                if df is None or df.empty:
+                    return []
+                from features.basic_indicators import calculate_market_sentiment
+                df = calculate_market_sentiment(df)
+                df = df.tail(days)
+                result = []
+                for idx, row in df.iterrows():
+                    result.append(
+                        {"date": row["date"], "sentiment_index": row["sentiment_index"]})
+                # 在所有result生成后，兜底补sentiment_index字段
+                for item in result:
+                    if 'sentiment_index' not in item:
+                        self.logger.warning(
+                            "历史市场情绪数据项无sentiment_index字段，已补None")
+                        item['sentiment_index'] = None
+                return result
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"获取历史市场情绪数据失败: {str(e)}")
+            return []
+
+    def get_market_sentiment(self) -> dict:
+        """
+        获取当前市场情绪数据，返回dict结构，包含sentiment_index、advance_decline、volume_ratio等核心指标。
+        Returns:
+            dict: 市场情绪数据
+        """
+        try:
+            params = {
+                "pn": "1",
+                "pz": "1000",
+                "po": "1",
+                "np": "1",
+                "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+                "fltt": "2",
+                "invt": "2",
+                "fid": "f3",
+                "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
+                "fields": "f12,f14,f2,f3,f4,f5,f6,f8,f9,f10"
+            }
+            url = "http://push2.eastmoney.com/api/qt/ulist/get"
+            response = self._session.get(
+                url,
+                params=params,
+                headers=self._headers
+            )
+            if response.status_code != 200:
+                self.logger.error(
+                    f"[EastMoney] 市场情绪API请求失败: {response.status_code}")
+                return self._empty_sentiment()
+            data = response.json()
+            if not data or "data" not in data or not data["data"]:
+                self.logger.error(f"[EastMoney] 市场情绪API返回空数据: {data}")
+                return self._empty_sentiment()
+            market_data = data["data"]
+            total = market_data.get("total", 0)
+            diff = market_data.get("diff", [])
+            if not diff or total == 0:
+                self.logger.error(
+                    f"[EastMoney] 市场情绪diff或total无效: diff={diff}, total={total}")
+                return self._empty_sentiment()
+            up_count = sum(1 for item in diff if float(item.get("f3", 0)) > 0)
+            down_count = sum(
+                1 for item in diff if float(item.get("f3", 0)) < 0)
+            # 主力资金流向
+            main_fund_flow = None
+            north_money = None
+            try:
+                fund_url = "http://push2.eastmoney.com/api/qt/stock/fflow/kline/get?secid=1.000001&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65&klt=1&lmt=1"
+                fund_resp = self._session.get(fund_url, headers=self._headers)
+                if fund_resp.status_code == 200:
+                    fund_data = fund_resp.json()
+                    klines = fund_data.get("data", {}).get("klines", [])
+                    if klines:
+                        kline = klines[-1]
+                        arr = kline.split(",")
+                        if len(arr) > 1:
+                            main_fund_flow = float(arr[1]) / 10000  # 转为亿元
+                        else:
+                            self.logger.warning(
+                                f"[EastMoney] 主力资金流向kline格式异常: {kline}")
+                    else:
+                        self.logger.warning(
+                            f"[EastMoney] 主力资金流向klines为空: {fund_data}")
+                else:
+                    self.logger.warning(
+                        f"[EastMoney] 主力资金流向API请求失败: {fund_resp.status_code}")
+            except Exception as e:
+                self.logger.error(f"[EastMoney] 主力资金流向获取异常: {e}")
+            sentiment_data = {
+                "sentiment_index": self._calculate_sentiment_index(up_count, down_count, total),
+                "advance_decline": {
+                    "advance": up_count,
+                    "decline": down_count,
+                    "unchanged": total - up_count - down_count
+                },
+                "volume_ratio": self._calculate_volume_ratio(market_data),
+                "turnover_rate": self._calculate_turnover_rate(market_data),
+                "main_fund_flow": main_fund_flow,
+                "north_money": north_money,
+                "margin_balance": self._get_margin_balance(),
+                "option_pcr": self._get_option_pcr(),
+                "fear_index": self._calculate_fear_index(up_count, down_count, total),
+                "timestamp": datetime.now()
+            }
+            # 兜底处理
+            if 'sentiment_index' not in sentiment_data:
+                self.logger.warning("市场情绪数据无sentiment_index字段，已补None")
+                sentiment_data['sentiment_index'] = None
+            return sentiment_data
+        except Exception as e:
+            self.logger.error(
+                f"获取市场情绪数据失败: {e} [EastMoneyDataSource::get_market_sentiment]")
+            return self._empty_sentiment()
+
+    def _empty_sentiment(self):
+        """返回空的市场情绪结构，保证UI不报错"""
+        return {
+            "sentiment_index": None,
+            "advance_decline": {"advance": None, "decline": None, "unchanged": None},
+            "volume_ratio": None,
+            "turnover_rate": None,
+            "main_fund_flow": None,
+            "north_money": None,
+            "margin_balance": None,
+            "option_pcr": None,
+            "fear_index": None,
+            "timestamp": datetime.now()
+        }

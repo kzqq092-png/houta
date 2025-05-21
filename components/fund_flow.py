@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QTableWidget, QTableWidgetItem, QPushButton,
-                             QFrame, QGridLayout, QProgressBar, QFileDialog, QApplication)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QPalette, QPainter, QFont
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSeries, QBarSet
@@ -17,6 +15,8 @@ from datetime import datetime
 from core.stock_screener import DataManager, StockScreener
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
+from gui.ui_components import BaseAnalysisPanel
+from components.template_manager import TemplateManager
 
 # 设置matplotlib中文字体
 mpl.rcParams["font.sans-serif"] = [
@@ -56,40 +56,68 @@ class DataUpdateThread(QThread):
         self._running = False
 
 
-class FundFlowWidget(QWidget):
-    """资金流向分析组件"""
+class FundFlowWidget(BaseAnalysisPanel):
+    """资金流向分析组件，继承统一分析面板基类"""
 
-    def __init__(self, parent=None, data_manager=None, chart_widget=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, data_manager=None, log_manager=None, chart_widget=None):
+        super().__init__(parent, log_manager=log_manager)
         self.data_manager = data_manager
         self.chart_widget = chart_widget
         self._data_cache = {}
         self._cache_time = {}
         self._custom_indicators = {}
         self._alerts = {}
+        self.template_manager = TemplateManager(
+            template_dir="templates/fund_flow")
+        self.main_layout = QVBoxLayout(self)
         self.init_ui()
 
     def init_ui(self):
         """初始化UI"""
-        layout = QVBoxLayout(self)
-
         # 创建资金流向概览卡片
-        self.create_overview_cards(layout)
+        self.create_overview_cards(self.main_layout)
 
         # 创建北向资金流向图表
-        self.create_north_flow_chart(layout)
+        self.create_north_flow_chart(self.main_layout)
 
         # 创建行业资金流向表格和图表
-        self.create_industry_flow_section(layout)
+        self.create_industry_flow_section(self.main_layout)
 
         # 创建概念资金流向表格和图表
-        self.create_concept_flow_section(layout)
+        self.create_concept_flow_section(self.main_layout)
 
         # 创建主力资金分析
-        self.create_main_force_analysis(layout)
+        self.create_main_force_analysis(self.main_layout)
 
         # 创建控制按钮
-        self.create_control_buttons(layout)
+        self.create_control_buttons(self.main_layout)
+
+        # 增加资金流参数输入
+        self.inflow_threshold = QDoubleSpinBox()
+        self.inflow_threshold.setRange(0, 1e8)
+        self.inflow_threshold.setValue(1e6)
+        self.add_param_widget("流入阈值", self.inflow_threshold)
+
+        self.outflow_threshold = QDoubleSpinBox()
+        self.outflow_threshold.setRange(0, 1e8)
+        self.outflow_threshold.setValue(1e6)
+        self.add_param_widget("流出阈值", self.outflow_threshold)
+
+        # 主力净流入阈值
+        self.main_inflow_threshold = QDoubleSpinBox()
+        self.main_inflow_threshold.setRange(-1e8, 1e8)
+        self.main_inflow_threshold.setValue(1000000)
+        self.add_param_widget("主力净流入阈值", self.main_inflow_threshold)
+        # 统计周期
+        self.period = QSpinBox()
+        self.period.setRange(1, 120)
+        self.period.setValue(5)
+        self.add_param_widget("统计周期", self.period)
+
+        # 模板管理按钮
+        self.template_button = QPushButton("模板管理")
+        self.template_button.clicked.connect(self.show_template_manager_dialog)
+        self.main_layout.addWidget(self.template_button)
 
         # 启动数据更新线程
         if self.data_manager:
@@ -635,3 +663,23 @@ class FundFlowWidget(QWidget):
 
         except Exception as e:
             print(f"更新主力资金分析失败: {str(e)}")
+
+    def show_template_manager_dialog(self):
+        # 复用StockScreenerWidget的模板管理对话框逻辑
+        QMessageBox.information(
+            self, "模板管理", "此处可集成批量模板管理UI，支持导入、导出、删除、重命名、应用等功能。")
+
+    def validate_params(self) -> (bool, str):
+        """校验所有参数控件的输入，支持QDoubleSpinBox等"""
+        valid = True
+        error_msgs = []
+        for name, widget in self.param_widgets.items():
+            widget.setStyleSheet("")
+            value = widget.value() if hasattr(widget, 'value') else None
+            if value is not None:
+                if value < widget.minimum() or value > widget.maximum():
+                    valid = False
+                    error_msgs.append(
+                        f"{name} 超出允许范围 [{widget.minimum()}, {widget.maximum()}]")
+                    widget.setStyleSheet("border: 2px solid red;")
+        return valid, "\n".join(error_msgs)

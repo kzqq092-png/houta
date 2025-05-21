@@ -1,6 +1,7 @@
 """
 交易系统主窗口模块
 """
+from components.stock_screener import StockScreenerWidget
 from gui.ui_components import StatusBar
 from gui.widgets.multi_chart_panel import MultiChartPanel
 from gui.widgets.log_widget import LogWidget
@@ -167,6 +168,7 @@ class TradingGUI(QMainWindow):
     def __init__(self):
         """Initialize the trading system GUI"""
         try:
+            self.screener_guide_shown = False  # 移动到最前面，防止属性未初始化
             self._is_initializing = True  # 新增：初始化标志
             super().__init__()
             self.setWindowTitle("Trading System")
@@ -481,11 +483,21 @@ class TradingGUI(QMainWindow):
             if hasattr(self, 'chart_type_combo'):
                 self.adjust_combobox_width(self.chart_type_combo)
 
+            self.ui_ready = True
+            QTimer.singleShot(500, self.show_startup_guides)
+
+            self.top_splitter.splitterMoved.connect(self.on_splitter_moved)
+            self.bottom_splitter.splitterMoved.connect(self.on_splitter_moved)
+
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+
+    def show_startup_guides(self):
+        # 移除自动弹窗逻辑，保留空实现或其他引导
+        pass
 
     def create_menubar(self):
         """创建菜单栏（包含所有原工具栏和数据源切换功能，按功能分类）"""
@@ -1913,173 +1925,141 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"切换图表主题失败: {str(e)}")
 
     def create_right_panel(self):
-        """Create right panel with analysis tools"""
+        """Create right panel with analysis tools and stock screener (多Tab结构)"""
         try:
-            # 创建右侧面板
             self.right_panel = QWidget()
-
             self.right_layout = QVBoxLayout(self.right_panel)
             self.right_layout.setContentsMargins(5, 5, 5, 5)
             self.right_layout.setSpacing(0)
 
-            # 右侧内容widget（用于滚动）
-            right_content = QWidget()
-            right_content_layout = QVBoxLayout(right_content)
-            right_content_layout.setContentsMargins(0, 0, 0, 0)
-            right_content_layout.setSpacing(8)
+            self.right_tab = QTabWidget(self.right_panel)
+            self.right_tab.currentChanged.connect(self.on_right_tab_changed)
 
-            # 创建策略组
-            strategy_group = QGroupBox("策略设置")
-            strategy_layout = QVBoxLayout(strategy_group)
-            strategy_layout.setContentsMargins(5, 15, 5, 5)
-            # 添加策略选择
-            strategy_type_layout = QHBoxLayout()
-            strategy_label = QLabel("策略类型:")
-            self.strategy_combo = QComboBox()
-            self.strategy_combo.addItems([
-                "均线策略", "MACD策略", "RSI策略", "布林带策略",
-                "KDJ策略", "自定义策略"
-            ])
-            self.strategy_combo.currentTextChanged.connect(
-                self.on_strategy_changed)
-            strategy_type_layout.addWidget(strategy_label)
-            strategy_type_layout.addWidget(self.strategy_combo)
-            strategy_layout.addLayout(strategy_type_layout)
+            # 市场情绪Tab（顺序提前）
+            try:
+                from components.market_sentiment import MarketSentimentWidget
+                self.market_sentiment_widget = MarketSentimentWidget(
+                    parent=self.right_tab,
+                    data_manager=self.data_manager,
+                    log_manager=self.log_manager
+                )
+                self.add_tab_with_toolbar(
+                    self.market_sentiment_widget, "市场情绪", help_text="市场情绪面板展示市场整体情绪、热点板块、涨跌分布等信息。")
+            except Exception as e:
+                self.log_manager.error(f"市场情绪Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 创建策略参数设置区域
-            self.strategy_params_group = QGroupBox("策略参数")
-            self.strategy_params_layout = QFormLayout(
-                self.strategy_params_group)
-            self.strategy_params_layout.setContentsMargins(5, 15, 5, 5)
-            self.strategy_params_layout.setSpacing(8)
-            strategy_layout.addWidget(self.strategy_params_group)
+            # 选股器Tab（顺序后移）
+            try:
+                self.stock_screener_widget = StockScreenerWidget(
+                    parent=self.right_tab,
+                    data_manager=self.data_manager,
+                    log_manager=self.log_manager
+                )
+                self.add_tab_with_toolbar(
+                    self.stock_screener_widget, "选股器", help_text="选股器用于根据多种条件筛选股票，支持基本面、技术面等多维度筛选。可手动刷新数据。")
+            except Exception as e:
+                self.log_manager.error(f"选股器Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 添加策略组到右侧布局
-            right_content_layout.addWidget(strategy_group)
+            # 多维分析Tab
+            try:
+                from gui.widgets.analysis_widget import AnalysisWidget
+                self.analysis_widget = AnalysisWidget()
+                self.add_tab_with_toolbar(
+                    self.analysis_widget, "多维分析", help_text="多维分析面板可对股票进行多角度分析，包括技术指标、基本面、资金流等。")
+            except Exception as e:
+                self.log_manager.error(f"多维分析Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 创建回测设置组
-            backtest_group = QGroupBox("回测设置")
-            backtest_layout = QFormLayout(backtest_group)
-            backtest_layout.setContentsMargins(5, 15, 5, 5)
-            # 初始资金
-            self.initial_capital = QDoubleSpinBox()
-            self.initial_capital.setFixedHeight(25)
-            self.initial_capital.setRange(1000.0, 10000000.0)
-            self.initial_capital.setValue(100000.0)
-            self.initial_capital.setSuffix(" 元")
-            backtest_layout.addRow("初始资金:", self.initial_capital)
+            # 个股分析Tab
+            try:
+                from components.stock_analysis import StockAnalysisWidget
+                self.stock_analysis_widget = StockAnalysisWidget(
+                    parent=self.right_tab,
+                    data_manager=self.data_manager,
+                    log_manager=self.log_manager
+                )
+                self.add_tab_with_toolbar(
+                    self.stock_analysis_widget, "个股分析", help_text="个股分析面板可查看单只股票的详细分析，包括财务、公告、新闻等。")
+            except Exception as e:
+                self.log_manager.error(f"个股分析Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 手续费率
-            self.commission_rate = QDoubleSpinBox()
-            self.commission_rate.setFixedHeight(25)
-            self.commission_rate.setDecimals(4)
-            self.commission_rate.setRange(0.0, 0.01)
-            self.commission_rate.setValue(0.0003)
-            self.commission_rate.setSuffix(" %")
-            backtest_layout.addRow("手续费率:", self.commission_rate)
+            # 策略回测Tab
+            try:
+                from gui.ui_components import AnalysisToolsPanel
+                self.analysis_tools_panel = AnalysisToolsPanel(
+                    parent=self.right_tab)
+                self.add_tab_with_toolbar(
+                    self.analysis_tools_panel, "策略回测", help_text="策略回测面板可对策略进行历史回测，评估策略表现。")
+            except Exception as e:
+                self.log_manager.error(f"策略回测Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 滑点设置
-            self.slippage = QDoubleSpinBox()
-            self.slippage.setFixedHeight(25)
-            self.slippage.setDecimals(4)
-            self.slippage.setRange(0.0, 0.01)
-            self.slippage.setValue(0.0001)
-            self.slippage.setSuffix(" %")
-            backtest_layout.addRow("滑点:", self.slippage)
+            # 新增自定义Tab
+            try:
+                self.custom_tab = QWidget()
+                custom_layout = QVBoxLayout(self.custom_tab)
+                custom_label = QLabel("自定义面板，用户可扩展功能或添加小工具。")
+                custom_layout.addWidget(custom_label)
+                self.add_tab_with_toolbar(
+                    self.custom_tab, "自定义", help_text="自定义面板，用户可扩展功能或添加小工具。")
+            except Exception as e:
+                self.log_manager.error(f"自定义Tab初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
 
-            # 回测时间范围
-            date_range_layout = QHBoxLayout()
-            date_range_layout.setContentsMargins(0, 0, 0, 0)
-            self.start_date = QDateEdit()
-            self.start_date.setFixedHeight(25)
-            self.start_date.setCalendarPopup(True)
-            self.start_date.setDate(QDate.currentDate().addYears(-1))
-            self.end_date = QDateEdit()
-            self.end_date.setFixedHeight(25)
-            self.end_date.setCalendarPopup(True)
-            self.end_date.setDate(QDate.currentDate())
-            date_range_layout.addWidget(self.start_date)
-            date_range_layout.addWidget(QLabel("至"))
-            date_range_layout.addWidget(self.end_date)
-            backtest_layout.addRow("回测区间:", date_range_layout)
-
-            # 添加回测设置组到右侧布局
-            right_content_layout.addWidget(backtest_group)
-
-            # 创建风险控制组
-            risk_group = QGroupBox("风险控制")
-            risk_layout = QFormLayout(risk_group)
-            risk_layout.setContentsMargins(5, 15, 5, 5)
-            # 止损设置
-            self.stop_loss = QDoubleSpinBox()
-            self.stop_loss.setFixedHeight(25)
-            self.stop_loss.setDecimals(2)
-            self.stop_loss.setRange(0.0, 100.0)
-            self.stop_loss.setValue(5.0)
-            self.stop_loss.setSuffix(" %")
-            risk_layout.addRow("止损比例:", self.stop_loss)
-
-            # 止盈设置
-            self.take_profit = QDoubleSpinBox()
-            self.take_profit.setFixedHeight(25)
-            self.take_profit.setDecimals(2)
-            self.take_profit.setRange(0.0, 100.0)
-            self.take_profit.setValue(10.0)
-            self.take_profit.setSuffix(" %")
-            risk_layout.addRow("止盈比例:", self.take_profit)
-
-            # 最大持仓
-            self.max_position = QSpinBox()
-            self.max_position.setFixedHeight(25)
-            self.max_position.setRange(1, 100)
-            self.max_position.setValue(5)
-            self.max_position.setSuffix(" 只")
-            risk_layout.addRow("最大持仓:", self.max_position)
-
-            # 添加风险控制组到右侧布局
-            right_content_layout.addWidget(risk_group)
-
-            # 创建操作按钮组
-            button_layout = QHBoxLayout()
-
-            # 分析按钮
-            analyze_btn = QPushButton("分析")
-            analyze_btn.clicked.connect(self.analyze)
-            button_layout.addWidget(analyze_btn)
-
-            # 回测按钮
-            backtest_btn = QPushButton("回测")
-            backtest_btn.clicked.connect(self.backtest)
-            button_layout.addWidget(backtest_btn)
-
-            # 优化按钮
-            optimize_btn = QPushButton("优化")
-            optimize_btn.clicked.connect(self.optimize)
-            button_layout.addWidget(optimize_btn)
-
-            # 添加按钮组到右侧布局
-            right_content_layout.addLayout(button_layout)
-
-            # 滚动区域包裹右侧内容
-            # right_scroll = QScrollArea()
-            # right_scroll.setWidgetResizable(True)
-            # right_scroll.setWidget(right_content)
-            self.right_layout.addWidget(right_content)
-
+            self.right_layout.addWidget(self.right_tab)
             self.right_panel.setSizePolicy(
                 QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.right_panel.setMinimumWidth(300)
-            self.right_panel.setMaximumWidth(300)
+            self.right_panel.setMinimumWidth(350)
             self.top_splitter.addWidget(self.right_panel)
-            self.log_manager.info("右侧面板创建完成")
+            self.log_manager.info("右侧面板（多Tab分析）创建完成")
             add_shadow(self.right_panel, blur_radius=18,
                        x_offset=0, y_offset=6)
-            # 新增：初始化参数控件
-            self.refresh_strategy_params()
         except Exception as e:
             self.log_manager.error(f"创建右侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
+
+    def add_tab_with_toolbar(self, widget, tab_name, help_text=""):
+        tab_widget = QWidget()
+        layout = QVBoxLayout(tab_widget)
+        toolbar = QHBoxLayout()
+        refresh_btn = QPushButton("刷新")
+        help_btn = QPushButton("帮助")
+        toolbar.addWidget(refresh_btn)
+        toolbar.addWidget(help_btn)
+        toolbar.addStretch()
+        layout.addLayout(toolbar)
+        layout.addWidget(widget)
+        refresh_btn.clicked.connect(lambda: self.refresh_tab_content(widget))
+        help_btn.clicked.connect(lambda: QMessageBox.information(
+            self, f"{tab_name}帮助", help_text))
+        self.right_tab.addTab(tab_widget, tab_name)
+
+    def refresh_tab_content(self, widget):
+        # 自动调用widget的refresh/update/reload方法
+        for method in ["refresh", "update", "reload"]:
+            if hasattr(widget, method):
+                try:
+                    getattr(widget, method)()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"刷新Tab内容失败: {str(e)}")
+                break
+
+    def on_right_tab_changed(self, index):
+        tab_text = self.right_tab.tabText(index)
+        # 只在首次点击选股器Tab时弹窗，且只弹一次
+        if tab_text == "选股器" and not getattr(self, "screener_guide_shown", False):
+            if hasattr(self, 'stock_screener_widget') and hasattr(self.stock_screener_widget, 'show_screener_guide'):
+                self.stock_screener_widget.show_screener_guide()
+                self.screener_guide_shown = True
+        widget = self.right_tab.widget(index)
+        if widget is not None and widget.layout() and widget.layout().count() > 1:
+            main_widget = widget.layout().itemAt(1).widget()
+            self.refresh_tab_content(main_widget)
 
     def refresh_strategy_params(self):
         """根据当前策略类型动态生成参数控件"""
@@ -3890,6 +3870,8 @@ class TradingGUI(QMainWindow):
             self.auto_select_first_stock()
 
     def _refresh_industry_combos(self):
+        if not hasattr(self, 'industry_combo'):
+            return
         try:
             self.industry_combo.blockSignals(True)
             self.industry_combo.clear()
@@ -3948,7 +3930,7 @@ class TradingGUI(QMainWindow):
 
         except Exception as e:
             # 如果错误处理本身出错，至少打印到控制台
-            print(f"错误处理失败: {str(e)}")
+            print(f"错误处理失败: {e}")
             print(f"原始错误: {str(exception)}")
 
     def update_performance(self, metrics: dict):
@@ -5298,6 +5280,18 @@ class TradingGUI(QMainWindow):
         """
         self.indicator_list.clearSelection()
         self.update_indicators()
+
+    def on_splitter_moved(self, pos, index):
+        if not hasattr(self, '_splitter_refresh_timer'):
+            self._splitter_refresh_timer = QTimer(self)
+            self._splitter_refresh_timer.setSingleShot(True)
+            self._splitter_refresh_timer.timeout.connect(
+                self.refresh_all_charts)
+        self._splitter_refresh_timer.start(200)  # 拖动结束200ms后刷新
+
+    def refresh_all_charts(self):
+        if hasattr(self, 'multi_chart_panel'):
+            self.multi_chart_panel.refresh_all_charts()
 
 
 class StockListWidget(QListWidget):
