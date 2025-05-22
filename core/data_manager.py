@@ -854,6 +854,14 @@ class DataManager:
             except Exception as e:
                 self.log_manager.warning(f"同花顺数据源初始化失败: {str(e)}")
 
+            # 初始化Akshare数据源
+            try:
+                from .akshare_data_source import AkshareDataSource
+                self._data_sources['akshare'] = AkshareDataSource()
+                self.log_manager.info("Akshare数据源初始化成功")
+            except Exception as e:
+                self.log_manager.warning(f"Akshare数据源初始化失败: {str(e)}")
+
         except Exception as e:
             self.log_manager.error(f"初始化数据源失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -904,41 +912,40 @@ class DataManager:
 
     def get_market_sentiment(self) -> dict:
         """
-        获取市场情绪数据，优先调用当前数据源的get_market_sentiment方法。
+        获取市场情绪数据，优先调用akshare数据源的get_market_sentiment方法，兜底处理所有字段，兼容UI展示。
         Returns:
             dict: 市场情绪数据，若数据源不支持则返回空dict
         """
         try:
-            if self._current_source in self._data_sources:
-                source = self._data_sources[self._current_source]
-                if hasattr(source, 'get_market_sentiment'):
-                    data = source.get_market_sentiment()
-                    # 兜底处理，确保返回dict且有sentiment_index字段
-                    if not isinstance(data, dict):
-                        self.log_manager.warning("市场情绪数据返回类型异常，已自动修正为空dict")
-                        return {'sentiment_index': None, 'detail': {}}
-                    if 'sentiment_index' not in data:
-                        self.log_manager.warning("市场情绪数据为空或无sentiment_index字段")
-                        data['sentiment_index'] = None
-                    return data
-            else:
-                self.log_manager.warning(
-                    f"当前数据源 {self._current_source} 不支持获取市场情绪数据，使用默认东财数据")
-                data = self._data_sources['eastmoney'].get_market_sentiment()
-                if not isinstance(data, dict):
+            data = self._data_sources.get('akshare')
+            if data and hasattr(data, 'get_market_sentiment'):
+                result = data.get_market_sentiment()
+                # 兜底处理，补全UI需要的字段
+                if not isinstance(result, dict):
                     self.log_manager.warning("市场情绪数据返回类型异常，已自动修正为空dict")
-                    return {'sentiment_index': None, 'detail': {}}
-                if 'sentiment_index' not in data:
+                    result = {'sentiment_index': None, 'advance_decline': {
+                        'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
+                if 'sentiment_index' not in result:
                     self.log_manager.warning("市场情绪数据为空或无sentiment_index字段")
-                    data['sentiment_index'] = None
-                return data
+                    result['sentiment_index'] = None
+                if 'advance_decline' not in result:
+                    result['advance_decline'] = {
+                        'advance': None, 'decline': None, 'unchanged': None}
+                if 'volume_ratio' not in result:
+                    result['volume_ratio'] = None
+                if 'timestamp' not in result:
+                    result['timestamp'] = datetime.now()
+                return result
+            else:
+                self.log_manager.warning("akshare数据源不可用，返回空市场情绪数据")
+                return {'sentiment_index': None, 'advance_decline': {'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
         except Exception as e:
             self.log_manager.error(f"获取市场情绪数据失败: {str(e)}")
-            return {'sentiment_index': None, 'detail': {}}
+            return {'sentiment_index': None, 'advance_decline': {'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
 
     def get_market_sentiment_history(self, days: int = 30, code: str = "000001", industry: str = None, concept: str = None, custom_stocks: list = None) -> list:
         """
-        获取历史市场情绪数据，支持指数、行业、概念或自选股。
+        获取历史市场情绪数据，优先调用akshare数据源的get_market_sentiment_history方法，兜底处理所有字段，兼容UI展示。
         Args:
             days: 获取的天数，默认30天
             code: 指数代码，默认上证指数
@@ -949,24 +956,27 @@ class DataManager:
             list: 历史市场情绪数据，每项为dict，包含date和sentiment_index等
         """
         try:
-            if self._current_source in self._data_sources:
-                source = self._data_sources[self._current_source]
-                if hasattr(source, 'get_market_sentiment_history'):
-                    data = source.get_market_sentiment_history(
-                        days=days, code=code, industry=industry, concept=concept, custom_stocks=custom_stocks)
-                    # 兜底处理，确保为list且每项有sentiment_index
-                    if not isinstance(data, list):
-                        self.log_manager.warning("历史市场情绪数据返回类型异常，已自动修正为空list")
-                        return []
-                    for item in data:
-                        if not isinstance(item, dict):
-                            continue
-                        if 'sentiment_index' not in item:
-                            self.log_manager.warning(
-                                "历史市场情绪数据项无sentiment_index字段，已补None")
-                            item['sentiment_index'] = None
-                    return data
-            return []
+            data_source = self._data_sources.get('akshare')
+            if data_source and hasattr(data_source, 'get_market_sentiment_history'):
+                data = data_source.get_market_sentiment_history(
+                    days=days, code=code, industry=industry, concept=concept, custom_stocks=custom_stocks)
+                # 兜底处理，确保为list且每项有sentiment_index
+                if not isinstance(data, list):
+                    self.log_manager.warning("历史市场情绪数据返回类型异常，已自动修正为空list")
+                    return []
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    if 'sentiment_index' not in item:
+                        self.log_manager.warning(
+                            "历史市场情绪数据项无sentiment_index字段，已补None")
+                        item['sentiment_index'] = None
+                    if 'date' not in item:
+                        item['date'] = None
+                return data
+            else:
+                self.log_manager.warning("akshare数据源不可用，返回空历史市场情绪数据")
+                return []
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"获取历史市场情绪数据失败: {str(e)}")

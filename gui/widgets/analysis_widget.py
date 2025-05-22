@@ -9,6 +9,11 @@ import random
 from datetime import datetime, timedelta
 import pandas as pd
 from PyQt5.QtGui import QColor
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+import concurrent.futures
+import pickle
 
 from core.logger import LogManager, LogLevel
 from utils.theme import get_theme_manager
@@ -38,7 +43,7 @@ class AnalysisWidget(QWidget):
         self.current_stock = None
         self.current_kdata = None
         self.current_indicators = []
-
+        self.log_manager = LogManager()
         # 初始化UI
         self.init_ui()
 
@@ -80,9 +85,11 @@ class AnalysisWidget(QWidget):
             hotspot_tab = self.create_hotspot_tab()
             tab_widget.addTab(hotspot_tab, "热点分析")
             # 添加标签页到布局
-            self.main_layout.addWidget(tab_widget)
+            if tab_widget.parent() is not self.main_layout:
+                self.main_layout.addWidget(tab_widget)
         except Exception as e:
-            LogManager().log(f"初始化分析控件UI失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"初始化分析控件UI失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_technical_tab(self) -> QWidget:
@@ -118,7 +125,8 @@ class AnalysisWidget(QWidget):
 
             return widget
         except Exception as e:
-            LogManager().log(f"创建技术分析标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"创建技术分析标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def calculate_indicators(self):
@@ -130,14 +138,14 @@ class AnalysisWidget(QWidget):
             talib_list = get_talib_indicator_list()
             category_map = get_all_indicators_by_category()
             if not talib_list or not category_map:
-                LogManager().log(
+                self.log_manager.log(
                     "未检测到任何ta-lib指标，请检查ta-lib安装或数据源！", LogLevel.ERROR)
                 return
             main_window = self.parentWidget()
             while main_window and not hasattr(main_window, 'get_current_indicators'):
                 main_window = main_window.parentWidget()
             if not main_window or not hasattr(main_window, 'get_current_indicators'):
-                LogManager().log("未找到主窗口统一指标接口", LogLevel.ERROR)
+                self.log_manager.log("未找到主窗口统一指标接口", LogLevel.ERROR)
                 return
             indicators = main_window.get_current_indicators()
             self.indicator_table.setRowCount(len(indicators))
@@ -158,7 +166,8 @@ class AnalysisWidget(QWidget):
                     self.calculate_boll(params)
             self.indicator_table.resizeColumnsToContents()
         except Exception as e:
-            LogManager().log(f"计算技术指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算技术指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_ma(self, params=None):
         """计算MA指标，参数从主窗口统一接口获取"""
@@ -168,7 +177,8 @@ class AnalysisWidget(QWidget):
             period = params.get('period', 20) if params else 20
             return calc_ma(self.current_kdata['close'], period)
         except Exception as e:
-            LogManager().log(f"计算MA指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算MA指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_macd(self, params=None):
         """计算MACD指标，参数从主窗口统一接口获取"""
@@ -180,7 +190,8 @@ class AnalysisWidget(QWidget):
             signal = params.get('signal', 9) if params else 9
             return calc_macd(self.current_kdata['close'], fast, slow, signal)
         except Exception as e:
-            LogManager().log(f"计算MACD指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算MACD指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_kdj(self, params=None):
         """计算KDJ指标，参数从主窗口统一接口获取"""
@@ -192,7 +203,8 @@ class AnalysisWidget(QWidget):
             m2 = params.get('m2', 3) if params else 3
             return calc_kdj(self.current_kdata, n, m1, m2)
         except Exception as e:
-            LogManager().log(f"计算KDJ指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算KDJ指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_rsi(self, params=None):
         """计算RSI指标，参数从主窗口统一接口获取"""
@@ -202,7 +214,8 @@ class AnalysisWidget(QWidget):
             period = params.get('period', 14) if params else 14
             return calc_rsi(self.current_kdata['close'], period)
         except Exception as e:
-            LogManager().log(f"计算RSI指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算RSI指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_boll(self, params=None):
         """计算BOLL指标，参数从主窗口统一接口获取"""
@@ -213,7 +226,8 @@ class AnalysisWidget(QWidget):
             std = params.get('std', 2) if params else 2
             return calc_boll(self.current_kdata['close'], period, std)
         except Exception as e:
-            LogManager().log(f"计算BOLL指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算BOLL指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_atr(self, params=None):
         """计算ATR指标，参数从主窗口统一接口获取"""
@@ -223,7 +237,8 @@ class AnalysisWidget(QWidget):
             period = params.get('period', 14) if params else 14
             return calc_atr(self.current_kdata, period)
         except Exception as e:
-            LogManager().log(f"计算ATR指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算ATR指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_obv(self, params=None):
         """计算OBV指标，参数从主窗口统一接口获取"""
@@ -232,7 +247,8 @@ class AnalysisWidget(QWidget):
                 return None
             return calc_obv(self.current_kdata)
         except Exception as e:
-            LogManager().log(f"计算OBV指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算OBV指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_cci(self, params=None):
         """计算CCI指标，参数从主窗口统一接口获取"""
@@ -242,7 +258,8 @@ class AnalysisWidget(QWidget):
             period = params.get('period', 14) if params else 14
             return calc_cci(self.current_kdata, period)
         except Exception as e:
-            LogManager().log(f"计算CCI指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"计算CCI指标失败: {str(e)}", LogLevel.ERROR)
 
     def clear_indicators(self):
         """清除指标"""
@@ -252,7 +269,8 @@ class AnalysisWidget(QWidget):
             self.current_indicators = []
             self.indicator_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"清除指标失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def on_indicator_changed(self, text):
@@ -260,7 +278,8 @@ class AnalysisWidget(QWidget):
         try:
             self.indicator_changed.emit(text)
         except Exception as e:
-            LogManager().log(f"指标变更处理失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"指标变更处理失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_pattern_tab(self) -> QWidget:
@@ -344,7 +363,8 @@ class AnalysisWidget(QWidget):
             return widget
 
         except Exception as e:
-            LogManager().log(f"创建形态识别标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"创建形态识别标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def identify_patterns(self):
@@ -388,7 +408,8 @@ class AnalysisWidget(QWidget):
             self.pattern_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"识别形态失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"识别形态失败: {str(e)}", LogLevel.ERROR)
 
     def find_head_shoulders(self, threshold: float, min_size: int):
         """识别头肩顶/底形态
@@ -501,7 +522,8 @@ class AnalysisWidget(QWidget):
                         self.pattern_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"识别头肩顶/底形态失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"识别头肩顶/底形态失败: {str(e)}", LogLevel.ERROR)
 
     def find_double_tops_bottoms(self, threshold: float, min_size: int):
         """识别双顶/双底形态
@@ -630,14 +652,16 @@ class AnalysisWidget(QWidget):
                             self.pattern_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"识别双顶/双底形态失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"识别双顶/双底形态失败: {str(e)}", LogLevel.ERROR)
 
     def clear_patterns(self):
         """清除形态识别结果"""
         try:
             self.pattern_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除形态识别结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"清除形态识别结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_trend_tab(self) -> QWidget:
@@ -702,7 +726,8 @@ class AnalysisWidget(QWidget):
             return widget
 
         except Exception as e:
-            LogManager().log(f"创建趋势分析标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"创建趋势分析标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def analyze_trend(self):
@@ -729,7 +754,8 @@ class AnalysisWidget(QWidget):
             self.trend_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_price_trend(self, period: int, threshold: float):
         """分析价格趋势
@@ -777,7 +803,8 @@ class AnalysisWidget(QWidget):
             self.trend_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析价格趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析价格趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_volume_trend(self, period: int, threshold: float):
         """分析成交量趋势
@@ -832,7 +859,8 @@ class AnalysisWidget(QWidget):
             self.trend_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析成交量趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析成交量趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_macd_trend(self, period: int, threshold: float):
         """分析MACD趋势
@@ -879,7 +907,8 @@ class AnalysisWidget(QWidget):
             self.trend_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析MACD趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析MACD趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_kdj_trend(self, period: int, threshold: float):
         """分析KDJ趋势
@@ -925,7 +954,8 @@ class AnalysisWidget(QWidget):
             self.trend_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析KDJ趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析KDJ趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_rsi_trend(self, period: int, threshold: float):
         """分析RSI趋势
@@ -985,14 +1015,16 @@ class AnalysisWidget(QWidget):
             self.trend_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析RSI趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析RSI趋势失败: {str(e)}", LogLevel.ERROR)
 
     def clear_trend(self):
         """清除趋势分析结果"""
         try:
             self.trend_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除趋势分析结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"清除趋势分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_wave_tab(self) -> QWidget:
@@ -1063,7 +1095,8 @@ class AnalysisWidget(QWidget):
             return widget
 
         except Exception as e:
-            LogManager().log(f"创建波浪分析标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"创建波浪分析标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def analyze_wave(self):
@@ -1092,7 +1125,8 @@ class AnalysisWidget(QWidget):
             self.wave_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析波浪失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(
+                f"分析波浪失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_elliott_waves(self, period: int, sensitivity: float):
         """分析艾略特波浪
@@ -1200,7 +1234,7 @@ class AnalysisWidget(QWidget):
                         self.wave_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析艾略特波浪失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析艾略特波浪失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_gann(self, period: int, sensitivity: float):
         """分析江恩理论
@@ -1299,7 +1333,7 @@ class AnalysisWidget(QWidget):
                     self.wave_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析江恩理论失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析江恩理论失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_support_resistance(self, period: int, sensitivity: float):
         """分析支撑阻力位
@@ -1523,14 +1557,14 @@ class AnalysisWidget(QWidget):
                 self.wave_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
-            LogManager().log(f"分析支撑阻力位失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析支撑阻力位失败: {str(e)}", LogLevel.ERROR)
 
     def clear_wave(self):
         """清除波浪分析结果"""
         try:
             self.wave_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除波浪分析结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"清除波浪分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_sentiment_tab(self) -> QWidget:
@@ -1631,7 +1665,7 @@ class AnalysisWidget(QWidget):
             return widget
 
         except Exception as e:
-            LogManager().log(f"创建市场情绪分析标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"创建市场情绪分析标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def analyze_sentiment(self):
@@ -1826,7 +1860,7 @@ class AnalysisWidget(QWidget):
             self.sentiment_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析市场情绪失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析市场情绪失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_history(self):
         """分析历史趋势"""
@@ -1898,7 +1932,7 @@ class AnalysisWidget(QWidget):
             self.history_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析历史趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析历史趋势失败: {str(e)}", LogLevel.ERROR)
 
     def add_history_row(self, name: str, data: List[float],
                         trend_func: Callable[[float], str]):
@@ -1955,7 +1989,7 @@ class AnalysisWidget(QWidget):
             self.history_table.setItem(row, 4, trend_item)
 
         except Exception as e:
-            LogManager().log(f"添加历史趋势行失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"添加历史趋势行失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def clear_sentiment(self):
@@ -1964,7 +1998,7 @@ class AnalysisWidget(QWidget):
             self.sentiment_table.setRowCount(0)
             self.history_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除市场情绪分析结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"清除市场情绪分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_sector_flow_tab(self) -> QWidget:
@@ -2038,7 +2072,7 @@ class AnalysisWidget(QWidget):
             return widget
 
         except Exception as e:
-            LogManager().log(f"创建板块资金流向分析标签页失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"创建板块资金流向分析标签页失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def analyze_sector_flow(self):
@@ -2054,7 +2088,7 @@ class AnalysisWidget(QWidget):
             self.analyze_north_flow()
 
         except Exception as e:
-            LogManager().log(f"分析板块资金流向失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析板块资金流向失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_industry_flow(self):
         """分析行业资金流向"""
@@ -2118,7 +2152,7 @@ class AnalysisWidget(QWidget):
                         })
 
                 except Exception as e:
-                    LogManager().log(
+                    self.log_manager.log(
                         f"计算行业 {industry.name} 资金流向失败: {str(e)}", LogLevel.ERROR)
                     continue
 
@@ -2156,7 +2190,7 @@ class AnalysisWidget(QWidget):
             self.industry_flow_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析行业资金流向失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析行业资金流向失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_concept_flow(self):
         """分析概念资金流向"""
@@ -2222,7 +2256,7 @@ class AnalysisWidget(QWidget):
                     })
 
                 except Exception as e:
-                    LogManager().log(
+                    self.log_manager.log(
                         f"计算概念 {concept.name} 资金流向失败: {str(e)}", LogLevel.ERROR)
                     continue
 
@@ -2260,7 +2294,7 @@ class AnalysisWidget(QWidget):
             self.concept_flow_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析概念资金流向失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析概念资金流向失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_north_flow(self):
         """分析北向资金"""
@@ -2311,7 +2345,7 @@ class AnalysisWidget(QWidget):
             self.north_flow_table.resizeColumnsToContents()
 
         except Exception as e:
-            LogManager().log(f"分析北向资金失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析北向资金失败: {str(e)}", LogLevel.ERROR)
 
     def clear_sector_flow(self):
         """清除板块资金流向分析结果"""
@@ -2320,7 +2354,7 @@ class AnalysisWidget(QWidget):
             self.concept_flow_table.setRowCount(0)
             self.north_flow_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除板块资金流向分析结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"清除板块资金流向分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def create_hotspot_tab(self) -> QWidget:
@@ -2335,7 +2369,8 @@ class AnalysisWidget(QWidget):
 
             # 添加热点板块表格
             self.hotspot_table = QTableWidget()
-            self.hotspot_table.setColumnCount(7)  # 增加一列用于显示板块强度
+            self.hotspot_table.setColumnCount(7)
+            # 增加一列用于显示板块强度
             self.hotspot_table.setHorizontalHeaderLabels([
                 "板块名称", "涨跌幅", "领涨股", "涨跌幅", "成交额", "换手率", "板块强度"
             ])
@@ -2378,6 +2413,22 @@ class AnalysisWidget(QWidget):
 
             rotation_group.setLayout(rotation_layout)
             layout.addWidget(rotation_group)
+
+            # 创建龙头股组
+            leader_group = QGroupBox("龙头股")
+            leader_layout = QVBoxLayout()
+
+            # 添加龙头股表格
+            self.leader_table = QTableWidget()
+            self.leader_table.setColumnCount(15)
+            self.leader_table.setHorizontalHeaderLabels([
+                "股票名称", "股票代码", "所属板块", "是否ST", "市值(亿)", "涨跌幅", "近5日涨跌幅", "成交额(亿)", "换手率(%)", "振幅(%)", "量比", "主力净流入(亿)", "主力净流入占比(%)", "涨停状态", "资金流向趋势(5日)", "综合得分"
+            ])
+            self.leader_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            leader_layout.addWidget(self.leader_table)
+
+            leader_group.setLayout(leader_layout)
+            layout.addWidget(leader_group)
 
             # 添加按钮
             button_layout = QHBoxLayout()
@@ -2485,6 +2536,8 @@ class AnalysisWidget(QWidget):
                             'turnover': total_turnover / len(stocks),
                             'strength': strength
                         })
+                    self.log_manager.log(
+                        f"板块 {block.name} 统计成功", LogLevel.INFO)
                 except Exception as e:
                     if hasattr(self, 'log_manager') and self.log_manager:
                         self.log_manager.log(
@@ -2541,6 +2594,8 @@ class AnalysisWidget(QWidget):
                 self.hotspot_table.setItem(i, 6, strength_item)
             # 调整列宽
             self.hotspot_table.resizeColumnsToContents()
+            self.log_manager.log(
+                f"热点板块分析成功", LogLevel.INFO)
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.log(f"分析热点板块失败: {str(e)}", LogLevel.ERROR)
@@ -2556,7 +2611,10 @@ class AnalysisWidget(QWidget):
             # 获取所有概念板块
             themes = []
             for block in sm.get_block_list():
-                if block.type != "概念":
+                # 修正类型判断，兼容不同Block实现
+                block_type = getattr(block, 'type', None) or getattr(
+                    block, 'category', None) or getattr(block, 'block_type', None)
+                if block_type != "概念":
                     continue
 
                 try:
@@ -2606,7 +2664,7 @@ class AnalysisWidget(QWidget):
                     })
 
                 except Exception as e:
-                    LogManager().log(
+                    self.log_manager.log(
                         f"计算主题 {block.name} 统计失败: {str(e)}", LogLevel.ERROR)
                     continue
 
@@ -2647,9 +2705,14 @@ class AnalysisWidget(QWidget):
 
             # 调整列宽
             self.theme_table.resizeColumnsToContents()
-
+            self.log_manager.log(
+                f"主题机会分析成功", LogLevel.INFO)
         except Exception as e:
-            LogManager().log(f"分析主题机会失败: {str(e)}", LogLevel.ERROR)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.log(
+                    f"分析主题机会失败: {str(e)}", LogLevel.ERROR)
+            else:
+                print(f"分析主题机会失败: {str(e)}")
 
     def analyze_leading_stocks(self):
         """分析龙头股"""
@@ -2666,51 +2729,101 @@ class AnalysisWidget(QWidget):
                         continue
 
                     for stock in stocks:
-                        kdata = stock.get_kdata(Query(-2))
-                        if len(kdata) < 2:
+                        kdata = stock.get_kdata(Query(-6))  # 取近6日，便于5日涨跌幅
+                        if len(kdata) < 6:
                             continue
-
-                        # 计算涨跌幅
-                        close = float(kdata[-1].close)
-                        pre_close = float(kdata[-2].close)
-                        change = (close - pre_close) / pre_close * 100
-
-                        # 计算成交额和换手率
-                        amount = float(kdata[-1].amount) / 100000000  # 转换为亿元
-                        # 统一换手率计算
-                        turnover = self._get_turnover(kdata, stock)
-
-                        # 计算主力净流入
-                        volume = float(kdata[-1].volume)
-                        if volume > 0:
-                            avg_price = float(kdata[-1].amount) / volume
-                            if avg_price > float(kdata[-1].open):
-                                main_flow = amount
-                            else:
-                                main_flow = -amount
-                        else:
+                        try:
+                            name = getattr(stock, 'name', '-')
+                            code = getattr(stock, 'code', '-')
+                            block_name = getattr(block, 'name', '-')
+                            is_st = 'ST' in name.upper() or getattr(stock, 'is_st', False)
+                            close = float(kdata[-1].close)
+                            pre_close = float(kdata[-2].close)
+                            change = (close - pre_close) / \
+                                pre_close * 100 if pre_close else 0
+                            # 近5日涨跌幅
+                            close_5 = float(kdata[-6].close)
+                            change_5 = (close - close_5) / \
+                                close_5 * 100 if close_5 else 0
+                            # 成交额
+                            amount = float(
+                                kdata[-1].amount) / 1e8 if hasattr(kdata[-1], 'amount') else 0
+                            # 换手率
+                            turnover = self._get_turnover(kdata, stock)
+                            # 市值
+                            circulating_shares = getattr(
+                                stock, 'circulating_shares', None)
+                            market_cap = close * circulating_shares / 1e8 if circulating_shares else '-'
+                            # 振幅
+                            high = float(kdata[-1].high)
+                            low = float(kdata[-1].low)
+                            amplitude = (high - low) / pre_close * \
+                                100 if pre_close else 0
+                            # 量比
+                            volume_ratio = getattr(
+                                kdata[-1], 'volume_ratio', '-') if hasattr(kdata[-1], 'volume_ratio') else '-'
+                            # 主力净流入
+                            volume = float(kdata[-1].volume)
                             main_flow = 0
-
-                        # 计算综合得分
-                        score = (
-                            abs(change) * 0.3 +  # 涨跌幅权重
-                            amount * 0.3 +  # 成交额权重
-                            turnover * 0.2 +  # 换手率权重
-                            abs(main_flow) * 0.2  # 主力净流入权重
-                        )
-
-                        leaders.append({
-                            'name': stock.name,
-                            'block': block.name,
-                            'change': change,
-                            'amount': amount,
-                            'turnover': turnover,
-                            'main_flow': main_flow,
-                            'score': score
-                        })
-
+                            if volume > 0:
+                                avg_price = float(kdata[-1].amount) / volume
+                                if avg_price > float(kdata[-1].open):
+                                    main_flow = float(kdata[-1].amount) / 1e8
+                                else:
+                                    main_flow = -float(kdata[-1].amount) / 1e8
+                            # 主力净流入占比
+                            main_flow_ratio = (
+                                main_flow / amount * 100) if amount else '-'
+                            # 涨停状态
+                            high_limit = getattr(kdata[-1], 'high_limit', None)
+                            is_limit_up = (
+                                close >= high_limit) if high_limit else '-'
+                            # 资金流向趋势（近5日主力净流入为正天数）
+                            flow_trend = 0
+                            for i in range(-5, 0):
+                                v = float(kdata[i].volume)
+                                if v > 0:
+                                    avg_p = float(kdata[i].amount) / v
+                                    if avg_p > float(kdata[i].open):
+                                        flow_trend += 1
+                            # 综合得分
+                            score = (
+                                abs(change) * 0.2 +  # 涨跌幅权重
+                                (amount if amount != '-' else 0) * 0.15 +
+                                (turnover if turnover != '-' else 0) * 0.1 +
+                                (abs(main_flow) if main_flow != '-' else 0) * 0.1 +
+                                (abs(change_5) if change_5 != '-' else 0) * 0.15 +
+                                (abs(amplitude) if amplitude != '-' else 0) * 0.1 +
+                                (flow_trend if flow_trend != '-' else 0) * 0.1 +
+                                (market_cap if market_cap != '-' else 0) * 0.1
+                            )
+                            leaders.append({
+                                'name': name,
+                                'code': code,
+                                'block': block_name,
+                                'is_st': '是' if is_st else '否',
+                                'market_cap': f"{market_cap:.2f}" if isinstance(market_cap, float) else '-',
+                                'change': change,
+                                'change_5': change_5,
+                                'amount': amount,
+                                'turnover': turnover,
+                                'amplitude': amplitude,
+                                'volume_ratio': f"{volume_ratio:.2f}" if isinstance(volume_ratio, float) else '-',
+                                'main_flow': main_flow,
+                                'main_flow_ratio': f"{main_flow_ratio:.2f}" if isinstance(main_flow_ratio, float) else '-',
+                                'is_limit_up': '涨停' if is_limit_up is True else ('-' if is_limit_up == '-' else '否'),
+                                'flow_trend': flow_trend,
+                                'score': score
+                            })
+                        except Exception as e:
+                            if hasattr(self, 'log_manager') and self.log_manager:
+                                self.log_manager.log(
+                                    f"单只股票统计失败: {str(e)}", LogLevel.ERROR)
+                            continue
                 except Exception as e:
-                    LogManager().log(f"计算股票统计失败: {str(e)}", LogLevel.ERROR)
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.log(
+                            f"计算股票统计失败: {str(e)}", LogLevel.ERROR)
                     continue
 
             # 按综合得分排序
@@ -2725,100 +2838,98 @@ class AnalysisWidget(QWidget):
                 self.leader_table.setItem(
                     i, 0, QTableWidgetItem(leader['name']))
                 self.leader_table.setItem(
-                    i, 1, QTableWidgetItem(leader['block']))
+                    i, 1, QTableWidgetItem(leader['code']))
                 self.leader_table.setItem(
-                    i, 2, QTableWidgetItem(f"{leader['change']:+.2f}%"))
+                    i, 2, QTableWidgetItem(leader['block']))
                 self.leader_table.setItem(
-                    i, 3, QTableWidgetItem(f"{leader['amount']:.2f}"))
+                    i, 3, QTableWidgetItem(leader['is_st']))
                 self.leader_table.setItem(
-                    i, 4, QTableWidgetItem(f"{leader['turnover']:.2f}%"))
+                    i, 4, QTableWidgetItem(leader['market_cap']))
+                # 涨跌幅
+                change_item = QTableWidgetItem(f"{leader['change']:+.2f}%")
+                change_item.setForeground(
+                    QColor("red") if leader['change'] > 0 else QColor("green"))
+                self.leader_table.setItem(i, 5, change_item)
+                # 近5日涨跌幅
+                change5_item = QTableWidgetItem(f"{leader['change_5']:+.2f}%")
+                change5_item.setForeground(
+                    QColor("red") if leader['change_5'] > 0 else QColor("green"))
+                self.leader_table.setItem(i, 6, change5_item)
+                # 成交额
+                self.leader_table.setItem(i, 7, QTableWidgetItem(
+                    f"{leader['amount']:.2f}" if leader['amount'] != '-' else '-'))
+                # 换手率
+                self.leader_table.setItem(i, 8, QTableWidgetItem(
+                    f"{leader['turnover']:.2f}%" if leader['turnover'] != '-' else '-'))
+                # 振幅
+                self.leader_table.setItem(i, 9, QTableWidgetItem(
+                    f"{leader['amplitude']:.2f}%" if leader['amplitude'] != '-' else '-'))
+                # 量比
                 self.leader_table.setItem(
-                    i, 5, QTableWidgetItem(f"{leader['main_flow']:.2f}"))
+                    i, 10, QTableWidgetItem(leader['volume_ratio']))
+                # 主力净流入
+                main_flow_item = QTableWidgetItem(
+                    f"{leader['main_flow']:+.2f}" if leader['main_flow'] != '-' else '-')
+                main_flow_item.setForeground(
+                    QColor("red") if leader['main_flow'] > 0 else QColor("green"))
+                self.leader_table.setItem(i, 11, main_flow_item)
+                # 主力净流入占比
                 self.leader_table.setItem(
-                    i, 6, QTableWidgetItem(f"{leader['score']:.2f}"))
+                    i, 12, QTableWidgetItem(leader['main_flow_ratio']))
+                # 涨停状态
+                self.leader_table.setItem(
+                    i, 13, QTableWidgetItem(leader['is_limit_up']))
+                # 资金流向趋势
+                self.leader_table.setItem(
+                    i, 14, QTableWidgetItem(str(leader['flow_trend'])))
+                # 综合得分
+                self.leader_table.setItem(
+                    i, 15, QTableWidgetItem(f"{leader['score']:.2f}"))
             self.leader_table.resizeColumnsToContents()
         except Exception as e:
-            LogManager().log(f"分析龙头股失败: {str(e)}", LogLevel.ERROR)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.log(
+                    f"分析龙头股失败: {str(e)}", LogLevel.ERROR)
+            else:
+                print(f"分析龙头股失败: {str(e)}")
 
     def analyze_rotation(self):
-        """分析热点轮动"""
+        """分析热点轮动（多进程+多线程+numpy加速）"""
         try:
             # 清空热点轮动表格
             self.rotation_table.setRowCount(0)
 
-            # 获取所有板块的历史数据
+            # 1. 预取所有股票K线数据（缓存）
+            kdata_cache = {}
+            block_list = sm.get_block_list()
+            for block in block_list:
+                stocks = block.get_stock_list()
+                for stock in stocks:
+                    code = getattr(stock, 'code', None) or getattr(
+                        stock, 'name', None)
+                    if code and code not in kdata_cache:
+                        kdata_cache[code] = stock.get_kdata(Query(-11))
+
+            # 2. 多进程并发处理所有板块
+            block_data_list = []
+            for block in block_list:
+                stocks = block.get_stock_list()
+                stock_codes = []
+                for stock in stocks:
+                    code = getattr(stock, 'code', None) or getattr(
+                        stock, 'name', None)
+                    if code:
+                        stock_codes.append(code)
+                block_data_list.append((block.name, stock_codes))
+            kdata_cache_bytes = pickle.dumps(kdata_cache)
             rotations = []
-            for block in sm.get_block_list():
-                try:
-                    stocks = block.get_stock_list()
-                    if not stocks:
-                        continue
-
-                    # 获取最近10个交易日的数据
-                    daily_stats = []
-                    for i in range(10):
-                        total_change = 0
-                        total_flow = 0
-                        valid_stocks = 0
-
-                        for stock in stocks:
-                            kdata = stock.get_kdata(Query(-10))
-                            if len(kdata) < 10:
-                                continue
-
-                            # 计算涨跌幅
-                            close = float(kdata[-(i+1)].close)
-                            pre_close = float(kdata[-(i+2)].close)
-                            change = (close - pre_close) / pre_close * 100
-                            total_change += change
-
-                            # 计算资金流向
-                            volume = float(kdata[-(i+1)].volume)
-                            amount = float(kdata[-(i+1)].amount)
-                            if volume > 0:
-                                avg_price = amount / volume
-                                if avg_price > float(kdata[-(i+1)].open):
-                                    total_flow += amount
-                                else:
-                                    total_flow -= amount
-
-                            valid_stocks += 1
-
-                        if valid_stocks > 0:
-                            daily_stats.append({
-                                'change': total_change / valid_stocks,
-                                'flow': total_flow / 100000000  # 转换为亿元
-                            })
-
-                    if len(daily_stats) == 10:
-                        # 计算上升趋势
-                        trend = sum(1 for i in range(1, len(daily_stats))
-                                    if daily_stats[i]['change'] > daily_stats[i-1]['change'])
-
-                        # 计算资金流入趋势
-                        flow_trend = sum(
-                            1 for stat in daily_stats if stat['flow'] > 0)
-
-                        # 计算持续天数
-                        duration = 0
-                        for stat in daily_stats:
-                            if stat['change'] > 0 and stat['flow'] > 0:
-                                duration += 1
-                            else:
-                                break
-
-                        rotations.append({
-                            'name': block.name,
-                            'trend': trend / 9 * 100,  # 转换为百分比
-                            'flow': sum(stat['flow'] for stat in daily_stats),
-                            'duration': duration,
-                            'score': trend / 9 * 0.4 + flow_trend / 10 * 0.4 + duration / 10 * 0.2
-                        })
-
-                except Exception as e:
-                    LogManager().log(
-                        f"计算板块 {block.name} 轮动分析失败: {str(e)}", LogLevel.ERROR)
-                    continue
+            with ProcessPoolExecutor(max_workers=6) as process_executor:
+                futures = [process_executor.submit(process_block_serializable, block_data, kdata_cache_bytes)
+                           for block_data in block_data_list]
+                for future in concurrent.futures.as_completed(futures):
+                    res = future.result()
+                    if res:
+                        rotations.append(res)
 
             # 按综合得分排序
             rotations.sort(key=lambda x: x['score'], reverse=True)
@@ -2826,11 +2937,8 @@ class AnalysisWidget(QWidget):
             # 更新表格
             self.rotation_table.setRowCount(len(rotations))
             for i, rotation in enumerate(rotations):
-                # 添加板块名称
                 self.rotation_table.setItem(
                     i, 0, QTableWidgetItem(rotation['name']))
-
-                # 添加上升趋势
                 trend_item = QTableWidgetItem(f"{rotation['trend']:.1f}%")
                 trend_item.setForeground(
                     QColor("red") if rotation['trend'] >= 60 else
@@ -2838,20 +2946,14 @@ class AnalysisWidget(QWidget):
                     QColor("green")
                 )
                 self.rotation_table.setItem(i, 1, trend_item)
-
-                # 添加资金流入
                 flow_item = QTableWidgetItem(f"{rotation['flow']:+.2f}")
                 flow_item.setForeground(
                     QColor("red" if rotation['flow'] > 0 else "green"))
                 self.rotation_table.setItem(i, 2, flow_item)
-
-                # 添加持续天数
                 self.rotation_table.setItem(
                     i, 3,
                     QTableWidgetItem(str(rotation['duration']))
                 )
-
-                # 添加轮动建议
                 if rotation['score'] >= 0.8:
                     suggestion = "积极参与"
                     color = QColor("red")
@@ -2864,16 +2966,18 @@ class AnalysisWidget(QWidget):
                 else:
                     suggestion = "暂不参与"
                     color = QColor("green")
-
                 suggestion_item = QTableWidgetItem(suggestion)
                 suggestion_item.setForeground(color)
                 self.rotation_table.setItem(i, 4, suggestion_item)
-
-            # 调整列宽
             self.rotation_table.resizeColumnsToContents()
-
+            self.log_manager.log(
+                f"热点轮动分析成功", LogLevel.INFO)
         except Exception as e:
-            LogManager().log(f"分析热点轮动失败: {str(e)}", LogLevel.ERROR)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.log(
+                    f"分析热点轮动失败: {str(e)}", LogLevel.ERROR)
+            else:
+                print(f"分析热点轮动失败: {str(e)}")
 
     def clear_hotspot(self):
         """清除热点分析结果"""
@@ -2883,7 +2987,7 @@ class AnalysisWidget(QWidget):
             self.leader_table.setRowCount(0)
             self.rotation_table.setRowCount(0)
         except Exception as e:
-            LogManager().log(f"清除热点分析结果失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"清除热点分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
 
     def setup_indicator_panel(self):
@@ -3072,7 +3176,7 @@ class AnalysisWidget(QWidget):
             else:
                 return 0.0
         except Exception as e:
-            LogManager().log(f"换手率计算失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"换手率计算失败: {str(e)}", LogLevel.ERROR)
             return 0.0
 
 
@@ -3080,3 +3184,75 @@ def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
     from indicators_algo import get_all_indicators_by_category
     return get_all_indicators_by_category()
+
+# 全局可序列化函数：多进程轮动分析用
+
+
+def process_block_serializable(block_data, kdata_cache_bytes):
+    block_name, stock_codes = block_data
+    kdata_cache = pickle.loads(kdata_cache_bytes)
+
+    def process_stock(code):
+        kdata = kdata_cache.get(code)
+        if not kdata or len(kdata) < 11:
+            return None
+        try:
+            close = np.array([float(k.close) for k in kdata])
+            pre_close = np.roll(close, 1)
+            pre_close[0] = close[0]
+            change_arr = (close[1:] - pre_close[1:]) / pre_close[1:] * 100
+            change_arr = change_arr[-10:]
+            volume = np.array([float(k.volume) for k in kdata])
+            amount = np.array([float(k.amount) for k in kdata])
+            open_arr = np.array([float(k.open) for k in kdata])
+            flow_arr = np.zeros(10)
+            for idx in range(1, 11):
+                v = volume[-idx]
+                a = amount[-idx]
+                o = open_arr[-idx]
+                if v > 0:
+                    avg_p = a / v
+                    flow_arr[-idx] = a if avg_p > o else -a
+                else:
+                    flow_arr[-idx] = 0
+            flow_arr = flow_arr / 1e8
+            return change_arr, flow_arr
+        except Exception:
+            return None
+    with ThreadPoolExecutor(max_workers=8) as stock_executor:
+        stock_results = list(stock_executor.map(process_stock, stock_codes))
+    valid_changes = []
+    valid_flows = []
+    for res in stock_results:
+        if res and len(res) == 2:
+            change_arr, flow_arr = res
+            if len(change_arr) == 10 and len(flow_arr) == 10:
+                valid_changes.append(change_arr)
+                valid_flows.append(flow_arr)
+    if not valid_changes:
+        return None
+    change_mat = np.stack(valid_changes)
+    flow_mat = np.stack(valid_flows)
+    avg_change = np.mean(change_mat, axis=0)
+    avg_flow = np.mean(flow_mat, axis=0)
+    daily_stats = [
+        {'change': avg_change[i], 'flow': avg_flow[i]}
+        for i in range(10)
+    ]
+    trend = sum(1 for i in range(1, len(daily_stats))
+                if daily_stats[i]['change'] > daily_stats[i-1]['change'])
+    flow_trend = sum(
+        1 for stat in daily_stats if stat['flow'] > 0)
+    duration = 0
+    for stat in daily_stats:
+        if stat['change'] > 0 and stat['flow'] > 0:
+            duration += 1
+        else:
+            break
+    return {
+        'name': block_name,
+        'trend': trend / 9 * 100,
+        'flow': float(np.sum(avg_flow)),
+        'duration': duration,
+        'score': trend / 9 * 0.4 + flow_trend / 10 * 0.4 + duration / 10 * 0.2
+    }

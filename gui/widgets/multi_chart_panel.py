@@ -80,7 +80,9 @@ class MultiChartPanel(QWidget):
             self.chart_widgets.append(row_widgets)
         # 默认只显示单屏
         self.grid_widget = DraggableWidget(self)
-        self.grid_widget.setLayout(self.grid)
+        # 修复QLayout重复添加问题，先判断是否已有布局
+        if self.grid_widget.layout() is None:
+            self.grid_widget.setLayout(self.grid)
         self.grid_widget.setVisible(False)
         self.grid_widget.setAcceptDrops(True)
         self.main_layout.addWidget(self.grid_widget)

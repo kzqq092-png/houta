@@ -316,7 +316,7 @@ class StockAnalysisWidget(BaseAnalysisPanel):
                     self.log_manager.log(f"[调试] 获取市场情绪失败: {e}", LogLevel.ERROR)
 
         # 展示核心指标
-        if not sentiment_data or not sentiment_data.get('sentiment_index'):
+        if not sentiment_data or sentiment_data.get('sentiment_index') is None:
             if self.log_manager:
                 self.log_manager.log(
                     "[调试] 市场情绪数据为空或无sentiment_index字段", LogLevel.WARNING)
@@ -330,7 +330,6 @@ class StockAnalysisWidget(BaseAnalysisPanel):
                 'advance_decline', {}).get('advance', 'N/A')
             decline = sentiment_data.get(
                 'advance_decline', {}).get('decline', 'N/A')
-
             if self.log_manager:
                 self.log_manager.log(
                     f"[调试] 展示市场情绪: index={index}, heat={heat}, advance={advance}, decline={decline}", LogLevel.DEBUG)
@@ -376,42 +375,13 @@ class StockAnalysisWidget(BaseAnalysisPanel):
                 "创业板指": "399006"
             }
             industry_list = []
-            if hasattr(self.data_manager, 'get_industries'):
-                try:
-                    industry_dict = self.data_manager.get_industries()
-                    industry_list = list(industry_dict.keys())
-                    if self.log_manager:
-                        self.log_manager.log(
-                            f"[调试] 获取行业列表: {industry_list}", LogLevel.DEBUG)
-                except Exception as e:
-                    industry_list = []
-                    if self.log_manager:
-                        self.log_manager.log(
-                            f"[调试] 获取行业列表失败: {e}", LogLevel.ERROR)
             concept_list = []
-            if hasattr(self.data_manager, 'get_concept_list'):
-                try:
-                    concept_df = self.data_manager.get_concept_list()
-                    if not concept_df.empty and 'name' in concept_df.columns:
-                        concept_list = list(concept_df['name'])
-                    if self.log_manager:
-                        self.log_manager.log(
-                            f"[调试] 获取概念列表: {concept_list}", LogLevel.DEBUG)
-                except Exception as e:
-                    concept_list = []
-                    if self.log_manager:
-                        self.log_manager.log(
-                            f"[调试] 获取概念列表失败: {e}", LogLevel.ERROR)
-            # 新增自选股
             select_combo = QComboBox()
             select_combo.addItem("[大盘指数] 上证指数")
             select_combo.addItem("[大盘指数] 深证成指")
             select_combo.addItem("[大盘指数] 创业板指")
-            for ind in industry_list:
-                select_combo.addItem(f"[行业] {ind}")
-            for c in concept_list:
-                select_combo.addItem(f"[概念] {c}")
             select_combo.addItem("[自选股] 我的自选")
+            # TODO: 动态加载行业、概念
             detail_layout.addWidget(QLabel("选择指数/行业/概念/自选股："))
             detail_layout.addWidget(select_combo)
             chart_canvas = None
@@ -494,20 +464,8 @@ class StockAnalysisWidget(BaseAnalysisPanel):
                         last_extreme = None
                 else:
                     ax.text(0.5, 0.5, "暂无历史数据", ha="center", va="center")
-
-                def on_click(event):
-                    if event.inaxes == ax and not df.empty:
-                        ind = int(event.xdata)
-                        if 0 <= ind < len(df):
-                            row = df.iloc[ind]
-                            date = row["date"]
-                            # 弹窗显示该日行情表现
-                            info = self.data_manager.get_market_day_info(
-                                date, code=code, industry=industry, concept=concept, custom_stocks=stock_list if custom else None)
-                            msg = f"{date:%Y-%m-%d}行情摘要：\n" + str(info)
-                            QMessageBox.information(detail_dlg, "行情联动", msg)
-                fig.canvas.mpl_connect('button_press_event', on_click)
-                detail_layout.insertWidget(3, chart_canvas)
+                detail_layout.addWidget(chart_canvas)
+                # 统计信息
                 if not df.empty and "sentiment_index" in df:
                     min_val = df["sentiment_index"].min()
                     max_val = df["sentiment_index"].max()

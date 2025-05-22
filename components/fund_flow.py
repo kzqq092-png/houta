@@ -214,7 +214,8 @@ class FundFlowWidget(BaseAnalysisPanel):
         self.north_chart_view.setRenderHint(QPainter.Antialiasing)
         group_layout.addWidget(self.north_chart_view)
 
-        layout.addWidget(group)
+        if layout is not None:
+            layout.addWidget(group)
 
     def create_industry_flow_section(self, layout):
         """创建行业资金流向区域"""
@@ -264,7 +265,8 @@ class FundFlowWidget(BaseAnalysisPanel):
         content_layout.addWidget(self.industry_canvas)
 
         group_layout.addLayout(content_layout)
-        layout.addWidget(group)
+        if layout is not None:
+            layout.addWidget(group)
 
     def create_concept_flow_section(self, layout):
         """创建概念资金流向区域"""
@@ -314,7 +316,8 @@ class FundFlowWidget(BaseAnalysisPanel):
         content_layout.addWidget(self.concept_canvas)
 
         group_layout.addLayout(content_layout)
-        layout.addWidget(group)
+        if layout is not None:
+            layout.addWidget(group)
 
     def create_main_force_analysis(self, layout):
         """创建主力资金分析区域"""

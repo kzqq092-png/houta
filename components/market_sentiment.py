@@ -100,6 +100,14 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         self.chart_widget = chart_widget
         self.template_manager = TemplateManager(
             template_dir="templates/market_sentiment")
+        # 修复：初始化数据缓存，防止未定义报错
+        self._data_cache = {}
+        self._cache_time = {}
+        self._custom_indicators = {}
+        self._alerts = {}
+        self._sentiment_cache = {}
+        self._sentiment_cache_time = {}
+
         self.init_ui()
 
         # 示例：增加情绪阈值参数输入
@@ -454,7 +462,7 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         """
         try:
             # 新增：无数据友好提示+骨架屏
-            if not data or not data.get('sentiment_index'):
+            if not data or data.get('sentiment_index') is None:
                 self.show_loading_skeleton()
                 self.sentiment_score_label.setText("暂无市场情绪数据")
                 self.sentiment_score_label.setStyleSheet(
@@ -468,9 +476,9 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self._sentiment_cache_time = datetime.now()
             # 使用QTimer.singleShot确保在主线程中更新UI
             QTimer.singleShot(0, lambda: self._update_ui_safely(data))
-
         except Exception as e:
-            self.log_manager.log(f"更新市场情绪数据失败: {e}", LogLevel.ERROR)
+            if hasattr(self, 'log_manager'):
+                self.log_manager.log(f"更新市场情绪数据失败: {e}", LogLevel.ERROR)
 
     def _update_ui_safely(self, data: dict):
         """在主线程中安全地更新UI
@@ -495,6 +503,30 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         except Exception as e:
             self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
 
+    def _update_sentiment_index(self, data: dict):
+        """
+        更新情绪分数标签
+        Args:
+            data: 市场情绪数据字典
+        """
+        try:
+            sentiment_index = data.get('sentiment_index', 0)
+            if hasattr(self, 'sentiment_score_label'):
+                self.sentiment_score_label.setText(f"{sentiment_index:.2f}")
+                # 设置颜色
+                if sentiment_index >= 70:
+                    self.sentiment_score_label.setStyleSheet(
+                        "font-size: 16px; font-weight: bold; color: #ff4d4f;")
+                elif sentiment_index >= 50:
+                    self.sentiment_score_label.setStyleSheet(
+                        "font-size: 16px; font-weight: bold; color: #faad14;")
+                else:
+                    self.sentiment_score_label.setStyleSheet(
+                        "font-size: 16px; font-weight: bold; color: #52c41a;")
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.log(f"更新情绪分数标签失败: {e}", LogLevel.ERROR)
+
     def _update_sentiment_chart(self, data):
         """更新情绪图表
 
@@ -503,40 +535,37 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         """
         try:
             if not hasattr(self, 'sentiment_chart') or not hasattr(self, 'sentiment_series'):
-                self.log_manager.warning("情绪图表未初始化")
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.warning("情绪图表未初始化")
                 return
-
             # 清除现有数据
             self.sentiment_series.clear()
-
             # 添加数据点
             sentiment_data = data.get('sentiment_index', {})
             if isinstance(sentiment_data, dict):
                 for i, (date, value) in enumerate(sentiment_data.items()):
                     if isinstance(value, (int, float)):
-                        self.sentiment_series.append(i, int(value))  # 转换为整数
+                        self.sentiment_series.append(i, int(value))
             elif isinstance(sentiment_data, (list, tuple)):
                 for i, value in enumerate(sentiment_data):
                     if isinstance(value, (int, float)):
-                        self.sentiment_series.append(i, int(value))  # 转换为整数
-
+                        self.sentiment_series.append(i, int(value))
+            elif isinstance(sentiment_data, (int, float)):
+                self.sentiment_series.append(0, int(sentiment_data))
             # 更新X轴范围
             points_count = self.sentiment_series.count()
             if points_count > 0:
                 self.sentiment_axis_x.setRange(0, points_count - 1)
-
             # 更新Y轴范围（保持0-100的整数范围）
             self.sentiment_axis_y.setRange(0, 100)
-
             # 更新图表
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
-
-            self.log_manager.info("情绪图表更新成功")
-
+            if hasattr(self, 'log_manager'):
+                self.log_manager.info("情绪图表更新成功")
         except Exception as e:
-            self.log_manager.error(f"更新情绪图表失败: {str(e)}")
-            raise
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"更新情绪图表失败: {str(e)}")
 
     def _update_heat_indicator(self, data):
         """更新热度指示器"""
@@ -918,3 +947,19 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         # 复用StockScreenerWidget的模板管理对话框逻辑
         QMessageBox.information(
             self, "模板管理", "此处可集成批量模板管理UI，支持导入、导出、删除、重命名、应用等功能。")
+
+    def _update_charts(self, data: dict):
+        """
+        更新市场情绪相关图表（兼容入口）
+        Args:
+            data: 市场情绪数据
+        """
+        self._update_sentiment_chart(data)
+
+    def _update_tables(self, data: dict):
+        """
+        更新市场情绪相关表格（兼容入口）
+        Args:
+            data: 市场情绪数据
+        """
+        self._update_sentiment_table(data)

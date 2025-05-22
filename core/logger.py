@@ -125,21 +125,21 @@ class LogManager(BaseLogManager):
         """
         try:
             # 获取调用者class和函数名
-            frame = inspect.currentframe()
-            outer_frames = inspect.getouterframes(frame)
-            # 默认
-            class_name = "Global"
-            func_name = ""
-            for record in outer_frames:
-                if record.function not in ("_write_log", "log", "_async_log"):
-                    func_name = record.function
-                    # 尝试获取self
-                    if 'self' in record.frame.f_locals:
-                        class_name = type(
-                            record.frame.f_locals['self']).__name__
-                    break
-            prefix = f"[{class_name}.{func_name}]"
-            message = f"{prefix} {message}"
+            # frame = inspect.currentframe()
+            # outer_frames = inspect.getouterframes(frame)
+            # # 默认
+            # class_name = "Global"
+            # func_name = ""
+            # for record in outer_frames:
+            #     if record.function not in ("_write_log", "log", "_async_log"):
+            #         func_name = record.function
+            #         # 尝试获取self
+            #         if 'self' in record.frame.f_locals:
+            #             class_name = type(
+            #                 record.frame.f_locals['self']).__name__
+            #         break
+            # prefix = f"[{class_name}.{func_name}]"
+            # message = f"{prefix} {message}"
             # 发送信号
             self.log_message.emit(message, level.value)
 
