@@ -7,4 +7,4 @@ from .technical_analysis import TechnicalAnalyzer
 from .wave_analysis import WaveAnalyzer
 from .pattern_recognition import PatternRecognizer
 
-__all__ = ['TechnicalAnalyzer', 'WaveAnalyzer', 'PatternRecognizer'] 
+__all__ = ['TechnicalAnalyzer', 'WaveAnalyzer', 'PatternRecognizer']

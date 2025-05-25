@@ -3,7 +3,7 @@
 """
 from typing import Dict, Any, List, Optional
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 import traceback
 
 from core.logger import LogManager
@@ -368,54 +368,34 @@ class TradingWidget(QWidget):
         except Exception as e:
             LogManager.log(f"清除数据失败: {str(e)}", "error")
 
+    def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
+        button.setEnabled(False)
+        self.show_progress("分析中，请稍候...")
+
+        def task():
+            try:
+                result = analysis_func(*args, **kwargs)
+                return result
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"分析异常: {str(e)}")
+                return None
+
+        def on_done(future):
+            button.setEnabled(True)
+            self.hide_progress()
+            res = future.result()
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(task)
+        future.add_done_callback(
+            lambda f: QTimer.singleShot(0, lambda: on_done(f)))
+
     def calculate_signals(self):
-        """计算交易信号"""
-        try:
-            if not self.current_stock:
-                return
-
-            # 获取当前策略
-            strategy = self.strategy_combo.currentText()
-
-            # 计算信号
-            signals = trading_system.calculate_signals(strategy)
-
-            # 更新信号列表
-            self.update_signals(signals)
-
-        except Exception as e:
-            LogManager.log(f"计算交易信号失败: {str(e)}", "error")
+        self._run_analysis_async(self.signal_btn, self._calculate_signals_impl)
 
     def run_backtest(self):
-        """运行回测"""
-        try:
-            if not self.current_stock:
-                return
-
-            # 获取回测参数
-            params = {
-                'strategy': self.strategy_combo.currentText(),
-                'initial_cash': self.initial_cash_spin.value(),
-                'commission_rate': self.commission_spin.value(),
-                'slippage': self.slippage_spin.value(),
-                'ma_short': self.ma_short_spin.value(),
-                'ma_long': self.ma_long_spin.value(),
-                'macd_short': self.macd_short_spin.value(),
-                'macd_long': self.macd_long_spin.value(),
-                'macd_signal': self.macd_signal_spin.value(),
-                'kdj_n': self.kdj_n_spin.value(),
-                'kdj_m1': self.kdj_m1_spin.value(),
-                'kdj_m2': self.kdj_m2_spin.value()
-            }
-
-            # 运行回测
-            results = trading_system.run_backtest(params)
-
-            # 更新回测结果
-            self.update_backtest_results(results)
-
-        except Exception as e:
-            LogManager.log(f"运行回测失败: {str(e)}", "error")
+        self._run_analysis_async(self.backtest_btn, self._run_backtest_impl)
 
     def reset_params(self):
         """重置参数"""

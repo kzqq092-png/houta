@@ -363,26 +363,41 @@ class FundFlowWidget(BaseAnalysisPanel):
             'callback': callback
         }
 
-    def export_data(self):
-        """导出资金流向数据"""
-        try:
-            filename, _ = QFileDialog.getSaveFileName(
-                self, "导出数据", "", "Excel Files (*.xlsx);;CSV Files (*.csv)"
-            )
-            if filename:
-                data = pd.DataFrame(self._data_cache)
-                if filename.endswith('.xlsx'):
-                    data.to_excel(filename)
-                else:
-                    data.to_csv(filename)
-                logging.info(f"数据已导出到: {filename}")
-        except Exception as e:
-            logging.error(f"导出数据失败: {e}")
+    def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
+        button.setEnabled(False)
+        self.show_progress("分析中，请稍候...")
 
-    def show_alert_dialog(self):
-        """显示预警设置对话框"""
-        # TODO: 实现预警设置对话框
-        pass
+        def task():
+            try:
+                result = analysis_func(*args, **kwargs)
+                return result
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"分析异常: {str(e)}")
+                return None
+
+        def on_done(future):
+            button.setEnabled(True)
+            self.hide_progress()
+            res = future.result()
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(task)
+        future.add_done_callback(
+            lambda f: QTimer.singleShot(0, lambda: on_done(f)))
+
+    def analyze_fund_flow(self):
+        self._run_analysis_async(
+            self.fund_flow_btn, self._analyze_fund_flow_impl)
+
+    def export_data(self):
+        self._run_analysis_async(self.export_btn, self._export_data_impl)
+
+    def refresh_data(self):
+        self._run_analysis_async(self.refresh_btn, self._refresh_data_impl)
+
+    def run_backtest(self):
+        self._run_analysis_async(self.backtest_btn, self._run_backtest_impl)
 
     def _update_overview_cards(self, data):
         """更新概览卡片数据

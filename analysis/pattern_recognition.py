@@ -9,19 +9,20 @@ from datetime import datetime
 import pandas as pd
 from hikyuu import Datetime, Query, KData, MA
 
+
 class PatternRecognizer:
     """Pattern recognition tools for trading system"""
-    
+
     def __init__(self):
         self.cache = {}
-        
+
     def find_head_shoulders(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
         """Find head and shoulders patterns
-        
+
         Args:
             kdata: KData object containing price data
             threshold: Price difference threshold
-            
+
         Returns:
             List of identified patterns
         """
@@ -30,29 +31,32 @@ class PatternRecognizer:
             patterns = []
             min_pattern_size = 20
             max_pattern_size = 60
-            
+
             for i in range(min_pattern_size, len(closes)-min_pattern_size):
                 # Find left shoulder
                 left_shoulder = np.max(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
-                
+                left_shoulder_idx = i - min_pattern_size + \
+                    np.argmax(closes[i-min_pattern_size:i])
+
                 # Find head
                 head = np.max(closes[i:i+min_pattern_size])
                 head_idx = i + np.argmax(closes[i:i+min_pattern_size])
-                
+
                 # Find right shoulder
-                right_shoulder = np.max(closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + np.argmax(closes[head_idx:head_idx+min_pattern_size])
-                
+                right_shoulder = np.max(
+                    closes[head_idx:head_idx+min_pattern_size])
+                right_shoulder_idx = head_idx + \
+                    np.argmax(closes[head_idx:head_idx+min_pattern_size])
+
                 # Validate pattern
                 if (head > left_shoulder and head > right_shoulder and
-                    abs(left_shoulder - right_shoulder) < threshold * head):
-                    
+                        abs(left_shoulder - right_shoulder) < threshold * head):
+
                     # Find neckline
                     neckline = min(
                         closes[left_shoulder_idx:right_shoulder_idx+1]
                     )
-                    
+
                     patterns.append({
                         'type': 'head_shoulders_top',
                         'left_shoulder': (left_shoulder_idx, left_shoulder),
@@ -64,24 +68,27 @@ class PatternRecognizer:
                             neckline
                         )
                     })
-                    
+
                 # Check inverse head and shoulders
                 left_shoulder = np.min(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
-                
+                left_shoulder_idx = i - min_pattern_size + \
+                    np.argmin(closes[i-min_pattern_size:i])
+
                 head = np.min(closes[i:i+min_pattern_size])
                 head_idx = i + np.argmin(closes[i:i+min_pattern_size])
-                
-                right_shoulder = np.min(closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + np.argmin(closes[head_idx:head_idx+min_pattern_size])
-                
+
+                right_shoulder = np.min(
+                    closes[head_idx:head_idx+min_pattern_size])
+                right_shoulder_idx = head_idx + \
+                    np.argmin(closes[head_idx:head_idx+min_pattern_size])
+
                 if (head < left_shoulder and head < right_shoulder and
-                    abs(left_shoulder - right_shoulder) < threshold * head):
-                    
+                        abs(left_shoulder - right_shoulder) < threshold * head):
+
                     neckline = max(
                         closes[left_shoulder_idx:right_shoulder_idx+1]
                     )
-                    
+
                     patterns.append({
                         'type': 'head_shoulders_bottom',
                         'left_shoulder': (left_shoulder_idx, left_shoulder),
@@ -93,19 +100,20 @@ class PatternRecognizer:
                             neckline
                         )
                     })
-            
+
             return patterns
-            
+
         except Exception as e:
-            raise Exception(f"Head and shoulders pattern recognition failed: {str(e)}")
-            
+            raise Exception(
+                f"Head and shoulders pattern recognition failed: {str(e)}")
+
     def find_double_tops_bottoms(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
         """Find double top and bottom patterns
-        
+
         Args:
             kdata: KData object containing price data
             threshold: Price difference threshold
-            
+
         Returns:
             List of identified patterns
         """
@@ -114,21 +122,22 @@ class PatternRecognizer:
             patterns = []
             min_pattern_size = 10
             max_pattern_size = 40
-            
+
             for i in range(min_pattern_size, len(closes)-min_pattern_size):
                 # Find first peak
                 peak1 = np.max(closes[i-min_pattern_size:i])
-                peak1_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
-                
+                peak1_idx = i - min_pattern_size + \
+                    np.argmax(closes[i-min_pattern_size:i])
+
                 # Find second peak
                 peak2 = np.max(closes[i:i+min_pattern_size])
                 peak2_idx = i + np.argmax(closes[i:i+min_pattern_size])
-                
+
                 # Validate double top
                 if abs(peak1 - peak2) < threshold * peak1:
                     # Find neckline
                     neckline = min(closes[peak1_idx:peak2_idx+1])
-                    
+
                     patterns.append({
                         'type': 'double_top',
                         'peak1': (peak1_idx, peak1),
@@ -139,17 +148,18 @@ class PatternRecognizer:
                             neckline
                         )
                     })
-                
+
                 # Find double bottom
                 trough1 = np.min(closes[i-min_pattern_size:i])
-                trough1_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
-                
+                trough1_idx = i - min_pattern_size + \
+                    np.argmin(closes[i-min_pattern_size:i])
+
                 trough2 = np.min(closes[i:i+min_pattern_size])
                 trough2_idx = i + np.argmin(closes[i:i+min_pattern_size])
-                
+
                 if abs(trough1 - trough2) < threshold * trough1:
                     neckline = max(closes[trough1_idx:trough2_idx+1])
-                    
+
                     patterns.append({
                         'type': 'double_bottom',
                         'trough1': (trough1_idx, trough1),
@@ -160,19 +170,20 @@ class PatternRecognizer:
                             neckline
                         )
                     })
-            
+
             return patterns
-            
+
         except Exception as e:
-            raise Exception(f"Double top/bottom pattern recognition failed: {str(e)}")
-            
+            raise Exception(
+                f"Double top/bottom pattern recognition failed: {str(e)}")
+
     def find_triangles(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
         """Find triangle patterns
-        
+
         Args:
             kdata: KData object containing price data
             threshold: Price difference threshold
-            
+
         Returns:
             List of identified patterns
         """
@@ -182,26 +193,26 @@ class PatternRecognizer:
             lows = np.array([float(k.low) for k in kdata])
             patterns = []
             min_pattern_size = 20
-            
+
             for i in range(min_pattern_size, len(closes)-min_pattern_size):
                 # Get local highs and lows
                 local_highs = []
                 local_lows = []
-                
+
                 for j in range(i-min_pattern_size, i+min_pattern_size):
                     if j > 0 and j < len(closes)-1:
                         if highs[j] > highs[j-1] and highs[j] > highs[j+1]:
                             local_highs.append((j, highs[j]))
                         if lows[j] < lows[j-1] and lows[j] < lows[j+1]:
                             local_lows.append((j, lows[j]))
-                
+
                 if len(local_highs) >= 2 and len(local_lows) >= 2:
                     # Fit lines to highs and lows
-                    high_slope = np.polyfit([x[0] for x in local_highs], 
-                                          [x[1] for x in local_highs], 1)[0]
+                    high_slope = np.polyfit([x[0] for x in local_highs],
+                                            [x[1] for x in local_highs], 1)[0]
                     low_slope = np.polyfit([x[0] for x in local_lows],
-                                         [x[1] for x in local_lows], 1)[0]
-                    
+                                           [x[1] for x in local_lows], 1)[0]
+
                     # Identify triangle patterns
                     if abs(high_slope) < 0.1 and abs(low_slope) < 0.1:
                         # Symmetrical triangle
@@ -214,7 +225,8 @@ class PatternRecognizer:
                                 'lows': local_lows,
                                 'confidence': self._calculate_pattern_confidence(
                                     [x[1] for x in local_highs + local_lows],
-                                    np.mean([x[1] for x in local_highs + local_lows])
+                                    np.mean([x[1]
+                                            for x in local_highs + local_lows])
                                 )
                             })
                         # Ascending triangle
@@ -243,61 +255,62 @@ class PatternRecognizer:
                                     np.mean([x[1] for x in local_lows])
                                 )
                             })
-            
+
             return patterns
-            
+
         except Exception as e:
             raise Exception(f"Triangle pattern recognition failed: {str(e)}")
-            
-    def _calculate_pattern_confidence(self, points: List[float], 
-                                   reference: float) -> float:
+
+    def _calculate_pattern_confidence(self, points: List[float],
+                                      reference: float) -> float:
         """Calculate pattern confidence score
-        
+
         Args:
             points: List of pattern points
             reference: Reference price level
-            
+
         Returns:
             Confidence score between 0 and 1
         """
         try:
             # Calculate price volatility
             volatility = np.std(points) / np.mean(points)
-            
+
             # Calculate price deviation from reference
-            deviation = np.mean([abs(p - reference) / reference for p in points])
-            
+            deviation = np.mean(
+                [abs(p - reference) / reference for p in points])
+
             # Calculate pattern symmetry
             diffs = np.diff(points)
             symmetry = 1 - np.std(diffs) / np.mean(np.abs(diffs))
-            
+
             # Combine factors
-            confidence = (0.4 * (1 - volatility) + 
-                        0.4 * (1 - deviation) +
-                        0.2 * symmetry)
-            
+            confidence = (0.4 * (1 - volatility) +
+                          0.4 * (1 - deviation) +
+                          0.2 * symmetry)
+
             return max(0, min(1, confidence))
-            
+
         except Exception as e:
             raise Exception(f"Pattern confidence calculation failed: {str(e)}")
-            
+
     def get_pattern_signals(self, kdata: KData) -> List[Dict]:
         """Get trading signals based on pattern recognition
-        
+
         Args:
             kdata: KData object containing price data
-            
+
         Returns:
             List of trading signals
         """
         try:
             signals = []
-            
+
             # Get patterns
             head_shoulders = self.find_head_shoulders(kdata)
             double_patterns = self.find_double_tops_bottoms(kdata)
             triangles = self.find_triangles(kdata)
-            
+
             # Generate head and shoulders signals
             for pattern in head_shoulders:
                 if pattern['type'] == 'head_shoulders_top':
@@ -318,7 +331,7 @@ class PatternRecognizer:
                         'confidence': pattern['confidence'],
                         'index': pattern['right_shoulder'][0]
                     })
-            
+
             # Generate double top/bottom signals
             for pattern in double_patterns:
                 if pattern['type'] == 'double_top':
@@ -339,7 +352,7 @@ class PatternRecognizer:
                         'confidence': pattern['confidence'],
                         'index': pattern['trough2'][0]
                     })
-            
+
             # Generate triangle signals
             for pattern in triangles:
                 if pattern['type'] == 'ascending_triangle':
@@ -360,8 +373,8 @@ class PatternRecognizer:
                         'confidence': pattern['confidence'],
                         'index': pattern['end_idx']
                     })
-            
+
             return signals
-            
+
         except Exception as e:
-            raise Exception(f"Pattern signal generation failed: {str(e)}") 
+            raise Exception(f"Pattern signal generation failed: {str(e)}")

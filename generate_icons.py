@@ -87,7 +87,7 @@ def create_icon(text, size=(32, 32), bg_color=(240, 240, 240), text_color=(60, 6
         return image
 
     except Exception as e:
-        print(f"创建图标失败: {e}")
+        print(f"[图标生成] 创建图标失败: {e}")
         # 创建一个带错误标记的图标
         image = Image.new('RGB', size, (255, 200, 200))
         draw = ImageDraw.Draw(image)

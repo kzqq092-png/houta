@@ -291,12 +291,15 @@ class SentimentStockSelectorDialog(QDialog):
                 futures.append(executor.submit(
                     self._simulate_score, sig, param, target))
             for i, fut in enumerate(as_completed(futures)):
-                sig, param, score = fut.result()
-                result += f"{sig}\t{param}\t{score:.2f}\n"
-                if (target == "最大收益" and score > best_score) or (target == "最小回撤" and score < best_score) or (target == "夏普比率" and score > best_score):
-                    best_score = score
-                    best_param = param
-                    best_signal = sig
+                try:
+                    sig, param, score = fut.result()
+                    result += f"{sig}\t{param}\t{score:.2f}\n"
+                    if (target == "最大收益" and score > best_score) or (target == "最小回撤" and score < best_score) or (target == "夏普比率" and score > best_score):
+                        best_score = score
+                        best_param = param
+                        best_signal = sig
+                except Exception as e:
+                    print(f"调优子任务异常: {str(e)}")
         if best_signal:
             self.signal_config[best_signal] = best_param
             save_signal_config(self.signal_config)

@@ -12,6 +12,7 @@ from datetime import datetime
 import ptvsd
 from gui.ui_components import BaseAnalysisPanel
 from components.template_manager import TemplateManager
+import traceback
 
 
 class DataUpdateThread(QThread):
@@ -139,28 +140,22 @@ class MarketSentimentWidget(BaseAnalysisPanel):
 
     def init_ui(self):
         """初始化UI"""
-        # 创建主布局
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = self.layout()
 
         # 创建情绪分数显示
         score_layout = QHBoxLayout()
         score_label = QLabel("市场情绪分数:")
         self.sentiment_score_label = QLabel("0.00")
         self.sentiment_score_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold;")
+            "font-size: 20px; font-weight: bold; color: #1976d2; padding: 4px 12px; border-radius: 8px; background: #e3f2fd;")
         score_layout.addWidget(score_label)
         score_layout.addWidget(self.sentiment_score_label)
         score_layout.addStretch()
         self.main_layout.addLayout(score_layout)
-
-        # 创建指标卡片区域
-        self.indicator_cards = QGridLayout()
-        self.main_layout.addLayout(self.indicator_cards)
-
-        # 创建情绪指标表格
-        self.create_sentiment_table(self.main_layout)
-
-        # 创建情绪图表
+        import akshare as ak
+        df = ak.index_news_sentiment_scope()
+        print(df)
+        # 只保留情绪指数走势图表
         self.create_sentiment_chart(self.main_layout)
 
         # 创建市场热度指示器
@@ -175,100 +170,30 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         status_layout.addStretch()
         self.main_layout.addLayout(status_layout)
 
-        # 创建控制按钮
-        self.create_control_buttons(self.main_layout)
+        # 控制按钮区（分析、导出、模板管理、自定义指标）
+        button_layout = QHBoxLayout()
+        self.analyze_button = QPushButton("市场情绪分析")
+        self.analyze_button.setStyleSheet(
+            "background: #1976d2; color: white; font-weight: bold; border-radius: 8px; padding: 6px 18px;")
+        self.analyze_button.setToolTip("点击进行市场情绪分析")
+        self.analyze_button.clicked.connect(self.on_analyze)
+        button_layout.addWidget(self.analyze_button)
 
-        # 模板管理按钮
-        manage_button = QPushButton("模板管理")
-        manage_button.clicked.connect(self.show_template_manager_dialog)
-        self.main_layout.addWidget(manage_button)
+        self.export_button = QPushButton("导出结果")
+        self.export_button.setStyleSheet(
+            "background: #43a047; color: white; font-weight: bold; border-radius: 8px; padding: 6px 18px;")
+        self.export_button.setToolTip("导出分析结果为图片")
+        self.export_button.clicked.connect(self.export_data)
+        button_layout.addWidget(self.export_button)
 
-    def create_indicator_cards(self, layout):
-        """创建主要指标卡片，增加美化效果"""
-        indicators = [
-            ("大盘强度", "70%", "强势"),
-            ("市场宽度", "65%", "偏强"),
-            ("资金趋势", "↑", "流入"),
-            ("板块热度", "85", "高热"),
-            ("情绪指数", "58.6", "乐观"),
-            ("技术评分", "75", "看多"),
-            ("主力资金流向", "+12亿", "流入"),
-            ("北向资金", "+5亿", "流入")
-        ]
-        for i, (name, value, status) in enumerate(indicators):
-            card = QFrame()
-            card.setFrameStyle(QFrame.Box | QFrame.Raised)
-            card.setLineWidth(2)
-            card.setStyleSheet("""
-                QFrame {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
-                    border-radius: 18px;
-                    border: 1.5px solid #90caf9;
-                    box-shadow: 0px 4px 16px rgba(33,150,243,0.08);
-                    margin: 12px;
-                    padding: 18px 12px 12px 12px;
-                }
-            """)
-            card_layout = QVBoxLayout(card)
-            card_layout.setSpacing(8)
-            # 指标名称
-            name_label = QLabel(name)
-            name_label.setStyleSheet(
-                "font-weight: bold; color: #1976d2; font-size: 15px;")
-            card_layout.addWidget(name_label)
-            # 指标值
-            value_label = QLabel(value)
-            value_label.setStyleSheet(
-                "font-size: 32px; color: #1565c0; font-weight: bold; margin: 6px 0;")
-            card_layout.addWidget(value_label)
-            # 状态
-            status_label = QLabel(status)
-            status_color = "#43a047" if "强" in status or "多" in status or "入" in status or "高" in status else "#e53935"
-            status_label.setStyleSheet(
-                f"background: {status_color}; color: white; border-radius: 10px; padding: 2px 12px; font-size: 13px; font-weight: bold;")
-            card_layout.addWidget(status_label)
-            self.indicator_cards.addWidget(card, i // 3, i % 3)
-        layout.addLayout(self.indicator_cards)
+        self.template_button = QPushButton("模板管理")
+        self.template_button.setStyleSheet(
+            "background: #ffa000; color: white; font-weight: bold; border-radius: 8px; padding: 6px 18px;")
+        self.template_button.setToolTip("管理情绪分析参数模板")
+        self.template_button.clicked.connect(self.show_template_manager_dialog)
+        button_layout.addWidget(self.template_button)
 
-    def create_sentiment_table(self, layout):
-        """美化情绪指标表格"""
-        self.sentiment_table = QTableWidget()
-        self.sentiment_table.setColumnCount(4)
-        self.sentiment_table.setRowCount(8)
-        self.sentiment_table.setHorizontalHeaderLabels([
-            "指标", "数值", "变化", "状态"])
-        indicators = [
-            "市场情绪指数",
-            "涨跌比",
-            "成交量比",
-            "换手率",
-            "北向资金",
-            "融资余额",
-            "期权PCR",
-            "恐慌指数"
-        ]
-        self.sentiment_table.setVerticalHeaderLabels(indicators)
-        self.sentiment_table.setStyleSheet("""
-            QTableWidget {
-                background: #e3f2fd;
-                alternate-background-color: #bbdefb;
-                selection-background-color: #90caf9;
-                border-radius: 8px;
-            }
-            QHeaderView::section {
-                background: #1976d2;
-                color: white;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-                font-size: 15px;
-            }
-            QTableWidget::item {
-                padding: 6px;
-                font-size: 14px;
-            }
-        """)
-        layout.addWidget(self.sentiment_table)
+        self.main_layout.addLayout(button_layout)
 
     def create_sentiment_chart(self, layout=None):
         """创建市场情绪图表
@@ -343,14 +268,16 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         self.heat_progress.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #90caf9;
-                border-radius: 8px;
+                border-radius: 12px;
                 text-align: center;
-                background: #e3f2fd;
-                height: 24px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #e3f2fd, stop:1 #bbdefb);
+                height: 28px;
+                font-size: 16px;
+                color: #1976d2;
             }
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #43a047, stop:1 #1976d2);
-                border-radius: 8px;
+                border-radius: 12px;
             }
         """)
         heat_layout.addWidget(self.heat_progress)
@@ -392,20 +319,48 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         }
 
     def export_data(self):
-        """导出市场情绪数据"""
+        """增强导出功能，支持导出表格和图表，操作写日志"""
         try:
-            filename, _ = QFileDialog.getSaveFileName(
-                self, "导出数据", "", "Excel Files (*.xlsx);;CSV Files (*.csv)"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "导出分析结果",
+                "",
+                "Excel Files (*.xlsx);;CSV Files (*.csv);;PNG Files (*.png)"
             )
-            if filename:
-                data = pd.DataFrame(self._data_cache)
-                if filename.endswith('.xlsx'):
-                    data.to_excel(filename)
-                else:
-                    data.to_csv(filename)
-                self.log_manager.log(f"数据已导出到: {filename}", LogLevel.INFO)
+            if file_path:
+                if file_path.endswith('.xlsx') or file_path.endswith('.csv'):
+                    # 导出表格
+                    import pandas as pd
+                    data = []
+                    for row in range(self.sentiment_table.rowCount()):
+                        row_data = []
+                        for col in range(self.sentiment_table.columnCount()):
+                            item = self.sentiment_table.item(row, col)
+                            row_data.append(item.text() if item else "")
+                        data.append(row_data)
+                    df = pd.DataFrame(data, columns=[self.sentiment_table.horizontalHeaderItem(
+                        i).text() for i in range(self.sentiment_table.columnCount())])
+                    if file_path.endswith('.xlsx'):
+                        df.to_excel(file_path, index=False)
+                    else:
+                        df.to_csv(file_path, index=False, encoding='utf-8-sig')
+                    self.log_manager.info(f"表格已导出到: {file_path}")
+                    QMessageBox.information(
+                        self, "导出成功", f"表格已导出到: {file_path}")
+                elif file_path.endswith('.png'):
+                    # 导出图表
+                    if hasattr(self, 'sentiment_chart_view'):
+                        pixmap = self.sentiment_chart_view.grab()
+                        pixmap.save(file_path)
+                        self.log_manager.info(f"图表已导出到: {file_path}")
+                        QMessageBox.information(
+                            self, "导出成功", f"图表已导出到: {file_path}")
+                    else:
+                        self.log_manager.warning("未找到图表控件，无法导出图表")
+                        QMessageBox.warning(self, "导出失败", "未找到图表控件，无法导出图表")
         except Exception as e:
-            self.log_manager.log(f"导出数据失败: {e}", LogLevel.ERROR)
+            self.log_manager.error(f"导出失败: {str(e)}")
+            QMessageBox.critical(self, "导出错误", f"导出失败: {str(e)}")
 
     def show_alert_dialog(self):
         """显示预警设置对话框"""
@@ -434,12 +389,12 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         return None
 
     def show_loading_skeleton(self):
-        """显示骨架屏动画"""
+        """显示骨架屏动画（增强版）"""
         if not hasattr(self, '_skeleton_label'):
             self._skeleton_label = QLabel("加载中...", self)
             self._skeleton_label.setAlignment(Qt.AlignCenter)
             self._skeleton_label.setStyleSheet(
-                "font-size: 18px; color: #cccccc;")
+                "font-size: 22px; color: #cccccc; background: #f7f9fa; border-radius: 12px; padding: 32px 0; border: 2px dashed #90caf9; box-shadow: 0 4px 24px rgba(33,150,243,0.10);")
             try:
                 self._movie = QMovie("resources/images/loading.gif")
                 if self._movie.isValid():
@@ -449,59 +404,121 @@ class MarketSentimentWidget(BaseAnalysisPanel):
                 pass
             self.main_layout.addWidget(self._skeleton_label)
         self._skeleton_label.show()
+        self._skeleton_label.raise_()
 
     def hide_loading_skeleton(self):
         if hasattr(self, '_skeleton_label'):
             self._skeleton_label.hide()
 
     def update_sentiment_data(self, data: dict):
-        """更新市场情绪数据
-
-        Args:
-            data: 市场情绪数据字典
-        """
+        """只更新情绪分数和多市场走势"""
         try:
-            # 新增：无数据友好提示+骨架屏
-            if not data or data.get('sentiment_index') is None:
-                self.show_loading_skeleton()
-                self.sentiment_score_label.setText("暂无市场情绪数据")
+            self.log_manager.info(f"收到市场情绪数据: {data}")
+            # 1. 情绪分数
+            score = data.get('sentiment_index')
+            if isinstance(score, (int, float)):
+                self.sentiment_score_label.setText(f"{score:.2f}")
                 self.sentiment_score_label.setStyleSheet(
-                    "font-size: 16px; color: #999999;")
-                if hasattr(self, 'sentiment_table'):
-                    self.sentiment_table.clearContents()
+                    "font-size: 20px; font-weight: bold; color: #1976d2; padding: 4px 12px; border-radius: 8px; background: #e3f2fd;")
+                self.log_manager.info(f"市场情绪分数显示: {score:.2f}")
+            else:
+                self.sentiment_score_label.setText("暂无数据")
+                self.sentiment_score_label.setStyleSheet(
+                    "font-size: 20px; color: #999999; font-weight: bold;")
+                self.log_manager.warning("市场情绪分数字段缺失或为None")
+
+            # 2. 多市场情绪指数走势
+            if hasattr(self.data_manager, 'get_market_sentiment_history'):
+                all_history = self.data_manager.get_market_sentiment_history(
+                    days=60)
+                self._update_sentiment_chart_multi(all_history)
+            else:
+                self._update_sentiment_chart_multi([])
+
+            # 3. 热度指示器
+            if hasattr(self, 'heat_progress'):
+                heat = data.get('market_heat')
+                if heat is not None:
+                    try:
+                        heat = float(heat)
+                        self.heat_progress.setValue(int(heat))
+                        self.log_manager.info(f"市场热度显示: {heat}")
+                    except Exception:
+                        self.heat_progress.setValue(0)
+                        self.log_manager.warning("市场热度字段格式异常")
+                else:
+                    self.heat_progress.setValue(0)
+                    self.log_manager.warning("市场热度字段缺失")
+        except Exception as e:
+            self.log_manager.error(f"更新市场情绪数据失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+
+    def _update_sentiment_chart_multi(self, all_history):
+        """多市场情绪走势曲线"""
+        try:
+            if not hasattr(self, 'sentiment_chart'):
                 return
-            self.hide_loading_skeleton()
-            # 新增：缓存数据
-            self._sentiment_cache = data
-            self._sentiment_cache_time = datetime.now()
-            # 使用QTimer.singleShot确保在主线程中更新UI
-            QTimer.singleShot(0, lambda: self._update_ui_safely(data))
+            self.sentiment_chart.removeAllSeries()
+            has_data = False
+            for market_data in all_history:
+                market = market_data.get('market', '未知')
+                history = market_data.get('history', [])
+                if not history:
+                    continue
+                series = QLineSeries()
+                series.setName(market)
+                for i, item in enumerate(history):
+                    v = item.get('sentiment_index')
+                    if v is not None:
+                        series.append(i, float(v))
+                if series.count() > 0:
+                    self.sentiment_chart.addSeries(series)
+                    series.attachAxis(self.sentiment_axis_x)
+                    series.attachAxis(self.sentiment_axis_y)
+                    has_data = True
+            # X轴范围
+            self.sentiment_axis_x.setRange(0, 59)
+            self.sentiment_axis_x.setTitleText("最近60天")
+            # Y轴范围自适应
+            self.sentiment_axis_y.setRange(0, 2)
+            self.sentiment_axis_y.setTitleText("情绪指数/收盘价")
+            if not has_data:
+                self.sentiment_chart.setTitle("暂无数据")
+            else:
+                self.sentiment_chart.setTitle("市场情绪走势（近60天）")
+            if hasattr(self, 'sentiment_chart_view'):
+                self.sentiment_chart_view.update()
         except Exception as e:
             if hasattr(self, 'log_manager'):
-                self.log_manager.log(f"更新市场情绪数据失败: {e}", LogLevel.ERROR)
+                self.log_manager.error(f"多市场情绪走势渲染失败: {str(e)}")
 
     def _update_ui_safely(self, data: dict):
-        """在主线程中安全地更新UI
-
-        Args:
-            data: 市场情绪数据字典
-        """
+        """在主线程中安全地更新UI，数据缺失时所有UI区域显示暂无数据，并写日志"""
         try:
-            # 更新数据缓存
+            if not data or data.get('sentiment_index') is None:
+                self.sentiment_score_label.setText("暂无市场情绪数据")
+                self.sentiment_score_label.setStyleSheet(
+                    "font-size: 20px; color: #999999; font-weight: bold;")
+                if hasattr(self, 'sentiment_table'):
+                    self.sentiment_table.clearContents()
+                    for row in range(self.sentiment_table.rowCount()):
+                        for col in range(self.sentiment_table.columnCount()):
+                            self.sentiment_table.setItem(
+                                row, col, QTableWidgetItem("暂无数据"))
+                if hasattr(self, 'sentiment_series'):
+                    self.sentiment_series.clear()
+                if hasattr(self, 'heat_progress'):
+                    self.heat_progress.setValue(0)
+                self.log_manager.warning("UI刷新时市场情绪数据缺失，所有UI区域已置为暂无数据")
+                return
             self._data_cache.update(data)
             self._cache_time[datetime.now()] = data
-
-            # 更新各个指标
             self._update_sentiment_index(data)
             self._update_heat_indicator(data)
             self._update_charts(data)
-            self._update_tables(data)
-
-            # 检查预警条件
             self._check_alerts(data)
-
         except Exception as e:
-            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
+            self.log_manager.error(f"更新UI失败: {e}")
 
     def _update_sentiment_index(self, data: dict):
         """
@@ -592,97 +609,6 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.update_thread.stop()
             self.update_thread.wait()
         super().closeEvent(event)
-
-    def _update_sentiment_table(self, data: Dict[str, Any]) -> None:
-        """更新情绪指标表格
-
-        Args:
-            data: 市场情绪数据
-        """
-        try:
-            # 获取情绪分数
-            sentiment_score = data.get('sentiment_score', 0)
-
-            # 更新情绪分数标签
-            if hasattr(self, 'sentiment_score_label'):
-                self.sentiment_score_label.setText(f"{sentiment_score:.2f}")
-
-                # 设置情绪分数标签颜色
-                if sentiment_score >= 70:
-                    self.sentiment_score_label.setStyleSheet(
-                        "font-size: 16px; font-weight: bold; color: #ff4d4f;")
-                elif sentiment_score >= 50:
-                    self.sentiment_score_label.setStyleSheet(
-                        "font-size: 16px; font-weight: bold; color: #faad14;")
-                else:
-                    self.sentiment_score_label.setStyleSheet(
-                        "font-size: 16px; font-weight: bold; color: #52c41a;")
-
-            # 获取指数数据
-            indices_data = data.get('indices', {})
-            if not indices_data:
-                indices_data = data.get('statistics', {}).get('indices', {})
-
-            # 更新指数数据
-            for code, index_data in indices_data.items():
-                try:
-                    # 获取指数名称
-                    name = index_data.get('name', code)
-
-                    # 获取收盘价
-                    close = float(index_data.get('close', 0))
-
-                    # 计算涨跌幅
-                    change = float(index_data.get('change', 0))
-                    change_pct = float(index_data.get('change_pct', 0))
-
-                    # 更新表格
-                    row = self.sentiment_table.rowCount()
-                    self.sentiment_table.insertRow(row)
-
-                    # 设置指数名称
-                    name_item = QTableWidgetItem(name)
-                    name_item.setTextAlignment(Qt.AlignCenter)
-                    self.sentiment_table.setItem(row, 0, name_item)
-
-                    # 设置收盘价
-                    close_item = QTableWidgetItem(f"{close:.2f}")
-                    close_item.setTextAlignment(Qt.AlignCenter)
-                    self.sentiment_table.setItem(row, 1, close_item)
-
-                    # 设置涨跌幅
-                    change_item = QTableWidgetItem(f"{change:.2f}")
-                    change_item.setTextAlignment(Qt.AlignCenter)
-                    self.sentiment_table.setItem(row, 2, change_item)
-
-                    # 设置涨跌百分比
-                    change_pct_item = QTableWidgetItem(f"{change_pct:.2f}%")
-                    change_pct_item.setTextAlignment(Qt.AlignCenter)
-
-                    # 设置涨跌百分比颜色
-                    if change_pct > 0:
-                        change_pct_item.setForeground(QColor("#ff4d4f"))
-                    elif change_pct < 0:
-                        change_pct_item.setForeground(QColor("#52c41a"))
-                    else:
-                        change_pct_item.setForeground(QColor("#000000"))
-
-                    self.sentiment_table.setItem(row, 3, change_pct_item)
-
-                except Exception as e:
-                    self.log_manager.log(
-                        f"更新指数 {code} 数据失败: {str(e)}", LogLevel.ERROR)
-                    continue
-
-            # 调整表格列宽
-            self.sentiment_table.resizeColumnsToContents()
-
-        except Exception as e:
-            self.log_manager.log(f"更新情绪指标表格失败: {str(e)}", LogLevel.ERROR)
-            if hasattr(self, 'sentiment_score_label'):
-                self.sentiment_score_label.setText("更新失败")
-                self.sentiment_score_label.setStyleSheet(
-                    "font-size: 16px; font-weight: bold; color: #ff4d4f;")
 
     def _get_status(self, name: str, value: float) -> str:
         """获取指标状态
@@ -797,156 +723,52 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.status_label.setText(status)
             self.status_label.setStyleSheet("color: #666666;")  # 灰色
 
-    def update_indicator_cards(self, data: Dict[str, Any]):
-        """更新指标卡片
-
-        Args:
-            data: 市场情绪数据
-        """
-        try:
-            # 清除现有卡片
-            while self.indicator_cards.count():
-                item = self.indicator_cards.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-
-            # 创建新的指标卡片
-            indicators = [
-                ('sentiment_score', '情绪指数', '分'),
-                ('volume_ratio', '成交量比', '倍'),
-                ('advance_decline.advance', '上涨家数', '家'),
-                ('advance_decline.decline', '下跌家数', '家')
-            ]
-
-            for i, (key, name, unit) in enumerate(indicators):
-                card = QFrame()
-                card.setFrameStyle(QFrame.Box | QFrame.Raised)
-                card.setLineWidth(2)
-                card.setStyleSheet("""
-                    QFrame {
-                        background-color: #ffffff;
-                        border-radius: 10px;
-                        padding: 10px;
-                    }
-                """)
-
-                card_layout = QVBoxLayout(card)
-
-                # 指标名称
-                name_label = QLabel(name)
-                name_label.setStyleSheet("font-weight: bold; color: #333333;")
-                card_layout.addWidget(name_label)
-
-                # 获取指标值
-                value = data
-                for k in key.split('.'):
-                    value = value.get(k, 0)
-
-                # 指标值
-                value_label = QLabel(f"{value}{unit}")
-                value_label.setStyleSheet("font-size: 18px; color: #2196F3;")
-                card_layout.addWidget(value_label)
-
-                # 状态
-                status = self._get_status(name, value)
-                status_label = QLabel(status)
-                status_color = "#4CAF50" if "强" in status or "多" in status or "入" in status else "#FF5722"
-                status_label.setStyleSheet(f"color: {status_color};")
-                card_layout.addWidget(status_label)
-
-                self.indicator_cards.addWidget(card, i // 2, i % 2)
-
-        except Exception as e:
-            self.log_manager.log(f"更新指标卡片失败: {str(e)}", LogLevel.ERROR)
-
-    def create_market_heat_chart(self):
-        """创建市场热度图表"""
-        try:
-            self.heat_chart = QChart()
-            self.heat_chart.setTitle("市场热度")
-            self.heat_chart.setAnimationOptions(QChart.SeriesAnimations)
-
-            self.heat_series = QLineSeries()
-            self.heat_series.setName("热度")
-
-            self.axisX = QValueAxis()
-            self.axisX.setTitleText("时间")
-            self.axisX.setLabelFormat("%d")
-
-            self.axisY = QValueAxis()
-            self.axisY.setTitleText("热度")
-            self.axisY.setRange(0, 100)  # 修改为整数
-            self.axisY.setLabelFormat("%d")
-
-            self.heat_chart.addSeries(self.heat_series)
-            self.heat_chart.addAxis(self.axisX, Qt.AlignBottom)
-            self.heat_chart.addAxis(self.axisY, Qt.AlignLeft)
-
-            self.heat_series.attachAxis(self.axisX)
-            self.heat_series.attachAxis(self.axisY)
-
-            self.heat_chart_view = QChartView(self.heat_chart)
-            self.heat_chart_view.setRenderHint(QPainter.Antialiasing)
-
-            self.heat_progress = QProgressBar()
-            self.heat_progress.setRange(0, 100)  # 已经是整数
-            self.heat_progress.setValue(0)
-
-            self.log_manager.info("市场热度图表创建成功")
-        except Exception as e:
-            self.log_manager.error(f"创建市场热度图表失败: {str(e)}")
-
-    def update_market_heat_chart(self, data):
-        """更新市场热度图表"""
-        try:
-            if not data:
-                self.log_manager.warning("没有市场热度数据")
-                return
-
-            self.heat_series.clear()
-
-            # 添加数据点
-            for i, value in enumerate(data):
-                self.heat_series.append(i, int(value))  # 转换为整数
-
-            # 更新X轴范围
-            self.axisX.setRange(0, len(data) - 1)
-
-            # 更新Y轴范围
-            self.axisY.setRange(0, 100)  # 修改为整数
-
-            # 更新进度条
-            latest_value = int(data[-1])  # 转换为整数
-            self.heat_progress.setValue(latest_value)
-
-            self.log_manager.info(f"市场热度图表更新成功，当前热度: {latest_value}")
-        except Exception as e:
-            self.log_manager.error(f"更新市场热度图表失败: {str(e)}")
-
-    def validate_params(self) -> (bool, str):
-        """
-        校验情绪阈值参数，范围0-100
-        """
-        valid, msg = super().validate_params()
-        # 可扩展自定义校验
-        return valid, msg
-
     def on_analyze(self):
-        """分析前校验参数"""
+        """分析前校验参数并强制拉取最新数据"""
         valid, msg = self.validate_params()
         if not valid:
             self.set_status_message(msg, error=True)
             self.sentiment_threshold.setToolTip(msg)
             return
-        self.set_status_message("参数校验通过", error=False)
+        self.set_status_message("参数校验通过，正在分析...", error=False)
         self.sentiment_threshold.setToolTip("")
-        # 继续原有分析逻辑
-        super().on_analyze()
+        try:
+            self.log_manager.info("分析按钮被点击，强制拉取最新市场情绪数据")
+            if hasattr(self.data_manager, 'get_market_sentiment'):
+                data = self.data_manager.get_market_sentiment()
+                if data:
+                    self.update_sentiment_data(data)
+                    self.set_status_message("分析完成", error=False)
+                else:
+                    self.set_status_message("未获取到市场情绪数据", error=True)
+                    self.log_manager.warning("分析未获取到数据")
+            else:
+                self.set_status_message(
+                    "数据管理器未实现get_market_sentiment", error=True)
+                self.log_manager.error("数据管理器未实现get_market_sentiment")
+        except Exception as e:
+            self.log_manager.error(f"分析失败: {str(e)}")
+            self.set_status_message(f"分析失败: {str(e)}", error=True)
+            QMessageBox.critical(self, "分析错误", f"分析失败: {str(e)}")
 
     def show_template_manager_dialog(self):
-        # 复用StockScreenerWidget的模板管理对话框逻辑
-        QMessageBox.information(
-            self, "模板管理", "此处可集成批量模板管理UI，支持导入、导出、删除、重命名、应用等功能。")
+        """显示模板管理对话框，支持模板的增删改查，详细日志"""
+        try:
+            from components.template_manager import TemplateManagerDialog
+            dialog = TemplateManagerDialog(
+                template_dir="templates/market_sentiment",
+                log_manager=self.log_manager,
+                parent=self
+            )
+            if dialog.exec_() == QDialog.Accepted:
+                template = dialog.get_current_template()
+                if template:
+                    # TODO: 回填参数到主面板（如有参数结构）
+                    self.log_manager.info(f"已应用模板: {template.get('name', '')}")
+                    # self.apply_template_params(template.get('params', {}))
+        except Exception as e:
+            self.log_manager.error(f"模板管理对话框弹出失败: {str(e)}")
+            QMessageBox.critical(self, "模板管理错误", f"模板管理对话框弹出失败: {str(e)}")
 
     def _update_charts(self, data: dict):
         """
@@ -956,10 +778,57 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         """
         self._update_sentiment_chart(data)
 
-    def _update_tables(self, data: dict):
-        """
-        更新市场情绪相关表格（兼容入口）
-        Args:
-            data: 市场情绪数据
-        """
-        self._update_sentiment_table(data)
+    def update_auto_refresh_interval(self):
+        """更新自动刷新间隔"""
+        interval = self.auto_refresh_spin.value()
+        if hasattr(self, 'update_thread'):
+            self.update_thread.update_interval = interval
+        self.log_manager.info(f"自动刷新间隔已设置为{interval}秒")
+
+    def show_custom_indicator_dialog(self):
+        """显示自定义指标管理对话框，支持自定义指标的增删改查，详细日志"""
+        try:
+            from components.custom_indicator_manager import CustomIndicatorManagerDialog
+            dialog = CustomIndicatorManagerDialog(
+                indicator_file="config/custom_indicators.json",
+                log_manager=self.log_manager,
+                parent=self
+            )
+            dialog.exec_()
+        except Exception as e:
+            self.log_manager.error(f"自定义指标对话框弹出失败: {str(e)}")
+            QMessageBox.critical(self, "自定义指标错误", f"自定义指标对话框弹出失败: {str(e)}")
+
+    def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
+        button.setEnabled(False)
+        self.show_progress("分析中，请稍候...")
+
+        def task():
+            try:
+                result = analysis_func(*args, **kwargs)
+                return result
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"分析异常: {str(e)}")
+                return None
+
+        def on_done(future):
+            button.setEnabled(True)
+            self.hide_progress()
+            res = future.result()
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(task)
+        future.add_done_callback(
+            lambda f: QTimer.singleShot(0, lambda: on_done(f)))
+
+    def analyze_sentiment(self):
+        self._run_analysis_async(
+            self.analyze_button, self._analyze_sentiment_impl)
+
+    def export_data(self):
+        self._run_analysis_async(self.export_button, self._export_data_impl)
+
+    def refresh_data(self):
+        self._run_analysis_async(self.refresh_button, self._refresh_data_impl)
+    # ... 其余耗时分析按钮同理 ...

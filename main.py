@@ -1,6 +1,7 @@
 """
 交易系统主窗口模块
 """
+from utils.cache import Cache
 from components.stock_screener import StockScreenerWidget
 from gui.ui_components import StatusBar
 from gui.widgets.multi_chart_panel import MultiChartPanel
@@ -16,7 +17,6 @@ from utils.performance_monitor import PerformanceMonitor
 from gui.widgets.chart_widget import ChartWidget
 from gui.menu_bar import MainMenuBar
 from gui.tool_bar import MainToolBar
-from core.cache_manager import CacheManager
 from utils.config_manager import ConfigManager
 from core.data_manager import DataManager
 from utils.theme import ThemeManager, get_theme_manager, Theme
@@ -54,26 +54,26 @@ QWidget {
     background: #f7f9fa;
 }
 QGroupBox {
-    border: 1.5px solid #e0e0e0;
-    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
     margin-top: 10px;
     background: #ffffff;
     /* box-shadow: 0 2px 8px rgba(0,0,0,0.04); */
-    padding: 8px;
+    padding: 2px;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
-    left: 12px;
-    padding: 0 6px 0 6px;
+    left: 2px;
+    padding: 0 2px 0 2px;
     background: #eaf3fb;
-    border-radius: 6px;
+    border-radius: 2px;
     color: #1976d2;
     font-weight: bold;
 }
 QPushButton {
     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
     font-size: 13px;
-    border-radius: 8px;
+    border-radius: 2px;
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
     border: 1px solid #90caf9;
     padding: 6px 16px;
@@ -94,7 +94,7 @@ QLabel {
 QComboBox {
     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
     font-size: 12px;
-    border-radius: 6px;
+    border-radius: 2px;
     border: 1px solid #bdbdbd;
     background: #f5faff;
     padding: 2px 8px;
@@ -102,7 +102,7 @@ QComboBox {
 QLineEdit, QTextEdit, QPlainTextEdit {
     font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
     font-size: 12px;
-    border-radius: 6px;
+    border-radius: 2px;
     border: 1px solid #bdbdbd;
     background: #f5faff;
     padding: 4px 8px;
@@ -112,13 +112,13 @@ QScrollArea {
     background: transparent;
 }
 QTabWidget::pane {
-    border-radius: 8px;
+    border-radius: 2px;
     border: 1px solid #e0e0e0;
     background: #fff;
 }
 QTabBar::tab {
     background: #e3f2fd;
-    border-radius: 6px 6px 0 0;
+    border-radius: 2px 2px 0 0;
     padding: 6px 16px;
     margin-right: 2px;
 }
@@ -204,7 +204,7 @@ class TradingGUI(QMainWindow):
                 raise
 
             # 初始化缓存管理器
-            self.cache_manager = CacheManager(max_size=1000)  # 设置合适的缓存大小
+            self.cache_manager = Cache()
 
             # 初始化行业管理器
             self.industry_manager = IndustryManager()
@@ -1469,12 +1469,44 @@ class TradingGUI(QMainWindow):
         try:
             # 获取股票数据
             stock_data = item.data(Qt.UserRole)
-
-            # 创建并显示详情对话框
+            from core.data_manager import DataManager
+            dm = DataManager()
+            code = stock_data.get('code')
+            # 拆分market和code
+            if code and len(code) > 2:
+                market, stock_code = code[:2], code[2:]
+                info = dm.get_stock_info(f"{market}{stock_code}")
+            else:
+                info = {}
+            if info:
+                stock_data.update(info)
+            # 获取历史K线数据
+            kdata = dm.get_k_data(code, freq='D')
+            if not kdata.empty:
+                stock_data['history'] = [
+                    {
+                        'date': str(idx.date()),
+                        'open': row['open'],
+                        'high': row['high'],
+                        'low': row['low'],
+                        'close': row['close'],
+                        'volume': row['volume']
+                    }
+                    for idx, row in kdata.tail(20).iterrows()
+                ]
+            # 统一获取财务数据
+            finance_data = dm.get_finance_data(code)
+            if 'finance_history' in finance_data:
+                stock_data['finance_history'] = finance_data['finance_history']
+            if 'all_fields' in finance_data:
+                stock_data['all_fields'] = finance_data['all_fields']
+            # 最新一期主要字段
+            for key in ['revenue', 'net_profit', 'roe', 'assets', 'liabilities', 'profit_margin', 'debt_to_equity', 'operating_cash_flow', 'equity']:
+                if key in finance_data:
+                    stock_data[key] = finance_data[key]
             from gui.dialogs.stock_detail_dialog import StockDetailDialog
             dialog = StockDetailDialog(stock_data, self)
             dialog.exec_()
-
         except Exception as e:
             self.log_manager.error(f"查看股票详情失败: {str(e)}")
 
@@ -1934,33 +1966,6 @@ class TradingGUI(QMainWindow):
 
             self.right_tab = QTabWidget(self.right_panel)
             self.right_tab.currentChanged.connect(self.on_right_tab_changed)
-
-            # 市场情绪Tab（顺序提前）
-            try:
-                from components.market_sentiment import MarketSentimentWidget
-                self.market_sentiment_widget = MarketSentimentWidget(
-                    parent=self.right_tab,
-                    data_manager=self.data_manager,
-                    log_manager=self.log_manager
-                )
-                self.add_tab_with_toolbar(
-                    self.market_sentiment_widget, "市场情绪", help_text="市场情绪面板展示市场整体情绪、热点板块、涨跌分布等信息。")
-            except Exception as e:
-                self.log_manager.error(f"市场情绪Tab初始化失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
-
-            # 选股器Tab（顺序后移）
-            try:
-                self.stock_screener_widget = StockScreenerWidget(
-                    parent=self.right_tab,
-                    data_manager=self.data_manager,
-                    log_manager=self.log_manager
-                )
-                self.add_tab_with_toolbar(
-                    self.stock_screener_widget, "选股器", help_text="选股器用于根据多种条件筛选股票，支持基本面、技术面等多维度筛选。可手动刷新数据。")
-            except Exception as e:
-                self.log_manager.error(f"选股器Tab初始化失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
 
             # 多维分析Tab
             try:
@@ -3266,8 +3271,20 @@ class TradingGUI(QMainWindow):
             if not selected_items:
                 return
             # 只刷新图表，所有指标渲染由ChartWidget自动同步主窗口get_current_indicators
-            self.chart_widget.update_chart()
-            self.log_manager.info("指标参数已更新")
+            if hasattr(self, 'current_stock') and self.current_stock:
+                k_data = self.get_kdata(self.current_stock)
+                title = f"{self.current_stock}"
+                data = {
+                    'stock_code': self.current_stock,
+                    'kdata': k_data,
+                    'title': title,
+                    'period': self.current_period,
+                    'chart_type': self.current_chart_type
+                }
+                self.chart_widget.update_chart(data)
+            else:
+                self.chart_widget.update_chart({})
+                self.log_manager.info("指标参数已更新")
         except Exception as e:
             self.log_manager.error(f"更新指标参数失败: {str(e)}")
 

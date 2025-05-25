@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 from core.eastmoney_source import EastMoneyDataSource
 from core.sina_source import SinaDataSource
 from core.tonghuashun_source import TongHuaShunDataSource
-from core.cache_manager import CacheManager
 import numpy as np
+from utils.cache import Cache
 # import ptvsd
 
 
@@ -41,8 +41,7 @@ class DataManager:
                 self.sm = None
 
             # 初始化缓存管理器
-            self.cache_manager = CacheManager(
-                max_size=1000, default_ttl=300)  # 默认缓存5分钟
+            self.cache_manager = Cache()
 
             # 初始化数据源
             self._data_sources = {}
@@ -695,7 +694,7 @@ class DataManager:
 
             # 根据当前数据源获取数据
             if self._current_source == 'hikyuu':
-                stock = hku.Stock(code)
+                stock = sm[code]
                 info = {
                     'code': stock.code,
                     'name': stock.name,
@@ -910,78 +909,6 @@ class DataManager:
             self.log_manager.error(f"获取备用数据源失败: {str(e)}")
             return None
 
-    def get_market_sentiment(self) -> dict:
-        """
-        获取市场情绪数据，优先调用akshare数据源的get_market_sentiment方法，兜底处理所有字段，兼容UI展示。
-        Returns:
-            dict: 市场情绪数据，若数据源不支持则返回空dict
-        """
-        try:
-            data = self._data_sources.get('akshare')
-            if data and hasattr(data, 'get_market_sentiment'):
-                result = data.get_market_sentiment()
-                # 兜底处理，补全UI需要的字段
-                if not isinstance(result, dict):
-                    self.log_manager.warning("市场情绪数据返回类型异常，已自动修正为空dict")
-                    result = {'sentiment_index': None, 'advance_decline': {
-                        'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
-                if 'sentiment_index' not in result:
-                    self.log_manager.warning("市场情绪数据为空或无sentiment_index字段")
-                    result['sentiment_index'] = None
-                if 'advance_decline' not in result:
-                    result['advance_decline'] = {
-                        'advance': None, 'decline': None, 'unchanged': None}
-                if 'volume_ratio' not in result:
-                    result['volume_ratio'] = None
-                if 'timestamp' not in result:
-                    result['timestamp'] = datetime.now()
-                return result
-            else:
-                self.log_manager.warning("akshare数据源不可用，返回空市场情绪数据")
-                return {'sentiment_index': None, 'advance_decline': {'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
-        except Exception as e:
-            self.log_manager.error(f"获取市场情绪数据失败: {str(e)}")
-            return {'sentiment_index': None, 'advance_decline': {'advance': None, 'decline': None, 'unchanged': None}, 'volume_ratio': None, 'timestamp': datetime.now()}
-
-    def get_market_sentiment_history(self, days: int = 30, code: str = "000001", industry: str = None, concept: str = None, custom_stocks: list = None) -> list:
-        """
-        获取历史市场情绪数据，优先调用akshare数据源的get_market_sentiment_history方法，兜底处理所有字段，兼容UI展示。
-        Args:
-            days: 获取的天数，默认30天
-            code: 指数代码，默认上证指数
-            industry: 行业名称，优先生效
-            concept: 概念板块名称，优先生效
-            custom_stocks: 自选股代码列表，优先生效
-        Returns:
-            list: 历史市场情绪数据，每项为dict，包含date和sentiment_index等
-        """
-        try:
-            data_source = self._data_sources.get('akshare')
-            if data_source and hasattr(data_source, 'get_market_sentiment_history'):
-                data = data_source.get_market_sentiment_history(
-                    days=days, code=code, industry=industry, concept=concept, custom_stocks=custom_stocks)
-                # 兜底处理，确保为list且每项有sentiment_index
-                if not isinstance(data, list):
-                    self.log_manager.warning("历史市场情绪数据返回类型异常，已自动修正为空list")
-                    return []
-                for item in data:
-                    if not isinstance(item, dict):
-                        continue
-                    if 'sentiment_index' not in item:
-                        self.log_manager.warning(
-                            "历史市场情绪数据项无sentiment_index字段，已补None")
-                        item['sentiment_index'] = None
-                    if 'date' not in item:
-                        item['date'] = None
-                return data
-            else:
-                self.log_manager.warning("akshare数据源不可用，返回空历史市场情绪数据")
-                return []
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"获取历史市场情绪数据失败: {str(e)}")
-            return []
-
     def get_custom_stocks(self) -> list:
         """
         获取自选股代码列表（可根据实际存储方式调整）
@@ -1053,3 +980,113 @@ class DataManager:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"获取行情摘要失败: {str(e)}")
             return {}
+
+    # 主流财务字段映射，真实字段名→英文key，默认只展示这些
+    FINANCE_FIELD_MAPPING = {
+        "利润表_营业收入": "revenue",
+        "利润表_净利润": "net_profit",
+        "资产负债表_资产总计": "assets",
+        "资产负债表_负债合计": "liabilities",
+        "利润表_营业利润": "operating_profit",
+        "利润表_利润总额": "total_profit",
+        "利润表_归属于母公司所有者的净利润": "parent_net_profit",
+        "资产负债表_归属于母公司股东权益": "equity",
+        "资产负债表_所有者权益（或股东权益）合计": "total_equity",
+        "盈利能力_净资产收益率": "roe",
+        "资本结构_资产负债率": "debt_to_equity",
+        "现金流量表_经营活动产生的现金流量净额": "operating_cash_flow",
+        "成长能力_营业收入增长率": "revenue_growth_rate",
+        "成长能力_净利润增长率": "net_profit_growth_rate",
+    }
+
+    def get_finance_data(self, code: str) -> dict:
+        """
+        获取指定股票的财务数据，优先多期历史，兼容所有hikyuu版本，自动兜底。
+        返回格式：
+        {
+            "finance_history": [  # 多期历史，默认只包含主流字段
+                {"date": ..., "revenue": ..., ...},
+                ...
+            ],
+            "all_fields": [  # 所有可用字段，供前端动态勾选
+                {"field": "利润表_营业收入", "key": "revenue"},
+                ...
+            ]
+        }
+        """
+        result = {"finance_history": [], "all_fields": []}
+        try:
+            stock = self.sm[code]
+            # 优先多期历史
+            if hasattr(stock, 'get_history_finance'):
+                fields = self.sm.get_history_finance_all_fields()
+                field_names = [f[1] for f in fields]
+                field_idx_map = {f[1]: f[0] for f in fields}
+                result["all_fields"] = [
+                    {"field": name, "key": self.FINANCE_FIELD_MAPPING.get(name, name)} for name in field_names
+                ]
+                history_finance = stock.get_history_finance()
+                for row in history_finance:
+                    if not any(row):
+                        continue
+                    # 只提取主流字段，缺失自动填 None
+                    item = {}
+                    # 统一格式化日期
+                    item["date"] = self._convert_hikyuu_datetime(row[0])
+                    for cn, en in self.FINANCE_FIELD_MAPPING.items():
+                        idx = field_idx_map.get(cn)
+                        if idx is not None and idx < len(row):
+                            item[en] = row[idx]
+                        else:
+                            item[en] = None
+                    result["finance_history"].append(item)
+                # 如果批量API无数据，尝试用 get_history_finance_info(date) 兜底
+                if not result["finance_history"]:
+                    today = datetime.now()
+                    dates = []
+                    for y in range(today.year, today.year-5, -1):
+                        for m in [1231, 930, 630, 331]:
+                            dates.append(int(f"{y}{m:04d}0000"))
+                    for d in dates:
+                        try:
+                            info = stock.get_history_finance_info(d)
+                            if info:
+                                item = {
+                                    "date": self._convert_hikyuu_datetime(d)}
+                                for cn, en in self.FINANCE_FIELD_MAPPING.items():
+                                    idx = field_idx_map.get(cn)
+                                    if idx is not None and idx < len(info):
+                                        item[en] = info[idx]
+                                    else:
+                                        item[en] = None
+                                result["finance_history"].append(item)
+                        except Exception as e:
+                            if hasattr(self, 'log_manager') and self.log_manager:
+                                self.log_manager.warning(
+                                    f"[财务数据兜底API] get_history_finance_info 异常: {str(e)}")
+                            else:
+                                print(
+                                    f"[财务数据兜底API] get_history_finance_info 异常: {str(e)}")
+                            continue
+            # 兜底：如果还没有数据，可补充akshare等（预留接口）
+            if not result["finance_history"]:
+                try:
+                    from data.data_loader import fetch_fundamental_data_akshare
+                    ak_df = fetch_fundamental_data_akshare(code)
+                    if ak_df is not None and not ak_df.empty:
+                        ak_row = ak_df.iloc[0]
+                        item = {"date": ak_row.get("报告期", None)}
+                        for cn, en in self.FINANCE_FIELD_MAPPING.items():
+                            item[en] = ak_row.get(en, None)
+                        result["finance_history"].append(item)
+                except Exception:
+                    self.log_manager.warning(
+                        f"[财务数据兜底API] fetch_fundamental_data_akshare 异常")
+
+        except Exception as e:
+            self.log_manager.error(
+                f"获取财务数据失败: {code}, 数据长度: {len(result['finance_history'])}")
+
+        self.log_manager.info(
+            f"获取财务数据成功: {code}, 数据长度: {len(result['finance_history'])}")
+        return result

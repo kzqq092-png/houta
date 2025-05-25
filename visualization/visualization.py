@@ -24,6 +24,7 @@ from .common_visualization import CommonVisualization
 
 logger = logging.getLogger(__name__)
 
+
 class Visualization:
     def __init__(self):
         self.chart_utils = ChartUtils()
@@ -31,73 +32,44 @@ class Visualization:
         self.trade_analysis = TradeAnalysis()
         self.model_analysis = ModelAnalysis()
         self.risk_analysis = RiskAnalysis()
-        
-    def plot_technical_indicators(self, kdata, figure, canvas, 
-                                fast_ma=None, slow_ma=None):
+
+    def plot_technical_indicators(self, kdata, figure, canvas,
+                                  fast_ma=None, slow_ma=None):
         """绘制技术指标"""
         try:
             # 创建子图
-            fig, axes = self.chart_utils.create_subplots(4, 1, figsize=(12, 12))
-            
+            fig, axes = self.chart_utils.create_subplots(
+                4, 1, figsize=(12, 12))
+
             # 绘制K线图
             self.chart_utils.plot_kline(axes[0], kdata)
             if fast_ma and slow_ma:
                 self.indicators.plot_ma(axes[0], kdata, [fast_ma.n, slow_ma.n])
-            
+
             # 绘制成交量
             self.chart_utils.plot_volume(axes[1], kdata)
-            
+
             # 绘制MACD
             self.indicators.plot_macd(axes[2], kdata)
-            
+
             # 绘制RSI
             self.indicators.plot_rsi(axes[3], kdata)
-            
+
             # 设置坐标轴格式
             for ax in axes:
                 self.chart_utils.set_axis_format(ax)
                 self.chart_utils.add_legend(ax)
-            
+
             # 调整布局
             self.chart_utils.adjust_layout(fig)
-            
+
             # 更新画布
             canvas.draw()
-            
+
         except Exception as e:
             logger.error(f"绘制技术指标失败: {str(e)}")
             raise
-            
-    def plot_market_sentiment(self, kdata, figure, canvas):
-        """绘制市场情绪指标"""
-        try:
-            # 创建子图
-            fig, axes = self.chart_utils.create_subplots(3, 1, figsize=(12, 9))
-            
-            # 绘制K线图
-            self.chart_utils.plot_kline(axes[0], kdata)
-            
-            # 绘制OBV
-            self.indicators.plot_obv(axes[1], kdata)
-            
-            # 绘制CCI
-            self.indicators.plot_cci(axes[2], kdata)
-            
-            # 设置坐标轴格式
-            for ax in axes:
-                self.chart_utils.set_axis_format(ax)
-                self.chart_utils.add_legend(ax)
-            
-            # 调整布局
-            self.chart_utils.adjust_layout(fig)
-            
-            # 更新画布
-            canvas.draw()
-            
-        except Exception as e:
-            logger.error(f"绘制市场情绪指标失败: {str(e)}")
-            raise
-            
+
     def plot_sector_analysis(self, stock, figure, canvas):
         """绘制板块分析"""
         try:
@@ -105,85 +77,91 @@ class Visualization:
             sector = stock.get_sector()
             if not sector:
                 raise ValueError("无法获取板块数据")
-                
+
             # 获取板块内所有股票
             stocks = sector.get_stocks()
             if len(stocks) == 0:
                 raise ValueError("板块内没有股票")
-                
+
             # 计算板块平均收益率
             returns = []
             for s in stocks:
                 try:
                     kdata = s.get_kdata(Query(-30))
                     if len(kdata) > 0:
-                        returns.append((kdata[-1].close - kdata[0].close) / kdata[0].close)
+                        returns.append(
+                            (kdata[-1].close - kdata[0].close) / kdata[0].close)
                 except:
                     continue
-                    
+
             if not returns:
                 raise ValueError("无法计算板块收益率")
-                
+
             # 创建图表
             fig, ax = self.chart_utils.create_subplots()
-            
+
             # 绘制收益率直方图
             ax.hist(returns, bins=20, color='blue', alpha=0.5)
-            ax.axvline(x=np.mean(returns), color='red', linestyle='--', 
-                      label=f'平均收益率: {np.mean(returns):.2%}')
-            
+            ax.axvline(x=np.mean(returns), color='red', linestyle='--',
+                       label=f'平均收益率: {np.mean(returns):.2%}')
+
             # 设置坐标轴格式
             self.chart_utils.set_axis_format(ax)
             self.chart_utils.add_legend(ax)
-            
+
             # 调整布局
             self.chart_utils.adjust_layout(fig)
-            
+
             # 更新画布
             canvas.draw()
-            
+
         except Exception as e:
             logger.error(f"绘制板块分析失败: {str(e)}")
             raise
-            
+
     def plot_trade_analysis(self, tm, kdata, figure, canvas):
         """绘制交易分析"""
         try:
             # 创建子图
-            fig, axes = self.chart_utils.create_subplots(4, 1, figsize=(12, 12))
-            
+            fig, axes = self.chart_utils.create_subplots(
+                4, 1, figsize=(12, 12))
+
             # 绘制K线图和交易点
             self.chart_utils.plot_kline(axes[0], kdata)
             self.trade_analysis.plot_trade_points(axes[0], tm, kdata)
-            
+
             # 绘制收益曲线
-            self.trade_analysis.plot_profit_curve(axes[1], tm, kdata.get_datetime_list())
-            
+            self.trade_analysis.plot_profit_curve(
+                axes[1], tm, kdata.get_datetime_list())
+
             # 绘制回撤曲线
-            self.trade_analysis.plot_drawdown(axes[2], tm, kdata.get_datetime_list())
-            
+            self.trade_analysis.plot_drawdown(
+                axes[2], tm, kdata.get_datetime_list())
+
             # 绘制持仓曲线
-            self.trade_analysis.plot_position(axes[3], tm, kdata.get_datetime_list())
-            
+            self.trade_analysis.plot_position(
+                axes[3], tm, kdata.get_datetime_list())
+
             # 设置坐标轴格式
             for ax in axes:
                 self.chart_utils.set_axis_format(ax)
                 self.chart_utils.add_legend(ax)
-            
+
             # 调整布局
             self.chart_utils.adjust_layout(fig)
-            
+
             # 更新画布
             canvas.draw()
-            
+
         except Exception as e:
             logger.error(f"绘制交易分析失败: {str(e)}")
             raise
 
+
 def plot_feature_importance_comparison(feature_importances_list, model_names, feature_names, top_n=15, figsize=(12, 10)):
     """
     比较多个模型的特征重要性
-    
+
     参数:
         feature_importances_list: list，多个模型的特征重要性数组列表
         model_names: list，模型名称列表
@@ -193,54 +171,57 @@ def plot_feature_importance_comparison(feature_importances_list, model_names, fe
     """
     if len(feature_importances_list) != len(model_names):
         raise ValueError("特征重要性列表和模型名称列表长度不匹配")
-    
+
     # 创建特征重要性DataFrame
     dfs = []
     for i, importances in enumerate(feature_importances_list):
         if len(importances) != len(feature_names):
             raise ValueError(f"模型 {model_names[i]} 的特征重要性长度与特征名称不匹配")
-        
+
         df = pd.DataFrame({
             'Feature': feature_names,
             'Importance': importances,
             'Model': model_names[i]
         })
         dfs.append(df)
-    
+
     combined_df = pd.concat(dfs)
-    
+
     # 获取每个模型的前N个重要特征
     top_features = set()
     for model in model_names:
         model_df = combined_df[combined_df['Model'] == model]
-        top_model_features = model_df.nlargest(top_n, 'Importance')['Feature'].values
+        top_model_features = model_df.nlargest(
+            top_n, 'Importance')['Feature'].values
         top_features.update(top_model_features)
-    
+
     # 过滤数据只包含前N个特征
     filtered_df = combined_df[combined_df['Feature'].isin(top_features)]
-    
+
     # 创建图形
     plt.figure(figsize=figsize)
-    
+
     # 使用seaborn绘制条形图
-    ax = sns.barplot(x='Importance', y='Feature', hue='Model', data=filtered_df)
-    
+    ax = sns.barplot(x='Importance', y='Feature',
+                     hue='Model', data=filtered_df)
+
     # 设置标题和标签
     plt.title('Feature Importance Comparison Across Models', fontsize=15)
     plt.xlabel('Importance')
     plt.ylabel('Feature')
-    
+
     # 调整图例位置
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    
+
     plt.tight_layout()
-    
+
     return plt.gcf()
+
 
 def plot_signal_over_time(df, signal_col='signal', figsize=(15, 8)):
     """
     绘制信号随时间变化的热力图
-    
+
     参数:
         df: DataFrame，包含信号数据
         signal_col: str，信号列名
@@ -248,46 +229,49 @@ def plot_signal_over_time(df, signal_col='signal', figsize=(15, 8)):
     """
     if signal_col not in df.columns:
         raise ValueError(f"DataFrame中缺少信号列: {signal_col}")
-    
+
     # 确保索引是日期类型
     if not isinstance(df.index, pd.DatetimeIndex):
         raise ValueError("DataFrame的索引必须是日期类型")
-    
+
     # 创建包含年月信息的DataFrame
     signal_df = pd.DataFrame({
         'year': df.index.year,
         'month': df.index.month,
         'signal': df[signal_col]
     })
-    
+
     # 按年月分组统计信号数量
-    pivot_buy = signal_df[signal_df['signal'] == 1].groupby(['year', 'month']).size().unstack(fill_value=0)
-    pivot_sell = signal_df[signal_df['signal'] == -1].groupby(['year', 'month']).size().unstack(fill_value=0)
-    
+    pivot_buy = signal_df[signal_df['signal'] == 1].groupby(
+        ['year', 'month']).size().unstack(fill_value=0)
+    pivot_sell = signal_df[signal_df['signal'] == -
+                           1].groupby(['year', 'month']).size().unstack(fill_value=0)
+
     # 计算信号比例（买-卖）/总量
-    pivot_ratio = (pivot_buy - pivot_sell) / (pivot_buy + pivot_sell + 1e-10)  # 添加小数避免除零
-    
+    pivot_ratio = (pivot_buy - pivot_sell) / \
+        (pivot_buy + pivot_sell + 1e-10)  # 添加小数避免除零
+
     # 创建图形
     fig, ax = plt.subplots(figsize=figsize)
-    
+
     # 绘制热力图
     cmap = plt.cm.RdYlGn  # 红色表示多卖出，绿色表示多买入
     im = ax.imshow(pivot_ratio, cmap=cmap, aspect='auto', vmin=-1, vmax=1)
-    
+
     # 设置坐标轴标签
     ax.set_xticks(np.arange(len(pivot_ratio.columns)))
-    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
     ax.set_yticks(np.arange(len(pivot_ratio.index)))
     ax.set_yticklabels(pivot_ratio.index)
-    
+
     # 添加标题
     plt.title('Signal Distribution Over Time', fontsize=15)
-    
+
     # 添加颜色条
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label('Signal Ratio (Buy - Sell) / Total')
-    
+
     # 在每个单元格添加文本
     for i in range(len(pivot_ratio.index)):
         for j in range(len(pivot_ratio.columns)):
@@ -295,7 +279,7 @@ def plot_signal_over_time(df, signal_col='signal', figsize=(15, 8)):
             sell_count = pivot_sell.iloc[i, j]
             text = f"{buy_count}-{sell_count}"
             ax.text(j, i, text, ha="center", va="center", color="black")
-    
+
     plt.tight_layout()
-    
-    return plt.gcf() 
+
+    return plt.gcf()

@@ -9,7 +9,7 @@ import json
 import os
 import re
 from typing import Dict, Any, Optional, Union
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
+from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QPalette
 from PyQt5.QtWidgets import *
 from .config_manager import ConfigManager
@@ -204,14 +204,33 @@ class ThemeManager(QObject):
                 QScrollBar:vertical {{
                     border: none;
                     background: {colors.get('background', '#f7f9fa')};
-                    width: 10px;
+                    width: 5px;
                     margin: 0px;
                 }}
                 
                 QScrollBar::handle:vertical {{
                     background: {colors.get('border', '#e0e0e0')};
-                    min-height: 20px;
+                    min-height: 5px;
                     border-radius: 5px;
+                }}
+
+                QScrollBar:horizontal {{
+                    border: none;
+                    background: {colors.get('background', '#f7f9fa')};
+                    height: 5px;
+                    margin: 0px;
+                }}
+
+                QScrollBar::handle:horizontal {{
+                    background: {colors.get('border', '#e0e0e0')};
+                    min-width: 5px;
+                    border-radius: 5px;
+                }}
+
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                    background: none;
+                    border: none;
                 }}
             """
 

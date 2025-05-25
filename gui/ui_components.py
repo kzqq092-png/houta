@@ -138,7 +138,7 @@ class BaseAnalysisPanel(QWidget):
         self.main_layout.addWidget(self.params_group)
         # 控制按钮区域
         self.button_layout = QHBoxLayout()
-        self.analyze_button = QPushButton("分析")
+        self.analyze_button = QPushButton("市场情绪分析")
         self.export_button = QPushButton("导出结果")
         self.button_layout.addWidget(self.analyze_button)
         self.button_layout.addWidget(self.export_button)
@@ -153,11 +153,11 @@ class BaseAnalysisPanel(QWidget):
         try:
             self.log_manager.info("分析按钮被点击")
             # 子类实现具体分析逻辑
-            QMessageBox.information(self, "分析", "分析已启动，结果将在完成后自动展示。")
+            QMessageBox.information(self, "市场情绪分析", "市场情绪分析已启动，结果将在完成后自动展示。")
         except Exception as e:
-            self.log_manager.error(f"分析启动失败: {str(e)}")
-            QMessageBox.critical(self, "分析错误", f"分析启动失败: {str(e)}")
-            self.error_occurred.emit(f"分析启动失败: {str(e)}")
+            self.log_manager.error(f"市场情绪分析启动失败: {str(e)}")
+            QMessageBox.critical(self, "市场情绪分析错误", f"市场情绪分析启动失败: {str(e)}")
+            self.error_occurred.emit(f"市场情绪分析启动失败: {str(e)}")
 
     def on_export(self):
         """统一导出逻辑，子类可扩展"""
@@ -308,9 +308,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
     def init_ui(self):
         """初始化UI"""
         try:
-            # 创建主布局
-            layout = QVBoxLayout(self)
-
+            layout = self.main_layout  # 修复：直接用父类的主布局，避免重复设置布局
             # 创建策略选择区域
             strategy_group = QGroupBox("策略选择")
             strategy_layout = QVBoxLayout()

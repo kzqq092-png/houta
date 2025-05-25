@@ -21,11 +21,11 @@ from core.logger import LogManager
 from utils.theme import get_theme_manager, Theme
 from utils.config_manager import ConfigManager
 import traceback
-from core.cache_manager import CacheManager
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, calc_talib_indicator
+from indicators_algo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .async_data_processor import AsyncDataProcessor
 from .chart_renderer import ChartRenderer
+from utils.cache import Cache
 
 
 class ChartWidget(QWidget):
@@ -65,7 +65,7 @@ class ChartWidget(QWidget):
             self.active_indicators = []  # 当前激活的指标列表，初始化为空，仅通过外部信号设置
 
             # 初始化缓存管理器
-            self.cache_manager = CacheManager(max_size=100)  # 图表最多缓存100个
+            self.cache_manager = Cache()  # 图表最多缓存100个
 
             # 启用双缓冲
             # self.setAttribute(Qt.WA_PaintOnScreen, True)

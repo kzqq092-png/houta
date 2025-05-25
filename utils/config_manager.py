@@ -215,7 +215,11 @@ class ConfigManager(QObject):
                 return value
 
         except Exception as e:
-            logger.error(f"Error getting configuration value: {str(e)}")
+            if hasattr(self, 'logger') and self.logger:
+                self.logger.error(
+                    f"Error getting configuration value: {str(e)}")
+            else:
+                print(f"Error getting configuration value: {str(e)}")
             return default
 
     def set(self, key: str, value: Any) -> None:
@@ -243,7 +247,11 @@ class ConfigManager(QObject):
                 self.config_changed.emit(key, value)
 
         except Exception as e:
-            logger.error(f"Error setting configuration value: {str(e)}")
+            if hasattr(self, 'logger') and self.logger:
+                self.logger.error(
+                    f"Error setting configuration value: {str(e)}")
+            else:
+                print(f"Error setting configuration value: {str(e)}")
 
     def get_section(self, section: str) -> Dict[str, Any]:
         """Get configuration section

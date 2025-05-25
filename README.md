@@ -772,5 +772,34 @@ stop_loss = ComponentFactory.create_stoploss({
 - 进度条和表格配色更鲜明，提升可读性
 - 加载中时自动显示骨架屏动画，提升等待体验
 
----
-如需进一步扩展或优化，欢迎随时联系开发者！
+
+## 新增依赖
+
+本项目已将自定义缓存框架切换为 [diskcache](https://pypi.org/project/diskcache/)，支持高性能的本地内存+磁盘缓存。
+
+### 安装依赖
+
+```bash
+pip install diskcache aioredis redis
+```
+
+## 缓存机制说明
+
+- 所有原有 `DataCache` 的用法无需更改，底层已自动切换为 diskcache 实现。
+- 支持多进程/多线程安全、LRU、过期、自动清理。
+- 缓存目录可通过 `cache_dir` 参数自定义。
+- 过期时间单位为分钟（内部自动转换为秒）。
+
+### 典型用法
+
+```python
+from utils.cache import DataCache
+
+cache = DataCache(cache_dir=".cache/data", expire_minutes=30)
+cache.set("key", "value")
+value = cache.get("key")
+cache.remove("key")
+cache.clear()
+```
+
+更多高级用法请参考 [diskcache 官方文档](http://www.grantjenks.com/docs/diskcache/)。

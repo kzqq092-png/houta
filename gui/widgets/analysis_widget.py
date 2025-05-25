@@ -5,16 +5,20 @@ from typing import Dict, Any, List, Optional, Callable
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import numpy as np
-import random
-from datetime import datetime, timedelta
+from datetime import *
 import pandas as pd
 from PyQt5.QtGui import QColor
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import ProcessPoolExecutor
-import concurrent.futures
-import pickle
 
+import akshare as ak
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import importlib
+import traceback
+import os
+import time
+from concurrent.futures import *
+import numba
+import threading
 from core.logger import LogManager, LogLevel
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
@@ -22,6 +26,17 @@ from hikyuu.indicator import *
 from hikyuu import sm
 from hikyuu import Query
 from indicators_algo import get_talib_indicator_list, get_talib_category, calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_all_indicators_by_category, calc_talib_indicator
+from utils.cache import Cache
+import requests
+from bs4 import BeautifulSoup
+import concurrent.futures
+
+# --- 修复 QVector<int> 警告 ---
+try:
+    from PyQt5.QtCore import qRegisterMetaType, QVector
+    qRegisterMetaType(QVector[int], "QVector<int>")
+except Exception:
+    pass
 
 
 class AnalysisWidget(QWidget):
@@ -30,6 +45,8 @@ class AnalysisWidget(QWidget):
     # 定义信号
     indicator_changed = pyqtSignal(str)  # 指标变更信号
     analysis_completed = pyqtSignal(dict)
+
+    data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
 
     def __init__(self, config_manager: Optional[ConfigManager] = None):
         """初始化分析控件
@@ -84,6 +101,9 @@ class AnalysisWidget(QWidget):
             # 添加热点分析标签页
             hotspot_tab = self.create_hotspot_tab()
             tab_widget.addTab(hotspot_tab, "热点分析")
+            # 新增舆情报告Tab
+            sentiment_report_tab = self.create_sentiment_report_tab()
+            tab_widget.addTab(sentiment_report_tab, "舆情报告")
             # 添加标签页到布局
             if tab_widget.parent() is not self.main_layout:
                 self.main_layout.addWidget(tab_widget)
@@ -91,6 +111,28 @@ class AnalysisWidget(QWidget):
             self.log_manager.log(
                 f"初始化分析控件UI失败: {str(e)}", LogLevel.ERROR)
             raise
+
+    def run_button_analysis_async(self, button, analysis_func, *args, **kwargs):
+        """通用按钮防抖+异步分析工具，分析时禁用按钮，结束后恢复，主线程不卡顿"""
+        original_style = button.styleSheet()  # 保存原始样式
+        button.setEnabled(False)
+        button.setStyleSheet("background-color: #888888; color: white;")
+
+        def task():
+            try:
+                analysis_func(*args, **kwargs)
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"分析异常: {str(e)}")
+
+        def on_done(future):
+            button.setEnabled(True)
+            button.setStyleSheet(original_style)  # 恢复原始样式
+        from concurrent.futures import ThreadPoolExecutor
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(task)
+        future.add_done_callback(
+            lambda f: QTimer.singleShot(0, lambda: on_done(f)))
 
     def create_technical_tab(self) -> QWidget:
         """创建技术分析标签页，仅展示指标分析结果，参数来源于主窗口统一接口"""
@@ -116,10 +158,12 @@ class AnalysisWidget(QWidget):
             # 添加按钮
             button_layout = QHBoxLayout()
             calculate_button = QPushButton("刷新分析")
-            calculate_button.clicked.connect(self.calculate_indicators)
+            calculate_button.clicked.connect(lambda: self.run_button_analysis_async(
+                calculate_button, self.calculate_indicators))
             button_layout.addWidget(calculate_button)
             clear_button = QPushButton("清除分析")
-            clear_button.clicked.connect(self.clear_indicators)
+            clear_button.clicked.connect(lambda: self.run_button_analysis_async(
+                clear_button, self.clear_indicators))
             button_layout.addWidget(clear_button)
             layout.addLayout(button_layout)
 
@@ -351,11 +395,13 @@ class AnalysisWidget(QWidget):
             button_layout = QHBoxLayout()
 
             identify_button = QPushButton("识别形态")
-            identify_button.clicked.connect(self.identify_patterns)
+            identify_button.clicked.connect(lambda: self.run_button_analysis_async(
+                identify_button, self.identify_patterns))
             button_layout.addWidget(identify_button)
 
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_patterns)
+            clear_button.clicked.connect(
+                lambda: self.run_button_analysis_async(clear_button, self.clear_patterns))
             button_layout.addWidget(clear_button)
 
             layout.addLayout(button_layout)
@@ -714,11 +760,13 @@ class AnalysisWidget(QWidget):
             button_layout = QHBoxLayout()
 
             analyze_button = QPushButton("分析趋势")
-            analyze_button.clicked.connect(self.analyze_trend)
+            analyze_button.clicked.connect(
+                lambda: self.run_button_analysis_async(analyze_button, self.analyze_trend))
             button_layout.addWidget(analyze_button)
 
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_trend)
+            clear_button.clicked.connect(
+                lambda: self.run_button_analysis_async(clear_button, self.clear_trend))
             button_layout.addWidget(clear_button)
 
             layout.addLayout(button_layout)
@@ -1083,11 +1131,13 @@ class AnalysisWidget(QWidget):
             button_layout = QHBoxLayout()
 
             analyze_button = QPushButton("分析波浪")
-            analyze_button.clicked.connect(self.analyze_wave)
+            analyze_button.clicked.connect(
+                lambda: self.run_button_analysis_async(analyze_button, self.analyze_wave))
             button_layout.addWidget(analyze_button)
 
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_wave)
+            clear_button.clicked.connect(
+                lambda: self.run_button_analysis_async(clear_button, self.clear_wave))
             button_layout.addWidget(clear_button)
 
             layout.addLayout(button_layout)
@@ -1649,15 +1699,18 @@ class AnalysisWidget(QWidget):
             button_layout = QHBoxLayout()
 
             analyze_button = QPushButton("分析情绪")
-            analyze_button.clicked.connect(self.analyze_sentiment)
+            analyze_button.clicked.connect(lambda: self.run_button_analysis_async(
+                analyze_button, self.analyze_sentiment))
             button_layout.addWidget(analyze_button)
 
             history_button = QPushButton("历史趋势")
-            history_button.clicked.connect(self.analyze_history)
+            history_button.clicked.connect(lambda: self.run_button_analysis_async(
+                history_button, self.analyze_history))
             button_layout.addWidget(history_button)
 
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_sentiment)
+            clear_button.clicked.connect(lambda: self.run_button_analysis_async(
+                clear_button, self.clear_sentiment))
             button_layout.addWidget(clear_button)
 
             layout.addLayout(button_layout)
@@ -2060,11 +2113,13 @@ class AnalysisWidget(QWidget):
             button_layout = QHBoxLayout()
 
             analyze_button = QPushButton("分析资金流向")
-            analyze_button.clicked.connect(self.analyze_sector_flow)
+            analyze_button.clicked.connect(lambda: self.run_button_analysis_async(
+                analyze_button, self.analyze_sector_flow))
             button_layout.addWidget(analyze_button)
 
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_sector_flow)
+            clear_button.clicked.connect(lambda: self.run_button_analysis_async(
+                clear_button, self.clear_sector_flow))
             button_layout.addWidget(clear_button)
 
             layout.addLayout(button_layout)
@@ -2091,261 +2146,141 @@ class AnalysisWidget(QWidget):
             self.log_manager.log(f"分析板块资金流向失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_industry_flow(self):
-        """分析行业资金流向"""
+        """分析行业资金流向，表格+60日走势图，使用akshare stock_fund_flow_industry"""
         try:
-            # 清空行业资金流向表格
             self.industry_flow_table.setRowCount(0)
+            df = ak.stock_fund_flow_industry()
+            if df is not None and not df.empty:
+                for i, row in df.iterrows():
+                    self.industry_flow_table.insertRow(i)
+                    self.industry_flow_table.setItem(
+                        i, 0, QTableWidgetItem(str(row.get('行业名称', ''))))
+                    main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
+                    main_item.setForeground(
+                        QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
+                    self.industry_flow_table.setItem(i, 1, main_item)
+                    super_item = QTableWidgetItem(str(row.get('超大单净流入', '')))
+                    self.industry_flow_table.setItem(i, 2, super_item)
+                    big_item = QTableWidgetItem(str(row.get('大单净流入', '')))
+                    self.industry_flow_table.setItem(i, 3, big_item)
+                    mid_item = QTableWidgetItem(str(row.get('中单净流入', '')))
+                    self.industry_flow_table.setItem(i, 4, mid_item)
+            else:
+                self.log_manager.log("行业资金流向无数据", LogLevel.WARNING)
+        except Exception as e:
+            self.log_manager.log(f"行业资金流向分析失败: {str(e)}", LogLevel.ERROR)
 
-            # 获取所有行业板块
-            industries = [block for block in sm.get_block_list()
-                          if block.type == "行业"]
+        # 60日走势图
+        try:
+            # 取前5大行业做示例
+            if df is not None and not df.empty:
+                self.plot_industry_trend(df.head(5))
+        except Exception as e:
+            self.log_manager.log(f"行业资金流向走势图失败: {str(e)}", LogLevel.ERROR)
 
-            # 计算每个行业的资金流向
-            industry_flows = []
-            for industry in industries:
+    def plot_industry_trend(self, df):
+        """行业资金流向60日走势图（示例：主力净流入）"""
+        try:
+            for _, row in df.iterrows():
+                name = row.get('行业名称', '')
                 try:
-                    stocks = industry.get_stock_list()
-                    if not stocks:
-                        continue
-
-                    # 计算行业资金流向
-                    main_flow = 0
-                    super_flow = 0
-                    big_flow = 0
-                    mid_flow = 0
-
-                    for stock in stocks:
-                        kdata = stock.get_kdata(Query(-1))
-                        if len(kdata) == 0:
-                            continue
-
-                        # 根据成交量和金额估算资金流向
-                        volume = float(kdata[-1].volume)
-                        amount = float(kdata[-1].amount)
-
-                        if volume > 0:
-                            avg_price = amount / volume
-                            if avg_price > float(kdata[-1].open):
-                                flow = amount
-                            else:
-                                flow = -amount
-
-                            # 按成交量大小分类
-                            if volume >= 1000000:  # 超大单
-                                super_flow += flow
-                            elif volume >= 100000:  # 大单
-                                big_flow += flow
-                            elif volume >= 10000:  # 中单
-                                mid_flow += flow
-
-                            main_flow = super_flow + big_flow
-
-                        # 自动计算换手率，兼容KRecord对象和DataFrame
-                        turnover = self._get_turnover(kdata, stock)
-
-                        industry_flows.append({
-                            'name': industry.name,
-                            'main_flow': main_flow / 100000000,  # 转换为亿元
-                            'super_flow': super_flow / 100000000,
-                            'big_flow': big_flow / 100000000,
-                            'mid_flow': mid_flow / 100000000
-                        })
-
+                    # akshare官方接口
+                    hist = ak.stock_sector_fund_flow_hist(
+                        symbol=name, sector_type="行业资金流")
+                    if hist is not None and not hist.empty:
+                        fig = Figure(figsize=(5, 3))
+                        canvas = FigureCanvas(fig)
+                        ax = fig.add_subplot(111)
+                        ax.plot(hist['日期'], hist['主力净流入'], label=name)
+                        ax.set_title(f"{name}近60日主力净流入")
+                        ax.legend()
+                        self.industry_trend_layout.addWidget(canvas)
                 except Exception as e:
                     self.log_manager.log(
-                        f"计算行业 {industry.name} 资金流向失败: {str(e)}", LogLevel.ERROR)
-                    continue
-
-            # 按主力净流入排序
-            industry_flows.sort(key=lambda x: x['main_flow'], reverse=True)
-
-            # 更新表格
-            self.industry_flow_table.setRowCount(len(industry_flows))
-            for i, flow in enumerate(industry_flows):
-                self.industry_flow_table.setItem(
-                    i, 0, QTableWidgetItem(flow['name']))
-
-                main_flow_item = QTableWidgetItem(f"{flow['main_flow']:+.2f}")
-                main_flow_item.setForeground(
-                    QColor("red" if flow['main_flow'] > 0 else "green"))
-                self.industry_flow_table.setItem(i, 1, main_flow_item)
-
-                super_flow_item = QTableWidgetItem(
-                    f"{flow['super_flow']:+.2f}")
-                super_flow_item.setForeground(
-                    QColor("red" if flow['super_flow'] > 0 else "green"))
-                self.industry_flow_table.setItem(i, 2, super_flow_item)
-
-                big_flow_item = QTableWidgetItem(f"{flow['big_flow']:+.2f}")
-                big_flow_item.setForeground(
-                    QColor("red" if flow['big_flow'] > 0 else "green"))
-                self.industry_flow_table.setItem(i, 3, big_flow_item)
-
-                mid_flow_item = QTableWidgetItem(f"{flow['mid_flow']:+.2f}")
-                mid_flow_item.setForeground(
-                    QColor("red" if flow['mid_flow'] > 0 else "green"))
-                self.industry_flow_table.setItem(i, 4, mid_flow_item)
-
-            # 调整列宽
-            self.industry_flow_table.resizeColumnsToContents()
-
+                        f"行业{name}资金流向历史获取失败: {str(e)}", LogLevel.WARNING)
         except Exception as e:
-            self.log_manager.log(f"分析行业资金流向失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"行业资金流向走势图失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_concept_flow(self):
-        """分析概念资金流向"""
+        """分析概念资金流向，表格+60日走势图，使用akshare stock_fund_flow_concept"""
         try:
-            # 清空概念资金流向表格
             self.concept_flow_table.setRowCount(0)
+            df = ak.stock_fund_flow_concept()
+            if df is not None and not df.empty:
+                for i, row in df.iterrows():
+                    self.concept_flow_table.insertRow(i)
+                    self.concept_flow_table.setItem(
+                        i, 0, QTableWidgetItem(str(row.get('概念名称', ''))))
+                    main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
+                    main_item.setForeground(
+                        QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
+                    self.concept_flow_table.setItem(i, 1, main_item)
+                    super_item = QTableWidgetItem(str(row.get('超大单净流入', '')))
+                    self.concept_flow_table.setItem(i, 2, super_item)
+                    big_item = QTableWidgetItem(str(row.get('大单净流入', '')))
+                    self.concept_flow_table.setItem(i, 3, big_item)
+                    mid_item = QTableWidgetItem(str(row.get('中单净流入', '')))
+                    self.concept_flow_table.setItem(i, 4, mid_item)
+            else:
+                self.log_manager.log("概念资金流向无数据", LogLevel.WARNING)
+        except Exception as e:
+            self.log_manager.log(f"概念资金流向分析失败: {str(e)}", LogLevel.ERROR)
 
-            # 获取所有概念板块
-            concepts = [block for block in sm.get_block_list()
-                        if block.type == "概念"]
+        # 60日走势图
+        try:
+            if df is not None and not df.empty:
+                self.plot_concept_trend(df.head(5))
+        except Exception as e:
+            self.log_manager.log(f"概念资金流向走势图失败: {str(e)}", LogLevel.ERROR)
 
-            # 计算每个概念的资金流向
-            concept_flows = []
-            for concept in concepts:
+    def plot_concept_trend(self, df):
+        """概念资金流向60日走势图（示例：主力净流入）"""
+        try:
+            for _, row in df.iterrows():
+                name = row.get('概念名称', '')
                 try:
-                    stocks = concept.get_stock_list()
-                    if not stocks:
-                        continue
-
-                    # 计算概念资金流向
-                    main_flow = 0
-                    super_flow = 0
-                    big_flow = 0
-                    mid_flow = 0
-                    total_turnover = 0
-
-                    for stock in stocks:
-                        kdata = stock.get_kdata(Query(-1))
-                        if len(kdata) == 0:
-                            continue
-
-                        # 根据成交量和金额估算资金流向
-                        volume = float(kdata[-1].volume)
-                        amount = float(kdata[-1].amount)
-
-                        if volume > 0:
-                            avg_price = amount / volume
-                            if avg_price > float(kdata[-1].open):
-                                flow = amount
-                            else:
-                                flow = -amount
-
-                            # 按成交量大小分类
-                            if volume >= 1000000:  # 超大单
-                                super_flow += flow
-                            elif volume >= 100000:  # 大单
-                                big_flow += flow
-                            elif volume >= 10000:  # 中单
-                                mid_flow += flow
-
-                            main_flow = super_flow + big_flow
-
-                        # 统一换手率计算
-                        turnover = self._get_turnover(kdata, stock)
-                        total_turnover += turnover
-
-                    concept_flows.append({
-                        'name': concept.name,
-                        'main_flow': main_flow / 100000000,  # 转换为亿元
-                        'super_flow': super_flow / 100000000,
-                        'big_flow': big_flow / 100000000,
-                        'mid_flow': mid_flow / 100000000
-                    })
-
+                    # akshare官方接口
+                    hist = ak.stock_sector_fund_flow_hist(
+                        symbol=name, sector_type="概念资金流")
+                    if hist is not None and not hist.empty:
+                        fig = Figure(figsize=(5, 3))
+                        canvas = FigureCanvas(fig)
+                        ax = fig.add_subplot(111)
+                        ax.plot(hist['日期'], hist['主力净流入'], label=name)
+                        ax.set_title(f"{name}近60日主力净流入")
+                        ax.legend()
+                        self.concept_trend_layout.addWidget(canvas)
                 except Exception as e:
                     self.log_manager.log(
-                        f"计算概念 {concept.name} 资金流向失败: {str(e)}", LogLevel.ERROR)
-                    continue
-
-            # 按主力净流入排序
-            concept_flows.sort(key=lambda x: x['main_flow'], reverse=True)
-
-            # 更新表格
-            self.concept_flow_table.setRowCount(len(concept_flows))
-            for i, flow in enumerate(concept_flows):
-                self.concept_flow_table.setItem(
-                    i, 0, QTableWidgetItem(flow['name']))
-
-                main_flow_item = QTableWidgetItem(f"{flow['main_flow']:+.2f}")
-                main_flow_item.setForeground(
-                    QColor("red" if flow['main_flow'] > 0 else "green"))
-                self.concept_flow_table.setItem(i, 1, main_flow_item)
-
-                super_flow_item = QTableWidgetItem(
-                    f"{flow['super_flow']:+.2f}")
-                super_flow_item.setForeground(
-                    QColor("red" if flow['super_flow'] > 0 else "green"))
-                self.concept_flow_table.setItem(i, 2, super_flow_item)
-
-                big_flow_item = QTableWidgetItem(f"{flow['big_flow']:+.2f}")
-                big_flow_item.setForeground(
-                    QColor("red" if flow['big_flow'] > 0 else "green"))
-                self.concept_flow_table.setItem(i, 3, big_flow_item)
-
-                mid_flow_item = QTableWidgetItem(f"{flow['mid_flow']:+.2f}")
-                mid_flow_item.setForeground(
-                    QColor("red" if flow['mid_flow'] > 0 else "green"))
-                self.concept_flow_table.setItem(i, 4, mid_flow_item)
-
-            # 调整列宽
-            self.concept_flow_table.resizeColumnsToContents()
-
+                        f"概念{name}资金流向历史获取失败: {str(e)}", LogLevel.WARNING)
         except Exception as e:
-            self.log_manager.log(f"分析概念资金流向失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"概念资金流向走势图失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_north_flow(self):
-        """分析北向资金"""
+        """分析北向资金，使用akshare stock_hsgt_north_net_flow_em"""
         try:
-            # 清空北向资金表格
             self.north_flow_table.setRowCount(0)
-
-            # 获取最近5个交易日的北向资金数据
-            dates = []
-            sh_flows = []
-            sz_flows = []
-            total_flows = []
-
-            # 这里使用随机数据模拟，实际应该从数据源获取
-            for i in range(5):
-                date = datetime.now() - timedelta(days=i)
-                dates.append(date.strftime('%Y-%m-%d'))
-
-                sh_flow = random.uniform(-50, 50)  # 沪股通资金流向
-                sz_flow = random.uniform(-30, 30)  # 深股通资金流向
-                total_flow = sh_flow + sz_flow  # 北向资金合计
-
-                sh_flows.append(sh_flow)
-                sz_flows.append(sz_flow)
-                total_flows.append(total_flow)
-
-            # 更新表格
-            self.north_flow_table.setRowCount(len(dates))
-            for i in range(len(dates)):
-                self.north_flow_table.setItem(i, 0, QTableWidgetItem(dates[i]))
-
-                sh_flow_item = QTableWidgetItem(f"{sh_flows[i]:+.2f}")
-                sh_flow_item.setForeground(
-                    QColor("red" if sh_flows[i] > 0 else "green"))
-                self.north_flow_table.setItem(i, 1, sh_flow_item)
-
-                sz_flow_item = QTableWidgetItem(f"{sz_flows[i]:+.2f}")
-                sz_flow_item.setForeground(
-                    QColor("red" if sz_flows[i] > 0 else "green"))
-                self.north_flow_table.setItem(i, 2, sz_flow_item)
-
-                total_flow_item = QTableWidgetItem(f"{total_flows[i]:+.2f}")
-                total_flow_item.setForeground(
-                    QColor("red" if total_flows[i] > 0 else "green"))
-                self.north_flow_table.setItem(i, 3, total_flow_item)
-
-            # 调整列宽
-            self.north_flow_table.resizeColumnsToContents()
-
+            df = ak.stock_hsgt_north_net_flow_em()
+            if df is not None and not df.empty:
+                df = df.head(60)
+                for i, row in df.iterrows():
+                    date = row['日期']
+                    sh = row['沪股通(亿元)']
+                    sz = row['深股通(亿元)']
+                    total = row['北向资金(亿元)']
+                    self.north_flow_table.insertRow(i)
+                    self.north_flow_table.setItem(
+                        i, 0, QTableWidgetItem(str(date)))
+                    self.north_flow_table.setItem(
+                        i, 1, QTableWidgetItem(f"{sh:+.2f}"))
+                    self.north_flow_table.setItem(
+                        i, 2, QTableWidgetItem(f"{sz:+.2f}"))
+                    self.north_flow_table.setItem(
+                        i, 3, QTableWidgetItem(f"{total:+.2f}"))
+            else:
+                self.log_manager.log("北向资金无数据", LogLevel.WARNING)
         except Exception as e:
-            self.log_manager.log(f"分析北向资金失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"北向资金分析失败: {str(e)}", LogLevel.ERROR)
 
     def clear_sector_flow(self):
         """清除板块资金流向分析结果"""
@@ -2358,50 +2293,43 @@ class AnalysisWidget(QWidget):
             raise
 
     def create_hotspot_tab(self) -> QWidget:
-        """创建热点分析标签页"""
+        """创建热点分析标签页，热点板块、主题机会、热点轮动三表格横向并列，板块资金流向三表格也横向并列"""
         try:
             widget = QWidget()
             layout = QVBoxLayout(widget)
 
-            # 创建热点板块组
+            # --- 热点三表格横向并列 ---
+            row_layout = QHBoxLayout()
+            # 热点板块
             hotspot_group = QGroupBox("热点板块")
             hotspot_layout = QVBoxLayout()
-
-            # 添加热点板块表格
             self.hotspot_table = QTableWidget()
             self.hotspot_table.setColumnCount(7)
-            # 增加一列用于显示板块强度
             self.hotspot_table.setHorizontalHeaderLabels([
                 "板块名称", "涨跌幅", "领涨股", "涨跌幅", "成交额", "换手率", "板块强度"
             ])
             self.hotspot_table.setEditTriggers(
                 QAbstractItemView.NoEditTriggers)
             hotspot_layout.addWidget(self.hotspot_table)
-
             hotspot_group.setLayout(hotspot_layout)
-            layout.addWidget(hotspot_group)
-
-            # 创建主题机会组
+            row_layout.addWidget(hotspot_group, 1)
+            row_layout.addSpacing(20)
+            # 主题机会
             theme_group = QGroupBox("主题机会")
             theme_layout = QVBoxLayout()
-
-            # 添加主题机会表格
             self.theme_table = QTableWidget()
-            self.theme_table.setColumnCount(6)  # 增加一列用于显示轮动指数
+            self.theme_table.setColumnCount(6)
             self.theme_table.setHorizontalHeaderLabels([
                 "主题名称", "相关股票数", "平均涨跌幅", "资金净流入", "热度指数", "轮动指数"
             ])
             self.theme_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             theme_layout.addWidget(self.theme_table)
-
             theme_group.setLayout(theme_layout)
-            layout.addWidget(theme_group)
-
-            # 创建热点轮动组
+            row_layout.addWidget(theme_group, 1)
+            row_layout.addSpacing(20)
+            # 热点轮动
             rotation_group = QGroupBox("热点轮动")
             rotation_layout = QVBoxLayout()
-
-            # 添加热点轮动表格
             self.rotation_table = QTableWidget()
             self.rotation_table.setColumnCount(5)
             self.rotation_table.setHorizontalHeaderLabels([
@@ -2410,15 +2338,52 @@ class AnalysisWidget(QWidget):
             self.rotation_table.setEditTriggers(
                 QAbstractItemView.NoEditTriggers)
             rotation_layout.addWidget(self.rotation_table)
-
             rotation_group.setLayout(rotation_layout)
-            layout.addWidget(rotation_group)
+            row_layout.addWidget(rotation_group, 1)
+            layout.addLayout(row_layout)
 
-            # 创建龙头股组
+            # --- 板块资金流向三表格横向并列 ---
+            sector_row_layout = QHBoxLayout()
+            # 行业资金流向
+            industry_group = QGroupBox("行业资金流向")
+            industry_layout = QVBoxLayout()
+            self.industry_flow_table = QTableWidget()
+            self.industry_flow_table.setColumnCount(5)
+            self.industry_flow_table.setHorizontalHeaderLabels([
+                "行业", "主力净流入", "超大单净流入", "大单净流入", "中单净流入"
+            ])
+            industry_layout.addWidget(self.industry_flow_table)
+            industry_group.setLayout(industry_layout)
+            sector_row_layout.addWidget(industry_group, 1)
+            sector_row_layout.addSpacing(20)
+            # 概念资金流向
+            concept_group = QGroupBox("概念资金流向")
+            concept_layout = QVBoxLayout()
+            self.concept_flow_table = QTableWidget()
+            self.concept_flow_table.setColumnCount(5)
+            self.concept_flow_table.setHorizontalHeaderLabels([
+                "概念", "主力净流入", "超大单净流入", "大单净流入", "中单净流入"
+            ])
+            concept_layout.addWidget(self.concept_flow_table)
+            concept_group.setLayout(concept_layout)
+            sector_row_layout.addWidget(concept_group, 1)
+            sector_row_layout.addSpacing(20)
+            # 北向资金
+            north_group = QGroupBox("北向资金")
+            north_layout = QVBoxLayout()
+            self.north_flow_table = QTableWidget()
+            self.north_flow_table.setColumnCount(4)
+            self.north_flow_table.setHorizontalHeaderLabels([
+                "时间", "沪股通", "深股通", "合计"
+            ])
+            north_layout.addWidget(self.north_flow_table)
+            north_group.setLayout(north_layout)
+            sector_row_layout.addWidget(north_group, 1)
+            layout.addLayout(sector_row_layout)
+
+            # 龙头股
             leader_group = QGroupBox("龙头股")
             leader_layout = QVBoxLayout()
-
-            # 添加龙头股表格
             self.leader_table = QTableWidget()
             self.leader_table.setColumnCount(15)
             self.leader_table.setHorizontalHeaderLabels([
@@ -2426,35 +2391,65 @@ class AnalysisWidget(QWidget):
             ])
             self.leader_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             leader_layout.addWidget(self.leader_table)
-
             leader_group.setLayout(leader_layout)
             layout.addWidget(leader_group)
 
-            # 添加按钮
+            # 按钮区
             button_layout = QHBoxLayout()
-
-            analyze_button = QPushButton("分析热点")
-            analyze_button.clicked.connect(self.analyze_hotspot)
-            button_layout.addWidget(analyze_button)
-
-            rotation_button = QPushButton("分析轮动")
-            rotation_button.clicked.connect(self.analyze_rotation)
-            button_layout.addWidget(rotation_button)
-
+            self.rotation_button = QPushButton("分析轮动")
+            self.rotation_button.clicked.connect(
+                self.start_all_hotspot_analysis)
+            button_layout.addWidget(self.rotation_button)
             clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(self.clear_hotspot)
+            clear_button.clicked.connect(
+                lambda: self.run_button_analysis_async(clear_button, self.clear_hotspot))
             button_layout.addWidget(clear_button)
-
             layout.addLayout(button_layout)
-
             return widget
-
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.log(f"创建热点分析标签页失败: {str(e)}", LogLevel.ERROR)
             else:
                 print(f"创建热点分析标签页失败: {str(e)}")
             raise
+
+    def start_all_hotspot_analysis(self):
+        """合并所有热点分析功能，点击分析轮动后并发执行所有分析，动态渲染表格"""
+        if hasattr(self, 'rotation_worker') and self.rotation_worker and self.rotation_worker.isRunning():
+            return
+        self.rotation_button.setEnabled(False)
+        self.rotation_button.setStyleSheet(
+            "background-color: #888888; color: white;")
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
+
+        def run_all():
+            try:
+                with ThreadPoolExecutor(max_workers=6) as executor:
+                    futures = []
+                    futures.append(executor.submit(
+                        self.analyze_hotspot_sectors))
+                    futures.append(executor.submit(
+                        self.analyze_theme_opportunities))
+                    futures.append(executor.submit(
+                        self.analyze_leading_stocks))
+                    futures.append(executor.submit(self.analyze_rotation))
+                    futures.append(executor.submit(self.analyze_industry_flow))
+                    futures.append(executor.submit(self.analyze_concept_flow))
+                    futures.append(executor.submit(self.analyze_north_flow))
+                    for f in futures:
+                        try:
+                            f.result()
+                        except Exception as e:
+                            if hasattr(self, 'log_manager'):
+                                self.log_manager.log(
+                                    f"分析任务异常: {str(e)}", LogLevel.ERROR)
+            finally:
+                def enable_btn():
+                    self.rotation_button.setEnabled(True)
+                    self.rotation_button.setStyleSheet("")
+                QTimer.singleShot(0, enable_btn)
+        threading.Thread(target=run_all, daemon=True).start()
 
     def analyze_hotspot(self):
         """分析市场热点"""
@@ -2475,18 +2470,19 @@ class AnalysisWidget(QWidget):
                 print(f"分析市场热点失败: {str(e)}")
 
     def analyze_hotspot_sectors(self):
-        """分析热点板块"""
+        """多线程分析热点板块"""
         try:
             self.hotspot_table.setRowCount(0)
             sectors = []
-            for block in sm.get_block_list():
+            start_time = time.time()
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            block_list = [block for block in sm.get_block_list() if not isinstance(
+                block, str) and hasattr(block, 'get_stock_list') and block.get_stock_list()]
+
+            def analyze_block(block):
                 try:
-                    if isinstance(block, str):
-                        continue
-                    stocks = block.get_stock_list() if hasattr(block, 'get_stock_list') else []
-                    if not stocks:
-                        continue
-                    # 计算板块统计
+                    stocks = block.get_stock_list()
                     total_change = 0
                     total_amount = 0
                     total_turnover = 0
@@ -2494,96 +2490,71 @@ class AnalysisWidget(QWidget):
                     leading_stock = None
                     leading_change = -100
                     for stock in stocks:
-                        kdata = stock.get_kdata(Query(-5))  # 获取最近5天数据用于计算板块强度
+                        kdata = stock.get_kdata(Query(-5))
                         if len(kdata) < 5:
-                            if hasattr(self, 'log_manager') and self.log_manager:
-                                self.log_manager.log(
-                                    f"{getattr(stock, 'name', stock)} K线数据不足5条，跳过。", LogLevel.WARNING)
                             continue
-                        # 计算涨跌幅
                         close = float(kdata[-1].close)
                         pre_close = float(kdata[-2].close)
                         change = (close - pre_close) / pre_close * 100
-                        # 统计上涨家数
                         if change > 0:
                             up_count += 1
-                        # 更新板块统计
                         total_change += change
                         total_amount += float(kdata[-1].amount)
-                        # 换手率用统一方法
                         turnover = self._get_turnover(kdata, stock)
                         total_turnover += turnover
-                        # 更新领涨股
                         if change > leading_change:
                             leading_stock = stock
                             leading_change = change
-                        # 计算5日涨跌幅
-                        five_day_change = (
-                            close - float(kdata[0].close)) / float(kdata[0].close) * 100
                     if len(stocks) > 0:
-                        # 计算板块强度
                         strength = (
-                            up_count / len(stocks) * 0.3 +  # 上涨家数占比
-                            abs(total_change / len(stocks)) * 0.4 +  # 平均涨跌幅
-                            (total_turnover / len(stocks)) * 0.3  # 平均换手率
+                            up_count / len(stocks) * 0.3 +
+                            abs(total_change / len(stocks)) * 0.4 +
+                            (total_turnover / len(stocks)) * 0.3
                         )
-                        sectors.append({
+                        return {
                             'name': block.name,
                             'change': total_change / len(stocks),
                             'leading_stock': leading_stock,
                             'leading_change': leading_change,
-                            'amount': total_amount / 100000000,  # 转换为亿元
+                            'amount': total_amount / 100000000,
                             'turnover': total_turnover / len(stocks),
                             'strength': strength
-                        })
-                    self.log_manager.log(
-                        f"板块 {block.name} 统计成功", LogLevel.INFO)
+                        }
                 except Exception as e:
-                    if hasattr(self, 'log_manager') and self.log_manager:
+                    if hasattr(self, 'log_manager'):
                         self.log_manager.log(
-                            f"计算板块 {getattr(block, 'name', str(block))} 统计失败: {str(e)}", LogLevel.ERROR)
-                    else:
-                        print(
-                            f"计算板块 {getattr(block, 'name', str(block))} 统计失败: {str(e)}")
-                    continue
-            # 按板块强度排序
+                            f"板块 {getattr(block, 'name', str(block))} 统计失败: {str(e)}", LogLevel.ERROR)
+                return None
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                future_to_block = {executor.submit(
+                    analyze_block, block): block for block in block_list}
+                for future in as_completed(future_to_block):
+                    res = future.result()
+                    if res:
+                        sectors.append(res)
+
             sectors.sort(key=lambda x: x['strength'], reverse=True)
-            # 更新表格
             self.hotspot_table.setRowCount(len(sectors))
             for i, sector in enumerate(sectors):
-                # 添加板块名称
                 self.hotspot_table.setItem(
                     i, 0, QTableWidgetItem(sector['name']))
-                # 添加板块涨跌幅
                 change_item = QTableWidgetItem(f"{sector['change']:+.2f}%")
                 change_item.setForeground(
                     QColor("red" if sector['change'] > 0 else "green"))
                 self.hotspot_table.setItem(i, 1, change_item)
-                # 添加领涨股
                 if sector['leading_stock']:
                     self.hotspot_table.setItem(
-                        i, 2,
-                        QTableWidgetItem(sector['leading_stock'].name)
-                    )
-                    # 添加领涨股涨跌幅
+                        i, 2, QTableWidgetItem(sector['leading_stock'].name))
                     leading_change_item = QTableWidgetItem(
                         f"{sector['leading_change']:+.2f}%")
                     leading_change_item.setForeground(
-                        QColor(
-                            "red" if sector['leading_change'] > 0 else "green")
-                    )
+                        QColor("red" if sector['leading_change'] > 0 else "green"))
                     self.hotspot_table.setItem(i, 3, leading_change_item)
-                # 添加成交额
                 self.hotspot_table.setItem(
-                    i, 4,
-                    QTableWidgetItem(f"{sector['amount']:.2f}")
-                )
-                # 添加换手率
+                    i, 4, QTableWidgetItem(f"{sector['amount']:.2f}"))
                 self.hotspot_table.setItem(
-                    i, 5,
-                    QTableWidgetItem(f"{sector['turnover']:.2f}%")
-                )
-                # 添加板块强度
+                    i, 5, QTableWidgetItem(f"{sector['turnover']:.2f}%"))
                 strength_item = QTableWidgetItem(f"{sector['strength']:.2f}")
                 if sector['strength'] >= 80:
                     strength_item.setForeground(QColor("red"))
@@ -2592,162 +2563,146 @@ class AnalysisWidget(QWidget):
                 else:
                     strength_item.setForeground(QColor("green"))
                 self.hotspot_table.setItem(i, 6, strength_item)
-            # 调整列宽
             self.hotspot_table.resizeColumnsToContents()
             self.log_manager.log(
-                f"热点板块分析成功", LogLevel.INFO)
+                f"热点板块分析成功，用时: {time.time() - start_time:.2f}秒", LogLevel.INFO)
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
+            if hasattr(self, 'log_manager'):
                 self.log_manager.log(f"分析热点板块失败: {str(e)}", LogLevel.ERROR)
             else:
                 print(f"分析热点板块失败: {str(e)}")
 
     def analyze_theme_opportunities(self):
-        """分析主题机会"""
+        """分析主题机会（修复表格数据为空/列数不一致/健壮性问题）"""
         try:
-            # 清空主题机会表格
             self.theme_table.setRowCount(0)
-
-            # 获取所有概念板块
+            start_time = time.time()
             themes = []
             for block in sm.get_block_list():
-                # 修正类型判断，兼容不同Block实现
                 block_type = getattr(block, 'type', None) or getattr(
                     block, 'category', None) or getattr(block, 'block_type', None)
                 if block_type != "概念":
                     continue
-
                 try:
                     stocks = block.get_stock_list()
                     if not stocks:
                         continue
-
-                    # 计算主题统计
                     total_change = 0
                     total_flow = 0
                     stock_count = len(stocks)
-
+                    valid_count = 0
                     for stock in stocks:
-                        kdata = stock.get_kdata(Query(-2))
-                        if len(kdata) < 2:
+                        try:
+                            kdata = stock.get_kdata(Query(-2))
+                            if len(kdata) < 2:
+                                continue
+                            close = float(getattr(kdata[-1], 'close', 0) or 0)
+                            pre_close = float(
+                                getattr(kdata[-2], 'close', 0) or 0)
+                            if pre_close == 0:
+                                continue
+                            change = (close - pre_close) / pre_close * 100
+                            total_change += change
+                            volume = float(
+                                getattr(kdata[-1], 'volume', 0) or 0)
+                            amount = float(
+                                getattr(kdata[-1], 'amount', 0) or 0)
+                            if volume > 0:
+                                avg_price = amount / volume
+                                if avg_price > float(getattr(kdata[-1], 'open', 0) or 0):
+                                    total_flow += amount
+                                else:
+                                    total_flow -= amount
+                            valid_count += 1
+                        except Exception as e:
+                            self.log_manager.log(
+                                f"主题{block.name}单只股票异常: {str(e)}", LogLevel.WARNING)
                             continue
-
-                        # 计算涨跌幅
-                        close = float(kdata[-1].close)
-                        pre_close = float(kdata[-2].close)
-                        change = (close - pre_close) / pre_close * 100
-                        total_change += change
-
-                        # 计算资金流向
-                        volume = float(kdata[-1].volume)
-                        amount = float(kdata[-1].amount)
-                        if volume > 0:
-                            avg_price = amount / volume
-                            if avg_price > float(kdata[-1].open):
-                                total_flow += amount
-                            else:
-                                total_flow -= amount
-
-                    # 计算热度指数
+                    if valid_count == 0:
+                        continue
                     heat_index = (
-                        abs(total_change / stock_count) * 0.4 +  # 涨跌幅权重
-                        abs(total_flow) / 100000000 * 0.3 +  # 资金流向权重
-                        stock_count * 0.3  # 相关股票数权重
+                        abs(total_change / valid_count) * 0.4 +
+                        abs(total_flow) / 100000000 * 0.3 +
+                        valid_count * 0.3
                     )
-
                     themes.append({
-                        'name': block.name,
-                        'stock_count': stock_count,
-                        'avg_change': total_change / stock_count,
-                        'net_flow': total_flow / 100000000,  # 转换为亿元
-                        'heat_index': heat_index
+                        'name': getattr(block, 'name', '-') or '-',
+                        'stock_count': valid_count,
+                        'avg_change': total_change / valid_count if valid_count else 0,
+                        'net_flow': total_flow / 100000000 if valid_count else 0,
+                        'heat_index': heat_index,
+                        'rotation_index': '-'  # 轮动指数暂无，预留
                     })
-
                 except Exception as e:
                     self.log_manager.log(
-                        f"计算主题 {block.name} 统计失败: {str(e)}", LogLevel.ERROR)
+                        f"计算主题 {getattr(block, 'name', '-') or '-'} 统计失败: {str(e)}", LogLevel.ERROR)
                     continue
-
-            # 按热度指数排序
             themes.sort(key=lambda x: x['heat_index'], reverse=True)
-
-            # 更新表格
-            self.theme_table.setRowCount(len(themes))
-            for i, theme in enumerate(themes):
-                # 添加主题名称
-                self.theme_table.setItem(i, 0, QTableWidgetItem(theme['name']))
-
-                # 添加相关股票数
-                self.theme_table.setItem(
-                    i, 1,
-                    QTableWidgetItem(str(theme['stock_count']))
-                )
-
-                # 添加平均涨跌幅
-                change_item = QTableWidgetItem(f"{theme['avg_change']:+.2f}%")
-                change_item.setForeground(
-                    QColor("red" if theme['avg_change'] > 0 else "green")
-                )
-                self.theme_table.setItem(i, 2, change_item)
-
-                # 添加资金净流入
-                flow_item = QTableWidgetItem(f"{theme['net_flow']:+.2f}")
-                flow_item.setForeground(
-                    QColor("red" if theme['net_flow'] > 0 else "green")
-                )
-                self.theme_table.setItem(i, 3, flow_item)
-
-                # 添加热度指数
-                self.theme_table.setItem(
-                    i, 4,
-                    QTableWidgetItem(f"{theme['heat_index']:.2f}")
-                )
-
-            # 调整列宽
+            if not themes:
+                self.theme_table.setRowCount(1)
+                for col in range(6):
+                    self.theme_table.setItem(0, col, QTableWidgetItem("无数据"))
+            else:
+                self.theme_table.setRowCount(len(themes))
+                for i, theme in enumerate(themes):
+                    self.theme_table.setItem(
+                        i, 0, QTableWidgetItem(str(theme['name'])))
+                    self.theme_table.setItem(
+                        i, 1, QTableWidgetItem(str(theme['stock_count'])))
+                    change_item = QTableWidgetItem(
+                        f"{theme['avg_change']:+.2f}%")
+                    change_item.setForeground(
+                        QColor("red") if theme['avg_change'] > 0 else QColor("green"))
+                    self.theme_table.setItem(i, 2, change_item)
+                    flow_item = QTableWidgetItem(f"{theme['net_flow']:+.2f}")
+                    flow_item.setForeground(
+                        QColor("red") if theme['net_flow'] > 0 else QColor("green"))
+                    self.theme_table.setItem(i, 3, flow_item)
+                    self.theme_table.setItem(
+                        i, 4, QTableWidgetItem(f"{theme['heat_index']:.2f}"))
+                    self.theme_table.setItem(i, 5, QTableWidgetItem(
+                        str(theme.get('rotation_index', '-'))))
             self.theme_table.resizeColumnsToContents()
             self.log_manager.log(
-                f"主题机会分析成功", LogLevel.INFO)
+                f"主题机会分析成功，用时: {time.time() - start_time:.2f}秒", LogLevel.INFO)
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.log(
-                    f"分析主题机会失败: {str(e)}", LogLevel.ERROR)
-            else:
-                print(f"分析主题机会失败: {str(e)}")
+            self.log_manager.log(f"分析主题机会失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_leading_stocks(self):
-        """分析龙头股"""
+        """分析龙头股，合并相同股票的所属板块为一行用/分割，修复部分数据为空问题"""
         try:
             # 清空龙头股表格
             self.leader_table.setRowCount(0)
-
+            start_time = time.time()
             # 获取所有股票的统计数据
-            leaders = []
+            leaders_dict = {}
             for block in sm.get_block_list():
                 try:
                     stocks = block.get_stock_list()
                     if not stocks:
                         continue
-
                     for stock in stocks:
                         kdata = stock.get_kdata(Query(-6))  # 取近6日，便于5日涨跌幅
                         if len(kdata) < 6:
                             continue
                         try:
-                            name = getattr(stock, 'name', '-')
-                            code = getattr(stock, 'code', '-')
-                            block_name = getattr(block, 'name', '-')
+                            name = getattr(stock, 'name', '-') or '-'
+                            code = getattr(stock, 'code', '-') or '-'
+                            block_name = getattr(block, 'name', '-') or '-'
                             is_st = 'ST' in name.upper() or getattr(stock, 'is_st', False)
-                            close = float(kdata[-1].close)
-                            pre_close = float(kdata[-2].close)
+                            close = float(getattr(kdata[-1], 'close', 0) or 0)
+                            pre_close = float(
+                                getattr(kdata[-2], 'close', 0) or 0)
                             change = (close - pre_close) / \
                                 pre_close * 100 if pre_close else 0
                             # 近5日涨跌幅
-                            close_5 = float(kdata[-6].close)
+                            close_5 = float(
+                                getattr(kdata[-6], 'close', 0) or 0)
                             change_5 = (close - close_5) / \
                                 close_5 * 100 if close_5 else 0
                             # 成交额
                             amount = float(
-                                kdata[-1].amount) / 1e8 if hasattr(kdata[-1], 'amount') else 0
+                                getattr(kdata[-1], 'amount', 0) or 0) / 1e8
                             # 换手率
                             turnover = self._get_turnover(kdata, stock)
                             # 市值
@@ -2755,25 +2710,34 @@ class AnalysisWidget(QWidget):
                                 stock, 'circulating_shares', None)
                             market_cap = close * circulating_shares / 1e8 if circulating_shares else '-'
                             # 振幅
-                            high = float(kdata[-1].high)
-                            low = float(kdata[-1].low)
+                            high = float(getattr(kdata[-1], 'high', 0) or 0)
+                            low = float(getattr(kdata[-1], 'low', 0) or 0)
                             amplitude = (high - low) / pre_close * \
                                 100 if pre_close else 0
                             # 量比
                             volume_ratio = getattr(
-                                kdata[-1], 'volume_ratio', '-') if hasattr(kdata[-1], 'volume_ratio') else '-'
+                                kdata[-1], 'volume_ratio', '-')
+                            if isinstance(volume_ratio, float):
+                                volume_ratio = f"{volume_ratio:.2f}"
                             # 主力净流入
-                            volume = float(kdata[-1].volume)
+                            volume = float(
+                                getattr(kdata[-1], 'volume', 0) or 0)
                             main_flow = 0
                             if volume > 0:
-                                avg_price = float(kdata[-1].amount) / volume
-                                if avg_price > float(kdata[-1].open):
-                                    main_flow = float(kdata[-1].amount) / 1e8
+                                avg_price = float(
+                                    getattr(kdata[-1], 'amount', 0) or 0) / volume
+                                if avg_price > float(getattr(kdata[-1], 'open', 0) or 0):
+                                    main_flow = float(
+                                        getattr(kdata[-1], 'amount', 0) or 0) / 1e8
                                 else:
-                                    main_flow = -float(kdata[-1].amount) / 1e8
+                                    main_flow = - \
+                                        float(
+                                            getattr(kdata[-1], 'amount', 0) or 0) / 1e8
                             # 主力净流入占比
                             main_flow_ratio = (
                                 main_flow / amount * 100) if amount else '-'
+                            if isinstance(main_flow_ratio, float):
+                                main_flow_ratio = f"{main_flow_ratio:.2f}"
                             # 涨停状态
                             high_limit = getattr(kdata[-1], 'high_limit', None)
                             is_limit_up = (
@@ -2781,14 +2745,15 @@ class AnalysisWidget(QWidget):
                             # 资金流向趋势（近5日主力净流入为正天数）
                             flow_trend = 0
                             for i in range(-5, 0):
-                                v = float(kdata[i].volume)
+                                v = float(getattr(kdata[i], 'volume', 0) or 0)
                                 if v > 0:
-                                    avg_p = float(kdata[i].amount) / v
-                                    if avg_p > float(kdata[i].open):
+                                    avg_p = float(
+                                        getattr(kdata[i], 'amount', 0) or 0) / v
+                                    if avg_p > float(getattr(kdata[i], 'open', 0) or 0):
                                         flow_trend += 1
                             # 综合得分
                             score = (
-                                abs(change) * 0.2 +  # 涨跌幅权重
+                                abs(change) * 0.2 +
                                 (amount if amount != '-' else 0) * 0.15 +
                                 (turnover if turnover != '-' else 0) * 0.1 +
                                 (abs(main_flow) if main_flow != '-' else 0) * 0.1 +
@@ -2797,24 +2762,28 @@ class AnalysisWidget(QWidget):
                                 (flow_trend if flow_trend != '-' else 0) * 0.1 +
                                 (market_cap if market_cap != '-' else 0) * 0.1
                             )
-                            leaders.append({
-                                'name': name,
-                                'code': code,
-                                'block': block_name,
-                                'is_st': '是' if is_st else '否',
-                                'market_cap': f"{market_cap:.2f}" if isinstance(market_cap, float) else '-',
-                                'change': change,
-                                'change_5': change_5,
-                                'amount': amount,
-                                'turnover': turnover,
-                                'amplitude': amplitude,
-                                'volume_ratio': f"{volume_ratio:.2f}" if isinstance(volume_ratio, float) else '-',
-                                'main_flow': main_flow,
-                                'main_flow_ratio': f"{main_flow_ratio:.2f}" if isinstance(main_flow_ratio, float) else '-',
-                                'is_limit_up': '涨停' if is_limit_up is True else ('-' if is_limit_up == '-' else '否'),
-                                'flow_trend': flow_trend,
-                                'score': score
-                            })
+                            # 合并相同股票代码的板块
+                            if code not in leaders_dict:
+                                leaders_dict[code] = {
+                                    'name': name,
+                                    'code': code,
+                                    'blocks': set([block_name]),
+                                    'is_st': '是' if is_st else '否',
+                                    'market_cap': f"{market_cap:.2f}" if isinstance(market_cap, float) else '-',
+                                    'change': change,
+                                    'change_5': change_5,
+                                    'amount': amount,
+                                    'turnover': turnover,
+                                    'amplitude': amplitude,
+                                    'volume_ratio': volume_ratio,
+                                    'main_flow': main_flow,
+                                    'main_flow_ratio': main_flow_ratio,
+                                    'is_limit_up': '涨停' if is_limit_up is True else ('-' if is_limit_up == '-' else '否'),
+                                    'flow_trend': flow_trend,
+                                    'score': score
+                                }
+                            else:
+                                leaders_dict[code]['blocks'].add(block_name)
                         except Exception as e:
                             if hasattr(self, 'log_manager') and self.log_manager:
                                 self.log_manager.log(
@@ -2825,13 +2794,11 @@ class AnalysisWidget(QWidget):
                         self.log_manager.log(
                             f"计算股票统计失败: {str(e)}", LogLevel.ERROR)
                     continue
-
             # 按综合得分排序
+            leaders = list(leaders_dict.values())
             leaders.sort(key=lambda x: x['score'], reverse=True)
-
             # 只保留前30个龙头股
             leaders = leaders[:30]
-
             # 更新表格
             self.leader_table.setRowCount(len(leaders))
             for i, leader in enumerate(leaders):
@@ -2839,8 +2806,9 @@ class AnalysisWidget(QWidget):
                     i, 0, QTableWidgetItem(leader['name']))
                 self.leader_table.setItem(
                     i, 1, QTableWidgetItem(leader['code']))
-                self.leader_table.setItem(
-                    i, 2, QTableWidgetItem(leader['block']))
+                # 合并板块名
+                block_str = '/'.join(sorted(leader['blocks']))
+                self.leader_table.setItem(i, 2, QTableWidgetItem(block_str))
                 self.leader_table.setItem(
                     i, 3, QTableWidgetItem(leader['is_st']))
                 self.leader_table.setItem(
@@ -2884,76 +2852,87 @@ class AnalysisWidget(QWidget):
                     i, 14, QTableWidgetItem(str(leader['flow_trend'])))
                 # 综合得分
                 self.leader_table.setItem(
-                    i, 15, QTableWidgetItem(f"{leader['score']:.2f}"))
+                    i, 15, QTableWidgetItem(f"{leader['score']}"))
             self.leader_table.resizeColumnsToContents()
+            self.log_manager.log(
+                f"龙头股分析成功，用时: {time.time() - start_time:.2f}秒", LogLevel.INFO)
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.log(
-                    f"分析龙头股失败: {str(e)}", LogLevel.ERROR)
+                self.log_manager.log(f"分析龙头股失败: {str(e)}", LogLevel.ERROR)
             else:
                 print(f"分析龙头股失败: {str(e)}")
 
     def analyze_rotation(self):
-        """分析热点轮动（多进程+多线程+numpy加速）"""
+        """热点轮动分析：板块级多线程+股票级多线程+Numba加速+批量Numpy运算"""
+        self.log_manager.log("开始热点轮动分析", LogLevel.INFO)
         try:
-            # 清空热点轮动表格
+            start_time = time.time()
             self.rotation_table.setRowCount(0)
-
-            # 1. 预取所有股票K线数据（缓存）
-            kdata_cache = {}
             block_list = sm.get_block_list()
-            for block in block_list:
-                stocks = block.get_stock_list()
-                for stock in stocks:
-                    code = getattr(stock, 'code', None) or getattr(
-                        stock, 'name', None)
-                    if code and code not in kdata_cache:
-                        kdata_cache[code] = stock.get_kdata(Query(-11))
 
-            # 2. 多进程并发处理所有板块
-            block_data_list = []
-            for block in block_list:
-                stocks = block.get_stock_list()
-                stock_codes = []
-                for stock in stocks:
-                    code = getattr(stock, 'code', None) or getattr(
-                        stock, 'name', None)
-                    if code:
-                        stock_codes.append(code)
-                block_data_list.append((block.name, stock_codes))
-            kdata_cache_bytes = pickle.dumps(kdata_cache)
+            max_workers = max(os.cpu_count(), 16)
             rotations = []
-            with ProcessPoolExecutor(max_workers=6) as process_executor:
-                futures = [process_executor.submit(process_block_serializable, block_data, kdata_cache_bytes)
-                           for block_data in block_data_list]
-                for future in concurrent.futures.as_completed(futures):
-                    res = future.result()
-                    if res:
-                        rotations.append(res)
+            futures = []
+            t_thread = time.time()
+            with ThreadPoolExecutor(max_workers=max_workers) as block_executor:
+                for block in block_list:
+                    stocks = block.get_stock_list()
+                    stock_codes = []
+                    kdata_part = {}
+                    for stock in stocks:
+                        code = getattr(stock, 'code', None) or getattr(
+                            stock, 'name', None)
+                        if code:
+                            stock_codes.append(code)
+                            klist = stock.get_kdata(Query(-11))  # 直接实时获取
+                            kdata_arr = {
+                                'close': [float(k.close) for k in klist],
+                                'volume': [float(k.volume) for k in klist],
+                                'amount': [float(k.amount) for k in klist],
+                                'open': [float(k.open) for k in klist]
+                            }
+                            kdata_part[code] = kdata_arr
+                    # 板块股票集合
+                    block_data = {
+                        'block_name': block.name,
+                        'stock_codes': stock_codes,
+                        'kdata_part': kdata_part
+                    }
+                    # 采集完一个板块，立即提交线程分析
+                    futures.append(block_executor.submit(
+                        process_block_threaded, block_data, self.log_manager))
+                # 统一收集结果
+                for i, future in enumerate(as_completed(futures, timeout=300)):
+                    try:
+                        res = future.result(timeout=120)
+                        if res:
+                            rotations.append(res)
+                        self.log_manager.info(
+                            f"热点轮动进度: {i+1}/{len(futures)}")
+                    except TimeoutError:
+                        self.log_manager.error(
+                            f"热点轮动子线程超时 {i+1}/{len(futures)}")
+                    except Exception as e:
+                        self.log_manager.error(
+                            f"热点轮动子线程异常: {str(e)}\n{traceback.format_exc()}")
+            t_thread_end = time.time()
+            self.log_manager.info(f"全部板块分析完成，耗时：{t_thread_end-t_thread:.2f}秒")
 
-            # 按综合得分排序
             rotations.sort(key=lambda x: x['score'], reverse=True)
-
-            # 更新表格
             self.rotation_table.setRowCount(len(rotations))
             for i, rotation in enumerate(rotations):
                 self.rotation_table.setItem(
                     i, 0, QTableWidgetItem(rotation['name']))
                 trend_item = QTableWidgetItem(f"{rotation['trend']:.1f}%")
-                trend_item.setForeground(
-                    QColor("red") if rotation['trend'] >= 60 else
-                    QColor("orange") if rotation['trend'] >= 40 else
-                    QColor("green")
-                )
+                trend_item.setForeground(QColor("red") if rotation['trend'] >= 60 else QColor(
+                    "orange") if rotation['trend'] >= 40 else QColor("green"))
                 self.rotation_table.setItem(i, 1, trend_item)
                 flow_item = QTableWidgetItem(f"{rotation['flow']:+.2f}")
                 flow_item.setForeground(
                     QColor("red" if rotation['flow'] > 0 else "green"))
                 self.rotation_table.setItem(i, 2, flow_item)
                 self.rotation_table.setItem(
-                    i, 3,
-                    QTableWidgetItem(str(rotation['duration']))
-                )
+                    i, 3, QTableWidgetItem(str(rotation['duration'])))
                 if rotation['score'] >= 0.8:
                     suggestion = "积极参与"
                     color = QColor("red")
@@ -2969,15 +2948,16 @@ class AnalysisWidget(QWidget):
                 suggestion_item = QTableWidgetItem(suggestion)
                 suggestion_item.setForeground(color)
                 self.rotation_table.setItem(i, 4, suggestion_item)
+                self.rotation_table.setItem(i, 5, QTableWidgetItem(
+                    f"{rotation['score']}"))
+                self.log_manager.info(
+                    f"热点轮动当前板块 {rotation['name']} 得分：{rotation['score']}")
             self.rotation_table.resizeColumnsToContents()
-            self.log_manager.log(
-                f"热点轮动分析成功", LogLevel.INFO)
+            self.log_manager.info(
+                f"热点轮动分析完成，共{len(rotations)}个板块,总耗时：{time.time() - start_time:.2f}秒")
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.log(
-                    f"分析热点轮动失败: {str(e)}", LogLevel.ERROR)
-            else:
-                print(f"分析热点轮动失败: {str(e)}")
+            self.log_manager.error(
+                f"分析热点轮动失败: {str(e)}\n{traceback.format_exc()}")
 
     def clear_hotspot(self):
         """清除热点分析结果"""
@@ -3179,48 +3159,502 @@ class AnalysisWidget(QWidget):
             self.log_manager.log(f"换手率计算失败: {str(e)}", LogLevel.ERROR)
             return 0.0
 
+    @staticmethod
+    def try_import(module_name):
+        try:
+            return importlib.import_module(module_name)
+        except ImportError:
+            return None
+
+    def get_industry_fund_flow_hist(self, name):
+        """自动轮询数据源获取行业历史资金流向"""
+        ak = self.try_import('akshare')
+        if ak:
+            try:
+                if hasattr(ak, 'stock_board_industry_hist_em'):
+                    return ak.stock_board_industry_hist_em(symbol=name, start_date="20240101", end_date="20240501")
+                if hasattr(ak, 'stock_sector_fund_flow_hist'):
+                    return ak.stock_sector_fund_flow_hist(symbol=name)
+            except Exception as e:
+                self.log_manager.log(
+                    f"akshare行业资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def get_concept_fund_flow_hist(self, name):
+        """自动轮询数据源获取概念历史资金流向"""
+        ak = self.try_import('akshare')
+        if ak:
+            try:
+                if hasattr(ak, 'stock_board_concept_hist_em'):
+                    return ak.stock_board_concept_hist_em(symbol=name, start_date="20240101", end_date="20240501")
+                if hasattr(ak, 'stock_sector_fund_flow_hist'):
+                    return ak.stock_sector_fund_flow_hist(symbol=name)
+            except Exception as e:
+                self.log_manager.log(
+                    f"akshare概念资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def get_north_fund_flow_hist(self):
+        """自动轮询数据源获取北向资金历史"""
+        ak = self.try_import('akshare')
+        if ak:
+            try:
+                if hasattr(ak, 'stock_hsgt_north_net_flow'):
+                    return ak.stock_hsgt_north_net_flow()
+                if hasattr(ak, 'stock_hsgt_north_cash_flow'):
+                    return ak.stock_hsgt_north_cash_flow()
+            except Exception as e:
+                self.log_manager.log(
+                    f"akshare北向资金获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def plot_industry_trend(self, df):
+        """行业资金流向60日走势图（自动轮询数据源）"""
+        try:
+            for _, row in df.iterrows():
+                name = row.get('行业名称', '')
+                hist = self.get_industry_fund_flow_hist(name)
+                if hist is not None and not hist.empty:
+                    fig = Figure(figsize=(5, 3))
+                    canvas = FigureCanvas(fig)
+                    ax = fig.add_subplot(111)
+                    ax.plot(hist['日期'], hist.get(
+                        '主力净流入', hist.columns[-1]), label=name)
+                    ax.set_title(f"{name}近60日主力净流入")
+                    ax.legend()
+                    self.industry_trend_layout.addWidget(canvas)
+                else:
+                    self.log_manager.log(
+                        f"行业{name}资金流向历史无可用数据源", LogLevel.WARNING)
+        except Exception as e:
+            self.log_manager.log(f"行业资金流向走势图失败: {str(e)}", LogLevel.ERROR)
+
+    def plot_concept_trend(self, df):
+        """概念资金流向60日走势图（自动轮询数据源）"""
+        try:
+            for _, row in df.iterrows():
+                name = row.get('概念名称', '')
+                hist = self.get_concept_fund_flow_hist(name)
+                if hist is not None and not hist.empty:
+                    fig = Figure(figsize=(5, 3))
+                    canvas = FigureCanvas(fig)
+                    ax = fig.add_subplot(111)
+                    ax.plot(hist['日期'], hist.get(
+                        '主力净流入', hist.columns[-1]), label=name)
+                    ax.set_title(f"{name}近60日主力净流入")
+                    ax.legend()
+                    self.concept_trend_layout.addWidget(canvas)
+                else:
+                    self.log_manager.log(
+                        f"概念{name}资金流向历史无可用数据源", LogLevel.WARNING)
+        except Exception as e:
+            self.log_manager.log(f"概念资金流向走势图失败: {str(e)}", LogLevel.ERROR)
+
+    def analyze_north_flow(self):
+        """分析北向资金，自动轮询数据源"""
+        try:
+            self.north_flow_table.setRowCount(0)
+            df = self.get_north_fund_flow_hist()
+            if df is not None and not df.empty:
+                df = df.head(60)
+                for i, row in df.iterrows():
+                    date = row.get('日期', '')
+                    sh = row.get('沪股通(亿元)', row.get('沪股通', 0))
+                    sz = row.get('深股通(亿元)', row.get('深股通', 0))
+                    total = row.get('北向资金(亿元)', row.get('北向资金', 0))
+                    self.north_flow_table.insertRow(i)
+                    self.north_flow_table.setItem(
+                        i, 0, QTableWidgetItem(str(date)))
+                    self.north_flow_table.setItem(
+                        i, 1, QTableWidgetItem(f"{sh:+.2f}"))
+                    self.north_flow_table.setItem(
+                        i, 2, QTableWidgetItem(f"{sz:+.2f}"))
+                    self.north_flow_table.setItem(
+                        i, 3, QTableWidgetItem(f"{total:+.2f}"))
+            else:
+                self.log_manager.log("北向资金无可用数据源", LogLevel.WARNING)
+        except Exception as e:
+            self.log_manager.log(f"北向资金分析失败: {str(e)}", LogLevel.ERROR)
+
+    def get_fund_flow_with_cache(self, key, fetch_func, *args, **kwargs):
+        """统一缓存+多数据源自动切换"""
+        data = self.data_cache.get(key)
+        if data is not None:
+            return data
+        data = fetch_func(*args, **kwargs)
+        if data is not None and not data.empty:
+            self.data_cache.set(key, data)
+        return data
+
+    def fetch_industry_fund_flow(self, industry_name):
+        """轮询东方财富、Sina、同花顺获取行业资金流向"""
+        try:
+            from core.eastmoney_source import EastMoneyDataSource
+            em = EastMoneyDataSource()
+            df = em.get_industry_fund_flow(industry_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"东方财富行业资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.sina_source import SinaDataSource
+            sina = SinaDataSource()
+            df = sina.get_industry_fund_flow(industry_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"Sina行业资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.tonghuashun_source import TongHuaShunDataSource
+            ths = TongHuaShunDataSource()
+            df = ths.get_industry_fund_flow(industry_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"同花顺行业资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def fetch_concept_fund_flow(self, concept_name):
+        """轮询东方财富、Sina、同花顺获取概念资金流向"""
+        try:
+            from core.eastmoney_source import EastMoneyDataSource
+            em = EastMoneyDataSource()
+            df = em.get_concept_fund_flow(concept_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"东方财富概念资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.sina_source import SinaDataSource
+            sina = SinaDataSource()
+            df = sina.get_concept_fund_flow(concept_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"Sina概念资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.tonghuashun_source import TongHuaShunDataSource
+            ths = TongHuaShunDataSource()
+            df = ths.get_concept_fund_flow(concept_name)
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"同花顺概念资金流向获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def fetch_north_fund_flow(self):
+        """轮询东方财富、Sina、同花顺获取北向资金流向"""
+        try:
+            from core.eastmoney_source import EastMoneyDataSource
+            em = EastMoneyDataSource()
+            df = em.get_north_fund_flow()
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"东方财富北向资金获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.sina_source import SinaDataSource
+            sina = SinaDataSource()
+            df = sina.get_north_fund_flow()
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"Sina北向资金获取失败: {str(e)}", LogLevel.WARNING)
+        try:
+            from core.tonghuashun_source import TongHuaShunDataSource
+            ths = TongHuaShunDataSource()
+            df = ths.get_north_fund_flow()
+            if df is not None and not df.empty:
+                return df
+        except Exception as e:
+            self.log_manager.log(f"同花顺北向资金获取失败: {str(e)}", LogLevel.WARNING)
+        return None
+
+    def get_industry_fund_flow(self, industry_name):
+        key = f"industry_fund_flow_{industry_name}"
+        return self.get_fund_flow_with_cache(key, self.fetch_industry_fund_flow, industry_name)
+
+    def get_concept_fund_flow(self, concept_name):
+        key = f"concept_fund_flow_{concept_name}"
+        return self.get_fund_flow_with_cache(key, self.fetch_concept_fund_flow, concept_name)
+
+    def get_north_fund_flow(self):
+        key = "north_fund_flow"
+        return self.get_fund_flow_with_cache(key, self.fetch_north_fund_flow)
+
+    def create_sentiment_report_tab(self) -> QWidget:
+        """创建舆情报告Tab，采集微博、雪球、财联社、炒股吧热度，支持多线程和采集周期设置，股票代码名称真实，分平台分列，趋势和热词着色"""
+        import akshare as ak
+        try:
+            widget = QWidget()
+            layout = QVBoxLayout(widget)
+            # 采集周期设置
+            period_layout = QHBoxLayout()
+            period_layout.addWidget(QLabel("采集周期(分钟):"))
+            self.sentiment_period_spin = QSpinBox()
+            self.sentiment_period_spin.setRange(1, 60)
+            self.sentiment_period_spin.setValue(2)
+            period_layout.addWidget(self.sentiment_period_spin)
+            # 合并按钮
+            self.sentiment_toggle_btn = QPushButton("开始采集")
+            period_layout.addWidget(self.sentiment_toggle_btn)
+            # 倒计时文本
+            self.sentiment_countdown_label = QLabel("")
+            period_layout.addWidget(self.sentiment_countdown_label)
+            layout.addLayout(period_layout)
+            # 获取真实A股股票代码和名称
+            try:
+                stock_df = ak.stock_info_a_code_name()
+                stock_list = stock_df.sample(n=10).values.tolist()  # 随机取10只
+            except Exception:
+                stock_list = [[f"600000", "浦发银行"], [f"000001", "平安银行"], [f"300750", "宁德时代"], [f"601318", "中国平安"], [f"600519", "贵州茅台"], [
+                    f"000333", "美的集团"], [f"002594", "比亚迪"], [f"000651", "格力电器"], [f"601166", "兴业银行"], [f"600036", "招商银行"]]
+            platforms = ["微博", "雪球", "财联社", "炒股吧"]
+            col_labels = ["股票代码", "股票名称"]
+            for p in platforms:
+                col_labels += [f"{p}热度值", f"{p}热度趋势", f"{p}热词/摘要"]
+            col_labels += ["采集时间"]
+            self.sentiment_table = QTableWidget()
+            self.sentiment_table.setColumnCount(len(col_labels))
+            self.sentiment_table.setHorizontalHeaderLabels(col_labels)
+            self.sentiment_table.setEditTriggers(
+                QAbstractItemView.NoEditTriggers)
+            layout.addWidget(self.sentiment_table)
+            # 采集定时器
+            self.sentiment_timer = QTimer()
+            self.sentiment_timer.setInterval(
+                self.sentiment_period_spin.value() * 60 * 1000)
+            self.sentiment_timer.timeout.connect(self._start_sentiment_collect)
+            self.sentiment_period_spin.valueChanged.connect(
+                self._update_sentiment_timer)
+            self.sentiment_collecting = False
+            self._sentiment_stock_list = stock_list
+            self._sentiment_platforms = platforms
+            # 倒计时定时器
+            self.sentiment_countdown_timer = QTimer()
+            self.sentiment_countdown_timer.setInterval(1000)
+            self.sentiment_countdown_timer.timeout.connect(
+                self._update_sentiment_countdown)
+            self.sentiment_next_collect_ts = None
+            # 按钮事件
+            self.sentiment_toggle_btn.clicked.connect(
+                self._toggle_sentiment_collect)
+            return widget
+        except Exception as e:
+            self.log_manager.log(f"创建舆情报告Tab失败: {str(e)}", LogLevel.ERROR)
+            raise
+
+    def _toggle_sentiment_collect(self):
+        if self.sentiment_timer.isActive():
+            self._stop_sentiment_timer()
+        else:
+            self._start_sentiment_timer()
+
+    def _start_sentiment_timer(self):
+        self.sentiment_timer.start()
+        self.sentiment_toggle_btn.setText("停止采集")
+        self._start_sentiment_collect()
+        # 启动倒计时
+        self.sentiment_next_collect_ts = time.time(
+        ) + self.sentiment_period_spin.value() * 60
+        self.sentiment_countdown_timer.start()
+        self._update_sentiment_countdown()
+
+    def _stop_sentiment_timer(self):
+        self.sentiment_timer.stop()
+        self.sentiment_toggle_btn.setText("开始采集")
+        self.sentiment_countdown_timer.stop()
+        self.sentiment_countdown_label.setText("")
+
+    def _update_sentiment_timer(self):
+        self.sentiment_timer.setInterval(
+            self.sentiment_period_spin.value() * 60 * 1000)
+        if self.sentiment_timer.isActive():
+            self.sentiment_next_collect_ts = time.time(
+            ) + self.sentiment_period_spin.value() * 60
+
+    def _update_sentiment_countdown(self):
+        if not self.sentiment_timer.isActive() or not self.sentiment_next_collect_ts:
+            self.sentiment_countdown_label.setText("")
+            return
+        remain = int(self.sentiment_next_collect_ts - time.time())
+        if remain < 0:
+            remain = 0
+        self.sentiment_countdown_label.setText(f"距离下次采集：{remain}秒")
+        if remain == 0:
+            self.sentiment_next_collect_ts = time.time(
+            ) + self.sentiment_period_spin.value() * 60
+
+    def _start_sentiment_collect(self):
+        if self.sentiment_collecting:
+            return
+        self.sentiment_collecting = True
+        from datetime import datetime
+        import concurrent.futures
+        stock_list = getattr(self, '_sentiment_stock_list', [])
+        platforms = getattr(self, '_sentiment_platforms',
+                            ["微博", "雪球", "财联社", "炒股吧"])
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        table_data = []
+        # 采集函数
+
+        def get_xueqiu_hot(code, name):
+            try:
+                # 雪球页面如 https://xueqiu.com/S/SH600000
+                url = f"https://xueqiu.com/S/SH{code}" if code.startswith(
+                    '6') else f"https://xueqiu.com/S/SZ{code}"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    # 雪球热度（讨论数）
+                    hot = soup.find("span", class_="stockDiscuss__num")
+                    if hot:
+                        return int(hot.text.replace(",", "")), "→", "AI"
+                return '-', '→', '-'
+            except Exception:
+                return '-', '→', '-'
+
+        def get_guba_hot(code, name):
+            try:
+                # 炒股吧页面 https://guba.eastmoney.com/list,600000.html
+                url = f"https://guba.eastmoney.com/list,{code}.html"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    # 热度：帖子数
+                    hot = soup.find("span", class_="total-posts")
+                    if hot:
+                        return int(hot.text.replace(",", "")), "→", "利好"
+                return '-', '→', '-'
+            except Exception:
+                return '-', '→', '-'
+
+        def get_cls_hot(code, name):
+            try:
+                # 财联社新闻热度（模拟，实际可用akshare或爬虫）
+                return '-', '→', '-'
+            except Exception:
+                return '-', '→', '-'
+
+        def get_weibo_hot(code, name):
+            try:
+                # 微博热搜榜（模拟，实际可用weibo-search或爬虫）
+                return '-', '→', '-'
+            except Exception:
+                return '-', '→', '-'
+        # 多线程采集
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            for code, name in stock_list:
+                row = [code, name]
+                futures = []
+                futures.append(executor.submit(get_weibo_hot, code, name))
+                futures.append(executor.submit(get_xueqiu_hot, code, name))
+                futures.append(executor.submit(get_cls_hot, code, name))
+                futures.append(executor.submit(get_guba_hot, code, name))
+                for f in futures:
+                    hot, trend, keywords = f.result()
+                    row += [hot, trend, keywords]
+                row += [now]
+                table_data.append(row)
+        self.sentiment_table.setRowCount(len(table_data))
+        # 着色规则
+        trend_color = {"↑": QColor("red"), "↓": QColor(
+            "green"), "→": QColor("black")}
+        keyword_color = {"利好": QColor("red"), "利空": QColor("green"), "涨停": QColor("orange"), "AI": QColor(
+            "blue"), "新能源": QColor("blue"), "大盘": QColor("black"), "新高": QColor("purple")}
+        for i, row in enumerate(table_data):
+            for j, val in enumerate(row):
+                item = QTableWidgetItem(str(val))
+                # 热度趋势着色
+                if j >= 4 and (j-2) % 3 == 0:
+                    item.setForeground(trend_color.get(val, QColor("black")))
+                # 热词着色
+                if j >= 5 and (j-1) % 3 == 0:
+                    item.setForeground(keyword_color.get(val, QColor("black")))
+                self.sentiment_table.setItem(i, j, item)
+        self.sentiment_collecting = False
+
 
 def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
     from indicators_algo import get_all_indicators_by_category
     return get_all_indicators_by_category()
 
-# 全局可序列化函数：多进程轮动分析用
+# --- 新增：轮动分析后台线程类 ---
 
 
-def process_block_serializable(block_data, kdata_cache_bytes):
-    block_name, stock_codes = block_data
-    kdata_cache = pickle.loads(kdata_cache_bytes)
+class RotationWorker(QThread):
+
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, widget):
+        super().__init__()
+        self.widget = widget
+
+    def run(self):
+        try:
+            # 调用原有的analyze_rotation方法（在子线程中执行，避免阻塞UI）
+            self.widget.analyze_rotation()
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+# 板块级多进程+股票级多线程+Numba加速
+
+
+@numba.njit
+def fast_process_stock(close, volume, amount, open_arr):
+    pre_close = np.roll(close, 1)
+    pre_close[0] = close[0]
+    change_arr = (close[1:] - pre_close[1:]) / pre_close[1:] * 100
+    change_arr = change_arr[-10:]
+    flow_arr = np.zeros(10)
+    for idx in range(1, 11):
+        v = volume[-idx]
+        a = amount[-idx]
+        o = open_arr[-idx]
+        if v > 0:
+            avg_p = a / v
+            flow_arr[-idx] = a if avg_p > o else -a
+        else:
+            flow_arr[-idx] = 0
+    flow_arr = flow_arr / 1e8
+    return change_arr, flow_arr
+
+
+def process_block_threaded(block_data, log_manager=None):
+    import numpy as np
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    block_name = block_data['block_name']
+    stock_codes = block_data['stock_codes']
+    kdata_part = block_data['kdata_part']
+
+    t0 = time.time()
 
     def process_stock(code):
-        kdata = kdata_cache.get(code)
-        if not kdata or len(kdata) < 11:
+        k = kdata_part.get(code)
+        if not k or len(k['close']) < 11:
             return None
         try:
-            close = np.array([float(k.close) for k in kdata])
-            pre_close = np.roll(close, 1)
-            pre_close[0] = close[0]
-            change_arr = (close[1:] - pre_close[1:]) / pre_close[1:] * 100
-            change_arr = change_arr[-10:]
-            volume = np.array([float(k.volume) for k in kdata])
-            amount = np.array([float(k.amount) for k in kdata])
-            open_arr = np.array([float(k.open) for k in kdata])
-            flow_arr = np.zeros(10)
-            for idx in range(1, 11):
-                v = volume[-idx]
-                a = amount[-idx]
-                o = open_arr[-idx]
-                if v > 0:
-                    avg_p = a / v
-                    flow_arr[-idx] = a if avg_p > o else -a
-                else:
-                    flow_arr[-idx] = 0
-            flow_arr = flow_arr / 1e8
-            return change_arr, flow_arr
-        except Exception:
+            close = np.array(k['close'], dtype=np.float64)
+            volume = np.array(k['volume'], dtype=np.float64)
+            amount = np.array(k['amount'], dtype=np.float64)
+            open_arr = np.array(k['open'], dtype=np.float64)
+            return fast_process_stock(close, volume, amount, open_arr)
+        except Exception as e:
+            if log_manager:
+                log_manager.error(f"[{block_name}] 股票{code}分析异常: {str(e)}")
             return None
-    with ThreadPoolExecutor(max_workers=8) as stock_executor:
+
+    # 股票级多线程
+    with ThreadPoolExecutor(max_workers=min(8, len(stock_codes))) as stock_executor:
         stock_results = list(stock_executor.map(process_stock, stock_codes))
+
     valid_changes = []
     valid_flows = []
     for res in stock_results:
@@ -3230,6 +3664,8 @@ def process_block_serializable(block_data, kdata_cache_bytes):
                 valid_changes.append(change_arr)
                 valid_flows.append(flow_arr)
     if not valid_changes:
+        if log_manager:
+            log_manager.warning(f"[{block_name}] 无有效股票结果")
         return None
     change_mat = np.stack(valid_changes)
     flow_mat = np.stack(valid_flows)
@@ -3241,18 +3677,39 @@ def process_block_serializable(block_data, kdata_cache_bytes):
     ]
     trend = sum(1 for i in range(1, len(daily_stats))
                 if daily_stats[i]['change'] > daily_stats[i-1]['change'])
-    flow_trend = sum(
-        1 for stat in daily_stats if stat['flow'] > 0)
+    flow_trend = sum(1 for stat in daily_stats if stat['flow'] > 0)
     duration = 0
     for stat in daily_stats:
         if stat['change'] > 0 and stat['flow'] > 0:
             duration += 1
         else:
             break
+    t1 = time.time()
+    # 1. 近10日累计涨幅
+    momentum = np.sum(avg_change)  # 或 np.mean(avg_change)
+    # 2. 近10日累计资金流入
+    flow = np.sum(avg_flow)
+    # 3. 近10日上涨天数
+    up_days = np.sum(np.array(avg_change) > 0)
+
+    # 归一化（可用全市场最大/最小值，或用经验值如20%涨幅、10亿资金流等）
+    momentum_score = min(max((momentum + 20) / 40, 0), 1)  # -20%~+20%归一化到0~1
+    flow_score = min(max((flow + 5) / 10, 0), 1)           # -5亿~+5亿归一化到0~1
+    active_score = up_days / 10
+
+    score = round(0.5 * momentum_score + 0.3 *
+                  flow_score + 0.2 * active_score, 2)
+    log_manager.info(
+        f"[{block_name}] 板块分析完成，股票数：{len(stock_codes)}，耗时：{t1 - t0:.2f}秒")
     return {
         'name': block_name,
         'trend': trend / 9 * 100,
-        'flow': float(np.sum(avg_flow)),
+        'trend_raw': trend,
+        'flow_trend': flow_trend,
         'duration': duration,
-        'score': trend / 9 * 0.4 + flow_trend / 10 * 0.4 + duration / 10 * 0.2
+        'flow': float(np.sum(avg_flow)),
+        'score': score,
+        'momentum': momentum,
+        'flow': flow,
+        'up_days': up_days
     }

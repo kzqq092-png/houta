@@ -19,9 +19,13 @@ from core.data_manager import DataManager
 from core.logger import LogManager, LogLevel
 from gui.ui_components import BaseAnalysisPanel
 from components.template_manager import TemplateManager
-from components.market_sentiment import MarketSentimentWidget
-import pandas as pd
 from components.custom_stock_manager import CustomStockManagerDialog
+
+try:
+    from PyQt5.QtCore import qRegisterMetaType, QVector
+    qRegisterMetaType(QVector[int], "QVector<int>")
+except Exception:
+    pass
 
 
 class StockAnalysisWidget(BaseAnalysisPanel):
@@ -43,8 +47,7 @@ class StockAnalysisWidget(BaseAnalysisPanel):
 
     def init_ui(self):
         """初始化UI"""
-        # 创建主布局
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = self.layout()
 
         # 创建水平分割器
         splitter = QSplitter(Qt.Horizontal)
@@ -62,9 +65,6 @@ class StockAnalysisWidget(BaseAnalysisPanel):
 
         # 创建技术指标表格
         self.create_technical_table(left_layout)
-
-        # 新增：市场情绪卡片
-        self.create_market_sentiment_card(left_layout)
 
         # 添加左侧面板到分割器
         splitter.addWidget(left_panel)
@@ -164,19 +164,14 @@ class StockAnalysisWidget(BaseAnalysisPanel):
             ["指标", "数值", "同比", "行业平均"])
 
         # 设置表格样式
-        self.fundamental_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #f5f5f5;
-                alternate-background-color: #e9e9e9;
-            }
-            QHeaderView::section {
-                background-color: #2196F3;
-                color: white;
-                padding: 6px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        self.fundamental_table.setStyleSheet('''
+            QTableWidget {border: 1px solid #b0b0b0; border-radius: 2px; background: #fff; font-size: 13px;}
+            QHeaderView::section {background: #444; color: #fff; font-weight: bold; border: 1px solid #b0b0b0; height: 28px; padding-left: 8px;}
+            QTableWidget::item {border: 1px solid #b0b0b0; background: #fff;}
+            QTableWidget::item:selected {background: #e3f2fd; color: #1976d2;}
+            QTableWidget::item:hover {background: #f5f5f5;}
+        ''')
+        self.fundamental_table.setAlternatingRowColors(True)
 
         group_layout.addWidget(self.fundamental_table)
         layout.addWidget(group)
@@ -193,19 +188,14 @@ class StockAnalysisWidget(BaseAnalysisPanel):
             ["指标", "数值", "信号", "状态"])
 
         # 设置表格样式
-        self.technical_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #f5f5f5;
-                alternate-background-color: #e9e9e9;
-            }
-            QHeaderView::section {
-                background-color: #2196F3;
-                color: white;
-                padding: 6px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        self.technical_table.setStyleSheet('''
+            QTableWidget {border: 1px solid #b0b0b0; border-radius: 2px; background: #fff; font-size: 13px;}
+            QHeaderView::section {background: #444; color: #fff; font-weight: bold; border: 1px solid #b0b0b0; height: 28px; padding-left: 8px;}
+            QTableWidget::item {border: 1px solid #b0b0b0; background: #fff;}
+            QTableWidget::item:selected {background: #e3f2fd; color: #1976d2;}
+            QTableWidget::item:hover {background: #f5f5f5;}
+        ''')
+        self.technical_table.setAlternatingRowColors(True)
 
         group_layout.addWidget(self.technical_table)
         layout.addWidget(group)
@@ -296,214 +286,6 @@ class StockAnalysisWidget(BaseAnalysisPanel):
                         f"{name} 超出允许范围 [{widget.minimum()}, {widget.maximum()}]")
                     widget.setStyleSheet("border: 2px solid red;")
         return valid, "\n".join(error_msgs)
-
-    def create_market_sentiment_card(self, layout):
-        """创建市场情绪卡片"""
-        group = QGroupBox("市场情绪")
-        group_layout = QVBoxLayout(group)
-
-        # 获取市场情绪数据
-        sentiment_data = {}
-        if self.data_manager and hasattr(self.data_manager, 'get_market_sentiment'):
-            try:
-                sentiment_data = self.data_manager.get_market_sentiment()
-                if self.log_manager:
-                    self.log_manager.log(
-                        f"[调试] 获取市场情绪数据: {sentiment_data}", LogLevel.DEBUG)
-            except Exception as e:
-                sentiment_data = {}
-                if self.log_manager:
-                    self.log_manager.log(f"[调试] 获取市场情绪失败: {e}", LogLevel.ERROR)
-
-        # 展示核心指标
-        if not sentiment_data or sentiment_data.get('sentiment_index') is None:
-            if self.log_manager:
-                self.log_manager.log(
-                    "[调试] 市场情绪数据为空或无sentiment_index字段", LogLevel.WARNING)
-            label = QLabel("暂无市场情绪数据")
-            label.setStyleSheet("font-weight: bold; color: #999999;")
-            group_layout.addWidget(label)
-        else:
-            index = sentiment_data.get('sentiment_index', 'N/A')
-            heat = sentiment_data.get('volume_ratio', 'N/A')
-            advance = sentiment_data.get(
-                'advance_decline', {}).get('advance', 'N/A')
-            decline = sentiment_data.get(
-                'advance_decline', {}).get('decline', 'N/A')
-            if self.log_manager:
-                self.log_manager.log(
-                    f"[调试] 展示市场情绪: index={index}, heat={heat}, advance={advance}, decline={decline}", LogLevel.DEBUG)
-            label = QLabel(
-                f"情绪指数: {index}   热度: {heat}   涨家: {advance}   跌家: {decline}")
-            label.setStyleSheet("font-weight: bold; color: #2196F3;")
-            group_layout.addWidget(label)
-
-        # 详情按钮
-        btn = QPushButton("查看市场情绪详情")
-        btn.clicked.connect(self.show_market_sentiment_dialog)
-        group_layout.addWidget(btn)
-
-        layout.addWidget(group)
-
-    def show_market_sentiment_dialog(self):
-        """弹出市场情绪分析多级弹窗"""
-        if self.log_manager:
-            self.log_manager.log("[调试] 打开市场情绪分析弹窗", LogLevel.DEBUG)
-        # 一级弹窗：市场情绪主面板
-        dlg = QDialog(self)
-        dlg.setWindowTitle("市场情绪分析")
-        dlg.setMinimumSize(900, 600)
-        vbox = QVBoxLayout(dlg)
-        sentiment_widget = MarketSentimentWidget(
-            parent=dlg, data_manager=self.data_manager, log_manager=self.log_manager)
-        vbox.addWidget(sentiment_widget)
-        # 二级弹窗按钮
-        btn_detail = QPushButton("更多情绪历史与统计")
-        vbox.addWidget(btn_detail)
-
-        def show_detail():
-            if self.log_manager:
-                self.log_manager.log("[调试] 打开市场情绪历史与统计弹窗", LogLevel.DEBUG)
-            detail_dlg = QDialog(dlg)
-            detail_dlg.setWindowTitle("市场情绪历史与统计")
-            detail_dlg.setMinimumSize(1200, 700)
-            detail_layout = QVBoxLayout(detail_dlg)
-            # 指数/行业/概念/自选股选择下拉框
-            index_map = {
-                "上证指数": "000001",
-                "深证成指": "399001",
-                "创业板指": "399006"
-            }
-            industry_list = []
-            concept_list = []
-            select_combo = QComboBox()
-            select_combo.addItem("[大盘指数] 上证指数")
-            select_combo.addItem("[大盘指数] 深证成指")
-            select_combo.addItem("[大盘指数] 创业板指")
-            select_combo.addItem("[自选股] 我的自选")
-            # TODO: 动态加载行业、概念
-            detail_layout.addWidget(QLabel("选择指数/行业/概念/自选股："))
-            detail_layout.addWidget(select_combo)
-            chart_canvas = None
-            stat_label = QLabel()
-            df = None
-            last_extreme = None
-
-            def refresh_chart():
-                nonlocal chart_canvas, stat_label, df, last_extreme
-                if chart_canvas:
-                    detail_layout.removeWidget(chart_canvas)
-                    chart_canvas.setParent(None)
-                text = select_combo.currentText()
-                is_index = text.startswith("[大盘指数]")
-                is_industry = text.startswith("[行业]")
-                is_concept = text.startswith("[概念]")
-                is_custom = text.startswith("[自选股]")
-                code, industry, concept, custom = None, None, None, False
-                if is_index:
-                    for k, v in index_map.items():
-                        if k in text:
-                            code = v
-                            break
-                elif is_industry:
-                    industry = text.replace("[行业] ", "")
-                elif is_concept:
-                    concept = text.replace("[概念] ", "")
-                elif is_custom:
-                    custom = True
-                sentiment_history = []
-                if hasattr(self.data_manager, 'get_market_sentiment_history'):
-                    try:
-                        if custom and hasattr(self.data_manager, 'get_custom_stocks'):
-                            stock_list = self.data_manager.get_custom_stocks()
-                            sentiment_history = self.data_manager.get_market_sentiment_history(
-                                days=30, custom_stocks=stock_list)
-                        else:
-                            sentiment_history = self.data_manager.get_market_sentiment_history(
-                                days=30, code=code, industry=industry, concept=concept)
-                        if self.log_manager:
-                            self.log_manager.log(
-                                f"[调试] 获取市场情绪历史: {sentiment_history}", LogLevel.DEBUG)
-                    except Exception as e:
-                        sentiment_history = []
-                        if self.log_manager:
-                            self.log_manager.log(
-                                f"[调试] 获取市场情绪历史失败: {e}", LogLevel.ERROR)
-                if not sentiment_history:
-                    current = self.data_manager.get_market_sentiment() if self.data_manager else {}
-                    sentiment_history = [{"date": pd.Timestamp.now(
-                    ), "sentiment_index": current.get("sentiment_index", 50)}]
-                    if self.log_manager:
-                        self.log_manager.log(
-                            "[调试] 市场情绪历史为空，使用当前数据占位", LogLevel.WARNING)
-                df = pd.DataFrame(sentiment_history)
-                fig = Figure(figsize=(10, 4))
-                chart_canvas = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
-                if not df.empty and "sentiment_index" in df:
-                    x = df["date"]
-                    y = df["sentiment_index"]
-                    ax.plot(x, y, marker="o", color="#2196F3", label="情绪指数")
-                    ax.fill_between(x, y, 80, where=(y >= 80),
-                                    color="#00C853", alpha=0.3, label="极度乐观")
-                    ax.fill_between(x, y, 20, where=(y <= 20),
-                                    color="#FF1744", alpha=0.3, label="极度悲观")
-                    ax.set_title(f"{text}近30天市场情绪趋势")
-                    ax.set_xlabel("日期")
-                    ax.set_ylabel("情绪指数")
-                    ax.legend()
-                    if y.iloc[-1] >= 80 and last_extreme != 'high':
-                        QMessageBox.warning(
-                            detail_dlg, "市场情绪预警", f"当前情绪指数{y.iloc[-1]:.2f}，已进入极度乐观区间！")
-                        last_extreme = 'high'
-                    elif y.iloc[-1] <= 20 and last_extreme != 'low':
-                        QMessageBox.warning(
-                            detail_dlg, "市场情绪预警", f"当前情绪指数{y.iloc[-1]:.2f}，已进入极度悲观区间！")
-                        last_extreme = 'low'
-                    elif 20 < y.iloc[-1] < 80:
-                        last_extreme = None
-                else:
-                    ax.text(0.5, 0.5, "暂无历史数据", ha="center", va="center")
-                detail_layout.addWidget(chart_canvas)
-                # 统计信息
-                if not df.empty and "sentiment_index" in df:
-                    min_val = df["sentiment_index"].min()
-                    max_val = df["sentiment_index"].max()
-                    mean_val = df["sentiment_index"].mean()
-                    std_val = df["sentiment_index"].std()
-                    q25 = df["sentiment_index"].quantile(0.25)
-                    q50 = df["sentiment_index"].quantile(0.5)
-                    q75 = df["sentiment_index"].quantile(0.75)
-                    min_date = df["date"][df["sentiment_index"] == min_val].iloc[0] if (
-                        df["sentiment_index"] == min_val).any() else "-"
-                    max_date = df["date"][df["sentiment_index"] == max_val].iloc[0] if (
-                        df["sentiment_index"] == max_val).any() else "-"
-                    stat_label.setText(
-                        f"最低: {min_val:.2f}({min_date:%Y-%m-%d})  最高: {max_val:.2f}({max_date:%Y-%m-%d})  均值: {mean_val:.2f}  波动率: {std_val:.2f}\n"
-                        f"分位数: Q25={q25:.2f}  Q50={q50:.2f}  Q75={q75:.2f}"
-                    )
-                    stat_label.setStyleSheet("font-weight: bold; color: #333;")
-                else:
-                    stat_label.setText("")
-                detail_layout.addWidget(stat_label)
-            select_combo.currentIndexChanged.connect(refresh_chart)
-
-            def export_data():
-                if df is not None and not df.empty:
-                    file_path, _ = QFileDialog.getSaveFileName(
-                        detail_dlg, "导出情绪历史数据", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
-                    if file_path:
-                        if file_path.endswith('.xlsx'):
-                            df.to_excel(file_path, index=False)
-                        else:
-                            df.to_csv(file_path, index=False)
-            export_btn = QPushButton("导出数据")
-            export_btn.clicked.connect(export_data)
-            detail_layout.addWidget(export_btn)
-            refresh_chart()
-            detail_dlg.exec_()
-        btn_detail.clicked.connect(show_detail)
-        dlg.exec_()
 
     def show_custom_stock_manager(self):
         dlg = CustomStockManagerDialog(self)

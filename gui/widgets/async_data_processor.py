@@ -49,8 +49,11 @@ class AsyncDataProcessor(QObject):
             # 收集结果
             results = {}
             for future in as_completed(futures):
-                chunk_result = future.result()
-                results.update(chunk_result)
+                try:
+                    chunk_result = future.result()
+                    results.update(chunk_result)
+                except Exception as e:
+                    self.calculation_error.emit(f"数据分块处理异常: {str(e)}")
 
             # 合并结果
             final_results = self._merge_results(results, data.index)
