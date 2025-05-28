@@ -201,11 +201,18 @@ class ChartWidget(QWidget):
         # self.loading_dialog.show()
 
     def update_loading_progress(self, value: int, message: str = None):
-        """更新加载进度"""
+        """更新加载进度，保证数值安全"""
+        value = max(0, min(100, int(value)))
         if hasattr(self, 'loading_dialog'):
             self.loading_dialog.setValue(value)
             if message:
                 self.loading_dialog.setLabelText(message)
+
+    def set_loading_progress_error(self, message="渲染失败"):
+        if hasattr(self, 'loading_dialog'):
+            self.loading_dialog.setStyleSheet(
+                "QProgressBar::chunk {background-color: #FF0000;}")
+            self.loading_dialog.setLabelText(message)
 
     def close_loading_dialog(self):
         """关闭加载进度对话框"""
@@ -1672,3 +1679,33 @@ class ChartWidget(QWidget):
     def _on_indicator_changed(self, indicators):
         """多屏同步所有激活指标，仅同步选中项（已废弃，自动同步主窗口get_current_indicators）"""
         self.update_chart()
+
+    def refresh(self) -> None:
+        """
+        刷新当前图表内容，异常只记录日志不抛出。
+        若有数据则重绘K线图，否则显示"无数据"提示。
+        """
+        try:
+            # 这里假设有self.current_kdata等数据
+            if hasattr(self, 'current_kdata') and self.current_kdata is not None:
+                self.update_chart({'kdata': self.current_kdata})
+            else:
+                self.show_no_data("无数据")
+        except Exception as e:
+            error_msg = f"刷新图表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            # 发射异常信号，主窗口可捕获弹窗
+            self.error_occurred.emit(error_msg)
+
+    def update(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
+
+    def reload(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()

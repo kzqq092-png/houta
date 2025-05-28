@@ -13,7 +13,6 @@ from utils import (
     ThemeConfig,
     ChartConfig,
     TradingConfig,
-    PerformanceConfig,
     DataConfig,
     UIConfig,
     LoggingConfig
@@ -26,7 +25,6 @@ __all__ = [
     'ThemeConfig',
     'ChartConfig',
     'TradingConfig',
-    'PerformanceConfig',
     'DataConfig',
     'UIConfig',
     'LoggingConfig',
@@ -38,12 +36,13 @@ __all__ = [
     'restore_config'
 ]
 
+
 def validate_config(config: Dict[str, Any]) -> bool:
     """验证配置是否有效
-    
+
     Args:
         config: 配置字典
-        
+
     Returns:
         配置是否有效
     """
@@ -52,39 +51,29 @@ def validate_config(config: Dict[str, Any]) -> bool:
         if 'version' not in config:
             logger.error("配置缺少版本信息")
             return False
-            
+
         # 验证必需的配置部分
         required_sections = {
             'theme': ThemeConfig,
             'chart': ChartConfig,
             'trading': TradingConfig,
-            'performance': PerformanceConfig,
             'data': DataConfig,
             'ui': UIConfig,
             'logging': LoggingConfig
         }
-        
+
         for section, config_class in required_sections.items():
             if section not in config:
                 logger.error(f"缺少必需的配置部分: {section}")
                 return False
-            
+
             try:
                 # 尝试创建配置对象来验证数据
                 config_class(**config[section])
             except Exception as e:
                 logger.error(f"配置部分 {section} 验证失败: {str(e)}")
                 return False
-                
-        # 验证性能监控阈值
-        if 'performance' in config:
-            perf_config = config['performance']
-            if 'thresholds' in perf_config:
-                for key, value in perf_config['thresholds'].items():
-                    if not isinstance(value, (int, float)) or value <= 0:
-                        logger.error(f"性能监控阈值无效: {key} = {value}")
-                        return False
-                        
+
         # 验证交易配置
         if 'trading' in config:
             trading_config = config['trading']
@@ -97,27 +86,28 @@ def validate_config(config: Dict[str, Any]) -> bool:
             if not 0 <= trading_config.get('position_ratio', 0) <= 1:
                 logger.error("仓位比例必须在0到1之间")
                 return False
-                
+
         # 验证图表配置
         if 'chart' in config:
             chart_config = config['chart']
             if chart_config.get('update_interval', 0) < 1:
                 logger.error("图表更新间隔必须大于0")
                 return False
-                
+
         return True
-        
+
     except Exception as e:
         logger.error(f"配置验证失败: {str(e)}")
         return False
 
+
 def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, Any]:
     """迁移配置到最新版本
-    
+
     Args:
         config: 当前配置
         current_version: 当前配置版本
-        
+
     Returns:
         迁移后的配置
     """
@@ -125,15 +115,12 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
         # 如果没有版本信息，假定为最早的版本
         if 'version' not in config:
             config['version'] = '1.0.0'
-            
+
         # 根据版本执行迁移
         if config['version'] == '1.0.0':
-            # 迁移到 1.1.0
-            if 'performance' not in config:
-                config['performance'] = PerformanceConfig().to_dict()
             config['version'] = '1.1.0'
             logger.info("配置已迁移到版本 1.1.0")
-            
+
         if config['version'] == '1.1.0':
             # 迁移到 1.2.0
             if 'ui' not in config:
@@ -151,7 +138,7 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
                     trading['time_stop'] = 5
             config['version'] = '1.2.0'
             logger.info("配置已迁移到版本 1.2.0")
-            
+
         if config['version'] == '1.2.0':
             # 迁移到 1.3.0
             if 'performance' in config:
@@ -166,20 +153,21 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
                     perf['track_exceptions'] = True
             config['version'] = '1.3.0'
             logger.info("配置已迁移到版本 1.3.0")
-            
+
         return config
-        
+
     except Exception as e:
         logger.error(f"配置迁移失败: {str(e)}")
         return config
 
+
 def backup_config(config_manager: ConfigManager, backup_dir: str = "backups") -> Optional[str]:
     """备份当前配置
-    
+
     Args:
         config_manager: 配置管理器实例
         backup_dir: 备份目录
-        
+
     Returns:
         备份文件路径，如果备份失败则返回 None
     """
@@ -187,29 +175,32 @@ def backup_config(config_manager: ConfigManager, backup_dir: str = "backups") ->
         # 确保备份目录存在
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
-            
+
         # 创建备份文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(backup_dir, f"config_backup_{timestamp}.json")
-        
+        backup_path = os.path.join(
+            backup_dir, f"config_backup_{timestamp}.json")
+
         # 保存当前配置
         with open(backup_path, 'w', encoding='utf-8') as f:
-            json.dump(config_manager.get_all(), f, indent=2, ensure_ascii=False)
-            
+            json.dump(config_manager.get_all(), f,
+                      indent=2, ensure_ascii=False)
+
         logger.info(f"配置已备份到: {backup_path}")
         return backup_path
-        
+
     except Exception as e:
         logger.error(f"配置备份失败: {str(e)}")
         return None
 
+
 def restore_config(config_manager: ConfigManager, backup_path: str) -> bool:
     """从备份恢复配置
-    
+
     Args:
         config_manager: 配置管理器实例
         backup_path: 备份文件路径
-        
+
     Returns:
         是否恢复成功
     """
@@ -217,25 +208,26 @@ def restore_config(config_manager: ConfigManager, backup_path: str) -> bool:
         # 读取备份文件
         with open(backup_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            
+
         # 验证配置
         if not validate_config(config):
             logger.error("备份配置验证失败")
             return False
-            
+
         # 迁移配置到最新版本
         config = migrate_config(config, config.get('version', '1.0.0'))
-        
+
         # 更新配置
         config_manager._config = config
         config_manager.save()
-        
+
         logger.info(f"配置已从备份恢复: {backup_path}")
         return True
-        
+
     except Exception as e:
         logger.error(f"恢复配置失败: {str(e)}")
         return False
+
 
 # 创建全局配置管理器实例
 config_manager = ConfigManager()
@@ -245,6 +237,7 @@ if not validate_config(config_manager.get_all()):
     logger.warning("配置验证失败，使用默认配置")
     config_manager.reset_all()
 else:
-    migrated_config = migrate_config(config_manager.get_all(), config_manager.get('version', '1.0.0'))
+    migrated_config = migrate_config(
+        config_manager.get_all(), config_manager.get('version', '1.0.0'))
     config_manager._config = migrated_config
-    config_manager.save() 
+    config_manager.save()

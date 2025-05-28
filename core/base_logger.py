@@ -97,3 +97,8 @@ class BaseLogManager(QObject):
             self.exception_occurred.emit(e)
         except Exception as ex:
             self.logger(f"处理异常失败: {str(ex)}")
+
+    def performance(self, message: str):
+        """记录性能日志"""
+        self.logger.info(f"[PERFORMANCE] {message}")
+        self.log_message.emit(message, "PERFORMANCE")

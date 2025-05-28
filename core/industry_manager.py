@@ -27,26 +27,37 @@ class IndustryManager(QObject):
             config_dir: 配置目录
             cache_file: 缓存文件名
         """
-        self.log_manager = log_manager or LogManager()
-        self.log_manager.info(f"初始化行业管理器")
-        super().__init__()
-        self.config_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config")
-        self.cache_file = os.path.join(self.config_dir, cache_file)
-        self.cache_lock = Lock()
-        self.industry_data = {}
-        self.last_update_time = None
-        self.update_interval = timedelta(days=1)  # 默认1天更新一次
-
-        # 创建配置目录
-        if not os.path.exists(self.config_dir):
-            os.makedirs(self.config_dir, exist_ok=True)
-
-        # 加载缓存数据
-        self.load_cache()
+        try:
+            self.log_manager = log_manager or LogManager()
+            self.log_manager.info(f"初始化行业管理器")
+            super().__init__()
+            self.config_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "config")
+            self.cache_file = os.path.join(self.config_dir, cache_file)
+            self.cache_lock = Lock()
+            self.industry_data = {}
+            self.last_update_time = None
+            self.update_interval = timedelta(days=1)  # 默认1天更新一次
+            if not os.path.exists(self.config_dir):
+                try:
+                    os.makedirs(self.config_dir, exist_ok=True)
+                except Exception as e:
+                    self.log_manager.error(f"创建配置目录失败: {str(e)}")
+            try:
+                self.load_cache()
+            except Exception as e:
+                self.log_manager.error(f"加载行业数据缓存失败: {str(e)}")
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"IndustryManager初始化异常: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
+            else:
+                print(f"IndustryManager初始化异常: {e}")
 
     def load_cache(self) -> None:
         """加载缓存数据"""
+        start_time = time.time()
+        self.log_manager.info("[IndustryManager.load_cache] 开始")
         try:
             if os.path.exists(self.cache_file):
                 with self.cache_lock:
@@ -77,6 +88,10 @@ class IndustryManager(QObject):
             self.log_manager.info(f"自动重新获取行业数据！！！！")
             os.remove(self.cache_file)
             self.update_industry_data(True)
+        finally:
+            elapsed = int((time.time() - start_time) * 1000)
+            self.log_manager.performance(
+                f"[IndustryManager.load_cache] 结束，耗时: {elapsed} ms")
 
     def save_cache(self) -> None:
         """保存缓存数据"""

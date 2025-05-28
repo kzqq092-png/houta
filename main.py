@@ -13,18 +13,17 @@ from hikyuu.indicator import *
 from hikyuu.data import *
 from hikyuu import *
 from utils.exception_handler import ExceptionHandler
-from utils.performance_monitor import PerformanceMonitor
 from gui.widgets.chart_widget import ChartWidget
 from gui.menu_bar import MainMenuBar
 from gui.tool_bar import MainToolBar
 from utils.config_manager import ConfigManager
 from core.data_manager import DataManager
 from utils.theme import ThemeManager, get_theme_manager, Theme
-from utils.config_types import LoggingConfig, PerformanceConfig
+from utils.config_types import LoggingConfig
 from core.logger import LogManager, BaseLogManager, LogLevel
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
@@ -46,6 +45,11 @@ import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
 
+try:
+    from PyQt5.QtCore import qRegisterMetaType, QVector
+    qRegisterMetaType(QVector[int], "QVector<int>")
+except Exception:
+    pass
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -78,7 +82,6 @@ QPushButton {
     border: 1px solid #90caf9;
     padding: 6px 16px;
     color: #1565c0;
-    transition: background 0.2s;
 }
 QPushButton:hover {
     background: #90caf9;
@@ -219,14 +222,6 @@ class TradingGUI(QMainWindow):
             self.theme_manager = get_theme_manager(self.config_manager)
             self.theme_manager.theme_changed.connect(self.apply_theme)
 
-            # 初始化性能监控器
-            performance_config = self.config_manager.performance
-            self.performance_monitor = PerformanceMonitor(performance_config)
-            self.performance_monitor.performance_updated.connect(
-                self.handle_performance_update)
-            self.performance_monitor.alert_triggered.connect(
-                self.handle_performance_alert)
-
             # 初始化线程池
             self.thread_pool = QThreadPool()
             self.thread_pool.setMaxThreadCount(4)
@@ -282,10 +277,6 @@ class TradingGUI(QMainWindow):
 
             # 连接分析完成信号
             self.analysis_completed.connect(self.handle_analysis_complete)
-
-            # 连接性能更新信号
-            if hasattr(self, 'performance_updated'):
-                self.performance_updated.connect(self.update_performance)
 
             # 连接错误信号
             self.error_occurred.connect(self.handle_error)
@@ -752,9 +743,9 @@ class TradingGUI(QMainWindow):
             if hasattr(self, 'data_manager'):
                 self.data_manager.clear_cache()
             self.log_manager.info("数据源初始化完成")
-
             # 预加载数据
             self.preload_data()
+
             self.log_manager.info("数据初始化完成")
 
         except Exception as e:
@@ -1632,7 +1623,6 @@ class TradingGUI(QMainWindow):
                 self, 'only_favorites_checkbox', None)
             favorites = getattr(self, 'favorites', set())
             log_manager = getattr(self, 'log_manager', None)
-
             if not stock_list_cache:
                 if log_manager:
                     log_manager.warning("股票列表缓存为空，正在重新加载...")
@@ -1959,6 +1949,7 @@ class TradingGUI(QMainWindow):
     def create_right_panel(self):
         """Create right panel with analysis tools and stock screener (多Tab结构)"""
         try:
+            self.log_manager.info("创建右侧面板")
             self.right_panel = QWidget()
             self.right_layout = QVBoxLayout(self.right_panel)
             self.right_layout.setContentsMargins(5, 5, 5, 5)
@@ -1975,20 +1966,6 @@ class TradingGUI(QMainWindow):
                     self.analysis_widget, "多维分析", help_text="多维分析面板可对股票进行多角度分析，包括技术指标、基本面、资金流等。")
             except Exception as e:
                 self.log_manager.error(f"多维分析Tab初始化失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
-
-            # 个股分析Tab
-            try:
-                from components.stock_analysis import StockAnalysisWidget
-                self.stock_analysis_widget = StockAnalysisWidget(
-                    parent=self.right_tab,
-                    data_manager=self.data_manager,
-                    log_manager=self.log_manager
-                )
-                self.add_tab_with_toolbar(
-                    self.stock_analysis_widget, "个股分析", help_text="个股分析面板可查看单只股票的详细分析，包括财务、公告、新闻等。")
-            except Exception as e:
-                self.log_manager.error(f"个股分析Tab初始化失败: {str(e)}")
                 self.log_manager.error(traceback.format_exc())
 
             # 策略回测Tab
@@ -2511,7 +2488,6 @@ class TradingGUI(QMainWindow):
             if not hasattr(self, 'stock_list') or self.stock_list is None:
                 self.log_manager.warning("股票列表控件尚未初始化，跳过UI更新")
                 return
-
             if not hasattr(self, 'stock_list_cache') or not self.stock_list_cache:
                 self.log_manager.warning("股票列表缓存为空，尝试重新加载数据")
                 self.preload_data()
@@ -3627,168 +3603,6 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"显示单位转换器失败: {str(e)}")
 
-    def start_performance_monitoring(self):
-        """启动性能监控"""
-        try:
-            if self.performance_monitor is None:
-                self.log_manager.warning("性能监控未初始化，尝试重新初始化")
-                # 使用正确的配置访问方式
-                perf_config = self.config_manager.performance
-                self.performance_monitor = PerformanceMonitor(
-                    cpu_threshold=perf_config.cpu_threshold,
-                    memory_threshold=perf_config.memory_threshold,
-                    disk_threshold=perf_config.disk_threshold,
-                    log_manager=self.log_manager
-                )
-
-            if not self.performance_monitor.is_monitoring:
-                self.performance_monitor.start_monitoring()
-                self.log_manager.info("性能监控启动成功")
-            else:
-                self.log_manager.warning("性能监控已在运行中")
-
-        except Exception as e:
-            self.log_manager.error(f"启动性能监控失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
-
-    def handle_performance_update(self, metrics: dict):
-        """处理性能指标更新
-
-        Args:
-            metrics: 性能指标字典
-        """
-        try:
-            # 更新性能显示
-            self.update_performance_metrics(metrics)
-
-            # 检查性能警告
-            self.check_performance(metrics)
-
-        except Exception as e:
-            self.log_manager.error(f"处理性能更新失败: {str(e)}")
-
-    def handle_performance_alert(self, message: str):
-        """处理性能告警
-
-        Args:
-            message: 告警消息
-        """
-        try:
-            # 显示告警消息
-            self.log_manager.warning(message)
-
-            # 如果有告警面板，显示告警
-            if hasattr(self, 'warning_area'):
-                current_time = safe_strftime(datetime.now(), '%H:%M:%S')
-                self.warning_area.append(f"[{current_time}] {message}")
-
-        except Exception as e:
-            self.log_manager.error(f"处理性能告警失败: {str(e)}")
-
-    def check_performance(self, metrics: dict):
-        """检查性能指标
-
-        Args:
-            metrics: 性能指标字典
-        """
-        try:
-            # 检查CPU使用率
-            if metrics['cpu_usage'] > self.config_manager.performance.cpu_threshold:
-                self.handle_performance_alert(
-                    f"CPU使用率过高: {metrics['cpu_usage']:.1f}%"
-                )
-
-            # 检查内存使用率
-            if metrics['memory_usage'] > self.config_manager.performance.memory_threshold:
-                self.handle_performance_alert(
-                    f"内存使用率过高: {metrics['memory_usage']:.1f}%"
-                )
-
-            # 检查响应时间
-            for func, time in metrics['response_times'].items():
-                if time > self.config_manager.performance.response_threshold:
-                    self.handle_performance_alert(
-                        f"函数 {func} 响应时间过长: {time:.2f}秒"
-                    )
-
-        except Exception as e:
-            self.log_manager.error(f"检查性能指标失败: {str(e)}")
-
-    def cleanup_memory(self):
-        """清理内存"""
-        try:
-            # 清理图表缓存
-            if hasattr(self, 'chart_widget'):
-                self.chart_widget.clear()
-
-            # 清理数据缓存
-            if hasattr(self, 'data_cache'):
-                self.data_cache.clear()
-
-            # 清理日志缓存
-            if hasattr(self, 'log_cache'):
-                self.log_cache.clear()
-
-            # 强制垃圾回收
-            import gc
-            gc.collect()
-
-        except Exception as e:
-            self.log_manager.error(f"清理内存失败: {str(e)}")
-
-    def update_performance_metrics(self, metrics: dict):
-        """更新性能指标显示
-
-        Args:
-            metrics: 性能指标字典
-        """
-        try:
-            # 更新CPU使用率
-            cpu_usage = metrics.get('cpu_usage', 0)
-            self.cpu_label.setText(f"{cpu_usage:.1f}%")
-            self.cpu_progress.setValue(int(cpu_usage))
-            self.cpu_progress.setStyleSheet(
-                self._get_progress_style(cpu_usage))
-
-            # 更新内存使用率
-            memory_usage = metrics.get('memory_usage', 0)
-            self.memory_label.setText(f"{memory_usage:.1f}%")
-            self.memory_progress.setValue(int(memory_usage))
-            self.memory_progress.setStyleSheet(
-                self._get_progress_style(memory_usage))
-
-            # 更新磁盘使用率
-            disk_usage = metrics.get('disk_usage', 0)
-            self.disk_label.setText(f"{disk_usage:.1f}%")
-            self.disk_progress.setValue(int(disk_usage))
-            self.disk_progress.setStyleSheet(
-                self._get_progress_style(disk_usage))
-
-            # 更新响应时间
-            response_time = metrics.get('response_time', 0)
-            self.response_label.setText(f"{response_time:.1f}ms")
-
-            # 更新线程池状态
-            active_threads = metrics.get('active_threads', 0)
-            self.threadpool_label.setText(str(active_threads))
-
-            # 更新缓存状态
-            cache_status = metrics.get('cache_status', '0/0')
-            self.cache_label.setText(cache_status)
-
-            # 更新渲染时间
-            render_time = metrics.get('render_time', 0)
-            self.render_time_label.setText(f"{render_time:.1f}ms")
-
-            # 检查性能阈值并显示警告
-            self._check_performance_thresholds(metrics)
-
-        except Exception as e:
-            error_msg = f"更新性能指标失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
     def update_trend_chart(self, equity_curve: list) -> None:
         """更新资金曲线图表"""
         try:
@@ -4012,168 +3826,57 @@ class TradingGUI(QMainWindow):
             print(f"错误处理失败: {str(e)}")
             print(f"原始错误: {error_msg}")
 
-    def init_performance_display(self):
-        """初始化性能指标显示面板"""
+    def update_performance_metrics(self, metrics: dict):
+        """更新性能指标显示（含动画、历史曲线、动态色彩）"""
         try:
-            # 创建性能指标面板
-            self.performance_panel = QWidget()
-            self.performance_panel.setObjectName("performancePanel")
-            layout = QVBoxLayout(self.performance_panel)
-
-            # 创建性能监控组
-            monitor_group = QGroupBox("系统性能监控")
-            monitor_layout = QGridLayout()
-            monitor_layout.setContentsMargins(5, 15, 5, 5)
-
-            # CPU使用率
-            self.cpu_label = QLabel("0%")
-            self.cpu_label.setFixedHeight(25)
-            self.cpu_progress = QProgressBar()
-            self.cpu_progress.setRange(0, 100)
-            monitor_layout.addWidget(QLabel("CPU使用率:"), 0, 0)
-            monitor_layout.addWidget(self.cpu_label, 0, 1)
-            monitor_layout.addWidget(self.cpu_progress, 0, 2)
-
-            # 内存使用率
-            self.memory_label = QLabel("0%")
-            self.memory_label.setFixedHeight(25)
-            self.memory_progress = QProgressBar()
-            self.memory_progress.setRange(0, 100)
-            monitor_layout.addWidget(QLabel("内存使用率:"), 1, 0)
-            monitor_layout.addWidget(self.memory_label, 1, 1)
-            monitor_layout.addWidget(self.memory_progress, 1, 2)
-
-            # 磁盘使用率
-            self.disk_label = QLabel("0%")
-            self.disk_label.setFixedHeight(25)
-            self.disk_progress = QProgressBar()
-            self.disk_progress.setRange(0, 100)
-            monitor_layout.addWidget(QLabel("磁盘使用率:"), 2, 0)
-            monitor_layout.addWidget(self.disk_label, 2, 1)
-            monitor_layout.addWidget(self.disk_progress, 2, 2)
-
-            # 响应时间
-            self.response_label = QLabel("0ms")
-            self.response_label.setFixedHeight(25)
-            monitor_layout.addWidget(QLabel("响应时间:"), 3, 0)
-            monitor_layout.addWidget(self.response_label, 3, 1)
-
-            # 线程池活跃线程数
-            self.threadpool_label = QLabel("0")
-            self.threadpool_label.setFixedHeight(25)
-            monitor_layout.addWidget(QLabel("线程池活跃线程:"), 4, 0)
-            monitor_layout.addWidget(self.threadpool_label, 4, 1)
-
-            # 添加图表缓存状态
-            self.cache_label = QLabel("0/100")
-            self.cache_label.setFixedHeight(25)
-            monitor_layout.addWidget(QLabel("图表缓存状态:"), 5, 0)
-            monitor_layout.addWidget(self.cache_label, 5, 1)
-
-            # 添加渲染性能指标
-            self.render_time_label = QLabel("0ms")
-            self.render_time_label.setFixedHeight(25)
-            monitor_layout.addWidget(QLabel("渲染时间:"), 6, 0)
-            monitor_layout.addWidget(self.render_time_label, 6, 1)
-
-            monitor_group.setLayout(monitor_layout)
-            layout.addWidget(monitor_group)
-
-            # 创建告警区域
-            warning_group = QGroupBox("性能告警")
-            warning_layout = QVBoxLayout()
-            warning_layout.setContentsMargins(5, 15, 5, 5)
-            self.warning_area = QTextEdit()
-            self.warning_area.setReadOnly(True)
-            self.warning_area.setMaximumHeight(100)
-            warning_layout.addWidget(self.warning_area)
-
-            # 添加告警控制
-            warning_controls = QHBoxLayout()
-            clear_warnings_btn = QPushButton("清除告警")
-            clear_warnings_btn.clicked.connect(self.clear_warnings)
-            export_warnings_btn = QPushButton("导出告警")
-            export_warnings_btn.clicked.connect(self.export_warnings)
-            warning_controls.addWidget(clear_warnings_btn)
-            warning_controls.addWidget(export_warnings_btn)
-            warning_layout.addLayout(warning_controls)
-
-            warning_group.setLayout(warning_layout)
-            layout.addWidget(warning_group)
-
-            # 创建性能优化建议区域
-            optimization_group = QGroupBox("性能优化建议")
-            optimization_layout = QVBoxLayout()
-            optimization_layout.setContentsMargins(5, 15, 5, 5)
-            self.optimization_area = QTextEdit()
-            self.optimization_area.setReadOnly(True)
-            self.optimization_area.setMaximumHeight(100)
-            optimization_layout.addWidget(self.optimization_area)
-            optimization_group.setLayout(optimization_layout)
-            layout.addWidget(optimization_group)
-
-            # 添加到右侧面板
-            if not self.right_panel.layout():
-                self.right_panel.setLayout(QVBoxLayout())
-            self.right_panel.layout().addWidget(self.performance_panel)
-
-            # 设置样式
-            self.performance_panel.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #cccccc;
-                    border-radius: 5px;
-                    text-align: center;
-                    background-color: #f5f5f5;
-                }
-                QProgressBar::chunk {
-                    background-color: #4CAF50;
-                    border-radius: 4px;
-                }
-                QLabel {
-                    font-size: 12px;
-                    color: #333333;
-                }
-                QGroupBox {
-                    font-weight: bold;
-                    border: 1px solid #cccccc;
-                    border-radius: 6px;
-                    margin-top: 12px;
-                    padding: 10px;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    left: 10px;
-                    padding: 0 5px;
-                    color: #1976D2;
-                }
-                QTextEdit {
-                    border: 1px solid #cccccc;
-                    border-radius: 4px;
-                    background-color: #ffffff;
-                    font-family: "Consolas", monospace;
-                }
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 5px 10px;
-                }
-                QPushButton:hover {
-                    background-color: #1976D2;
-                }
-                QPushButton:pressed {
-                    background-color: #0D47A1;
-                }
-            """)
-
-            # 启动性能监控
-            self.start_performance_monitoring()
-
-            self.log_manager.info("性能监控面板初始化完成")
-
+            cpu_usage = metrics.get('cpu_usage', 0)
+            memory_usage = metrics.get('memory_usage', 0)
+            disk_usage = metrics.get('disk_usage', 0)
+            self.cpu_label.setText(f"{cpu_usage:.1f}%")
+            self.memory_label.setText(f"{memory_usage:.1f}%")
+            self.disk_label.setText(f"{disk_usage:.1f}%")
+            self.set_progress_with_animation(self.cpu_progress, int(cpu_usage))
+            self.set_progress_with_animation(
+                self.memory_progress, int(memory_usage))
+            self.set_progress_with_animation(
+                self.disk_progress, int(disk_usage))
+            # 维护历史数据
+            self.cpu_history.append(cpu_usage)
+            self.memory_history.append(memory_usage)
+            self.disk_history.append(disk_usage)
+            max_len = 60
+            self.cpu_history = self.cpu_history[-max_len:]
+            self.memory_history = self.memory_history[-max_len:]
+            self.disk_history = self.disk_history[-max_len:]
+            self.cpu_curve.setData(self.cpu_history)
+            self.memory_curve.setData(self.memory_history)
+            self.disk_curve.setData(self.disk_history)
+            # 其他指标
+            self.response_label.setText(
+                f"{metrics.get('response_time', 0):.1f}ms")
+            self.threadpool_label.setText(
+                str(metrics.get('active_threads', 0)))
+            self.cache_label.setText(str(metrics.get('cache_status', '0/0')))
+            self.render_time_label.setText(
+                f"{metrics.get('render_time', 0):.1f}ms")
         except Exception as e:
-            self.log_manager.error(f"初始化性能监控面板失败: {str(e)}")
+            print(f"更新性能指标: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"更新性能指标: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
+
+    def toggle_performance_dialog(self):
+        """显示或隐藏性能监控弹窗"""
+        if not hasattr(self, 'performance_dialog'):
+            self.init_performance_display()
+        if self.performance_dialog.isVisible():
+            self.performance_dialog.hide()
+            if hasattr(self, 'performance_monitor') and self.performance_monitor.is_monitoring:
+                self.performance_monitor.stop_monitoring()
+        else:
+            self.performance_dialog.show()
+            if hasattr(self, 'performance_monitor') and not self.performance_monitor.is_monitoring:
+                self.performance_monitor.start_monitoring()
 
     def clear_warnings(self):
         """清除性能告警"""
@@ -4200,39 +3903,6 @@ class TradingGUI(QMainWindow):
 
         except Exception as e:
             self.log_manager.error(f"导出性能告警失败: {str(e)}")
-
-    def update_performance_metrics(self, metrics: dict):
-        """更新性能指标显示
-
-        Args:
-            metrics: 性能指标字典
-        """
-        try:
-            # 更新CPU使用率
-            cpu_usage = metrics.get('cpu_usage', 0)
-            self.cpu_label.setText(f"{cpu_usage:.1f}%")
-            self.cpu_progress.setValue(int(cpu_usage))
-            self.cpu_progress.setStyleSheet(
-                self._get_progress_style(cpu_usage))
-
-            # 更新内存使用率
-            memory_usage = metrics.get('memory_usage', 0)
-            self.memory_label.setText(f"{memory_usage:.1f}%")
-            self.memory_progress.setValue(int(memory_usage))
-            self.memory_progress.setStyleSheet(
-                self._get_progress_style(memory_usage))
-
-            # 更新磁盘使用率
-            disk_usage = metrics.get('disk_usage', 0)
-            self.disk_label.setText(f"{disk_usage:.1f}%")
-            self.disk_progress.setValue(int(disk_usage))
-            self.disk_progress.setStyleSheet(
-                self._get_progress_style(disk_usage))
-        except Exception as e:
-            print(f"更新性能指标: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"更新性能指标: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
 
     def show_log_panel(self, *args, **kwargs):
         """显示日志区"""
@@ -5110,7 +4780,6 @@ class TradingGUI(QMainWindow):
                 self.data_manager.set_data_source("tonghuashun")
             else:  # 默认使用 Hikyuu
                 self.data_manager.set_data_source("hikyuu")
-
             # 重新加载数据
             self.preload_data()
 
@@ -5444,9 +5113,9 @@ def main():
         print("初始化日志管理器完成")
 
         # Create main window
-        print("创建主窗口")
+        logger.info("创建主窗口")
         window = TradingGUI()
-        print("创建主窗口完成")
+        logger.info("创建主窗口完成")
 
         # Install global exception handler
         global_handler = GlobalExceptionHandler(window)
@@ -5454,7 +5123,7 @@ def main():
 
         # Show window
         window.show()
-        print("显示主窗口完成")
+        logger.info("显示主窗口完成")
 
         # Start event loop
         return app.exec_()

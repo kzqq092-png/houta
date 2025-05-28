@@ -430,3 +430,29 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             LogManager.log(f"处理策略变更失败: {str(e)}", "error")
+
+    def refresh(self) -> None:
+        """
+        刷新交易控件内容，异常只记录日志不抛出。
+        """
+        try:
+            self.clear_data()
+            self.calculate_signals()
+        except Exception as e:
+            error_msg = f"刷新交易控件失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            # 发射异常信号，主窗口可捕获弹窗
+            self.error_occurred.emit(error_msg)
+
+    def update(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
+
+    def reload(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()

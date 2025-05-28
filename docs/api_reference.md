@@ -247,26 +247,6 @@ def detect_and_handle_outliers(series, n_sigmas=3.0):
 
 ## 工具模块
 
-### 性能监控 (utils/performance_monitor.py)
-
-#### PerformanceMonitor
-系统性能监控类。
-
-```python
-class PerformanceMonitor:
-    def start_monitoring(self):
-        """启动性能监控"""
-        
-    def stop_monitoring(self):
-        """停止性能监控"""
-        
-    def get_metrics(self) -> dict:
-        """获取性能指标
-        
-        Returns:
-            性能指标数据
-        """
-```
 
 ### 配置管理 (utils/config_manager.py)
 
@@ -292,27 +272,6 @@ class ConfigManager:
 
 ### optimization/performance_optimizer.py
 
-```python
-class PerformanceOptimizer:
-    """性能优化器类(已弃用)"""
-    
-    def monitor_operation(self, operation: str):
-        """监控操作执行时间"""
-        
-    def end_operation(self, operation: str) -> float:
-        """结束操作监控"""
-```
-
-### utils/performance_config.py
-
-```python
-@dataclass
-class PerformanceConfig:
-    """性能监控配置类(已弃用)"""
-    update_interval: float = 1.0
-    cpu_threshold: float = 80.0
-    memory_threshold: float = 80.0
-```
 
 ### data/data_preprocessing.py
 

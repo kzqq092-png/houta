@@ -5,11 +5,50 @@
 """
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QTextBlock, QColor, QTextCursor
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
+from PyQt5.QtGui import QTextBlock, QColor, QTextCursor, QCursor
 from datetime import datetime
 from core.logger import LogManager, LogLevel
 import traceback
+
+
+class DragHandle(QWidget):
+    """顶部可拖动分隔条"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(4)
+        self.setCursor(Qt.SizeVerCursor)
+        self._dragging = False
+        self._drag_start_pos = None
+        self._orig_height = None
+        self.setStyleSheet(
+            "background: #e0e0e0; border-top: 1px solid #bdbdbd; border-bottom: 1px solid #bdbdbd;")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._dragging = True
+            self._drag_start_pos = event.globalPos()
+            self._orig_height = self.parentWidget().height() if self.parentWidget() else None
+            event.accept()
+        else:
+            event.ignore()
+
+    def mouseMoveEvent(self, event):
+        if self._dragging and self._drag_start_pos and self._orig_height is not None:
+            dy = event.globalY() - self._drag_start_pos.y()
+            new_height = max(60, self._orig_height - dy)
+            if self.parentWidget():
+                self.parentWidget().setFixedHeight(new_height)
+            event.accept()
+        else:
+            event.ignore()
+
+    def mouseReleaseEvent(self, event):
+        self._dragging = False
+        self._drag_start_pos = None
+        self._orig_height = None
+        event.accept()
 
 
 class LogWidget(QWidget):
@@ -64,11 +103,14 @@ class LogWidget(QWidget):
     def init_ui(self):
         """初始化UI（风格与策略设置区一致）"""
         try:
-            # 创建主布局
             layout = QVBoxLayout(self)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
             layout.setAlignment(Qt.AlignTop)
+
+            # 顶部可拖动分隔条
+            self.drag_handle = DragHandle(self)
+            layout.addWidget(self.drag_handle)
 
             toolbar_layout = QHBoxLayout()
             toolbar_layout.setContentsMargins(-2, -2, -2, -2)
@@ -331,15 +373,15 @@ class LogWidget(QWidget):
                     width: 0;
                 }}
             """)
-            self.update()
-            self.adjustSize()
+            # self.update()  # 移除递归调用
+            # self.adjustSize()  # 移除递归调用
         except Exception as e:
             error_msg = f"应用样式失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
-            self.update()
-            self.adjustSize()
+            # self.update()  # 移除递归调用
+            # self.adjustSize()  # 移除递归调用
 
     def add_log(self, message: str, level: str = "INFO"):
         """添加日志，增加去重逻辑，并修复自动滚动逻辑"""
@@ -829,6 +871,27 @@ class LogWidget(QWidget):
             if scroll_to_end or not self.pause_scroll:
                 QTimer.singleShot(
                     0, lambda: self.log_text.moveCursor(QTextCursor.End))
-            self.apply_style()
-            self.update()
-            self.adjustSize()
+            # self.apply_style()  # 移除递归调用
+            # self.update()  # 移除递归调用
+            # self.adjustSize()  # 移除递归调用
+
+    def refresh(self) -> None:
+        """
+        刷新日志控件内容，异常只记录日志不抛出。
+        """
+        try:
+            self.refresh_display(scroll_to_end=True)
+        except Exception as e:
+            self.log_manager.error(f"刷新日志控件失败: {str(e)}")
+
+    def update(self) -> None:
+        """
+        只做Qt刷新，不再递归调用refresh。
+        """
+        QWidget.update(self)
+
+    def reload(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()

@@ -25,25 +25,20 @@ class LogManager(BaseLogManager):
         Args:
             config: 日志配置对象
         """
-        super().__init__()
-
-        # 使用默认配置
-        self.config = config or LoggingConfig()
-
-        # 验证配置
-        is_valid, error_msg = self.config.validate()
-        if not is_valid:
-            raise ValueError(f"日志配置无效: {error_msg}")
-
-        # 配置日志记录器
-        self._setup_logger()
-
-        # 设置异步日志
-        if self.config.async_logging:
-            from concurrent.futures import ThreadPoolExecutor
-            self.log_queue = []
-            self.executor = ThreadPoolExecutor(
-                max_workers=self.config.worker_threads)
+        try:
+            super().__init__()
+            self.config = config or LoggingConfig()
+            is_valid, error_msg = self.config.validate()
+            if not is_valid:
+                print(f"日志配置无效: {error_msg}")
+            self._setup_logger()
+            if self.config.async_logging:
+                from concurrent.futures import ThreadPoolExecutor
+                self.log_queue = []
+                self.executor = ThreadPoolExecutor(
+                    max_workers=self.config.worker_threads)
+        except Exception as e:
+            print(f"LogManager初始化异常: {e}")
 
     def _setup_logger(self):
         """设置日志记录器"""
@@ -124,22 +119,6 @@ class LogManager(BaseLogManager):
             level: 日志级别
         """
         try:
-            # 获取调用者class和函数名
-            # frame = inspect.currentframe()
-            # outer_frames = inspect.getouterframes(frame)
-            # # 默认
-            # class_name = "Global"
-            # func_name = ""
-            # for record in outer_frames:
-            #     if record.function not in ("_write_log", "log", "_async_log"):
-            #         func_name = record.function
-            #         # 尝试获取self
-            #         if 'self' in record.frame.f_locals:
-            #             class_name = type(
-            #                 record.frame.f_locals['self']).__name__
-            #         break
-            # prefix = f"[{class_name}.{func_name}]"
-            # message = f"{prefix} {message}"
             # 发送信号
             self.log_message.emit(message, level.value)
 
@@ -198,3 +177,8 @@ class LogManager(BaseLogManager):
 
         # 记录配置变更
         self.info("日志配置已更新")
+
+    def performance(self, message: str):
+        """记录耗时性能日志"""
+        self.logger.info(f"[PERFORMANCE] {message}")
+        self.log_message.emit(message, "PERFORMANCE")

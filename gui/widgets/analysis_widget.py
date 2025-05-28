@@ -29,7 +29,6 @@ from indicators_algo import get_talib_indicator_list, get_talib_category, calc_m
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
-import concurrent.futures
 
 # --- 修复 QVector<int> 警告 ---
 try:
@@ -45,6 +44,7 @@ class AnalysisWidget(QWidget):
     # 定义信号
     indicator_changed = pyqtSignal(str)  # 指标变更信号
     analysis_completed = pyqtSignal(dict)
+    error_occurred = pyqtSignal(str)  # 新增错误信号
 
     data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
 
@@ -54,24 +54,41 @@ class AnalysisWidget(QWidget):
         Args:
             config_manager: Optional ConfigManager instance to use
         """
+
+        self.log_manager = LogManager()
+        self.log_manager.info("初始化分析控件")
+
         super().__init__()
 
         # 初始化变量
         self.current_stock = None
         self.current_kdata = None
         self.current_indicators = []
-        self.log_manager = LogManager()
+        self.rotation_worker = None
         # 初始化UI
-        self.init_ui()
-
-        # 应用主题
-        self.theme_manager = get_theme_manager(
-            config_manager or ConfigManager())
-        self.theme_manager.apply_theme(self)
+        try:
+            self.init_ui()
+        except Exception as e:
+            msg = f"AnalysisWidget UI初始化失败: {str(e)}"
+            self.log_manager.error(msg)
+            self.error_occurred.emit(msg)
+        try:
+            self.log_manager.info("初始化分析控件主题")
+            self.theme_manager = get_theme_manager(
+                config_manager or ConfigManager())
+            self.theme_manager.apply_theme(self)
+            self.log_manager.info("初始化分析控件主题完成")
+        except Exception as e:
+            msg = f"AnalysisWidget主题应用失败: {str(e)}"
+            self.log_manager.error(msg)
+            self.error_occurred.emit(msg)
+        # 自动连接RotationWorker信号
+        self._connect_rotation_worker_signals()
 
     def init_ui(self):
         """初始化UI"""
         try:
+            self.log_manager.info("初始化分析控件UI")
             # 创建主布局
             if self.layout() is None:
                 self.main_layout = QVBoxLayout(self)
@@ -113,21 +130,37 @@ class AnalysisWidget(QWidget):
             raise
 
     def run_button_analysis_async(self, button, analysis_func, *args, **kwargs):
-        """通用按钮防抖+异步分析工具，分析时禁用按钮，结束后恢复，主线程不卡顿"""
-        original_style = button.styleSheet()  # 保存原始样式
-        button.setEnabled(False)
-        button.setStyleSheet("background-color: #888888; color: white;")
+        """
+        通用按钮防抖+异步分析工具，点击后按钮文本变为"取消"，再次点击时中断分析，结束后恢复原文本。
+        """
+        original_text = button.text()
+        button.setText("取消")
+        button.setStyleSheet("")
+        button._interrupted = False
+
+        def on_cancel():
+            button._interrupted = True
+            button.setText(original_text)
+
+        # 绑定取消逻辑
+        button.clicked.disconnect()
+        button.clicked.connect(on_cancel)
 
         def task():
             try:
-                analysis_func(*args, **kwargs)
+                if not getattr(button, '_interrupted', False):
+                    analysis_func(*args, **kwargs)
             except Exception as e:
+                msg = f"分析异常: {str(e)}"
                 if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
+                    self.log_manager.error(msg)
+                self.error_occurred.emit(msg)
 
         def on_done(future):
-            button.setEnabled(True)
-            button.setStyleSheet(original_style)  # 恢复原始样式
+            button.setText(original_text)
+            button.clicked.disconnect()
+            button.clicked.connect(lambda: self.run_button_analysis_async(
+                button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(task)
@@ -174,14 +207,24 @@ class AnalysisWidget(QWidget):
             raise
 
     def calculate_indicators(self):
-        """根据主窗口统一接口获取当前指标及参数，计算并展示分析结果，修复无指标问题"""
+        start_time = time.time()
+        self.log_manager.info("[AnalysisWidget.calculate_indicators] 开始")
         try:
+            self.indicator_table.setRowCount(0)
             if not self.current_kdata:
+                self.indicator_table.setRowCount(1)
+                for col in range(self.indicator_table.columnCount()):
+                    self.indicator_table.setItem(
+                        0, col, QTableWidgetItem("无数据"))
                 return
             from indicators_algo import get_talib_indicator_list, get_all_indicators_by_category
             talib_list = get_talib_indicator_list()
             category_map = get_all_indicators_by_category()
             if not talib_list or not category_map:
+                self.indicator_table.setRowCount(1)
+                for col in range(self.indicator_table.columnCount()):
+                    self.indicator_table.setItem(
+                        0, col, QTableWidgetItem("无数据"))
                 self.log_manager.log(
                     "未检测到任何ta-lib指标，请检查ta-lib安装或数据源！", LogLevel.ERROR)
                 return
@@ -189,29 +232,143 @@ class AnalysisWidget(QWidget):
             while main_window and not hasattr(main_window, 'get_current_indicators'):
                 main_window = main_window.parentWidget()
             if not main_window or not hasattr(main_window, 'get_current_indicators'):
+                self.indicator_table.setRowCount(1)
+                for col in range(self.indicator_table.columnCount()):
+                    self.indicator_table.setItem(
+                        0, col, QTableWidgetItem("无数据"))
                 self.log_manager.log("未找到主窗口统一指标接口", LogLevel.ERROR)
                 return
             indicators = main_window.get_current_indicators()
-            self.indicator_table.setRowCount(len(indicators))
-            for i, ind in enumerate(indicators):
+            if not indicators:
+                self.indicator_table.setRowCount(1)
+                for col in range(self.indicator_table.columnCount()):
+                    self.indicator_table.setItem(
+                        0, col, QTableWidgetItem("无数据"))
+                return
+            row_idx = 0
+            for ind in indicators:
                 name = ind.get('name')
                 params = ind.get('params', {})
                 ind_type = ind.get('type', '')
-                # 根据指标类型调用对应分析方法
-                if name.startswith('MA'):
-                    self.calculate_ma(params)
-                elif name == 'MACD':
-                    self.calculate_macd(params)
-                elif name == 'KDJ':
-                    self.calculate_kdj(params)
-                elif name == 'RSI':
-                    self.calculate_rsi(params)
-                elif name == 'BOLL':
-                    self.calculate_boll(params)
+                value, status, suggestion = "-", "-", "观望"
+                try:
+                    if name.startswith('MA'):
+                        ma = self.calculate_ma(params)
+                        if ma is not None and len(ma) > 0:
+                            value = f"{ma[-1]:.2f}"
+                            close = self.current_kdata['close']
+                            if close[-1] > ma[-1]:
+                                status = "金叉"
+                                suggestion = "买入"
+                            else:
+                                status = "死叉"
+                                suggestion = "卖出"
+                    elif name == 'MACD':
+                        macd = self.calculate_macd(params)
+                        if macd is not None and isinstance(macd, tuple) and len(macd) == 3:
+                            dif, dea, hist = macd
+                            value = f"DIF:{dif[-1]:.2f} DEA:{dea[-1]:.2f}"
+                            if dif[-1] > dea[-1]:
+                                status = "金叉"
+                                suggestion = "买入"
+                            else:
+                                status = "死叉"
+                                suggestion = "卖出"
+                    elif name == 'KDJ':
+                        kdj = self.calculate_kdj(params)
+                        if kdj is not None and isinstance(kdj, tuple) and len(kdj) == 3:
+                            k, d, j = kdj
+                            value = f"K:{k[-1]:.2f} D:{d[-1]:.2f} J:{j[-1]:.2f}"
+                            if k[-1] > d[-1]:
+                                status = "多头"
+                                suggestion = "买入"
+                            else:
+                                status = "空头"
+                                suggestion = "卖出"
+                    elif name == 'RSI':
+                        rsi = self.calculate_rsi(params)
+                        if rsi is not None and len(rsi) > 0:
+                            value = f"{rsi[-1]:.2f}"
+                            if rsi[-1] > 70:
+                                status = "超买"
+                                suggestion = "卖出"
+                            elif rsi[-1] < 30:
+                                status = "超卖"
+                                suggestion = "买入"
+                            else:
+                                status = "中性"
+                                suggestion = "观望"
+                    elif name == 'BOLL':
+                        boll = self.calculate_boll(params)
+                        if boll is not None and isinstance(boll, tuple) and len(boll) == 3:
+                            mid, upper, lower = boll
+                            value = f"中轨:{mid[-1]:.2f} 上轨:{upper[-1]:.2f} 下轨:{lower[-1]:.2f}"
+                            close = self.current_kdata['close']
+                            if close[-1] > upper[-1]:
+                                status = "突破上轨"
+                                suggestion = "卖出"
+                            elif close[-1] < lower[-1]:
+                                status = "跌破下轨"
+                                suggestion = "买入"
+                            else:
+                                status = "区间"
+                                suggestion = "观望"
+                    elif name == 'ATR':
+                        atr = self.calculate_atr(params)
+                        if atr is not None and len(atr) > 0:
+                            value = f"{atr[-1]:.2f}"
+                            status = "波动率"
+                            suggestion = "观望"
+                    elif name == 'OBV':
+                        obv = self.calculate_obv(params)
+                        if obv is not None and len(obv) > 0:
+                            value = f"{obv[-1]:.2f}"
+                            status = "量能"
+                            suggestion = "观望"
+                    elif name == 'CCI':
+                        cci = self.calculate_cci(params)
+                        if cci is not None and len(cci) > 0:
+                            value = f"{cci[-1]:.2f}"
+                            if cci[-1] > 100:
+                                status = "超买"
+                                suggestion = "卖出"
+                            elif cci[-1] < -100:
+                                status = "超卖"
+                                suggestion = "买入"
+                            else:
+                                status = "中性"
+                                suggestion = "观望"
+                    # 结果填充
+                    self.indicator_table.insertRow(row_idx)
+                    self.indicator_table.setItem(
+                        row_idx, 0, QTableWidgetItem(name))
+                    self.indicator_table.setItem(
+                        row_idx, 1, QTableWidgetItem(value))
+                    self.indicator_table.setItem(
+                        row_idx, 2, QTableWidgetItem(status))
+                    self.indicator_table.setItem(
+                        row_idx, 3, QTableWidgetItem(suggestion))
+                    row_idx += 1
+                except Exception as e:
+                    self.log_manager.log(
+                        f"分析指标{name}异常: {str(e)}", LogLevel.ERROR)
+                    from PyQt5.QtWidgets import QMessageBox
+                    QMessageBox.warning(
+                        self, "分析异常", f"分析指标{name}异常: {str(e)}")
+            if row_idx == 0:
+                self.indicator_table.setRowCount(1)
+                for col in range(self.indicator_table.columnCount()):
+                    self.indicator_table.setItem(
+                        0, col, QTableWidgetItem("无数据"))
             self.indicator_table.resizeColumnsToContents()
         except Exception as e:
-            self.log_manager.log(
-                f"计算技术指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"计算技术指标失败: {str(e)}", LogLevel.ERROR)
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "分析异常", f"计算技术指标失败: {str(e)}")
+        finally:
+            elapsed = int((time.time() - start_time) * 1000)
+            self.log_manager.performance(
+                f"[AnalysisWidget.calculate_indicators] 结束，耗时: {elapsed} ms")
 
     def calculate_ma(self, params=None):
         """计算MA指标，参数从主窗口统一接口获取"""
@@ -274,36 +431,30 @@ class AnalysisWidget(QWidget):
                 f"计算BOLL指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_atr(self, params=None):
-        """计算ATR指标，参数从主窗口统一接口获取"""
         try:
             if self.current_kdata is None:
                 return None
-            period = params.get('period', 14) if params else 14
-            return calc_atr(self.current_kdata, period)
+            n = params.get('period', 14) if params else 14
+            return calc_atr(self.current_kdata, n)
         except Exception as e:
-            self.log_manager.log(
-                f"计算ATR指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"计算ATR指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_obv(self, params=None):
-        """计算OBV指标，参数从主窗口统一接口获取"""
         try:
             if self.current_kdata is None:
                 return None
             return calc_obv(self.current_kdata)
         except Exception as e:
-            self.log_manager.log(
-                f"计算OBV指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"计算OBV指标失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_cci(self, params=None):
-        """计算CCI指标，参数从主窗口统一接口获取"""
         try:
             if self.current_kdata is None:
                 return None
-            period = params.get('period', 14) if params else 14
-            return calc_cci(self.current_kdata, period)
+            n = params.get('period', 14) if params else 14
+            return calc_cci(self.current_kdata, n)
         except Exception as e:
-            self.log_manager.log(
-                f"计算CCI指标失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"计算CCI指标失败: {str(e)}", LogLevel.ERROR)
 
     def clear_indicators(self):
         """清除指标"""
@@ -416,43 +567,51 @@ class AnalysisWidget(QWidget):
     def identify_patterns(self):
         """识别形态"""
         try:
-            if not self.current_kdata:
-                return
-
-            # 清空结果表格
             self.pattern_table.setRowCount(0)
-
-            # 获取参数
+            if not self.current_kdata:
+                self.pattern_table.setRowCount(1)
+                for col in range(self.pattern_table.columnCount()):
+                    self.pattern_table.setItem(0, col, QTableWidgetItem("无数据"))
+                return
+            # ...原有识别逻辑...
+            found = False
             threshold = self.threshold_spin.value() / 100
             min_size = self.min_size_spin.value()
-
-            # 识别选中的形态
             for pattern, check in self.pattern_checks.items():
                 if not check.isChecked():
                     continue
-
                 if pattern == "头肩顶/底":
                     self.find_head_shoulders(threshold, min_size)
+                    found = True
                 elif pattern == "双顶/双底":
                     self.find_double_tops_bottoms(threshold, min_size)
+                    found = True
                 elif pattern == "三重顶/底":
                     self.find_triple_tops_bottoms(threshold, min_size)
+                    found = True
                 elif pattern == "上升/下降三角形":
                     self.find_triangles(threshold, min_size)
+                    found = True
                 elif pattern == "旗形/三角旗":
                     self.find_flags(threshold, min_size)
+                    found = True
                 elif pattern == "楔形":
                     self.find_wedges(threshold, min_size)
+                    found = True
                 elif pattern == "突破形态":
                     self.find_breakouts(threshold, min_size)
+                    found = True
                 elif pattern == "缺口形态":
                     self.find_gaps(threshold, min_size)
+                    found = True
                 elif pattern == "岛型反转":
                     self.find_island_reversals(threshold, min_size)
-
-            # 调整列宽
+                    found = True
+            if not found or self.pattern_table.rowCount() == 0:
+                self.pattern_table.setRowCount(1)
+                for col in range(self.pattern_table.columnCount()):
+                    self.pattern_table.setItem(0, col, QTableWidgetItem("无数据"))
             self.pattern_table.resizeColumnsToContents()
-
         except Exception as e:
             self.log_manager.log(
                 f"识别形态失败: {str(e)}", LogLevel.ERROR)
@@ -781,26 +940,24 @@ class AnalysisWidget(QWidget):
     def analyze_trend(self):
         """分析趋势"""
         try:
-            if not self.current_kdata:
-                return
-
-            # 清空结果表格
             self.trend_table.setRowCount(0)
-
-            # 获取参数
+            if not self.current_kdata:
+                self.trend_table.setRowCount(1)
+                for col in range(self.trend_table.columnCount()):
+                    self.trend_table.setItem(0, col, QTableWidgetItem("无数据"))
+                return
             period = self.trend_period.value()
             threshold = self.trend_threshold.value()
-
-            # 分析各指标趋势
             self.analyze_price_trend(period, threshold)
             self.analyze_volume_trend(period, threshold)
             self.analyze_macd_trend(period, threshold)
             self.analyze_kdj_trend(period, threshold)
             self.analyze_rsi_trend(period, threshold)
-
-            # 调整列宽
+            if self.trend_table.rowCount() == 0:
+                self.trend_table.setRowCount(1)
+                for col in range(self.trend_table.columnCount()):
+                    self.trend_table.setItem(0, col, QTableWidgetItem("无数据"))
             self.trend_table.resizeColumnsToContents()
-
         except Exception as e:
             self.log_manager.log(
                 f"分析趋势失败: {str(e)}", LogLevel.ERROR)
@@ -1152,28 +1309,26 @@ class AnalysisWidget(QWidget):
     def analyze_wave(self):
         """分析波浪"""
         try:
-            if not self.current_kdata:
-                return
-
-            # 清空结果表格
             self.wave_table.setRowCount(0)
-
-            # 获取参数
+            if not self.current_kdata:
+                self.wave_table.setRowCount(1)
+                for col in range(self.wave_table.columnCount()):
+                    self.wave_table.setItem(0, col, QTableWidgetItem("无数据"))
+                return
             wave_type = self.wave_type.currentText()
             period = self.wave_period.value()
             sensitivity = self.wave_sensitivity.value()
-
-            # 根据选择的波浪类型进行分析
             if wave_type == "艾略特波浪":
                 self.analyze_elliott_waves(period, sensitivity)
             elif wave_type == "江恩理论":
                 self.analyze_gann(period, sensitivity)
             elif wave_type == "支撑阻力位":
                 self.analyze_support_resistance(period, sensitivity)
-
-            # 调整列宽
+            if self.wave_table.rowCount() == 0:
+                self.wave_table.setRowCount(1)
+                for col in range(self.wave_table.columnCount()):
+                    self.wave_table.setItem(0, col, QTableWidgetItem("无数据"))
             self.wave_table.resizeColumnsToContents()
-
         except Exception as e:
             self.log_manager.log(
                 f"分析波浪失败: {str(e)}", LogLevel.ERROR)
@@ -2168,15 +2323,18 @@ class AnalysisWidget(QWidget):
             else:
                 self.log_manager.log("行业资金流向无数据", LogLevel.WARNING)
         except Exception as e:
-            self.log_manager.log(f"行业资金流向分析失败: {str(e)}", LogLevel.ERROR)
-
+            msg = f"行业资金流向分析失败: {str(e)}"
+            self.log_manager.log(msg, LogLevel.ERROR)
+            self.error_occurred.emit(msg)
         # 60日走势图
         try:
             # 取前5大行业做示例
             if df is not None and not df.empty:
                 self.plot_industry_trend(df.head(5))
         except Exception as e:
-            self.log_manager.log(f"行业资金流向走势图失败: {str(e)}", LogLevel.ERROR)
+            msg = f"行业资金流向走势图失败: {str(e)}"
+            self.log_manager.log(msg, LogLevel.ERROR)
+            self.error_occurred.emit(msg)
 
     def plot_industry_trend(self, df):
         """行业资金流向60日走势图（示例：主力净流入）"""
@@ -2394,11 +2552,10 @@ class AnalysisWidget(QWidget):
             leader_group.setLayout(leader_layout)
             layout.addWidget(leader_group)
 
-            # 按钮区
+            # 按钮区和进度条
             button_layout = QHBoxLayout()
             self.rotation_button = QPushButton("分析轮动")
-            self.rotation_button.clicked.connect(
-                self.start_all_hotspot_analysis)
+            self.rotation_button.clicked.connect(self.toggle_rotation_analysis)
             button_layout.addWidget(self.rotation_button)
             clear_button = QPushButton("清除结果")
             clear_button.clicked.connect(
@@ -2413,43 +2570,125 @@ class AnalysisWidget(QWidget):
                 print(f"创建热点分析标签页失败: {str(e)}")
             raise
 
+    def toggle_rotation_analysis(self):
+        """
+        合并分析轮动与中断分析按钮逻辑。
+        """
+        if self.rotation_button.text() == "分析轮动":
+            self._rotation_interrupted = False
+            self.rotation_button.setText("中断分析")
+            self.start_all_hotspot_analysis()
+        else:
+            self.interrupt_rotation_analysis()
+            self.rotation_button.setText("分析轮动")
+
     def start_all_hotspot_analysis(self):
-        """合并所有热点分析功能，点击分析轮动后并发执行所有分析，动态渲染表格"""
+        """
+        合并所有热点分析功能，点击分析轮动后并发执行所有分析，动态渲染表格，轮动分析用QThread后台执行，避免Qt定时器错误和主界面卡顿。
+        """
         if hasattr(self, 'rotation_worker') and self.rotation_worker and self.rotation_worker.isRunning():
             return
         self.rotation_button.setEnabled(False)
         self.rotation_button.setStyleSheet(
             "background-color: #888888; color: white;")
-        from concurrent.futures import ThreadPoolExecutor
-        import threading
 
-        def run_all():
-            try:
-                with ThreadPoolExecutor(max_workers=6) as executor:
-                    futures = []
-                    futures.append(executor.submit(
-                        self.analyze_hotspot_sectors))
-                    futures.append(executor.submit(
-                        self.analyze_theme_opportunities))
-                    futures.append(executor.submit(
-                        self.analyze_leading_stocks))
-                    futures.append(executor.submit(self.analyze_rotation))
-                    futures.append(executor.submit(self.analyze_industry_flow))
-                    futures.append(executor.submit(self.analyze_concept_flow))
-                    futures.append(executor.submit(self.analyze_north_flow))
-                    for f in futures:
-                        try:
-                            f.result()
-                        except Exception as e:
-                            if hasattr(self, 'log_manager'):
-                                self.log_manager.log(
-                                    f"分析任务异常: {str(e)}", LogLevel.ERROR)
-            finally:
-                def enable_btn():
-                    self.rotation_button.setEnabled(True)
-                    self.rotation_button.setStyleSheet("")
-                QTimer.singleShot(0, enable_btn)
-        threading.Thread(target=run_all, daemon=True).start()
+        # 优化：将run_others放到QThread中执行，彻底避免主线程卡顿
+        from PyQt5.QtCore import QThread, pyqtSignal
+        import types
+
+        class OthersWorker(QThread):
+            error = pyqtSignal(str)
+
+            def __init__(self, widget):
+                super().__init__()
+                self.widget = widget
+
+            def run(self):
+                try:
+                    from concurrent.futures import ThreadPoolExecutor
+                    with ThreadPoolExecutor(max_workers=6) as executor:
+                        futures = []
+                        futures.append(executor.submit(
+                            self.widget.analyze_hotspot_sectors))
+                        futures.append(executor.submit(
+                            self.widget.analyze_theme_opportunities))
+                        futures.append(executor.submit(
+                            self.widget.analyze_leading_stocks))
+                        futures.append(executor.submit(
+                            self.widget.analyze_industry_flow))
+                        futures.append(executor.submit(
+                            self.widget.analyze_concept_flow))
+                        futures.append(executor.submit(
+                            self.widget.analyze_north_flow))
+                        for f in futures:
+                            try:
+                                f.result()
+                            except Exception as e:
+                                if hasattr(self.widget, 'log_manager'):
+                                    self.widget.log_manager.log(
+                                        f"分析任务异常: {str(e)}", LogLevel.ERROR)
+                except Exception as e:
+                    self.error.emit(str(e))
+
+        self.others_worker = OthersWorker(self)
+        self.others_worker.error.connect(
+            lambda msg: self.log_manager.log(f"分析任务异常: {msg}", LogLevel.ERROR))
+        self.others_worker.finished.connect(self._start_rotation_worker)
+        self.others_worker.start()
+
+    def _start_rotation_worker(self):
+        self.rotation_worker = RotationWorker(self)
+        self._connect_rotation_worker_signals()
+        self.rotation_worker.finished.connect(self._on_rotation_finished)
+        self.rotation_worker.error.connect(self._on_rotation_error)
+        self.rotation_worker.start()
+
+    def interrupt_rotation_analysis(self):
+        """
+        中断热点轮动分析
+        """
+        self._rotation_interrupted = True
+        self.log_manager.info("用户请求中断热点轮动分析")
+        main_window = self.parentWidget()
+        while main_window and not hasattr(main_window, 'status_bar'):
+            main_window = main_window.parentWidget()
+        status_bar = getattr(main_window, 'status_bar', None)
+        if status_bar:
+            status_bar.set_status("热点轮动分析已中断")
+            status_bar.set_progress(0)
+            QTimer.singleShot(2000, lambda: status_bar.show_progress(False))
+        # 按钮状态恢复
+        self.rotation_button.setEnabled(True)
+        self.rotation_button.setStyleSheet("")
+        self.rotation_button.setText("分析轮动")
+
+    def _on_rotation_finished(self):
+        self.rotation_button.setEnabled(True)
+        self.rotation_button.setStyleSheet("")
+        self.rotation_button.setText("分析轮动")
+        main_window = self.parentWidget()
+        while main_window and not hasattr(main_window, 'status_bar'):
+            main_window = main_window.parentWidget()
+        status_bar = getattr(main_window, 'status_bar', None)
+        if status_bar:
+            status_bar.set_progress(100)
+            status_bar.set_status("热点轮动分析完成")
+            QTimer.singleShot(2000, lambda: status_bar.show_progress(False))
+
+    def _on_rotation_error(self, msg):
+        self.rotation_button.setEnabled(True)
+        self.rotation_button.setStyleSheet("")
+        self.rotation_button.setText("分析轮动")
+        main_window = self.parentWidget()
+        while main_window and not hasattr(main_window, 'status_bar'):
+            main_window = main_window.parentWidget()
+        status_bar = getattr(main_window, 'status_bar', None)
+        if status_bar:
+            status_bar.set_progress_error("热点轮动分析失败")
+            status_bar.set_status(msg)
+            QTimer.singleShot(2000, lambda: status_bar.show_progress(False))
+        if hasattr(self, 'log_manager'):
+            self.log_manager.error(f"热点轮动分析异常: {msg}")
 
     def analyze_hotspot(self):
         """分析市场热点"""
@@ -2535,34 +2774,39 @@ class AnalysisWidget(QWidget):
                         sectors.append(res)
 
             sectors.sort(key=lambda x: x['strength'], reverse=True)
-            self.hotspot_table.setRowCount(len(sectors))
-            for i, sector in enumerate(sectors):
-                self.hotspot_table.setItem(
-                    i, 0, QTableWidgetItem(sector['name']))
-                change_item = QTableWidgetItem(f"{sector['change']:+.2f}%")
-                change_item.setForeground(
-                    QColor("red" if sector['change'] > 0 else "green"))
-                self.hotspot_table.setItem(i, 1, change_item)
-                if sector['leading_stock']:
+            self.hotspot_table.setRowCount(len(sectors) if sectors else 1)
+            if not sectors:
+                for col in range(self.hotspot_table.columnCount()):
+                    self.hotspot_table.setItem(0, col, QTableWidgetItem("无数据"))
+            else:
+                for i, sector in enumerate(sectors):
                     self.hotspot_table.setItem(
-                        i, 2, QTableWidgetItem(sector['leading_stock'].name))
-                    leading_change_item = QTableWidgetItem(
-                        f"{sector['leading_change']:+.2f}%")
-                    leading_change_item.setForeground(
-                        QColor("red" if sector['leading_change'] > 0 else "green"))
-                    self.hotspot_table.setItem(i, 3, leading_change_item)
-                self.hotspot_table.setItem(
-                    i, 4, QTableWidgetItem(f"{sector['amount']:.2f}"))
-                self.hotspot_table.setItem(
-                    i, 5, QTableWidgetItem(f"{sector['turnover']:.2f}%"))
-                strength_item = QTableWidgetItem(f"{sector['strength']:.2f}")
-                if sector['strength'] >= 80:
-                    strength_item.setForeground(QColor("red"))
-                elif sector['strength'] >= 50:
-                    strength_item.setForeground(QColor("orange"))
-                else:
-                    strength_item.setForeground(QColor("green"))
-                self.hotspot_table.setItem(i, 6, strength_item)
+                        i, 0, QTableWidgetItem(sector['name']))
+                    change_item = QTableWidgetItem(f"{sector['change']:+.2f}%")
+                    change_item.setForeground(
+                        QColor("red" if sector['change'] > 0 else "green"))
+                    self.hotspot_table.setItem(i, 1, change_item)
+                    if sector['leading_stock']:
+                        self.hotspot_table.setItem(
+                            i, 2, QTableWidgetItem(sector['leading_stock'].name))
+                        leading_change_item = QTableWidgetItem(
+                            f"{sector['leading_change']:+.2f}%")
+                        leading_change_item.setForeground(
+                            QColor("red" if sector['leading_change'] > 0 else "green"))
+                        self.hotspot_table.setItem(i, 3, leading_change_item)
+                    self.hotspot_table.setItem(
+                        i, 4, QTableWidgetItem(f"{sector['amount']:.2f}"))
+                    self.hotspot_table.setItem(
+                        i, 5, QTableWidgetItem(f"{sector['turnover']:.2f}%"))
+                    strength_item = QTableWidgetItem(
+                        f"{sector['strength']:.2f}")
+                    if sector['strength'] >= 80:
+                        strength_item.setForeground(QColor("red"))
+                    elif sector['strength'] >= 50:
+                        strength_item.setForeground(QColor("orange"))
+                    else:
+                        strength_item.setForeground(QColor("green"))
+                    self.hotspot_table.setItem(i, 6, strength_item)
             self.hotspot_table.resizeColumnsToContents()
             self.log_manager.log(
                 f"热点板块分析成功，用时: {time.time() - start_time:.2f}秒", LogLevel.INFO)
@@ -2862,103 +3106,6 @@ class AnalysisWidget(QWidget):
             else:
                 print(f"分析龙头股失败: {str(e)}")
 
-    def analyze_rotation(self):
-        """热点轮动分析：板块级多线程+股票级多线程+Numba加速+批量Numpy运算"""
-        self.log_manager.log("开始热点轮动分析", LogLevel.INFO)
-        try:
-            start_time = time.time()
-            self.rotation_table.setRowCount(0)
-            block_list = sm.get_block_list()
-
-            max_workers = max(os.cpu_count(), 16)
-            rotations = []
-            futures = []
-            t_thread = time.time()
-            with ThreadPoolExecutor(max_workers=max_workers) as block_executor:
-                for block in block_list:
-                    stocks = block.get_stock_list()
-                    stock_codes = []
-                    kdata_part = {}
-                    for stock in stocks:
-                        code = getattr(stock, 'code', None) or getattr(
-                            stock, 'name', None)
-                        if code:
-                            stock_codes.append(code)
-                            klist = stock.get_kdata(Query(-11))  # 直接实时获取
-                            kdata_arr = {
-                                'close': [float(k.close) for k in klist],
-                                'volume': [float(k.volume) for k in klist],
-                                'amount': [float(k.amount) for k in klist],
-                                'open': [float(k.open) for k in klist]
-                            }
-                            kdata_part[code] = kdata_arr
-                    # 板块股票集合
-                    block_data = {
-                        'block_name': block.name,
-                        'stock_codes': stock_codes,
-                        'kdata_part': kdata_part
-                    }
-                    # 采集完一个板块，立即提交线程分析
-                    futures.append(block_executor.submit(
-                        process_block_threaded, block_data, self.log_manager))
-                # 统一收集结果
-                for i, future in enumerate(as_completed(futures, timeout=300)):
-                    try:
-                        res = future.result(timeout=120)
-                        if res:
-                            rotations.append(res)
-                        self.log_manager.info(
-                            f"热点轮动进度: {i+1}/{len(futures)}")
-                    except TimeoutError:
-                        self.log_manager.error(
-                            f"热点轮动子线程超时 {i+1}/{len(futures)}")
-                    except Exception as e:
-                        self.log_manager.error(
-                            f"热点轮动子线程异常: {str(e)}\n{traceback.format_exc()}")
-            t_thread_end = time.time()
-            self.log_manager.info(f"全部板块分析完成，耗时：{t_thread_end-t_thread:.2f}秒")
-
-            rotations.sort(key=lambda x: x['score'], reverse=True)
-            self.rotation_table.setRowCount(len(rotations))
-            for i, rotation in enumerate(rotations):
-                self.rotation_table.setItem(
-                    i, 0, QTableWidgetItem(rotation['name']))
-                trend_item = QTableWidgetItem(f"{rotation['trend']:.1f}%")
-                trend_item.setForeground(QColor("red") if rotation['trend'] >= 60 else QColor(
-                    "orange") if rotation['trend'] >= 40 else QColor("green"))
-                self.rotation_table.setItem(i, 1, trend_item)
-                flow_item = QTableWidgetItem(f"{rotation['flow']:+.2f}")
-                flow_item.setForeground(
-                    QColor("red" if rotation['flow'] > 0 else "green"))
-                self.rotation_table.setItem(i, 2, flow_item)
-                self.rotation_table.setItem(
-                    i, 3, QTableWidgetItem(str(rotation['duration'])))
-                if rotation['score'] >= 0.8:
-                    suggestion = "积极参与"
-                    color = QColor("red")
-                elif rotation['score'] >= 0.6:
-                    suggestion = "可以参与"
-                    color = QColor("orange")
-                elif rotation['score'] >= 0.4:
-                    suggestion = "保持关注"
-                    color = QColor("black")
-                else:
-                    suggestion = "暂不参与"
-                    color = QColor("green")
-                suggestion_item = QTableWidgetItem(suggestion)
-                suggestion_item.setForeground(color)
-                self.rotation_table.setItem(i, 4, suggestion_item)
-                self.rotation_table.setItem(i, 5, QTableWidgetItem(
-                    f"{rotation['score']}"))
-                self.log_manager.info(
-                    f"热点轮动当前板块 {rotation['name']} 得分：{rotation['score']}")
-            self.rotation_table.resizeColumnsToContents()
-            self.log_manager.info(
-                f"热点轮动分析完成，共{len(rotations)}个板块,总耗时：{time.time() - start_time:.2f}秒")
-        except Exception as e:
-            self.log_manager.error(
-                f"分析热点轮动失败: {str(e)}\n{traceback.format_exc()}")
-
     def clear_hotspot(self):
         """清除热点分析结果"""
         try:
@@ -2966,6 +3113,12 @@ class AnalysisWidget(QWidget):
             self.theme_table.setRowCount(0)
             self.leader_table.setRowCount(0)
             self.rotation_table.setRowCount(0)
+            # 无数据提示
+            for table in [self.hotspot_table, self.theme_table, self.leader_table, self.rotation_table]:
+                if table.rowCount() == 0:
+                    table.setRowCount(1)
+                    for col in range(table.columnCount()):
+                        table.setItem(0, col, QTableWidgetItem("无数据"))
         except Exception as e:
             self.log_manager.log(f"清除热点分析结果失败: {str(e)}", LogLevel.ERROR)
             raise
@@ -3576,6 +3729,20 @@ class AnalysisWidget(QWidget):
                 self.sentiment_table.setItem(i, j, item)
         self.sentiment_collecting = False
 
+    def _connect_rotation_worker_signals(self):
+        """
+        连接rotation_worker的信号到对应的槽函数，确保热点轮动分析进度和结果能正确显示。
+        """
+        if hasattr(self, 'rotation_worker') and self.rotation_worker:
+            try:
+                self.rotation_worker.update_progress.connect(
+                    self._on_rotation_progress)
+                self.rotation_worker.update_table.connect(
+                    self._on_rotation_table)
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"连接rotation_worker信号失败: {str(e)}")
+
 
 def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
@@ -3589,18 +3756,220 @@ class RotationWorker(QThread):
 
     finished = pyqtSignal()
     error = pyqtSignal(str)
+    update_progress = pyqtSignal(int, str)
+    update_table = pyqtSignal(list)
 
     def __init__(self, widget):
         super().__init__()
         self.widget = widget
+        self._rotation_interrupted = False
 
     def run(self):
         try:
-            # 调用原有的analyze_rotation方法（在子线程中执行，避免阻塞UI）
-            self.widget.analyze_rotation()
+            self.widget.log_manager.log("开始热点轮动分析", LogLevel.INFO)
+            if hasattr(self.widget, 'interrupt_button'):
+                self.widget.interrupt_button.setEnabled(True)
+            # 获取主窗口status_bar
+            main_window = self.widget.parentWidget()
+            while main_window and not hasattr(main_window, 'status_bar'):
+                main_window = main_window.parentWidget()
+            status_bar = getattr(main_window, 'status_bar', None)
+            if status_bar:
+                status_bar.set_progress(0)
+                status_bar.set_status("热点轮动分析中...")
+                status_bar.show_progress(True)
+            import concurrent.futures
+            import time
+            start_time = time.time()
+            self.widget.rotation_table.setRowCount(0)
+            block_list = sm.get_block_list()
+            total_blocks = len(block_list)
+            max_workers = min(os.cpu_count() or 4, 8)
+            rotations = []
+            futures = []
+            t_thread = time.time()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as block_executor:
+                for block in block_list:
+                    if self._rotation_interrupted or getattr(self.widget, '_rotation_interrupted', False):
+                        self.widget.log_manager.info("热点轮动分析被用户中断，提前结束任务提交")
+                        break
+                    stocks = block.get_stock_list()
+                    stock_codes = []
+                    kdata_part = {}
+                    for stock in stocks:
+                        code = getattr(stock, 'code', None) or getattr(
+                            stock, 'name', None)
+                        if code:
+                            stock_codes.append(code)
+                            klist = stock.get_kdata(Query(-11))
+                            kdata_arr = {
+                                'close': [float(k.close) for k in klist],
+                                'volume': [float(k.volume) for k in klist],
+                                'amount': [float(k.amount) for k in klist],
+                                'open': [float(k.open) for k in klist]
+                            }
+                            kdata_part[code] = kdata_arr
+                    block_data = {
+                        'block_name': block.name,
+                        'stock_codes': stock_codes,
+                        'kdata_part': kdata_part
+                    }
+                    futures.append(block_executor.submit(
+                        self._process_block_safe, block_data))
+                # 统一收集结果
+                finished = 0
+                for i, future in enumerate(concurrent.futures.as_completed(futures, timeout=300)):
+                    if self._rotation_interrupted or getattr(self.widget, '_rotation_interrupted', False):
+                        self.widget.log_manager.info("热点轮动分析被用户中断，提前结束结果收集")
+                        break
+                    try:
+                        res = future.result(timeout=60)
+                        if res:
+                            rotations.append(res)
+                        finished += 1
+                        percent = int(finished / max(1, total_blocks) * 100)
+                        self.update_progress.emit(
+                            percent, f"热点轮动分析进度: {finished}/{total_blocks}")
+                        self.widget.log_manager.info(
+                            f"热点轮动进度: {finished}/{total_blocks}")
+                    except concurrent.futures.TimeoutError:
+                        self.widget.log_manager.error(
+                            f"热点轮动子线程超时 {i+1}/{len(futures)}")
+                    except Exception as e:
+                        self.widget.log_manager.error(
+                            f"热点轮动子线程异常: {str(e)}\n{traceback.format_exc()}")
+            t_thread_end = time.time()
+            self.widget.log_manager.info(
+                f"全部板块分析完成，耗时：{t_thread_end-t_thread:.2f}秒")
+            rotations.sort(key=lambda x: x['score'], reverse=True)
+            self.update_table.emit(rotations)
             self.finished.emit()
         except Exception as e:
-            self.error.emit(str(e))
+            self.error.emit(f"热点轮动分析失败: {str(e)}\n{traceback.format_exc()}")
+
+    def _process_block_safe(self, block_data):
+        import numpy as np
+        import time
+        block_name = block_data['block_name']
+        stock_codes = block_data['stock_codes']
+        kdata_part = block_data['kdata_part']
+        t0 = time.time()
+        valid_changes = []
+        valid_flows = []
+        for code in stock_codes:
+            k = kdata_part.get(code)
+            if not k or len(k['close']) < 11:
+                continue
+            try:
+                close = np.array(k['close'], dtype=np.float64)
+                volume = np.array(k['volume'], dtype=np.float64)
+                amount = np.array(k['amount'], dtype=np.float64)
+                open_arr = np.array(k['open'], dtype=np.float64)
+                change_arr, flow_arr = fast_process_stock(
+                    close, volume, amount, open_arr)
+                if len(change_arr) == 10 and len(flow_arr) == 10:
+                    valid_changes.append(change_arr)
+                    valid_flows.append(flow_arr)
+            except Exception as e:
+                if hasattr(self.widget, 'log_manager'):
+                    self.widget.log_manager.error(
+                        f"[{block_name}] 股票{code}分析异常: {str(e)}")
+        if not valid_changes:
+            if hasattr(self.widget, 'log_manager'):
+                self.widget.log_manager.warning(f"[{block_name}] 无有效股票结果")
+            return None
+        change_mat = np.stack(valid_changes)
+        flow_mat = np.stack(valid_flows)
+        avg_change = np.mean(change_mat, axis=0)
+        avg_flow = np.mean(flow_mat, axis=0)
+        daily_stats = [
+            {'change': avg_change[i], 'flow': avg_flow[i]}
+            for i in range(10)
+        ]
+        trend = sum(1 for i in range(1, len(daily_stats))
+                    if daily_stats[i]['change'] > daily_stats[i-1]['change'])
+        flow_trend = sum(1 for stat in daily_stats if stat['flow'] > 0)
+        duration = 0
+        for stat in daily_stats:
+            if stat['change'] > 0 and stat['flow'] > 0:
+                duration += 1
+            else:
+                break
+        t1 = time.time()
+        momentum = np.sum(avg_change)
+        flow = np.sum(avg_flow)
+        up_days = np.sum(np.array(avg_change) > 0)
+        momentum_score = min(max((momentum + 20) / 40, 0), 1)
+        flow_score = min(max((flow + 5) / 10, 0), 1)
+        active_score = up_days / 10
+        score = round(0.5 * momentum_score + 0.3 *
+                      flow_score + 0.2 * active_score, 2)
+        if hasattr(self.widget, 'log_manager'):
+            self.widget.log_manager.info(
+                f"[{block_name}] 板块分析完成，股票数：{len(stock_codes)}，耗时：{t1 - t0:.2f}秒")
+        return {
+            'name': block_name,
+            'trend': trend / 9 * 100,
+            'trend_raw': trend,
+            'flow_trend': flow_trend,
+            'duration': duration,
+            'flow': float(np.sum(avg_flow)),
+            'score': score,
+            'momentum': momentum,
+            'flow': flow,
+            'up_days': up_days
+        }
+
+    def _on_rotation_progress(self, percent, msg):
+        """
+        热点轮动分析进度更新槽函数，负责更新主窗口状态栏进度和状态。
+        """
+        main_window = self.parentWidget()
+        while main_window and not hasattr(main_window, 'status_bar'):
+            main_window = main_window.parentWidget()
+        status_bar = getattr(main_window, 'status_bar', None)
+        if status_bar:
+            status_bar.set_progress(percent)
+            status_bar.set_status(msg)
+
+    def _on_rotation_table(self, rotations):
+        """
+        热点轮动分析结果表格更新槽函数，负责将分析结果填充到rotation_table。
+        """
+        if hasattr(self, 'rotation_table'):
+            self.rotation_table.setRowCount(len(rotations))
+            for i, rotation in enumerate(rotations):
+                self.rotation_table.setItem(
+                    i, 0, QTableWidgetItem(rotation['name']))
+                trend_item = QTableWidgetItem(f"{rotation['trend']:.1f}%")
+                trend_item.setForeground(QColor("red") if rotation['trend'] >= 60 else QColor(
+                    "orange") if rotation['trend'] >= 40 else QColor("green"))
+                self.rotation_table.setItem(i, 1, trend_item)
+                flow_item = QTableWidgetItem(f"{rotation['flow']:+.2f}")
+                flow_item.setForeground(
+                    QColor("red" if rotation['flow'] > 0 else "green"))
+                self.rotation_table.setItem(i, 2, flow_item)
+                self.rotation_table.setItem(
+                    i, 3, QTableWidgetItem(str(rotation['duration'])))
+                if rotation['score'] >= 0.8:
+                    suggestion = "积极参与"
+                    color = QColor("red")
+                elif rotation['score'] >= 0.6:
+                    suggestion = "可以参与"
+                    color = QColor("orange")
+                elif rotation['score'] >= 0.4:
+                    suggestion = "保持关注"
+                    color = QColor("black")
+                else:
+                    suggestion = "暂不参与"
+                    color = QColor("green")
+                suggestion_item = QTableWidgetItem(suggestion)
+                suggestion_item.setForeground(color)
+                self.rotation_table.setItem(i, 4, suggestion_item)
+                self.rotation_table.setItem(
+                    i, 5, QTableWidgetItem(f"{rotation['score']}"))
+            self.rotation_table.resizeColumnsToContents()
+
 
 # 板块级多进程+股票级多线程+Numba加速
 

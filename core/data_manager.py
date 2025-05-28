@@ -16,6 +16,7 @@ from core.sina_source import SinaDataSource
 from core.tonghuashun_source import TongHuaShunDataSource
 import numpy as np
 from utils.cache import Cache
+import time
 # import ptvsd
 
 
@@ -233,19 +234,9 @@ class DataManager:
                    end_date: Optional[str] = None,
                    query: Optional[Any] = None,
                    **kwargs) -> pd.DataFrame:
-        """获取K线数据
-
-        Args:
-            code: 股票代码
-            freq: K线周期 ('D':日线, 'W':周线, 'M':月线, '60':60分钟, '30':30分钟, '15':15分钟, '5':5分钟)
-            start_date: 开始日期，格式：YYYY-MM-DD
-            end_date: 结束日期，格式：YYYY-MM-DD
-            query: 可选，hikyuu的Query对象或负数天数（如-7表示最近7天）
-            **kwargs: 其他参数
-
-        Returns:
-            pd.DataFrame: K线数据
-        """
+        start_time = time.time()
+        self.log_manager.info(
+            f"[DataManager.get_k_data] 开始: code={code}, freq={freq}, start_date={start_date}, end_date={end_date}")
         try:
             # 检查股票代码格式
             if not code:
@@ -399,6 +390,10 @@ class DataManager:
             self.log_manager.error(f"获取K线数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             return pd.DataFrame()
+        finally:
+            elapsed = int((time.time() - start_time) * 1000)
+            self.log_manager.performance(
+                f"[DataManager.get_k_data] 结束，耗时: {elapsed} ms")
 
     def get_stock_list(self, market: str = 'all') -> pd.DataFrame:
         """获取股票列表
@@ -749,7 +744,7 @@ class DataManager:
                 from .tonghuashun_source import TongHuaShunDataSource
                 self._data_sources['tonghuashun'] = TongHuaShunDataSource()
             else:  # 默认使用 Hikyuu
-                from data_source import HikyuuDataSource
+                from .hikyuu_source import HikyuuDataSource
                 self._data_sources['hikyuu'] = HikyuuDataSource()
 
             # 初始化数据源
@@ -823,7 +818,7 @@ class DataManager:
         try:
             # 初始化 Hikyuu 数据源
             try:
-                from data_source import HikyuuDataSource
+                from core.hikyuu_source import HikyuuDataSource
                 self._data_sources['hikyuu'] = HikyuuDataSource()
                 self.log_manager.info("Hikyuu数据源初始化成功")
             except Exception as e:

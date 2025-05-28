@@ -278,7 +278,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             parent: 父窗口
         """
         try:
-            super().__init__(parent)
 
             # 初始化日志管理器
             if hasattr(parent, 'log_manager'):
@@ -287,6 +286,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 from core.logger import LogManager
                 self.log_manager = LogManager()
 
+            self.log_manager.info("初始化策略回测UI组件")
+            super().__init__(parent)
             # 初始化UI
             self.init_ui()
 
@@ -308,6 +309,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
     def init_ui(self):
         """初始化UI"""
         try:
+            self.log_manager.info("初始化策略回测区域")
             layout = self.main_layout  # 修复：直接用父类的主布局，避免重复设置布局
             # 创建策略选择区域
             strategy_group = QGroupBox("策略选择")
@@ -356,6 +358,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
     def init_data(self):
         """初始化数据"""
         try:
+            self.log_manager.info("初始化策略回测数据")
             # 初始化数据缓存
             self.data_cache = {}
 
@@ -406,6 +409,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
     def connect_signals(self):
         """连接信号"""
         try:
+            self.log_manager.info("连接策略选择信号")
             # 连接策略选择信号
             self.strategy_combo.currentTextChanged.connect(
                 self.on_strategy_changed)
@@ -651,13 +655,45 @@ class StatusBar(QStatusBar):
         current_time = datetime.now().strftime("%H:%M:%S")
         self.time_label.setText(f"时间: {current_time}")
 
-    def show_progress(self, visible=True):
-        """Show or hide progress bar"""
-        self.progress_bar.setVisible(visible)
-
     def set_progress(self, value):
-        """Set progress bar value"""
-        self.progress_bar.setValue(value)
+        """Set progress bar value, ensure in main thread and value in 0-100, dynamic color"""
+        value = max(0, min(100, int(value)))
+
+        def update():
+            self.progress_bar.setValue(value)
+            # 动态设置颜色
+            if value >= 90:
+                color = "#FF0000"
+            elif value >= 70:
+                color = "#FFA500"
+            elif value >= 50:
+                color = "#FFD700"
+            else:
+                color = "#4CAF50"
+            self.progress_bar.setStyleSheet(f"""
+                QProgressBar::chunk {{
+                    background-color: {color};
+                    border-radius: 4px;
+                }}
+            """)
+        QTimer.singleShot(0, update)
+
+    def set_progress_error(self, message="任务失败"):
+        def update():
+            self.progress_bar.setStyleSheet("""
+                QProgressBar::chunk {
+                    background-color: #FF0000;
+                    border-radius: 4px;
+                }
+            """)
+            self.status_label.setText(message)
+        QTimer.singleShot(0, update)
+
+    def show_progress(self, visible=True):
+        self.progress_bar.setVisible(visible)
+        if not visible:
+            self.set_progress(0)
+            self.status_label.setText("就绪")
 
     def set_status(self, message):
         """Set status message"""

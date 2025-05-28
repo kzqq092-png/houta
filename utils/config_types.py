@@ -190,110 +190,12 @@ class TradingConfig:
         )
 
 
-class PerformanceConfig:
-    """性能监控配置"""
-
-    def __init__(self, **kwargs):
-        # 性能监控阈值
-        self.cpu_threshold = kwargs.get('cpu_threshold', 80)  # CPU使用率阈值(%)
-        self.memory_threshold = kwargs.get(
-            'memory_threshold', 80)  # 内存使用率阈值(%)
-        self.disk_threshold = kwargs.get('disk_threshold', 90)  # 磁盘使用率阈值(%)
-        self.response_threshold = kwargs.get(
-            'response_threshold', 1.0)  # 响应时间阈值(秒)
-
-        # CPU监控配置
-        self.cpu_interval = kwargs.get('cpu_interval', 1.0)  # CPU采样间隔(秒)
-        self.cpu_average_window = kwargs.get(
-            'cpu_average_window', 5)  # CPU使用率平均窗口大小
-        self.cpu_per_core = kwargs.get('cpu_per_core', False)  # 是否按每个核心监控
-
-        # 监控配置
-        self.update_interval = kwargs.get('update_interval', 1.0)  # 更新间隔(秒)
-        self.metrics_history_size = kwargs.get(
-            'metrics_history_size', 100)  # 历史数据大小
-        self.monitor_cpu = kwargs.get('monitor_cpu', True)  # 是否监控CPU
-        self.monitor_memory = kwargs.get('monitor_memory', True)  # 是否监控内存
-        self.monitor_disk = kwargs.get('monitor_disk', True)  # 是否监控磁盘
-        self.log_to_file = kwargs.get('log_to_file', True)  # 是否记录日志到文件
-
-    def get(self, key: str, default=None):
-        """获取配置项
-
-        Args:
-            key: 配置项名称
-            default: 默认值
-
-        Returns:
-            配置项值
-        """
-        return getattr(self, key, default)
-
-    def set(self, key: str, value):
-        """设置配置项
-
-        Args:
-            key: 配置项名称
-            value: 配置项值
-        """
-        setattr(self, key, value)
-
-    def to_dict(self) -> dict:
-        """转换为字典
-
-        Returns:
-            配置字典
-        """
-        return {
-            'cpu_threshold': self.cpu_threshold,
-            'memory_threshold': self.memory_threshold,
-            'disk_threshold': self.disk_threshold,
-            'response_threshold': self.response_threshold,
-            'cpu_interval': self.cpu_interval,
-            'cpu_average_window': self.cpu_average_window,
-            'cpu_per_core': self.cpu_per_core,
-            'update_interval': self.update_interval,
-            'metrics_history_size': self.metrics_history_size,
-            'monitor_cpu': self.monitor_cpu,
-            'monitor_memory': self.monitor_memory,
-            'monitor_disk': self.monitor_disk,
-            'log_to_file': self.log_to_file
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'PerformanceConfig':
-        """从字典创建配置
-
-        Args:
-            data: 配置字典
-
-        Returns:
-            PerformanceConfig实例
-        """
-        return cls(
-            cpu_threshold=data.get('cpu_threshold', 80),
-            memory_threshold=data.get('memory_threshold', 80),
-            disk_threshold=data.get('disk_threshold', 90),
-            response_threshold=data.get('response_threshold', 1.0),
-            cpu_interval=data.get('cpu_interval', 1.0),
-            cpu_average_window=data.get('cpu_average_window', 5),
-            cpu_per_core=data.get('cpu_per_core', False),
-            update_interval=data.get('update_interval', 1.0),
-            metrics_history_size=data.get('metrics_history_size', 100),
-            monitor_cpu=data.get('monitor_cpu', True),
-            monitor_memory=data.get('monitor_memory', True),
-            monitor_disk=data.get('monitor_disk', True),
-            log_to_file=data.get('log_to_file', True)
-        )
-
-
 @dataclass
 class AppConfig:
     """Application configuration container"""
     theme: ThemeConfig = field(default_factory=ThemeConfig)
     chart: ChartConfig = field(default_factory=ChartConfig)
     trading: TradingConfig = field(default_factory=TradingConfig)
-    performance: PerformanceConfig = field(default_factory=PerformanceConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary
@@ -304,8 +206,7 @@ class AppConfig:
         return {
             "theme": self.theme.to_dict(),
             "chart": self.chart.to_dict(),
-            "trading": self.trading.to_dict(),
-            "performance": self.performance.to_dict()
+            "trading": self.trading.to_dict()
         }
 
     @classmethod
@@ -321,13 +222,11 @@ class AppConfig:
         theme_data = data.get("theme", {})
         chart_data = data.get("chart", {})
         trading_data = data.get("trading", {})
-        performance_data = data.get("performance", {})
 
         return cls(
             theme=ThemeConfig.from_dict(theme_data),
             chart=ChartConfig.from_dict(chart_data),
-            trading=TradingConfig.from_dict(trading_data),
-            performance=PerformanceConfig.from_dict(performance_data)
+            trading=TradingConfig.from_dict(trading_data)
         )
 
 

@@ -19,7 +19,6 @@ from .config_types import (
     ThemeConfig,
     ChartConfig,
     TradingConfig,
-    PerformanceConfig,
     DataConfig,
     UIConfig,
     LoggingConfig
@@ -125,7 +124,6 @@ class ConfigManager(QObject):
             self._theme = ThemeConfig.from_dict(theme_config)
             self._chart = ChartConfig.from_dict(chart_config)
             self._trading = TradingConfig.from_dict(trading_config)
-            self._performance = PerformanceConfig.from_dict(performance_config)
             self._data = DataConfig.from_dict(data_config)
             self._ui = UIConfig.from_dict(ui_config)
             self._logging = LoggingConfig.from_dict(logging_config)
@@ -142,7 +140,6 @@ class ConfigManager(QObject):
             self._theme = ThemeConfig()
             self._chart = ChartConfig()
             self._trading = TradingConfig()
-            self._performance = PerformanceConfig()
             self._data = DataConfig()
             self._ui = UIConfig()
             self._logging = LoggingConfig()
@@ -331,7 +328,6 @@ class ConfigManager(QObject):
                 'theme': ThemeConfig,
                 'chart': ChartConfig,
                 'trading': TradingConfig,
-                'performance': PerformanceConfig,
                 'data': DataConfig,
                 'ui': UIConfig,
                 'logging': LoggingConfig
@@ -384,11 +380,6 @@ class ConfigManager(QObject):
     def logging(self) -> LoggingConfig:
         """Get logging configuration"""
         return self._logging
-
-    @property
-    def performance(self) -> PerformanceConfig:
-        """Get performance configuration"""
-        return self._performance
 
     def get_version(self) -> str:
         """获取配置版本

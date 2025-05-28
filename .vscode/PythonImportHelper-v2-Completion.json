@@ -7779,15 +7779,6 @@
         "documentation": {}
     },
     {
-        "label": "PerformanceMonitor",
-        "kind": 6,
-        "importPath": "utils.performance_monitor",
-        "description": "utils.performance_monitor",
-        "peekOfCode": "class PerformanceMonitor(QObject):\n    \"\"\"性能监控器类，负责监控系统性能指标\"\"\"\n    performance_updated = pyqtSignal(dict)  # 性能指标更新信号\n    alert_triggered = pyqtSignal(str)       # 性能警报信号\n    def __init__(self, cpu_threshold=80, memory_threshold=80, disk_threshold=90, log_manager=None):\n        \"\"\"初始化性能监控器\n        Args:\n            cpu_threshold (float): CPU使用率阈值（百分比）\n            memory_threshold (float): 内存使用率阈值（百分比）\n            disk_threshold (float): 磁盘使用率阈值（百分比）",
-        "detail": "utils.performance_monitor",
-        "documentation": {}
-    },
-    {
         "label": "ThemeManager",
         "kind": 6,
         "importPath": "utils.theme",

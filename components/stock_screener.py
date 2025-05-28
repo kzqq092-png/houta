@@ -20,7 +20,7 @@ import json
 import traceback
 from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
 from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
-from components.template_manager import TemplateManager
+import time
 
 
 class PagedTableWidget(QWidget):
@@ -1064,12 +1064,14 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.log_manager.log(f"更新分布图失败: {str(e)}", LogLevel.ERROR)
 
     def screen_stocks(self):
-        """执行股票筛选"""
-        if not self.conditions:
-            QMessageBox.warning(self, "警告", "请添加筛选条件")
-            return
-
+        start_time = time.time()
+        if self.log_manager:
+            self.log_manager.info("[StockScreenerWidget.screen_stocks] 开始")
         try:
+            if not self.conditions:
+                QMessageBox.warning(self, "警告", "请添加筛选条件")
+                return
+
             # 创建进度对话框
             progress = QProgressDialog("正在筛选股票...", "取消", 0, 100, self)
             progress.setWindowModality(Qt.WindowModal)
@@ -1089,26 +1091,20 @@ class StockScreenerWidget(BaseAnalysisPanel):
             for i, stock in enumerate(stock_list):
                 if progress.wasCanceled():
                     break
-
-                # 更新进度
-                progress.setValue(i)
+                # 更新进度，保证范围安全
+                progress.setValue(max(0, min(i, total_stocks)))
                 progress.setLabelText(
                     f"正在筛选股票: {stock['code']} - {stock['name']}")
-
                 # 获取股票数据
                 stock_data = self.data_manager.get_stock_data(stock['code'])
                 if stock_data.empty:
                     continue
-
                 # 检查是否满足所有条件
                 match_score = 0
                 total_conditions = len(self.conditions)
-
                 for condition in self.conditions:
                     condition_type = condition['type']
                     condition_params = condition['params']
-
-                    # 根据条件类型进行筛选
                     if condition_type == "技术指标":
                         if self.check_technical_condition(stock_data, condition_params):
                             match_score += 1
@@ -1121,30 +1117,26 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     elif condition_type == "消息面":
                         if self.check_news_condition(stock['code'], condition_params):
                             match_score += 1
-
-                # 计算匹配度
                 match_ratio = match_score / total_conditions
-
-                # 如果匹配度大于0，添加到结果中
                 if match_ratio > 0:
                     results.append({
                         'code': stock['code'],
                         'name': stock['name'],
                         'match_ratio': match_ratio
                     })
-
             # 更新结果表格
             self.update_result_table(results)
-
-            # 显示完成消息
-            QMessageBox.information(
-                self,
-                "完成",
-                f"筛选完成，共找到 {len(results)} 只符合条件的股票"
-            )
-
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"筛选过程中发生错误: {str(e)}")
+            progress.setStyleSheet(
+                "QProgressBar::chunk {background-color: #FF0000;}")
+            progress.setLabelText(f"筛选失败: {str(e)}")
+        finally:
+            elapsed = int((time.time() - start_time) * 1000)
+            if self.log_manager:
+                self.log_manager.performance(
+                    f"[StockScreenerWidget.screen_stocks] 结束，耗时: {elapsed} ms")
+            progress.setValue(total_stocks)
+            QTimer.singleShot(500, progress.close)
 
     def check_technical_condition(self, stock_data, condition_params):
         """检查技术指标条件，支持多种指标"""

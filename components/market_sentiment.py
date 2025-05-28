@@ -11,7 +11,6 @@ from core.logger import LogManager, LogLevel
 from datetime import datetime
 import ptvsd
 from gui.ui_components import BaseAnalysisPanel
-from components.template_manager import TemplateManager
 import traceback
 
 
@@ -282,6 +281,17 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         """)
         heat_layout.addWidget(self.heat_progress)
         layout.addLayout(heat_layout)
+
+    def set_heat_progress(self, value):
+        value = max(0, min(100, int(value)))
+        self.heat_progress.setValue(value)
+
+    def set_heat_progress_error(self, message="分析失败"):
+        self.heat_progress.setStyleSheet(
+            "QProgressBar::chunk {background-color: #FF0000;}")
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(message)
+            self.status_label.setStyleSheet("color: #FF5252;")
 
     def create_control_buttons(self, layout):
         """创建控制按钮"""
