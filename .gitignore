@@ -5,3 +5,13 @@
 *.pyw
 *.pyz
 *.pywz
+.cache/*
+.cache
+.env
+.idea
+.vscode
+.pytest_cache
+.DS_Store
+.cursorrules
+.cursour
+__pycache__

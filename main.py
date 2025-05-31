@@ -1,7 +1,6 @@
 """
 交易系统主窗口模块
 """
-from PyQt5.QtCore import qRegisterMetaType, QVector
 from utils.cache import Cache
 from components.stock_screener import StockScreenerWidget
 from gui.ui_components import StatusBar
@@ -29,9 +28,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 import mplfinance
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import *
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -45,10 +42,6 @@ import traceback
 import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
-
-# 注册QVector<int>类型，避免信号槽警告
-qRegisterMetaType(QVector[int], "QVector<int>")
-
 
 # 定义全局样式表
 GLOBAL_STYLE = """

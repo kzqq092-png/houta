@@ -9,9 +9,8 @@ import json
 import os
 import re
 from typing import Dict, Any, Optional, Union
-from PyQt5.QtCore import *
-from PyQt5.QtGui import QColor, QPalette
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 from .config_manager import ConfigManager
 from .theme_types import Theme
 from .config_types import ThemeConfig
