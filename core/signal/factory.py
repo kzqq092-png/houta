@@ -2,6 +2,7 @@ from hikyuu import crtSG
 from .base import BaseSignal
 from .enhanced import EnhancedSignal
 from typing import Dict, Any, Optional, Type
+from core.data_manager import data_manager
 
 
 class SignalFactory:
@@ -48,7 +49,6 @@ class SignalFactory:
             """
             try:
                 import pandas as pd
-                from core.data_manager import data_manager
                 if isinstance(k, pd.DataFrame):
                     k = data_manager.df_to_kdata(k)
                 # 创建信号系统

@@ -8,6 +8,7 @@ from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import pandas as pd
 from hikyuu import *
+from core.data_manager import data_manager
 
 
 class TechnicalAnalyzer:
@@ -27,7 +28,6 @@ class TechnicalAnalyzer:
             Dict containing support and resistance levels
         """
         try:
-            from core.data_manager import data_manager
             if isinstance(kdata, pd.DataFrame):
                 kdata = data_manager.df_to_kdata(kdata)
             closes = np.array([float(k.close) for k in kdata])
@@ -142,7 +142,6 @@ class TechnicalAnalyzer:
         """
         try:
             import pandas as pd
-            from core.data_manager import data_manager
             if isinstance(kdata, pd.DataFrame):
                 kdata = data_manager.df_to_kdata(kdata)
             closes = np.array([float(k.close) for k in kdata])

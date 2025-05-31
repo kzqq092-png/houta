@@ -30,9 +30,9 @@ from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
 from analysis.pattern_recognition import PatternRecognizer
-from core.data_manager import DataManager as data_manager
-
-
+from core.data_manager import data_manager
+from features.advanced_indicators import create_pattern_recognition_features, ALL_PATTERN_TYPES
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 
 
 class AnalysisWidget(QWidget):
@@ -129,18 +129,24 @@ class AnalysisWidget(QWidget):
     def run_button_analysis_async(self, button, analysis_func, *args, **kwargs):
         """
         通用按钮防抖+异步分析工具，点击后按钮文本变为"取消"，再次点击时中断分析，结束后恢复原文本。
+        修复：保证分析结束后按钮状态恢复，异常时也能恢复，防止按钮卡死。
         """
         original_text = button.text()
         button.setText("取消")
         button.setStyleSheet("")
         button._interrupted = False
+        button.setEnabled(False)
 
         def on_cancel():
             button._interrupted = True
             button.setText(original_text)
+            button.setEnabled(True)
 
         # 绑定取消逻辑
-        button.clicked.disconnect()
+        try:
+            button.clicked.disconnect()
+        except Exception:
+            pass
         button.clicked.connect(on_cancel)
 
         def task():
@@ -155,7 +161,11 @@ class AnalysisWidget(QWidget):
 
         def on_done(future):
             button.setText(original_text)
-            button.clicked.disconnect()
+            button.setEnabled(True)
+            try:
+                button.clicked.disconnect()
+            except Exception:
+                pass
             button.clicked.connect(lambda: self.run_button_analysis_async(
                 button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
@@ -475,107 +485,315 @@ class AnalysisWidget(QWidget):
             raise
 
     def create_pattern_tab(self) -> QWidget:
-        """创建形态识别标签页
+        """创建形态分析Tab，支持形态类型多选、参数自定义、结果表格、可视化联动"""
+        from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QAbstractItemView, QCheckBox, QComboBox, QDialog, QFormLayout, QSpinBox, QDoubleSpinBox
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        # 形态类型多选区
+        pattern_types = [
+            ('hammer', '锤头线'),
+            ('inverted_hammer', '倒锤头'),
+            ('shooting_star', '流星线'),
+            ('doji', '十字星'),
+            ('marubozu', '光头光脚线'),
+            ('spinning_top', '纺锤线'),
+            ('engulfing', '吞没形态'),
+            ('piercing', '刺透形态'),
+            ('dark_cloud_cover', '乌云盖顶'),
+            ('morning_star', '早晨之星'),
+            ('evening_star', '黄昏之星'),
+            ('three_white_soldiers', '三白兵'),
+            ('three_black_crows', '三只乌鸦'),
+            ('tower_top', '塔形顶'),
+            ('tower_bottom', '塔形底'),
+            ('flag', '旗形'),
+            ('wedge', '楔形'),
+            ('rectangle', '矩形整理'),
+            ('channel', '通道'),
+            ('head_shoulders', '头肩形'),
+            ('double_tops_bottoms', '双顶/双底'),
+            ('triangles', '三角形'),
+        ]
+        self.pattern_type_checks = []
+        type_layout = QHBoxLayout()
+        for key, label in pattern_types:
+            cb = QCheckBox(label)
+            cb.setChecked(True)
+            cb.pattern_key = key
+            self.pattern_type_checks.append(cb)
+            type_layout.addWidget(cb)
+        layout.addLayout(type_layout)
+        # 参数设置按钮
+        param_btn = QPushButton("参数设置")
 
-        Returns:
-            形态识别标签页控件
-        """
-        try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
+        def show_param_dialog():
+            dlg = QDialog(tab)
+            dlg.setWindowTitle("形态参数设置")
+            form = QFormLayout(dlg)
+            self.pattern_param_controls = {}
+            # 仅示例部分参数
+            for pname, label, default, minv, maxv, step in [
+                ('hammer_shadow_ratio', '锤头影线/实体比', 2.0, 1.0, 5.0, 0.1),
+                ('doji_body_ratio', '十字星实体/全K比', 0.1, 0.01, 0.3, 0.01),
+                ('engulfing_min_body_ratio', '吞没最小实体比', 0.7, 0.3, 1.0, 0.05),
+                ('threshold', '价格阈值', 0.02, 0.001, 0.1, 0.001),
+            ]:
+                spin = QDoubleSpinBox()
+                spin.setRange(minv, maxv)
+                spin.setSingleStep(step)
+                spin.setValue(default)
+                form.addRow(label, spin)
+                self.pattern_param_controls[pname] = spin
+            ok_btn = QPushButton("确定")
+            ok_btn.clicked.connect(dlg.accept)
+            form.addRow(ok_btn)
+            if dlg.exec_() == QDialog.Accepted:
+                self.pattern_params = {
+                    k: v.value() for k, v in self.pattern_param_controls.items()}
+        param_btn.clicked.connect(show_param_dialog)
+        layout.addWidget(param_btn)
+        # 识别按钮
+        analyze_btn = QPushButton("识别形态")
+        layout.addWidget(analyze_btn)
+        # 结果表格
+        self.pattern_table = QTableWidget(0, 7)
+        self.pattern_table.setHorizontalHeaderLabels(
+            ['形态', '信号', '置信度', '对称性', '建议', 'K线索引', '价格'])
+        self.pattern_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.pattern_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        layout.addWidget(self.pattern_table)
+        # 统计分析和导出按钮（预留）
+        stat_btn = QPushButton("统计分析")
+        export_btn = QPushButton("导出结果")
+        layout.addWidget(stat_btn)
+        layout.addWidget(export_btn)
+        # 统计分析弹窗
 
-            # 创建形态选择组
-            pattern_group = QGroupBox("形态选择")
-            pattern_layout = QVBoxLayout()
+        def show_stat_dialog():
+            from analysis.pattern_recognition import PatternRecognizer
+            from PyQt5.QtWidgets import QTabWidget, QWidget, QVBoxLayout, QFormLayout, QTableWidget, QTableWidgetItem
+            import matplotlib.pyplot as plt
+            from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+            import numpy as np
+            kdata = getattr(self, 'kdata', None)
+            if kdata is None or len(kdata) < 10:
+                return
+            types = [
+                cb.pattern_key for cb in self.pattern_type_checks if cb.isChecked()]
+            params = getattr(self, 'pattern_params', {})
+            recognizer = PatternRecognizer(params)
+            stats = recognizer.get_pattern_statistics(
+                kdata, pattern_types=types)
+            # 回测结果联动
+            backtest_stats = getattr(self, 'backtest_stats', None)
+            dlg = QDialog(tab)
+            dlg.setWindowTitle("形态统计分析")
+            tabs = QTabWidget(dlg)
+            # 表格Tab
+            table_tab = QWidget()
+            form = QFormLayout(table_tab)
+            table = QTableWidget(len(stats), 4)
+            table.setHorizontalHeaderLabels(['形态', '出现次数', '胜率', '平均涨跌幅'])
+            for i, (pat, stat) in enumerate(stats.items()):
+                table.setItem(i, 0, QTableWidgetItem(pat))
+                table.setItem(i, 1, QTableWidgetItem(
+                    str(stat.get('count', 0))))
+                table.setItem(i, 2, QTableWidgetItem(
+                    f"{stat.get('win_rate', 0):.2%}"))
+                table.setItem(i, 3, QTableWidgetItem(
+                    f"{stat.get('avg_return', 0):.2%}"))
+            form.addRow(table)
+            tabs.addTab(table_tab, "统计表格")
+            # 柱状图Tab
+            bar_tab = QWidget()
+            bar_layout = QVBoxLayout(bar_tab)
+            fig1, ax1 = plt.subplots(figsize=(6, 3))
+            patterns = list(stats.keys())
+            counts = [v.get('count', 0) for v in stats.values()]
+            win_rates = [v.get('win_rate', 0) for v in stats.values()]
+            avg_returns = [v.get('avg_return', 0) for v in stats.values()]
+            x = np.arange(len(patterns))
+            ax1.bar(x, counts, color='#1976d2', alpha=0.7)
+            ax1.set_xticks(x)
+            ax1.set_xticklabels(patterns, rotation=45, ha='right', fontsize=8)
+            ax1.set_ylabel('出现次数')
+            ax1.set_title('各形态出现次数')
+            bar_layout.addWidget(FigureCanvas(fig1))
+            fig2, ax2 = plt.subplots(figsize=(6, 3))
+            ax2.bar(x, win_rates, color='#43a047', alpha=0.7)
+            ax2.set_xticks(x)
+            ax2.set_xticklabels(patterns, rotation=45, ha='right', fontsize=8)
+            ax2.set_ylabel('胜率')
+            ax2.set_title('各形态胜率')
+            bar_layout.addWidget(FigureCanvas(fig2))
+            fig3, ax3 = plt.subplots(figsize=(6, 3))
+            ax3.bar(x, avg_returns, color='#ff9800', alpha=0.7)
+            ax3.set_xticks(x)
+            ax3.set_xticklabels(patterns, rotation=45, ha='right', fontsize=8)
+            ax3.set_ylabel('平均涨跌幅')
+            ax3.set_title('各形态平均涨跌幅')
+            bar_layout.addWidget(FigureCanvas(fig3))
+            tabs.addTab(bar_tab, "柱状图")
+            # 饼图Tab
+            pie_tab = QWidget()
+            pie_layout = QVBoxLayout(pie_tab)
+            fig4, ax4 = plt.subplots(figsize=(5, 4))
+            ax4.pie(counts, labels=patterns, autopct='%1.1f%%', startangle=90)
+            ax4.set_title('形态出现占比')
+            pie_layout.addWidget(FigureCanvas(fig4))
+            tabs.addTab(pie_tab, "饼图")
+            # 回测联动Tab
+            if backtest_stats:
+                bt_tab = QWidget()
+                bt_layout = QVBoxLayout(bt_tab)
+                fig_bt, ax_bt = plt.subplots(figsize=(6, 3))
+                bt_patterns = list(backtest_stats.keys())
+                bt_win = [backtest_stats[k].get(
+                    'win_rate', 0) for k in bt_patterns]
+                ax_bt.bar(np.arange(len(bt_patterns)),
+                          bt_win, color='#e64a19', alpha=0.7)
+                ax_bt.set_xticks(np.arange(len(bt_patterns)))
+                ax_bt.set_xticklabels(
+                    bt_patterns, rotation=45, ha='right', fontsize=8)
+                ax_bt.set_ylabel('回测胜率')
+                ax_bt.set_title('各形态回测胜率')
+                bt_layout.addWidget(FigureCanvas(fig_bt))
+                tabs.addTab(bt_tab, "回测联动")
+            vlayout = QVBoxLayout(dlg)
+            vlayout.addWidget(tabs)
+            ok_btn = QPushButton("关闭")
+            ok_btn.clicked.connect(dlg.accept)
+            vlayout.addWidget(ok_btn)
+            dlg.exec_()
+        stat_btn.clicked.connect(show_stat_dialog)
+        # 导出功能
 
-            # 添加形态复选框
-            self.pattern_checks = {}
-            # 只保留已实现的形态
-            patterns = [
-                ("头肩顶/底", True),
-                ("双顶/双底", True),
-                ("上升/下降三角形", True),
-                ("三重顶/底", False),
-                ("旗形/三角旗", False),
-                ("楔形", False),
-                ("突破形态", False),
-                ("缺口形态", False),
-                ("岛型反转", False)
-            ]
-            for pattern, enabled in patterns:
-                check = QCheckBox(pattern)
-                check.setEnabled(enabled)
-                if not enabled:
-                    check.setToolTip("暂未实现")
-                self.pattern_checks[pattern] = check
-                pattern_layout.addWidget(check)
+        def export_results():
+            import pandas as pd
+            from PyQt5.QtWidgets import QFileDialog
+            kdata = getattr(self, 'kdata', None)
+            if kdata is None or len(kdata) < 10:
+                return
+            # 导出识别结果
+            results = []
+            for row in range(self.pattern_table.rowCount()):
+                row_data = {}
+                for col, key in enumerate(['形态', '信号', '置信度', '对称性', '建议', 'K线索引', '价格']):
+                    item = self.pattern_table.item(row, col)
+                    row_data[key] = item.text() if item else ''
+                results.append(row_data)
+            df = pd.DataFrame(results)
+            fname, _ = QFileDialog.getSaveFileName(
+                tab, "导出识别结果", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            if fname:
+                if fname.endswith('.csv'):
+                    df.to_csv(fname, index=False)
+                else:
+                    df.to_excel(fname, index=False)
+            # 导出统计分析
+            from analysis.pattern_recognition import PatternRecognizer
+            types = [
+                cb.pattern_key for cb in self.pattern_type_checks if cb.isChecked()]
+            params = getattr(self, 'pattern_params', {})
+            recognizer = PatternRecognizer(params)
+            stats = recognizer.get_pattern_statistics(
+                kdata, pattern_types=types)
+            stats_df = pd.DataFrame([{**{'形态': k}, **v}
+                                    for k, v in stats.items()])
+            if not stats_df.empty:
+                fname2, _ = QFileDialog.getSaveFileName(
+                    tab, "导出统计分析", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+                if fname2:
+                    if fname2.endswith('.csv'):
+                        stats_df.to_csv(fname2, index=False)
+                    else:
+                        stats_df.to_excel(fname2, index=False)
+        export_btn.clicked.connect(export_results)
+        # 识别逻辑
 
-            pattern_group.setLayout(pattern_layout)
-            layout.addWidget(pattern_group)
+        def do_analyze():
+            from analysis.pattern_recognition import PatternRecognizer
+            kdata = getattr(self, 'current_kdata', None)
+            if kdata is None or (hasattr(kdata, '__len__') and len(kdata) < 10):
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, "提示", "K线数据为空或不足，无法进行形态分析。请先切换到有数据的股票或调整时间范围。")
+                return
+            types = [
+                cb.pattern_key for cb in self.pattern_type_checks if cb.isChecked()]
+            params = getattr(self, 'pattern_params', {})
+            recognizer = PatternRecognizer(params)
+            results = recognizer.get_pattern_signals(
+                kdata, pattern_types=types)
+            self.pattern_table.setRowCount(len(results))
+            for i, pat in enumerate(results):
+                # 形态类型
+                self.pattern_table.setItem(i, 0, QTableWidgetItem(
+                    pat.get('pattern', pat.get('type', ''))))
+                # 信号
+                self.pattern_table.setItem(
+                    i, 1, QTableWidgetItem(pat.get('signal', '')))
+                # 置信度
+                self.pattern_table.setItem(i, 2, QTableWidgetItem(
+                    f"{pat.get('confidence', 0):.2f}"))
+                # 对称性
+                self.pattern_table.setItem(
+                    i, 3, QTableWidgetItem(f"{pat.get('symmetry', 0):.2f}"))
+                # 建议
+                advice = pat.get('advice', None)
+                if not advice:
+                    # 自动推断建议
+                    if pat.get('signal', '') == 'buy':
+                        advice = '买入'
+                    elif pat.get('signal', '') == 'sell':
+                        advice = '卖出'
+                    else:
+                        advice = '观望'
+                self.pattern_table.setItem(i, 4, QTableWidgetItem(advice))
+                # K线索引
+                idx = pat.get('index', None)
+                if idx is None:
+                    # 兼容头肩顶/底等结构
+                    idx = pat.get('head', (None,))[0]
+                self.pattern_table.setItem(i, 5, QTableWidgetItem(
+                    str(idx) if idx is not None else ''))
+                # 价格
+                price = pat.get('price', None)
+                if price is None:
+                    # 兼容头肩顶/底等结构
+                    price = pat.get('head', (None, None))[1]
+                self.pattern_table.setItem(i, 6, QTableWidgetItem(
+                    str(price) if price is not None else ''))
+            # 结果传递到主窗口/ChartWidget
+            if hasattr(self.parent(), 'parent') and callable(getattr(self.parent(), 'parent', None)):
+                mainwin = self.parent().parent()
+                if hasattr(mainwin, 'chart_widget'):
+                    mainwin.chart_widget.plot_patterns(results)
+            # 也可通过信号传递
+            if hasattr(self, 'analysis_completed'):
+                self.analysis_completed.emit({'pattern_signals': results})
+        analyze_btn.clicked.connect(do_analyze)
+        # 表格点击定位K线
 
-            # 创建参数设置组
-            param_group = QGroupBox("参数设置")
-            param_layout = QFormLayout()
-
-            # 添加识别阈值
-            self.threshold_spin = QDoubleSpinBox()
-            self.threshold_spin.setRange(60, 100)
-            self.threshold_spin.setValue(80)
-            self.threshold_spin.setSingleStep(1)
-            param_layout.addRow("识别阈值(%):", self.threshold_spin)
-
-            # 添加最小形态大小
-            self.min_size_spin = QSpinBox()
-            self.min_size_spin.setRange(5, 100)
-            self.min_size_spin.setValue(20)
-            param_layout.addRow("最小形态大小:", self.min_size_spin)
-
-            param_group.setLayout(param_layout)
-            layout.addWidget(param_group)
-
-            # 创建识别结果组
-            result_group = QGroupBox("识别结果")
-            result_layout = QVBoxLayout()
-
-            # 添加结果表格
-            self.pattern_table = QTableWidget()
-            self.pattern_table.setColumnCount(4)
-            self.pattern_table.setHorizontalHeaderLabels([
-                "形态", "位置", "可信度", "建议"
-            ])
-            result_layout.addWidget(self.pattern_table)
-
-            result_group.setLayout(result_layout)
-            layout.addWidget(result_group)
-
-            # 添加按钮
-            button_layout = QHBoxLayout()
-
-            identify_button = QPushButton("识别形态")
-            identify_button.clicked.connect(lambda: self.run_button_analysis_async(
-                identify_button, self.identify_patterns))
-            button_layout.addWidget(identify_button)
-
-            clear_button = QPushButton("清除结果")
-            clear_button.clicked.connect(
-                lambda: self.run_button_analysis_async(clear_button, self.clear_patterns))
-            button_layout.addWidget(clear_button)
-
-            layout.addLayout(button_layout)
-
-            return widget
-
-        except Exception as e:
-            self.log_manager.log(
-                f"创建形态识别标签页失败: {str(e)}", LogLevel.ERROR)
-            raise
+        def on_table_click(row, col):
+            idx = self.pattern_table.item(row, 5)
+            if idx:
+                idx = int(idx.text())
+                if hasattr(self.parent(), 'parent') and callable(getattr(self.parent(), 'parent', None)):
+                    mainwin = self.parent().parent()
+                    if hasattr(mainwin, 'chart_widget') and hasattr(mainwin.chart_widget, 'price_ax'):
+                        ax = mainwin.chart_widget.price_ax
+                        ax.axvline(idx, color='#ff1744', lw=2,
+                                   ls='--', alpha=0.7, zorder=100)
+                        mainwin.chart_widget.canvas.draw_idle()
+        self.pattern_table.cellClicked.connect(on_table_click)
+        return tab
 
     def identify_patterns(self):
-        """识别形态（重构：调用后端PatternRecognizer）"""
+        """识别形态，支持更多K线形态，结果表格展示新形态"""
         try:
             self.pattern_table.setRowCount(0)
             kdata = self.current_kdata
-            # 统一数据有效性判断，兼容 DataFrame 和 KData
             if kdata is None:
                 self.log_manager.warning("K线数据为空，无法进行形态识别")
                 self.pattern_table.setRowCount(1)
@@ -584,112 +802,118 @@ class AnalysisWidget(QWidget):
                 return
             import pandas as pd
             from core.data_manager import data_manager as global_data_manager
-            # 判断数据类型
             if isinstance(kdata, pd.DataFrame):
-                if len(kdata) < 20:
-                    self.log_manager.warning("K线数据不足20条，无法进行形态识别DataFrame")
-                    self.pattern_table.setRowCount(1)
-                    for col in range(self.pattern_table.columnCount()):
-                        self.pattern_table.setItem(
-                            0, col, QTableWidgetItem("无数据"))
-                    return
-                kdata_for_pattern = kdata
+                kdata_for_pattern = kdata.copy()
+                if 'code' not in kdata_for_pattern.columns:
+                    code = None
+                    if hasattr(self, 'current_stock') and self.current_stock:
+                        code = getattr(self, 'current_stock', None)
+                    if not code and hasattr(self, 'selected_code'):
+                        code = getattr(self, 'selected_code', None)
+                    if not code and hasattr(self, 'code'):
+                        code = getattr(self, 'code', None)
+                    if code:
+                        kdata_for_pattern['code'] = code
+                # 先用高级特征扩展K线形态
+                kdata_for_pattern = create_pattern_recognition_features(
+                    kdata_for_pattern)
             else:
-                if len(kdata) < 20:
-                    self.log_manager.warning("K线数据不足20条，无法进行形态识别")
-                    self.pattern_table.setRowCount(1)
-                    for col in range(self.pattern_table.columnCount()):
-                        self.pattern_table.setItem(
-                            0, col, QTableWidgetItem("无数据"))
-                    return
-                kdata_for_pattern = global_data_manager.kdata_to_df(kdata)
+                kdata_for_pattern = kdata
             from analysis.pattern_recognition import PatternRecognizer
             recognizer = PatternRecognizer()
             found = False
             threshold = self.threshold_spin.value() / 100
-            min_size = self.min_size_spin.value()  # 目前未用，可扩展
+            min_size = self.min_size_spin.value()
             # 形态与方法映射
             pattern_map = {
                 "头肩顶/底": recognizer.find_head_shoulders,
                 "双顶/双底": recognizer.find_double_tops_bottoms,
                 "上升/下降三角形": recognizer.find_triangles,
             }
+            # 新增K线形态直接用DataFrame特征
+            kline_feature_map = {
+                "锤子线": lambda df: df[df['is_hammer'] == 1].index.tolist(),
+                "吞没形态": lambda df: df[(df['bullish_engulfing'] == 1) | (df['bearish_engulfing'] == 1)].index.tolist(),
+                "启明星": lambda df: df[df['morning_star'] == 1].index.tolist(),
+                "黄昏星": lambda df: df[df['evening_star'] == 1].index.tolist(),
+                "三白兵": lambda df: df[df['three_white_soldiers'] == 1].index.tolist(),
+                "三只乌鸦": lambda df: df[df['three_black_crows'] == 1].index.tolist(),
+                "十字星": lambda df: df[df['is_doji'] == 1].index.tolist(),
+                "星线": lambda df: df[df['is_star'] == 1].index.tolist(),
+            }
             for pattern, check in self.pattern_checks.items():
                 if not check.isChecked():
                     continue
                 func = pattern_map.get(pattern)
-                if func is None:
-                    # 未实现的形态，表格中显示提示
-                    row = self.pattern_table.rowCount()
-                    self.pattern_table.insertRow(row)
-                    self.pattern_table.setItem(
-                        row, 0, QTableWidgetItem(pattern))
-                    self.pattern_table.setItem(row, 1, QTableWidgetItem("-"))
-                    self.pattern_table.setItem(row, 2, QTableWidgetItem("-"))
-                    self.pattern_table.setItem(
-                        row, 3, QTableWidgetItem("暂未实现"))
-                    continue
-                try:
-                    results = func(kdata_for_pattern, threshold)
-                except Exception as e:
-                    self.log_manager.log(
-                        f"{pattern}识别异常: {str(e)}", LogLevel.ERROR)
-                    continue
-                if results:
-                    found = True
-                    for res in results:
-                        row = self.pattern_table.rowCount()
-                        self.pattern_table.insertRow(row)
-                        # 结果展示格式
-                        if res.get('type') == 'head_shoulders_top':
+                if func is not None:
+                    try:
+                        results = func(kdata_for_pattern, threshold)
+                    except Exception as e:
+                        self.log_manager.log(
+                            f"{pattern}识别异常: {str(e)}", LogLevel.ERROR)
+                        continue
+                    if results:
+                        found = True
+                        for res in results:
+                            row = self.pattern_table.rowCount()
+                            self.pattern_table.insertRow(row)
+                            # 结果展示格式
+                            if res.get('type') == 'head_shoulders_top':
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem("头肩顶"))
+                            elif res.get('type') == 'head_shoulders_bottom':
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem("头肩底"))
+                            elif res.get('type') == 'double_top':
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem("双顶"))
+                            elif res.get('type') == 'double_bottom':
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem("双底"))
+                            elif 'triangle' in res.get('type', ''):
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem(res.get('type', pattern)))
+                            else:
+                                self.pattern_table.setItem(
+                                    row, 0, QTableWidgetItem(res.get('type', pattern)))
+                            # 位置
+                            pos = str(res.get('left_shoulder',
+                                              res.get('peak1', (None,)))[0])
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem("头肩顶"))
-                        elif res.get('type') == 'head_shoulders_bottom':
+                                row, 1, QTableWidgetItem(pos))
+                            # 可信度
+                            conf = f"{res.get('confidence', 0):.2f}"
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem("头肩底"))
-                        elif res.get('type') == 'double_top':
+                                row, 2, QTableWidgetItem(conf))
+                            # 建议
+                            advice = "买入" if res.get('signal', '') == 'buy' else (
+                                "卖出" if res.get('signal', '') == 'sell' else "观望")
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem("双顶"))
-                        elif res.get('type') == 'double_bottom':
+                                row, 3, QTableWidgetItem(advice))
+                elif pattern in kline_feature_map and isinstance(kdata_for_pattern, pd.DataFrame):
+                    idxs = kline_feature_map[pattern](kdata_for_pattern)
+                    if idxs:
+                        found = True
+                        for idx in idxs:
+                            row = self.pattern_table.rowCount()
+                            self.pattern_table.insertRow(row)
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem("双底"))
-                        elif 'triangle' in res.get('type', ''):
+                                row, 0, QTableWidgetItem(pattern))
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem(res.get('type', pattern)))
-                        else:
+                                row, 1, QTableWidgetItem(str(idx)))
                             self.pattern_table.setItem(
-                                row, 0, QTableWidgetItem(res.get('type', pattern)))
-                        # 位置
-                        pos = str(res.get('left_shoulder',
-                                  res.get('peak1', (None,)))[0])
-                        if 'right_shoulder' in res:
-                            pos += f"-{res['right_shoulder'][0]}"
-                        elif 'peak2' in res:
-                            pos += f"-{res['peak2'][0]}"
-                        elif 'trough2' in res:
-                            pos += f"-{res['trough2'][0]}"
-                        elif 'start_idx' in res and 'end_idx' in res:
-                            pos = f"{res['start_idx']}-{res['end_idx']}"
-                        self.pattern_table.setItem(
-                            row, 1, QTableWidgetItem(pos))
-                        # 可信度
-                        conf = res.get('confidence', 0)
-                        self.pattern_table.setItem(
-                            row, 2, QTableWidgetItem(f"{conf:.1%}"))
-                        # 建议
-                        suggestion = "卖出" if 'top' in res.get(
-                            'type', '') or 'descending' in res.get('type', '') else "买入"
-                        suggestion_item = QTableWidgetItem(suggestion)
-                        suggestion_item.setForeground(
-                            Qt.green if suggestion == "卖出" else Qt.red)
-                        self.pattern_table.setItem(row, 3, suggestion_item)
+                                row, 2, QTableWidgetItem("-"))
+                            self.pattern_table.setItem(
+                                row, 3, QTableWidgetItem("观望"))
             if not found or self.pattern_table.rowCount() == 0:
                 self.pattern_table.setRowCount(1)
                 for col in range(self.pattern_table.columnCount()):
                     self.pattern_table.setItem(0, col, QTableWidgetItem("无数据"))
-            self.pattern_table.resizeColumnsToContents()
+                QMessageBox.information(
+                    self, "提示", "未识别到任何典型形态，建议尝试其他股票或调整参数。")
         except Exception as e:
-            self.log_manager.log(f"识别形态失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"形态识别异常: {str(e)}", LogLevel.ERROR)
+            QMessageBox.critical(self, "形态识别异常", str(e))
 
     def clear_patterns(self):
         """清除形态识别结果"""
@@ -850,53 +1074,42 @@ class AnalysisWidget(QWidget):
             threshold: 趋势阈值
         """
         try:
-            volume = self.current_kdata.volume
-            ma = MA(volume, period)
+            # 兼容DataFrame和KData
+            if hasattr(self.current_kdata, 'volume'):
+                volume = self.current_kdata.volume
+            elif isinstance(self.current_kdata, dict) and 'volume' in self.current_kdata:
+                volume = self.current_kdata['volume']
+            elif isinstance(self.current_kdata, pd.DataFrame) and 'volume' in self.current_kdata.columns:
+                volume = self.current_kdata['volume']
+            else:
+                from hikyuu import VOL
+                volume = VOL(self.current_kdata)
+            from indicators_algo import calc_ma
+            ma = calc_ma(volume, period)
 
-            # 计算趋势
             trend = "放量" if float(volume[-1]) > float(ma[-1]) else "缩量"
-
-            # 计算趋势强度
             strength = abs(float(volume[-1]) -
                            float(ma[-1])) / float(ma[-1]) * 100
 
-            # 添加结果
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
-
-            self.trend_table.setItem(
-                row, 0,
-                QTableWidgetItem("成交量")
-            )
-
+            self.trend_table.setItem(row, 0, QTableWidgetItem("成交量"))
             trend_item = QTableWidgetItem(trend)
-            trend_item.setForeground(
-                Qt.red if trend == "放量" else Qt.green
-            )
+            trend_item.setForeground(Qt.red if trend == "放量" else Qt.green)
             self.trend_table.setItem(row, 1, trend_item)
-
             self.trend_table.setItem(
-                row, 2,
-                QTableWidgetItem(f"{strength:.1f}%")
-            )
-
-            # 根据价格趋势给出建议
+                row, 2, QTableWidgetItem(f"{strength:.1f}%"))
             price_trend = self.trend_table.item(0, 1).text()
             if price_trend == "上升":
                 suggestion = "买入" if trend == "放量" else "观望"
             else:
                 suggestion = "卖出" if trend == "放量" else "观望"
-
             suggestion_item = QTableWidgetItem(suggestion)
             suggestion_item.setForeground(
-                Qt.red if suggestion == "买入" else
-                Qt.green if suggestion == "卖出" else Qt.black
-            )
+                Qt.red if suggestion == "买入" else Qt.green if suggestion == "卖出" else Qt.black)
             self.trend_table.setItem(row, 3, suggestion_item)
-
         except Exception as e:
-            self.log_manager.log(
-                f"分析成交量趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析成交量趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_macd_trend(self, period: int, threshold: float):
         """分析MACD趋势
@@ -906,45 +1119,36 @@ class AnalysisWidget(QWidget):
             threshold: 趋势阈值
         """
         try:
-            close = self.current_kdata.close
-            macd = MACD(close)
-
-            # 计算趋势
-            trend = "多头" if float(macd.dif[-1]) > float(macd.dea[-1]) else "空头"
-
-            # 计算趋势强度
-            strength = abs(float(macd.dif[-1]) - float(macd.dea[-1])) * 100
-
-            # 添加结果
+            # 兼容DataFrame和KData
+            if isinstance(self.current_kdata, pd.DataFrame):
+                from indicators_algo import calc_macd
+                dif, dea, hist = calc_macd(self.current_kdata['close'])
+            else:
+                macd = MACD(self.current_kdata)
+                # 兼容属性和tuple
+                if hasattr(macd, 'dif') and hasattr(macd, 'dea'):
+                    dif, dea = macd.dif, macd.dea
+                elif isinstance(macd, tuple) and len(macd) >= 2:
+                    dif, dea = macd[0], macd[1]
+                else:
+                    raise ValueError("MACD结果格式不支持")
+            trend = "多头" if float(dif[-1]) > float(dea[-1]) else "空头"
+            strength = abs(float(dif[-1]) - float(dea[-1])) * 100
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
-
-            self.trend_table.setItem(
-                row, 0,
-                QTableWidgetItem("MACD")
-            )
-
+            self.trend_table.setItem(row, 0, QTableWidgetItem("MACD"))
             trend_item = QTableWidgetItem(trend)
-            trend_item.setForeground(
-                Qt.red if trend == "多头" else Qt.green
-            )
+            trend_item.setForeground(Qt.red if trend == "多头" else Qt.green)
             self.trend_table.setItem(row, 1, trend_item)
-
             self.trend_table.setItem(
-                row, 2,
-                QTableWidgetItem(f"{strength:.1f}%")
-            )
-
+                row, 2, QTableWidgetItem(f"{strength:.1f}%"))
             suggestion = "买入" if trend == "多头" else "卖出"
             suggestion_item = QTableWidgetItem(suggestion)
             suggestion_item.setForeground(
-                Qt.red if trend == "多头" else Qt.green
-            )
+                Qt.red if suggestion == "多头" else Qt.green)
             self.trend_table.setItem(row, 3, suggestion_item)
-
         except Exception as e:
-            self.log_manager.log(
-                f"分析MACD趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析MACD趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_kdj_trend(self, period: int, threshold: float):
         """分析KDJ趋势
@@ -954,44 +1158,36 @@ class AnalysisWidget(QWidget):
             threshold: 趋势阈值
         """
         try:
-            kdj = KDJ(self.current_kdata)
-
-            # 计算趋势
-            trend = "多头" if float(kdj.k[-1]) > float(kdj.d[-1]) else "空头"
-
-            # 计算趋势强度
-            strength = abs(float(kdj.k[-1]) - float(kdj.d[-1]))
-
-            # 添加结果
+            # 兼容DataFrame和KData
+            if isinstance(self.current_kdata, pd.DataFrame):
+                from indicators_algo import calc_kdj
+                k, d, j = calc_kdj(self.current_kdata)
+            else:
+                kdj = KDJ(self.current_kdata)
+                # 兼容属性和tuple
+                if hasattr(kdj, 'k') and hasattr(kdj, 'd'):
+                    k, d = kdj.k, kdj.d
+                elif isinstance(kdj, tuple) and len(kdj) >= 2:
+                    k, d = kdj[0], kdj[1]
+                else:
+                    raise ValueError("KDJ结果格式不支持")
+            trend = "多头" if float(k[-1]) > float(d[-1]) else "空头"
+            strength = abs(float(k[-1]) - float(d[-1]))
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
-
-            self.trend_table.setItem(
-                row, 0,
-                QTableWidgetItem("KDJ")
-            )
-
+            self.trend_table.setItem(row, 0, QTableWidgetItem("KDJ"))
             trend_item = QTableWidgetItem(trend)
-            trend_item.setForeground(
-                Qt.red if trend == "多头" else Qt.green
-            )
+            trend_item.setForeground(Qt.red if trend == "多头" else Qt.green)
             self.trend_table.setItem(row, 1, trend_item)
-
             self.trend_table.setItem(
-                row, 2,
-                QTableWidgetItem(f"{strength:.1f}%")
-            )
-
+                row, 2, QTableWidgetItem(f"{strength:.1f}%"))
             suggestion = "买入" if trend == "多头" else "卖出"
             suggestion_item = QTableWidgetItem(suggestion)
             suggestion_item.setForeground(
-                Qt.red if trend == "多头" else Qt.green
-            )
+                Qt.red if suggestion == "多头" else Qt.green)
             self.trend_table.setItem(row, 3, suggestion_item)
-
         except Exception as e:
-            self.log_manager.log(
-                f"分析KDJ趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析KDJ趋势失败: {str(e)}", LogLevel.ERROR)
 
     def analyze_rsi_trend(self, period: int, threshold: float):
         """分析RSI趋势
@@ -3611,6 +3807,7 @@ class AnalysisWidget(QWidget):
                         self.log_manager.info(
                             f"df_to_kdata转换后KData长度: {len(result)}")
                         self.current_kdata = result
+                        self.kdata = result  # 保证self.kdata同步
                         if len(result) == 0:
                             self.log_manager.warning(
                                 "set_kdata: KData长度为0，可能所有数据被过滤，建议检查DataFrame的datetime字段、数据完整性和格式！")
@@ -3619,16 +3816,65 @@ class AnalysisWidget(QWidget):
                     except Exception as e:
                         self.log_manager.error(f"K线数据转换KData失败: {str(e)}")
                         self.current_kdata = None
+                        self.kdata = None
                 else:
                     self.current_kdata = kdata
+                    self.kdata = kdata  # 保证self.kdata同步
                     self.log_manager.info(
                         f"set_kdata直接赋值KData长度: {len(kdata) if hasattr(kdata, '__len__') else '未知'}")
                     if hasattr(self.current_kdata, '__len__') and len(self.current_kdata) == 0:
                         self.log_manager.warning(
                             "set_kdata: 直接赋值KData长度为0，数据源可能为空！")
+            else:
+                self.current_kdata = None
+                self.kdata = None
         except Exception as e:
             self.log_manager.error(f"set_kdata异常: {str(e)}")
             self.current_kdata = None
+            self.kdata = None
+
+    def refresh(self) -> None:
+        """
+        刷新分析控件内容，自动刷新所有Tab（如重新计算分析、刷新表格等）。
+        """
+        try:
+            # 依次刷新各Tab内容（如有刷新方法）
+            # 技术分析Tab
+            if hasattr(self, 'calculate_indicators'):
+                self.calculate_indicators()
+            # 形态识别Tab
+            if hasattr(self, 'do_analyze'):
+                self.do_analyze()
+            # 趋势分析Tab
+            if hasattr(self, 'analyze_trend'):
+                self.analyze_trend()
+            # 波浪分析Tab
+            if hasattr(self, 'analyze_wave'):
+                self.analyze_wave()
+            # 市场情绪Tab
+            if hasattr(self, 'analyze_sentiment'):
+                self.analyze_sentiment()
+            # 板块资金流向Tab
+            if hasattr(self, 'analyze_industry_flow'):
+                self.analyze_industry_flow()
+            # 热点分析Tab
+            if hasattr(self, 'analyze_hotspot'):
+                self.analyze_hotspot()
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"刷新分析控件失败: {str(e)}")
+
+    def update(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
+
+    def reload(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
 
 
 def get_indicator_categories():
@@ -3969,3 +4215,25 @@ def process_block_threaded(block_data, log_manager=None):
         'flow': flow,
         'up_days': up_days
     }
+
+
+class PatternRecognitionWorker(QThread):
+    result_ready = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+    def __init__(self, kdata, pattern_types):
+        super().__init__()
+        self.kdata = kdata
+        self.pattern_types = pattern_types
+
+    def run(self):
+        try:
+            # 只做数据处理，不做任何UI操作
+            kdata = create_pattern_recognition_features(self.kdata)
+            from analysis.pattern_recognition import PatternRecognizer
+            recognizer = PatternRecognizer()
+            results = recognizer.get_pattern_signals(
+                kdata, pattern_types=self.pattern_types)
+            self.result_ready.emit(results)
+        except Exception as e:
+            self.error.emit(str(e))

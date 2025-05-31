@@ -118,6 +118,11 @@ def calculate_advanced_indicators(df):
     return df
 
 
+ALL_PATTERN_TYPES = [
+    "头肩顶", "头肩底", "双顶", "双底", "三角形", "锤子线", "倒锤头", "吞没形态", "启明星", "黄昏星", "三白兵", "三只乌鸦", "十字星", "流星线", "射击之星"
+]
+
+
 def create_pattern_recognition_features(df):
     """
     创建K线形态识别特征
@@ -245,6 +250,28 @@ def create_pattern_recognition_features(df):
                                        df_new['evening_star'] * 2 +
                                        df_new['three_black_crows'] * 2 +
                                        (df_new['is_hammer'] & (df_new['close'] > df_new['close'].rolling(window=10).mean())) * 1)
+
+    # 新增形态特征
+    df_new['hammer'] = ((df_new['high'] - df_new['low'] > 3 * (df_new['open'] - df_new['close'])) & ((df_new['close'] - df_new['low']) / (.001 +
+                        df_new['high'] - df_new['low']) > 0.6) & ((df_new['open'] - df_new['low']) / (.001 + df_new['high'] - df_new['low']) > 0.6)).astype(int)
+    df_new['inverted_hammer'] = ((df_new['high'] - df_new['low'] > 3 * (df_new['open'] - df_new['close'])) & ((df_new['high'] - df_new['close']) /
+                                 (.001 + df_new['high'] - df_new['low']) > 0.6) & ((df_new['high'] - df_new['open']) / (.001 + df_new['high'] - df_new['low']) > 0.6)).astype(int)
+    df_new['bullish_engulfing'] = ((df_new['close'] > df_new['open']) & (df_new['close'].shift(1) < df_new['open'].shift(
+        1)) & (df_new['close'] > df_new['open'].shift(1)) & (df_new['open'] < df_new['close'].shift(1))).astype(int)
+    df_new['bearish_engulfing'] = ((df_new['close'] < df_new['open']) & (df_new['close'].shift(1) > df_new['open'].shift(
+        1)) & (df_new['open'] > df_new['close'].shift(1)) & (df_new['close'] < df_new['open'].shift(1))).astype(int)
+    df_new['morning_star'] = ((df_new['close'].shift(2) < df_new['open'].shift(2)) & (df_new['close'].shift(
+        1) < df_new['open'].shift(1)) & (df_new['close'] > df_new['open']) & (df_new['close'] > df_new['open'].shift(1))).astype(int)
+    df_new['evening_star'] = ((df_new['close'].shift(2) > df_new['open'].shift(2)) & (df_new['close'].shift(
+        1) > df_new['open'].shift(1)) & (df_new['close'] < df_new['open']) & (df_new['close'] < df_new['open'].shift(1))).astype(int)
+    df_new['three_white_soldiers'] = ((df_new['close'] > df_new['open']) & (df_new['close'].shift(
+        1) > df_new['open'].shift(1)) & (df_new['close'].shift(2) > df_new['open'].shift(2))).astype(int)
+    df_new['three_black_crows'] = ((df_new['close'] < df_new['open']) & (df_new['close'].shift(
+        1) < df_new['open'].shift(1)) & (df_new['close'].shift(2) < df_new['open'].shift(2))).astype(int)
+    df_new['doji'] = (abs(df_new['close'] - df_new['open']) <
+                      (df_new['high'] - df_new['low']) * 0.1).astype(int)
+    df_new['shooting_star'] = ((df_new['high'] - df_new['close'] > 2 * (
+        df_new['open'] - df_new['close'])) & (df_new['open'] > df_new['close'])).astype(int)
 
     # 移除临时列以保持DataFrame整洁
     temp_cols = ['body_size', 'upper_shadow', 'lower_shadow', 'total_range',

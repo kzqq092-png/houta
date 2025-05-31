@@ -262,6 +262,11 @@ class BaseAnalysisPanel(QWidget):
             else:
                 self.status_label.setStyleSheet("")
 
+    def __del__(self):
+        # 防止QLabel重复删除导致wrapped C/C++ object of type QLabel has been deleted
+        if hasattr(self, 'metric_labels'):
+            self.metric_labels.clear()
+
 
 class AnalysisToolsPanel(BaseAnalysisPanel):
     """Analysis tools panel for the right side of the main window"""
@@ -278,7 +283,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             parent: 父窗口
         """
         try:
-
             # 初始化日志管理器
             if hasattr(parent, 'log_manager'):
                 self.log_manager = parent.log_manager
@@ -288,17 +292,16 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
 
             self.log_manager.info("初始化策略回测UI组件")
             super().__init__(parent)
+            # 修正：确保main_layout已初始化
+            if not hasattr(self, 'main_layout'):
+                self.main_layout = QVBoxLayout(self)
             # 初始化UI
             self.init_ui()
-
             # 初始化数据
             self.init_data()
-
             # 连接信号
             self.connect_signals()
-
             self.log_manager.info("分析工具面板初始化完成")
-
         except Exception as e:
             print(f"初始化UI组件失败: {str(e)}")
             if hasattr(self, 'log_manager'):
@@ -596,12 +599,39 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 label = QLabel("--")
                 metrics_layout.addRow(f"{name}:", label)
                 self.metric_labels[name] = label
-            self.layout.addWidget(metrics_group)
+            self.main_layout.addWidget(metrics_group)
         except Exception as e:
             error_msg = f"创建性能指标显示区域失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+
+    def refresh(self) -> None:
+        """
+        刷新分析工具面板内容，自动刷新回测结果和性能指标。
+        """
+        try:
+            # 重新执行分析和回测（如有方法）
+            if hasattr(self, 'on_analyze'):
+                self.on_analyze()
+            # 刷新性能指标显示
+            if hasattr(self, 'update_metrics_display'):
+                self.update_metrics_display()
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"刷新分析工具面板失败: {str(e)}")
+
+    def update(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
+
+    def reload(self) -> None:
+        """
+        兼容旧接口，重定向到refresh。
+        """
+        self.refresh()
 
 
 class StatusBar(QStatusBar):

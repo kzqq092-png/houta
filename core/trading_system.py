@@ -53,13 +53,12 @@ class TradingSystem:
                 ktype
             )
             import pandas as pd
-            from core.data_manager import data_manager as global_data_manager
             if isinstance(kdata, pd.DataFrame):
                 if 'code' not in kdata.columns:
                     kdata = kdata.copy()
                     kdata['code'] = self.current_stock
                 try:
-                    self.current_kdata = global_data_manager.df_to_kdata(kdata)
+                    self.current_kdata = data_manager.df_to_kdata(kdata)
                 except Exception as e:
                     LogManager.log(f"K线数据转换KData失败: {str(e)}", LogLevel.ERROR)
                     self.current_kdata = None
@@ -154,6 +153,42 @@ class TradingSystem:
                             'price': float(kdata[i].close),
                             'strength': abs(kdj.k[i] - kdj.d[i])
                         })
+
+            elif strategy == "形态分析":
+                self.log_manager.info(
+                    f"形态分析收到数据: shape={kdata.shape}, columns={list(kdata.columns)}")
+                self.log_manager.info(f"前5行数据:\n{kdata.head()}")
+                from analysis.pattern_recognition import PatternRecognizer
+                recognizer = PatternRecognizer()
+                kdata_for_pattern = kdata
+                if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
+                    code = None
+                    if hasattr(self, 'current_stock') and self.current_stock:
+                        code = getattr(self, 'current_stock', None)
+                    if not code and hasattr(self, 'selected_code'):
+                        code = getattr(self, 'selected_code', None)
+                    if not code and hasattr(self, 'code'):
+                        code = getattr(self, 'code', None)
+                    if code:
+                        kdata_for_pattern = kdata.copy()
+                        kdata_for_pattern['code'] = code
+                        self.log_manager.info(
+                            f"形态分析自动补全DataFrame code字段: {code}")
+                    else:
+                        self.log_manager.error(
+                            "形态分析无法自动补全DataFrame code字段，请确保DataFrame包含股票代码")
+                pattern_signals = recognizer.get_pattern_signals(
+                    kdata_for_pattern)
+                results = {
+                    'strategy': strategy,
+                    'pattern_signals': pattern_signals
+                }
+                if not pattern_signals:
+                    self.log_manager.info("形态分析未识别到任何形态")
+                else:
+                    self.log_manager.info(
+                        f"形态分析识别到{len(pattern_signals)}个形态信号")
+                return results
 
             self.current_signals = signals
             return signals

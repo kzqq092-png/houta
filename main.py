@@ -17,7 +17,7 @@ from gui.widgets.chart_widget import ChartWidget
 from gui.menu_bar import MainMenuBar
 from gui.tool_bar import MainToolBar
 from utils.config_manager import ConfigManager
-from core.data_manager import DataManager
+from core.data_manager import data_manager
 from utils.theme import ThemeManager, get_theme_manager, Theme
 from utils.config_types import LoggingConfig
 from core.logger import LogManager, BaseLogManager, LogLevel
@@ -191,7 +191,7 @@ class TradingGUI(QMainWindow):
 
             # 初始化数据管理器
             try:
-                self.data_manager = DataManager(self.log_manager)
+                self.data_manager = data_manager  # 直接赋值全局实例
                 self.log_manager.info("数据管理器初始化完成")
             except Exception as e:
                 self.log_manager.error(f"数据管理器初始化失败: {str(e)}")
@@ -1452,19 +1452,18 @@ class TradingGUI(QMainWindow):
         try:
             # 获取股票数据
             stock_data = item.data(Qt.UserRole)
-            from core.data_manager import DataManager
-            dm = DataManager()
+            from core.data_manager import data_manager
             code = stock_data.get('code')
             # 拆分market和code
             if code and len(code) > 2:
                 market, stock_code = code[:2], code[2:]
-                info = dm.get_stock_info(f"{market}{stock_code}")
+                info = data_manager.get_stock_info(f"{market}{stock_code}")
             else:
                 info = {}
             if info:
                 stock_data.update(info)
             # 获取历史K线数据
-            kdata = dm.get_k_data(code, freq='D')
+            kdata = data_manager.get_k_data(code, freq='D')
             if not kdata.empty:
                 stock_data['history'] = [
                     {
@@ -1478,7 +1477,7 @@ class TradingGUI(QMainWindow):
                     for idx, row in kdata.tail(20).iterrows()
                 ]
             # 统一获取财务数据
-            finance_data = dm.get_finance_data(code)
+            finance_data = data_manager.get_finance_data(code)
             if 'finance_history' in finance_data:
                 stock_data['finance_history'] = finance_data['finance_history']
             if 'all_fields' in finance_data:
@@ -2042,6 +2041,13 @@ class TradingGUI(QMainWindow):
         if widget is not None and widget.layout() and widget.layout().count() > 1:
             main_widget = widget.layout().itemAt(1).widget()
             self.refresh_tab_content(main_widget)
+            # 新增：自动调用Tab主控件的refresh方法
+            if hasattr(main_widget, 'refresh'):
+                try:
+                    main_widget.refresh()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"Tab自动刷新失败: {str(e)}")
 
     def refresh_strategy_params(self):
         """根据当前策略类型动态生成参数控件"""
@@ -2153,7 +2159,24 @@ class TradingGUI(QMainWindow):
             self.log_manager.info(f"前5行数据:\n{data.head()}")
             from analysis.pattern_recognition import PatternRecognizer
             recognizer = PatternRecognizer()
-            pattern_signals = recognizer.get_pattern_signals(data)
+            import pandas as pd
+            kdata_for_pattern = data
+            if isinstance(data, pd.DataFrame) and 'code' not in data.columns:
+                code = None
+                if hasattr(self, 'current_stock') and self.current_stock:
+                    code = getattr(self, 'current_stock', None)
+                if not code and hasattr(self, 'selected_code'):
+                    code = getattr(self, 'selected_code', None)
+                if not code and hasattr(self, 'code'):
+                    code = getattr(self, 'code', None)
+                if code:
+                    kdata_for_pattern = data.copy()
+                    kdata_for_pattern['code'] = code
+                    self.log_manager.info(f"形态分析自动补全DataFrame code字段: {code}")
+                else:
+                    self.log_manager.error(
+                        "形态分析无法自动补全DataFrame code字段，请确保DataFrame包含股票代码")
+            pattern_signals = recognizer.get_pattern_signals(kdata_for_pattern)
             results = {
                 'strategy': strategy,
                 'pattern_signals': pattern_signals
@@ -4536,7 +4559,26 @@ class TradingGUI(QMainWindow):
                 self.log_manager.info(f"前5行数据:\n{data.head()}")
                 from analysis.pattern_recognition import PatternRecognizer
                 recognizer = PatternRecognizer()
-                pattern_signals = recognizer.get_pattern_signals(data)
+                import pandas as pd
+                kdata_for_pattern = data
+                if isinstance(data, pd.DataFrame) and 'code' not in data.columns:
+                    code = None
+                    if hasattr(self, 'current_stock') and self.current_stock:
+                        code = getattr(self, 'current_stock', None)
+                    if not code and hasattr(self, 'selected_code'):
+                        code = getattr(self, 'selected_code', None)
+                    if not code and hasattr(self, 'code'):
+                        code = getattr(self, 'code', None)
+                    if code:
+                        kdata_for_pattern = data.copy()
+                        kdata_for_pattern['code'] = code
+                        self.log_manager.info(
+                            f"形态分析自动补全DataFrame code字段: {code}")
+                    else:
+                        self.log_manager.error(
+                            "形态分析无法自动补全DataFrame code字段，请确保DataFrame包含股票代码")
+                pattern_signals = recognizer.get_pattern_signals(
+                    kdata_for_pattern)
                 results = {
                     'strategy': strategy,
                     'pattern_signals': pattern_signals
@@ -4546,6 +4588,9 @@ class TradingGUI(QMainWindow):
                 else:
                     self.log_manager.info(
                         f"形态分析识别到{len(pattern_signals)}个形态信号")
+            else:
+                label = QLabel("请选择策略")
+                self.strategy_params_layout.addRow(label)
 
             return results
 
@@ -5131,7 +5176,6 @@ def main():
     try:
         # Create application
         app = QApplication(sys.argv)
-
         # Initialize config manager first
         print("初始化配置管理器")
         config_manager = ConfigManager()

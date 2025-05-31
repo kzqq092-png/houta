@@ -8,7 +8,7 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import pandas as pd
-from core.data_manager import DataManager as data_manager
+from core.data_manager import data_manager
 from hikyuu import Datetime, Query, KData
 from talib import HT_TRENDLINE, MA
 try:

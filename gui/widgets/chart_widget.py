@@ -271,6 +271,10 @@ class ChartWidget(QWidget):
                 if main_window and hasattr(main_window, 'get_current_indicators'):
                     self.active_indicators = main_window.get_current_indicators()
             self._render_indicators(kdata, x=x)
+            # --- 新增：形态信号可视化 ---
+            pattern_signals = data.get('pattern_signals', None)
+            if pattern_signals:
+                self.plot_patterns(pattern_signals)
             self._optimize_display()
             if not kdata.empty:
                 for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
@@ -332,7 +336,7 @@ class ChartWidget(QWidget):
                 ax.title.set_fontsize(8)
                 ax.xaxis.label.set_fontsize(8)
                 ax.yaxis.label.set_fontsize(8)
-            self._optimize_display()  # 保证每次刷新后都恢复网格和刻度
+            self._optimize_display()
             # --- 十字光标X轴日期标签固定在X轴下方 ---
             # 在 on_mouse_move 事件中，x_text 固定为X轴下方边界
             # ...找到 on_mouse_move ...
@@ -1709,3 +1713,88 @@ class ChartWidget(QWidget):
         兼容旧接口，重定向到refresh。
         """
         self.refresh()
+
+    def plot_patterns(self, pattern_signals: list):
+        """
+        在K线主图上高亮形态K线、绘制标记（如箭头、圆圈、文字），并支持交互（点击/悬停显示形态详情）。
+        Args:
+            pattern_signals: List[dict]，每个dict至少包含 'index', 'pattern', 'signal', 'confidence' 等字段
+        """
+        import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
+        import mplcursors
+        if not hasattr(self, 'price_ax') or self.current_kdata is None or not pattern_signals:
+            return
+        ax = self.price_ax
+        kdata = self.current_kdata
+        x = np.arange(len(kdata))
+        # 颜色和样式映射
+        pattern_colors = {
+            'hammer': '#1976d2',
+            'inverted_hammer': '#0097a7',
+            'shooting_star': '#d32f2f',
+            'doji': '#ff9800',
+            'marubozu': '#388e3c',
+            'spinning_top': '#7b1fa2',
+            'engulfing': '#0288d1',
+            'piercing': '#c2185b',
+            'dark_cloud_cover': '#ffa000',
+            'morning_star': '#43a047',
+            'evening_star': '#e64a19',
+            'three_white_soldiers': '#00bcd4',
+            'three_black_crows': '#607d8b',
+            'tower_top': '#fbc02d',
+            'tower_bottom': '#ffd600',
+            'flag': '#8bc34a',
+            'wedge': '#5d4037',
+            'rectangle': '#00bfae',
+            'channel': '#ff4081',
+            'head_shoulders': '#fbc02d',
+            'double_tops_bottoms': '#8d6e63',
+            'triangles': '#009688',
+        }
+        details = []
+        for pat in pattern_signals:
+            idx = pat.get('index')
+            if idx is None or idx < 0 or idx >= len(kdata):
+                continue
+            pattern = pat.get('pattern', 'pattern')
+            signal = pat.get('signal', '')
+            conf = pat.get('confidence', 0)
+            price = kdata.iloc[idx]['close'] if 'close' in kdata.columns else None
+            color = pattern_colors.get(pattern, '#1976d2')
+            # 高亮K线（半透明背景）
+            ax.axvspan(idx-0.4, idx+0.4, color=color, alpha=0.18, zorder=10)
+            # 标记形态
+            marker = '↑' if signal == 'buy' else '↓' if signal == 'sell' else '●'
+            ax.text(idx, price, marker, color=color, fontsize=14, fontweight='bold',
+                    ha='center', va='bottom' if signal == 'buy' else 'top', zorder=20)
+            # 形态名称和置信度
+            ax.text(idx, price, f"{pattern}\n{conf:.2f}", color=color, fontsize=7,
+                    ha='center', va='top' if signal == 'buy' else 'bottom', alpha=0.7, zorder=21)
+            # 收集详情用于交互
+            details.append({
+                'x': idx, 'y': price, 'pattern': pattern, 'signal': signal, 'confidence': conf,
+                '涨跌幅': pat.get('return', None), '详情': pat
+            })
+        # 支持交互：点击/悬停显示形态详情
+        try:
+            cursor = mplcursors.cursor(ax, hover=True)
+
+            @cursor.connect("add")
+            def on_add(sel):
+                # 最近的点
+                x = int(round(sel.target[0]))
+                for d in details:
+                    if abs(d['x'] - x) <= 0:
+                        info = f"形态: {d['pattern']}\n信号: {d['signal']}\n置信度: {d['confidence']:.2f}"
+                        if d['涨跌幅'] is not None:
+                            info += f"\n后续涨跌幅: {d['涨跌幅']:.2%}"
+                        sel.annotation.set_text(info)
+                        break
+        except Exception:
+            pass  # mplcursors为可选依赖
+        self.canvas.draw_idle()
+        # 预留：统计分析可视化接口
+        # def plot_pattern_statistics(stats: dict):
+        #     ...
