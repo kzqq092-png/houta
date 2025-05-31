@@ -29,13 +29,10 @@ from indicators_algo import get_talib_indicator_list, get_talib_category, calc_m
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
+from analysis.pattern_recognition import PatternRecognizer
+from core.data_manager import DataManager as data_manager
 
-# --- 修复 QVector<int> 警告 ---
-try:
-    from PyQt5.QtCore import qRegisterMetaType, QVector
-    qRegisterMetaType(QVector[int], "QVector<int>")
-except Exception:
-    pass
+
 
 
 class AnalysisWidget(QWidget):
@@ -493,14 +490,23 @@ class AnalysisWidget(QWidget):
 
             # 添加形态复选框
             self.pattern_checks = {}
+            # 只保留已实现的形态
             patterns = [
-                "头肩顶/底", "双顶/双底", "三重顶/底",
-                "上升/下降三角形", "旗形/三角旗", "楔形",
-                "突破形态", "缺口形态", "岛型反转"
+                ("头肩顶/底", True),
+                ("双顶/双底", True),
+                ("上升/下降三角形", True),
+                ("三重顶/底", False),
+                ("旗形/三角旗", False),
+                ("楔形", False),
+                ("突破形态", False),
+                ("缺口形态", False),
+                ("岛型反转", False)
             ]
-
-            for pattern in patterns:
+            for pattern, enabled in patterns:
                 check = QCheckBox(pattern)
+                check.setEnabled(enabled)
+                if not enabled:
+                    check.setToolTip("暂未实现")
                 self.pattern_checks[pattern] = check
                 pattern_layout.addWidget(check)
 
@@ -565,300 +571,125 @@ class AnalysisWidget(QWidget):
             raise
 
     def identify_patterns(self):
-        """识别形态"""
+        """识别形态（重构：调用后端PatternRecognizer）"""
         try:
             self.pattern_table.setRowCount(0)
-            if not self.current_kdata:
+            kdata = self.current_kdata
+            # 统一数据有效性判断，兼容 DataFrame 和 KData
+            if kdata is None:
+                self.log_manager.warning("K线数据为空，无法进行形态识别")
                 self.pattern_table.setRowCount(1)
                 for col in range(self.pattern_table.columnCount()):
                     self.pattern_table.setItem(0, col, QTableWidgetItem("无数据"))
                 return
-            # ...原有识别逻辑...
+            import pandas as pd
+            from core.data_manager import data_manager as global_data_manager
+            # 判断数据类型
+            if isinstance(kdata, pd.DataFrame):
+                if len(kdata) < 20:
+                    self.log_manager.warning("K线数据不足20条，无法进行形态识别DataFrame")
+                    self.pattern_table.setRowCount(1)
+                    for col in range(self.pattern_table.columnCount()):
+                        self.pattern_table.setItem(
+                            0, col, QTableWidgetItem("无数据"))
+                    return
+                kdata_for_pattern = kdata
+            else:
+                if len(kdata) < 20:
+                    self.log_manager.warning("K线数据不足20条，无法进行形态识别")
+                    self.pattern_table.setRowCount(1)
+                    for col in range(self.pattern_table.columnCount()):
+                        self.pattern_table.setItem(
+                            0, col, QTableWidgetItem("无数据"))
+                    return
+                kdata_for_pattern = global_data_manager.kdata_to_df(kdata)
+            from analysis.pattern_recognition import PatternRecognizer
+            recognizer = PatternRecognizer()
             found = False
             threshold = self.threshold_spin.value() / 100
-            min_size = self.min_size_spin.value()
+            min_size = self.min_size_spin.value()  # 目前未用，可扩展
+            # 形态与方法映射
+            pattern_map = {
+                "头肩顶/底": recognizer.find_head_shoulders,
+                "双顶/双底": recognizer.find_double_tops_bottoms,
+                "上升/下降三角形": recognizer.find_triangles,
+            }
             for pattern, check in self.pattern_checks.items():
                 if not check.isChecked():
                     continue
-                if pattern == "头肩顶/底":
-                    self.find_head_shoulders(threshold, min_size)
+                func = pattern_map.get(pattern)
+                if func is None:
+                    # 未实现的形态，表格中显示提示
+                    row = self.pattern_table.rowCount()
+                    self.pattern_table.insertRow(row)
+                    self.pattern_table.setItem(
+                        row, 0, QTableWidgetItem(pattern))
+                    self.pattern_table.setItem(row, 1, QTableWidgetItem("-"))
+                    self.pattern_table.setItem(row, 2, QTableWidgetItem("-"))
+                    self.pattern_table.setItem(
+                        row, 3, QTableWidgetItem("暂未实现"))
+                    continue
+                try:
+                    results = func(kdata_for_pattern, threshold)
+                except Exception as e:
+                    self.log_manager.log(
+                        f"{pattern}识别异常: {str(e)}", LogLevel.ERROR)
+                    continue
+                if results:
                     found = True
-                elif pattern == "双顶/双底":
-                    self.find_double_tops_bottoms(threshold, min_size)
-                    found = True
-                elif pattern == "三重顶/底":
-                    self.find_triple_tops_bottoms(threshold, min_size)
-                    found = True
-                elif pattern == "上升/下降三角形":
-                    self.find_triangles(threshold, min_size)
-                    found = True
-                elif pattern == "旗形/三角旗":
-                    self.find_flags(threshold, min_size)
-                    found = True
-                elif pattern == "楔形":
-                    self.find_wedges(threshold, min_size)
-                    found = True
-                elif pattern == "突破形态":
-                    self.find_breakouts(threshold, min_size)
-                    found = True
-                elif pattern == "缺口形态":
-                    self.find_gaps(threshold, min_size)
-                    found = True
-                elif pattern == "岛型反转":
-                    self.find_island_reversals(threshold, min_size)
-                    found = True
+                    for res in results:
+                        row = self.pattern_table.rowCount()
+                        self.pattern_table.insertRow(row)
+                        # 结果展示格式
+                        if res.get('type') == 'head_shoulders_top':
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem("头肩顶"))
+                        elif res.get('type') == 'head_shoulders_bottom':
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem("头肩底"))
+                        elif res.get('type') == 'double_top':
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem("双顶"))
+                        elif res.get('type') == 'double_bottom':
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem("双底"))
+                        elif 'triangle' in res.get('type', ''):
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem(res.get('type', pattern)))
+                        else:
+                            self.pattern_table.setItem(
+                                row, 0, QTableWidgetItem(res.get('type', pattern)))
+                        # 位置
+                        pos = str(res.get('left_shoulder',
+                                  res.get('peak1', (None,)))[0])
+                        if 'right_shoulder' in res:
+                            pos += f"-{res['right_shoulder'][0]}"
+                        elif 'peak2' in res:
+                            pos += f"-{res['peak2'][0]}"
+                        elif 'trough2' in res:
+                            pos += f"-{res['trough2'][0]}"
+                        elif 'start_idx' in res and 'end_idx' in res:
+                            pos = f"{res['start_idx']}-{res['end_idx']}"
+                        self.pattern_table.setItem(
+                            row, 1, QTableWidgetItem(pos))
+                        # 可信度
+                        conf = res.get('confidence', 0)
+                        self.pattern_table.setItem(
+                            row, 2, QTableWidgetItem(f"{conf:.1%}"))
+                        # 建议
+                        suggestion = "卖出" if 'top' in res.get(
+                            'type', '') or 'descending' in res.get('type', '') else "买入"
+                        suggestion_item = QTableWidgetItem(suggestion)
+                        suggestion_item.setForeground(
+                            Qt.green if suggestion == "卖出" else Qt.red)
+                        self.pattern_table.setItem(row, 3, suggestion_item)
             if not found or self.pattern_table.rowCount() == 0:
                 self.pattern_table.setRowCount(1)
                 for col in range(self.pattern_table.columnCount()):
                     self.pattern_table.setItem(0, col, QTableWidgetItem("无数据"))
             self.pattern_table.resizeColumnsToContents()
         except Exception as e:
-            self.log_manager.log(
-                f"识别形态失败: {str(e)}", LogLevel.ERROR)
-
-    def find_head_shoulders(self, threshold: float, min_size: int):
-        """识别头肩顶/底形态
-
-        Args:
-            threshold: 识别阈值
-            min_size: 最小形态大小
-        """
-        try:
-            high = self.current_kdata.high
-            low = self.current_kdata.low
-
-            # 寻找局部极值点
-            peaks = []
-            troughs = []
-
-            for i in range(1, len(high)-1):
-                # 寻找峰顶
-                if high[i] > high[i-1] and high[i] > high[i+1]:
-                    peaks.append((i, float(high[i])))
-
-                # 寻找谷底
-                if low[i] < low[i-1] and low[i] < low[i+1]:
-                    troughs.append((i, float(low[i])))
-
-            # 识别头肩顶形态
-            for i in range(len(peaks)-4):
-                # 获取连续5个峰顶点
-                p1, p2, p3, p4, p5 = peaks[i:i+5]
-
-                # 检查是否满足头肩顶特征
-                if (abs(p1[1] - p5[1])/p1[1] < 0.1 and  # 左右肩高度相近
-                    p3[1] > p1[1] and p3[1] > p5[1] and  # 头部最高
-                    p2[1] < p3[1] and p4[1] < p3[1] and  # 颈部低于头部
-                        p2[1] - p1[1] > 0 and p4[1] - p5[1] > 0):  # 颈线向上倾斜
-
-                    # 计算可信度
-                    confidence = min(
-                        1.0,
-                        (p3[1] - p1[1])/p1[1] * threshold
-                    ) * 100
-
-                    if confidence >= threshold * 100:
-                        # 添加识别结果
-                        row = self.pattern_table.rowCount()
-                        self.pattern_table.insertRow(row)
-
-                        self.pattern_table.setItem(
-                            row, 0,
-                            QTableWidgetItem("头肩顶")
-                        )
-
-                        position = f"{p1[0]}-{p5[0]}"
-                        self.pattern_table.setItem(
-                            row, 1,
-                            QTableWidgetItem(position)
-                        )
-
-                        self.pattern_table.setItem(
-                            row, 2,
-                            QTableWidgetItem(f"{confidence:.1f}%")
-                        )
-
-                        suggestion = "卖出"
-                        suggestion_item = QTableWidgetItem(suggestion)
-                        suggestion_item.setForeground(Qt.green)
-                        self.pattern_table.setItem(row, 3, suggestion_item)
-
-            # 识别头肩底形态
-            for i in range(len(troughs)-4):
-                # 获取连续5个谷底点
-                t1, t2, t3, t4, t5 = troughs[i:i+5]
-
-                # 检查是否满足头肩底特征
-                if (abs(t1[1] - t5[1])/t1[1] < 0.1 and  # 左右肩高度相近
-                    t3[1] < t1[1] and t3[1] < t5[1] and  # 头部最低
-                    t2[1] > t3[1] and t4[1] > t3[1] and  # 颈部高于头部
-                        t2[1] - t1[1] < 0 and t4[1] - t5[1] < 0):  # 颈线向下倾斜
-
-                    # 计算可信度
-                    confidence = min(
-                        1.0,
-                        (t1[1] - t3[1])/t3[1] * threshold
-                    ) * 100
-
-                    if confidence >= threshold * 100:
-                        # 添加识别结果
-                        row = self.pattern_table.rowCount()
-                        self.pattern_table.insertRow(row)
-
-                        self.pattern_table.setItem(
-                            row, 0,
-                            QTableWidgetItem("头肩底")
-                        )
-
-                        position = f"{t1[0]}-{t5[0]}"
-                        self.pattern_table.setItem(
-                            row, 1,
-                            QTableWidgetItem(position)
-                        )
-
-                        self.pattern_table.setItem(
-                            row, 2,
-                            QTableWidgetItem(f"{confidence:.1f}%")
-                        )
-
-                        suggestion = "买入"
-                        suggestion_item = QTableWidgetItem(suggestion)
-                        suggestion_item.setForeground(Qt.red)
-                        self.pattern_table.setItem(row, 3, suggestion_item)
-
-        except Exception as e:
-            self.log_manager.log(
-                f"识别头肩顶/底形态失败: {str(e)}", LogLevel.ERROR)
-
-    def find_double_tops_bottoms(self, threshold: float, min_size: int):
-        """识别双顶/双底形态
-
-        Args:
-            threshold: 识别阈值
-            min_size: 最小形态大小
-        """
-        try:
-            high = self.current_kdata.high
-            low = self.current_kdata.low
-
-            # 寻找局部极值点
-            peaks = []
-            troughs = []
-
-            for i in range(1, len(high)-1):
-                # 寻找峰顶
-                if high[i] > high[i-1] and high[i] > high[i+1]:
-                    peaks.append((i, float(high[i])))
-
-                # 寻找谷底
-                if low[i] < low[i-1] and low[i] < low[i+1]:
-                    troughs.append((i, float(low[i])))
-
-            # 识别双顶形态
-            for i in range(len(peaks)-1):
-                p1, p2 = peaks[i:i+2]
-
-                # 检查两个顶点之间的距离
-                if p2[0] - p1[0] < min_size:
-                    continue
-
-                # 检查是否满足双顶特征
-                if abs(p1[1] - p2[1])/p1[1] < 0.05:  # 两个顶点高度相近
-                    # 寻找中间的谷底
-                    middle_trough = None
-                    for t in troughs:
-                        if p1[0] < t[0] < p2[0]:
-                            if middle_trough is None or t[1] < middle_trough[1]:
-                                middle_trough = t
-
-                    if middle_trough and middle_trough[1] < min(p1[1], p2[1]):
-                        # 计算可信度
-                        height_diff = min(p1[1], p2[1]) - middle_trough[1]
-                        confidence = min(
-                            1.0,
-                            height_diff/middle_trough[1] * threshold
-                        ) * 100
-
-                        if confidence >= threshold * 100:
-                            # 添加识别结果
-                            row = self.pattern_table.rowCount()
-                            self.pattern_table.insertRow(row)
-
-                            self.pattern_table.setItem(
-                                row, 0,
-                                QTableWidgetItem("双顶")
-                            )
-
-                            position = f"{p1[0]}-{p2[0]}"
-                            self.pattern_table.setItem(
-                                row, 1,
-                                QTableWidgetItem(position)
-                            )
-
-                            self.pattern_table.setItem(
-                                row, 2,
-                                QTableWidgetItem(f"{confidence:.1f}%")
-                            )
-
-                            suggestion = "卖出"
-                            suggestion_item = QTableWidgetItem(suggestion)
-                            suggestion_item.setForeground(Qt.green)
-                            self.pattern_table.setItem(row, 3, suggestion_item)
-
-            # 识别双底形态
-            for i in range(len(troughs)-1):
-                t1, t2 = troughs[i:i+2]
-
-                # 检查两个底点之间的距离
-                if t2[0] - t1[0] < min_size:
-                    continue
-
-                # 检查是否满足双底特征
-                if abs(t1[1] - t2[1])/t1[1] < 0.05:  # 两个底点高度相近
-                    # 寻找中间的峰顶
-                    middle_peak = None
-                    for p in peaks:
-                        if t1[0] < p[0] < t2[0]:
-                            if middle_peak is None or p[1] > middle_peak[1]:
-                                middle_peak = p
-
-                    if middle_peak and middle_peak[1] > max(t1[1], t2[1]):
-                        # 计算可信度
-                        height_diff = middle_peak[1] - max(t1[1], t2[1])
-                        confidence = min(
-                            1.0,
-                            height_diff/middle_peak[1] * threshold
-                        ) * 100
-
-                        if confidence >= threshold * 100:
-                            # 添加识别结果
-                            row = self.pattern_table.rowCount()
-                            self.pattern_table.insertRow(row)
-
-                            self.pattern_table.setItem(
-                                row, 0,
-                                QTableWidgetItem("双底")
-                            )
-
-                            position = f"{t1[0]}-{t2[0]}"
-                            self.pattern_table.setItem(
-                                row, 1,
-                                QTableWidgetItem(position)
-                            )
-
-                            self.pattern_table.setItem(
-                                row, 2,
-                                QTableWidgetItem(f"{confidence:.1f}%")
-                            )
-
-                            suggestion = "买入"
-                            suggestion_item = QTableWidgetItem(suggestion)
-                            suggestion_item.setForeground(Qt.red)
-                            self.pattern_table.setItem(row, 3, suggestion_item)
-
-        except Exception as e:
-            self.log_manager.log(
-                f"识别双顶/双底形态失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"识别形态失败: {str(e)}", LogLevel.ERROR)
 
     def clear_patterns(self):
         """清除形态识别结果"""
@@ -3742,6 +3573,62 @@ class AnalysisWidget(QWidget):
             except Exception as e:
                 if hasattr(self, 'log_manager'):
                     self.log_manager.error(f"连接rotation_worker信号失败: {str(e)}")
+
+    def set_kdata(self, kdata):
+        """
+        设置当前K线数据，供所有分析和形态识别使用。
+        Args:
+            kdata: K线数据对象（如hikyuu.KData或pandas.DataFrame）
+        """
+        import pandas as pd
+        from core.data_manager import data_manager as global_data_manager
+        try:
+            if kdata is not None and (not isinstance(kdata, pd.DataFrame) or not kdata.empty):
+                if isinstance(kdata, pd.DataFrame):
+                    if 'datetime' not in kdata.columns and isinstance(kdata.index, pd.DatetimeIndex):
+                        kdata = kdata.copy()
+                        kdata['datetime'] = kdata.index
+                        kdata = kdata.reset_index(drop=True)
+                    # 自动补全 code 字段
+                    if 'code' not in kdata.columns:
+                        code = None
+                        if hasattr(self, 'current_stock') and self.current_stock:
+                            code = getattr(self.current_stock, 'code', None)
+                        if not code and hasattr(self, 'selected_code'):
+                            code = getattr(self, 'selected_code', None)
+                        if not code and hasattr(self, 'code'):
+                            code = getattr(self, 'code', None)
+                        if code:
+                            kdata = kdata.copy()
+                            kdata['code'] = code
+                            self.log_manager.info(
+                                f"set_kdata自动补全DataFrame code字段: {code}")
+                        else:
+                            self.log_manager.error(
+                                "set_kdata无法自动补全DataFrame code字段，请确保DataFrame包含股票代码")
+                    try:
+                        result = global_data_manager.df_to_kdata(kdata)
+                        self.log_manager.info(
+                            f"df_to_kdata转换后KData长度: {len(result)}")
+                        self.current_kdata = result
+                        if len(result) == 0:
+                            self.log_manager.warning(
+                                "set_kdata: KData长度为0，可能所有数据被过滤，建议检查DataFrame的datetime字段、数据完整性和格式！")
+                            self.log_manager.warning(
+                                f"DataFrame字段: {list(kdata.columns)}，前5行: {kdata.head()}")
+                    except Exception as e:
+                        self.log_manager.error(f"K线数据转换KData失败: {str(e)}")
+                        self.current_kdata = None
+                else:
+                    self.current_kdata = kdata
+                    self.log_manager.info(
+                        f"set_kdata直接赋值KData长度: {len(kdata) if hasattr(kdata, '__len__') else '未知'}")
+                    if hasattr(self.current_kdata, '__len__') and len(self.current_kdata) == 0:
+                        self.log_manager.warning(
+                            "set_kdata: 直接赋值KData长度为0，数据源可能为空！")
+        except Exception as e:
+            self.log_manager.error(f"set_kdata异常: {str(e)}")
+            self.current_kdata = None
 
 
 def get_indicator_categories():

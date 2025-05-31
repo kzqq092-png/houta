@@ -17,7 +17,6 @@ import logging
 from .chart_utils import ChartUtils
 from .indicators import TechnicalIndicators
 from .trade_analysis import TradeAnalysis
-from .utils import DataUtils
 from .risk_analysis import RiskAnalysis
 from .model_analysis import ModelAnalysis
 from .common_visualization import CommonVisualization

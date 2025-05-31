@@ -259,6 +259,9 @@ class DataManager:
             cached_data = self.cache_manager.get(cache_key)
             if cached_data is not None:
                 if not cached_data.empty:
+                    if 'code' not in cached_data.columns:
+                        cached_data = cached_data.copy()
+                        cached_data['code'] = code
                     return cached_data
                 else:
                     self.log_manager.warning(f"缓存中的K线数据为空: {code}")
@@ -325,6 +328,10 @@ class DataManager:
                     df['datetime'] = pd.to_datetime(df['datetime'])
                     df.set_index('datetime', inplace=True)
 
+                    # 自动补全 code 字段
+                    if 'code' not in df.columns:
+                        df['code'] = code
+
                 elif self._current_source == 'eastmoney':
                     df = self._data_sources['eastmoney'].get_kdata(
                         code, freq, start_date, end_date)
@@ -354,16 +361,17 @@ class DataManager:
                 df = df.replace([np.inf, -np.inf], np.nan)
                 df = df.dropna(subset=['close'])  # 至少要有收盘价
 
+                # 自动补全 code 字段
+                if 'code' not in df.columns:
+                    df['code'] = code
+
                 # 缓存数据
                 self.cache_manager.set(cache_key, df)
 
                 # 记录数据范围
                 if not df.empty:
                     self.log_manager.info(
-                        f"成功获取股票 {code} 的K线数据，"
-                        f"时间范围: {df.index[0]} 至 {df.index[-1]}，"
-                        f"共 {len(df)} 条记录"
-                    )
+                        f"成功获取股票 {code} 的K线数据， 时间范围: {df.index[0]} 至 {df.index[-1]}，共 {len(df)} 条记录")
 
                 return df
 
@@ -379,6 +387,8 @@ class DataManager:
                             self._current_source = source
                             df = self.get_k_data(
                                 code, freq, start_date, end_date, query=query)
+                            if 'code' not in df.columns:
+                                df['code'] = code
                             if not df.empty:
                                 return df
                             self._current_source = old_source
@@ -913,6 +923,49 @@ class DataManager:
         # TODO: 实现自选股存储与读取，这里用演示数据
         return ["000001", "600519", "300750"]
 
+    def get_concept_stocks(self, concept: str) -> list:
+        """
+        获取指定概念的成分股代码列表
+        Args:
+            concept: 概念名称
+        Returns:
+            list: 成分股代码
+        """
+        try:
+            # 优先从缓存获取
+            cache_key = f"concept_stocks_{concept}"
+            cached = self.cache_manager.get(cache_key)
+            if cached is not None:
+                return cached
+            # 尝试从行业管理器获取
+            if hasattr(self, 'industry_manager') and hasattr(self.industry_manager, 'industry_data'):
+                result = []
+                for code, info in self.industry_manager.industry_data.items():
+                    # 概念可能在exchange_industry或sectors/concept
+                    if info.get('exchange_industry') and concept in info['exchange_industry']:
+                        result.append(code)
+                    elif 'sectors' in info and 'concept' in info['sectors'] and concept in info['sectors']['concept']:
+                        result.append(code)
+                if result:
+                    self.cache_manager.set(cache_key, result)
+                    return result
+            # 兜底：尝试从数据源获取
+            if hasattr(self, '_data_sources') and 'eastmoney' in self._data_sources:
+                try:
+                    em = self._data_sources['eastmoney']
+                    if hasattr(em, 'get_concept_members'):
+                        result = em.get_concept_members(concept)
+                        if result:
+                            self.cache_manager.set(cache_key, result)
+                            return result
+                except Exception:
+                    pass
+            return []
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.warning(f"获取概念成分股失败: {str(e)}")
+            return []
+
     def get_market_day_info(self, date, code=None, industry=None, concept=None, custom_stocks=None) -> dict:
         """
         获取指定日期的行情摘要（自选股/指数/行业/概念）
@@ -939,9 +992,7 @@ class DataManager:
                 return result
             elif concept:
                 # 获取概念成分股当日行情
-                from core.data_manager import DataManager
-                dm = DataManager()
-                stock_list = list(dm.get_concept_stocks(concept))
+                stock_list = list(self.get_concept_stocks(concept))
                 result = {}
                 for code_ in stock_list:
                     df = self.get_k_data(code_, start_date=str(date)[
@@ -952,9 +1003,7 @@ class DataManager:
                             row["close"]-row["open"])/row["open"]*100}
                 return result
             elif industry:
-                from core.data_manager import DataManager
-                dm = DataManager()
-                stock_list = list(dm.get_industry_stocks(industry))
+                stock_list = list(self.get_industry_stocks(industry))
                 result = {}
                 for code_ in stock_list:
                     df = self.get_k_data(code_, start_date=str(date)[
@@ -1085,3 +1134,103 @@ class DataManager:
         self.log_manager.info(
             f"获取财务数据成功: {code}, 数据长度: {len(result['finance_history'])}")
         return result
+
+    def df_to_kdata(self, df):
+        """
+        将pandas.DataFrame批量转换为hikyuu.KData对象，自动处理字段映射和类型。
+        Args:
+            df: DataFrame，需包含datetime、open、high、low、close、amount、volume列
+        Returns:
+            KData对象
+        """
+        # 新实现：直接通过 stock.get_kdata(Query(...)) 获得 KData，保证与主图数据一致
+        try:
+            if df is None or df.empty:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.warning("df_to_kdata收到空DataFrame")
+                from hikyuu import KData
+                return KData()
+            # 自动推断股票代码
+            code = None
+            if 'code' in df.columns:
+                code = df['code'].iloc[0]
+            elif hasattr(df, 'code'):
+                code = df.code
+            # 如果没有 code 字段，无法自动获取，需用户保证 DataFrame 来源于某只股票
+            if not code:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(
+                        "df_to_kdata无法推断股票代码，请确保DataFrame包含'code'字段或属性")
+                from hikyuu import KData
+                return KData()
+            # 自动推断起止日期，兼容 index 为 DatetimeIndex
+            if 'datetime' in df.columns:
+                start_date = str(df['datetime'].min())[:10]
+                end_date = str(df['datetime'].max())[:10]
+            elif isinstance(df.index, pd.DatetimeIndex):
+                # 自动恢复 datetime 列
+                df = df.copy()
+                df['datetime'] = df.index
+                start_date = str(df['datetime'].min())[:10]
+                end_date = str(df['datetime'].max())[:10]
+            else:
+                start_date = None
+                end_date = None
+            from hikyuu.interactive import sm
+            from hikyuu import Query, Datetime
+            stock = sm[code]
+            if start_date and end_date:
+                query = Query(Datetime(start_date), Datetime(end_date))
+            else:
+                query = Query(-len(df))
+            kdata = stock.get_kdata(query)
+            if hasattr(self, 'log_manager'):
+                self.log_manager.info(
+                    f"df_to_kdata已自动切换为stock.get_kdata(Query(...))方式，code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
+            return kdata
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f'df_to_kdata自动切换KData失败: {str(e)}')
+            from hikyuu import KData
+            return KData()
+
+    def kdata_to_df(self, kdata):
+        """
+        将hikyuu.KData对象批量转换为pandas.DataFrame，自动处理字段映射和类型。
+        Args:
+            kdata: KData对象
+        Returns:
+            DataFrame
+        """
+        import pandas as pd
+        if kdata is None or len(kdata) == 0:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.warning("kdata_to_df收到空KData")
+            return pd.DataFrame()
+        records = []
+        for i in range(len(kdata)):
+            rec = kdata[i]
+            dt = getattr(rec, 'datetime', None)
+            records.append({
+                'datetime': str(dt),
+                'open': getattr(rec, 'open', None),
+                'high': getattr(rec, 'high', None),
+                'low': getattr(rec, 'low', None),
+                'close': getattr(rec, 'close', None),
+                'volume': getattr(rec, 'volume', None),
+                'amount': getattr(rec, 'amount', None),
+                'code': getattr(rec, 'code', None) if hasattr(rec, 'code') else None
+            })
+        df = pd.DataFrame(records)
+        if 'datetime' in df.columns:
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+            df.set_index('datetime', inplace=True)
+        return df
+
+
+# 全局唯一数据管理器实例，供全系统import使用
+try:
+    from core.base_logger import BaseLogManager
+    data_manager = DataManager(BaseLogManager())
+except Exception:
+    data_manager = DataManager()

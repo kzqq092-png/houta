@@ -42,6 +42,13 @@ class DataUpdateThread(QThread):
         while self._running:
             try:
                 data = self._fetch_market_data()
+                # 自动补全所有DataFrame中的code字段
+                for k, v in data.items():
+                    if isinstance(v, pd.DataFrame) and 'code' not in v.columns and hasattr(self.data_manager, 'current_stock'):
+                        v = v.copy()
+                        v['code'] = getattr(
+                            self.data_manager, 'current_stock', None)
+                        data[k] = v
                 self.data_updated.emit(data)
             except Exception as e:
                 logging.error(f"数据更新错误: {e}")

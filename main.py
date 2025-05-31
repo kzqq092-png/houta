@@ -1,6 +1,7 @@
 """
 交易系统主窗口模块
 """
+from PyQt5.QtCore import qRegisterMetaType, QVector
 from utils.cache import Cache
 from components.stock_screener import StockScreenerWidget
 from gui.ui_components import StatusBar
@@ -45,11 +46,9 @@ import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
 
-try:
-    from PyQt5.QtCore import qRegisterMetaType, QVector
-    qRegisterMetaType(QVector[int], "QVector<int>")
-except Exception:
-    pass
+# 注册QVector<int>类型，避免信号槽警告
+qRegisterMetaType(QVector[int], "QVector<int>")
+
 
 # 定义全局样式表
 GLOBAL_STYLE = """
@@ -1784,6 +1783,10 @@ class TradingGUI(QMainWindow):
                 # 负数表示向前N天
                 self.current_time_range = time_range_map[time_range]
                 self.update_chart()
+                # 新增：同步K线数据到AnalysisWidget
+                if hasattr(self, 'analysis_widget') and self.current_stock:
+                    kdata = self.get_kdata(self.current_stock)
+                    self.analysis_widget.set_kdata(kdata)
                 self.log_manager.info(f"时间范围已更改为: {time_range}")
 
         except Exception as e:
@@ -1999,6 +2002,10 @@ class TradingGUI(QMainWindow):
             self.log_manager.info("右侧面板（多Tab分析）创建完成")
             add_shadow(self.right_panel, blur_radius=18,
                        x_offset=0, y_offset=6)
+            # 确保策略下拉框包含"形态分析"
+            if hasattr(self, 'strategy_combo'):
+                if "形态分析" not in [self.strategy_combo.itemText(i) for i in range(self.strategy_combo.count())]:
+                    self.strategy_combo.addItem("形态分析")
         except Exception as e:
             self.log_manager.error(f"创建右侧面板失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -2147,6 +2154,21 @@ class TradingGUI(QMainWindow):
             self.strategy_params_layout.addRow("参数值:", value)
             self.param_controls["name"] = name
             self.param_controls["value"] = value
+        elif strategy == "形态分析":
+            self.log_manager.info(
+                f"形态分析收到数据: shape={data.shape}, columns={list(data.columns)}")
+            self.log_manager.info(f"前5行数据:\n{data.head()}")
+            from analysis.pattern_recognition import PatternRecognizer
+            recognizer = PatternRecognizer()
+            pattern_signals = recognizer.get_pattern_signals(data)
+            results = {
+                'strategy': strategy,
+                'pattern_signals': pattern_signals
+            }
+            if not pattern_signals:
+                self.log_manager.info("形态分析未识别到任何形态")
+            else:
+                self.log_manager.info(f"形态分析识别到{len(pattern_signals)}个形态信号")
         else:
             label = QLabel("请选择策略")
             self.strategy_params_layout.addRow(label)
@@ -2371,6 +2393,10 @@ class TradingGUI(QMainWindow):
                 self.current_period = period_map[period]
                 # 更新图表
                 self.update_chart()
+                # 新增：同步K线数据到AnalysisWidget
+                if hasattr(self, 'analysis_widget') and self.current_stock:
+                    kdata = self.get_kdata(self.current_stock)
+                    self.analysis_widget.set_kdata(kdata)
                 # 记录日志
                 self.log_manager.info(f"已切换周期为: {period}")
 
@@ -2889,6 +2915,15 @@ class TradingGUI(QMainWindow):
             # 更新指标
             self.update_indicators()
 
+            # 新增：同步K线数据到AnalysisWidget，自动补全code字段
+            if hasattr(self, 'analysis_widget'):
+                kdata = self.get_kdata(self.current_stock)
+                import pandas as pd
+                if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
+                    kdata = kdata.copy()
+                    kdata['code'] = self.current_stock
+                self.analysis_widget.set_kdata(kdata)
+
             # 记录日志
             self.log_manager.info(f"已选择股票: {stock_code}")
 
@@ -3249,6 +3284,10 @@ class TradingGUI(QMainWindow):
             # 只刷新图表，所有指标渲染由ChartWidget自动同步主窗口get_current_indicators
             if hasattr(self, 'current_stock') and self.current_stock:
                 k_data = self.get_kdata(self.current_stock)
+                import pandas as pd
+                if isinstance(k_data, pd.DataFrame) and 'code' not in k_data.columns:
+                    k_data = k_data.copy()
+                    k_data['code'] = self.current_stock
                 title = f"{self.current_stock}"
                 data = {
                     'stock_code': self.current_stock,
@@ -4167,6 +4206,10 @@ class TradingGUI(QMainWindow):
                 return
             # 获取K线数据，自动根据时间范围
             k_data = self.get_kdata(self.current_stock)
+            import pandas as pd
+            if isinstance(k_data, pd.DataFrame) and 'code' not in k_data.columns:
+                k_data = k_data.copy()
+                k_data['code'] = self.current_stock
             if k_data is None or k_data.empty:
                 self.log_manager.warning(f"获取股票 {self.current_stock} 的K线数据为空")
                 if hasattr(self, 'chart_widget'):
@@ -4186,19 +4229,7 @@ class TradingGUI(QMainWindow):
             }
             if results is not None:
                 data['analysis'] = results
-            # 自动判断数据量，自动选择异步或同步渲染
-            if hasattr(self, 'chart_widget'):
-                # 渲染前显示加载提示
-                if hasattr(self.chart_widget, 'show_loading_dialog'):
-                    self.chart_widget.show_loading_dialog()
-                if len(k_data) > 100:
-                    self.chart_widget.async_update_chart(data)
-                else:
-                    self.chart_widget.update_chart(data)
-                # 渲染后关闭加载提示（由ChartWidget内部关闭）
-                self.log_manager.info(f"成功更新{self.current_stock}的图表显示")
-            else:
-                self.log_manager.warning("图表控件未初始化")
+            self.chart_widget.update_chart(data)
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -4300,11 +4331,11 @@ class TradingGUI(QMainWindow):
             self.log_manager.info(f"开始分析 - 策略: {strategy}")
 
             # 获取股票数据
-            data = self.data_manager.get_stock_data(
+            data = self.data_manager.get_k_data(
                 self.current_stock,
-                self.current_period,
-                Query(self.start_date.date().toPyDate(),
-                      self.end_date.date().toPyDate(), Query.DATE)
+                freq=self.current_period,
+                start_date=self.start_date.date().strftime('%Y-%m-%d'),
+                end_date=self.end_date.date().strftime('%Y-%m-%d')
             )
 
             # 执行分析
@@ -4505,6 +4536,23 @@ class TradingGUI(QMainWindow):
                         'J': j
                     }
                 }
+
+            elif strategy == "形态分析":
+                self.log_manager.info(
+                    f"形态分析收到数据: shape={data.shape}, columns={list(data.columns)}")
+                self.log_manager.info(f"前5行数据:\n{data.head()}")
+                from analysis.pattern_recognition import PatternRecognizer
+                recognizer = PatternRecognizer()
+                pattern_signals = recognizer.get_pattern_signals(data)
+                results = {
+                    'strategy': strategy,
+                    'pattern_signals': pattern_signals
+                }
+                if not pattern_signals:
+                    self.log_manager.info("形态分析未识别到任何形态")
+                else:
+                    self.log_manager.info(
+                        f"形态分析识别到{len(pattern_signals)}个形态信号")
 
             return results
 

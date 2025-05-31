@@ -8,10 +8,13 @@ from hikyuu.interactive import *
 from core.data_manager import data_manager
 from utils.performance_monitor import monitor_performance
 from core.logger import LogManager, LogLevel
+from hikyuu import KData, KRecord
 
 
 class TradingSystem:
-    """交易系统类"""
+    """交易系统类
+    注意：所有资金流、成分股、K线等接口应统一通过core.data_manager.data_manager调用，避免重复实现和多实例。
+    """
 
     def __init__(self):
         """初始化交易系统"""
@@ -38,111 +41,117 @@ class TradingSystem:
     def load_kdata(self, start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
                    ktype: str = 'D'):
-        """加载K线数据
-
-        Args:
-            start_date: 开始日期
-            end_date: 结束日期
-            ktype: K线类型
-        """
+        """加载K线数据，自动兼容DataFrame和KData"""
         try:
             if not self.current_stock:
                 raise ValueError("未设置股票")
 
-            self.current_kdata = data_manager.get_kdata(
+            kdata = data_manager.get_kdata(
                 self.current_stock,
                 start_date,
                 end_date,
                 ktype
             )
-
+            import pandas as pd
+            from core.data_manager import data_manager as global_data_manager
+            if isinstance(kdata, pd.DataFrame):
+                if 'code' not in kdata.columns:
+                    kdata = kdata.copy()
+                    kdata['code'] = self.current_stock
+                try:
+                    self.current_kdata = global_data_manager.df_to_kdata(kdata)
+                except Exception as e:
+                    LogManager.log(f"K线数据转换KData失败: {str(e)}", LogLevel.ERROR)
+                    self.current_kdata = None
+            else:
+                self.current_kdata = kdata
         except Exception as e:
             LogManager.log(f"加载K线数据失败: {str(e)}", LogLevel.ERROR)
 
     def calculate_signals(self, strategy: str = 'MA') -> List[Dict[str, Any]]:
-        """计算交易信号
-
-        Args:
-            strategy: 策略名称
-
-        Returns:
-            交易信号列表
-        """
+        """计算交易信号，自动兼容KData和DataFrame"""
         try:
             if not self.current_kdata:
                 raise ValueError("未加载K线数据")
-
+            kdata = self.current_kdata
+            import pandas as pd
+            if isinstance(kdata, pd.DataFrame):
+                try:
+                    kdata = data_manager.df_to_kdata(kdata)
+                except Exception as e:
+                    LogManager.log(f"K线数据转换KData失败: {str(e)}", LogLevel.ERROR)
+                    return []
             signals = []
 
             if strategy == 'MA':
                 # 计算MA指标
-                ma5 = TA_MA(self.current_kdata.close, 5)
-                ma10 = TA_MA(self.current_kdata.close, 10)
+                ma5 = TA_MA(kdata.close, 5)
+                ma10 = TA_MA(kdata.close, 10)
 
                 # 生成交易信号
-                for i in range(1, len(self.current_kdata)):
+                for i in range(1, len(kdata)):
                     if (ma5[i] > ma10[i] and ma5[i-1] <= ma10[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'MA',
                             'signal': 'BUY',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(ma5[i] - ma10[i])
                         })
                     elif (ma5[i] < ma10[i] and ma5[i-1] >= ma10[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'MA',
                             'signal': 'SELL',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(ma5[i] - ma10[i])
                         })
 
             elif strategy == 'MACD':
                 # 计算MACD指标
-                macd = TA_MACD(self.current_kdata.close)
+                macd = TA_MACD(kdata.close)
 
                 # 生成交易信号
-                for i in range(1, len(self.current_kdata)):
+                for i in range(1, len(kdata)):
                     if (macd.dif[i] > macd.dea[i] and
                             macd.dif[i-1] <= macd.dea[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'MACD',
                             'signal': 'BUY',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(macd.dif[i] - macd.dea[i])
                         })
                     elif (macd.dif[i] < macd.dea[i] and
                           macd.dif[i-1] >= macd.dea[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'MACD',
                             'signal': 'SELL',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(macd.dif[i] - macd.dea[i])
                         })
 
             elif strategy == 'KDJ':
                 # 计算KDJ指标
-                kdj = TA_STOCH(self.current_kdata)
+                kdj = TA_STOCH(kdata)
 
                 # 生成交易信号
-                for i in range(1, len(self.current_kdata)):
+                for i in range(1, len(kdata)):
                     if (kdj.k[i] > kdj.d[i] and kdj.k[i-1] <= kdj.d[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'KDJ',
                             'signal': 'BUY',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(kdj.k[i] - kdj.d[i])
                         })
                     elif (kdj.k[i] < kdj.d[i] and kdj.k[i-1] >= kdj.d[i-1]):
                         signals.append({
-                            'time': self.current_kdata[i].datetime.datetime(),
+                            'time': kdata[i].datetime.datetime(),
                             'type': 'KDJ',
                             'signal': 'SELL',
-                            'price': float(self.current_kdata[i].close),
+                            'price': float(kdata[i].close),
                             'strength': abs(kdj.k[i] - kdj.d[i])
                         })
 

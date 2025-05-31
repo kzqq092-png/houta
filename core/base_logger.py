@@ -54,27 +54,27 @@ class BaseLogManager(QObject):
 
     def debug(self, message: str):
         """记录调试日志"""
-        self.logger.debug(message)
+        self.logger.debug(message.strip())
         self.log_message.emit(message, LogLevel.DEBUG.value)
 
     def info(self, message: str):
         """记录信息日志"""
-        self.logger.info(message)
+        self.logger.info(message.strip())
         self.log_message.emit(message, LogLevel.INFO.value)
 
     def warning(self, message: str):
         """记录警告日志"""
-        self.logger.warning(message)
+        self.logger.warning(message.strip())
         self.log_message.emit(message, LogLevel.WARNING.value)
 
     def error(self, message: str):
         """记录错误日志"""
-        self.logger.error(message)
+        self.logger.error(message.strip())
         self.log_message.emit(message, LogLevel.ERROR.value)
 
     def critical(self, message: str):
         """记录严重错误日志"""
-        self.logger.critical(message)
+        self.logger.critical(message.strip())
         self.log_message.emit(message, LogLevel.CRITICAL.value)
 
     def clear(self):
@@ -100,5 +100,5 @@ class BaseLogManager(QObject):
 
     def performance(self, message: str):
         """记录性能日志"""
-        self.logger.info(f"[PERFORMANCE] {message}")
+        self.logger.info(f"[PERFORMANCE] {message.strip()}")
         self.log_message.emit(message, "PERFORMANCE")

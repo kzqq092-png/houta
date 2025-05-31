@@ -8,6 +8,7 @@ from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import pandas as pd
 from hikyuu import Datetime, Query, KData, MA
+from core.data_manager import DataManager as data_manager
 
 
 class PatternRecognizer:
@@ -16,17 +17,21 @@ class PatternRecognizer:
     def __init__(self):
         self.cache = {}
 
-    def find_head_shoulders(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
+    def find_head_shoulders(self, kdata, threshold: float = 0.02) -> List[Dict]:
         """Find head and shoulders patterns
-
         Args:
-            kdata: KData object containing price data
+            kdata: KData对象或DataFrame
             threshold: Price difference threshold
-
         Returns:
             List of identified patterns
         """
         try:
+            if isinstance(kdata, pd.DataFrame):
+                kdata = data_manager.df_to_kdata(kdata)
+            if not kdata or len(kdata) < 20:
+                print("[PatternRecognizer] find_head_shoulders: kdata为空或不足20条，跳过识别")
+                return []
+
             closes = np.array([float(k.close) for k in kdata])
             patterns = []
             min_pattern_size = 20
@@ -107,17 +112,22 @@ class PatternRecognizer:
             raise Exception(
                 f"Head and shoulders pattern recognition failed: {str(e)}")
 
-    def find_double_tops_bottoms(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
+    def find_double_tops_bottoms(self, kdata, threshold: float = 0.02) -> List[Dict]:
         """Find double top and bottom patterns
-
         Args:
-            kdata: KData object containing price data
+            kdata: KData对象或DataFrame
             threshold: Price difference threshold
-
         Returns:
             List of identified patterns
         """
         try:
+            if isinstance(kdata, pd.DataFrame):
+                kdata = data_manager.df_to_kdata(kdata)
+            if not kdata or len(kdata) < 10:
+                print(
+                    "[PatternRecognizer] find_double_tops_bottoms: kdata为空或不足10条，跳过识别")
+                return []
+
             closes = np.array([float(k.close) for k in kdata])
             patterns = []
             min_pattern_size = 10
@@ -177,17 +187,21 @@ class PatternRecognizer:
             raise Exception(
                 f"Double top/bottom pattern recognition failed: {str(e)}")
 
-    def find_triangles(self, kdata: KData, threshold: float = 0.02) -> List[Dict]:
+    def find_triangles(self, kdata, threshold: float = 0.02) -> List[Dict]:
         """Find triangle patterns
-
         Args:
-            kdata: KData object containing price data
+            kdata: KData对象或DataFrame
             threshold: Price difference threshold
-
         Returns:
             List of identified patterns
         """
         try:
+            if isinstance(kdata, pd.DataFrame):
+                kdata = data_manager.df_to_kdata(kdata)
+            if not kdata or len(kdata) < 10:
+                print("[PatternRecognizer] find_triangles: kdata为空或不足10条，跳过识别")
+                return []
+
             closes = np.array([float(k.close) for k in kdata])
             highs = np.array([float(k.high) for k in kdata])
             lows = np.array([float(k.low) for k in kdata])

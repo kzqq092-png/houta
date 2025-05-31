@@ -7,6 +7,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from gui.widgets.chart_widget import ChartWidget
 from utils.theme import get_theme_manager
+import pandas as pd
 
 
 class DraggableWidget(QWidget):
@@ -137,6 +138,9 @@ class MultiChartPanel(QWidget):
                     code = self.stock_list[idx]['marketCode'] if isinstance(
                         self.stock_list[idx], dict) else self.stock_list[idx]
                     kdata = self.data_manager.get_k_data(code=code, freq='D')
+                    if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
+                        kdata = kdata.copy()
+                        kdata['code'] = code
                     idx += 1
                     if kdata is not None and not kdata.empty:
                         data = {
