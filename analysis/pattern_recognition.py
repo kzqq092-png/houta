@@ -90,7 +90,7 @@ class PatternRecognizer:
                     # 计算对称性，防止分母为0
                     diffs = np.array([left_shoulder, head, right_shoulder])
                     mean_abs_diffs = np.mean(np.abs(diffs))
-                    if mean_abs_diffs == 0:
+                    if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
                         symmetry = 0.0
                     else:
                         symmetry = 1 - np.std(diffs) / mean_abs_diffs
@@ -130,7 +130,7 @@ class PatternRecognizer:
 
                     diffs = np.array([left_shoulder, head, right_shoulder])
                     mean_abs_diffs = np.mean(np.abs(diffs))
-                    if mean_abs_diffs == 0:
+                    if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
                         symmetry = 0.0
                     else:
                         symmetry = 1 - np.std(diffs) / mean_abs_diffs
@@ -344,15 +344,26 @@ class PatternRecognizer:
         """
         try:
             # Calculate price volatility
-            volatility = np.std(points) / np.mean(points)
+            mean_points = np.mean(points)
+            if mean_points == 0 or np.isnan(mean_points):
+                volatility = 0
+            else:
+                volatility = np.std(points) / mean_points
 
             # Calculate price deviation from reference
-            deviation = np.mean(
-                [abs(p - reference) / reference for p in points])
+            if reference == 0 or np.isnan(reference):
+                deviation = 0
+            else:
+                deviation = np.mean(
+                    [abs(p - reference) / reference for p in points])
 
             # Calculate pattern symmetry
             diffs = np.diff(points)
-            symmetry = 1 - np.std(diffs) / np.mean(np.abs(diffs))
+            mean_abs_diffs = np.mean(np.abs(diffs))
+            if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
+                symmetry = 0
+            else:
+                symmetry = 1 - np.std(diffs) / mean_abs_diffs
 
             # Combine factors
             confidence = (0.4 * (1 - volatility) +

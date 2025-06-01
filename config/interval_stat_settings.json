@@ -1,0 +1,23 @@
+{
+  "strong_bull": 15.0,
+  "strong_bear": -15.0,
+  "extreme_volatility": 9.0,
+  "max_drawdown": -15.0,
+  "periods": [
+    5,
+    20,
+    60,
+    120
+  ],
+  "score_weights": {
+    "ret": 0.16,
+    "up_ratio": 0.37,
+    "vol": 0.15,
+    "volatility_vol": 0.1,
+    "mdd": 0.02,
+    "skew": 0.05,
+    "sharpe": 0.05,
+    "turnover": 0.1
+  },
+  "font_size": 13
+}

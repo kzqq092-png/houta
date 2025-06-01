@@ -1862,6 +1862,9 @@ class TradingGUI(QMainWindow):
             self.top_splitter.addWidget(self.middle_panel)
             # 关键：主窗口 self.chart_widget 始终指向单屏 ChartWidget 实例
             self.chart_widget = self.multi_chart_panel.single_chart
+            # 自动连接区间统计信号
+            self.chart_widget.request_stat_dialog.connect(
+                self.show_stat_dialog)
             self.log_manager.info("中间面板(多图表分屏)创建完成")
             add_shadow(self.middle_panel, blur_radius=24,
                        x_offset=0, y_offset=8)
@@ -1871,6 +1874,102 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"创建中间面板(多图表分屏)失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             raise
+
+    def show_stat_dialog(self, interval):
+        """弹出区间统计弹窗，统计当前区间K线的涨跌幅、均值、最大回撤等，并用专业可视化展示"""
+        try:
+            start_idx, end_idx = interval
+            kdata = getattr(self.chart_widget, 'current_kdata', None)
+            if kdata is None or kdata.empty or start_idx >= end_idx:
+                QMessageBox.warning(self, "提示", "区间数据无效！")
+                return
+            sub = kdata.iloc[start_idx:end_idx+1]
+            if sub.empty:
+                QMessageBox.warning(self, "提示", "区间数据无效！")
+                return
+            # 统计项（与原有统计一致，略）
+            open_ = sub.iloc[0]['open']
+            close_ = sub.iloc[-1]['close']
+            high = sub['high'].max()
+            low = sub['low'].min()
+            mean = sub['close'].mean()
+            ret = (close_ - open_) / open_ * 100
+            max_drawdown = (
+                (sub['close'].cummax() - sub['close']) / sub['close'].cummax()).max() * 100
+            up_days = (sub['close'] > sub['open']).sum()
+            down_days = (sub['close'] < sub['open']).sum()
+            amplitude = ((sub['high'] - sub['low']) / sub['close'] * 100)
+            amp_mean = amplitude.mean()
+            amp_max = amplitude.max()
+            vol_mean = sub['volume'].mean()
+            vol_sum = sub['volume'].sum()
+            returns = sub['close'].pct_change().dropna()
+            volatility = returns.std() * (252 ** 0.5) * 100 if not returns.empty else 0
+            std_ret = returns.std() * 100 if not returns.empty else 0
+            max_up = returns.max() * 100 if not returns.empty else 0
+            max_down = returns.min() * 100 if not returns.empty else 0
+            up_seq = (sub['close'] > sub['open']).astype(int)
+            down_seq = (sub['close'] < sub['open']).astype(int)
+
+            def max_consecutive(arr):
+                max_len = cnt = 0
+                for v in arr:
+                    if v:
+                        cnt += 1
+                        max_len = max(max_len, cnt)
+                    else:
+                        cnt = 0
+                return max_len
+            max_up_seq = max_consecutive(up_seq)
+            max_down_seq = max_consecutive(down_seq)
+            total_days = len(sub)
+            up_ratio = up_days / total_days * 100 if total_days else 0
+            down_ratio = down_days / total_days * 100 if total_days else 0
+            open_up = (sub['open'] > sub['open'].shift(1)).sum()
+            open_down = (sub['open'] < sub['open'].shift(1)).sum()
+            close_new_high = (sub['close'] == sub['close'].cummax()).sum()
+            close_new_low = (sub['close'] == sub['close'].cummin()).sum()
+            gap = (sub['open'] - sub['close'].shift(1)).abs()
+            max_gap = gap[1:].max() if len(gap) > 1 else 0
+            max_amplitude = amplitude.max()
+            max_vol = sub['volume'].max()
+            min_vol = sub['volume'].min()
+            stat = {
+                '开盘价': open_,
+                '收盘价': close_,
+                '最高价': high,
+                '最低价': low,
+                '均价': mean,
+                '涨跌幅(%)': ret,
+                '最大回撤(%)': max_drawdown,
+                '振幅均值(%)': amp_mean,
+                '振幅最大(%)': amp_max,
+                '区间波动率(年化%)': volatility,
+                '区间收益率标准差(%)': std_ret,
+                '最大单日涨幅(%)': max_up,
+                '最大单日跌幅(%)': max_down,
+                '最大单日振幅(%)': max_amplitude,
+                '最大跳空缺口': max_gap,
+                '成交量均值': vol_mean,
+                '成交量总和': vol_sum,
+                '最大成交量': max_vol,
+                '最小成交量': min_vol,
+                '阳线天数': up_days,
+                '阴线天数': down_days,
+                '阳线比例(%)': up_ratio,
+                '阴线比例(%)': down_ratio,
+                '最大连续阳线': max_up_seq,
+                '最大连续阴线': max_down_seq,
+                '开盘上涨次数': open_up,
+                '开盘下跌次数': open_down,
+                '收盘创新高次数': close_new_high,
+                '收盘新低次数': close_new_low
+            }
+            from gui.dialogs.interval_stat_dialog import IntervalStatDialog
+            dlg = IntervalStatDialog(sub, stat, self)
+            dlg.exec_()
+        except Exception as e:
+            QMessageBox.critical(self, "区间统计错误", str(e))
 
     def on_zoom_changed(self, zoom_level: float):
         """处理缩放级别变化事件

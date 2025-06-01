@@ -37,6 +37,8 @@ class ChartWidget(QWidget):
     chart_updated = pyqtSignal(dict)  # 图表更新信号
     error_occurred = pyqtSignal(str)  # 错误信号
     zoom_changed = pyqtSignal(float)  # 缩放变更信号
+    request_indicator_dialog = pyqtSignal()
+    request_stat_dialog = pyqtSignal(tuple)  # (start_idx, end_idx)
 
     def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None, theme_manager=None, log_manager=None, data_manager=None):
         """初始化图表控件
@@ -128,6 +130,10 @@ class ChartWidget(QWidget):
             self._apply_initial_theme()
 
             self.log_manager.info("图表控件初始化完成")
+
+            self.highlighted_indices = set()  # 高亮K线索引
+            self._replay_timer = None         # 回放定时器
+            self._replay_index = None         # 回放当前索引
 
         except Exception as e:
             error_msg = f"初始化失败: {str(e)}"
@@ -239,7 +245,7 @@ class ChartWidget(QWidget):
         idx = np.linspace(0, len(kdata)-1, max_points).astype(int)
         return kdata.iloc[idx]
 
-    def update_chart(self, data: dict):
+    def update_chart(self, data: dict = None):
         """唯一K线渲染实现，X轴为等距序号，彻底消除节假日断层。"""
         try:
             if not data or 'kdata' not in data:
@@ -464,6 +470,18 @@ class ChartWidget(QWidget):
                 self.indicator_ax.set_xticks(xticks)
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=0, fontsize=7)
+
+            # 绘制高亮K线
+            try:
+                if self.current_kdata is not None and hasattr(self, 'price_ax'):
+                    for idx in self.highlighted_indices:
+                        if 0 <= idx < len(self.current_kdata):
+                            candle = self.current_kdata.iloc[idx]
+                            self.price_ax.axvline(
+                                idx, color='#ffd600', linestyle='--', linewidth=1.5, alpha=0.7, zorder=1000)
+            except Exception as e:
+                if self.log_manager:
+                    self.log_manager.error(f"高亮K线绘制失败: {str(e)}")
 
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
@@ -1798,3 +1816,147 @@ class ChartWidget(QWidget):
         # 预留：统计分析可视化接口
         # def plot_pattern_statistics(stats: dict):
         #     ...
+
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+        save_action = menu.addAction("保存图表为图片")
+        export_action = menu.addAction("导出K线/指标数据")
+        indicator_action = menu.addAction("添加/隐藏指标")
+        stat_action = menu.addAction("区间统计")
+        highlight_action = menu.addAction("标记/高亮K线")
+        replay_action = menu.addAction("历史回看/回放")
+        copy_action = menu.addAction("复制图表到剪贴板")
+        refresh_action = menu.addAction("刷新图表")
+        clear_highlight_action = menu.addAction("清空高亮")
+        action = menu.exec_(event.globalPos())
+        if action == save_action:
+            self.save_chart_image()
+        elif action == export_action:
+            self.export_kline_and_indicators()
+        elif action == indicator_action:
+            self.request_indicator_dialog.emit()
+        elif action == stat_action:
+            self.trigger_stat_dialog()
+        elif action == highlight_action:
+            self.mark_highlight_candle(event)
+        elif action == replay_action:
+            self.toggle_replay()
+        elif action == copy_action:
+            self.copy_chart_to_clipboard()
+        elif action == refresh_action:
+            self.refresh()
+        elif action == clear_highlight_action:
+            self.clear_highlighted_candles()
+
+    def save_chart_image(self):
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "保存图表", "", "PNG Files (*.png);;JPEG Files (*.jpg);;PDF Files (*.pdf)")
+            if file_path:
+                self.figure.savefig(file_path)
+                if self.log_manager:
+                    self.log_manager.info(f"图表已保存到: {file_path}")
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"保存图表失败: {str(e)}")
+
+    def export_kline_and_indicators(self):
+        try:
+            import pandas as pd
+            if self.current_kdata is None or self.current_kdata.empty:
+                QMessageBox.warning(self, "提示", "当前无K线数据可导出！")
+                return
+            df = self.current_kdata.copy()
+            # 合并所有已绘制指标（假设指标已添加为df列）
+            # 可扩展：遍历self.active_indicators，合并指标数据
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "导出K线/指标数据", "", "CSV Files (*.csv)")
+            if file_path:
+                df.to_csv(file_path, index=False, encoding='utf-8-sig')
+                if self.log_manager:
+                    self.log_manager.info(f"K线/指标数据已导出到: {file_path}")
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"导出K线/指标数据失败: {str(e)}")
+
+    def trigger_stat_dialog(self):
+        # 统计当前缩放区间或鼠标选区
+        try:
+            if self.current_kdata is None or self.current_kdata.empty:
+                QMessageBox.warning(self, "提示", "当前无K线数据可统计！")
+                return
+            # 取当前X轴可见范围
+            xlim = self.price_ax.get_xlim()
+            start_idx = int(max(0, round(xlim[0])))
+            end_idx = int(min(len(self.current_kdata)-1, round(xlim[1])))
+            self.request_stat_dialog.emit((start_idx, end_idx))
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"区间统计失败: {str(e)}")
+
+    def mark_highlight_candle(self, event):
+        # 标记鼠标所在K线为高亮
+        try:
+            if self.current_kdata is None or self.current_kdata.empty:
+                return
+            # 计算鼠标在axes中的xdata
+            pos = self.price_ax.transData.inverted().transform((event.x(), event.y()))
+            x_idx = int(round(pos[0]))
+            if 0 <= x_idx < len(self.current_kdata):
+                self.highlighted_indices.add(x_idx)
+                self.refresh()
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"标记高亮K线失败: {str(e)}")
+
+    def clear_highlighted_candles(self):
+        self.highlighted_indices.clear()
+        self.refresh()
+
+    def toggle_replay(self):
+        # 历史回看/回放动画
+        try:
+            if self._replay_timer and self._replay_timer.isActive():
+                self._replay_timer.stop()
+                self._replay_timer = None
+                self._replay_index = None
+                return
+            if self.current_kdata is None or self.current_kdata.empty:
+                return
+            from PyQt5.QtCore import QTimer
+            self._replay_index = 10  # 从第10根K线开始
+            self._replay_timer = QTimer(self)
+            self._replay_timer.timeout.connect(self._replay_step)
+            self._replay_timer.start(100)
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"历史回看/回放启动失败: {str(e)}")
+
+    def _replay_step(self):
+        if self._replay_index is None or self.current_kdata is None:
+            return
+        if self._replay_index >= len(self.current_kdata):
+            self._replay_timer.stop()
+            self._replay_index = None
+            return
+        # 只显示前self._replay_index根K线
+        self.update_chart(
+            {'kdata': self.current_kdata.iloc[:self._replay_index]})
+        self._replay_index += 1
+
+    def copy_chart_to_clipboard(self):
+        try:
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.QtGui import QPixmap
+            import io
+            buf = io.BytesIO()
+            self.figure.savefig(buf, format='png')
+            buf.seek(0)
+            pixmap = QPixmap()
+            pixmap.loadFromData(buf.read(), 'PNG')
+            QApplication.clipboard().setPixmap(pixmap)
+            if self.log_manager:
+                self.log_manager.info("图表已复制到剪贴板")
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"复制图表到剪贴板失败: {str(e)}")
