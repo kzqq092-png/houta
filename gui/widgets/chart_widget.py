@@ -195,17 +195,6 @@ class ChartWidget(QWidget):
         with QMutexLocker(self._update_lock):
             self._update_queue.append((update_func, args))
 
-    def show_loading_dialog(self):
-        """显示加载进度对话框"""
-        # if not hasattr(self, 'loading_dialog'):
-        #     self.loading_dialog = QProgressDialog(self)
-        #     self.loading_dialog.setWindowTitle("正在加载")
-        #     self.loading_dialog.setLabelText("正在更新图表...")
-        #     self.loading_dialog.setRange(0, 100)
-        #     self.loading_dialog.setWindowModality(Qt.WindowModal)
-        #     self.loading_dialog.setAutoClose(True)
-        # self.loading_dialog.show()
-
     def update_loading_progress(self, value: int, message: str = None):
         """更新加载进度，保证数值安全"""
         value = max(0, min(100, int(value)))
@@ -224,19 +213,6 @@ class ChartWidget(QWidget):
         """关闭加载进度对话框"""
         if hasattr(self, 'loading_dialog'):
             self.loading_dialog.close()
-
-    def get_stock_theme(self, stock_code):
-        """根据股票代码返回专属配色"""
-        # 可扩展为从配置或数据库读取
-        color_map = {
-            'sz301566': {
-                'main': '#1976d2', 'line': '#ff9800', 'ma': '#bdbdbd', 'bg': '#f7fafd', 'vol': '#90caf9', 'indicator': '#e53935'
-            },
-            'default': {
-                'main': '#1976d2', 'line': '#43a047', 'ma': '#fbc02d', 'bg': '#f7fafd', 'vol': '#90caf9', 'indicator': '#e53935'
-            }
-        }
-        return color_map.get(stock_code, color_map['default'])
 
     def _downsample_kdata(self, kdata, max_points=1200):
         """对K线数据做降采样，提升渲染性能"""
@@ -261,7 +237,6 @@ class ChartWidget(QWidget):
             else:
                 self._ymin = 0
                 self._ymax = 1
-            self.show_loading_dialog()
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.cla()
             style = self._get_chart_style()
@@ -326,7 +301,7 @@ class ChartWidget(QWidget):
             text_color = colors.get('chart_text', '#222b45')
             bg_color = colors.get('chart_background', '#ffffff')
             self._stock_info_text = self.price_ax.text(
-                0.01, 0.98, info_str,
+                0.01, 0.99, info_str,  # y坐标0.98
                 transform=self.price_ax.transAxes,
                 va='top', ha='left',
                 fontsize=8,
@@ -483,6 +458,34 @@ class ChartWidget(QWidget):
                 if self.log_manager:
                     self.log_manager.error(f"高亮K线绘制失败: {str(e)}")
 
+            # 左上角显示技术指标名称（下移到0.95）
+            if hasattr(self, '_indicator_info_text') and self._indicator_info_text:
+                try:
+                    if self._indicator_info_text in self.price_ax.texts:
+                        self._indicator_info_text.remove()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"移除指标信息文本失败: {str(e)}")
+                self._indicator_info_text = None
+            indicator_names = []
+            if hasattr(self, 'active_indicators') and self.active_indicators:
+                for ind in self.active_indicators:
+                    name = ind.get('name', '')
+                    if name:
+                        indicator_names.append(name)
+            indicator_str = ', '.join(indicator_names)
+            if indicator_str:
+                self._indicator_info_text = self.price_ax.text(
+                    0.01, 0.9, indicator_str,
+                    transform=self.price_ax.transAxes,
+                    va='top', ha='left',
+                    fontsize=8,
+                    color=text_color,
+                    bbox=dict(facecolor=bg_color, alpha=0.7,
+                              edgecolor='none', boxstyle='round,pad=0.2'),
+                    zorder=200
+                )
+
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
             self.close_loading_dialog()
@@ -533,11 +536,11 @@ class ChartWidget(QWidget):
                     upper = upper.dropna()
                     lower = lower.dropna()
                     self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style('BOLL-Mid', i)['color'],
-                                       linewidth=0.7, alpha=0.85, label='BOLL-Mid')
+                                       linewidth=0.5, alpha=0.85, label='BOLL-Mid')
                     self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style('BOLL-Upper', i+1)['color'],
                                        linewidth=0.7, alpha=0.85, label='BOLL-Upper')
                     self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style('BOLL-Lower', i+2)['color'],
-                                       linewidth=0.7, alpha=0.85, label='BOLL-Lower')
+                                       linewidth=0.5, alpha=0.85, label='BOLL-Lower')
                 elif group == 'talib':
                     try:
                         import talib
@@ -890,10 +893,47 @@ class ChartWidget(QWidget):
                 self.indicator_ax.set_xticks(xticks)
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=0, fontsize=7)
-            # 移除底部指标栏相关刷新
-            # self._update_combined_indicator_bar(kdata)
-            # self._update_volume_bar(kdata)
-            # self._update_macd_bar(kdata)
+
+            # 绘制高亮K线
+            try:
+                if self.current_kdata is not None and hasattr(self, 'price_ax'):
+                    for idx in self.highlighted_indices:
+                        if 0 <= idx < len(self.current_kdata):
+                            candle = self.current_kdata.iloc[idx]
+                            self.price_ax.axvline(
+                                idx, color='#ffd600', linestyle='--', linewidth=1.5, alpha=0.7, zorder=1000)
+            except Exception as e:
+                if self.log_manager:
+                    self.log_manager.error(f"高亮K线绘制失败: {str(e)}")
+
+            # 左上角显示技术指标名称（下移到0.95）
+            if hasattr(self, '_indicator_info_text') and self._indicator_info_text:
+                try:
+                    if self._indicator_info_text in self.price_ax.texts:
+                        self._indicator_info_text.remove()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"移除指标信息文本失败: {str(e)}")
+                self._indicator_info_text = None
+            indicator_names = []
+            if hasattr(self, 'active_indicators') and self.active_indicators:
+                for ind in self.active_indicators:
+                    name = ind.get('name', '')
+                    if name:
+                        indicator_names.append(name)
+            indicator_str = ', '.join(indicator_names)
+            if indicator_str:
+                self._indicator_info_text = self.price_ax.text(
+                    0.01, 0.95, indicator_str,
+                    transform=self.price_ax.transAxes,
+                    va='top', ha='left',
+                    fontsize=8,
+                    color=text_color,
+                    bbox=dict(facecolor=bg_color, alpha=0.7,
+                              edgecolor='none', boxstyle='round,pad=0.2'),
+                    zorder=200
+                )
+
         except Exception as e:
             self.log_manager.error(f"更新图表失败: {str(e)}")
             self.close_loading_dialog()
@@ -1558,8 +1598,7 @@ class ChartWidget(QWidget):
         if len(kdata) <= 100 or n_segments <= 1:
             QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}))
             return
-        # 渲染前显示加载进度
-        self.show_loading_dialog()
+
         # 分段
         segments = np.array_split(kdata, n_segments)
         results = [None] * n_segments

@@ -17,55 +17,131 @@ from core.tonghuashun_source import TongHuaShunDataSource
 import numpy as np
 from utils.cache import Cache
 import time
+import sqlite3
+import os
+from core.industry_manager import IndustryManager
 # import ptvsd
+
+DB_PATH = os.path.join(os.path.dirname(
+    os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
 
 
 class DataManager:
-    """数据管理器"""
+    """基于sqlite的数据管理器"""
 
-    def __init__(self, log_manager: Optional[BaseLogManager] = None):
-        """初始化数据管理器
-
-        Args:
-            log_manager: 日志管理器实例，可选
-        """
+    def __init__(self, log_manager=None):
+        self.conn = sqlite3.connect(DB_PATH)
+        self.log_manager = log_manager
+        self.cache_manager = Cache()  # 兼容原有缓存机制
+        self._current_source = 'hikyuu'  # 默认数据源，兼容原有逻辑
+        self.sm = sm  # hikyuu的StockManager实例
+        self._data_sources = {}  # 兼容多数据源逻辑
+        self.industry_manager = IndustryManager(
+            log_manager=self.log_manager)  # 行业管理器
+        # 自动加载和更新行业数据
         try:
-            self.log_manager = log_manager or BaseLogManager()
-
-            # 初始化 StockManager
-            try:
-                from hikyuu.interactive import sm
-                self.sm = sm
-                self.log_manager.info("StockManager初始化成功")
-            except Exception as e:
-                self.log_manager.error(f"StockManager初始化失败: {str(e)}")
-                self.sm = None
-
-            # 初始化缓存管理器
-            self.cache_manager = Cache()
-
-            # 初始化数据源
-            self._data_sources = {}
-            self._current_source = 'hikyuu'  # 默认使用 Hikyuu 数据源
-            self._init_data_sources()
-
-            # 初始化行业管理器
-            from core.industry_manager import IndustryManager
-            self.industry_manager = IndustryManager(
-                log_manager=self.log_manager)
-            self.industry_manager.industry_updated.connect(
-                self._on_industry_data_updated)
-            self.log_manager.info("行业管理器初始化完成")
-
-            # 初始化市场和行业数据
-            self._init_market_industry_data()
-
-            self.log_manager.info("数据管理器初始化完成")
-
+            self.log_manager.info("自动加载行业数据缓存...")
+            self.industry_manager.load_cache()
+            self.log_manager.info("自动更新行业数据...")
+            self.industry_manager.update_industry_data()
+            self.log_manager.info("行业数据初始化完成")
         except Exception as e:
-            self.log_manager.error(f"初始化数据管理器失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
-            raise
+            if self.log_manager:
+                self.log_manager.warning(f"行业数据初始化异常: {str(e)}")
+
+    def get_config(self, key: str, default=None):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT value FROM config WHERE key=?', (key,))
+        row = cursor.fetchone()
+        if row:
+            import json
+            try:
+                return json.loads(row[0])
+            except Exception:
+                return row[0]
+        return default
+
+    def set_config(self, key: str, value):
+        import json
+        value_str = json.dumps(value, ensure_ascii=False)
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'REPLACE INTO config (key, value) VALUES (?, ?)', (key, value_str))
+        self.conn.commit()
+
+    def get_data_source(self):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT name, type, config, is_active FROM data_source WHERE is_active=1')
+        row = cursor.fetchone()
+        if row:
+            import json
+            return {'name': row[0], 'type': row[1], 'config': json.loads(row[2]) if row[2] else {}, 'is_active': row[3]}
+        return None
+
+    def set_data_source(self, name: str):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE data_source SET is_active=0')
+        cursor.execute(
+            'UPDATE data_source SET is_active=1 WHERE name=?', (name,))
+        self.conn.commit()
+
+    def get_stock_list(self):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT code, name, market_code, type, valid, start_date, end_date, industry_id, extra FROM stock')
+        rows = cursor.fetchall()
+        columns = ['code', 'name', 'market', 'type', 'valid',
+                   'start_date', 'end_date', 'industry_id', 'extra']
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_industry_list(self):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT id, name, parent_id, level, extra FROM industry')
+        rows = cursor.fetchall()
+        columns = ['id', 'name', 'parent_id', 'level', 'extra']
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_market_list(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT id, name, code, region, extra FROM market')
+        rows = cursor.fetchall()
+        columns = ['id', 'name', 'code', 'region', 'extra']
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_concept_list(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT code, name, extra FROM concept')
+        rows = cursor.fetchall()
+        columns = ['code', 'name', 'extra']
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_indicator_list(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT name, category, params, extra FROM indicator')
+        rows = cursor.fetchall()
+        columns = ['name', 'category', 'params', 'extra']
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_favorites(self, user_id: str, fav_type: str):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT fav_key, fav_value FROM user_favorites WHERE user_id=? AND fav_type=?', (user_id, fav_type))
+        rows = cursor.fetchall()
+        return rows
+
+    def add_favorite(self, user_id: str, fav_type: str, fav_key: str, fav_value: str):
+        cursor = self.conn.cursor()
+        cursor.execute('INSERT INTO user_favorites (user_id, fav_type, fav_key, fav_value) VALUES (?, ?, ?, ?)',
+                       (user_id, fav_type, fav_key, fav_value))
+        self.conn.commit()
+
+    def remove_favorite(self, user_id: str, fav_type: str, fav_key: str):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'DELETE FROM user_favorites WHERE user_id=? AND fav_type=? AND fav_key=?', (user_id, fav_type, fav_key))
+        self.conn.commit()
 
     def _init_market_industry_data(self):
         """初始化市场和行业数据"""

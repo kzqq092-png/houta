@@ -33,6 +33,7 @@ from PyQt5.QtWebEngineWidgets import *
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import ptvsd
+import subprocess
 import numpy as np
 import pandas as pd
 import sys
@@ -2052,15 +2053,14 @@ class TradingGUI(QMainWindow):
             self.right_tab = QTabWidget(self.right_panel)
             self.right_tab.currentChanged.connect(self.on_right_tab_changed)
 
-            # 多维分析Tab
-            try:
-                from gui.widgets.analysis_widget import AnalysisWidget
-                self.analysis_widget = AnalysisWidget()
-                self.add_tab_with_toolbar(
-                    self.analysis_widget, "多维分析", help_text="多维分析面板可对股票进行多角度分析，包括技术指标、基本面、资金流等。")
-            except Exception as e:
-                self.log_manager.error(f"多维分析Tab初始化失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            # 多维分析Tab延迟加载
+            self.analysis_widget = None
+            self.analysis_tab_widget = QWidget()
+            self.analysis_tab_layout = QVBoxLayout(self.analysis_tab_widget)
+            self.analysis_tab_layout.setContentsMargins(0, 0, 0, 0)
+            self.analysis_tab_layout.setSpacing(0)
+            self.right_tab.addTab(self.analysis_tab_widget, "多维分析")
+            self.analysis_tab_loaded = False
 
             # 策略回测Tab
             try:
@@ -2131,6 +2131,17 @@ class TradingGUI(QMainWindow):
 
     def on_right_tab_changed(self, index):
         tab_text = self.right_tab.tabText(index)
+        # 延迟加载多维分析Tab
+        if tab_text == "多维分析" and not getattr(self, "analysis_tab_loaded", False):
+            try:
+                from gui.widgets.analysis_widget import AnalysisWidget
+                self.analysis_widget = AnalysisWidget()
+                self.analysis_tab_layout.addWidget(self.analysis_widget)
+                self.analysis_tab_loaded = True
+                self.log_manager.info("多维分析Tab已延迟加载")
+            except Exception as e:
+                self.log_manager.error(f"多维分析Tab延迟加载失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
         # 只在首次点击选股器Tab时弹窗，且只弹一次
         if tab_text == "选股器" and not getattr(self, "screener_guide_shown", False):
             if hasattr(self, 'stock_screener_widget') and hasattr(self.stock_screener_widget, 'show_screener_guide'):
@@ -3024,11 +3035,16 @@ class TradingGUI(QMainWindow):
             # 更新当前股票
             self.current_stock = stock_code
 
-            # 更新图表
-            self.update_chart()
+            # 优先用缓存
+            if hasattr(self, 'chart_cache') and stock_code in self.chart_cache:
+                kdata = self.chart_cache[stock_code]
+            else:
+                kdata = self.get_kdata(stock_code)
+                if hasattr(self, 'chart_cache'):
+                    self.chart_cache[stock_code] = kdata
 
-            # 更新指标
-            self.update_indicators()
+            # 更新图表（自动带指标）
+            self.update_chart()
 
             # 新增：同步K线数据到AnalysisWidget，自动补全code字段
             if hasattr(self, 'analysis_widget'):
@@ -4312,15 +4328,20 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def update_chart(self, results=None):
-        """唯一主业务入口，负责K线数据准备、自动分发到ChartWidget/MultiChartPanel。"""
+        """唯一主业务入口，负责K线数据准备、自动分发到ChartWidget/MultiChartPanel。自动带当前选中指标。"""
         try:
             if not hasattr(self, 'current_stock') or not self.current_stock:
                 self.log_manager.warning("没有选中的股票，无法更新图表")
                 if hasattr(self, 'chart_widget'):
                     self.chart_widget.show_no_data("请先选择股票")
                 return
-            # 获取K线数据，自动根据时间范围
-            k_data = self.get_kdata(self.current_stock)
+            # 优先用缓存
+            if hasattr(self, 'chart_cache') and self.current_stock in self.chart_cache:
+                k_data = self.chart_cache[self.current_stock]
+            else:
+                k_data = self.get_kdata(self.current_stock)
+                if hasattr(self, 'chart_cache'):
+                    self.chart_cache[self.current_stock] = k_data
             import pandas as pd
             if isinstance(k_data, pd.DataFrame) and 'code' not in k_data.columns:
                 k_data = k_data.copy()
@@ -4332,15 +4353,19 @@ class TradingGUI(QMainWindow):
                 return
             # 获取股票名称
             stock = self.sm[self.current_stock]
-            # 新增：title 和 stock_code 字段，title 格式为"股票代码 股票名称"
             title = f"{self.current_stock} {stock.name}"
-            # 准备图表数据
+            # 获取当前选中指标
+            selected_items = self.indicator_list.selectedItems(
+            ) if hasattr(self, 'indicator_list') else []
+            indicators = [item.text()
+                          for item in selected_items] if selected_items else []
             data = {
                 'stock_code': self.current_stock,
                 'kdata': k_data,
                 'title': title,
                 'period': self.current_period,
-                'chart_type': self.current_chart_type
+                'chart_type': self.current_chart_type,
+                'indicators': indicators
             }
             if results is not None:
                 data['analysis'] = results
@@ -5151,6 +5176,8 @@ class TradingGUI(QMainWindow):
         """
         self.indicator_list.clearSelection()
         self.update_indicators()
+        if hasattr(self, 'chart_widget'):
+            self.chart_widget.clear_indicators()
 
     def on_splitter_moved(self, pos, index):
         if not hasattr(self, '_splitter_refresh_timer'):
@@ -5273,10 +5300,14 @@ def main():
     """Main program entry"""
     logger = None
     try:
+        # 初始化sqlite数据库
+        subprocess.run([sys.executable, os.path.join(
+            os.path.dirname(__file__), 'db', 'init_db.py')])
         # Create application
         app = QApplication(sys.argv)
         # Initialize config manager first
         print("初始化配置管理器")
+        from utils.config_manager import ConfigManager
         config_manager = ConfigManager()
         print("初始化配置管理器完成")
 
@@ -5298,7 +5329,10 @@ def main():
 
         # Create main window
         logger.info("创建主窗口")
+        from core.data_manager import DataManager
         window = TradingGUI()
+        window.config_manager = config_manager
+        window.data_manager = DataManager(logger)
         logger.info("创建主窗口完成")
 
         # Install global exception handler
