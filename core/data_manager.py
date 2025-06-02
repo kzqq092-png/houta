@@ -1303,6 +1303,43 @@ class DataManager:
             df.set_index('datetime', inplace=True)
         return df
 
+    def save_indicator_combination(self, name: str, user_id: str, indicators: list, extra: str = None):
+        import json
+        cursor = self.conn.cursor()
+        indicators_json = json.dumps(indicators, ensure_ascii=False)
+        cursor.execute('''INSERT INTO indicator_combination (name, user_id, indicators, created_at, extra) VALUES (?, ?, ?, datetime('now'), ?)''',
+                       (name, user_id, indicators_json, extra))
+        self.conn.commit()
+
+    def get_indicator_combinations(self, user_id: str = None):
+        cursor = self.conn.cursor()
+        if user_id:
+            cursor.execute(
+                '''SELECT id, name, user_id, indicators, created_at, extra FROM indicator_combination WHERE user_id=?''', (user_id,))
+        else:
+            cursor.execute(
+                '''SELECT id, name, user_id, indicators, created_at, extra FROM indicator_combination''')
+        rows = cursor.fetchall()
+        import json
+        result = []
+        for row in rows:
+            indicators = json.loads(row[3]) if row[3] else []
+            result.append({
+                'id': row[0],
+                'name': row[1],
+                'user_id': row[2],
+                'indicators': indicators,
+                'created_at': row[4],
+                'extra': row[5]
+            })
+        return result
+
+    def delete_indicator_combination(self, comb_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''DELETE FROM indicator_combination WHERE id=?''', (comb_id,))
+        self.conn.commit()
+
 
 # 全局唯一数据管理器实例，供全系统import使用
 try:

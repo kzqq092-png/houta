@@ -100,6 +100,16 @@ def init_db():
         record_value TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    # 11. 指标组合表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS indicator_combination (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        user_id TEXT,
+        indicators TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        extra TEXT
+    )''')
     conn.commit()
     conn.close()
 

@@ -528,11 +528,22 @@ class TradingGUI(QMainWindow):
             self.menu_bar.update_action.triggered.connect(self.check_update)
             self.menu_bar.about_action.triggered.connect(self.show_about)
 
+            db_admin_action = QAction("数据库管理", self)
+            db_admin_action.triggered.connect(self.show_database_admin)
+            self.menuBar().addAction(db_admin_action)
+
             self.log_manager.info("菜单栏创建完成")
 
         except Exception as e:
             self.log_manager.error(f"创建菜单栏失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+
+    def show_database_admin(self):
+        from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
+        db_path = os.path.join(os.path.dirname(
+            __file__), "db", "hikyuu_system.db")
+        dlg = DatabaseAdminDialog(db_path, self)
+        dlg.exec_()
 
     def create_statusbar(self):
         """创建自定义状态栏，合并所有状态栏功能，放到底部右下角，并添加日志按钮"""
@@ -1299,9 +1310,16 @@ class TradingGUI(QMainWindow):
             save_combination_btn = QPushButton("保存组合")
             save_combination_btn.clicked.connect(
                 self.save_indicator_combination)
+            load_combination_btn = QPushButton("加载组合")
+            load_combination_btn.clicked.connect(
+                self.load_indicator_combination_dialog)
+            delete_combination_btn = QPushButton("删除组合")
+            delete_combination_btn.clicked.connect(
+                self.delete_indicator_combination_dialog)
             indicator_buttons_layout.addWidget(manage_indicator_btn)
             indicator_buttons_layout.addWidget(save_combination_btn)
-
+            indicator_buttons_layout.addWidget(load_combination_btn)
+            indicator_buttons_layout.addWidget(delete_combination_btn)
             clear_all_btn = QPushButton("取消指标")
             clear_all_btn.clicked.connect(self.clear_all_selected_indicators)
             indicator_buttons_layout.addWidget(clear_all_btn)
@@ -3068,19 +3086,12 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
 
     def on_indicators_changed(self) -> None:
-        """处理指标变化事件，只刷新图表，不弹窗"""
+        """处理指标变化事件，只刷新图表，不弹窗，不再直接刷新分屏"""
         try:
-            # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
                 return
-            # 多屏同步：传递所有激活指标
-            if hasattr(self, 'multi_chart_panel') and self.multi_chart_panel.is_multi:
-                indicators = [item.text() for item in selected_items]
-                self.multi_chart_panel._on_indicator_changed(indicators)
-            # 只刷新图表
             self.update_chart()
-            # 记录日志
             self.log_manager.info("指标已更新")
         except Exception as e:
             self.log_manager.error(f"处理指标变化事件失败: {str(e)}")
@@ -3435,18 +3446,12 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"更新指标参数失败: {str(e)}")
 
     def save_indicator_combination(self) -> None:
-        """保存当前选中的指标组合
-
-        将当前选中的指标及其参数保存到配置文件中，方便后续使用
-        """
+        """保存当前选中的指标组合（数据库版）"""
         try:
-            # 获取选中的指标
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
                 self.log_manager.warning("请先选择要保存的指标")
                 return
-
-            # 获取组合名称
             name, ok = QInputDialog.getText(
                 self,
                 "保存指标组合",
@@ -3454,71 +3459,64 @@ class TradingGUI(QMainWindow):
                 QLineEdit.Normal,
                 ""
             )
-
             if not ok or not name:
                 return
-
-            # 收集指标参数
             indicators = []
             for item in selected_items:
                 indicator = item.text()
                 params = {}
-
                 if "MA" in indicator:
                     params = {
                         "type": "MA",
-                        "period": self.param_controls[f"{indicator}_period"].value()
+                        "period": self.param_controls.get(f"{indicator}_period", QSpinBox()).value() if self.param_controls.get(f"{indicator}_period") else 20
                     }
                 elif "MACD" in indicator:
                     params = {
                         "type": "MACD",
-                        "fast": self.param_controls[f"{indicator}_fast"].value(),
-                        "slow": self.param_controls[f"{indicator}_slow"].value(),
-                        "signal": self.param_controls[f"{indicator}_signal"].value()
+                        "fast": self.param_controls.get(f"{indicator}_fast", QSpinBox()).value() if self.param_controls.get(f"{indicator}_fast") else 12,
+                        "slow": self.param_controls.get(f"{indicator}_slow", QSpinBox()).value() if self.param_controls.get(f"{indicator}_slow") else 26,
+                        "signal": self.param_controls.get(f"{indicator}_signal", QSpinBox()).value() if self.param_controls.get(f"{indicator}_signal") else 9
                     }
                 elif "RSI" in indicator:
                     params = {
                         "type": "RSI",
-                        "period": self.param_controls[f"{indicator}_period"].value()
+                        "period": self.param_controls.get(f"{indicator}_period", QSpinBox()).value() if self.param_controls.get(f"{indicator}_period") else 14
                     }
                 elif "BOLL" in indicator:
                     params = {
                         "type": "BOLL",
-                        "period": self.param_controls[f"{indicator}_period"].value(),
-                        "std": self.param_controls[f"{indicator}_std"].value()
+                        "period": self.param_controls.get(f"{indicator}_period", QSpinBox()).value() if self.param_controls.get(f"{indicator}_period") else 20,
+                        "std": self.param_controls.get(f"{indicator}_std", QDoubleSpinBox()).value() if self.param_controls.get(f"{indicator}_std") else 2.0
                     }
-
                 indicators.append({
                     "name": indicator,
                     "params": params
                 })
-
-            # 创建组合对象
-            combination = {
-                "name": name,
-                "indicators": indicators,
-                "created_at": safe_strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-            }
-
-            # 加载现有组合
-            combinations = []
-            combinations_file = 'config/indicator_combinations.json'
-            if os.path.exists(combinations_file):
-                with open(combinations_file, 'r', encoding='utf-8') as f:
-                    combinations = json.load(f)
-
-            # 添加新组合
-            combinations.append(combination)
-
-            # 保存组合
-            os.makedirs('config', exist_ok=True)
-            with open(combinations_file, 'w', encoding='utf-8') as f:
-                json.dump(combinations, f, ensure_ascii=False, indent=2)
-
+            user_id = "default"  # 可扩展为多用户
+            self.data_manager.save_indicator_combination(
+                name, user_id, indicators)
             self.log_manager.info(f"已保存指标组合: {name}")
-
         except Exception as e:
             self.log_manager.error(f"保存指标组合失败: {str(e)}")
+
+    def load_indicator_combinations(self):
+        """加载所有指标组合（数据库版）"""
+        try:
+            user_id = "default"
+            combinations = self.data_manager.get_indicator_combinations(
+                user_id)
+            return combinations
+        except Exception as e:
+            self.log_manager.error(f"加载指标组合失败: {str(e)}")
+            return []
+
+    def delete_indicator_combination(self, comb_id: int):
+        """删除指定id的指标组合（数据库版）"""
+        try:
+            self.data_manager.delete_indicator_combination(comb_id)
+            self.log_manager.info(f"已删除指标组合: {comb_id}")
+        except Exception as e:
+            self.log_manager.error(f"删除指标组合失败: {str(e)}")
 
     def show_calculator(self) -> None:
         """显示计算器，优化UI和功能"""
@@ -4375,74 +4373,12 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(traceback.format_exc())
 
     def update_technical_indicators(self, k_data: pd.DataFrame) -> None:
-        """更新技术指标
-
-        Args:
-            k_data: K线数据DataFrame
-        """
-        try:
-            # 计算并绘制MA
-            ma_periods = [5, 10, 20, 30, 60]
-            for period in ma_periods:
-                ma = k_data['close'].rolling(period).mean()
-                self.chart_widget.add_indicator(
-                    f'MA{period}', ma, f'MA{period}')
-
-            # 计算并绘制MACD
-            exp1 = k_data['close'].ewm(span=12, adjust=False).mean()
-            exp2 = k_data['close'].ewm(span=26, adjust=False).mean()
-            macd = exp1 - exp2
-            signal = macd.ewm(span=9, adjust=False).mean()
-            hist = macd - signal
-            self.chart_widget.add_indicator('MACD', macd, 'MACD')
-            self.chart_widget.add_indicator('Signal', signal, 'Signal')
-            self.chart_widget.add_indicator('Hist', hist, 'Hist')
-
-            # 计算并绘制RSI
-            delta = k_data['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs))
-            self.chart_widget.add_indicator('RSI', rsi, 'RSI')
-
-            self.log_manager.info("成功更新技术指标")
-
-        except Exception as e:
-            self.log_manager.error(f"更新技术指标失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+        """技术指标刷新合并到update_chart流程，不再单独add_indicator"""
+        pass
 
     def update_fundamental_indicators(self, k_data: pd.DataFrame) -> None:
-        """更新基本面指标
-
-        Args:
-            k_data: K线数据DataFrame
-        """
-        try:
-            if not self.current_stock:
-                return
-
-            stock = self.sm[self.current_stock]
-
-            # 获取基本面数据
-            try:
-                pe = stock.get_pe_ratio()
-                pb = stock.get_pb_ratio()
-                roe = stock.get_roe()
-
-                # 添加基本面指标
-                self.chart_widget.add_indicator('PE', pe, 'PE比率')
-                self.chart_widget.add_indicator('PB', pb, 'PB比率')
-                self.chart_widget.add_indicator('ROE', roe, 'ROE')
-
-            except Exception as e:
-                self.log_manager.warning(f"获取基本面数据失败: {str(e)}")
-
-            self.log_manager.info("成功更新基本面指标")
-
-        except Exception as e:
-            self.log_manager.error(f"更新基本面指标失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+        """基本面指标刷新合并到update_chart流程，不再单独add_indicator"""
+        pass
 
     def analyze(self):
         """执行分析"""
@@ -5175,9 +5111,7 @@ class TradingGUI(QMainWindow):
         一键取消所有所选指标，UI联动
         """
         self.indicator_list.clearSelection()
-        self.update_indicators()
-        if hasattr(self, 'chart_widget'):
-            self.chart_widget.clear_indicators()
+        self.update_chart()  # 只刷新主入口
 
     def on_splitter_moved(self, pos, index):
         if not hasattr(self, '_splitter_refresh_timer'):
@@ -5188,8 +5122,67 @@ class TradingGUI(QMainWindow):
         self._splitter_refresh_timer.start(200)  # 拖动结束200ms后刷新
 
     def refresh_all_charts(self):
-        if hasattr(self, 'multi_chart_panel'):
-            self.multi_chart_panel.refresh_all_charts()
+        """只刷新主控端一次，分屏同步由主控端驱动"""
+        if hasattr(self, 'multi_chart_panel') and hasattr(self.multi_chart_panel, 'is_multi'):
+            if self.multi_chart_panel.is_multi:
+                # 只刷新主控端一次
+                self.update_chart()
+            else:
+                self.update_chart()
+
+    def load_indicator_combination_dialog(self):
+        """弹出对话框，选择并加载指标组合"""
+        try:
+            user_id = "default"
+            combinations = self.data_manager.get_indicator_combinations(
+                user_id)
+            if not combinations:
+                QMessageBox.information(self, "提示", "暂无已保存的指标组合")
+                return
+            items = [f"{c[1]} (ID:{c[0]})" for c in combinations]
+            item, ok = QInputDialog.getItem(
+                self, "加载指标组合", "请选择要加载的指标组合:", items, 0, False)
+            if ok and item:
+                idx = items.index(item)
+                indicators = combinations[idx][3]
+                import json
+                indicators = json.loads(indicators)
+                # 清空当前选中
+                self.indicator_list.clearSelection()
+                # 逐个选中组合中的指标
+                for ind in indicators:
+                    for i in range(self.indicator_list.count()):
+                        item_widget = self.indicator_list.item(i)
+                        if item_widget.text() == ind["name"]:
+                            item_widget.setSelected(True)
+                            # 设置参数控件
+                            if hasattr(self, "param_controls") and ind.get("params"):
+                                for k, v in ind["params"].items():
+                                    if k in self.param_controls:
+                                        self.param_controls[k].setValue(v)
+                self.update_chart()
+        except Exception as e:
+            self.log_manager.error(f"加载指标组合失败: {str(e)}")
+
+    def delete_indicator_combination_dialog(self):
+        """弹出对话框，选择并删除指标组合"""
+        try:
+            user_id = "default"
+            combinations = self.data_manager.get_indicator_combinations(
+                user_id)
+            if not combinations:
+                QMessageBox.information(self, "提示", "暂无已保存的指标组合")
+                return
+            items = [f"{c[1]} (ID:{c[0]})" for c in combinations]
+            item, ok = QInputDialog.getItem(
+                self, "删除指标组合", "请选择要删除的指标组合:", items, 0, False)
+            if ok and item:
+                idx = items.index(item)
+                comb_id = combinations[idx][0]
+                self.data_manager.delete_indicator_combination(comb_id)
+                QMessageBox.information(self, "提示", f"已删除指标组合: {item}")
+        except Exception as e:
+            self.log_manager.error(f"删除指标组合失败: {str(e)}")
 
 
 class StockListWidget(QListWidget):

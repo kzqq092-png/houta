@@ -1,0 +1,896 @@
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QTableView, QPushButton, QMessageBox, QLineEdit, QLabel, QFileDialog, QStyledItemDelegate, QSpinBox, QDoubleSpinBox, QDateEdit, QCheckBox, QComboBox, QInputDialog, QSplitter, QHeaderView, QWidget
+from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
+from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtGui import QFont, QColor, QBrush
+import os
+import csv
+import json
+import requests
+
+
+class TypeDelegate(QStyledItemDelegate):
+    def __init__(self, field_types, parent=None, field_permissions=None, table_name=None):
+        super().__init__(parent)
+        self.field_types = field_types
+        self.field_permissions = field_permissions or {}
+        self.table_name = table_name
+
+    def createEditor(self, parent, option, index):
+        field = index.model().headerData(index.column(), Qt.Horizontal)
+        # 字段级只读限制
+        if self.field_permissions.get(self.table_name, {}).get(field) == 'readonly':
+            return None
+        ftype = self.field_types.get(field, '').lower()
+        if 'int' in ftype:
+            editor = QSpinBox(parent)
+            editor.setMinimum(-2**31)
+            editor.setMaximum(2**31-1)
+            return editor
+        elif 'real' in ftype or 'float' in ftype or 'double' in ftype:
+            editor = QDoubleSpinBox(parent)
+            editor.setDecimals(6)
+            editor.setMinimum(-1e12)
+            editor.setMaximum(1e12)
+            return editor
+        elif 'date' in ftype:
+            editor = QDateEdit(parent)
+            editor.setCalendarPopup(True)
+            editor.setDisplayFormat('yyyy-MM-dd')
+            return editor
+        elif 'bool' in ftype or 'tinyint(1)' in ftype:
+            editor = QCheckBox(parent)
+            return editor
+        else:
+            return super().createEditor(parent, option, index)
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        field = index.model().headerData(index.column(), Qt.Horizontal)
+        ftype = self.field_types.get(field, '').lower()
+        if isinstance(editor, QSpinBox):
+            editor.setValue(int(value) if value not in (None, '') else 0)
+        elif isinstance(editor, QDoubleSpinBox):
+            editor.setValue(float(value) if value not in (None, '') else 0.0)
+        elif isinstance(editor, QDateEdit):
+            if value:
+                editor.setDate(QDate.fromString(str(value)[:10], 'yyyy-MM-dd'))
+            else:
+                editor.setDate(QDate.currentDate())
+        elif isinstance(editor, QCheckBox):
+            editor.setChecked(
+                bool(int(value)) if value not in (None, '') else False)
+        else:
+            super().setEditorData(editor, index)
+
+    def setModelData(self, editor, model, index):
+        field = model.headerData(index.column(), Qt.Horizontal)
+        # 字段级只读限制
+        if self.field_permissions.get(self.table_name, {}).get(field) == 'readonly':
+            return
+        ftype = self.field_types.get(field, '').lower()
+        if isinstance(editor, QSpinBox):
+            model.setData(index, editor.value())
+        elif isinstance(editor, QDoubleSpinBox):
+            model.setData(index, editor.value())
+        elif isinstance(editor, QDateEdit):
+            model.setData(index, editor.date().toString('yyyy-MM-dd'))
+        elif isinstance(editor, QCheckBox):
+            model.setData(index, 1 if editor.isChecked() else 0)
+        else:
+            super().setModelData(editor, model, index)
+
+
+class DatabaseAdminDialog(QDialog):
+    def __init__(self, db_path, parent=None, mode='admin'):
+        super().__init__(parent)
+        self.setWindowTitle("数据库管理后台")
+        self.resize(1000, 650)
+        self.db_path = db_path
+        self.mode = mode  # 'readonly', 'write', 'admin'
+        self.current_table = None
+        self.page_size = 50
+        self.current_page = 0
+        self.init_ui()
+        self.log = []
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_splitter = QSplitter(Qt.Horizontal)
+        # 左侧表名列表
+        self.table_list = QListWidget()
+        self.table_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.table_list.setWordWrap(True)
+        self.table_list.itemClicked.connect(self.load_table)
+        # 修复1：设置最小宽度和初始宽度，防止表名被遮挡
+        self.table_list.setMinimumWidth(140)
+        self.table_list.setMaximumWidth(320)
+        self.table_list.setFixedWidth(180)  # 可根据实际表名长度调整
+        main_splitter.addWidget(self.table_list)
+        # 右侧内容区
+        right_widget = QWidget(self)
+        right_layout = QVBoxLayout(right_widget)
+        # 搜索栏
+        search_layout = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("字段/内容搜索...支持模糊")
+        self.search_edit.textChanged.connect(self.apply_search)
+        search_layout.addWidget(QLabel("搜索:"))
+        search_layout.addWidget(self.search_edit)
+        right_layout.addLayout(search_layout)
+        # 表格
+        self.table_view = QTableView()
+        self.table_view.setAlternatingRowColors(True)
+        self.table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.table_view.setSelectionMode(QTableView.ExtendedSelection)
+        self.table_view.setFont(QFont("Consolas", 10))
+        self.table_view.horizontalHeader().setStyleSheet(
+            "font-weight:bold; padding: 4px; background: #E3F2FD; border: none;")
+        self.table_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Interactive)  # 允许拖拽列宽
+        self.table_view.horizontalHeader().setStretchLastSection(False)  # 修复3：最右侧显示网格线
+        self.table_view.setShowGrid(True)  # 显示单元格网格线
+        self.table_view.setWordWrap(False)  # 防止表头字段名被遮挡
+        self.table_view.setHorizontalScrollMode(QTableView.ScrollPerPixel)
+        self.table_view.setVerticalScrollMode(QTableView.ScrollPerPixel)
+        right_layout.addWidget(self.table_view, 8)
+        # 分页
+        page_layout = QHBoxLayout()
+        self.prev_btn = QPushButton("上一页")
+        self.next_btn = QPushButton("下一页")
+        self.page_label = QLabel()
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.next_btn.clicked.connect(self.next_page)
+        page_layout.addWidget(self.prev_btn)
+        page_layout.addWidget(self.page_label)
+        page_layout.addWidget(self.next_btn)
+        right_layout.addLayout(page_layout)
+        # 操作按钮
+        btn_layout = QHBoxLayout()
+        self.add_btn = QPushButton("新增")
+        self.del_btn = QPushButton("删除")
+        self.save_btn = QPushButton("保存修改")
+        self.import_btn = QPushButton("导入CSV")
+        self.export_btn = QPushButton("导出CSV")
+        self.batch_btn = QPushButton("批量修改")
+        self.log_btn = QPushButton("查看权限变更日志")
+        self.perm_btn = QPushButton("字段权限管理")
+        self.upload_btn = QPushButton("上传权限到云端")
+        self.download_btn = QPushButton("从云端拉取权限")
+        self.schema_btn = QPushButton("表结构管理")
+        self.stats_btn = QPushButton("数据统计")
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItems(["中文", "English"])
+        self.lang_combo.currentTextChanged.connect(self.switch_language)
+        self.log_btn.clicked.connect(self.show_permission_log)
+        self.perm_btn.clicked.connect(self.show_permission_manager)
+        self.upload_btn.clicked.connect(self.upload_permissions_to_cloud)
+        self.download_btn.clicked.connect(self.download_permissions_from_cloud)
+        self.schema_btn.clicked.connect(self.show_schema_manager)
+        self.stats_btn.clicked.connect(self.show_table_stats)
+        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.del_btn)
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.import_btn)
+        btn_layout.addWidget(self.export_btn)
+        btn_layout.addWidget(self.batch_btn)
+        btn_layout.addWidget(self.perm_btn)
+        btn_layout.addWidget(self.log_btn)
+        btn_layout.addWidget(self.upload_btn)
+        btn_layout.addWidget(self.download_btn)
+        btn_layout.addWidget(self.schema_btn)
+        btn_layout.addWidget(self.stats_btn)
+        btn_layout.addWidget(self.lang_combo)
+        right_layout.addLayout(btn_layout)
+        main_splitter.addWidget(right_widget)
+        # 修复2：设置分割条初始宽度和拉伸策略，防止自动回弹
+        main_splitter.setSizes([180, 820])  # 总宽度1000，左180右820
+        main_splitter.setStretchFactor(0, 0)
+        main_splitter.setStretchFactor(1, 1)
+        main_splitter.setCollapsible(0, False)
+        main_splitter.setCollapsible(1, False)
+        # 修复4：分割条拖动事件，记忆并恢复宽度
+
+        def save_splitter_state():
+            self._splitter_sizes = main_splitter.sizes()
+
+        def restore_splitter_state():
+            if hasattr(self, '_splitter_sizes'):
+                main_splitter.setSizes(self._splitter_sizes)
+        main_splitter.splitterMoved.connect(
+            lambda pos, idx: save_splitter_state())
+        self.restore_splitter_state = restore_splitter_state
+        main_layout.addWidget(main_splitter)
+        # 连接数据库
+        self.db = QSqlDatabase.addDatabase("QSQLITE", "dbadmin")
+        self.db.setDatabaseName(self.db_path)
+        self.db.open()
+        self.table_list.addItems(self.db.tables())
+        # 事件绑定
+        self.add_btn.clicked.connect(self.add_row)
+        self.del_btn.clicked.connect(self.del_row)
+        self.save_btn.clicked.connect(self.save_changes)
+        self.import_btn.clicked.connect(self.import_csv)
+        self.export_btn.clicked.connect(self.export_csv)
+        self.batch_btn.clicked.connect(self.show_batch_modify)
+        # 权限管理
+        if self.mode == 'readonly':
+            self.add_btn.setEnabled(False)
+            self.del_btn.setEnabled(False)
+            self.save_btn.setEnabled(False)
+            self.import_btn.setEnabled(False)
+        # 日志
+        self.log = []
+        self.log_window = None
+        # 字段权限配置（示例，可扩展为从配置文件/数据库读取）
+        self.field_permissions = {}  # {table: {field: 'readonly'/'write'/'hidden'}}
+        self.load_field_permissions()
+        # 表格美化
+        self.table_view.setStyleSheet("""
+            QTableView {
+                border: 1px solid #B0BEC5;
+                background: #FAFAFA;
+                selection-background-color: #E3F2FD;
+                selection-color: #1976D2;
+                gridline-color: #CFD8DC;
+                font-family: '微软雅黑', 'Arial', sans-serif;
+                font-size: 13px;
+            }
+            QHeaderView::section {
+                background: #E3F2FD;
+                font-weight: bold;
+                border: none;
+                padding: 4px;
+            }
+            QTableView::item:selected {
+                background: #BBDEFB;
+                color: #0D47A1;
+            }
+            QTableView::item {
+                border-right: 1px solid #CFD8DC;
+                border-bottom: 1px solid #CFD8DC;
+            }
+        """)
+        self.table_view.setAlternatingRowColors(True)
+        # 按钮美化
+        btn_style = """
+        QPushButton {
+            background: #E3F2FD;
+            border: 1px solid #90CAF9;
+            border-radius: 6px;
+            padding: 6px 16px;
+            font-size: 13px;
+        }
+        QPushButton:hover {
+            background: #BBDEFB;
+            border: 1px solid #1976D2;
+        }
+        """
+        for btn in [self.add_btn, self.del_btn, self.save_btn, self.import_btn, self.export_btn,
+                    self.batch_btn, self.log_btn, self.perm_btn, self.upload_btn, self.download_btn,
+                    self.schema_btn, self.stats_btn]:
+            btn.setStyleSheet(btn_style)
+        # 左侧表名高亮
+        self.table_list.setStyleSheet("""
+        QListWidget {
+            border: 1px solid #B0BEC5;
+            background: #F5F5F5;
+            font-size: 13px;
+        }
+        QListWidget::item:selected {
+            background: #1976D2;
+            color: white;
+            font-weight: bold;
+        }
+        """)
+        # 分页控件美化
+        self.page_label.setStyleSheet(
+            "font-size:13px;color:#1976D2;background:#E3F2FD;border-radius:4px;padding:2px 8px;")
+        self.prev_btn.setStyleSheet(btn_style)
+        self.next_btn.setStyleSheet(btn_style)
+        # 空数据提示（在refresh_table中动态显示）
+
+    def load_field_permissions(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.field_permissions = json.load(f)
+            except Exception:
+                self.field_permissions = {}
+        else:
+            self.field_permissions = {}
+
+    def save_field_permissions(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        log_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions_log.json')
+        # 记录变更日志
+        old = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    old = json.load(f)
+            except Exception:
+                old = {}
+        diff = []
+        for table, fields in self.field_permissions.items():
+            for field, perm in fields.items():
+                old_perm = old.get(table, {}).get(field, None)
+                if old_perm != perm:
+                    diff.append({"table": table, "field": field,
+                                "old": old_perm, "new": perm})
+        if diff:
+            log_entry = {"time": QDate.currentDate().toString(
+                'yyyy-MM-dd'), "diff": diff}
+            logs = []
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, 'r', encoding='utf-8') as f:
+                        logs = json.load(f)
+                except Exception:
+                    logs = []
+            logs.append(log_entry)
+            with open(log_path, 'w', encoding='utf-8') as f:
+                json.dump(logs, f, ensure_ascii=False, indent=2)
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(self.field_permissions, f, ensure_ascii=False, indent=2)
+
+    def load_table(self, item):
+        self.current_table = item.text()
+        self.current_page = 0
+        self.refresh_table()
+
+    def refresh_table(self):
+        table_name = self.current_table
+        if not table_name:
+            return
+        self.model = QSqlTableModel(self, self.db)
+        self.model.setTable(table_name)
+        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.model.select()
+        # 字段类型与主键信息
+        self.field_types = {}
+        self.pk_fields = set()
+        query = self.db.exec(f"PRAGMA table_info({table_name})")
+        while query.next():
+            name = query.value(1)
+            ftype = query.value(2)
+            pk = query.value(5)
+            self.field_types[name] = ftype
+            if pk:
+                self.pk_fields.add(name)
+        # 字段级权限适配
+        perms = self.field_permissions.get(table_name, {})
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if perms.get(name) == 'hidden':
+                self.table_view.setColumnHidden(col, True)
+            else:
+                self.table_view.setColumnHidden(col, False)
+        self.table_view.setModel(self.model)
+        self.table_view.setItemDelegate(TypeDelegate(
+            self.field_types, self.table_view, self.field_permissions, table_name))
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if name in self.pk_fields:
+                self.table_view.setColumnWidth(col, 120)
+        self.apply_search()
+        self.update_page_label()
+        # 空数据提示
+        if self.model.rowCount() == 0:
+            label = QLabel("暂无数据", self.table_view)
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("color: #90A4AE; font-size: 16px;")
+            self.table_view.setIndexWidget(self.model.index(0, 0), label)
+
+    def add_row(self):
+        if hasattr(self, 'model'):
+            self.model.insertRow(self.model.rowCount())
+            self.log.append(f"新增行于表 {self.current_table}")
+
+    def del_row(self):
+        if hasattr(self, 'model'):
+            idxs = self.table_view.selectionModel().selectedRows()
+            if not idxs:
+                return
+            if QMessageBox.question(self, "确认删除", f"确定要删除选中{len(idxs)}行吗？") == QMessageBox.Yes:
+                for idx in sorted(idxs, key=lambda x: -x.row()):
+                    self.model.removeRow(idx.row())
+                self.log.append(f"批量删除{len(idxs)}行于表 {self.current_table}")
+
+    def save_changes(self):
+        if hasattr(self, 'model'):
+            if not self.model.submitAll():
+                QMessageBox.warning(
+                    self, "保存失败", self.model.lastError().text())
+            else:
+                QMessageBox.information(self, "保存成功", "所有更改已保存！")
+                self.log.append(f"保存更改于表 {self.current_table}")
+
+    def import_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "导入CSV", "", "CSV Files (*.csv)")
+        if not path:
+            return
+        import csv
+        with open(path, encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            for row in reader:
+                self.model.insertRow(self.model.rowCount())
+                for col, val in enumerate(row):
+                    self.model.setData(self.model.index(
+                        self.model.rowCount()-1, col), val)
+        QMessageBox.information(self, "导入完成", "CSV数据已导入，记得保存！")
+        self.log.append(f"导入CSV到表 {self.current_table}")
+
+    def export_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出CSV", f"{self.current_table}.csv", "CSV Files (*.csv)")
+        if not path:
+            return
+        with open(path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            headers = [self.model.headerData(
+                i, Qt.Horizontal) for i in range(self.model.columnCount())]
+            writer.writerow(headers)
+            for row in range(self.model.rowCount()):
+                writer.writerow([self.model.data(self.model.index(row, col))
+                                for col in range(self.model.columnCount())])
+        QMessageBox.information(self, "导出完成", "CSV数据已导出！")
+        self.log.append(f"导出CSV于表 {self.current_table}")
+
+    def apply_search(self):
+        if not hasattr(self, 'model') or not self.current_table:
+            return
+        text = self.search_edit.text().strip()
+        if not text:
+            self.model.setFilter("")
+        else:
+            filters = []
+            for col in range(self.model.columnCount()):
+                name = self.model.headerData(col, Qt.Horizontal)
+                filters.append(f"{name} LIKE '%{text}%'")
+            self.model.setFilter(" OR ".join(filters))
+        self.model.select()
+        self.update_page_label()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.refresh_table()
+
+    def next_page(self):
+        self.current_page += 1
+        self.refresh_table()
+
+    def update_page_label(self):
+        total = self.model.rowCount()
+        self.page_label.setText(
+            f"第{self.current_page+1}页 / 共{(total-1)//self.page_size+1}页  共{total}行")
+
+    def show_log(self):
+        if self.log_window is None:
+            self.log_window = QDialog(self)
+            self.log_window.setWindowTitle("操作日志")
+            vbox = QVBoxLayout(self.log_window)
+            self.log_text = QLineEdit()
+            self.log_text.setReadOnly(True)
+            vbox.addWidget(self.log_text)
+            export_btn = QPushButton("导出日志")
+            export_btn.clicked.connect(self.export_log)
+            vbox.addWidget(export_btn)
+            rollback_btn = QPushButton("撤销最近操作")
+            rollback_btn.clicked.connect(self.rollback_last)
+            vbox.addWidget(rollback_btn)
+        self.log_text.setText("\n".join(self.log))
+        self.log_window.exec_()
+
+    def export_log(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出日志", "dbadmin_log.txt", "Text Files (*.txt)")
+        if path:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(self.log))
+            QMessageBox.information(self, "导出完成", "日志已导出！")
+
+    def rollback_last(self):
+        # 简单实现：撤销最近一次新增/删除/导入操作（仅内存，未保存前有效）
+        if not self.log:
+            QMessageBox.information(self, "无操作可撤销", "没有可撤销的操作！")
+            return
+        last = self.log[-1]
+        if "新增行" in last:
+            if hasattr(self, 'model'):
+                self.model.removeRow(self.model.rowCount()-1)
+                self.log.append("撤销："+last)
+        elif "批量删除" in last:
+            QMessageBox.information(self, "暂不支持批量回滚", "批量删除暂不支持自动回滚，请手动恢复。")
+        elif "导入CSV" in last:
+            QMessageBox.information(self, "暂不支持导入回滚", "导入操作暂不支持自动回滚，请手动删除。")
+        else:
+            QMessageBox.information(self, "无法撤销", "该操作无法自动撤销。")
+
+    def show_permission_manager(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("字段权限管理")
+        vbox = QVBoxLayout(dlg)
+        table_combo = QListWidget()
+        table_combo.addItems(self.db.tables())
+        vbox.addWidget(QLabel("选择表："))
+        vbox.addWidget(table_combo)
+        field_list = QListWidget()
+        vbox.addWidget(QLabel("字段权限："))
+        vbox.addWidget(field_list)
+        perm_combo = QComboBox()
+        perm_combo.addItems(["可写", "只读", "隐藏"])
+        vbox.addWidget(QLabel("设置权限："))
+        vbox.addWidget(perm_combo)
+        save_btn = QPushButton("保存权限")
+        vbox.addWidget(save_btn)
+
+        def load_fields():
+            field_list.clear()
+            table = table_combo.currentItem().text() if table_combo.currentItem() else None
+            if not table:
+                return
+            model = QSqlTableModel(self, self.db)
+            model.setTable(table)
+            model.select()
+            for col in range(model.columnCount()):
+                name = model.headerData(col, Qt.Horizontal)
+                field_list.addItem(name)
+        table_combo.currentItemChanged.connect(lambda *_: load_fields())
+
+        def set_perm():
+            table = table_combo.currentItem().text() if table_combo.currentItem() else None
+            perm = perm_combo.currentText()
+            for item in field_list.selectedItems():
+                field = item.text()
+                if table not in self.field_permissions:
+                    self.field_permissions[table] = {}
+                if perm == "可写":
+                    self.field_permissions[table][field] = "write"
+                elif perm == "只读":
+                    self.field_permissions[table][field] = "readonly"
+                elif perm == "隐藏":
+                    self.field_permissions[table][field] = "hidden"
+            QMessageBox.information(dlg, "权限设置", "权限已设置，记得保存！")
+        perm_combo.currentTextChanged.connect(lambda _: set_perm())
+        save_btn.clicked.connect(lambda: (
+            self.save_field_permissions(), QMessageBox.information(dlg, "保存成功", "权限已保存！")))
+        load_fields()
+        dlg.exec_()
+
+    def show_batch_modify(self):
+        if not hasattr(self, 'model') or not self.current_table:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("批量字段修改/查找替换")
+        vbox = QVBoxLayout(dlg)
+        # 字段选择
+        field_label = QLabel("字段:")
+        vbox.addWidget(field_label)
+        field_combo = QListWidget()
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if self.field_permissions.get(self.current_table, {}).get(name) != 'hidden':
+                field_combo.addItem(name)
+        vbox.addWidget(field_combo)
+        # 填充值
+        fill_label = QLabel("填充值:")
+        vbox.addWidget(fill_label)
+        fill_edit = QLineEdit()
+        vbox.addWidget(fill_edit)
+        # 查找替换
+        find_label = QLabel("查找:")
+        vbox.addWidget(find_label)
+        find_edit = QLineEdit()
+        replace_label = QLabel("替换为:")
+        vbox.addWidget(replace_label)
+        replace_edit = QLineEdit()
+        vbox.addWidget(find_edit)
+        vbox.addWidget(replace_edit)
+        # 条件筛选
+        cond_label = QLabel("条件(如 a=1,b=2,支持正则):")
+        vbox.addWidget(cond_label)
+        cond_edit = QLineEdit()
+        vbox.addWidget(cond_edit)
+        # 应用按钮
+        apply_btn = QPushButton("应用")
+        vbox.addWidget(apply_btn)
+
+        def do_batch():
+            import re
+            selected_fields = [item.text()
+                               for item in field_combo.selectedItems()]
+            if not selected_fields:
+                QMessageBox.warning(dlg, "请选择字段", "请至少选择一个字段")
+                return
+            fill_val = fill_edit.text()
+            find_val = find_edit.text()
+            replace_val = replace_edit.text()
+            cond = cond_edit.text().strip()
+            # 多条件解析
+            conds = []
+            if cond:
+                for part in cond.split(','):
+                    if '=' in part:
+                        k, v = part.split('=', 1)
+                        conds.append((k.strip(), v.strip()))
+            idxs = self.table_view.selectionModel().selectedRows()
+            if not idxs:
+                idxs = [self.model.index(row, 0)
+                        for row in range(self.model.rowCount())]
+            for idx in idxs:
+                row = idx.row()
+                # 多条件判断
+                match = True
+                for k, v in conds:
+                    col_idx = None
+                    for col in range(self.model.columnCount()):
+                        if self.model.headerData(col, Qt.Horizontal) == k:
+                            col_idx = col
+                            break
+                    if col_idx is not None:
+                        cell_val = str(self.model.data(
+                            self.model.index(row, col_idx)))
+                        # 支持正则
+                        try:
+                            if not re.fullmatch(v, cell_val):
+                                match = False
+                                break
+                        except Exception:
+                            if cell_val != v:
+                                match = False
+                                break
+                if not match:
+                    continue
+                for col in range(self.model.columnCount()):
+                    name = self.model.headerData(col, Qt.Horizontal)
+                    # 字段级只读限制
+                    if self.field_permissions.get(self.current_table, {}).get(name) == 'readonly':
+                        continue
+                    if name in selected_fields:
+                        if fill_val:
+                            self.model.setData(
+                                self.model.index(row, col), fill_val)
+                        if find_val:
+                            val0 = str(self.model.data(
+                                self.model.index(row, col)))
+                            if find_val in val0:
+                                self.model.setData(self.model.index(
+                                    row, col), val0.replace(find_val, replace_val))
+            self.log.append(
+                f"批量修改字段 {selected_fields} 于表 {self.current_table}")
+            QMessageBox.information(dlg, "批量修改完成", "批量操作已完成，记得保存！")
+            dlg.accept()
+        apply_btn.clicked.connect(do_batch)
+        dlg.exec_()
+
+    def upload_permissions_to_cloud(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        url = 'https://your-cloud-api/upload'  # 替换为你的云端API
+        try:
+            with open(config_path, 'rb') as f:
+                files = {'file': ('db_field_permissions.json', f)}
+                r = requests.post(url, files=files)
+            if r.status_code == 200:
+                QMessageBox.information(self, "上传成功", "权限配置已上传到云端！")
+            else:
+                QMessageBox.warning(self, "上传失败", f"云端返回: {r.text}")
+        except Exception as e:
+            QMessageBox.warning(self, "上传失败", str(e))
+
+    def download_permissions_from_cloud(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        url = 'https://your-cloud-api/download'  # 替换为你的云端API
+        try:
+            r = requests.get(url)
+            if r.status_code == 200:
+                with open(config_path, 'wb') as f:
+                    f.write(r.content)
+                self.load_field_permissions()
+                QMessageBox.information(self, "下载成功", "权限配置已从云端拉取并生效！")
+            else:
+                QMessageBox.warning(self, "下载失败", f"云端返回: {r.text}")
+        except Exception as e:
+            QMessageBox.warning(self, "下载失败", str(e))
+
+    def show_permission_log(self):
+        log_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions_log.json')
+        dlg = QDialog(self)
+        dlg.setWindowTitle("权限变更日志")
+        vbox = QVBoxLayout(dlg)
+        log_list = QListWidget()
+        vbox.addWidget(log_list)
+        rollback_btn = QPushButton("回滚到选中版本")
+        vbox.addWidget(rollback_btn)
+        logs = []
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+                for i, entry in enumerate(logs):
+                    time = entry.get('time', '')
+                    for d in entry.get('diff', []):
+                        log_list.addItem(
+                            f"[{i}] [{time}] {d['table']}.{d['field']}: {d['old']} -> {d['new']}")
+            except Exception as e:
+                log_list.addItem(f"日志读取失败: {str(e)}")
+        else:
+            log_list.addItem("暂无日志记录")
+
+        def do_rollback():
+            idx = log_list.currentRow()
+            if idx < 0 or idx >= len(logs):
+                QMessageBox.warning(dlg, "未选择", "请先选择要回滚的版本")
+                return
+            # 回滚到选中日志之前的权限配置
+            config_path = os.path.join(os.path.dirname(
+                __file__), 'db_field_permissions.json')
+            # 重新构建权限配置
+            perms = {}
+            for i in range(idx+1):
+                for d in logs[i].get('diff', []):
+                    table, field, new = d['table'], d['field'], d['new']
+                    if table not in perms:
+                        perms[table] = {}
+                    perms[table][field] = new
+            self.field_permissions = perms
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.field_permissions, f,
+                          ensure_ascii=False, indent=2)
+            self.load_field_permissions()
+            QMessageBox.information(dlg, "回滚成功", f"已回滚到第{idx+1}个版本，权限已生效！")
+        rollback_btn.clicked.connect(do_rollback)
+        dlg.exec_()
+
+    def show_schema_manager(self):
+        table = self.current_table
+        if not table:
+            QMessageBox.warning(self, "未选择表", "请先选择要管理结构的表")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"表结构管理 - {table}")
+        vbox = QVBoxLayout(dlg)
+        # 字段注释加载
+        comment_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_comments.json')
+        comments = {}
+        if os.path.exists(comment_path):
+            try:
+                with open(comment_path, 'r', encoding='utf-8') as f:
+                    comments = json.load(f)
+            except Exception:
+                comments = {}
+        if table not in comments:
+            comments[table] = {}
+        # 字段列表
+        field_list = QListWidget()
+        model = QSqlTableModel(self, self.db)
+        model.setTable(table)
+        model.select()
+        for col in range(model.columnCount()):
+            name = model.headerData(col, Qt.Horizontal)
+            comment = comments[table].get(name, "")
+            field_list.addItem(f"{name}  # {comment}" if comment else name)
+        vbox.addWidget(QLabel("字段列表："))
+        vbox.addWidget(field_list)
+        # 字段操作
+        add_btn = QPushButton("新增字段")
+        del_btn = QPushButton("删除字段")
+        type_btn = QPushButton("修改类型")
+        comment_btn = QPushButton("编辑注释")
+        vbox.addWidget(add_btn)
+        vbox.addWidget(del_btn)
+        vbox.addWidget(type_btn)
+        vbox.addWidget(comment_btn)
+
+        def add_field():
+            name, ok = QInputDialog.getText(dlg, "新增字段", "字段名：")
+            if not ok or not name:
+                return
+            ftype, ok = QInputDialog.getText(
+                dlg, "字段类型", "类型(如 TEXT, INTEGER, REAL)：")
+            if not ok or not ftype:
+                return
+            sql = f"ALTER TABLE {table} ADD COLUMN {name} {ftype}"
+            try:
+                self.db.exec(sql)
+                QMessageBox.information(dlg, "成功", f"已添加字段 {name}")
+                self.refresh_table()
+                field_list.addItem(name)
+            except Exception as e:
+                QMessageBox.warning(dlg, "失败", str(e))
+
+        def del_field():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            QMessageBox.information(
+                dlg, "提示", f"SQLite不支持直接删除字段，请用导出-重建表-导入数据方式实现。")
+
+        def change_type():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            ftype, ok = QInputDialog.getText(
+                dlg, "修改类型", "新类型(如 TEXT, INTEGER, REAL)：")
+            if not ok or not ftype:
+                return
+            QMessageBox.information(
+                dlg, "提示", f"SQLite不支持直接修改字段类型，请用导出-重建表-导入数据方式实现。")
+
+        def edit_comment():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            old_comment = comments[table].get(name, "")
+            new_comment, ok = QInputDialog.getText(
+                dlg, "编辑注释", f"字段 {name} 注释：", text=old_comment)
+            if not ok:
+                return
+            comments[table][name] = new_comment
+            with open(comment_path, 'w', encoding='utf-8') as f:
+                json.dump(comments, f, ensure_ascii=False, indent=2)
+            # 刷新显示
+            field_list.clear()
+            for col in range(model.columnCount()):
+                fname = model.headerData(col, Qt.Horizontal)
+                cmt = comments[table].get(fname, "")
+                field_list.addItem(f"{fname}  # {cmt}" if cmt else fname)
+        add_btn.clicked.connect(add_field)
+        del_btn.clicked.connect(del_field)
+        type_btn.clicked.connect(change_type)
+        comment_btn.clicked.connect(edit_comment)
+        dlg.exec_()
+
+    def show_table_stats(self):
+        table = self.current_table
+        if not table:
+            QMessageBox.warning(self, "未选择表", "请先选择要统计的表")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"数据统计 - {table}")
+        vbox = QVBoxLayout(dlg)
+        model = QSqlTableModel(self, self.db)
+        model.setTable(table)
+        model.select()
+        row_count = model.rowCount()
+        vbox.addWidget(QLabel(f"行数：{row_count}"))
+        for col in range(model.columnCount()):
+            name = model.headerData(col, Qt.Horizontal)
+            values = set()
+            for row in range(row_count):
+                values.add(str(model.data(model.index(row, col))))
+            vbox.addWidget(QLabel(f"字段 {name} - 唯一值: {len(values)}"))
+        dlg.exec_()
+
+    def switch_language(self, lang):
+        # 简单实现：按钮、标签、提示等中英文切换
+        zh = lang == "中文"
+        self.add_btn.setText("新增" if zh else "Add")
+        self.del_btn.setText("删除" if zh else "Delete")
+        self.save_btn.setText("保存修改" if zh else "Save")
+        self.import_btn.setText("导入CSV" if zh else "Import CSV")
+        self.export_btn.setText("导出CSV" if zh else "Export CSV")
+        self.batch_btn.setText("批量修改" if zh else "Batch Edit")
+        self.log_btn.setText("权限变更日志" if zh else "Perm Log")
+        self.perm_btn.setText("字段权限管理" if zh else "Field Perm")
+        self.upload_btn.setText("传权限到云" if zh else "Upload Perm")
+        self.download_btn.setText("云端拉取权" if zh else "Download Perm")
+        self.schema_btn.setText("表结构管理" if zh else "Schema")
+        self.stats_btn.setText("数据统计" if zh else "Stats")
+        self.page_label.setText(self.page_label.text().replace("页", "Page").replace("共", "Total").replace(
+            "行", "Rows") if not zh else self.page_label.text().replace("Page", "页").replace("Total", "共").replace("Rows", "行"))
+        self.table_list.setStyleSheet(self.table_list.styleSheet().replace(
+            "font-size: 13px;", "font-size: 13px;" if zh else "font-size: 13px;"))
