@@ -73,6 +73,7 @@ class AnalysisWidget(QWidget):
             self.log_manager.info("初始化分析控件主题")
             self.theme_manager = get_theme_manager(
                 config_manager or ConfigManager())
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
             self.theme_manager.apply_theme(self)
             self.log_manager.info("初始化分析控件主题完成")
         except Exception as e:
@@ -133,8 +134,6 @@ class AnalysisWidget(QWidget):
         """
         original_text = button.text()
         button.setText("取消")
-        button.setStyleSheet("")
-        button._interrupted = False
         button.setEnabled(False)
 
         def on_cancel():
@@ -2616,8 +2615,7 @@ class AnalysisWidget(QWidget):
         if hasattr(self, 'rotation_worker') and self.rotation_worker and self.rotation_worker.isRunning():
             return
         self.rotation_button.setEnabled(False)
-        self.rotation_button.setStyleSheet(
-            "background-color: #888888; color: white;")
+        self.rotation_button.setText("分析轮动")
 
         # 优化：将run_others放到QThread中执行，彻底避免主线程卡顿
         from PyQt5.QtCore import QThread, pyqtSignal
@@ -2686,12 +2684,10 @@ class AnalysisWidget(QWidget):
             QTimer.singleShot(2000, lambda: status_bar.show_progress(False))
         # 按钮状态恢复
         self.rotation_button.setEnabled(True)
-        self.rotation_button.setStyleSheet("")
         self.rotation_button.setText("分析轮动")
 
     def _on_rotation_finished(self):
         self.rotation_button.setEnabled(True)
-        self.rotation_button.setStyleSheet("")
         self.rotation_button.setText("分析轮动")
         main_window = self.parentWidget()
         while main_window and not hasattr(main_window, 'status_bar'):
@@ -2704,7 +2700,6 @@ class AnalysisWidget(QWidget):
 
     def _on_rotation_error(self, msg):
         self.rotation_button.setEnabled(True)
-        self.rotation_button.setStyleSheet("")
         self.rotation_button.setText("分析轮动")
         main_window = self.parentWidget()
         while main_window and not hasattr(main_window, 'status_bar'):

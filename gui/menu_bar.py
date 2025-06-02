@@ -6,11 +6,12 @@ This module contains the menu bar implementation for the trading system.
 
 from PyQt5.QtWidgets import (
     QMenuBar, QMenu, QAction, QFileDialog, QMessageBox,
-    QInputDialog, QShortcut
+    QInputDialog, QShortcut, QDialog
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
 import traceback
+from utils.theme import get_theme_manager
 
 
 class MainMenuBar(QMenuBar):
@@ -31,6 +32,11 @@ class MainMenuBar(QMenuBar):
             else:
                 from core.logger import LogManager
                 self.log_manager = LogManager()
+
+            # 初始化主题管理器
+            self.theme_manager = get_theme_manager()
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             # 初始化UI
             self.init_ui()
@@ -149,22 +155,17 @@ class MainMenuBar(QMenuBar):
 
             self.view_menu.addSeparator()
 
-            # 主题
-            self.theme_menu = self.view_menu.addMenu("主题")
-            self.light_theme_action = QAction("浅色", self)
-            self.dark_theme_action = QAction("深色", self)
-            self.gradient_theme_action = QAction("渐变", self)
-            self.theme_menu.addAction(self.light_theme_action)
-            self.theme_menu.addAction(self.dark_theme_action)
-            self.theme_menu.addAction(self.gradient_theme_action)
-
-            # 绑定切换主题逻辑
-            self.light_theme_action.triggered.connect(
-                lambda: self.parent.set_theme_by_menu('light'))
-            self.dark_theme_action.triggered.connect(
-                lambda: self.parent.set_theme_by_menu('dark'))
-            self.gradient_theme_action.triggered.connect(
-                lambda: self.parent.set_theme_by_menu('gradient'))
+            # 移除主题切换子菜单，合并到设置
+            # self.theme_menu = self.view_menu.addMenu("主题")
+            # self.light_theme_action = QAction("浅色", self)
+            # self.dark_theme_action = QAction("深色", self)
+            # self.gradient_theme_action = QAction("渐变", self)
+            # self.theme_menu.addAction(self.light_theme_action)
+            # self.theme_menu.addAction(self.dark_theme_action)
+            # self.theme_menu.addAction(self.gradient_theme_action)
+            # self.light_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('light'))
+            # self.dark_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('dark'))
+            # self.gradient_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('gradient'))
 
         except Exception as e:
             if self.log_manager:
@@ -445,8 +446,8 @@ class MainMenuBar(QMenuBar):
 
     def show_settings(self):
         """Show settings dialog"""
-        # TODO: Implement settings dialog
-        pass
+        if hasattr(self.parent(), 'show_settings'):
+            self.parent().show_settings()
 
     def show_calculator(self):
         """Show calculator"""
@@ -465,14 +466,16 @@ class MainMenuBar(QMenuBar):
 
     def show_about(self):
         """Show about dialog"""
+        dialog = QMessageBox(self)
         QMessageBox.about(
-            self,
+            dialog,
             "关于",
             "交易系统 v1.0.0\n\n"
             "一个基于Python的量化交易系统\n"
             "使用PyQt5构建用户界面\n"
             "使用hikyuu框架进行量化分析"
         )
+        self.theme_manager.apply_theme(dialog)
 
     def apply_theme(self, theme_manager):
         """根据主题优化菜单栏样式"""

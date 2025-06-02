@@ -5,9 +5,11 @@ This module provides a unified theme management solution with support for
 multiple themes, dynamic theme switching, and theme customization.
 """
 
+from enum import Enum
 import json
 import os
 import re
+import glob
 from typing import Dict, Any, Optional, Union
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -16,8 +18,27 @@ from .theme_types import Theme
 from .config_types import ThemeConfig
 from core.base_logger import BaseLogManager
 from utils.theme_utils import load_theme_json_with_comments
+import sqlite3
+from datetime import datetime
+from PyQt5.QtGui import *
+
 # Global theme manager instance
 _theme_manager_instance: Optional['ThemeManager'] = None
+
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'themes.db')
+
+
+def safe_read_file(filepath):
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return f.read()
+    except UnicodeDecodeError:
+        try:
+            with open(filepath, 'r', encoding='gbk') as f:
+                return f.read()
+        except UnicodeDecodeError:
+            with open(filepath, 'r', encoding='latin1') as f:
+                return f.read()
 
 
 def load_theme_json_with_comments(path: str) -> dict:
@@ -32,6 +53,11 @@ def load_theme_json_with_comments(path: str) -> dict:
     content = '\n'.join(
         [line for line in content.splitlines() if line.strip()])
     return json.loads(content)
+
+
+class ThemeType(Enum):
+    JSON = 'json'
+    QSS = 'qss'
 
 
 class ThemeManager(QObject):
@@ -59,7 +85,61 @@ class ThemeManager(QObject):
             os.path.dirname(__file__)), 'config', 'theme.json')
         self._theme_data = {}
         self._current_theme = Theme.LIGHT
+        self._init_db()
         self._load_theme_json()
+        self.qss_theme_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'QSSTheme')
+        self._import_themes_to_db()
+        self._current_theme_type = ThemeType.JSON
+        self._current_qss_file = None
+
+    def _init_db(self):
+        self.conn = sqlite3.connect(DB_PATH)
+        self.conn.execute('''CREATE TABLE IF NOT EXISTS themes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE,
+            type TEXT,
+            content TEXT,
+            origin TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )''')
+        self.conn.commit()
+
+    def _import_themes_to_db(self):
+        # 导入QSS主题
+        for qss_file in glob.glob(os.path.join(self.qss_theme_dir, '*.qss')):
+            name = self._extract_qss_theme_name(
+                qss_file) or os.path.splitext(os.path.basename(qss_file))[0]
+            content = safe_read_file(qss_file)
+            self._upsert_theme(name, 'qss', content, 'file')
+        # 导入JSON主题
+        for t in self._theme_data.keys():
+            name = t.capitalize()
+            content = json.dumps(self._theme_data[t], ensure_ascii=False)
+            self._upsert_theme(name, 'json', content, 'file')
+
+    def _upsert_theme(self, name, type_, content, origin):
+        now = datetime.now().isoformat()
+        cur = self.conn.cursor()
+        cur.execute('SELECT id FROM themes WHERE name=?', (name,))
+        if cur.fetchone():
+            cur.execute('UPDATE themes SET type=?, content=?, origin=?, updated_at=? WHERE name=?',
+                        (type_, content, origin, now, name))
+        else:
+            cur.execute('INSERT INTO themes (name, type, content, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                        (name, type_, content, origin, now, now))
+        self.conn.commit()
+
+    def _get_all_themes_from_db(self):
+        cur = self.conn.cursor()
+        cur.execute('SELECT name, type FROM themes ORDER BY id')
+        return cur.fetchall()
+
+    def _get_theme_content(self, name):
+        cur = self.conn.cursor()
+        cur.execute('SELECT type, content FROM themes WHERE name=?', (name,))
+        return cur.fetchone()
 
     def _load_theme_json(self):
         """加载主题配置文件"""
@@ -75,22 +155,26 @@ class ThemeManager(QObject):
         """获取当前主题"""
         return self._current_theme
 
-    def set_theme(self, theme: Theme) -> None:
-        """设置主题
-
-        Args:
-            theme: 要设置的主题
-        """
-        if not isinstance(theme, Theme):
-            raise ValueError(f"Invalid theme type: {type(theme)}")
-
-        if theme != self._current_theme:
-            self._current_theme = theme
-            # 保存到配置
-            self.config_manager.theme.theme = theme
+    def set_theme(self, theme_name: str):
+        row = self._get_theme_content(theme_name)
+        if not row:
+            return
+        type_, content = row
+        if type_ == 'qss':
+            self._current_theme_type = ThemeType.QSS
+            self.apply_qss_theme_content(content)
+            # QSS主题不再emit信号，防止递归
+        else:
+            self._current_theme_type = ThemeType.JSON
+            theme_dict = json.loads(content)
+            for t in Theme:
+                if t.name.lower() == theme_name.lower():
+                    self._current_theme = t
+                    break
+            self._theme_cache[theme_name.lower()] = theme_dict
+            self.config_manager.theme.theme = self._current_theme
             self.config_manager.save()
-            # 发送主题变更信号
-            self.theme_changed.emit(theme)
+            self.theme_changed.emit(self._current_theme)
 
     def get_theme_colors(self, theme: Optional[Theme] = None) -> Dict[str, Any]:
         """获取主题颜色
@@ -299,6 +383,75 @@ class ThemeManager(QObject):
             True if current theme is dark
         """
         return self.current_theme.is_dark
+
+    def _scan_qss_themes(self):
+        themes = {}
+        for qss_file in glob.glob(os.path.join(self.qss_theme_dir, '*.qss')):
+            name = self._extract_qss_theme_name(qss_file)
+            if not name:
+                name = os.path.splitext(os.path.basename(qss_file))[0]
+            themes[name] = qss_file
+        return themes
+
+    def _extract_qss_theme_name(self, qss_file):
+        try:
+            with open(qss_file, 'r', encoding='utf-8') as f:
+                for _ in range(10):
+                    line = f.readline()
+                    if 'Style Sheet' in line or 'StyleSheet' in line:
+                        return line.strip('/*').strip().replace('Style Sheet for QT Applications', '').replace('StyleSheet for QT Applications', '').replace('Style Sheet', '').replace('for QT Applications', '').strip()
+        except Exception:
+            pass
+        return None
+
+    def get_all_themes(self):
+        # 返回所有主题名称（数据库）
+        return [row[0] for row in self._get_all_themes_from_db()]
+
+    def apply_qss_theme_content(self, qss):
+        QApplication.instance().setStyleSheet(qss)
+
+    def clear_qss_theme(self):
+        QApplication.instance().setStyleSheet('')
+
+    def is_qss_theme(self):
+        return self._current_theme_type == ThemeType.QSS
+
+    # 主题增删改查接口（预留）
+    def add_theme(self, name, type_, content, origin='user'):
+        self._upsert_theme(name, type_, content, origin)
+
+    def delete_theme(self, name):
+        self.conn.execute('DELETE FROM themes WHERE name=?', (name,))
+        self.conn.commit()
+
+    def update_theme(self, name, content):
+        now = datetime.now().isoformat()
+        self.conn.execute(
+            'UPDATE themes SET content=?, updated_at=? WHERE name=?', (content, now, name))
+        self.conn.commit()
+
+    def edit_theme(self, name: str, new_content: str) -> bool:
+        """
+        编辑QSS主题内容并保存到数据库，仅支持QSS类型主题。
+        Args:
+            name: 主题名称
+            new_content: 新的QSS内容
+        Returns:
+            True: 编辑成功
+            False: 编辑失败（主题不存在或不是QSS类型）
+        """
+        row = self._get_theme_content(name)
+        if not row:
+            return False
+        type_, _ = row
+        if type_ != 'qss':
+            return False
+        self.update_theme(name, new_content)
+        # 编辑后自动应用新主题
+        self.set_theme(name)
+        self.theme_changed.emit(name)
+        return True
 
 
 def get_theme_manager(config_manager: Optional[ConfigManager] = None) -> ThemeManager:

@@ -213,7 +213,8 @@ class TradingGUI(QMainWindow):
 
             # 初始化主题管理器
             self.theme_manager = get_theme_manager(self.config_manager)
-            self.theme_manager.theme_changed.connect(self.apply_theme)
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             # 初始化线程池
             self.thread_pool = QThreadPool()
@@ -321,7 +322,8 @@ class TradingGUI(QMainWindow):
             error_msg: 错误信息
         """
         self.log_manager.error(f"分析错误: {error_msg}")
-        QMessageBox.warning(self, "分析错误", error_msg)
+        msg_box = QMessageBox.warning(self, "分析错误", error_msg)
+        self.theme_manager.apply_theme(msg_box)
 
     def handle_chart_error(self, error_msg: str):
         """处理图表错误
@@ -330,7 +332,8 @@ class TradingGUI(QMainWindow):
             error_msg: 错误信息
         """
         self.log_manager.error(f"图表错误: {error_msg}")
-        QMessageBox.warning(self, "图表错误", error_msg)
+        msg_box = QMessageBox.warning(self, "图表错误", error_msg)
+        self.theme_manager.apply_theme(msg_box)
 
     def handle_log_error(self, error_msg: str):
         """处理日志错误
@@ -339,7 +342,8 @@ class TradingGUI(QMainWindow):
             error_msg: 错误信息
         """
         self.log_manager.error(f"日志错误: {error_msg}")
-        QMessageBox.warning(self, "日志错误", error_msg)
+        msg_box = QMessageBox.warning(self, "日志错误", error_msg)
+        self.theme_manager.apply_theme(msg_box)
 
     def handle_log_clear(self):
         """处理日志清除"""
@@ -455,7 +459,7 @@ class TradingGUI(QMainWindow):
             self.create_statusbar()
 
             # 应用主题
-            self.apply_theme()
+            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("UI初始化完成")
 
@@ -616,6 +620,7 @@ class TradingGUI(QMainWindow):
             dialog.show()
             self.center_dialog(dialog, self)
             dialog.exec_()
+            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示关于对话框失败: {str(e)}")
 
@@ -657,68 +662,250 @@ class TradingGUI(QMainWindow):
             dialog.show()
             self.center_dialog(dialog, self)
             dialog.exec_()
+            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示帮助对话框失败: {str(e)}")
 
     def show_settings(self):
-        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置"""
+        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置，并集成主题管理Tab"""
         try:
-            dialog = QDialog()
-            dialog.setWindowTitle("设置")
-            dialog.setMinimumSize(600, 400)
+            dialog = QDialog(self)
+            dialog.setWindowTitle("主题设置")
+            dialog.setMinimumSize(800, 600)
 
-            layout = QVBoxLayout(dialog)
-
-            # 基本设置
+            tab_widget = QTabWidget(dialog)
+            # 基本设置Tab
+            basic_tab = QWidget()
+            basic_layout = QVBoxLayout(basic_tab)
             settings_group = QGroupBox("基本设置")
             settings_layout = QFormLayout(settings_group)
-
             # 主题设置
-            theme_combo = QComboBox()
-            theme_combo.addItems(["浅色", "深色", "系统"])
-            settings_layout.addRow("主题:", theme_combo)
-
+            theme_names = self.theme_manager.get_all_themes()
+            self.theme_combo = QComboBox()
+            self.theme_combo.addItems(theme_names)
+            self.theme_combo.currentTextChanged.connect(self.on_theme_changed)
+            settings_layout.addRow("主题:", self.theme_combo)
             # 字体大小
             font_size = QSpinBox()
             font_size.setRange(8, 24)
             font_size.setValue(12)
             settings_layout.addRow("字体大小:", font_size)
-
             # 语言设置
             lang_combo = QComboBox()
             lang_combo.addItems(["简体中文", "English"])
             settings_layout.addRow("语言:", lang_combo)
-
             # 自动保存
             auto_save = QCheckBox("自动保存设置")
             auto_save.setChecked(True)
             settings_layout.addRow("", auto_save)
+            basic_layout.addWidget(settings_group)
+            tab_widget.addTab(basic_tab, "基本设置")
 
-            layout.addWidget(settings_group)
+            # 主题管理Tab
+            theme_tab = QWidget()
+            theme_layout = QVBoxLayout(theme_tab)
+            # 主题列表
+            theme_list = QListWidget()
+            theme_list.addItems(theme_names)
+            theme_layout.addWidget(QLabel("主题列表:"))
+            theme_layout.addWidget(theme_list)
+            # 主题操作按钮
+            btn_layout = QHBoxLayout()
+            btn_add = QPushButton("导入主题")
+            btn_export = QPushButton("导出主题")
+            btn_delete = QPushButton("删除主题")
+            btn_rename = QPushButton("重命名主题")
+            btn_edit = QPushButton("编辑QSS主题")
+            btn_preview = QPushButton("预览主题")
+            btn_layout.addWidget(btn_add)
+            btn_layout.addWidget(btn_export)
+            btn_layout.addWidget(btn_delete)
+            btn_layout.addWidget(btn_rename)
+            btn_layout.addWidget(btn_edit)
+            btn_layout.addWidget(btn_preview)
+            theme_layout.addLayout(btn_layout)
+            # 主题内容编辑区
+            theme_content_edit = QTextEdit()
+            theme_content_edit.setReadOnly(True)
+            theme_layout.addWidget(QLabel("主题内容预览/编辑:"))
+            theme_layout.addWidget(theme_content_edit)
+            tab_widget.addTab(theme_tab, "主题管理")
 
-            # 其它扩展设置分组（可按需添加）
-            # ...
+            # 主题列表选中事件
+            def on_theme_selected():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    theme_content_edit.clear()
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+                    return
+                row = self.theme_manager._get_theme_content(name)
+                if not row:
+                    theme_content_edit.clear()
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+                    return
+                type_, content = row
+                theme_content_edit.setPlainText(content)
+                if type_ == 'qss':
+                    theme_content_edit.setReadOnly(False)
+                    btn_edit.setEnabled(True)
+                else:
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+            theme_list.currentItemChanged.connect(lambda *_: on_theme_selected())
+            if theme_list.count() > 0:
+                theme_list.setCurrentRow(0)
 
+            # 编辑QSS主题
+            def on_edit_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                new_content = theme_content_edit.toPlainText()
+                ok = self.theme_manager.edit_theme(name, new_content)
+                if ok:
+                    QMessageBox.information(dialog, "编辑成功", f"主题 {name} 已更新并应用！")
+                    refresh_theme_list()
+                    refresh_theme_combo()
+                else:
+                    QMessageBox.warning(dialog, "编辑失败", f"仅支持QSS类型主题编辑！")
+            btn_edit.clicked.connect(on_edit_theme)
+
+            # 预览主题
+            def on_preview_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                self.theme_manager.set_theme(name)
+                self.apply_theme()
+                QMessageBox.information(dialog, "预览主题", f"已预览主题: {name}")
+                refresh_theme_combo()
+            btn_preview.clicked.connect(on_preview_theme)
+
+            # 删除主题
+            def on_delete_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                reply = QMessageBox.question(dialog, "删除主题", f"确定要删除主题: {name} 吗？", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.theme_manager.delete_theme(name)
+                    theme_list.takeItem(theme_list.currentRow())
+                    theme_content_edit.clear()
+                    QMessageBox.information(dialog, "删除成功", f"主题 {name} 已删除！")
+                    refresh_theme_list()
+                    refresh_theme_combo()
+            btn_delete.clicked.connect(on_delete_theme)
+
+            # 重命名主题
+            def on_rename_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                new_name, ok = QInputDialog.getText(dialog, "重命名主题", "请输入新主题名:", QLineEdit.Normal, name)
+                if ok and new_name and new_name != name:
+                    row = self.theme_manager._get_theme_content(name)
+                    if row:
+                        type_, content = row
+                        self.theme_manager.add_theme(new_name, type_, content)
+                        self.theme_manager.delete_theme(name)
+                        theme_list.addItem(new_name)
+                        theme_list.takeItem(theme_list.currentRow())
+                        QMessageBox.information(dialog, "重命名成功", f"主题 {name} 已重命名为 {new_name}！")
+                        refresh_theme_list()
+                        refresh_theme_combo()
+            btn_rename.clicked.connect(on_rename_theme)
+
+            # 导入主题
+            def on_import_theme():
+                file_path, _ = QFileDialog.getOpenFileName(dialog, "导入主题", "", "QSS/JSON Files (*.qss *.json)")
+                if not file_path:
+                    return
+                ext = os.path.splitext(file_path)[1].lower()
+                name = os.path.splitext(os.path.basename(file_path))[0]
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                if ext == '.qss':
+                    self.theme_manager.add_theme(name, 'qss', content)
+                elif ext == '.json':
+                    self.theme_manager.add_theme(name, 'json', content)
+                else:
+                    QMessageBox.warning(dialog, "导入失败", "仅支持QSS或JSON文件！")
+                    return
+                theme_list.addItem(name)
+                QMessageBox.information(dialog, "导入成功", f"主题 {name} 已导入！")
+                refresh_theme_list()
+                refresh_theme_combo()
+            btn_add.clicked.connect(on_import_theme)
+
+            # 导出主题
+            def on_export_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                row = self.theme_manager._get_theme_content(name)
+                if not row:
+                    return
+                type_, content = row
+                ext = '.qss' if type_ == 'qss' else '.json'
+                file_path, _ = QFileDialog.getSaveFileName(dialog, "导出主题", f"{name}{ext}", f"QSS/JSON Files (*{ext})")
+                if not file_path:
+                    return
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                QMessageBox.information(dialog, "导出成功", f"主题 {name} 已导出到 {file_path}！")
+            btn_export.clicked.connect(on_export_theme)
+
+            # 主题列表刷新
+            def refresh_theme_list():
+                theme_list.clear()
+                theme_list.addItems(self.theme_manager.get_all_themes())
+
+            # 主题下拉框刷新
+            def refresh_theme_combo():
+                current = self.theme_combo.currentText() if self.theme_combo.count() > 0 else None
+                self.theme_combo.blockSignals(True)
+                self.theme_combo.clear()
+                self.theme_combo.addItems(self.theme_manager.get_all_themes())
+                if current and current in [self.theme_combo.itemText(i) for i in range(self.theme_combo.count())]:
+                    self.theme_combo.setCurrentText(current)
+                self.theme_combo.blockSignals(False)
+
+            # 主题管理Tab切换时刷新
+            tab_widget.currentChanged.connect(lambda idx: refresh_theme_list() if tab_widget.tabText(idx) == "主题管理" else None)
+
+            # 主布局
+            main_layout = QVBoxLayout(dialog)
+            main_layout.addWidget(tab_widget)
             # 按钮
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-            )
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             buttons.accepted.connect(dialog.accept)
             buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-
-            # 显示对话框并居中
+            main_layout.addWidget(buttons)
+            dialog.setLayout(main_layout)
             dialog.show()
-            self.center_dialog(dialog)
+            self.center_dialog(dialog, self)
             if dialog.exec_() == QDialog.Accepted:
                 # 保存设置逻辑（可扩展）
-                self.theme_manager.set_theme(theme_combo.currentText())
+                self.theme_manager.set_theme(self.theme_combo.currentText())
+                self.apply_theme()
                 self.config_manager.set_font_size(font_size.value())
                 self.config_manager.set_language(lang_combo.currentText())
                 self.config_manager.set_auto_save(auto_save.isChecked())
                 self.log_manager.info("设置已保存")
+            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
+
+    def on_theme_changed(self, theme_name):
+        self.theme_manager.set_theme(theme_name)
+        if self.theme_manager.is_qss_theme():
+            # QSS主题已全局应用，无需递归apply_theme
+            pass
+        else:
+            self.theme_manager.clear_qss_theme()
+            self.apply_theme()
 
     def init_data(self):
         """Initialize data"""
@@ -760,23 +947,17 @@ class TradingGUI(QMainWindow):
 
     def apply_theme(self):
         """Apply theme to all widgets (主窗口唯一递归入口)"""
+        if getattr(self, '_is_applying_theme', False):
+            return
+        self._is_applying_theme = True
         try:
             if not hasattr(self, 'theme_manager'):
                 self.log_manager.warning("主题管理器未初始化")
                 return
-
             # 应用主题到主窗口
-            theme = self.theme_manager.current_theme
-            colors = self.theme_manager.get_theme_colors()
-
-            # 设置主窗口样式
-            self.setStyleSheet(f"""
-                QMainWindow {{
-                    background-color: {colors['background_color']};
-                    color: {colors['text']};
-                }}
-            """)
-
+            theme_names = self.theme_manager.get_all_themes()
+            if theme_names:
+                self.theme_manager.set_theme(theme_names[0])
             # 应用主题到所有子部件
             for widget in self.findChildren(QWidget):
                 if widget is not self:  # 避免递归调用自身
@@ -786,331 +967,27 @@ class TradingGUI(QMainWindow):
                         self.log_manager.warning(
                             f"应用主题到部件失败: {str(widget_error)}")
                         continue
-
             self.log_manager.info("主题应用完成")
-
             # 在apply_theme中自动调用
             self.apply_global_styles()
-
         except Exception as e:
             self.log_manager.error(f"应用主题失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+        finally:
+            self._is_applying_theme = False
 
     def apply_global_styles(self):
         """批量应用全局UI优化样式，菜单栏及下方按钮统一为弹框风格，日志区修复自动滚动底部，整体风格更一致，弹窗/自定义控件/分割线风格统一"""
-        theme = self.theme_manager.get_theme_colors()
-        panel_bg = theme.get('background', '#23293a')
-        panel_border = theme.get('border', '#5e35b1')
-        button_bg = theme.get('button_bg', '#23293a')
-        button_hover = theme.get('button_hover', '#1976d2')
-        button_pressed = theme.get('button_pressed', '#1565c0')
-        button_text = theme.get('button_text', '#e0e6ed')
-        button_border = theme.get('button_border', '#1976d2')
-        font_family = "'Microsoft YaHei', 'Roboto', 'Arial', sans-serif"
-        button_height = 14
-        font_size = 12
-        radius = 5
-        # 统一按钮、输入框、下拉框、日志区、主内容区、菜单栏样式
-        panel_style = f"""
-            QWidget, QGroupBox, QFrame {{
-                background: {panel_bg};
-                border: 1.5px solid {panel_border};
-                border-radius: {radius}px;
-                font-family: {font_family};
-                font-size: {font_size}px;
-                padding: 10px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px 0 6px;
-                background: {panel_border};
-                border-radius: 6px;
-                color: {button_hover};
-                font-weight: bold;
-            }}
-            QFrame[frameShape="4"] {{ /* HLine */
-                border-top: 2px solid {panel_border};
-                border-bottom: none;
-                border-left: none;
-                border-right: none;
-                margin-top: 8px;
-                margin-bottom: 8px;
-            }}
-            QFrame[frameShape="5"] {{ /* VLine */
-                border-left: 2px solid {panel_border};
-                border-top: none;
-                border-bottom: none;
-                border-right: none;
-                margin-left: 8px;
-                margin-right: 8px;
-            }}
-        """
-        # 弹框按钮风格（菜单栏下所有主按钮、弹框按钮、工具栏按钮）
-        dialog_button_style = f"""
-            QPushButton, QToolButton, .DialogButton {{
-                background: {button_bg};
-                color: {button_text};
-                border: 1.5px solid {button_border};
-                border-radius: {radius}px;
-                font-weight: bold;
-                font-size: {font_size}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                min-width: 60px;
-                padding: 0 16px;
-                margin: 0 4px;
-            }}
-            QPushButton:hover, QToolButton:hover, .DialogButton:hover {{
-                background: {button_hover};
-                color: #ffd600;
-            }}
-            QPushButton:pressed, QToolButton:pressed, .DialogButton:pressed {{
-                background: {button_pressed};
-                color: #ffd600;
-            }}
-        """
-        input_style = f"""
-            QLineEdit, QComboBox, QTextEdit, QPlainTextEdit {{
-                background: {panel_bg};
-                color: {button_text};
-                border: 1.5px solid {button_border};
-                border-radius: {radius}px;
-                font-size: {font_size}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                padding: 0 12px;
-                margin: 0 4px;
-            }}
-        """
-        # 日志区样式
-        log_text = "#ffd600" if button_text.lower(
-        ) in ["#e0e6ed", "#f5f5f5"] else "#23293a"
-        log_style = f"""
-            QTextEdit, QPlainTextEdit {{
-                background: {panel_bg};
-                color: {log_text};
-                border: 1.5px solid {button_border};
-                border-radius: {radius}px;
-                font-size: {font_size}px;
-                padding: 8px 12px;
-                margin: 0;
-            }}
-        """
-        toolbar_style = f"""
-            QToolBar {{
-                background: {panel_bg};
-                border-bottom: 2px solid {panel_border};
-                spacing: 8px;
-                padding: 4px 8px;
-            }}
-            QToolButton {{
-                background: transparent;
-                color: {button_text};
-                border-radius: {radius}px;
-                font-size: {font_size}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                min-width: 40px;
-                padding: 0 16px;
-                margin: 0 4px;
-            }}
-            QToolButton:hover {{
-                background: {button_hover};
-                color: #ffd600;
-            }}
-            QToolButton:pressed {{
-                background: {button_pressed};
-                color: #ffd600;
-            }}
-        """
-        chart_style = f"""
-            QWidget#ChartWidget {{
-                background: {panel_bg};
-                border-radius: {radius}px;
-                border: 1.5px solid {panel_border};
-            }}
-        """
-        # 菜单栏样式
-        menubar_style = f"""
-            QMenuBar {{
-                background: #f7f9fa;
-                color: #23293a;
-                border-bottom: 1.5px solid #e0e0e0;
-                font-weight: bold;
-                font-size: 14px;
-                min-height: 26px;
-                padding: 2px 8px 2px 8px;
-            }}
-            QMenuBar::item {{
-                background: transparent;
-                color: #23293a;
-                padding: 3px 16px 3px 16px;
-                margin: 0 2px;
-                border-radius: 4px 4px 0 0;
-                min-height: 20px;
-            }}
-            QMenuBar::item:selected {{
-                background: #e3f2fd;
-                color: #1976d2;
-            }}
-            QMenuBar::item:pressed {{
-                background: #bbdefb;
-                color: #1976d2;
-            }}
-            QMenu {{
-                background: #f7f9fa;
-                color: #23293a;
-                border: 1.5px solid #e0e0e0;
-                font-size: 13px;
-                padding: 4px 0;
-            }}
-            QMenu::item {{
-                padding: 5px 32px 5px 24px;
-                min-height: 22px;
-            }}
-            QMenu::item:selected {{
-                background: #e3f2fd;
-                color: #1976d2;
-            }}
-            QMenu::separator {{
-                height: 1px;
-                background: #e0e0e0;
-                margin: 2px 8px;
-            }}
-        """
-        # 列表控件风格建议
-        list_style = f"""
-            QListWidget, QTableWidget, QTreeWidget {{
-                background: {panel_bg};
-                color: {button_text};
-                border: 1.5px solid {panel_border};
-                border-radius: {radius}px;
-                font-size: {font_size}px;
-                padding: 10px;
-            }}
-            QListWidget::item:selected, QTableWidget::item:selected, QTreeWidget::item:selected {{
-                background: {button_hover};
-                color: #ffd600;
-                border-radius: {radius}px;
-            }}
-        """
-        # 弹窗/表单风格统一
-        dialog_style = f"""
-            QDialog, QMessageBox, QInputDialog, QDialogButtonBox, QFormLayout, QGroupBox {{
-                background: {panel_bg};
-                border: 1.5px solid {panel_border};
-                border-radius: {radius}px;
-                font-family: {font_family};
-                font-size: {font_size}px;
-                color: {button_text};
-                padding: 12px;
-            }}
-            QDialog QLabel, QDialog QLineEdit, QDialog QComboBox, QDialog QPushButton {{
-                font-size: {font_size}px;
-                border-radius: {radius}px;
-            }}
-            QDialog QPushButton {{
-                min-height: {button_height}px;
-                font-weight: bold;
-            }}
-        """
-        # 自定义控件风格统一
-        custom_style = f"""
-            QWidget#CustomChart, QWidget#SpecialPanel {{
-                background: {panel_bg};
-                border: 1.5px solid {panel_border};
-                border-radius: {radius}px;
-            }}
-        """
-        # 新增/增强主内容区、图表区、日志区、分割线、侧栏、弹窗等QSS，提升层次感和聚焦感
-        main_content_bg = theme.get('main_content_bg', panel_bg)
-        chart_panel_bg = theme.get('chart_panel_bg', panel_bg)
-        log_bg = theme.get('log_bg', panel_bg)
-        divider = theme.get('divider', panel_border)
-        shadow = theme.get('shadow', 'rgba(0,0,0,0.06)')
-        focus = theme.get('focus', button_hover)
-        sidebar_bg = theme.get('sidebar_bg', panel_bg)
-        sidebar_border = theme.get('sidebar_border', panel_border)
-        dialog_bg = theme.get('dialog_bg', panel_bg)
-        dialog_border = theme.get('dialog_border', panel_border)
-        dialog_shadow = theme.get('dialog_shadow', shadow)
-
-        # 主内容区/图表区/日志区聚焦
-        main_content_style = f"""
-            QWidget#MainContent {{
-                background: {main_content_bg};
-                border-radius: {radius}px;
-                border: 1.5px solid {panel_border};
-                /* box-shadow: 0 2px 12px 0 {shadow}; */
-            }}
-            QWidget#ChartWidget {{
-                background: {chart_panel_bg};
-                border-radius: {radius}px;
-                border: 1.5px solid {panel_border};
-                /* box-shadow: 0 2px 12px 0 {shadow}; */
-            }}
-            /* QWidget#LogPanel 已移除 */
-        """
-        # 分割线/阴影增强
-        divider_style = f"""
-            QFrame[frameShape="4"], QFrame[frameShape="5"] {{
-                border-top: 2px solid {divider};
-                border-left: 2px solid {divider};
-                opacity: 0.8;
-            }}
-        """
-        # 侧栏风格
-        sidebar_style = f"""
-            QWidget#SidebarPanel {{
-                background: {sidebar_bg};
-                border: 1.5px solid {sidebar_border};
-                border-radius: {radius}px;
-            }}
-        """
-        # 弹窗/表单风格增强
-        dialog_style = f"""
-            QDialog, QMessageBox, QInputDialog, QDialogButtonBox, QFormLayout, QGroupBox {{
-                background: {dialog_bg};
-                border: 1.5px solid {dialog_border};
-                border-radius: {radius}px;
-                /* box-shadow: 0 4px 24px 0 {dialog_shadow}; */
-                font-family: {font_family};
-                font-size: {font_size}px;
-                color: {button_text};
-                padding: 12px;
-            }}
-        """
-        # 列表控件高亮增强
-        list_style = f"""
-            QListWidget, QTableWidget, QTreeWidget {{
-                background: {panel_bg};
-                color: {button_text};
-                border: 1.5px solid {panel_border};
-                border-radius: {radius}px;
-                font-size: {font_size}px;
-                padding: 4px;
-            }}
-            QListWidget::item:selected, QTableWidget::item:selected, QTreeWidget::item:selected {{
-                background: {focus};
-                color: #ffd600;
-                border-radius: {radius}px;
-            }}
-            QListWidget::item:hover, QTableWidget::item:hover, QTreeWidget::item:hover {{
-                background: {button_hover};
-                color: #ffd600;
-            }}
-        """
-        # 其余QSS片段保持不变，合并所有风格
-        self.setStyleSheet(panel_style + dialog_button_style + input_style +
-                           log_style + toolbar_style + chart_style + menubar_style + list_style + dialog_style + custom_style +
-                           main_content_style + divider_style + sidebar_style)
+        # 全局QSS主题应用统一通过ThemeManager.set_theme
+        theme_names = self.theme_manager.get_all_themes()
+        if theme_names:
+            self.theme_manager.set_theme(theme_names[0])
         # 菜单栏
         if hasattr(self, 'menu_bar'):
             self.menu_bar.apply_theme(self.theme_manager)
         # 工具栏
         if hasattr(self, 'toolbar'):
-            self.toolbar.setStyleSheet(toolbar_style)
+            self.toolbar.setStyleSheet("")
 
     def create_left_panel(self):
         """Create left panel with stock list and indicators"""
@@ -3620,7 +3497,6 @@ class TradingGUI(QMainWindow):
             else:
                 # 添加文本
                 display.insert(text)
-
         except Exception as e:
             self.log_manager.error(f"计算器操作失败: {str(e)}")
 
@@ -4795,62 +4671,234 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"检查更新失败: {str(e)}")
 
     def show_settings(self):
-        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置"""
+        """显示设置对话框，支持主题、字体、语言、自动保存等扩展设置，并集成主题管理Tab"""
         try:
             dialog = QDialog(self)
             dialog.setWindowTitle("设置")
-            dialog.setMinimumSize(600, 400)
+            dialog.setMinimumSize(800, 600)
 
-            layout = QVBoxLayout(dialog)
-
-            # 基本设置
+            tab_widget = QTabWidget(dialog)
+            # 基本设置Tab
+            basic_tab = QWidget()
+            basic_layout = QVBoxLayout(basic_tab)
             settings_group = QGroupBox("基本设置")
             settings_layout = QFormLayout(settings_group)
-
             # 主题设置
-            theme_combo = QComboBox()
-            theme_combo.addItems(["浅色", "深色", "系统"])
-            settings_layout.addRow("主题:", theme_combo)
-
+            theme_names = self.theme_manager.get_all_themes()
+            self.theme_combo = QComboBox()
+            self.theme_combo.addItems(theme_names)
+            self.theme_combo.currentTextChanged.connect(self.on_theme_changed)
+            settings_layout.addRow("主题:", self.theme_combo)
             # 字体大小
             font_size = QSpinBox()
             font_size.setRange(8, 24)
-            font_size.setValue(8)
+            font_size.setValue(12)
             settings_layout.addRow("字体大小:", font_size)
-
             # 语言设置
             lang_combo = QComboBox()
             lang_combo.addItems(["简体中文", "English"])
             settings_layout.addRow("语言:", lang_combo)
-
             # 自动保存
             auto_save = QCheckBox("自动保存设置")
             auto_save.setChecked(True)
             settings_layout.addRow("", auto_save)
+            basic_layout.addWidget(settings_group)
+            tab_widget.addTab(basic_tab, "基本设置")
 
-            layout.addWidget(settings_group)
+            # 主题管理Tab
+            theme_tab = QWidget()
+            theme_layout = QVBoxLayout(theme_tab)
+            # 主题列表
+            theme_list = QListWidget()
+            theme_list.addItems(theme_names)
+            theme_layout.addWidget(QLabel("主题列表:"))
+            theme_layout.addWidget(theme_list)
+            # 主题操作按钮
+            btn_layout = QHBoxLayout()
+            btn_add = QPushButton("导入主题")
+            btn_export = QPushButton("导出主题")
+            btn_delete = QPushButton("删除主题")
+            btn_rename = QPushButton("重命名主题")
+            btn_edit = QPushButton("编辑QSS主题")
+            btn_preview = QPushButton("预览主题")
+            btn_layout.addWidget(btn_add)
+            btn_layout.addWidget(btn_export)
+            btn_layout.addWidget(btn_delete)
+            btn_layout.addWidget(btn_rename)
+            btn_layout.addWidget(btn_edit)
+            btn_layout.addWidget(btn_preview)
+            theme_layout.addLayout(btn_layout)
+            # 主题内容编辑区
+            theme_content_edit = QTextEdit()
+            theme_content_edit.setReadOnly(True)
+            theme_layout.addWidget(QLabel("主题内容预览/编辑:"))
+            theme_layout.addWidget(theme_content_edit)
+            tab_widget.addTab(theme_tab, "主题管理")
 
-            # 其它扩展设置分组（可按需添加）
-            # ...
+            # 主题列表选中事件
+            def on_theme_selected():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    theme_content_edit.clear()
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+                    return
+                row = self.theme_manager._get_theme_content(name)
+                if not row:
+                    theme_content_edit.clear()
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+                    return
+                type_, content = row
+                theme_content_edit.setPlainText(content)
+                if type_ == 'qss':
+                    theme_content_edit.setReadOnly(False)
+                    btn_edit.setEnabled(True)
+                else:
+                    theme_content_edit.setReadOnly(True)
+                    btn_edit.setEnabled(False)
+            theme_list.currentItemChanged.connect(lambda *_: on_theme_selected())
+            if theme_list.count() > 0:
+                theme_list.setCurrentRow(0)
 
+            # 编辑QSS主题
+            def on_edit_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                new_content = theme_content_edit.toPlainText()
+                ok = self.theme_manager.edit_theme(name, new_content)
+                if ok:
+                    QMessageBox.information(dialog, "编辑成功", f"主题 {name} 已更新并应用！")
+                    refresh_theme_list()
+                    refresh_theme_combo()
+                else:
+                    QMessageBox.warning(dialog, "编辑失败", f"仅支持QSS类型主题编辑！")
+            btn_edit.clicked.connect(on_edit_theme)
+
+            # 预览主题
+            def on_preview_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                self.theme_manager.set_theme(name)
+                self.apply_theme()
+                QMessageBox.information(dialog, "预览主题", f"已预览主题: {name}")
+                refresh_theme_combo()
+            btn_preview.clicked.connect(on_preview_theme)
+
+            # 删除主题
+            def on_delete_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                reply = QMessageBox.question(dialog, "删除主题", f"确定要删除主题: {name} 吗？", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.theme_manager.delete_theme(name)
+                    theme_list.takeItem(theme_list.currentRow())
+                    theme_content_edit.clear()
+                    QMessageBox.information(dialog, "删除成功", f"主题 {name} 已删除！")
+                    refresh_theme_list()
+                    refresh_theme_combo()
+            btn_delete.clicked.connect(on_delete_theme)
+
+            # 重命名主题
+            def on_rename_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                new_name, ok = QInputDialog.getText(dialog, "重命名主题", "请输入新主题名:", QLineEdit.Normal, name)
+                if ok and new_name and new_name != name:
+                    row = self.theme_manager._get_theme_content(name)
+                    if row:
+                        type_, content = row
+                        self.theme_manager.add_theme(new_name, type_, content)
+                        self.theme_manager.delete_theme(name)
+                        theme_list.addItem(new_name)
+                        theme_list.takeItem(theme_list.currentRow())
+                        QMessageBox.information(dialog, "重命名成功", f"主题 {name} 已重命名为 {new_name}！")
+                        refresh_theme_list()
+                        refresh_theme_combo()
+            btn_rename.clicked.connect(on_rename_theme)
+
+            # 导入主题
+            def on_import_theme():
+                file_path, _ = QFileDialog.getOpenFileName(dialog, "导入主题", "", "QSS/JSON Files (*.qss *.json)")
+                if not file_path:
+                    return
+                ext = os.path.splitext(file_path)[1].lower()
+                name = os.path.splitext(os.path.basename(file_path))[0]
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                if ext == '.qss':
+                    self.theme_manager.add_theme(name, 'qss', content)
+                elif ext == '.json':
+                    self.theme_manager.add_theme(name, 'json', content)
+                else:
+                    QMessageBox.warning(dialog, "导入失败", "仅支持QSS或JSON文件！")
+                    return
+                theme_list.addItem(name)
+                QMessageBox.information(dialog, "导入成功", f"主题 {name} 已导入！")
+                refresh_theme_list()
+                refresh_theme_combo()
+            btn_add.clicked.connect(on_import_theme)
+
+            # 导出主题
+            def on_export_theme():
+                name = theme_list.currentItem().text() if theme_list.currentItem() else None
+                if not name:
+                    return
+                row = self.theme_manager._get_theme_content(name)
+                if not row:
+                    return
+                type_, content = row
+                ext = '.qss' if type_ == 'qss' else '.json'
+                file_path, _ = QFileDialog.getSaveFileName(dialog, "导出主题", f"{name}{ext}", f"QSS/JSON Files (*{ext})")
+                if not file_path:
+                    return
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                QMessageBox.information(dialog, "导出成功", f"主题 {name} 已导出到 {file_path}！")
+            btn_export.clicked.connect(on_export_theme)
+
+            # 主题列表刷新
+            def refresh_theme_list():
+                theme_list.clear()
+                theme_list.addItems(self.theme_manager.get_all_themes())
+
+            # 主题下拉框刷新
+            def refresh_theme_combo():
+                current = self.theme_combo.currentText() if self.theme_combo.count() > 0 else None
+                self.theme_combo.blockSignals(True)
+                self.theme_combo.clear()
+                self.theme_combo.addItems(self.theme_manager.get_all_themes())
+                if current and current in [self.theme_combo.itemText(i) for i in range(self.theme_combo.count())]:
+                    self.theme_combo.setCurrentText(current)
+                self.theme_combo.blockSignals(False)
+
+            # 主题管理Tab切换时刷新
+            tab_widget.currentChanged.connect(lambda idx: refresh_theme_list() if tab_widget.tabText(idx) == "主题管理" else None)
+
+            # 主布局
+            main_layout = QVBoxLayout(dialog)
+            main_layout.addWidget(tab_widget)
             # 按钮
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-            )
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             buttons.accepted.connect(dialog.accept)
             buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-
-            # 显示对话框并居中
+            main_layout.addWidget(buttons)
+            dialog.setLayout(main_layout)
             dialog.show()
             self.center_dialog(dialog, self)
             if dialog.exec_() == QDialog.Accepted:
                 # 保存设置逻辑（可扩展）
-                # 例如：self.theme_manager.set_theme(theme_combo.currentText())
-                # self.config_manager.set_font_size(font_size.value())
-                # self.config_manager.set_language(lang_combo.currentText())
-                # self.config_manager.set_auto_save(auto_save.isChecked())
+                self.theme_manager.set_theme(self.theme_combo.currentText())
+                self.apply_theme()
+                self.config_manager.set_font_size(font_size.value())
+                self.config_manager.set_language(lang_combo.currentText())
+                self.config_manager.set_auto_save(auto_save.isChecked())
                 self.log_manager.info("设置已保存")
+            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 

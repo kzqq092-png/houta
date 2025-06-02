@@ -15,6 +15,7 @@ from PyQt5.QtGui import QIcon, QKeySequence
 import os
 import traceback
 from gui.widgets.log_widget import LogWidget
+from utils.theme import get_theme_manager
 
 
 class MainToolBar(QToolBar):
@@ -35,6 +36,11 @@ class MainToolBar(QToolBar):
             else:
                 from core.logger import LogManager
                 self.log_manager = LogManager()
+
+            # 初始化主题管理器
+            self.theme_manager = get_theme_manager()
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             # 初始化UI
             self.init_ui()
@@ -186,7 +192,8 @@ class MainToolBar(QToolBar):
             if file_path:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write("")
-                QMessageBox.information(self, "成功", "文件创建成功")
+                msg_box = QMessageBox.information(self, "成功", "文件创建成功")
+                self.theme_manager.apply_theme(msg_box)
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"创建文件失败: {str(e)}")
@@ -205,7 +212,8 @@ class MainToolBar(QToolBar):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 # TODO: Process file content
-                QMessageBox.information(self, "成功", "文件打开成功")
+                msg_box = QMessageBox.information(self, "成功", "文件打开成功")
+                self.theme_manager.apply_theme(msg_box)
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"打开文件失败: {str(e)}")
@@ -232,47 +240,8 @@ class MainToolBar(QToolBar):
     def show_settings(self):
         """Show settings dialog"""
         try:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("设置")
-            dialog.setMinimumSize(600, 400)
-
-            layout = QVBoxLayout(dialog)
-            layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(10)
-
-            # Add settings widgets
-            settings_group = QGroupBox("基本设置")
-            settings_layout = QFormLayout(settings_group)
-
-            # 主题设置
-            theme_combo = QComboBox()
-            theme_combo.addItems(["浅色", "深色", "系统"])
-            settings_layout.addRow("主题:", theme_combo)
-
-            # 字体大小
-            font_size = QSpinBox()
-            font_size.setRange(8, 24)
-            font_size.setValue(8)
-            settings_layout.addRow("字体大小:", font_size)
-
-            layout.addWidget(settings_group)
-
-            # Add buttons
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-            )
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-
-            if dialog.exec_() == QDialog.Accepted:
-                # TODO: Apply settings
-                pass
-
+            if hasattr(self.parent(), 'show_settings'):
+                self.parent().show_settings()
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 
@@ -291,15 +260,6 @@ class MainToolBar(QToolBar):
             display = QLineEdit()
             display.setReadOnly(True)
             display.setAlignment(Qt.AlignRight)
-            display.setStyleSheet("""
-                QLineEdit {
-                    font-size: 20px;
-                    padding: 5px;
-                    background: #f5f5f5;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                }
-            """)
             layout.addWidget(display)
 
             # Add calculator buttons
@@ -315,16 +275,6 @@ class MainToolBar(QToolBar):
                 for text in row:
                     button = QPushButton(text)
                     button.setMinimumSize(50, 50)
-                    button.setStyleSheet("""
-                        QPushButton {
-                            font-size: 18px;
-                            border-radius: 25px;
-                            background: #e0e0e0;
-                        }
-                        QPushButton:hover {
-                            background: #d0d0d0;
-                        }
-                    """)
                     button_row.addWidget(button)
                 layout.addLayout(button_row)
 
@@ -376,18 +326,6 @@ class MainToolBar(QToolBar):
 
             # Add convert button
             convert_button = QPushButton("转换")
-            convert_button.setStyleSheet("""
-                QPushButton {
-                    font-size: 14px;
-                    padding: 8px;
-                    background: #2196F3;
-                    color: white;
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background: #1976D2;
-                }
-            """)
             layout.addWidget(convert_button)
 
             # 显示对话框并居中

@@ -10,6 +10,7 @@ from PyQt5.QtGui import QTextBlock, QColor, QTextCursor, QCursor
 from datetime import datetime
 from core.logger import LogManager, LogLevel
 import traceback
+from utils.theme import get_theme_manager
 
 
 class DragHandle(QWidget):
@@ -88,7 +89,9 @@ class LogWidget(QWidget):
             self.connect_signals()
 
             # 设置样式
-            self.apply_style()
+            self.theme_manager = get_theme_manager()
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("日志控件初始化完成")
 
@@ -205,7 +208,6 @@ class LogWidget(QWidget):
             self.log_text.verticalScrollBar().valueChanged.connect(
                 self._on_scrollbar_value_changed)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.apply_style()  # 强制应用样式
             self.update()
             self.adjustSize()
 
@@ -249,139 +251,7 @@ class LogWidget(QWidget):
             self.error_occurred.emit(error_msg)
 
     def apply_style(self):
-        """应用样式（与策略设置区风格完全一致，支持主题切换，统一高度）"""
-        try:
-            dark = False
-            if hasattr(self, 'theme_manager') and self.theme_manager is not self:
-                dark = getattr(self.theme_manager, 'is_dark', False)
-            bg = "#f7f9fa" if not dark else "#23293a"
-            fg = "#23293a" if not dark else "#e0e6ed"
-            border = "#bdbdbd" if not dark else "#444a5a"
-            line_color = "#e0e0e0" if not dark else "#444a5a"
-            btn_bg = "#1976d2"
-            btn_fg = "white"
-            btn_hover = "#1565c0"
-            btn_pressed = "#0d47a1"
-            input_bg = "white" if not dark else "#23293a"
-            input_fg = fg
-            highlight = "#ffd600"
-            font_size = 12
-            height = 14  # 工具栏所有控件高度统一为12px
-            self.setStyleSheet(f"""
-                QWidget {{
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 12px;
-                    background: {bg};
-                    border-radius: 4px;
-                }}
-                QLabel {{
-                    color: #1976d2;
-                    font-weight: normal;
-                    font-size: {font_size}px;
-                    min-height: {height}px;
-                    max-height: {height}px;
-                    line-height: {height}px;
-                    background: none;
-                    border: none;
-                }}
-                QComboBox, QLineEdit {{
-                    border: 1px solid {border};
-                    border-radius: 4px;
-                    padding: 2px 8px;
-                    background: {input_bg};
-                    color: {input_fg};
-                    min-height: {height}px;
-                    max-height: {height}px;
-                    font-size: {font_size}px;
-                }}
-                QComboBox:hover, QLineEdit:hover {{
-                    border-color: #1976d2;
-                }}
-                QComboBox:focus, QLineEdit:focus {{
-                    border-color: #1976d2;
-                }}
-                QPushButton {{
-                    border: none;
-                    border-radius: 4px;
-                    padding: 2px 8px;
-                    background: {btn_bg};
-                    color: {btn_fg};
-                    font-weight: bold;
-                    min-width: 60px;
-                    min-height: {height}px;
-                    max-height: {height}px;
-                    font-size: 12px;
-                }}
-                QPushButton:hover {{
-                    background: {btn_hover};
-                }}
-                QPushButton:pressed {{
-                    background: {btn_pressed};
-                }}
-                QTextEdit, QPlainTextEdit {{
-                    border: 1px solid {border};
-                    border-radius: 4px;
-                    padding: 10px 16px;
-                    margin: 0;
-                    background: {input_bg};
-                    color: {input_fg};
-                    font-family: 'Consolas', 'Microsoft YaHei', monospace;
-                    font-size: {font_size}px;
-                    line-height: 1.4;
-                    min-height: 120px;
-                    max-height: 777215px;
-                }}
-                QTextEdit:focus, QPlainTextEdit:focus {{
-                    outline: 1px solid #1976d2;
-                }}
-                QFrame#line {{
-                    border-top: 1px solid {line_color};
-                    margin: 6px 0 6px 0;
-                }}
-                QScrollArea {{
-                    border: none;
-                    background: transparent;
-                    margin: 0;
-                    padding: 0;
-                }}
-                QScrollBar:vertical {{
-                    background: {input_bg};
-                    width: 10px;
-                    margin: 0;
-                    border-radius: 5px;
-                }}
-                QScrollBar::handle:vertical {{
-                    background: #bdbdbd;
-                    min-height: 20px;
-                    border-radius: 5px;
-                }}
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                    height: 0;
-                }}
-                QScrollBar:horizontal {{
-                    background: {input_bg};
-                    height: 10px;
-                    margin: 0;
-                    border-radius: 5px;
-                }}
-                QScrollBar::handle:horizontal {{
-                    background: #bdbdbd;
-                    min-width: 20px;
-                    border-radius: 5px;
-                }}
-                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-                    width: 0;
-                }}
-            """)
-            # self.update()  # 移除递归调用
-            # self.adjustSize()  # 移除递归调用
-        except Exception as e:
-            error_msg = f"应用样式失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-            # self.update()  # 移除递归调用
-            # self.adjustSize()  # 移除递归调用
+        pass  # 移除自定义样式，统一由主题管理器apply_theme
 
     def add_log(self, message: str, level: str = "INFO"):
         """添加日志，增加去重逻辑，并修复自动滚动逻辑"""
@@ -561,7 +431,7 @@ class LogWidget(QWidget):
             self.popup_dialog.setAttribute(Qt.WA_DeleteOnClose)
 
             # 应用主题样式
-            self.popup_dialog.setStyleSheet(self.styleSheet())
+            self.theme_manager.apply_theme(self.popup_dialog)
 
             # 创建主布局
             layout = QVBoxLayout(self.popup_dialog)
@@ -714,24 +584,21 @@ class LogWidget(QWidget):
             export_btn.clicked.connect(do_export)
 
             # 右键菜单
-            def popup_context_menu(pos):
-                menu = QMenu(self.popup_dialog)
-                copy_action = menu.addAction("复制")
-                select_all_action = menu.addAction("全选")
-                clear_action = menu.addAction("清空")
-                export_action = menu.addAction("导出")
-                action = menu.exec_(log_text.mapToGlobal(pos))
-                if action == copy_action:
-                    log_text.copy()
-                elif action == select_all_action:
-                    log_text.selectAll()
-                elif action == clear_action:
-                    log_text.clear()
-                elif action == export_action:
-                    do_export()
-
-            log_text.setContextMenuPolicy(Qt.CustomContextMenu)
-            log_text.customContextMenuRequested.connect(popup_context_menu)
+            menu = QMenu(self.popup_dialog)
+            self.theme_manager.apply_theme(menu)
+            copy_action = menu.addAction("复制")
+            select_all_action = menu.addAction("全选")
+            clear_action = menu.addAction("清空")
+            export_action = menu.addAction("导出")
+            action = menu.exec_(log_text.mapToGlobal(pos))
+            if action == copy_action:
+                log_text.copy()
+            elif action == select_all_action:
+                log_text.selectAll()
+            elif action == clear_action:
+                log_text.clear()
+            elif action == export_action:
+                do_export()
 
             def on_close():
                 self.popup_dialog = None

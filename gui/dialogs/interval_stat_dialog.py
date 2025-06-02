@@ -32,100 +32,15 @@ class IntervalStatDialog(QDialog):
     def init_ui(self):
         # 全局QSS美化
         self.setStyleSheet('''
-            QDialog {
-                background: #f7f9fa;
-                font-family: "Microsoft YaHei", "SimHei", "Arial Unicode MS", sans-serif;
-                font-size: 14px;
-                color: #23293a;
-                border-radius: 2px;
-            }
-            QTabWidget::pane {
-                border-radius: 2px;
-                border: 1px solid #90caf9;
-                background: #fff;
-                margin-top: 2px;
-            }
-            QTabBar::tab {
-                background: #e3f2fd;
-                border-radius: 8px 8px 0 0;
-                padding: 8px 24px;
-                margin-right: 2px;
-                font-weight: bold;
-                font-size: 15px;
-                color: #1976d2;
-            }
-            QTabBar::tab:selected {
-                background: #1976d2;
-                color: #fff;
-            }
-            QTableWidget {
-                background: #fff;
-                border-radius: 8px;
-                border: 1px solid #e0e0e0;
-                font-size: 14px;
-                font-weight: 500;
-                gridline-color: #e0e0e0;
-            }
-            QHeaderView::section {
-                background: #e3f2fd;
-                color: #1976d2;
-                font-weight: bold;
-                border: none;
-                border-radius: 8px 8px 0 0;
-                height: 25px;
-                padding-left: 12px;
-            }
-            QTableWidget::item {
-                border-bottom: 1px solid #e0e0e0;
-                background: #fff;
-                font-size: 14px;
-            }
-            QPushButton {
-                font-family: "Microsoft YaHei", "SimHei", sans-serif;
-                font-size: 14px;
-                border-radius: 4px;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
-                border: 1px solid #90caf9;
-                padding: 8px 24px;
-                color: #1565c0;
-                min-height: 32px;
-                max-height: 32px;
-            }
-            QPushButton:hover {
-                background: #90caf9;
-                color: #0d47a1;
-            }
-            QPushButton:pressed {
-                background: #64b5f6;
-            }
-            QLabel[adviceTitle="true"] {
-                font-weight: bold;
-                font-size: 14px;
-                color: #1976d2;
-                margin-bottom: 8px;
-            }
-            QLabel[groupTitle="true"] {
-                font-weight: bold;
-                font-size: 14px;
-                margin-top: 8px;
-                margin-bottom: 8px;
-            }
-            QFrame[adviceCard="true"] {
-                background: #fff;
-                border-radius: 4px;
-                border: 1.5px solid #90caf9;
-                padding: 8px 12px;
-                margin-bottom: 10px;
-            }
             QProgressBar {
-                border-radius: 4px;
+                border-radius: 2px;
                 background: #e3f2fd;
-                height: 24px;
+                height: 18px;
                 font-size: 14px;
                 text-align: center;
             }
             QProgressBar::chunk {
-                border-radius: 4px;
+                border-radius: 2px;
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #43a047, stop:1 #81c784);
             }
             QProgressBar[risk="true"]::chunk {
@@ -202,8 +117,6 @@ class IntervalStatDialog(QDialog):
         # 左侧：统计表格+多因子评分
         left_card = QFrame()
         left_card.setObjectName("leftCard")
-        left_card.setStyleSheet(
-            "QFrame#leftCard{background:#fff;border-radius:4px;border:1px solid #e0e0e0;padding:18px 18px 12px 18px;}")
         left_layout = QVBoxLayout(left_card)
         table = QTableWidget(len(self.stat), 2)
         table.setHorizontalHeaderLabels(["指标", "数值"])
@@ -237,8 +150,6 @@ class IntervalStatDialog(QDialog):
         # 历史对比
         hist_label = QLabel(self.generate_history_compare())
         hist_label.setWordWrap(True)
-        hist_label.setStyleSheet(
-            "color:#1976d2;font-size:13px;margin-top:8px;")
         left_layout.addWidget(hist_label)
         left_layout.addStretch()
         main_layout.addWidget(left_card, 2)

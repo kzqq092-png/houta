@@ -133,6 +133,11 @@ class DatabaseAdminDialog(QDialog):
         self.table_view.setHorizontalScrollMode(QTableView.ScrollPerPixel)
         self.table_view.setVerticalScrollMode(QTableView.ScrollPerPixel)
         right_layout.addWidget(self.table_view, 8)
+        # 主题表特殊说明
+        self.theme_hint = QLabel()
+        self.theme_hint.setStyleSheet("color:#1976D2;font-size:13px;background:#E3F2FD;border-radius:4px;padding:4px;")
+        self.theme_hint.setVisible(False)
+        right_layout.addWidget(self.theme_hint)
         # 分页
         page_layout = QHBoxLayout()
         self.prev_btn = QPushButton("上一页")
@@ -204,7 +209,19 @@ class DatabaseAdminDialog(QDialog):
         self.db = QSqlDatabase.addDatabase("QSQLITE", "dbadmin")
         self.db.setDatabaseName(self.db_path)
         self.db.open()
-        self.table_list.addItems(self.db.tables())
+        tables = self.db.tables()
+        self.table_list.addItems(tables)
+        # 自动高亮themes表
+        if "themes" in tables:
+            items = self.table_list.findItems("themes", Qt.MatchExactly)
+            if items:
+                self.table_list.setCurrentItem(items[0])
+                self.load_table(items[0])
+                self.theme_hint.setText(
+                    "\u2605 主题表(themes)：用于管理UI主题，支持QSS/JSON类型，建议通过主题管理界面操作。可直接编辑、导入导出主题内容。\n字段说明：name=主题名，type=类型(qss/json)，content=内容，origin=来源，created_at/updated_at=时间。\n如需批量导入QSS主题，可将QSS文件放入QSSTheme目录，重启后自动导入。")
+                self.theme_hint.setVisible(True)
+        else:
+            self.theme_hint.setVisible(False)
         # 事件绑定
         self.add_btn.clicked.connect(self.add_row)
         self.del_btn.clicked.connect(self.del_row)
@@ -225,68 +242,10 @@ class DatabaseAdminDialog(QDialog):
         self.field_permissions = {}  # {table: {field: 'readonly'/'write'/'hidden'}}
         self.load_field_permissions()
         # 表格美化
-        self.table_view.setStyleSheet("""
-            QTableView {
-                border: 1px solid #B0BEC5;
-                background: #FAFAFA;
-                selection-background-color: #E3F2FD;
-                selection-color: #1976D2;
-                gridline-color: #CFD8DC;
-                font-family: '微软雅黑', 'Arial', sans-serif;
-                font-size: 13px;
-            }
-            QHeaderView::section {
-                background: #E3F2FD;
-                font-weight: bold;
-                border: none;
-                padding: 4px;
-            }
-            QTableView::item:selected {
-                background: #BBDEFB;
-                color: #0D47A1;
-            }
-            QTableView::item {
-                border-right: 1px solid #CFD8DC;
-                border-bottom: 1px solid #CFD8DC;
-            }
-        """)
-        self.table_view.setAlternatingRowColors(True)
-        # 按钮美化
-        btn_style = """
-        QPushButton {
-            background: #E3F2FD;
-            border: 1px solid #90CAF9;
-            border-radius: 6px;
-            padding: 6px 16px;
-            font-size: 13px;
-        }
-        QPushButton:hover {
-            background: #BBDEFB;
-            border: 1px solid #1976D2;
-        }
-        """
-        for btn in [self.add_btn, self.del_btn, self.save_btn, self.import_btn, self.export_btn,
-                    self.batch_btn, self.log_btn, self.perm_btn, self.upload_btn, self.download_btn,
-                    self.schema_btn, self.stats_btn]:
-            btn.setStyleSheet(btn_style)
         # 左侧表名高亮
-        self.table_list.setStyleSheet("""
-        QListWidget {
-            border: 1px solid #B0BEC5;
-            background: #F5F5F5;
-            font-size: 13px;
-        }
-        QListWidget::item:selected {
-            background: #1976D2;
-            color: white;
-            font-weight: bold;
-        }
-        """)
         # 分页控件美化
         self.page_label.setStyleSheet(
             "font-size:13px;color:#1976D2;background:#E3F2FD;border-radius:4px;padding:2px 8px;")
-        self.prev_btn.setStyleSheet(btn_style)
-        self.next_btn.setStyleSheet(btn_style)
         # 空数据提示（在refresh_table中动态显示）
 
     def load_field_permissions(self):
@@ -892,5 +851,3 @@ class DatabaseAdminDialog(QDialog):
         self.stats_btn.setText("数据统计" if zh else "Stats")
         self.page_label.setText(self.page_label.text().replace("页", "Page").replace("共", "Total").replace(
             "行", "Rows") if not zh else self.page_label.text().replace("Page", "页").replace("Total", "共").replace("Rows", "行"))
-        self.table_list.setStyleSheet(self.table_list.styleSheet().replace(
-            "font-size: 13px;", "font-size: 13px;" if zh else "font-size: 13px;"))

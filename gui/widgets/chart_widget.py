@@ -78,6 +78,8 @@ class ChartWidget(QWidget):
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = theme_manager or get_theme_manager(
                 self.config_manager)
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             # 初始化日志管理器
             self.log_manager = log_manager or LogManager()
@@ -1858,6 +1860,7 @@ class ChartWidget(QWidget):
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
+        self.theme_manager.apply_theme(menu)
         save_action = menu.addAction("保存图表为图片")
         export_action = menu.addAction("导出K线/指标数据")
         indicator_action = menu.addAction("添加/隐藏指标")
@@ -1999,3 +2002,9 @@ class ChartWidget(QWidget):
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"复制图表到剪贴板失败: {str(e)}")
+
+    def show_stat_dialog(self):
+        dialog = QDialog(self)
+        self.theme_manager.apply_theme(dialog)
+        # ... existing code ...
+        # ... existing code ...

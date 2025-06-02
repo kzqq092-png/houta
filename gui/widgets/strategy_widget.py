@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from core.logger import LogManager, LogLevel
 import traceback
 from gui.widgets.log_widget import LogWidget
+from utils.theme import get_theme_manager
 
 
 class StrategyWidget(QWidget):
@@ -42,7 +43,9 @@ class StrategyWidget(QWidget):
             self.connect_signals()
 
             # 设置样式
-            self.apply_style()
+            self.theme_manager = get_theme_manager()
+            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
+            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("策略控件初始化完成")
 
@@ -71,6 +74,8 @@ class StrategyWidget(QWidget):
             LogWidget().center_dialog(dialog, self)
             dialog.exec_()
 
+            self.theme_manager.apply_theme(dialog)
+
         except Exception as e:
             self.log_manager.error(f"显示错误对话框失败: {str(e)}")
 
@@ -92,6 +97,8 @@ class StrategyWidget(QWidget):
             LogWidget().center_dialog(dialog, self)
             dialog.exec_()
 
+            self.theme_manager.apply_theme(dialog)
+
         except Exception as e:
             self.log_manager.error(f"显示警告对话框失败: {str(e)}")
 
@@ -112,6 +119,8 @@ class StrategyWidget(QWidget):
             dialog.show()
             LogWidget().center_dialog(dialog, self)
             dialog.exec_()
+
+            self.theme_manager.apply_theme(dialog)
 
         except Exception as e:
             self.log_manager.error(f"显示信息对话框失败: {str(e)}")
@@ -194,66 +203,7 @@ class StrategyWidget(QWidget):
             self.error_occurred.emit(error_msg)
 
     def apply_style(self):
-        """应用样式"""
-        try:
-            self.setStyleSheet("""
-                QWidget {
-                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                    font-size: 12px;
-                }
-                QGroupBox {
-                    border: 1px solid #bdbdbd;
-                    border-radius: 4px;
-                    margin-top: 12px;
-                    padding-top: 12px;
-                }
-                QGroupBox::title {
-                    subcontrol-origin: margin;
-                    left: 8px;
-                    padding: 0 4px;
-                    color: #1976d2;
-                }
-                QComboBox {
-                    border: 1px solid #bdbdbd;
-                    border-radius: 4px;
-                    padding: 4px;
-                    background: white;
-                }
-                QComboBox:hover {
-                    border-color: #1976d2;
-                }
-                QSpinBox, QDoubleSpinBox {
-                    border: 1px solid #bdbdbd;
-                    border-radius: 4px;
-                    padding: 4px;
-                    background: white;
-                }
-                QSpinBox:hover, QDoubleSpinBox:hover {
-                    border-color: #1976d2;
-                }
-                QPushButton {
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px 12px;
-                    background: #1976d2;
-                    color: white;
-                }
-                QPushButton:hover {
-                    background: #1565c0;
-                }
-                QPushButton:pressed {
-                    background: #0d47a1;
-                }
-                QScrollArea {
-                    border: none;
-                }
-            """)
-
-        except Exception as e:
-            error_msg = f"应用样式失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+        pass  # 移除自定义样式，统一由主题管理器apply_theme
 
     def on_strategy_changed(self, strategy: str):
         """处理策略变更事件

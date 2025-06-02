@@ -35,13 +35,6 @@ class ColumnSelectorDialog(QDialog):
         self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(False)
-        self.table.setStyleSheet('''
-            QTableWidget {border: 0.5px solid #b0b0b0;  background: #fff; font-size: 8px;}
-            QHeaderView::section {background: #444; color: #fff; height: 15px; padding-left: 2px;}
-            QTableWidget::item {border: 0.5px solid #b0b0b0; background: #fff;}
-            QTableWidget::item:selected {background: #e3f2fd; color: #1976d2;}
-            QTableWidget::item:hover {background: #f5f5f5;}
-        ''')
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("筛选字段名...")
         self.search_edit.textChanged.connect(self.apply_filter)
@@ -85,7 +78,6 @@ class ColumnSelectorDialog(QDialog):
                 layout.addWidget(cb)
                 label = QLabel(field['field'])
                 label.setFixedWidth(230)
-                label.setStyleSheet("font-size:13px;")
                 label.setAlignment(Qt.AlignCenter)
                 layout.addWidget(label)
                 layout.addStretch()
@@ -200,11 +192,6 @@ class StockDetailDialog(QDialog):
             tab_btn_layout.addWidget(btn)
         tab_btn_widget = QWidget()
         tab_btn_widget.setLayout(tab_btn_layout)
-        tab_btn_widget.setStyleSheet('''
-QWidget {background: #fff; border-radius: 2px 2px 0 0; padding: 0; margin: 0;}
-QPushButton {background: #e3f2fd; border: none; border-radius: 2px 2px 0 0; padding: 6px 16px; margin-right: 2px; font-weight: bold; color: #1976d2;}
-QPushButton:checked {background: #1976d2; color: #fff;}
-''')
         main_layout.addWidget(tab_btn_widget)
         # 内容区
         self.stacked = QStackedWidget(self)
@@ -257,11 +244,6 @@ QPushButton:checked {background: #1976d2; color: #fff;}
         table.horizontalHeader().setStretchLastSection(True)
         table.verticalHeader().setVisible(False)
         table.setContentsMargins(0, 0, 0, 0)
-        table.setStyleSheet('''
-QTableWidget {border: 1px solid #e0e0e0; border-radius: 2px; background: #fff;}
-QHeaderView::section {background: #e3f2fd; color: #1976d2; font-weight: bold; border: none; border-radius: 2px 2px 0 0; height: 36px; padding-left: 8px;}
-QTableWidget::item {border: none; background: #fff;}
-''')
         basic_info = [
             ("股票代码", self.stock_data['code']),
             ("股票名称", self.stock_data['name']),
@@ -305,11 +287,6 @@ QTableWidget::item {border: none; background: #fff;}
             table.horizontalHeader().setStretchLastSection(True)
             table.verticalHeader().setVisible(False)
             table.setContentsMargins(0, 0, 0, 0)
-            table.setStyleSheet('''
-QTableWidget {border: 1px solid #e0e0e0; border-radius: 2px; background: #fff;}
-QHeaderView::section {background: #e3f2fd; color: #1976d2; font-weight: bold; border: none; border-radius: 2px 2px 0 0; height: 28px; padding-left: 4px;}
-QTableWidget::item {border: 1px solid #e0e0e0; background: #fff;}
-''')
             for row, item in enumerate(finance_history):
                 for col, key in enumerate(keys):
                     val = item.get(key, None)
@@ -374,11 +351,6 @@ QTableWidget::item {border: 1px solid #e0e0e0; background: #fff;}
         table.horizontalHeader().setStretchLastSection(True)
         table.verticalHeader().setVisible(False)
         table.setContentsMargins(0, 0, 0, 0)
-        table.setStyleSheet('''
-QTableWidget {border: 1px solid #e0e0e0; border-radius: 2px; background: #fff;}
-QHeaderView::section {background: #e3f2fd; color: #1976d2; font-weight: bold; border: none; border-radius: 2px 2px 0 0; height: 36px; padding-left: 2px;}
-QTableWidget::item {border: none; background: #fff;}
-''')
         for row, item in enumerate(history):
             table.setItem(row, 0, QTableWidgetItem(item.get('date', '')))
             # 数值字段保留2位小数
