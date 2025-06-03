@@ -35,8 +35,8 @@ class IntervalStatDialog(QDialog):
             QProgressBar {
                 border-radius: 2px;
                 background: #e3f2fd;
-                height: 18px;
-                font-size: 14px;
+                height: 14px;
+                font-size: 12px;
                 text-align: center;
             }
             QProgressBar::chunk {
@@ -349,6 +349,12 @@ class IntervalStatDialog(QDialog):
             ax.set_xlabel('序号')
             ax.set_ylabel('价格')
             ax.legend()
+            # 顶部显示收盘价最大/最小/均值
+            close_max = df['close'].max()
+            close_min = df['close'].min()
+            close_mean = df['close'].mean()
+            ax.text(0.5, 0.95, f"最高: {close_max:.2f}  最低: {close_min:.2f}  均值: {close_mean:.2f}",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)
         return tab
@@ -362,6 +368,8 @@ class IntervalStatDialog(QDialog):
         fig, ax = plt.subplots(figsize=(4, 3))
         ax.bar(['阳线', '阴线'], [up, down], color=['#e53935', '#43a047'])
         ax.set_title('涨跌天数分布')
+        # 顶部显示阳线和阴线数量
+        ax.text(0.5, 0.95, f"阳线: {up} 天  阴线: {down} 天", transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#333')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)
         return tab
@@ -376,6 +384,13 @@ class IntervalStatDialog(QDialog):
         ax.set_title('日收益率分布(%)')
         ax.set_xlabel('收益率(%)')
         ax.set_ylabel('天数')
+        # 顶部显示最大/最小/均值
+        if not returns.empty:
+            ret_max = returns.max()
+            ret_min = returns.min()
+            ret_mean = returns.mean()
+            ax.text(0.5, 0.95, f"最大: {ret_max:.2f}%  最小: {ret_min:.2f}%  均值: {ret_mean:.2f}%",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)
         return tab
@@ -389,6 +404,13 @@ class IntervalStatDialog(QDialog):
         ax.set_title('成交量分布')
         ax.set_xlabel('成交量')
         ax.set_ylabel('天数')
+        # 顶部显示最大/最小/均值
+        if not df['volume'].empty:
+            vol_max = df['volume'].max()
+            vol_min = df['volume'].min()
+            vol_mean = df['volume'].mean()
+            ax.text(0.5, 0.95, f"最大: {vol_max:.0f}  最小: {vol_min:.0f}  均值: {vol_mean:.0f}",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#ffa726')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)
         return tab

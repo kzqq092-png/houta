@@ -11,13 +11,13 @@
   ],
   "score_weights": {
     "ret": 0.16,
-    "up_ratio": 0.37,
-    "vol": 0.15,
-    "volatility_vol": 0.1,
-    "mdd": 0.02,
-    "skew": 0.05,
-    "sharpe": 0.05,
-    "turnover": 0.1
+    "up_ratio": 0.0,
+    "vol": 0.18,
+    "volatility_vol": 0.0,
+    "mdd": 0.34,
+    "skew": 0.32,
+    "sharpe": 0.0,
+    "turnover": 0.0
   },
   "font_size": 13
 }

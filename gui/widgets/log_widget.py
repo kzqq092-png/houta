@@ -129,7 +129,6 @@ class LogWidget(QWidget):
             self.level_combo = QComboBox()
             self.level_combo.addItems(["全部", "信息", "警告", "错误", "调试"])
             self.level_combo.setFixedWidth(80)
-            self.level_combo.setFixedHeight(15)
             toolbar_layout.addWidget(level_label)
             toolbar_layout.addWidget(self.level_combo)
 
@@ -137,7 +136,6 @@ class LogWidget(QWidget):
             self.search_box = QLineEdit()
             self.search_box.setPlaceholderText("搜索日志...")
             self.search_box.setFixedWidth(180)
-            self.search_box.setFixedHeight(15)
             toolbar_layout.addWidget(self.search_box)
 
             # 添加弹性空间
@@ -154,34 +152,29 @@ class LogWidget(QWidget):
             # 最大化/还原按钮
             self.maximize_btn = QPushButton("最大化")
             self.maximize_btn.setFixedWidth(70)
-            self.maximize_btn.setFixedHeight(15)
             self.maximize_btn.clicked.connect(self.toggle_maximize)
             toolbar_layout.addWidget(self.maximize_btn)
 
             # 弹窗按钮
             self.popup_btn = QPushButton("弹窗")
             self.popup_btn.setFixedWidth(70)
-            self.popup_btn.setFixedHeight(15)
             self.popup_btn.clicked.connect(self.show_popup)
             toolbar_layout.addWidget(self.popup_btn)
 
             # 暂停/恢复滚动按钮
             self.pause_btn = QPushButton("暂停滚动")
             self.pause_btn.setFixedWidth(80)
-            self.pause_btn.setFixedHeight(15)
             self.pause_btn.clicked.connect(self.toggle_scroll)
             toolbar_layout.addWidget(self.pause_btn)
 
             # 清除按钮
             self.clear_button = QPushButton("清除")
             self.clear_button.setFixedWidth(60)
-            self.clear_button.setFixedHeight(15)
             toolbar_layout.addWidget(self.clear_button)
 
             # 导出按钮
             self.export_button = QPushButton("导出")
             self.export_button.setFixedWidth(60)
-            self.export_button.setFixedHeight(15)
             toolbar_layout.addWidget(self.export_button)
 
             # 工具栏直接加到主布局
@@ -201,7 +194,7 @@ class LogWidget(QWidget):
             self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.log_text.setStyleSheet(
-                "margin-top: 0px; margin-bottom: 0px; font-size: 12px; line-height: 1.4; padding: 10px 16px; font-family: 'Consolas', 'Microsoft YaHei', monospace;")
+                "margin-top: 0px; margin-bottom: 0px; font-size: 12px; line-height: 1.4; padding: 5px 16px; font-family: 'Consolas', 'Microsoft YaHei', monospace;")
             layout.addWidget(self.log_text, 1)
 
             # 自动检测用户手动滚动，切换自动滚动状态

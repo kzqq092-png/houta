@@ -231,7 +231,7 @@ class MainMenuBar(QMenuBar):
 
             # 设置
             self.settings_action = QAction(
-                QIcon("icons/settings.png"), "设置", self)
+                QIcon("icons/settings.png"), "主题切换", self)
             self.settings_action.setStatusTip("打开设置对话框")
             self.tools_menu.addAction(self.settings_action)
         except Exception as e:

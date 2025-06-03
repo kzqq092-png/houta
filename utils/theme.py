@@ -25,7 +25,7 @@ from PyQt5.QtGui import *
 # Global theme manager instance
 _theme_manager_instance: Optional['ThemeManager'] = None
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'themes.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db/', 'themes.db')
 
 
 def safe_read_file(filepath):
@@ -163,7 +163,17 @@ class ThemeManager(QObject):
         if type_ == 'qss':
             self._current_theme_type = ThemeType.QSS
             self.apply_qss_theme_content(content)
-            # QSS主题不再emit信号，防止递归
+            # QSS主题也应emit当前Theme，保证UI联动
+            # 尝试根据name映射Theme枚举，否则默认LIGHT
+            theme_enum = None
+            for t in Theme:
+                if t.name.lower() == theme_name.lower():
+                    theme_enum = t
+                    break
+            if theme_enum is None:
+                theme_enum = Theme.LIGHT
+            self._current_theme = theme_enum
+            self.theme_changed.emit(self._current_theme)
         else:
             self._current_theme_type = ThemeType.JSON
             theme_dict = json.loads(content)
@@ -450,7 +460,7 @@ class ThemeManager(QObject):
         self.update_theme(name, new_content)
         # 编辑后自动应用新主题
         self.set_theme(name)
-        self.theme_changed.emit(name)
+        # 不再重复emit，set_theme已emit
         return True
 
 

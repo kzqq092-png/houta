@@ -142,7 +142,11 @@ class ModelAnalysis:
                     text = f"{buy_count}-{sell_count}"
                     ax.text(j, i, text, ha="center",
                             va="center", color="black")
-
+            # 顶部显示买卖信号总和
+            total_buy = pivot_buy.values.sum()
+            total_sell = pivot_sell.values.sum()
+            ax.text(0.5, 0.95, f"总买入信号: {int(total_buy)}  总卖出信号: {int(total_sell)}",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=12, color='#d32f2f')
             plt.tight_layout()
 
             return plt.gcf()

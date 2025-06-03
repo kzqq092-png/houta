@@ -273,6 +273,38 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.compare_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             self.main_layout.addWidget(self.compare_table)
 
+            # 新增多因子选股Tab
+            self.tab_widget = QTabWidget()
+            self.tab_widget.addTab(QWidget(), "常规选股")
+            self.multi_factor_tab = QWidget()
+            mf_layout = QVBoxLayout(self.multi_factor_tab)
+            # 特征选择方式
+            self.feature_method_combo = QComboBox()
+            self.feature_method_combo.addItems(["PCA降维", "增强型特征选择", "自定义特征"])
+            mf_layout.addWidget(QLabel("特征选择方法："))
+            mf_layout.addWidget(self.feature_method_combo)
+            # 因子权重设置（简化为表格）
+            self.factor_table = QTableWidget(0, 2)
+            self.factor_table.setHorizontalHeaderLabels(["特征/因子", "权重"])
+            mf_layout.addWidget(QLabel("因子权重设置："))
+            mf_layout.addWidget(self.factor_table)
+            # 一键多因子选股按钮
+            self.run_multi_factor_btn = QPushButton("一键多因子选股")
+            mf_layout.addWidget(self.run_multi_factor_btn)
+            # 结果表格
+            self.multi_factor_result = QTableWidget()
+            self.multi_factor_result.setColumnCount(8)
+            self.multi_factor_result.setHorizontalHeaderLabels(["股票代码", "名称", "行业", "最新价", "涨跌幅", "PE", "PB", "综合得分"])
+            mf_layout.addWidget(self.multi_factor_result)
+            # 导出按钮
+            self.export_multi_factor_btn = QPushButton("导出选股结果")
+            mf_layout.addWidget(self.export_multi_factor_btn)
+            self.tab_widget.addTab(self.multi_factor_tab, "多因子选股")
+            self.main_layout.addWidget(self.tab_widget)
+            # 信号绑定
+            self.run_multi_factor_btn.clicked.connect(self.run_multi_factor_selection)
+            self.export_multi_factor_btn.clicked.connect(self.export_multi_factor_results)
+
         except Exception as e:
             self.log_manager.error(f"初始化UI失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1048,16 +1080,37 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 ax.set_xlabel('筛选得分')
                 ax.set_ylabel('股票数量')
                 ax.set_title('筛选得分分布')
+                # 顶部显示最大、最小、均值、标准差
+                score_max = df['score'].max()
+                score_min = df['score'].min()
+                score_mean = df['score'].mean()
+                score_std = df['score'].std()
+                ax.text(0.5, 0.95, f"最大: {score_max:.2f}  最小: {score_min:.2f}  均值: {score_mean:.2f}  标准差: {score_std:.2f}",
+                        transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
             elif chart_type == "涨跌幅分布图":
                 ax.hist(df['change_percent'], bins=20, alpha=0.7)
                 ax.set_xlabel('涨跌幅(%)')
                 ax.set_ylabel('股票数量')
                 ax.set_title('涨跌幅分布')
+                # 顶部显示最大、最小、均值、标准差
+                chg_max = df['change_percent'].max()
+                chg_min = df['change_percent'].min()
+                chg_mean = df['change_percent'].mean()
+                chg_std = df['change_percent'].std()
+                ax.text(0.5, 0.95, f"最大: {chg_max:.2f}%  最小: {chg_min:.2f}%  均值: {chg_mean:.2f}%  标准差: {chg_std:.2f}%",
+                        transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#e53935')
             else:  # 价格分布图
                 ax.hist(df['close'], bins=20, alpha=0.7)
                 ax.set_xlabel('最新价')
                 ax.set_ylabel('股票数量')
                 ax.set_title('价格分布')
+                # 顶部显示最大、最小、均值、标准差
+                close_max = df['close'].max()
+                close_min = df['close'].min()
+                close_mean = df['close'].mean()
+                close_std = df['close'].std()
+                ax.text(0.5, 0.95, f"最大: {close_max:.2f}  最小: {close_min:.2f}  均值: {close_mean:.2f}  标准差: {close_std:.2f}",
+                        transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#43a047')
             # 调整布局
             self.figure.tight_layout()
             # 更新画布
@@ -1315,6 +1368,49 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     score_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     self.paged_table.table.setItem(i, 4, score_item)
+
+                # 统计分析
+                if not results.empty:
+                    change_arr = results['change_percent'].values
+                    score_arr = results['score'].values
+                    row_count = len(results)
+                    table = self.paged_table.table
+                    # 添加统计行
+                    table.setRowCount(row_count + 3)
+                    # 均值行
+                    mean_items = [QTableWidgetItem("均值"), QTableWidgetItem(""),
+                                  QTableWidgetItem(""),
+                                  QTableWidgetItem(f"{change_arr.mean():.2f}%"),
+                                  QTableWidgetItem(f"{score_arr.mean():.2f}")]
+                    for j, item in enumerate(mean_items):
+                        item.setBackground(QColor("#fffde7"))
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        table.setItem(row_count, j, item)
+                    # 最大行
+                    max_idx = np.argmax(score_arr)
+                    max_items = [QTableWidgetItem("最大"), QTableWidgetItem(""),
+                                 QTableWidgetItem(""),
+                                 QTableWidgetItem(f"{change_arr[max_idx]:.2f}%"),
+                                 QTableWidgetItem(f"{score_arr[max_idx]:.2f}")]
+                    for j, item in enumerate(max_items):
+                        item.setBackground(QColor("#ffe082"))
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        table.setItem(row_count + 1, j, item)
+                    # 最小行
+                    min_idx = np.argmin(score_arr)
+                    min_items = [QTableWidgetItem("最小"), QTableWidgetItem(""),
+                                 QTableWidgetItem(""),
+                                 QTableWidgetItem(f"{change_arr[min_idx]:.2f}%"),
+                                 QTableWidgetItem(f"{score_arr[min_idx]:.2f}")]
+                    for j, item in enumerate(min_items):
+                        item.setBackground(QColor("#ffccbc"))
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        table.setItem(row_count + 2, j, item)
+                    # 极值高亮
+                    table.item(max_idx, 4).setBackground(QColor("#b2ff59"))
+                    table.item(min_idx, 4).setBackground(QColor("#ffcdd2"))
+                    table.item(np.argmax(change_arr), 3).setBackground(QColor("#b2ff59"))
+                    table.item(np.argmin(change_arr), 3).setBackground(QColor("#ffcdd2"))
             else:
                 # 如果输入是字典列表
                 self.paged_table.table.setRowCount(len(results))
@@ -1663,23 +1759,59 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.batch_input.setText(codes)
 
     def compare_strategies(self):
-        codes = [c.strip()
-                 for c in self.batch_input.text().split(',') if c.strip()]
-        strategies = [cb.text()
-                      for cb in self.strategy_checkboxes if cb.isChecked()]
+        codes = [c.strip() for c in self.batch_input.text().split(',') if c.strip()]
+        strategies = [cb.text() for cb in self.strategy_checkboxes if cb.isChecked()]
         if not codes or not strategies:
             QMessageBox.warning(self, "参数错误", "请至少输入一个股票代码并选择一个策略")
             return
+        # 清空表格
         self.compare_table.setRowCount(0)
+        # 动态设置表头，展示常用对比指标
+        headers = ["股票代码", "策略", "信号", "得分", "涨跌幅", "PE", "PB", "ROE", "主力净流入", "北向资金"]
+        self.compare_table.setColumnCount(len(headers))
+        self.compare_table.setHorizontalHeaderLabels(headers)
+        from core.stock_screener import StockScreener
+        screener = StockScreener(self.data_manager, self.log_manager)
+        row = 0
         for code in codes:
             for strategy in strategies:
-                # 这里应调用实际分析逻辑，示例用占位符
-                result = f"{strategy}分析结果"
-                row = self.compare_table.rowCount()
-                self.compare_table.insertRow(row)
-                self.compare_table.setItem(row, 0, QTableWidgetItem(code))
-                self.compare_table.setItem(row, 1, QTableWidgetItem(strategy))
-                self.compare_table.setItem(row, 2, QTableWidgetItem(result))
+                try:
+                    # 根据策略类型调用不同分析方法
+                    if strategy in ["双均线", "MACD", "KDJ", "RSI", "BOLL"]:
+                        # 技术指标策略
+                        params = {"ma_short": 5, "ma_long": 20, "rsi_value": 50}  # 可扩展为UI参数
+                        df = screener.screen_by_technical([code], params)
+                    else:
+                        # 其他策略可扩展
+                        df = None
+                    if df is not None and not df.empty:
+                        info = df.iloc[0]
+                        items = [
+                            str(info.get("code", code)),
+                            strategy,
+                            "买入" if info.get("change", 0) > 0 else "观望",  # 示例信号
+                            f"{info.get('score', 0):.2f}" if 'score' in info else "-",
+                            f"{info.get('change', 0):.2f}%" if 'change' in info else "-",
+                            f"{info.get('pe', 0):.2f}" if 'pe' in info else "-",
+                            f"{info.get('pb', 0):.2f}" if 'pb' in info else "-",
+                            f"{info.get('roe', 0):.2f}" if 'roe' in info else "-",
+                            f"{info.get('main_force', 0):.2f}" if 'main_force' in info else "-",
+                            f"{info.get('north_money', 0):.2f}" if 'north_money' in info else "-",
+                        ]
+                    else:
+                        items = [code, strategy, "无信号", "-", "-", "-", "-", "-", "-", "-"]
+                    self.compare_table.insertRow(row)
+                    for col, val in enumerate(items):
+                        self.compare_table.setItem(row, col, QTableWidgetItem(val))
+                    row += 1
+                except Exception as e:
+                    self.log_manager.error(f"策略对比分析失败: {code}-{strategy}: {str(e)}")
+                    self.compare_table.insertRow(row)
+                    for col, val in enumerate([code, strategy, "异常", "-", "-", "-", "-", "-", "-", "-"]):
+                        self.compare_table.setItem(row, col, QTableWidgetItem(val))
+                    row += 1
+        self.compare_table.resizeColumnsToContents()
+        QMessageBox.information(self, "对比完成", "多策略对比分析已完成，结果已展示。")
 
     def export_batch_results(self):
         """
@@ -1734,3 +1866,87 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self._custom_indicators = {}
         self._custom_indicators[name] = func
         # 可在筛选/对比分析时调用自定义指标
+
+    def run_multi_factor_selection(self):
+        """一键多因子选股，自动特征工程+因子加权+批量选股"""
+        try:
+            from features.feature_selection import integrate_enhanced_features, enhanced_feature_selection, select_features_pca
+            # 获取股票数据
+            stock_list = self.data_manager.get_stock_list()
+            dfs = []
+            for code in stock_list['code']:
+                df = self.data_manager.get_kdata(code)
+                if not df.empty:
+                    df = integrate_enhanced_features(df)
+                    df['code'] = code
+                    dfs.append(df)
+            if not dfs:
+                QMessageBox.warning(self, "无数据", "未获取到有效股票数据")
+                return
+            all_df = pd.concat(dfs, ignore_index=True)
+            # 特征选择
+            method = self.feature_method_combo.currentText()
+            if method == "PCA降维":
+                selected = select_features_pca(all_df.drop(['code'], axis=1), n_components=8)
+            elif method == "增强型特征选择":
+                y = (all_df['close'].pct_change().shift(-1) > 0).astype(int)  # 以次日涨跌为目标
+                selected, _ = enhanced_feature_selection(all_df.drop(['code'], axis=1), y)
+                selected = [all_df.columns[i] for i in selected if all_df.columns[i] != 'code']
+            else:
+                selected = [self.factor_table.item(i, 0).text() for i in range(self.factor_table.rowCount())]
+            # 权重
+            weights = {}
+            for i, feat in enumerate(selected):
+                item = self.factor_table.item(i, 1)
+                try:
+                    weights[feat] = float(item.text()) if item else 1.0
+                except Exception:
+                    weights[feat] = 1.0
+            # 计算综合得分
+            all_df['score'] = 0
+            for feat in selected:
+                if feat in all_df.columns:
+                    all_df['score'] += all_df[feat].rank(pct=True) * weights.get(feat, 1.0)
+            # 结果排序
+            result = all_df.groupby('code').agg({
+                'score': 'mean', 'close': 'last', 'industry': 'last', 'name': 'last', 'pe': 'last', 'pb': 'last', 'change': 'last'
+            }).reset_index()
+            result = result.sort_values('score', ascending=False).head(100)
+            self.multi_factor_result.setRowCount(len(result))
+            for i, row in result.iterrows():
+                self.multi_factor_result.setItem(i, 0, QTableWidgetItem(str(row['code'])))
+                self.multi_factor_result.setItem(i, 1, QTableWidgetItem(str(row['name'])))
+                self.multi_factor_result.setItem(i, 2, QTableWidgetItem(str(row['industry'])))
+                self.multi_factor_result.setItem(i, 3, QTableWidgetItem(f"{row['close']:.2f}"))
+                self.multi_factor_result.setItem(i, 4, QTableWidgetItem(f"{row['change']:.2f}%" if 'change' in row else '-'))
+                self.multi_factor_result.setItem(i, 5, QTableWidgetItem(f"{row['pe']:.2f}" if 'pe' in row else '-'))
+                self.multi_factor_result.setItem(i, 6, QTableWidgetItem(f"{row['pb']:.2f}" if 'pb' in row else '-'))
+                self.multi_factor_result.setItem(i, 7, QTableWidgetItem(f"{row['score']:.4f}"))
+            self.multi_factor_result.resizeColumnsToContents()
+            QMessageBox.information(self, "多因子选股完成", "多因子选股已完成，结果已展示。")
+        except Exception as e:
+            QMessageBox.critical(self, "多因子选股异常", str(e))
+
+    def export_multi_factor_results(self):
+        try:
+            import pandas as pd
+            row_count = self.multi_factor_result.rowCount()
+            if row_count == 0:
+                QMessageBox.warning(self, "无数据", "没有可导出的多因子选股结果")
+                return
+            data = []
+            for row in range(row_count):
+                data.append([
+                    self.multi_factor_result.item(row, col).text() if self.multi_factor_result.item(row, col) else ''
+                    for col in range(self.multi_factor_result.columnCount())
+                ])
+            df = pd.DataFrame(data, columns=["股票代码", "名称", "行业", "最新价", "涨跌幅", "PE", "PB", "综合得分"])
+            file_path, _ = QFileDialog.getSaveFileName(self, "导出多因子选股结果", "多因子选股结果", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            if file_path:
+                if file_path.endswith('.xlsx'):
+                    df.to_excel(file_path, index=False)
+                else:
+                    df.to_csv(file_path, index=False)
+                QMessageBox.information(self, "导出成功", "多因子选股结果已导出")
+        except Exception as e:
+            QMessageBox.critical(self, "导出失败", f"导出多因子选股结果失败: {str(e)}")

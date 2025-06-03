@@ -534,15 +534,44 @@ class FundFlowWidget(BaseAnalysisPanel):
                     QTableWidgetItem(f"{outflows[idx]:.2f}"),
                     QTableWidgetItem(f"{strengths[idx]:.1f}%")
                 ]
-
-                # 设置对齐方式和颜色
                 for j, item in enumerate(items):
-                    if j > 0:  # 数值列右对齐
+                    if j > 0:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    if j == 1:  # 净流入列设置颜色
-                        item.setForeground(
-                            QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
+                    if j == 1:
+                        item.setForeground(QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.industry_table.setItem(i, j, item)
+            # 添加合计、均值行
+            row_count = len(industries)
+            self.industry_table.setRowCount(row_count + 2)
+            # 合计行
+            sum_items = [QTableWidgetItem("合计"),
+                         QTableWidgetItem(f"{net_flows.sum():.2f}"),
+                         QTableWidgetItem(f"{inflows.sum():.2f}"),
+                         QTableWidgetItem(f"{outflows.sum():.2f}"),
+                         QTableWidgetItem("")]
+            for j, item in enumerate(sum_items):
+                item.setBackground(QColor("#e3f2fd"))
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.industry_table.setItem(row_count, j, item)
+            # 均值行
+            mean_items = [QTableWidgetItem("均值"),
+                          QTableWidgetItem(f"{net_flows.mean():.2f}"),
+                          QTableWidgetItem(f"{inflows.mean():.2f}"),
+                          QTableWidgetItem(f"{outflows.mean():.2f}"),
+                          QTableWidgetItem(f"{strengths.mean():.1f}%")]
+            for j, item in enumerate(mean_items):
+                item.setBackground(QColor("#fffde7"))
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.industry_table.setItem(row_count + 1, j, item)
+            # 极值高亮
+            max_net_idx = np.argmax(net_flows)
+            min_net_idx = np.argmin(net_flows)
+            max_str_idx = np.argmax(strengths)
+            min_str_idx = np.argmin(strengths)
+            self.industry_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.industry_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.industry_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.industry_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
             # 更新行业资金流向图表
             self.industry_figure.clear()
@@ -565,6 +594,14 @@ class FundFlowWidget(BaseAnalysisPanel):
             for i, v in enumerate(top5_net_flows):
                 ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
                         va='center', ha='left' if v >= 0 else 'right')
+
+            # 顶部显示净流入最大、最小、均值、合计
+            net_max = net_flows.max()
+            net_min = net_flows.min()
+            net_mean = net_flows.mean()
+            net_sum = net_flows.sum()
+            ax.text(0.5, 1.05, f"净流入  最大: {net_max:.2f}亿  最小: {net_min:.2f}亿  均值: {net_mean:.2f}亿  合计: {net_sum:.2f}亿",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
 
             ax.set_title('行业资金流向TOP5')
             ax.grid(True, alpha=0.3)
@@ -601,15 +638,44 @@ class FundFlowWidget(BaseAnalysisPanel):
                     QTableWidgetItem(f"{outflows[idx]:.2f}"),
                     QTableWidgetItem(f"{strengths[idx]:.1f}%")
                 ]
-
-                # 设置对齐方式和颜色
                 for j, item in enumerate(items):
-                    if j > 0:  # 数值列右对齐
+                    if j > 0:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    if j == 1:  # 净流入列设置颜色
-                        item.setForeground(
-                            QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
+                    if j == 1:
+                        item.setForeground(QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.concept_table.setItem(i, j, item)
+            # 添加合计、均值行
+            row_count = len(concepts)
+            self.concept_table.setRowCount(row_count + 2)
+            # 合计行
+            sum_items = [QTableWidgetItem("合计"),
+                         QTableWidgetItem(f"{net_flows.sum():.2f}"),
+                         QTableWidgetItem(f"{inflows.sum():.2f}"),
+                         QTableWidgetItem(f"{outflows.sum():.2f}"),
+                         QTableWidgetItem("")]
+            for j, item in enumerate(sum_items):
+                item.setBackground(QColor("#e3f2fd"))
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.concept_table.setItem(row_count, j, item)
+            # 均值行
+            mean_items = [QTableWidgetItem("均值"),
+                          QTableWidgetItem(f"{net_flows.mean():.2f}"),
+                          QTableWidgetItem(f"{inflows.mean():.2f}"),
+                          QTableWidgetItem(f"{outflows.mean():.2f}"),
+                          QTableWidgetItem(f"{strengths.mean():.1f}%")]
+            for j, item in enumerate(mean_items):
+                item.setBackground(QColor("#fffde7"))
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.concept_table.setItem(row_count + 1, j, item)
+            # 极值高亮
+            max_net_idx = np.argmax(net_flows)
+            min_net_idx = np.argmin(net_flows)
+            max_str_idx = np.argmax(strengths)
+            min_str_idx = np.argmin(strengths)
+            self.concept_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.concept_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.concept_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.concept_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
             # 更新概念资金流向图表
             self.concept_figure.clear()
@@ -632,6 +698,14 @@ class FundFlowWidget(BaseAnalysisPanel):
             for i, v in enumerate(top5_net_flows):
                 ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
                         va='center', ha='left' if v >= 0 else 'right')
+
+            # 顶部显示净流入最大、最小、均值、合计
+            net_max = net_flows.max()
+            net_min = net_flows.min()
+            net_mean = net_flows.mean()
+            net_sum = net_flows.sum()
+            ax.text(0.5, 1.05, f"净流入  最大: {net_max:.2f}亿  最小: {net_min:.2f}亿  均值: {net_mean:.2f}亿  合计: {net_sum:.2f}亿",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
 
             ax.set_title('概念资金流向TOP5')
             ax.grid(True, alpha=0.3)
@@ -665,6 +739,13 @@ class FundFlowWidget(BaseAnalysisPanel):
                     '#4CAF50' if main_force_flow[i] >= 0 else '#F44336')
             ax1.set_title('主力净流入趋势')
             ax1.tick_params(axis='x', rotation=45)
+            # 顶部显示最大、最小、均值、合计
+            mf_max = main_force_flow.max()
+            mf_min = main_force_flow.min()
+            mf_mean = main_force_flow.mean()
+            mf_sum = main_force_flow.sum()
+            ax1.text(0.5, 1.05, f"最大: {mf_max:.2f}  最小: {mf_min:.2f}  均值: {mf_mean:.2f}  合计: {mf_sum:.2f}",
+                     transform=ax1.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
 
             # 2. 资金规模分布
             sizes = ['超大单', '大单', '中单', '小单']
@@ -672,6 +753,9 @@ class FundFlowWidget(BaseAnalysisPanel):
             colors = ['#2196F3', '#4CAF50', '#FFC107', '#FF5722']
             ax2.pie(values, labels=sizes, colors=colors, autopct='%1.1f%%')
             ax2.set_title('资金规模分布')
+            # 顶部显示总金额
+            total_value = values.sum()
+            ax2.text(0.5, 1.08, f"总金额: {total_value:.2f}", transform=ax2.transAxes, ha='center', va='bottom', fontsize=11, color='#2196F3')
 
             # 3. 主力活跃度热力图
             activity_data = np.random.uniform(0, 1, (5, 5))
@@ -681,6 +765,9 @@ class FundFlowWidget(BaseAnalysisPanel):
             sns.heatmap(activity_data, annot=True, fmt='.2f', cmap='RdYlGn',
                         xticklabels=times, yticklabels=types, ax=ax3)
             ax3.set_title('主力活跃度分析')
+            # 顶部显示均值
+            act_mean = activity_data.mean()
+            ax3.text(0.5, 1.05, f"均值: {act_mean:.2f}", transform=ax3.transAxes, ha='center', va='bottom', fontsize=11, color='#f57c00')
 
             # 调整布局
             self.main_force_figure.tight_layout()

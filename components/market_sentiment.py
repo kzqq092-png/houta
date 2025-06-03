@@ -569,22 +569,33 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.sentiment_series.clear()
             # 添加数据点
             sentiment_data = data.get('sentiment_index', {})
+            values = []
             if isinstance(sentiment_data, dict):
                 for i, (date, value) in enumerate(sentiment_data.items()):
                     if isinstance(value, (int, float)):
                         self.sentiment_series.append(i, int(value))
+                        values.append(float(value))
             elif isinstance(sentiment_data, (list, tuple)):
                 for i, value in enumerate(sentiment_data):
                     if isinstance(value, (int, float)):
                         self.sentiment_series.append(i, int(value))
+                        values.append(float(value))
             elif isinstance(sentiment_data, (int, float)):
                 self.sentiment_series.append(0, int(sentiment_data))
+                values.append(float(sentiment_data))
             # 更新X轴范围
             points_count = self.sentiment_series.count()
             if points_count > 0:
                 self.sentiment_axis_x.setRange(0, points_count - 1)
             # 更新Y轴范围（保持0-100的整数范围）
             self.sentiment_axis_y.setRange(0, 100)
+            # 在图表顶部添加最大、最小、均值
+            if hasattr(self, 'sentiment_chart') and values:
+                max_val = max(values)
+                min_val = min(values)
+                mean_val = sum(values) / len(values)
+                # 通过QChart的title增强显示
+                self.sentiment_chart.setTitle(f"市场情绪（最大: {max_val:.2f}  最小: {min_val:.2f}  均值: {mean_val:.2f}）")
             # 更新图表
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
@@ -842,3 +853,48 @@ class MarketSentimentWidget(BaseAnalysisPanel):
     def refresh_data(self):
         self._run_analysis_async(self.refresh_button, self._refresh_data_impl)
     # ... 其余耗时分析按钮同理 ...
+
+    def update_sentiment_table(self, data: dict):
+        """更新市场情绪表格，添加统计行和极值高亮"""
+        if not hasattr(self, 'sentiment_table'):
+            return
+        df = data.get('sentiment_table_df')
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return
+        self.sentiment_table.setRowCount(len(df) + 3)
+        # 填充数据
+        for i, row in df.iterrows():
+            for j, value in enumerate(row):
+                item = QTableWidgetItem(str(value))
+                self.sentiment_table.setItem(i, j, item)
+        # 统计行
+        mean_vals = df.mean(numeric_only=True)
+        max_vals = df.max(numeric_only=True)
+        min_vals = df.min(numeric_only=True)
+        col_count = df.shape[1]
+        # 均值行
+        for j in range(col_count):
+            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.2f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
+            item.setBackground(QColor("#fffde7"))
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sentiment_table.setItem(len(df), j, item)
+        # 最大行
+        for j in range(col_count):
+            item = QTableWidgetItem(f"{max_vals.iloc[j]:.2f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
+            item.setBackground(QColor("#ffe082"))
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sentiment_table.setItem(len(df)+1, j, item)
+        # 最小行
+        for j in range(col_count):
+            item = QTableWidgetItem(f"{min_vals.iloc[j]:.2f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
+            item.setBackground(QColor("#ffccbc"))
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sentiment_table.setItem(len(df)+2, j, item)
+        # 极值高亮
+        for j in range(col_count):
+            max_idx = df.iloc[:, j].idxmax() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
+            min_idx = df.iloc[:, j].idxmin() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
+            if max_idx is not None:
+                self.sentiment_table.item(max_idx, j).setBackground(QColor("#b2ff59"))
+            if min_idx is not None:
+                self.sentiment_table.item(min_idx, j).setBackground(QColor("#ffcdd2"))

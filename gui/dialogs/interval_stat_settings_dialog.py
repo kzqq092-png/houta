@@ -442,4 +442,4 @@ class IntervalStatSettingsDialog(QDialog):
     def on_font_size_changed(self, value):
         self.settings['font_size'] = value
         save_settings(self.settings)
-        self.apply_font_size(value)
+        # self.apply_font_size(value)

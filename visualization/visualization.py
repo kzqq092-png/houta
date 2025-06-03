@@ -103,7 +103,9 @@ class Visualization:
             ax.hist(returns, bins=20, color='blue', alpha=0.5)
             ax.axvline(x=np.mean(returns), color='red', linestyle='--',
                        label=f'平均收益率: {np.mean(returns):.2%}')
-
+            # 顶部显示最大、最小、均值
+            ax.text(0.5, 1.05, f"最大: {max(returns):.2%}  最小: {min(returns):.2%}  均值: {np.mean(returns):.2%}",
+                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='blue')
             # 设置坐标轴格式
             self.chart_utils.set_axis_format(ax)
             self.chart_utils.add_legend(ax)

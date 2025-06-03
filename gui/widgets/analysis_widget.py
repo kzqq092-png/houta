@@ -94,44 +94,88 @@ class AnalysisWidget(QWidget):
             else:
                 self.main_layout = self.layout()
             # 创建标签页
-            tab_widget = QTabWidget()
+            self.tab_widget = QTabWidget()
+            self.tab_widget.currentChanged.connect(self.on_tab_changed)
             # 添加技术分析标签页
-            technical_tab = self.create_technical_tab()
-            tab_widget.addTab(technical_tab, "技术分析")
+            self.technical_tab = self.create_technical_tab()
+            self.tab_widget.addTab(self.technical_tab, "技术分析")
             # 添加形态识别标签页
-            pattern_tab = self.create_pattern_tab()
-            tab_widget.addTab(pattern_tab, "形态识别")
+            self.pattern_tab = self.create_pattern_tab()
+            self.tab_widget.addTab(self.pattern_tab, "形态识别")
             # 添加趋势分析标签页
-            trend_tab = self.create_trend_tab()
-            tab_widget.addTab(trend_tab, "趋势分析")
+            self.trend_tab = self.create_trend_tab()
+            self.tab_widget.addTab(self.trend_tab, "趋势分析")
             # 添加波浪分析标签页
-            wave_tab = self.create_wave_tab()
-            tab_widget.addTab(wave_tab, "波浪分析")
+            self.wave_tab = self.create_wave_tab()
+            self.tab_widget.addTab(self.wave_tab, "波浪分析")
             # 添加市场情绪标签页
-            sentiment_tab = self.create_sentiment_tab()
-            tab_widget.addTab(sentiment_tab, "市场情绪")
+            self.sentiment_tab = self.create_sentiment_tab()
+            self.tab_widget.addTab(self.sentiment_tab, "市场情绪")
             # 添加板块资金流向分析标签页
-            sector_flow_tab = self.create_sector_flow_tab()
-            tab_widget.addTab(sector_flow_tab, "板块资金流向")
+            self.sector_flow_tab = self.create_sector_flow_tab()
+            self.tab_widget.addTab(self.sector_flow_tab, "板块资金流向")
             # 添加热点分析标签页
-            hotspot_tab = self.create_hotspot_tab()
-            tab_widget.addTab(hotspot_tab, "热点分析")
+            self.hotspot_tab = self.create_hotspot_tab()
+            self.tab_widget.addTab(self.hotspot_tab, "热点分析")
             # 新增舆情报告Tab
-            sentiment_report_tab = self.create_sentiment_report_tab()
-            tab_widget.addTab(sentiment_report_tab, "舆情报告")
-            # 添加标签页到布局
-            if tab_widget.parent() is not self.main_layout:
-                self.main_layout.addWidget(tab_widget)
+            self.sentiment_report_tab = self.create_sentiment_report_tab()
+            self.tab_widget.addTab(self.sentiment_report_tab, "舆情报告")
+            if self.tab_widget.parent() is not self.main_layout:
+                self.main_layout.addWidget(self.tab_widget)
         except Exception as e:
             self.log_manager.log(
                 f"初始化分析控件UI失败: {str(e)}", LogLevel.ERROR)
             raise
 
+    def on_tab_changed(self, index):
+        """Tab切换时只刷新当前Tab内容，且异步运行分析，主界面不卡顿"""
+        tab_text = self.tab_widget.tabText(index)
+        if tab_text == "技术分析":
+            btn = self.technical_tab.findChild(QPushButton, "刷新分析")
+            if btn:
+                self.run_button_analysis_async(btn, self.calculate_indicators)
+        elif tab_text == "形态识别":
+            btn = self.pattern_tab.findChild(QPushButton, "识别形态")
+            if btn:
+                self.run_button_analysis_async(btn, self.do_analyze)
+        elif tab_text == "趋势分析":
+            btn = self.trend_tab.findChild(QPushButton, "分析趋势")
+            if btn:
+                self.run_button_analysis_async(btn, self.analyze_trend)
+        elif tab_text == "波浪分析":
+            btn = self.wave_tab.findChild(QPushButton, "分析波浪")
+            if btn:
+                self.run_button_analysis_async(btn, self.analyze_wave)
+        elif tab_text == "市场情绪":
+            btn = self.sentiment_tab.findChild(QPushButton, "分析情绪")
+            if btn:
+                self.run_button_analysis_async(btn, self.analyze_sentiment)
+        elif tab_text == "板块资金流向":
+            btn = self.sector_flow_tab.findChild(QPushButton, "分析板块")
+            if btn:
+                self.run_button_analysis_async(btn, self.analyze_industry_flow)
+        elif tab_text == "热点分析":
+            btn = self.hotspot_tab.findChild(QPushButton, "分析轮动")
+            if btn:
+                self.run_button_analysis_async(btn, self.analyze_hotspot)
+
+    def refresh(self) -> None:
+        """
+        只刷新当前Tab内容，避免全量分析导致卡顿。
+        """
+        index = self.tab_widget.currentIndex()
+        self.on_tab_changed(index)
+
     def run_button_analysis_async(self, button, analysis_func, *args, **kwargs):
         """
         通用按钮防抖+异步分析工具，点击后按钮文本变为"取消"，再次点击时中断分析，结束后恢复原文本。
         修复：保证分析结束后按钮状态恢复，异常时也能恢复，防止按钮卡死。
+        优化：线程池全局唯一，防止多线程泄漏。
         """
+        from concurrent.futures import ThreadPoolExecutor
+        from PyQt5.QtCore import QTimer
+        if not hasattr(self, '_thread_pool'):
+            self._thread_pool = ThreadPoolExecutor(max_workers=2)
         original_text = button.text()
         button.setText("取消")
         button.setEnabled(False)
@@ -140,8 +184,6 @@ class AnalysisWidget(QWidget):
             button._interrupted = True
             button.setText(original_text)
             button.setEnabled(True)
-
-        # 绑定取消逻辑
         try:
             button.clicked.disconnect()
         except Exception:
@@ -167,9 +209,7 @@ class AnalysisWidget(QWidget):
                 pass
             button.clicked.connect(lambda: self.run_button_analysis_async(
                 button, analysis_func, *args, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(task)
+        future = self._thread_pool.submit(task)
         future.add_done_callback(
             lambda f: QTimer.singleShot(0, lambda: on_done(f)))
 
@@ -2312,159 +2352,69 @@ class AnalysisWidget(QWidget):
             raise
 
     def analyze_sector_flow(self):
-        """分析板块资金流向"""
+        """分析板块资金流向，统一调用后端接口，支持多源、历史、极值高亮"""
         try:
-            # 分析行业资金流向
-            self.analyze_industry_flow()
-
-            # 分析概念资金流向
-            self.analyze_concept_flow()
-
-            # 分析北向资金
-            self.analyze_north_flow()
-
-        except Exception as e:
-            self.log_manager.log(f"分析板块资金流向失败: {str(e)}", LogLevel.ERROR)
-
-    def analyze_industry_flow(self):
-        """分析行业资金流向，表格+60日走势图，使用akshare stock_fund_flow_industry"""
-        try:
+            from core.trading_system import trading_system
+            fund_flow = trading_system.get_fund_flow()
+            # 行业资金流
+            industry = fund_flow.get('industry_flow', [])
             self.industry_flow_table.setRowCount(0)
-            df = ak.stock_fund_flow_industry()
-            if df is not None and not df.empty:
-                for i, row in df.iterrows():
-                    self.industry_flow_table.insertRow(i)
-                    self.industry_flow_table.setItem(
-                        i, 0, QTableWidgetItem(str(row.get('行业名称', ''))))
-                    main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
-                    main_item.setForeground(
-                        QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
-                    self.industry_flow_table.setItem(i, 1, main_item)
-                    super_item = QTableWidgetItem(str(row.get('超大单净流入', '')))
-                    self.industry_flow_table.setItem(i, 2, super_item)
-                    big_item = QTableWidgetItem(str(row.get('大单净流入', '')))
-                    self.industry_flow_table.setItem(i, 3, big_item)
-                    mid_item = QTableWidgetItem(str(row.get('中单净流入', '')))
-                    self.industry_flow_table.setItem(i, 4, mid_item)
-            else:
-                self.log_manager.log("行业资金流向无数据", LogLevel.WARNING)
-        except Exception as e:
-            msg = f"行业资金流向分析失败: {str(e)}"
-            self.log_manager.log(msg, LogLevel.ERROR)
-            self.error_occurred.emit(msg)
-        # 60日走势图
-        try:
-            # 取前5大行业做示例
-            if df is not None and not df.empty:
-                self.plot_industry_trend(df.head(5))
-        except Exception as e:
-            msg = f"行业资金流向走势图失败: {str(e)}"
-            self.log_manager.log(msg, LogLevel.ERROR)
-            self.error_occurred.emit(msg)
-
-    def plot_industry_trend(self, df):
-        """行业资金流向60日走势图（示例：主力净流入）"""
-        try:
-            for _, row in df.iterrows():
-                name = row.get('行业名称', '')
-                try:
-                    # akshare官方接口
-                    hist = ak.stock_sector_fund_flow_hist(
-                        symbol=name, sector_type="行业资金流")
-                    if hist is not None and not hist.empty:
-                        fig = Figure(figsize=(5, 3))
-                        canvas = FigureCanvas(fig)
-                        ax = fig.add_subplot(111)
-                        ax.plot(hist['日期'], hist['主力净流入'], label=name)
-                        ax.set_title(f"{name}近60日主力净流入")
-                        ax.legend()
-                        self.industry_trend_layout.addWidget(canvas)
-                except Exception as e:
-                    self.log_manager.log(
-                        f"行业{name}资金流向历史获取失败: {str(e)}", LogLevel.WARNING)
-        except Exception as e:
-            self.log_manager.log(f"行业资金流向走势图失败: {str(e)}", LogLevel.ERROR)
-
-    def analyze_concept_flow(self):
-        """分析概念资金流向，表格+60日走势图，使用akshare stock_fund_flow_concept"""
-        try:
+            for i, row in enumerate(industry):
+                self.industry_flow_table.insertRow(i)
+                self.industry_flow_table.setItem(i, 0, QTableWidgetItem(str(row.get('行业', ''))))
+                main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
+                main_item.setForeground(QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
+                self.industry_flow_table.setItem(i, 1, main_item)
+                self.industry_flow_table.setItem(i, 2, QTableWidgetItem(str(row.get('超大单净流入', ''))))
+                self.industry_flow_table.setItem(i, 3, QTableWidgetItem(str(row.get('大单净流入', ''))))
+                self.industry_flow_table.setItem(i, 4, QTableWidgetItem(str(row.get('中单净流入', ''))))
+            # 概念资金流
+            concept = fund_flow.get('concept_flow', [])
             self.concept_flow_table.setRowCount(0)
-            df = ak.stock_fund_flow_concept()
-            if df is not None and not df.empty:
-                for i, row in df.iterrows():
-                    self.concept_flow_table.insertRow(i)
-                    self.concept_flow_table.setItem(
-                        i, 0, QTableWidgetItem(str(row.get('概念名称', ''))))
-                    main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
-                    main_item.setForeground(
-                        QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
-                    self.concept_flow_table.setItem(i, 1, main_item)
-                    super_item = QTableWidgetItem(str(row.get('超大单净流入', '')))
-                    self.concept_flow_table.setItem(i, 2, super_item)
-                    big_item = QTableWidgetItem(str(row.get('大单净流入', '')))
-                    self.concept_flow_table.setItem(i, 3, big_item)
-                    mid_item = QTableWidgetItem(str(row.get('中单净流入', '')))
-                    self.concept_flow_table.setItem(i, 4, mid_item)
-            else:
-                self.log_manager.log("概念资金流向无数据", LogLevel.WARNING)
-        except Exception as e:
-            self.log_manager.log(f"概念资金流向分析失败: {str(e)}", LogLevel.ERROR)
-
-        # 60日走势图
-        try:
-            if df is not None and not df.empty:
-                self.plot_concept_trend(df.head(5))
-        except Exception as e:
-            self.log_manager.log(f"概念资金流向走势图失败: {str(e)}", LogLevel.ERROR)
-
-    def plot_concept_trend(self, df):
-        """概念资金流向60日走势图（示例：主力净流入）"""
-        try:
-            for _, row in df.iterrows():
-                name = row.get('概念名称', '')
-                try:
-                    # akshare官方接口
-                    hist = ak.stock_sector_fund_flow_hist(
-                        symbol=name, sector_type="概念资金流")
-                    if hist is not None and not hist.empty:
-                        fig = Figure(figsize=(5, 3))
-                        canvas = FigureCanvas(fig)
-                        ax = fig.add_subplot(111)
-                        ax.plot(hist['日期'], hist['主力净流入'], label=name)
-                        ax.set_title(f"{name}近60日主力净流入")
-                        ax.legend()
-                        self.concept_trend_layout.addWidget(canvas)
-                except Exception as e:
-                    self.log_manager.log(
-                        f"概念{name}资金流向历史获取失败: {str(e)}", LogLevel.WARNING)
-        except Exception as e:
-            self.log_manager.log(f"概念资金流向走势图失败: {str(e)}", LogLevel.ERROR)
-
-    def analyze_north_flow(self):
-        """分析北向资金，使用akshare stock_hsgt_north_net_flow_em"""
-        try:
+            for i, row in enumerate(concept):
+                self.concept_flow_table.insertRow(i)
+                self.concept_flow_table.setItem(i, 0, QTableWidgetItem(str(row.get('概念', ''))))
+                main_item = QTableWidgetItem(str(row.get('主力净流入', '')))
+                main_item.setForeground(QColor("red" if float(row.get('主力净流入', 0)) > 0 else "green"))
+                self.concept_flow_table.setItem(i, 1, main_item)
+                self.concept_flow_table.setItem(i, 2, QTableWidgetItem(str(row.get('超大单净流入', ''))))
+                self.concept_flow_table.setItem(i, 3, QTableWidgetItem(str(row.get('大单净流入', ''))))
+                self.concept_flow_table.setItem(i, 4, QTableWidgetItem(str(row.get('中单净流入', ''))))
+            # 北向资金
+            north = fund_flow.get('north_flow', [])
             self.north_flow_table.setRowCount(0)
-            df = ak.stock_hsgt_north_net_flow_em()
-            if df is not None and not df.empty:
-                df = df.head(60)
-                for i, row in df.iterrows():
-                    date = row['日期']
-                    sh = row['沪股通(亿元)']
-                    sz = row['深股通(亿元)']
-                    total = row['北向资金(亿元)']
-                    self.north_flow_table.insertRow(i)
-                    self.north_flow_table.setItem(
-                        i, 0, QTableWidgetItem(str(date)))
-                    self.north_flow_table.setItem(
-                        i, 1, QTableWidgetItem(f"{sh:+.2f}"))
-                    self.north_flow_table.setItem(
-                        i, 2, QTableWidgetItem(f"{sz:+.2f}"))
-                    self.north_flow_table.setItem(
-                        i, 3, QTableWidgetItem(f"{total:+.2f}"))
-            else:
-                self.log_manager.log("北向资金无数据", LogLevel.WARNING)
+            for i, row in enumerate(north):
+                self.north_flow_table.insertRow(i)
+                self.north_flow_table.setItem(i, 0, QTableWidgetItem(str(row.get('时间', ''))))
+                self.north_flow_table.setItem(i, 1, QTableWidgetItem(str(row.get('沪股通', ''))))
+                self.north_flow_table.setItem(i, 2, QTableWidgetItem(str(row.get('深股通', ''))))
+                self.north_flow_table.setItem(i, 3, QTableWidgetItem(str(row.get('合计', ''))))
+            # 极值高亮、历史对比等可扩展
         except Exception as e:
-            self.log_manager.log(f"北向资金分析失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"板块资金流向分析失败: {str(e)}", LogLevel.ERROR)
+            QMessageBox.critical(self, "错误", f"板块资金流向分析失败: {str(e)}")
+
+    def export_fund_flow(self):
+        """一键导出全部资金流数据"""
+        try:
+            import pandas as pd
+            file_path, _ = QFileDialog.getSaveFileName(self, "导出资金流数据", "资金流数据", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            if not file_path:
+                return
+            # 导出行业、概念、北向资金流
+            industry_data = [[self.industry_flow_table.item(i, j).text() for j in range(
+                self.industry_flow_table.columnCount())] for i in range(self.industry_flow_table.rowCount())]
+            concept_data = [[self.concept_flow_table.item(i, j).text() for j in range(
+                self.concept_flow_table.columnCount())] for i in range(self.concept_flow_table.rowCount())]
+            north_data = [[self.north_flow_table.item(i, j).text() for j in range(self.north_flow_table.columnCount())]
+                          for i in range(self.north_flow_table.rowCount())]
+            with pd.ExcelWriter(file_path) as writer:
+                pd.DataFrame(industry_data, columns=["行业", "主力净流入", "超大单净流入", "大单净流入", "中单净流入"]).to_excel(writer, sheet_name="行业资金流", index=False)
+                pd.DataFrame(concept_data, columns=["概念", "主力净流入", "超大单净流入", "大单净流入", "中单净流入"]).to_excel(writer, sheet_name="概念资金流", index=False)
+                pd.DataFrame(north_data, columns=["时间", "沪股通", "深股通", "合计"]).to_excel(writer, sheet_name="北向资金", index=False)
+            QMessageBox.information(self, "导出成功", "资金流数据已导出")
+        except Exception as e:
+            QMessageBox.critical(self, "导出失败", f"导出资金流数据失败: {str(e)}")
 
     def clear_sector_flow(self):
         """清除板块资金流向分析结果"""
@@ -3827,49 +3777,6 @@ class AnalysisWidget(QWidget):
             self.log_manager.error(f"set_kdata异常: {str(e)}")
             self.current_kdata = None
             self.kdata = None
-
-    def refresh(self) -> None:
-        """
-        刷新分析控件内容，自动刷新所有Tab（如重新计算分析、刷新表格等）。
-        """
-        try:
-            # 依次刷新各Tab内容（如有刷新方法）
-            # 技术分析Tab
-            if hasattr(self, 'calculate_indicators'):
-                self.calculate_indicators()
-            # 形态识别Tab
-            if hasattr(self, 'do_analyze'):
-                self.do_analyze()
-            # 趋势分析Tab
-            if hasattr(self, 'analyze_trend'):
-                self.analyze_trend()
-            # 波浪分析Tab
-            if hasattr(self, 'analyze_wave'):
-                self.analyze_wave()
-            # 市场情绪Tab
-            if hasattr(self, 'analyze_sentiment'):
-                self.analyze_sentiment()
-            # 板块资金流向Tab
-            if hasattr(self, 'analyze_industry_flow'):
-                self.analyze_industry_flow()
-            # 热点分析Tab
-            if hasattr(self, 'analyze_hotspot'):
-                self.analyze_hotspot()
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"刷新分析控件失败: {str(e)}")
-
-    def update(self) -> None:
-        """
-        兼容旧接口，重定向到refresh。
-        """
-        self.refresh()
-
-    def reload(self) -> None:
-        """
-        兼容旧接口，重定向到refresh。
-        """
-        self.refresh()
 
 
 def get_indicator_categories():

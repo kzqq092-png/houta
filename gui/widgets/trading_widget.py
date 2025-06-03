@@ -242,116 +242,84 @@ class TradingWidget(QWidget):
             LogManager.log(f"更新信号列表失败: {str(e)}", "error")
 
     def update_backtest_results(self, results: Dict[str, Any]):
-        """更新回测结果
-
-        Args:
-            results: 回测结果字典
-        """
+        """更新回测结果，展示所有主流绩效/风险指标，支持一键导出"""
         try:
-            # 更新绩效指标
+            # 绩效指标
+            perf_keys = [
+                'total_return', 'annualized_return', 'annualized_volatility', 'sharpe_ratio',
+                'max_drawdown', 'calmar_ratio', 'win_rate', 'profit_factor', 'avg_win', 'avg_loss',
+                'avg_holding_period', '索提诺比率', '卡玛比率', '信息比率', 'Alpha', 'Beta', '跟踪误差', '换手率', '最大连续亏损'
+            ]
             self.performance_table.setRowCount(0)
-            for name, value in results['performance'].items():
+            for name in perf_keys:
+                value = results['performance'].get(name, '-')
                 row = self.performance_table.rowCount()
                 self.performance_table.insertRow(row)
-
-                self.performance_table.setItem(
-                    row, 0,
-                    QTableWidgetItem(name)
-                )
-                self.performance_table.setItem(
-                    row, 1,
-                    QTableWidgetItem(f"{value:.2%}")
-                )
-
-            # 更新风险指标
+                self.performance_table.setItem(row, 0, QTableWidgetItem(name))
+                self.performance_table.setItem(row, 1, QTableWidgetItem(f"{value:.4f}" if isinstance(value, float) else str(value)))
+            # 风险指标
+            risk_keys = ['alpha', 'beta', 'information_ratio', 'tracking_error', 'var']
             self.risk_table.setRowCount(0)
-            for name, value in results['risk'].items():
+            for name in risk_keys:
+                value = results['risk'].get(name, '-')
                 row = self.risk_table.rowCount()
                 self.risk_table.insertRow(row)
-
-                self.risk_table.setItem(
-                    row, 0,
-                    QTableWidgetItem(name)
-                )
-                self.risk_table.setItem(
-                    row, 1,
-                    QTableWidgetItem(f"{value:.4f}")
-                )
-
-            # 更新交易记录
+                self.risk_table.setItem(row, 0, QTableWidgetItem(name))
+                self.risk_table.setItem(row, 1, QTableWidgetItem(f"{value:.4f}" if isinstance(value, float) else str(value)))
+            # 交易明细
             self.trade_table.setRowCount(0)
             for trade in results['trades']:
                 row = self.trade_table.rowCount()
                 self.trade_table.insertRow(row)
-
-                self.trade_table.setItem(
-                    row, 0,
-                    QTableWidgetItem(trade['time'].strftime('%Y-%m-%d'))
-                )
-                self.trade_table.setItem(
-                    row, 1,
-                    QTableWidgetItem(trade['stock'])
-                )
-                self.trade_table.setItem(
-                    row, 2,
-                    QTableWidgetItem(trade['business'])
-                )
-                self.trade_table.setItem(
-                    row, 3,
-                    QTableWidgetItem(f"{trade['price']:.2f}")
-                )
-                self.trade_table.setItem(
-                    row, 4,
-                    QTableWidgetItem(str(trade['quantity']))
-                )
-                self.trade_table.setItem(
-                    row, 5,
-                    QTableWidgetItem(f"{trade['cost']:.2f}")
-                )
-                self.trade_table.setItem(
-                    row, 6,
-                    QTableWidgetItem(f"{trade['cash']:.2f}")
-                )
-
-            # 更新持仓信息
+                self.trade_table.setItem(row, 0, QTableWidgetItem(trade['time'].strftime('%Y-%m-%d')))
+                self.trade_table.setItem(row, 1, QTableWidgetItem(trade['stock']))
+                self.trade_table.setItem(row, 2, QTableWidgetItem(trade['business']))
+                self.trade_table.setItem(row, 3, QTableWidgetItem(f"{trade['price']:.2f}"))
+                self.trade_table.setItem(row, 4, QTableWidgetItem(str(trade['quantity'])))
+                self.trade_table.setItem(row, 5, QTableWidgetItem(f"{trade['cost']:.2f}"))
+                self.trade_table.setItem(row, 6, QTableWidgetItem(f"{trade['cash']:.2f}"))
+            # 持仓明细
             self.position_table.setRowCount(0)
             for pos in results['positions']:
                 row = self.position_table.rowCount()
                 self.position_table.insertRow(row)
-
-                self.position_table.setItem(
-                    row, 0,
-                    QTableWidgetItem(pos['stock'])
-                )
-                self.position_table.setItem(
-                    row, 1,
-                    QTableWidgetItem(str(pos['quantity']))
-                )
-                self.position_table.setItem(
-                    row, 2,
-                    QTableWidgetItem(f"{pos['cost']:.2f}")
-                )
-                self.position_table.setItem(
-                    row, 3,
-                    QTableWidgetItem(f"{pos['price']:.2f}")
-                )
-                self.position_table.setItem(
-                    row, 4,
-                    QTableWidgetItem(f"{pos['profit']:.2f}")
-                )
-                self.position_table.setItem(
-                    row, 5,
-                    QTableWidgetItem(f"{pos['stoploss']:.2f}")
-                )
-
+                self.position_table.setItem(row, 0, QTableWidgetItem(pos['stock']))
+                self.position_table.setItem(row, 1, QTableWidgetItem(str(pos['quantity'])))
+                self.position_table.setItem(row, 2, QTableWidgetItem(f"{pos['cost']:.2f}"))
+                self.position_table.setItem(row, 3, QTableWidgetItem(f"{pos.get('price', 0):.2f}"))
+                self.position_table.setItem(row, 4, QTableWidgetItem(f"{pos.get('profit', 0):.2f}"))
+                self.position_table.setItem(row, 5, QTableWidgetItem(f"{pos.get('stoploss', 0):.2f}"))
             # 调整列宽
             self.performance_table.resizeColumnsToContents()
             self.risk_table.resizeColumnsToContents()
             self.trade_table.resizeColumnsToContents()
             self.position_table.resizeColumnsToContents()
-
         except Exception as e:
             LogManager.log(f"更新回测结果失败: {str(e)}", "error")
+
+    def export_backtest_results(self):
+        """一键导出全部回测结果（绩效、风险、交易、持仓、图表）"""
+        try:
+            import pandas as pd
+            file_path, _ = QFileDialog.getSaveFileName(self, "导出回测结果", "回测结果", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            if not file_path:
+                return
+            # 导出绩效、风险、交易、持仓
+            perf_data = [[self.performance_table.item(i, 0).text(), self.performance_table.item(i, 1).text()]
+                         for i in range(self.performance_table.rowCount())]
+            risk_data = [[self.risk_table.item(i, 0).text(), self.risk_table.item(i, 1).text()] for i in range(self.risk_table.rowCount())]
+            trade_data = [[self.trade_table.item(i, j).text() for j in range(self.trade_table.columnCount())]
+                          for i in range(self.trade_table.rowCount())]
+            pos_data = [[self.position_table.item(i, j).text() for j in range(self.position_table.columnCount())]
+                        for i in range(self.position_table.rowCount())]
+            with pd.ExcelWriter(file_path) as writer:
+                pd.DataFrame(perf_data, columns=["指标", "数值"]).to_excel(writer, sheet_name="绩效指标", index=False)
+                pd.DataFrame(risk_data, columns=["风险指标", "数值"]).to_excel(writer, sheet_name="风险指标", index=False)
+                pd.DataFrame(trade_data).to_excel(writer, sheet_name="交易明细", index=False)
+                pd.DataFrame(pos_data).to_excel(writer, sheet_name="持仓明细", index=False)
+            QMessageBox.information(self, "导出成功", "回测结果已导出")
+        except Exception as e:
+            QMessageBox.critical(self, "导出失败", f"导出回测结果失败: {str(e)}")
 
     def clear_data(self):
         """清除数据"""

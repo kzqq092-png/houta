@@ -436,16 +436,27 @@ class StrategyBacktester:
             raise ValueError("请先运行回测")
 
         # 保存回测数据
-        self.results.to_csv(f"{file_path}_results.csv")
-
+        df = self.results.copy()
+        # 添加统计行
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        mean_row = df[numeric_cols].mean().to_dict()
+        max_row = df[numeric_cols].max().to_dict()
+        min_row = df[numeric_cols].min().to_dict()
+        mean_row.update({c: '' for c in df.columns if c not in numeric_cols})
+        max_row.update({c: '' for c in df.columns if c not in numeric_cols})
+        min_row.update({c: '' for c in df.columns if c not in numeric_cols})
+        mean_row['备注'] = '均值'
+        max_row['备注'] = '最大'
+        min_row['备注'] = '最小'
+        df['备注'] = ''
+        df = pd.concat([df, pd.DataFrame([mean_row, max_row, min_row], columns=df.columns)], ignore_index=True)
+        df.to_csv(f"{file_path}_results.csv", index=False)
         # 保存交易记录
         if self.trades:
             trades_df = pd.DataFrame(self.trades)
             trades_df.to_csv(f"{file_path}_trades.csv")
-
         # 计算并保存指标
         metrics = self.calculate_metrics()
-
         with open(f"{file_path}_metrics.txt", 'w') as f:
             f.write("===== Backtest Results =====\n")
             for key, value in metrics.items():
@@ -456,7 +467,6 @@ class StrategyBacktester:
                         f.write(f"{key}: {value:.4f}\n")
                 else:
                     f.write(f"{key}: {value}\n")
-
         # 保存图表
         fig = self.plot_results()
         fig.savefig(f"{file_path}_chart.png")
