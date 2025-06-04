@@ -25,7 +25,7 @@ from PyQt5.QtGui import *
 # Global theme manager instance
 _theme_manager_instance: Optional['ThemeManager'] = None
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db/', 'themes.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
 
 
 def safe_read_file(filepath):
@@ -109,14 +109,22 @@ class ThemeManager(QObject):
     def _import_themes_to_db(self):
         # 导入QSS主题
         for qss_file in glob.glob(os.path.join(self.qss_theme_dir, '*.qss')):
-            name = self._extract_qss_theme_name(
-                qss_file) or os.path.splitext(os.path.basename(qss_file))[0]
+            name = self._extract_qss_theme_name(qss_file) or os.path.splitext(os.path.basename(qss_file))[0]
             content = safe_read_file(qss_file)
+            # 跳过已存在的主题
+            cur = self.conn.cursor()
+            cur.execute('SELECT id FROM themes WHERE name=?', (name,))
+            if cur.fetchone():
+                continue
             self._upsert_theme(name, 'qss', content, 'file')
         # 导入JSON主题
         for t in self._theme_data.keys():
             name = t.capitalize()
             content = json.dumps(self._theme_data[t], ensure_ascii=False)
+            cur = self.conn.cursor()
+            cur.execute('SELECT id FROM themes WHERE name=?', (name,))
+            if cur.fetchone():
+                continue
             self._upsert_theme(name, 'json', content, 'file')
 
     def _upsert_theme(self, name, type_, content, origin):
@@ -182,8 +190,10 @@ class ThemeManager(QObject):
                     self._current_theme = t
                     break
             self._theme_cache[theme_name.lower()] = theme_dict
-            self.config_manager.theme.theme = self._current_theme
-            self.config_manager.save()
+            # 只持久化主题名到config表
+            theme_cfg = self.config_manager.get('theme', {})
+            theme_cfg['theme_name'] = theme_name
+            self.config_manager.set('theme', theme_cfg)
             self.theme_changed.emit(self._current_theme)
 
     def get_theme_colors(self, theme: Optional[Theme] = None) -> Dict[str, Any]:
@@ -217,127 +227,6 @@ class ThemeManager(QObject):
         """
         colors = self.get_theme_colors(theme)
         return colors.get(name, default)
-
-    def apply_theme(self, widget: QWidget, theme: Optional[Theme] = None) -> None:
-        """应用主题到指定部件
-
-        Args:
-            widget: 要应用主题的部件
-            theme: 可选的主题，默认使用当前主题
-        """
-        try:
-            theme = theme or self._current_theme
-            colors = self.get_theme_colors(theme)
-
-            # 基础样式
-            style = f"""
-                QWidget {{
-                    background-color: {colors.get('background', '#f7f9fa')};
-                    color: {colors.get('text', '#222b45')};
-                }}
-                
-                QGroupBox {{
-                    border: 1px solid {colors.get('border', '#e0e0e0')};
-                    border-radius: 6px;
-                    margin-top: 6px;
-                    padding: 6px;
-                }}
-                
-                QPushButton {{
-                    background-color: {colors.get('button_bg', '#e3f2fd')};
-                    color: {colors.get('button_text', '#1565c0')};
-                    border: 1px solid {colors.get('button_border', '#90caf9')};
-                    border-radius: 4px;
-                    padding: 4px;
-                }}
-                
-                QPushButton:hover {{
-                    background-color: {colors.get('button_hover', '#90caf9')};
-                }}
-                
-                QPushButton:pressed {{
-                    background-color: {colors.get('button_pressed', '#64b5f6')};
-                }}
-                
-                QLineEdit, QTextEdit, QPlainTextEdit {{
-                    background-color: {colors.get('background', '#f7f9fa')};
-                    color: {colors.get('text', '#222b45')};
-                    border: 1px solid {colors.get('border', '#e0e0e0')};
-                    border-radius: 4px;
-                    padding: 2px;
-                }}
-                
-                QComboBox {{
-                    background-color: {colors.get('background', '#f7f9fa')};
-                    color: {colors.get('text', '#222b45')};
-                    border: 1px solid {colors.get('border', '#e0e0e0')};
-                    border-radius: 4px;
-                    padding: 2px;
-                }}
-                
-                QTableView {{
-                    background-color: {colors.get('background', '#f7f9fa')};
-                    color: {colors.get('text', '#222b45')};
-                    border: 1px solid {colors.get('border', '#e0e0e0')};
-                    gridline-color: {colors.get('border', '#e0e0e0')};
-                }}
-                
-                QTableView::item:selected {{
-                    background-color: {colors.get('selected_bg', '#E3F2FD')};
-                    color: {colors.get('selected_text', '#1976D2')};
-                }}
-                
-                QHeaderView::section {{
-                    background-color: {colors.get('table_header_bg', '#2196F3')};
-                    color: {colors.get('table_header_text', '#ffffff')};
-                    padding: 4px;
-                    border: none;
-                }}
-                
-                QScrollBar:vertical {{
-                    border: none;
-                    background: {colors.get('background', '#f7f9fa')};
-                    width: 5px;
-                    margin: 0px;
-                }}
-                
-                QScrollBar::handle:vertical {{
-                    background: {colors.get('border', '#e0e0e0')};
-                    min-height: 5px;
-                    border-radius: 5px;
-                }}
-
-                QScrollBar:horizontal {{
-                    border: none;
-                    background: {colors.get('background', '#f7f9fa')};
-                    height: 5px;
-                    margin: 0px;
-                }}
-
-                QScrollBar::handle:horizontal {{
-                    background: {colors.get('border', '#e0e0e0')};
-                    min-width: 5px;
-                    border-radius: 5px;
-                }}
-
-                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                    background: none;
-                    border: none;
-                }}
-            """
-
-            # 如果是渐变主题,添加渐变背景
-            if theme == Theme.GRADIENT:
-                style = style.replace(
-                    f"background-color: {colors.get('background', '#f7f9fa')};",
-                    f"background: {colors.get('background', 'linear-gradient(135deg, #3a8dde 0%, #7b1fa2 100%)')};"
-                )
-
-            widget.setStyleSheet(style)
-
-        except Exception as e:
-            print(f"应用主题到部件失败: {str(e)}")
 
     def apply_chart_theme(self, figure, theme: Optional[Theme] = None) -> None:
         """Apply theme to matplotlib figure
@@ -419,7 +308,39 @@ class ThemeManager(QObject):
         return [row[0] for row in self._get_all_themes_from_db()]
 
     def apply_qss_theme_content(self, qss):
-        QApplication.instance().setStyleSheet(qss)
+        # 全局滚动条样式
+        scrollbar_qss = '''
+            QScrollBar:vertical {
+                width: 5px;
+                background: #f0f0f0;
+                margin: 0px;
+                border-radius: 3px;
+            }
+            QScrollBar:horizontal {
+                height: 5px;
+                background: #f0f0f0;
+                margin: 0px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+                background: #b0b0b0;
+                min-height: 20px;
+                min-width: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                height: 0px;
+                width: 0px;
+                background: none;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: none;
+            }
+        '''
+        QApplication.instance().setStyleSheet(qss + '\n' + scrollbar_qss)
 
     def clear_qss_theme(self):
         QApplication.instance().setStyleSheet('')

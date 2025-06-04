@@ -39,8 +39,6 @@ class MainToolBar(QToolBar):
 
             # 初始化主题管理器
             self.theme_manager = get_theme_manager()
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
 
             # 初始化UI
             self.init_ui()
@@ -193,7 +191,6 @@ class MainToolBar(QToolBar):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write("")
                 msg_box = QMessageBox.information(self, "成功", "文件创建成功")
-                self.theme_manager.apply_theme(msg_box)
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"创建文件失败: {str(e)}")
@@ -213,7 +210,6 @@ class MainToolBar(QToolBar):
                     content = f.read()
                 # TODO: Process file content
                 msg_box = QMessageBox.information(self, "成功", "文件打开成功")
-                self.theme_manager.apply_theme(msg_box)
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"打开文件失败: {str(e)}")

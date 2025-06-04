@@ -675,7 +675,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 dialog.setStandardButtons(QMessageBox.Ok)
 
                 # 显示对话框并居中
-                self.theme_manager.apply_theme(dialog)
                 dialog.show()
                 self.center_dialog(dialog, self)
                 dialog.exec_()
@@ -691,7 +690,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
             dialog.setStandardButtons(QMessageBox.Ok)
 
             # 显示对话框并居中
-            self.theme_manager.apply_theme(dialog)
             dialog.show()
             self.center_dialog(dialog, self)
             dialog.exec_()
@@ -1129,7 +1127,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
 
             # 创建进度对话框
             progress = QProgressDialog("正在筛选股票...", "取消", 0, 100, self)
-            self.theme_manager.apply_theme(progress)
             progress.setWindowModality(Qt.WindowModal)
             progress.setWindowTitle("股票筛选")
             progress.setAutoClose(True)

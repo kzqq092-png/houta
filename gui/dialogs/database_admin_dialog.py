@@ -83,6 +83,7 @@ class TypeDelegate(QStyledItemDelegate):
 class DatabaseAdminDialog(QDialog):
     def __init__(self, db_path, parent=None, mode='admin'):
         super().__init__(parent)
+        self.field_permissions = {}  # 提前初始化，防止AttributeError
         self.setWindowTitle("数据库管理后台")
         self.resize(1000, 650)
         self.db_path = db_path
@@ -123,8 +124,7 @@ class DatabaseAdminDialog(QDialog):
         self.table_view.setSelectionBehavior(QTableView.SelectRows)
         self.table_view.setSelectionMode(QTableView.ExtendedSelection)
         self.table_view.setFont(QFont("Consolas", 10))
-        self.table_view.horizontalHeader().setStyleSheet(
-            "font-weight:bold; padding: 4px; background: #E3F2FD; border: none;")
+        # self.table_view.horizontalHeader().setStyleSheet("font-weight:bold; padding: 4px; background: #E3F2FD; border: none;")
         self.table_view.horizontalHeader().setSectionResizeMode(
             QHeaderView.Interactive)  # 允许拖拽列宽
         self.table_view.horizontalHeader().setStretchLastSection(False)  # 修复3：最右侧显示网格线
@@ -239,7 +239,6 @@ class DatabaseAdminDialog(QDialog):
         self.log = []
         self.log_window = None
         # 字段权限配置（示例，可扩展为从配置文件/数据库读取）
-        self.field_permissions = {}  # {table: {field: 'readonly'/'write'/'hidden'}}
         self.load_field_permissions()
         # 表格美化
         # 左侧表名高亮

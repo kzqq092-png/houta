@@ -126,7 +126,6 @@ class SentimentStockSelectorDialog(QDialog):
     def visual_edit_signal(self):
         # 可视化信号编辑弹窗，支持参数区间
         dlg = QDialog(self)
-        self.theme_manager.apply_theme(dlg)
         dlg.setWindowTitle("信号可视化编辑")
         vbox = QVBoxLayout(dlg)
         vbox.addWidget(QLabel("选择基础指标："))

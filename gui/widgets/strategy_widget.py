@@ -44,8 +44,6 @@ class StrategyWidget(QWidget):
 
             # 设置样式
             self.theme_manager = get_theme_manager()
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("策略控件初始化完成")
 
@@ -55,75 +53,6 @@ class StrategyWidget(QWidget):
                 self.log_manager.error(error_msg)
                 self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
-
-    def show_error(self, message: str):
-        """显示错误对话框
-
-        Args:
-            message: 错误消息
-        """
-        try:
-            dialog = QMessageBox(self)
-            dialog.setWindowTitle("错误")
-            dialog.setIcon(QMessageBox.Critical)
-            dialog.setText(message)
-            dialog.setStandardButtons(QMessageBox.Ok)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-            dialog.exec_()
-
-            self.theme_manager.apply_theme(dialog)
-
-        except Exception as e:
-            self.log_manager.error(f"显示错误对话框失败: {str(e)}")
-
-    def show_warning(self, message: str):
-        """显示警告对话框
-
-        Args:
-            message: 警告消息
-        """
-        try:
-            dialog = QMessageBox(self)
-            dialog.setWindowTitle("警告")
-            dialog.setIcon(QMessageBox.Warning)
-            dialog.setText(message)
-            dialog.setStandardButtons(QMessageBox.Ok)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-            dialog.exec_()
-
-            self.theme_manager.apply_theme(dialog)
-
-        except Exception as e:
-            self.log_manager.error(f"显示警告对话框失败: {str(e)}")
-
-    def show_info(self, message: str):
-        """显示信息对话框
-
-        Args:
-            message: 信息消息
-        """
-        try:
-            dialog = QMessageBox(self)
-            dialog.setWindowTitle("信息")
-            dialog.setIcon(QMessageBox.Information)
-            dialog.setText(message)
-            dialog.setStandardButtons(QMessageBox.Ok)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-            dialog.exec_()
-
-            self.theme_manager.apply_theme(dialog)
-
-        except Exception as e:
-            self.log_manager.error(f"显示信息对话框失败: {str(e)}")
 
     def init_ui(self):
         """初始化UI"""
@@ -201,9 +130,6 @@ class StrategyWidget(QWidget):
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
-
-    def apply_style(self):
-        pass  # 移除自定义样式，统一由主题管理器apply_theme
 
     def on_strategy_changed(self, strategy: str):
         """处理策略变更事件

@@ -90,8 +90,6 @@ class LogWidget(QWidget):
 
             # 设置样式
             self.theme_manager = get_theme_manager()
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("日志控件初始化完成")
 
@@ -125,7 +123,7 @@ class LogWidget(QWidget):
             level_label.setFixedWidth(80)
             level_label.setAlignment(Qt.AlignLeft)
             level_label.setStyleSheet(
-                "color: #1376d2; font-size: 12px; background: none; border: none; font-weight: normal; min-height: 20px; max-height: 20px; line-height: 20px;")
+                "color: #1376d2; font-size: 12px; background: none; border: none; font-weight: normal; min-height: 15px; max-height: 20px; line-height: 20px;")
             self.level_combo = QComboBox()
             self.level_combo.addItems(["全部", "信息", "警告", "错误", "调试"])
             self.level_combo.setFixedWidth(80)
@@ -423,9 +421,6 @@ class LogWidget(QWidget):
             self.popup_dialog.setWindowModality(Qt.NonModal)
             self.popup_dialog.setAttribute(Qt.WA_DeleteOnClose)
 
-            # 应用主题样式
-            self.theme_manager.apply_theme(self.popup_dialog)
-
             # 创建主布局
             layout = QVBoxLayout(self.popup_dialog)
             layout.setContentsMargins(8, 8, 8, 8)
@@ -578,7 +573,6 @@ class LogWidget(QWidget):
 
             # 右键菜单
             menu = QMenu(self.popup_dialog)
-            self.theme_manager.apply_theme(menu)
             copy_action = menu.addAction("复制")
             select_all_action = menu.addAction("全选")
             clear_action = menu.addAction("清空")

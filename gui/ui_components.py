@@ -36,7 +36,6 @@ class BaseAnalysisPanel(QWidget):
 
     def __init__(self, parent=None, log_manager: Optional[LogManager] = None):
         super().__init__(parent)
-        self.apply_theme()
         self.log_manager = log_manager or LogManager()
         self.param_widgets: Dict[str, Any] = {}
         self.metric_labels: Dict[str, QLabel] = {}
@@ -80,53 +79,6 @@ class BaseAnalysisPanel(QWidget):
             slot: 槽函数，参数(event, data)
         """
         BaseAnalysisPanel.custom_signal.connect(slot)
-
-    def apply_theme(self):
-        """应用统一主题色、字体、控件间距等QSS样式"""
-        qss = """
-        QWidget {
-            font-family: 'Microsoft YaHei', Arial, sans-serif;
-            font-size: 14px;
-        }
-        QGroupBox {
-            border: 1px solid #1976D2;
-            border-radius: 8px;
-            margin-top: 8px;
-            padding: 8px;
-        }
-        QPushButton {
-            background-color: #1976D2;
-            color: white;
-            border-radius: 6px;
-            padding: 6px 16px;
-            min-width: 80px;
-        }
-        QPushButton:hover {
-            background-color: #1565C0;
-        }
-        QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox {
-            border: 1px solid #1976D2;
-            border-radius: 4px;
-            padding: 4px 8px;
-        }
-        QLabel {
-            color: #222;
-        }
-        QTabWidget::pane {
-            border: 1px solid #1976D2;
-            border-radius: 8px;
-        }
-        QTableWidget {
-            gridline-color: #1976D2;
-            selection-background-color: #E3F2FD;
-            selection-color: #1976D2;
-        }
-        QMessageBox {
-            background: #fff;
-            font-size: 15px;
-        }
-        """
-        # self.setStyleSheet(qss)
 
     def init_base_ui(self):
         """初始化通用UI区域（参数、导出、按钮等）"""
@@ -329,15 +281,13 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             self.error_occurred.emit(f"初始化失败: {str(e)}")
 
     def init_ui(self):
-        """初始化UI"""
+        """初始化UI，合并所有功能区，确保所有控件都被正确初始化"""
         try:
             self.log_manager.info("初始化策略回测区域")
-            layout = self.main_layout  # 修复：直接用父类的主布局，避免重复设置布局
-            # 创建策略选择区域
+            layout = self.main_layout  # 用父类的主布局
+            # 策略选择区域
             strategy_group = QGroupBox("策略选择")
             strategy_layout = QVBoxLayout()
-
-            # 添加策略选择下拉框
             self.strategy_combo = QComboBox()
             self.strategy_combo.addItems([
                 '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
@@ -348,12 +298,9 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             strategy_layout.addWidget(self.strategy_combo)
             strategy_group.setLayout(strategy_layout)
             layout.addWidget(strategy_group)
-
-            # 创建回测设置区域
+            # 回测设置区域
             backtest_group = QGroupBox("回测设置")
             backtest_layout = QGridLayout()
-
-            # 添加回测设置控件
             self.backtest_widgets = {}
             row = 0
             for setting in ['初始资金', '手续费率', '滑点']:
@@ -365,12 +312,87 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 backtest_layout.addWidget(spin, row, 1)
                 self.backtest_widgets[setting] = spin
                 row += 1
-
             backtest_group.setLayout(backtest_layout)
             layout.addWidget(backtest_group)
-
+            # 分割线
+            line = QLabel()
+            line.setFixedHeight(2)
+            line.setStyleSheet("background:#e0e0e0;")
+            layout.addWidget(line)
+            # 批量回测/AI Tab
+            self.tab_widget = QTabWidget()
+            # 单次回测Tab
+            self.single_tab = QWidget()
+            single_layout = QVBoxLayout(self.single_tab)
+            # 可扩展单次回测内容
+            self.tab_widget.addTab(self.single_tab, "单次回测")
+            # 批量回测Tab
+            self.batch_tab = QWidget()
+            batch_layout = QVBoxLayout(self.batch_tab)
+            self.batch_stock_input = QLineEdit()
+            self.batch_stock_input.setPlaceholderText("输入多个股票代码，用逗号分隔")
+            batch_layout.addWidget(QLabel("批量股票代码："))
+            batch_layout.addWidget(self.batch_stock_input)
+            self.batch_strategy_list = QListWidget()
+            self.batch_strategy_list.setSelectionMode(QListWidget.MultiSelection)
+            for s in [
+                '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
+                'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
+                'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
+                    'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略']:
+                self.batch_strategy_list.addItem(s)
+            batch_layout.addWidget(QLabel("批量策略选择："))
+            batch_layout.addWidget(self.batch_strategy_list)
+            self.param_grid_table = QTableWidget(0, 3)
+            self.param_grid_table.setHorizontalHeaderLabels(["参数名", "起始值", "终止值"])
+            batch_layout.addWidget(QLabel("参数范围设置（可选）："))
+            batch_layout.addWidget(self.param_grid_table)
+            add_param_btn = QPushButton("添加参数")
+            add_param_btn.clicked.connect(lambda: self.param_grid_table.insertRow(self.param_grid_table.rowCount()))
+            batch_layout.addWidget(add_param_btn)
+            self.run_batch_btn = QPushButton("一键批量回测")
+            batch_layout.addWidget(self.run_batch_btn)
+            self.batch_progress = QProgressBar()
+            batch_layout.addWidget(self.batch_progress)
+            self.batch_result_table = QTableWidget()
+            self.batch_result_table.setColumnCount(12)
+            self.batch_result_table.setHorizontalHeaderLabels([
+                "股票代码", "策略", "参数组合", "年化收益率", "最大回撤", "夏普比率", "卡玛比率", "索提诺比率", "信息比率", "胜率", "盈亏比", "最优标记"])
+            batch_layout.addWidget(self.batch_result_table)
+            self.export_batch_btn = QPushButton("导出全部回测结果")
+            batch_layout.addWidget(self.export_batch_btn)
+            self.batch_tab.setLayout(batch_layout)
+            self.tab_widget.addTab(self.batch_tab, "批量回测/参数调优")
+            # AI Tab
+            self.ai_tab_widget = QTabWidget()
+            self.ai_stock_tab = QWidget()
+            ai_stock_layout = QVBoxLayout(self.ai_stock_tab)
+            self.ai_stock_input = QTextEdit()
+            self.ai_stock_input.setPlaceholderText("请输入选股需求或因子描述（如：高ROE、低估值、强势资金流等，或直接用自然语言描述）")
+            ai_stock_layout.addWidget(QLabel("AI智能选股（支持自然语言/参数化因子输入）："))
+            ai_stock_layout.addWidget(self.ai_stock_input)
+            self.ai_stock_run_btn = QPushButton("一键AI选股")
+            ai_stock_layout.addWidget(self.ai_stock_run_btn)
+            self.ai_stock_result_table = QTableWidget()
+            ai_stock_layout.addWidget(self.ai_stock_result_table)
+            self.ai_stock_export_btn = QPushButton("导出选股结果")
+            ai_stock_layout.addWidget(self.ai_stock_export_btn)
+            self.ai_tab_widget.addTab(self.ai_stock_tab, "AI智能选股")
+            self.ai_strategy_tab = QWidget()
+            ai_strategy_layout = QVBoxLayout(self.ai_strategy_tab)
+            self.ai_strategy_input = QTextEdit()
+            self.ai_strategy_input.setPlaceholderText("请输入策略描述或自然语言需求")
+            ai_strategy_layout.addWidget(QLabel("AI策略生成："))
+            ai_strategy_layout.addWidget(self.ai_strategy_input)
+            self.ai_strategy_run_btn = QPushButton("一键生成策略")
+            ai_strategy_layout.addWidget(self.ai_strategy_run_btn)
+            self.ai_strategy_result = QTextEdit()
+            self.ai_strategy_result.setReadOnly(True)
+            ai_strategy_layout.addWidget(self.ai_strategy_result)
+            self.ai_tab_widget.addTab(self.ai_strategy_tab, "AI策略生成")
+            self.tab_widget.addTab(self.ai_tab_widget, "AI智能功能")
+            layout.addWidget(self.tab_widget)
             self.log_manager.info("分析工具面板UI初始化完成")
-
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -433,6 +455,9 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         try:
             self.log_manager.info("连接策略选择信号")
             # 连接策略选择信号
+            if self.strategy_combo is None:
+                self.log_manager.error("connect_signals失败: self.strategy_combo为None，UI未正确初始化，跳过信号连接。")
+                return
             self.strategy_combo.currentTextChanged.connect(
                 self.on_strategy_changed)
 
@@ -651,426 +676,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         兼容旧接口，重定向到refresh。
         """
         self.refresh()
-
-    def init_ui(self):
-        super().init_ui()
-        # 新增批量回测/参数调优Tab
-        self.tab_widget = QTabWidget()
-        self.tab_widget.addTab(QWidget(), "单次回测")
-        self.batch_tab = QWidget()
-        batch_layout = QVBoxLayout(self.batch_tab)
-        # 股票批量输入
-        self.batch_stock_input = QLineEdit()
-        self.batch_stock_input.setPlaceholderText("输入多个股票代码，用逗号分隔")
-        batch_layout.addWidget(QLabel("批量股票代码："))
-        batch_layout.addWidget(self.batch_stock_input)
-        # 策略多选
-        self.batch_strategy_list = QListWidget()
-        self.batch_strategy_list.setSelectionMode(QListWidget.MultiSelection)
-        for s in [
-            '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
-            'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
-            'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
-                'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略']:
-            self.batch_strategy_list.addItem(s)
-        batch_layout.addWidget(QLabel("批量策略选择："))
-        batch_layout.addWidget(self.batch_strategy_list)
-        # 参数网格设置
-        self.param_grid_table = QTableWidget(0, 3)
-        self.param_grid_table.setHorizontalHeaderLabels(["参数名", "起始值", "终止值"])
-        batch_layout.addWidget(QLabel("参数范围设置（可选）："))
-        batch_layout.addWidget(self.param_grid_table)
-        # 添加参数行按钮
-        add_param_btn = QPushButton("添加参数")
-        add_param_btn.clicked.connect(lambda: self.param_grid_table.insertRow(self.param_grid_table.rowCount()))
-        batch_layout.addWidget(add_param_btn)
-        # 一键批量回测按钮
-        self.run_batch_btn = QPushButton("一键批量回测")
-        batch_layout.addWidget(self.run_batch_btn)
-        # 进度条
-        self.batch_progress = QProgressBar()
-        batch_layout.addWidget(self.batch_progress)
-        # 结果表格
-        self.batch_result_table = QTableWidget()
-        self.batch_result_table.setColumnCount(12)
-        self.batch_result_table.setHorizontalHeaderLabels([
-            "股票代码", "策略", "参数组合", "年化收益率", "最大回撤", "夏普比率", "卡玛比率", "索提诺比率", "信息比率", "胜率", "盈亏比", "最优标记"])
-        batch_layout.addWidget(self.batch_result_table)
-        # 一键导出按钮
-        self.export_batch_btn = QPushButton("导出全部回测结果")
-        batch_layout.addWidget(self.export_batch_btn)
-        self.tab_widget.addTab(self.batch_tab, "批量回测/参数调优")
-        self.main_layout.addWidget(self.tab_widget)
-        # 信号绑定
-        self.run_batch_btn.clicked.connect(self.run_batch_backtest)
-        self.export_batch_btn.clicked.connect(self.export_batch_results)
-        # 新增AI/智能功能Tab
-        self.ai_tab_widget = QTabWidget()
-        # 1. AI智能选股Tab
-        self.ai_stock_tab = QWidget()
-        ai_stock_layout = QVBoxLayout(self.ai_stock_tab)
-        self.ai_stock_input = QTextEdit()
-        self.ai_stock_input.setPlaceholderText("请输入选股需求或因子描述（如：高ROE、低估值、强势资金流等，或直接用自然语言描述）")
-        ai_stock_layout.addWidget(QLabel("AI智能选股（支持自然语言/参数化因子输入）："))
-        ai_stock_layout.addWidget(self.ai_stock_input)
-        self.ai_stock_run_btn = QPushButton("一键AI选股")
-        ai_stock_layout.addWidget(self.ai_stock_run_btn)
-        self.ai_stock_result_table = QTableWidget()
-        ai_stock_layout.addWidget(self.ai_stock_result_table)
-        self.ai_stock_export_btn = QPushButton("导出选股结果")
-        ai_stock_layout.addWidget(self.ai_stock_export_btn)
-        self.ai_tab_widget.addTab(self.ai_stock_tab, "AI智能选股")
-        # 2. AI策略生成Tab
-        self.ai_strategy_tab = QWidget()
-        ai_strategy_layout = QVBoxLayout(self.ai_strategy_tab)
-        self.ai_strategy_input = QTextEdit()
-        self.ai_strategy_input.setPlaceholderText("请输入策略描述（如：均线金叉买入，MACD背离等，或直接用自然语言描述）")
-        ai_strategy_layout.addWidget(QLabel("AI策略生成（自然语言转策略代码+回测）："))
-        ai_strategy_layout.addWidget(self.ai_strategy_input)
-        self.ai_strategy_run_btn = QPushButton("一键生成并回测")
-        ai_strategy_layout.addWidget(self.ai_strategy_run_btn)
-        self.ai_strategy_code = QTextEdit()
-        self.ai_strategy_code.setReadOnly(True)
-        ai_strategy_layout.addWidget(QLabel("生成的策略代码："))
-        ai_strategy_layout.addWidget(self.ai_strategy_code)
-        self.ai_strategy_result_table = QTableWidget()
-        ai_strategy_layout.addWidget(self.ai_strategy_result_table)
-        self.ai_strategy_export_btn = QPushButton("导出回测结果")
-        ai_strategy_layout.addWidget(self.ai_strategy_export_btn)
-        self.ai_tab_widget.addTab(self.ai_strategy_tab, "AI策略生成")
-        # 3. 智能预警Tab
-        self.ai_alert_tab = QWidget()
-        ai_alert_layout = QVBoxLayout(self.ai_alert_tab)
-        self.ai_alert_condition = QTextEdit()
-        self.ai_alert_condition.setPlaceholderText("请输入预警条件（如：单日涨跌幅超10%，主力资金异动，热点板块异动等）")
-        ai_alert_layout.addWidget(QLabel("智能预警条件设置："))
-        ai_alert_layout.addWidget(self.ai_alert_condition)
-        self.ai_alert_push_type = QComboBox()
-        self.ai_alert_push_type.addItems(["桌面弹窗", "邮件", "微信", "短信"])
-        ai_alert_layout.addWidget(QLabel("推送方式："))
-        ai_alert_layout.addWidget(self.ai_alert_push_type)
-        self.ai_alert_run_btn = QPushButton("启动智能预警")
-        ai_alert_layout.addWidget(self.ai_alert_run_btn)
-        self.ai_alert_history = QTableWidget()
-        ai_alert_layout.addWidget(QLabel("历史预警记录："))
-        ai_alert_layout.addWidget(self.ai_alert_history)
-        self.ai_tab_widget.addTab(self.ai_alert_tab, "智能预警")
-        # 4. 智能报告Tab
-        self.ai_report_tab = QWidget()
-        ai_report_layout = QVBoxLayout(self.ai_report_tab)
-        self.ai_report_object = QLineEdit()
-        self.ai_report_object.setPlaceholderText("输入个股/板块/策略名称")
-        ai_report_layout.addWidget(QLabel("报告对象："))
-        ai_report_layout.addWidget(self.ai_report_object)
-        self.ai_report_type = QComboBox()
-        self.ai_report_type.addItems(["个股深度分析", "板块深度分析", "策略深度分析"])
-        ai_report_layout.addWidget(QLabel("报告类型："))
-        ai_report_layout.addWidget(self.ai_report_type)
-        self.ai_report_run_btn = QPushButton("一键生成报告")
-        ai_report_layout.addWidget(self.ai_report_run_btn)
-        self.ai_report_content = QTextEdit()
-        self.ai_report_content.setReadOnly(True)
-        ai_report_layout.addWidget(QLabel("报告内容预览："))
-        ai_report_layout.addWidget(self.ai_report_content)
-        self.ai_report_export_btn = QPushButton("导出报告（PDF/Word）")
-        ai_report_layout.addWidget(self.ai_report_export_btn)
-        self.ai_tab_widget.addTab(self.ai_report_tab, "智能报告")
-        # 5. AI助手Tab
-        self.ai_assistant_tab = QWidget()
-        ai_assistant_layout = QVBoxLayout(self.ai_assistant_tab)
-        self.ai_assistant_chat = QTextEdit()
-        self.ai_assistant_chat.setPlaceholderText("请输入您的问题、数据分析需求、策略优化等（支持多轮对话）")
-        ai_assistant_layout.addWidget(QLabel("AI助手对话区："))
-        ai_assistant_layout.addWidget(self.ai_assistant_chat)
-        self.ai_assistant_send_btn = QPushButton("发送")
-        ai_assistant_layout.addWidget(self.ai_assistant_send_btn)
-        self.ai_assistant_response = QTextEdit()
-        self.ai_assistant_response.setReadOnly(True)
-        ai_assistant_layout.addWidget(QLabel("AI助手回复："))
-        ai_assistant_layout.addWidget(self.ai_assistant_response)
-        self.ai_tab_widget.addTab(self.ai_assistant_tab, "AI助手")
-        # 加入主界面
-        self.main_layout.addWidget(self.ai_tab_widget)
-        # 新增多模态AI分析Tab
-        self.multimodal_tab = QWidget()
-        mm_layout = QVBoxLayout(self.multimodal_tab)
-        # 图片上传
-        self.mm_image_btn = QPushButton("上传图片（K线/财报等）")
-        self.mm_image_path = QLineEdit()
-        self.mm_image_path.setReadOnly(True)
-        mm_layout.addWidget(self.mm_image_btn)
-        mm_layout.addWidget(self.mm_image_path)
-        # 表格上传
-        self.mm_table_btn = QPushButton("上传表格（csv/xlsx）")
-        self.mm_table_path = QLineEdit()
-        self.mm_table_path.setReadOnly(True)
-        mm_layout.addWidget(self.mm_table_btn)
-        mm_layout.addWidget(self.mm_table_path)
-        # 文本输入
-        self.mm_text_input = QTextEdit()
-        self.mm_text_input.setPlaceholderText("可选：补充分析说明或问题")
-        mm_layout.addWidget(QLabel("补充说明/问题："))
-        mm_layout.addWidget(self.mm_text_input)
-        # 分析按钮
-        self.mm_run_btn = QPushButton("一键多模态AI分析")
-        mm_layout.addWidget(self.mm_run_btn)
-        # 结果展示
-        self.mm_result = QTextEdit()
-        self.mm_result.setReadOnly(True)
-        mm_layout.addWidget(QLabel("分析结果："))
-        mm_layout.addWidget(self.mm_result)
-        self.ai_tab_widget.addTab(self.multimodal_tab, "多模态AI分析")
-        # 文件选择事件
-
-        def select_image():
-            path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg *.bmp)")
-            if path:
-                self.mm_image_path.setText(path)
-        self.mm_image_btn.clicked.connect(select_image)
-
-        def select_table():
-            path, _ = QFileDialog.getOpenFileName(self, "选择表格", "", "CSV Files (*.csv);;Excel Files (*.xlsx *.xls)")
-            if path:
-                self.mm_table_path.setText(path)
-        self.mm_table_btn.clicked.connect(select_table)
-        # 分析按钮事件
-
-        def run_multimodal():
-            from components.ai_multimodal import AIMultimodalAnalyzer
-            api_key = self.get_openai_key()
-            analyzer = AIMultimodalAnalyzer(api_key)
-            image_path = self.mm_image_path.text()
-            table_path = self.mm_table_path.text()
-            user_input = self.mm_text_input.toPlainText()
-            self.mm_run_btn.setEnabled(False)
-
-            def worker():
-                res = None
-                if image_path:
-                    res = analyzer.analyze_image(image_path, user_input)
-                elif table_path:
-                    res = analyzer.analyze_table(table_path, user_input)
-                elif user_input:
-                    res = analyzer.analyze_text(user_input)
-                else:
-                    res = {"error": "请上传图片/表格或输入文本"}
-                self.mm_run_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "多模态AI分析异常", res['error'])
-                    return
-                self.mm_result.setPlainText(res.get('result', ''))
-            threading.Thread(target=worker, daemon=True).start()
-        self.mm_run_btn.clicked.connect(run_multimodal)
-
-        # 新增AI行情解读Tab
-        import threading
-        self.market_news_tab = QWidget()
-        mn_layout = QVBoxLayout(self.market_news_tab)
-        # 文本输入
-        self.mn_text_input = QTextEdit()
-        self.mn_text_input.setPlaceholderText("请输入公告、新闻、行情描述等文本")
-        mn_layout.addWidget(QLabel("文本输入："))
-        mn_layout.addWidget(self.mn_text_input)
-        # URL输入
-        self.mn_url_input = QLineEdit()
-        self.mn_url_input.setPlaceholderText("可选：输入新闻/公告URL，自动抓取内容")
-        mn_layout.addWidget(QLabel("新闻/公告URL："))
-        mn_layout.addWidget(self.mn_url_input)
-        # 分析按钮
-        self.mn_run_btn = QPushButton("一键AI行情解读")
-        mn_layout.addWidget(self.mn_run_btn)
-        # 结果展示
-        self.mn_result = QTextEdit()
-        self.mn_result.setReadOnly(True)
-        mn_layout.addWidget(QLabel("解读结果："))
-        mn_layout.addWidget(self.mn_result)
-        self.ai_tab_widget.addTab(self.market_news_tab, "AI行情解读")
-        # 分析按钮事件
-
-        def run_market_news():
-            from components.ai_market_news import AIMarketNewsAnalyzer
-            api_key = self.get_openai_key()
-            analyzer = AIMarketNewsAnalyzer(api_key)
-            user_input = self.mn_text_input.toPlainText()
-            url = self.mn_url_input.text()
-            self.mn_run_btn.setEnabled(False)
-
-            def worker():
-                res = analyzer.analyze(user_input, url)
-                self.mn_run_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "AI行情解读异常", res['error'])
-                    return
-                self.mn_result.setPlainText(res.get('result', ''))
-            threading.Thread(target=worker, daemon=True).start()
-        self.mn_run_btn.clicked.connect(run_market_news)
-
-        # 新增AI知识图谱Tab
-        import threading
-        self.kg_tab = QWidget()
-        kg_layout = QVBoxLayout(self.kg_tab)
-        # 文本输入
-        self.kg_text_input = QTextEdit()
-        self.kg_text_input.setPlaceholderText("请输入公告、研报、新闻等文本，自动抽取知识图谱")
-        kg_layout.addWidget(QLabel("文本输入："))
-        kg_layout.addWidget(self.kg_text_input)
-        # 构建图谱按钮
-        self.kg_build_btn = QPushButton("一键构建知识图谱")
-        kg_layout.addWidget(self.kg_build_btn)
-        # 三元组展示
-        self.kg_triples = QTextEdit()
-        self.kg_triples.setReadOnly(True)
-        kg_layout.addWidget(QLabel("知识三元组："))
-        kg_layout.addWidget(self.kg_triples)
-        # 问答输入
-        self.kg_qa_input = QLineEdit()
-        self.kg_qa_input.setPlaceholderText("请输入与图谱相关的问题，如：主要股东有哪些？")
-        kg_layout.addWidget(QLabel("智能问答："))
-        kg_layout.addWidget(self.kg_qa_input)
-        # 问答按钮
-        self.kg_qa_btn = QPushButton("图谱智能问答")
-        kg_layout.addWidget(self.kg_qa_btn)
-        # 问答结果
-        self.kg_qa_result = QTextEdit()
-        self.kg_qa_result.setReadOnly(True)
-        kg_layout.addWidget(QLabel("问答结果："))
-        kg_layout.addWidget(self.kg_qa_result)
-        self.ai_tab_widget.addTab(self.kg_tab, "AI知识图谱")
-        # 构建图谱事件
-
-        def run_kg_build():
-            from components.ai_kg import AIKnowledgeGraph
-            api_key = self.get_openai_key()
-            kg = AIKnowledgeGraph(api_key)
-            text = self.kg_text_input.toPlainText()
-            self.kg_build_btn.setEnabled(False)
-
-            def worker():
-                res = kg.build_graph(text)
-                self.kg_build_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "知识图谱构建异常", res['error'])
-                    return
-                triples = res.get('triples', [])
-                self.kg_triples.setPlainText(str(triples))
-                self._ai_kg_instance = kg  # 缓存实例供问答用
-            threading.Thread(target=worker, daemon=True).start()
-        self.kg_build_btn.clicked.connect(run_kg_build)
-        # 问答事件
-
-        def run_kg_qa():
-            kg = getattr(self, '_ai_kg_instance', None)
-            if not kg:
-                QMessageBox.warning(self, "请先构建知识图谱", "请先输入文本并构建知识图谱")
-                return
-            question = self.kg_qa_input.text()
-            self.kg_qa_btn.setEnabled(False)
-
-            def worker():
-                res = kg.ask(question)
-                self.kg_qa_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "知识图谱问答异常", res['error'])
-                    return
-                self.kg_qa_result.setPlainText(res.get('answer', ''))
-            threading.Thread(target=worker, daemon=True).start()
-
-        # 新增AI调仓/风控Tab
-        import threading
-        self.rebalance_tab = QWidget()
-        rb_layout = QVBoxLayout(self.rebalance_tab)
-        # 持仓表格
-        self.rb_table = QTableWidget(0, 4)
-        self.rb_table.setHorizontalHeaderLabels(["股票代码", "名称", "持仓数量", "持仓成本"])
-        rb_layout.addWidget(QLabel("当前持仓："))
-        rb_layout.addWidget(self.rb_table)
-        self.rb_add_row_btn = QPushButton("添加持仓行")
-        rb_layout.addWidget(self.rb_add_row_btn)
-
-        def add_rb_row():
-            self.rb_table.insertRow(self.rb_table.rowCount())
-        self.rb_add_row_btn.clicked.connect(add_rb_row)
-        # 策略输入
-        self.rb_strategy = QLineEdit()
-        self.rb_strategy.setPlaceholderText("可选：策略描述，如多因子、趋势等")
-        rb_layout.addWidget(QLabel("策略描述："))
-        rb_layout.addWidget(self.rb_strategy)
-        # 风控参数
-        self.rb_risk = QLineEdit()
-        self.rb_risk.setPlaceholderText("可选：风控参数，如最大回撤、单股权重上限等")
-        rb_layout.addWidget(QLabel("风控参数："))
-        rb_layout.addWidget(self.rb_risk)
-        # 补充说明
-        self.rb_user_input = QLineEdit()
-        self.rb_user_input.setPlaceholderText("可选：补充说明")
-        rb_layout.addWidget(QLabel("补充说明："))
-        rb_layout.addWidget(self.rb_user_input)
-        # 一键AI调仓按钮
-        self.rb_run_btn = QPushButton("一键AI调仓/风控分析")
-        rb_layout.addWidget(self.rb_run_btn)
-        # 结果展示
-        self.rb_result = QTextEdit()
-        self.rb_result.setReadOnly(True)
-        rb_layout.addWidget(QLabel("调仓建议与风险分析："))
-        rb_layout.addWidget(self.rb_result)
-        # 自然语言问答
-        self.rb_qa_input = QLineEdit()
-        self.rb_qa_input.setPlaceholderText("可直接提问，如：如何优化当前持仓？")
-        rb_layout.addWidget(QLabel("自然语言调仓/风控问答："))
-        rb_layout.addWidget(self.rb_qa_input)
-        self.rb_qa_btn = QPushButton("AI调仓/风控问答")
-        rb_layout.addWidget(self.rb_qa_btn)
-        self.rb_qa_result = QTextEdit()
-        self.rb_qa_result.setReadOnly(True)
-        rb_layout.addWidget(QLabel("问答结果："))
-        rb_layout.addWidget(self.rb_qa_result)
-        self.ai_tab_widget.addTab(self.rebalance_tab, "AI调仓/风控")
-        # 一键AI调仓事件
-
-        def run_rebalance():
-            from components.ai_rebalance import AIRebalancer
-            api_key = self.get_openai_key()
-            rebalancer = AIRebalancer(api_key)
-            positions = []
-            for row in range(self.rb_table.rowCount()):
-                code = self.rb_table.item(row, 0).text() if self.rb_table.item(row, 0) else ''
-                name = self.rb_table.item(row, 1).text() if self.rb_table.item(row, 1) else ''
-                amount = self.rb_table.item(row, 2).text() if self.rb_table.item(row, 2) else ''
-                cost = self.rb_table.item(row, 3).text() if self.rb_table.item(row, 3) else ''
-                if code:
-                    positions.append({"code": code, "name": name, "amount": amount, "cost": cost})
-            strategy = self.rb_strategy.text()
-            risk_params = self.rb_risk.text()
-            user_input = self.rb_user_input.text()
-            self.rb_run_btn.setEnabled(False)
-
-            def worker():
-                res = rebalancer.rebalance(positions, strategy, risk_params, user_input)
-                self.rb_run_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "AI调仓/风控异常", res['error'])
-                    return
-                self.rb_result.setPlainText(res.get('result', ''))
-            threading.Thread(target=worker, daemon=True).start()
-        self.rb_run_btn.clicked.connect(run_rebalance)
-        # AI调仓/风控问答事件
-
-        def run_rb_qa():
-            from components.ai_rebalance import AIRebalancer
-            api_key = self.get_openai_key()
-            rebalancer = AIRebalancer(api_key)
-            user_input = self.rb_qa_input.text()
-            self.rb_qa_btn.setEnabled(False)
-
-            def worker():
-                res = rebalancer.ask(user_input)
-                self.rb_qa_btn.setEnabled(True)
-                if 'error' in res:
-                    QMessageBox.critical(self, "AI调仓/风控问答异常", res['error'])
-                    return
-                self.rb_qa_result.setPlainText(res.get('result', ''))
-            threading.Thread(target=worker, daemon=True).start()
-        self.rb_qa_btn.clicked.connect(run_rb_qa)
 
     def run_batch_backtest(self):
         """一键批量回测，自动遍历参数组合，异步执行，进度实时显示"""

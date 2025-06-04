@@ -73,8 +73,6 @@ class AnalysisWidget(QWidget):
             self.log_manager.info("初始化分析控件主题")
             self.theme_manager = get_theme_manager(
                 config_manager or ConfigManager())
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
             self.log_manager.info("初始化分析控件主题完成")
         except Exception as e:
             msg = f"AnalysisWidget主题应用失败: {str(e)}"

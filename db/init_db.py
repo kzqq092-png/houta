@@ -110,6 +110,17 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         extra TEXT
     )''')
+    # 12. 主题表（合并自themes.db）
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS themes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        type TEXT,
+        content TEXT,
+        origin TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )''')
     conn.commit()
     conn.close()
 

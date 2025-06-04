@@ -44,112 +44,6 @@ import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
 
-# 定义全局样式表
-GLOBAL_STYLE = """
-QWidget {
-    font-family: 'Microsoft YaHei', 'SimHei', 'Arial Unicode MS', sans-serif;
-    background: #f7f9fa;
-}
-QGroupBox {
-    border: 1px solid #e0e0e0;
-    border-radius: 2px;
-    margin-top: 10px;
-    background: #ffffff;
-    /* box-shadow: 0 2px 8px rgba(0,0,0,0.04); */
-    padding: 2px;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 2px;
-    padding: 0 2px 0 2px;
-    background: #eaf3fb;
-    border-radius: 2px;
-    color: #1976d2;
-    font-weight: bold;
-}
-QPushButton {
-    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-    font-size: 13px;
-    border-radius: 2px;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
-    border: 1px solid #90caf9;
-    padding: 6px 16px;
-    color: #1565c0;
-}
-QPushButton:hover {
-    background: #90caf9;
-    color: #0d47a1;
-}
-QPushButton:pressed {
-    background: #64b5f6;
-}
-QLabel {
-    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-    font-size: 12px;
-}
-QComboBox {
-    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-    font-size: 12px;
-    border-radius: 2px;
-    border: 1px solid #bdbdbd;
-    background: #f5faff;
-    padding: 2px 8px;
-}
-QLineEdit, QTextEdit, QPlainTextEdit {
-    font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
-    font-size: 12px;
-    border-radius: 2px;
-    border: 1px solid #bdbdbd;
-    background: #f5faff;
-    padding: 4px 8px;
-}
-QScrollArea {
-    border: none;
-    background: transparent;
-}
-QTabWidget::pane {
-    border-radius: 2px;
-    border: 1px solid #e0e0e0;
-    background: #fff;
-}
-QTabBar::tab {
-    background: #e3f2fd;
-    border-radius: 2px 2px 0 0;
-    padding: 6px 16px;
-    margin-right: 2px;
-}
-QTabBar::tab:selected {
-    background: #1976d2;
-    color: #fff;
-}
-/* 全局滚动条美化：取消横向滚动条，竖向滚动条变窄 */
-QScrollBar:horizontal {
-    height: 0px;
-    max-height: 0px;
-    min-height: 0px;
-    background: transparent;
-}
-QScrollBar:vertical {
-    width: 6px;
-    background: #f0f0f0;
-    margin: 0px;
-    border-radius: 3px;
-}
-QScrollBar::handle:vertical {
-    background: #b0b0b0;
-    min-height: 20px;
-    border-radius: 3px;
-}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    height: 0px;
-    background: none;
-    border: none;
-}
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    background: none;
-}
-"""
-
 
 class TradingGUI(QMainWindow):
     """Trading system main window"""
@@ -170,7 +64,38 @@ class TradingGUI(QMainWindow):
             self.setWindowTitle("Trading System")
             self.setGeometry(100, 100, 1200, 800)
             self.setMinimumSize(800, 600)
-            # self.setAcceptDrops(True)  # 移到init_ui中
+            # 全局滚动条样式
+            QApplication.instance().setStyleSheet('''
+                QScrollBar:vertical {
+                    width: 5px;
+                    background: #f0f0f0;
+                    margin: 0px;
+                    border-radius: 3px;
+                }
+                QScrollBar:horizontal {
+                    height: 5px;
+                    background: #f0f0f0;
+                    margin: 0px;
+                    border-radius: 3px;
+                }
+                QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+                    background: #b0b0b0;
+                    min-height: 20px;
+                    min-width: 20px;
+                    border-radius: 3px;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                    height: 0px;
+                    width: 0px;
+                    background: none;
+                    border: none;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+                QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                    background: none;
+                }
+            ''')
 
             # 初始化缓存相关属性
             self.stock_list_cache = []  # 初始化股票列表缓存
@@ -213,8 +138,11 @@ class TradingGUI(QMainWindow):
 
             # 初始化主题管理器
             self.theme_manager = get_theme_manager(self.config_manager)
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
+            # 启动时优先从主库读取上次主题
+            theme_cfg = self.config_manager.get('theme', {})
+            theme_name = theme_cfg.get('theme_name')
+            if theme_name:
+                self.theme_manager.set_theme(theme_name)
 
             # 初始化线程池
             self.thread_pool = QThreadPool()
@@ -323,7 +251,6 @@ class TradingGUI(QMainWindow):
         """
         self.log_manager.error(f"分析错误: {error_msg}")
         msg_box = QMessageBox.warning(self, "分析错误", error_msg)
-        self.theme_manager.apply_theme(msg_box)
 
     def handle_chart_error(self, error_msg: str):
         """处理图表错误
@@ -333,7 +260,6 @@ class TradingGUI(QMainWindow):
         """
         self.log_manager.error(f"图表错误: {error_msg}")
         msg_box = QMessageBox.warning(self, "图表错误", error_msg)
-        self.theme_manager.apply_theme(msg_box)
 
     def handle_log_error(self, error_msg: str):
         """处理日志错误
@@ -343,7 +269,6 @@ class TradingGUI(QMainWindow):
         """
         self.log_manager.error(f"日志错误: {error_msg}")
         msg_box = QMessageBox.warning(self, "日志错误", error_msg)
-        self.theme_manager.apply_theme(msg_box)
 
     def handle_log_clear(self):
         """处理日志清除"""
@@ -457,9 +382,6 @@ class TradingGUI(QMainWindow):
             # 创建菜单栏和状态栏
             self.create_menubar()
             self.create_statusbar()
-
-            # 应用主题
-            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("UI初始化完成")
 
@@ -619,7 +541,6 @@ class TradingGUI(QMainWindow):
             dialog.show()
             self.center_dialog(dialog, self)
             dialog.exec_()
-            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示关于对话框失败: {str(e)}")
 
@@ -661,12 +582,16 @@ class TradingGUI(QMainWindow):
             dialog.show()
             self.center_dialog(dialog, self)
             dialog.exec_()
-            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示帮助对话框失败: {str(e)}")
 
     def on_theme_changed(self, theme_name):
         self.theme_manager.set_theme(theme_name)
+        # 主题切换后，持久化到ConfigManager
+        if hasattr(self, 'config_manager'):
+            theme_cfg = self.config_manager.get('theme', {})
+            theme_cfg['theme_name'] = theme_name
+            self.config_manager.set('theme', theme_cfg)
         if self.theme_manager.is_qss_theme():
             # QSS主题已全局应用，无需递归apply_theme
             pass
@@ -694,7 +619,7 @@ class TradingGUI(QMainWindow):
                 self.chart_cache = {}
 
             # 加载配置
-            self.settings = self.config_manager.get_all()
+            self.get_db_config = self.config_manager.get_all()
             self.log_manager.info("配置加载完成")
 
             # 初始化数据源
@@ -723,29 +648,22 @@ class TradingGUI(QMainWindow):
                 return
             # 只对JSON主题递归刷新，QSS主题只全局应用一次
             if not self.theme_manager.is_qss_theme():
+                # 1. 设置主窗口背景色
+                colors = self.theme_manager.get_theme_colors()
+                bg_color = colors.get('background', '#f7f9fa')
+                self.setStyleSheet(f"background-color: {bg_color};")
+                # 2. 递归处理其他QWidget
                 for widget in self.findChildren(QWidget):
-                    if widget is not self:
-                        try:
-                            self.theme_manager.apply_theme(widget)
-                        except Exception as widget_error:
-                            self.log_manager.warning(f"应用主题到部件失败: {str(widget_error)}")
-                            continue
+                    # 跳过菜单栏、工具栏，避免重复
+                    if widget in [self.menu_bar, getattr(self, 'toolbar', None)]:
+                        continue
+
                 self.log_manager.info("主题应用完成")
-            # QSS主题已全局应用，无需递归apply_theme
         except Exception as e:
             self.log_manager.error(f"应用主题失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
         finally:
             self._is_applying_theme = False
-
-    def apply_global_styles(self):
-        """批量应用全局UI优化样式，菜单栏及下方按钮统一为弹框风格，日志区修复自动滚动底部，整体风格更一致，弹窗/自定义控件/分割线风格统一"""
-        # 全局QSS主题应用统一通过ThemeManager.set_theme
-        # 不再重复set_theme，避免递归和卡顿
-        if hasattr(self, 'menu_bar'):
-            self.menu_bar.apply_theme(self.theme_manager)
-        if hasattr(self, 'toolbar'):
-            self.toolbar.setStyleSheet("")
 
     def create_left_panel(self):
         """Create left panel with stock list and indicators"""
@@ -828,27 +746,6 @@ class TradingGUI(QMainWindow):
             # 性能优化：启用统一项高度，提升大数据量时的滚动和重绘效率
             self.stock_list.setUniformItemSizes(True)
 
-            # 设置自定义样式
-            self.stock_list.setStyleSheet("""
-                QListWidget {
-                    background-color: transparent;
-                    border: 1px solid #E0E0E0;
-                    border-radius: 4px;
-                    padding: 2px;
-                }
-                QListWidget::item {
-                    padding: 5px;
-                    border-bottom: 1px solid #E0E0E0;
-                }
-                QListWidget::item:selected {
-                    background-color: #E3F2FD;
-                    color: #1976D2;
-                }
-                QListWidget::item:hover {
-                    background-color: #F5F5F5;
-                }
-            """)
-
             # 设置右键菜单
             self.stock_list.setContextMenuPolicy(Qt.CustomContextMenu)
             self.stock_list.customContextMenuRequested.connect(
@@ -904,25 +801,7 @@ class TradingGUI(QMainWindow):
                 QAbstractItemView.MultiSelection)
             self.indicator_list.itemSelectionChanged.connect(
                 self.on_indicators_changed)
-            self.indicator_list.setStyleSheet("""
-                QListWidget {
-                    background-color: transparent;
-                    border: 1px solid #E0E0E0;
-                    border-radius: 4px;
-                    padding: 2px;
-                }
-                QListWidget::item {
-                    padding: 5px;
-                    border-bottom: 1px solid #E0E0E0;
-                }
-                QListWidget::item:selected {
-                    background-color: #E3F2FD;
-                    color: #1976D2;
-                }
-                QListWidget::item:hover {
-                    background-color: #F5F5F5;
-                }
-            """)
+
             indicator_list_scroll = QScrollArea()
             indicator_list_scroll.setWidgetResizable(True)
             indicator_list_scroll.setWidget(self.indicator_list)
@@ -972,44 +851,6 @@ class TradingGUI(QMainWindow):
 
             self.log_manager.info("左侧面板创建完成")
             add_shadow(self.left_panel)
-
-            # 自动美化股票列表和指标列表QSS
-            stock_list_style = """
-            QListWidget {
-                border: 0.5px solid #90caf9;
-                border-radius: 6px;
-                background: #fff;
-            }
-            QScrollBar:horizontal {
-                height: 0px;
-                max-height: 0px;
-                min-height: 0px;
-                background: transparent;
-            }
-            QScrollBar:vertical {
-                width: 6px;
-                background: #f0f0f0;
-                margin: 0px;
-                border-radius: 3px;
-            }
-            QScrollBar::handle:vertical {
-                background: #b0b0b0;
-                min-height: 20px;
-                border-radius: 3px;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-                background: none;
-                border: none;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-            """
-            if hasattr(self, 'stock_list') and self.stock_list:
-                self.stock_list.setStyleSheet(stock_list_style)
-            if hasattr(self, 'indicator_list') and self.indicator_list:
-                self.indicator_list.setStyleSheet(stock_list_style)
 
             # 强制隐藏横向滚动条，彻底去除横向滚动条空间
             self.stock_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -2077,8 +1918,21 @@ class TradingGUI(QMainWindow):
                         spinbox.setValue(float(value[2]))
                     else:
                         spinbox = QSpinBox()
-                        spinbox.setRange(int(value[0]), int(value[1]))
-                        spinbox.setValue(int(value[2]))
+                        # 修复：防止value[x]为非数字字符串导致int()异常
+                        try:
+                            v0 = int(value[0]) if str(value[0]).isdigit() else 0
+                        except Exception:
+                            v0 = 0
+                        try:
+                            v1 = int(value[1]) if str(value[1]).isdigit() else 100
+                        except Exception:
+                            v1 = 100
+                        try:
+                            v2 = int(value[2]) if str(value[2]).isdigit() else v0
+                        except Exception:
+                            v2 = v0
+                        spinbox.setRange(v0, v1)
+                        spinbox.setValue(v2)
                     self.param_controls[name] = spinbox
                     layout.addRow(name + ":", spinbox)
                 else:
@@ -4673,11 +4527,10 @@ class TradingGUI(QMainWindow):
                 # 保存设置逻辑（可扩展）
                 self.theme_manager.set_theme(self.theme_combo.currentText())
                 self.apply_theme()
-                self.config_manager.set_font_size(font_size.value())
+                self.config_manager.set_theme_type(font_size.value(), self.theme_combo.currentText())
                 self.config_manager.set_language(lang_combo.currentText())
                 self.config_manager.set_auto_save(auto_save.isChecked())
                 self.log_manager.info("设置已保存")
-            self.theme_manager.apply_theme(dialog)
         except Exception as e:
             self.log_manager.error(f"显示设置对话框失败: {str(e)}")
 

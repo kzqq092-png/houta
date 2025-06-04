@@ -35,8 +35,6 @@ class MainMenuBar(QMenuBar):
 
             # 初始化主题管理器
             self.theme_manager = get_theme_manager()
-            self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-            self.theme_manager.apply_theme(self)
 
             # 初始化UI
             self.init_ui()
@@ -463,19 +461,6 @@ class MainMenuBar(QMenuBar):
         """Show documentation"""
         # TODO: Implement documentation viewer
         pass
-
-    def show_about(self):
-        """Show about dialog"""
-        dialog = QMessageBox(self)
-        QMessageBox.about(
-            dialog,
-            "关于",
-            "交易系统 v1.0.0\n\n"
-            "一个基于Python的量化交易系统\n"
-            "使用PyQt5构建用户界面\n"
-            "使用hikyuu框架进行量化分析"
-        )
-        self.theme_manager.apply_theme(dialog)
 
     def apply_theme(self, theme_manager):
         """根据主题优化菜单栏样式"""

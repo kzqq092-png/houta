@@ -32,8 +32,6 @@ class MultiChartPanel(QWidget):
         self.cols = cols
         self.config_manager = config_manager
         self.theme_manager = theme_manager or get_theme_manager(config_manager)
-        self.theme_manager.theme_changed.connect(lambda _: self.theme_manager.apply_theme(self))
-        self.theme_manager.apply_theme(self)
         self.log_manager = log_manager
         self.data_manager = data_manager
         self.stock_list = stock_list or []
@@ -220,7 +218,6 @@ class MultiChartPanel(QWidget):
             else:
                 if hasattr(self, 'single_chart') and self.single_chart:
                     self.single_chart.apply_theme()
-            self.theme_manager.apply_theme(self)
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"应用主题失败: {str(e)}")
@@ -342,7 +339,3 @@ class MultiChartPanel(QWidget):
                 chart.resizeEvent(QResizeEvent(chart.size(), chart.size()))
         QTimer.singleShot(30, lambda: self._refresh_chart_batch(
             charts, idx+batch_size, batch_size))
-
-    def show_stat_dialog(self):
-        dialog = QDialog(self)
-        self.theme_manager.apply_theme(dialog)

@@ -74,7 +74,6 @@ class IntervalStatSettingsDialog(QDialog):
         font_hbox.addWidget(self.font_spin)
         font_hbox.addStretch()
         layout.addLayout(font_hbox)
-        self.apply_font_size(font_size)
         # 阈值设置
         threshold_group = QGroupBox("建议阈值设置")
         threshold_grid = QGridLayout(threshold_group)
@@ -318,126 +317,6 @@ class IntervalStatSettingsDialog(QDialog):
         self.close()
         dlg = IntervalStatSettingsDialog(self.parent())
         dlg.exec_()
-
-    def apply_font_size(self, font_size):
-        self.setStyleSheet(f'''
-            QDialog {{
-                background: #f7f9fa;
-                font-family: 'Microsoft YaHei', 'SimHei', 'Arial Unicode MS', sans-serif;
-                font-size: {font_size}px;
-                color: #23293a;
-                border-radius: 8px;
-            }}
-            QGroupBox {{
-                border: 1px solid #90caf9;
-                border-radius: 6px;
-                margin-top: 10px;
-                background: #ffffff;
-                font-weight: bold;
-                font-size: {font_size+1}px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 8px 0 8px;
-                background: #eaf3fb;
-                border-radius: 4px;
-                color: #1976d2;
-                font-weight: bold;
-            }}
-            QLabel {{
-                font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                min-height: 15px;
-                max-height: 15px;
-                font-size: {font_size}px;
-            }}
-            QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
-                font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
-                font-size: {font_size}px;
-                border-radius: 4px;
-                border: 1px solid #90caf9;
-                background: #f5faff;
-                padding: 4px 8px;
-            }}
-            QPushButton {{
-                font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-                font-size: {font_size}px;
-                border-radius: 4px;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e3f2fd, stop:1 #bbdefb);
-                border: 1px solid #90caf9;
-                padding: 6px 16px;
-                color: #1565c0;
-                min-height: 15px;
-                max-height: 15px;
-            }}
-            QPushButton:hover {{
-                background: #90caf9;
-                color: #0d47a1;
-            }}
-            QPushButton:pressed {{
-                background: #64b5f6;
-            }}
-            QDialogButtonBox QPushButton {{
-                min-width: 60px;
-                min-height: 15px;
-                max-height: 15px;
-                font-size: {font_size}px;
-            }}
-            QListWidget {{
-                background: #fff;
-                border: 1.5px solid #90caf9;
-                border-radius: 4px;
-                font-size: {font_size}px;
-                padding: 2px;
-            }}
-            QListWidget::item {{
-                padding: 5px;
-                border-bottom: 1px solid #E0E0E0;
-            }}
-            QListWidget::item:selected {{
-                background-color: #E3F2FD;
-                color: #1976D2;
-            }}
-            QListWidget::item:hover {{
-                background-color: #F5F5F5;
-            }}
-            QSlider::groove:horizontal {{
-                border: 1px solid #b0b0b0;
-                height: 4px;
-                background: #e3f2fd;
-                border-radius: 3px;
-            }}
-            QSlider::handle:horizontal {{
-                background: #1976d2;
-                border: 1.5px solid #90caf9;
-                width: 16px;
-                margin: -5px 0;
-                border-radius: 8px;
-            }}
-            QSlider::sub-page:horizontal {{
-                background: #90caf9;
-                border-radius: 3px;
-            }}
-            QScrollBar:vertical {{
-                width: 8px;
-                background: #f0f0f0;
-                margin: 0px;
-                border-radius: 4px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: #b0b0b0;
-                min-height: 20px;
-                border-radius: 4px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px;
-                background: none;
-                border: none;
-            }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
-                background: none;
-            }}
-        ''')
 
     def on_font_size_changed(self, value):
         self.settings['font_size'] = value

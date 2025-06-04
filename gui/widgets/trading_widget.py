@@ -46,7 +46,6 @@ class TradingWidget(QWidget):
             # 应用主题
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = get_theme_manager(self.config_manager)
-            self.theme_manager.apply_theme(self)
 
             self.log_manager.info("交易控件初始化完成")
 

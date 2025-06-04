@@ -103,9 +103,10 @@ class ConfigManager(QObject):
     def logging(self):
         return self.get('logging', {})
 
-    def set_font_size(self, size: int):
+    def set_theme_type(self, size: int, theme_name: str):
         theme = self.get('theme', {})
         theme['font_size'] = size
+        theme['theme_name'] = theme_name
         self.set('theme', theme)
 
     def set_language(self, lang: str):
