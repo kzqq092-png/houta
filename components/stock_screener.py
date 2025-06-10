@@ -21,6 +21,7 @@ import traceback
 from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
 from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 
 class PagedTableWidget(QWidget):
@@ -1222,24 +1223,53 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 if ind.startswith('MA'):
                     period = int(ind[2:]) if len(
                         ind) > 2 and ind[2:].isdigit() else 5
-                    return calc_ma(stock_data['close'], period).iloc[-1]
+                    close_data = stock_data['close']
+                    if isinstance(close_data, pd.Series):
+                        return calc_ma(close_data, period).iloc[-1]
+                    else:
+                        from hikyuu.indicator import MA
+                        return MA(close_data, n=period)[-1]
                 if ind == 'MACD':
-                    macd, _, _ = calc_macd(stock_data['close'])
-                    return macd.iloc[-1]
+                    close_data = stock_data['close']
+                    if isinstance(close_data, pd.Series):
+                        macd, _, _ = calc_macd(close_data)
+                        return macd.iloc[-1]
+                    else:
+                        from hikyuu.indicator import MACD
+                        macd = MACD(close_data, n1=12, n2=26, n3=9)
+                        return macd.dif[-1] if hasattr(macd, 'dif') else macd[-1]
                 if ind == 'RSI':
                     return calc_rsi(stock_data['close']).iloc[-1]
                 if ind == 'KDJ':
                     k, d, j = calc_kdj(stock_data)
                     return j.iloc[-1]
                 if ind == 'BOLL':
-                    _, upper, lower = calc_boll(stock_data['close'])
-                    return upper.iloc[-1]
+                    close_data = stock_data['close']
+                    if isinstance(close_data, pd.Series):
+                        _, upper, lower = calc_boll(close_data)
+                        return upper.iloc[-1]
+                    else:
+                        from hikyuu.indicator import BOLL
+                        boll = BOLL(close_data, n=20, width=2)
+                        return boll.upper[-1] if hasattr(boll, 'upper') else boll[-1]
                 if ind == 'ATR':
-                    return calc_atr(stock_data).iloc[-1]
+                    if isinstance(stock_data['close'], pd.Series):
+                        return calc_atr(stock_data).iloc[-1]
+                    else:
+                        from hikyuu.indicator import ATR
+                        return ATR(stock_data, n=14)[-1]
                 if ind == 'OBV':
-                    return calc_obv(stock_data).iloc[-1]
+                    if isinstance(stock_data['close'], pd.Series):
+                        return calc_obv(stock_data).iloc[-1]
+                    else:
+                        from hikyuu.indicator import OBV
+                        return OBV(stock_data)[-1]
                 if ind == 'CCI':
-                    return calc_cci(stock_data).iloc[-1]
+                    if isinstance(stock_data['close'], pd.Series):
+                        return calc_cci(stock_data).iloc[-1]
+                    else:
+                        from hikyuu.indicator import CCI
+                        return CCI(stock_data, n=14)[-1]
                 return None
             v1 = get_value(ind1)
             v2 = get_value(ind2)
@@ -1947,3 +1977,75 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 QMessageBox.information(self, "导出成功", "多因子选股结果已导出")
         except Exception as e:
             QMessageBox.critical(self, "导出失败", f"导出多因子选股结果失败: {str(e)}")
+
+    def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
+        original_text = button.text()
+        button.setText("取消")
+        button._interrupted = False
+
+        def on_cancel():
+            button._interrupted = True
+            button.setText(original_text)
+            button.setEnabled(True)
+            # 重新绑定分析逻辑
+            try:
+                button.clicked.disconnect()
+            except Exception:
+                pass
+            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+
+        try:
+            button.clicked.disconnect()
+        except Exception:
+            pass
+        button.clicked.connect(on_cancel)
+
+        def task():
+            try:
+                if not getattr(button, '_interrupted', False):
+                    result = analysis_func(*args, **kwargs)
+                    return result
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"分析异常: {str(e)}")
+                return None
+            finally:
+                QTimer.singleShot(0, lambda: on_done(None))
+
+        def on_done(future):
+            button.setText(original_text)
+            button.setEnabled(True)
+            # 重新绑定分析逻辑
+            try:
+                button.clicked.disconnect()
+            except Exception:
+                pass
+            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+        from concurrent.futures import ThreadPoolExecutor
+        if not hasattr(self, '_thread_pool'):
+            self._thread_pool = ThreadPoolExecutor(max_workers=2)
+        future = self._thread_pool.submit(task)
+        # 只需在finally中恢复，无需重复回调
+
+    def on_screener_analyze(self):
+        """选股分析入口，参数校验、日志、调用主分析逻辑，自动适配所有策略和UI刷新。"""
+        valid, msg = self.validate_params()
+        if not valid:
+            self.set_status_message(msg, error=True)
+            return
+        self.set_status_message("参数校验通过，正在分析...", error=False)
+        try:
+            self.log_manager.info("on_screener_analyze 开始分析 - 选股")
+            if hasattr(self.data_manager, 'get_screener_results'):
+                data = self.data_manager.get_screener_results()
+                if data:
+                    self.update_screener_results(data)
+                    self.set_status_message("分析完成", error=False)
+                else:
+                    self.set_status_message("未获取到选股结果", error=True)
+                    self.log_manager.warning("分析未获取到数据")
+            else:
+                self.set_status_message("数据管理器未实现get_screener_results", error=True)
+        except Exception as e:
+            self.set_status_message(f"分析失败: {str(e)}", error=True)
+            self.log_manager.error(f"分析失败: {str(e)}")

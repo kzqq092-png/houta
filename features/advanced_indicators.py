@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy import stats
+from datetime import datetime
 
 
 def calculate_advanced_indicators(df):
@@ -13,6 +14,9 @@ def calculate_advanced_indicators(df):
     返回:
         DataFrame: 添加了高级技术指标的DataFrame
     """
+    df = _kdata_preprocess(df, context="高级指标")
+    if df is None or df.empty:
+        return df
     # MACD
     exp12 = df['close'].ewm(span=12, adjust=False).mean()
     exp26 = df['close'].ewm(span=26, adjust=False).mean()
@@ -133,6 +137,9 @@ def create_pattern_recognition_features(df):
     返回:
         DataFrame: 添加了K线形态特征的DataFrame
     """
+    df = _kdata_preprocess(df, context="形态特征")
+    if df is None or df.empty:
+        return df
     # 确保有必要的列
     required_cols = ['open', 'high', 'low', 'close']
     if not all(col in df.columns for col in required_cols):
@@ -562,3 +569,21 @@ def add_advanced_indicators(df):
     result = result.fillna(method='bfill').fillna(method='ffill').fillna(0)
 
     return result
+
+
+def _kdata_preprocess(df, context="分析"):
+    required_cols = ['open', 'high', 'low', 'close', 'volume']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        print(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
+        for col in missing_cols:
+            df[col] = 0.0
+    for col in ['open', 'high', 'low', 'close', 'volume']:
+        before = len(df)
+        df = df[df[col].notna() & (df[col] >= 0)]
+        after = len(df)
+        if after < before:
+            print(f"[{context}] 已过滤{before-after}行{col}异常数据")
+    if df.empty:
+        print(f"[{context}] 数据全部无效，返回空")
+    return df.reset_index(drop=True)

@@ -52,6 +52,9 @@ class StrategyBacktester:
         返回:
             DataFrame: 包含回测结果的DataFrame
         """
+        self.data = self._kdata_preprocess(self.data, context="回测引擎")
+        if self.data is None or self.data.empty:
+            raise ValueError("回测数据全部无效")
         if signal_col not in self.data.columns:
             raise ValueError(f"数据中缺少信号列: {signal_col}")
         if price_col not in self.data.columns:
@@ -471,6 +474,26 @@ class StrategyBacktester:
         fig = self.plot_results()
         fig.savefig(f"{file_path}_chart.png")
         plt.close(fig)
+
+    def _kdata_preprocess(self, df, context="分析"):
+        required_cols = ['open', 'high', 'low', 'close', 'volume', 'signal']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            print(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
+            for col in missing_cols:
+                if col == 'signal':
+                    df['signal'] = 0
+                else:
+                    df[col] = 0.0
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            before = len(df)
+            df = df[df[col].notna() & (df[col] >= 0)]
+            after = len(df)
+            if after < before:
+                print(f"[{context}] 已过滤{before-after}行{col}异常数据")
+        if df.empty:
+            print(f"[{context}] 数据全部无效，返回空")
+        return df.reset_index(drop=True)
 
 
 def backtest_strategy(data, signal_col='signal', price_col='close',

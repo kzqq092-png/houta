@@ -27,15 +27,15 @@ class BaseSignal(SignalBase):
         try:
             if isinstance(k, pd.DataFrame):
                 k = data_manager.df_to_kdata(k)
+            if k is None or len(k) == 0:
+                print("信号计算收到空KData，直接返回")
+                return
             # 计算基础指标
             indicators = self._calculate_indicators(k)
-
             # 生成信号
             signals = self._generate_signals(k, indicators)
-
             # 记录信号
             self._record_signals(k, signals)
-
         except Exception as e:
             print(f"信号计算错误: {str(e)}")
             return
@@ -43,23 +43,33 @@ class BaseSignal(SignalBase):
     def _calculate_indicators(self, k) -> Dict[str, Any]:
         """计算技术指标"""
         indicators = {}
-
-        # 计算移动平均线
-        indicators['ma_fast'] = MA(CLOSE(k), n=self.get_param("n_fast", 12))
-        indicators['ma_slow'] = MA(CLOSE(k), n=self.get_param("n_slow", 26))
-
-        # 计算MACD
-        indicators['macd'] = MACD(CLOSE(k),
-                                  n1=self.get_param("n_fast", 12),
-                                  n2=self.get_param("n_slow", 26),
-                                  n3=self.get_param("n_signal", 9))
-
-        # 计算RSI
-        indicators['rsi'] = RSI(CLOSE(k), n=self.get_param("rsi_window", 14))
-
-        # 计算KDJ
-        indicators['kdj'] = KDJ(k, n=self.get_param("kdj_n", 9))
-
+        import pandas as pd
+        if hasattr(k, 'to_df'):
+            df = k.to_df()
+            if isinstance(df['close'], pd.Series):
+                from indicators_algo import calc_ma, calc_macd, calc_rsi
+                indicators['ma_fast'] = calc_ma(df['close'], self.get_param("n_fast", 12))
+                indicators['ma_slow'] = calc_ma(df['close'], self.get_param("n_slow", 26))
+                macd, _, _ = calc_macd(df['close'], self.get_param("n_fast", 12), self.get_param("n_slow", 26), self.get_param("n_signal", 9))
+                indicators['macd'] = macd
+                indicators['rsi'] = calc_rsi(df['close'], self.get_param("rsi_window", 14))
+                # KDJ等同理
+            else:
+                from hikyuu.indicator import MA, MACD, RSI, KDJ
+                close_ind = CLOSE(k)
+                indicators['ma_fast'] = MA(close_ind, n=self.get_param("n_fast", 12))
+                indicators['ma_slow'] = MA(close_ind, n=self.get_param("n_slow", 26))
+                indicators['macd'] = MACD(close_ind, n1=self.get_param("n_fast", 12),
+                                          n2=self.get_param("n_slow", 26), n3=self.get_param("n_signal", 9))
+                indicators['rsi'] = RSI(close_ind, n=self.get_param("rsi_window", 14))
+                indicators['kdj'] = KDJ(k, n=self.get_param("kdj_n", 9))
+        else:
+            # 兼容性兜底
+            indicators['ma_fast'] = None
+            indicators['ma_slow'] = None
+            indicators['macd'] = None
+            indicators['rsi'] = None
+            indicators['kdj'] = None
         return indicators
 
     def _generate_signals(self, k, indicators: Dict[str, Any]) -> Dict[str, Any]:

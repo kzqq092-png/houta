@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
+from indicators_algo import calc_ma
 
 
 def add_basic_indicators(df):
@@ -17,14 +18,28 @@ def add_basic_indicators(df):
 
     # 计算移动平均线
     for window in [5, 10, 20, 50, 200]:
-        result[f'MA{window}'] = result['close'].rolling(window=window).mean()
+        close_data = result['close']
+        if isinstance(close_data, pd.Series):
+            result[f'MA{window}'] = calc_ma(close_data, window)
+        else:
+            from hikyuu.indicator import MA
+            result[f'MA{window}'] = MA(close_data, n=window)
 
     # 计算MACD
-    result['ema12'] = result['close'].ewm(span=12, adjust=False).mean()
-    result['ema26'] = result['close'].ewm(span=26, adjust=False).mean()
-    result['macd'] = result['ema12'] - result['ema26']
-    result['signal_line'] = result['macd'].ewm(span=9, adjust=False).mean()
-    result['macd_hist'] = result['macd'] - result['signal_line']
+    close_data = result['close']
+    if isinstance(close_data, pd.Series):
+        result['ema12'] = close_data.ewm(span=12, adjust=False).mean()
+        result['ema26'] = close_data.ewm(span=26, adjust=False).mean()
+        result['macd'] = result['ema12'] - result['ema26']
+        result['signal_line'] = result['macd'].ewm(span=9, adjust=False).mean()
+        result['macd_hist'] = result['macd'] - result['signal_line']
+    else:
+        from hikyuu.indicator import MACD
+        macd = MACD(close_data, n1=12, n2=26, n3=9)
+        # hikyuu MACD 返回Indicator对象，需转为numpy或pandas
+        result['macd'] = macd.dif if hasattr(macd, 'dif') else macd
+        result['signal_line'] = macd.dea if hasattr(macd, 'dea') else None
+        result['macd_hist'] = macd.bar if hasattr(macd, 'bar') else None
 
     # 计算RSI
     delta = result['close'].diff()
@@ -97,10 +112,18 @@ def calculate_base_indicators(df):
     df = df.sort_index()
 
     # 计算移动平均线
-    df['MA5'] = df['close'].rolling(window=5).mean()
-    df['MA10'] = df['close'].rolling(window=10).mean()
-    df['MA20'] = df['close'].rolling(window=20).mean()
-    df['MA60'] = df['close'].rolling(window=60).mean()
+    close_data = df['close']
+    if isinstance(close_data, pd.Series):
+        df['MA5'] = calc_ma(close_data, 5)
+        df['MA10'] = calc_ma(close_data, 10)
+        df['MA20'] = calc_ma(close_data, 20)
+        df['MA60'] = calc_ma(close_data, 60)
+    else:
+        from hikyuu.indicator import MA
+        df['MA5'] = MA(close_data, n=5)
+        df['MA10'] = MA(close_data, n=10)
+        df['MA20'] = MA(close_data, n=20)
+        df['MA60'] = MA(close_data, n=60)
 
     # 计算量价指标
     df['volume_ma5'] = df['volume'].rolling(window=5).mean()
@@ -133,12 +156,19 @@ def calculate_base_indicators(df):
         window=10).corr(df['volume'])
 
     # 添加布林带指标
-    df['bbands_middle'] = df['close'].rolling(window=20).mean()
-    df['bbands_std'] = df['close'].rolling(window=20).std()
-    df['bbands_upper'] = df['bbands_middle'] + 2 * df['bbands_std']
-    df['bbands_lower'] = df['bbands_middle'] - 2 * df['bbands_std']
-    df['bbands_width'] = (df['bbands_upper'] -
-                          df['bbands_lower']) / df['bbands_middle']
+    if isinstance(close_data, pd.Series):
+        df['bbands_middle'] = close_data.rolling(window=20).mean()
+        df['bbands_std'] = close_data.rolling(window=20).std()
+        df['bbands_upper'] = df['bbands_middle'] + 2 * df['bbands_std']
+        df['bbands_lower'] = df['bbands_middle'] - 2 * df['bbands_std']
+        df['bbands_width'] = (df['bbands_upper'] - df['bbands_lower']) / df['bbands_middle']
+    else:
+        from hikyuu.indicator import BOLL
+        boll = BOLL(close_data, n=20, width=2)
+        df['bbands_middle'] = boll.mid if hasattr(boll, 'mid') else boll
+        df['bbands_upper'] = boll.upper if hasattr(boll, 'upper') else None
+        df['bbands_lower'] = boll.lower if hasattr(boll, 'lower') else None
+        df['bbands_width'] = (df['bbands_upper'] - df['bbands_lower']) / df['bbands_middle'] if df['bbands_middle'] is not None else None
 
     # 添加移动平均线交叉信号
     df['ma5_cross_ma10'] = ((df['MA5'] > df['MA10']) & (df['MA5'].shift(1) <= df['MA10'].shift(1))).astype(int) - \
@@ -156,6 +186,42 @@ def calculate_base_indicators(df):
     # 添加量能指标
     df['volume_surge'] = (df['volume'] > 1.5 * df['volume_ma5']).astype(int)
     df['volume_shrink'] = (df['volume'] < 0.5 * df['volume_ma5']).astype(int)
+
+    # 计算MACD
+    if isinstance(close_data, pd.Series):
+        ema12 = close_data.ewm(span=12, adjust=False).mean()
+        ema26 = close_data.ewm(span=26, adjust=False).mean()
+        df['macd'] = ema12 - ema26
+        df['signal_line'] = df['macd'].ewm(span=9, adjust=False).mean()
+        df['macd_hist'] = df['macd'] - df['signal_line']
+    else:
+        from hikyuu.indicator import MACD
+        macd = MACD(close_data, n1=12, n2=26, n3=9)
+        df['macd'] = macd.dif if hasattr(macd, 'dif') else macd
+        df['signal_line'] = macd.dea if hasattr(macd, 'dea') else None
+        df['macd_hist'] = macd.bar if hasattr(macd, 'bar') else None
+
+    # 添加ATR指标
+    if isinstance(df['close'], pd.Series):
+        from indicators_algo import calc_atr
+        df['atr'] = calc_atr(df, 14)
+    else:
+        from hikyuu.indicator import ATR
+        df['atr'] = ATR(df, n=14)
+    # 添加OBV指标
+    if isinstance(df['close'], pd.Series):
+        from indicators_algo import calc_obv
+        df['obv'] = calc_obv(df)
+    else:
+        from hikyuu.indicator import OBV
+        df['obv'] = OBV(df)
+    # 添加CCI指标
+    if isinstance(df['close'], pd.Series):
+        from indicators_algo import calc_cci
+        df['cci'] = calc_cci(df, 14)
+    else:
+        from hikyuu.indicator import CCI
+        df['cci'] = CCI(df, n=14)
 
     return df
 

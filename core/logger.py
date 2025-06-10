@@ -137,12 +137,14 @@ class LogManager(BaseLogManager):
         except Exception as e:
             print(f"日志记录错误: {str(e)}")
 
-    def log(self, message: str, level: 'LogLevel | str' = LogLevel.INFO):
-        """记录日志
+    def log(self, message: str, level: 'LogLevel | str' = LogLevel.INFO, trace_id: str = None, request_id: str = None):
+        """记录日志，支持trace_id和request_id
 
         Args:
             message: 日志消息
             level: 日志级别（可为LogLevel或字符串）
+            trace_id: 调用链ID
+            request_id: 请求ID
         """
         # 兼容字符串类型
         if isinstance(level, str):
@@ -150,6 +152,9 @@ class LogManager(BaseLogManager):
                 level = LogLevel[level.upper()]
             except Exception:
                 level = LogLevel.INFO
+        # 拼接trace_id/request_id
+        if trace_id or request_id:
+            message = f"[trace_id={trace_id or ''}][request_id={request_id or ''}] {message}"
         if self.config.async_logging:
             self._async_log(message, level)
         else:
@@ -182,3 +187,15 @@ class LogManager(BaseLogManager):
         """记录耗时性能日志"""
         self.logger.info(f"[PERFORMANCE] {message}")
         self.log_message.emit(message, "PERFORMANCE")
+
+    def get_last_trace_log(self, trace_id: str) -> str:
+        """
+        获取指定trace_id的最近一次调用链日志内容（从日志文件中检索）
+        """
+        log_file = os.path.join('logs', self.config.log_file)
+        if not os.path.exists(log_file):
+            return "日志文件不存在"
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        trace_logs = [line for line in lines if f"trace_id={trace_id}" in line]
+        return ''.join(trace_logs[-20:]) if trace_logs else "未找到trace_id相关日志"

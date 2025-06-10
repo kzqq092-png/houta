@@ -11,91 +11,153 @@ except ImportError:
 
 
 def calc_ma(close: pd.Series, n: int) -> pd.Series:
-    """计算移动平均线（用ta-lib MA）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    return pd.Series(talib.MA(close.values, timeperiod=n), index=close.index, name=f"MA{n}")
+    """计算移动平均线，优先用ta-lib，自动回退pandas实现，增加类型检查和异常捕获。"""
+    try:
+        if not isinstance(close, pd.Series):
+            raise TypeError("calc_ma: close参数必须为pd.Series类型")
+        if talib is not None:
+            return pd.Series(talib.MA(close.values, timeperiod=n), index=close.index, name=f"MA{n}")
+        else:
+            return close.rolling(window=n).mean().rename(f"MA{n}")
+    except Exception as e:
+        # 返回全NaN，防止异常中断
+        return pd.Series([float('nan')] * len(close), index=close.index, name=f"MA{n}")
 
 # --- MACD ---
 
 
 def calc_macd(close: pd.Series, fast=12, slow=26, signal=9):
     """计算MACD指标（用ta-lib MACD）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    macd, macdsignal, macdhist = talib.MACD(
-        close.values, fastperiod=fast, slowperiod=slow, signalperiod=signal)
-    return (pd.Series(macd, index=close.index, name="MACD"),
-            pd.Series(macdsignal, index=close.index, name="MACD_signal"),
-            pd.Series(macdhist, index=close.index, name="MACD_hist"))
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        if not isinstance(close, pd.Series):
+            raise TypeError("calc_macd: close参数必须为pd.Series类型")
+        macd, macdsignal, macdhist = talib.MACD(
+            close.values, fastperiod=fast, slowperiod=slow, signalperiod=signal)
+        idx = close.index
+        return (pd.Series(macd, index=idx, name="MACD"),
+                pd.Series(macdsignal, index=idx, name="MACD_signal"),
+                pd.Series(macdhist, index=idx, name="MACD_hist"))
+    except Exception as e:
+        idx = close.index if isinstance(close, pd.Series) else None
+        return (
+            pd.Series([float('nan')] * len(close), index=idx, name="MACD") if idx is not None else None,
+            pd.Series([float('nan')] * len(close), index=idx, name="MACD_signal") if idx is not None else None,
+            pd.Series([float('nan')] * len(close), index=idx, name="MACD_hist") if idx is not None else None
+        )
 
 # --- RSI ---
 
 
 def calc_rsi(close: pd.Series, n=14):
     """计算RSI指标（用ta-lib RSI）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    return pd.Series(talib.RSI(close.values, timeperiod=n), index=close.index, name=f"RSI{n}")
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        if not isinstance(close, pd.Series):
+            raise TypeError("calc_rsi: close参数必须为pd.Series类型")
+        return pd.Series(talib.RSI(close.values, timeperiod=n), index=close.index, name=f"RSI{n}")
+    except Exception as e:
+        idx = close.index if isinstance(close, pd.Series) else None
+        return pd.Series([float('nan')] * len(close), index=idx, name=f"RSI{n}") if idx is not None else None
 
 # --- KDJ ---
 
 
 def calc_kdj(df: pd.DataFrame, n=9, m1=3, m2=3):
     """计算KDJ指标（用ta-lib STOCH）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    k, d = talib.STOCH(df['high'].values, df['low'].values, df['close'].values,
-                       fastk_period=n, slowk_period=m1, slowd_period=m2)
-    j = 3 * k - 2 * d
-    return (pd.Series(k, index=df.index, name="K"),
-            pd.Series(d, index=df.index, name="D"),
-            pd.Series(j, index=df.index, name="J"))
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        for col in ['high', 'low', 'close']:
+            if col not in df.columns:
+                raise ValueError(f"calc_kdj: 缺少{col}列")
+        k, d = talib.STOCH(df['high'].values, df['low'].values, df['close'].values,
+                           fastk_period=n, slowk_period=m1, slowd_period=m2)
+        j = 3 * k - 2 * d
+        idx = df.index
+        return (pd.Series(k, index=idx, name="K"),
+                pd.Series(d, index=idx, name="D"),
+                pd.Series(j, index=idx, name="J"))
+    except Exception as e:
+        idx = df.index if isinstance(df, pd.DataFrame) else None
+        def nan_series(name): return pd.Series([float('nan')] * len(df), index=idx, name=name) if idx is not None else None
+        return (nan_series("K"), nan_series("D"), nan_series("J"))
 
 # --- BOLL ---
 
 
 def calc_boll(close: pd.Series, n=20, p=2):
     """计算布林带（用ta-lib BBANDS）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    upper, mid, lower = talib.BBANDS(
-        close.values, timeperiod=n, nbdevup=p, nbdevdn=p)
-    return (pd.Series(mid, index=close.index, name="BOLL_mid"),
-            pd.Series(upper, index=close.index, name="BOLL_upper"),
-            pd.Series(lower, index=close.index, name="BOLL_lower"))
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        if not isinstance(close, pd.Series):
+            raise TypeError("calc_boll: close参数必须为pd.Series类型")
+        upper, mid, lower = talib.BBANDS(
+            close.values, timeperiod=n, nbdevup=p, nbdevdn=p)
+        idx = close.index
+        return (pd.Series(mid, index=idx, name="BOLL_mid"),
+                pd.Series(upper, index=idx, name="BOLL_upper"),
+                pd.Series(lower, index=idx, name="BOLL_lower"))
+    except Exception as e:
+        idx = close.index if isinstance(close, pd.Series) else None
+        def nan_series(name): return pd.Series([float('nan')] * len(close), index=idx, name=name) if idx is not None else None
+        return (nan_series("BOLL_mid"), nan_series("BOLL_upper"), nan_series("BOLL_lower"))
 
 # --- ATR ---
 
 
 def calc_atr(df: pd.DataFrame, n=14):
     """计算ATR指标（用ta-lib ATR）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    atr = talib.ATR(df['high'].values, df['low'].values,
-                    df['close'].values, timeperiod=n)
-    return pd.Series(atr, index=df.index, name=f"ATR{n}")
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        for col in ['high', 'low', 'close']:
+            if col not in df.columns:
+                raise ValueError(f"calc_atr: 缺少{col}列")
+        atr = talib.ATR(df['high'].values, df['low'].values,
+                        df['close'].values, timeperiod=n)
+        return pd.Series(atr, index=df.index, name=f"ATR{n}")
+    except Exception as e:
+        idx = df.index if isinstance(df, pd.DataFrame) else None
+        return pd.Series([float('nan')] * len(df), index=idx, name=f"ATR{n}") if idx is not None else None
 
 # --- OBV ---
 
 
 def calc_obv(df: pd.DataFrame):
     """计算OBV指标（用ta-lib OBV）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    obv = talib.OBV(df['close'].values, df['volume'].values)
-    return pd.Series(obv, index=df.index, name="OBV")
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        for col in ['close', 'volume']:
+            if col not in df.columns:
+                raise ValueError(f"calc_obv: 缺少{col}列")
+        obv = talib.OBV(df['close'].values, df['volume'].values)
+        return pd.Series(obv, index=df.index, name="OBV")
+    except Exception as e:
+        idx = df.index if isinstance(df, pd.DataFrame) else None
+        return pd.Series([float('nan')] * len(df), index=idx, name="OBV") if idx is not None else None
 
 # --- CCI ---
 
 
 def calc_cci(df: pd.DataFrame, n=14):
     """计算CCI指标（用ta-lib CCI）"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    cci = talib.CCI(df['high'].values, df['low'].values,
-                    df['close'].values, timeperiod=n)
-    return pd.Series(cci, index=df.index, name=f"CCI{n}")
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        for col in ['high', 'low', 'close']:
+            if col not in df.columns:
+                raise ValueError(f"calc_cci: 缺少{col}列")
+        cci = talib.CCI(df['high'].values, df['low'].values,
+                        df['close'].values, timeperiod=n)
+        return pd.Series(cci, index=df.index, name=f"CCI{n}")
+    except Exception as e:
+        idx = df.index if isinstance(df, pd.DataFrame) else None
+        return pd.Series([float('nan')] * len(df), index=idx, name=f"CCI{n}") if idx is not None else None
 
 # 可选：加lru_cache缓存装饰器提升性能
 
@@ -127,36 +189,42 @@ def get_talib_indicator_list() -> list:
 
 
 def calc_talib_indicator(name: str, df: pd.DataFrame, **params):
-    """通用调用ta-lib指标，自动适配参数，返回结果Series或DataFrame"""
-    if talib is None:
-        raise ImportError('ta-lib库未安装')
-    name = name.upper()
-    if not hasattr(talib, name):
-        raise ValueError(f'不支持的ta-lib指标: {name}')
-    func = getattr(talib, name)
-    # 自动适配参数
-    import inspect
-    sig = inspect.signature(func)
-    call_args = {}
-    for k in sig.parameters:
-        if k in df.columns:
-            call_args[k] = df[k].values
-        elif k in params:
-            call_args[k] = params[k]
-        elif sig.parameters[k].default is not inspect.Parameter.empty:
-            call_args[k] = sig.parameters[k].default
+    """通用调用ta-lib指标，自动适配参数，返回结果Series或DataFrame，异常时返回空DataFrame/Series"""
+    try:
+        if talib is None:
+            raise ImportError('ta-lib库未安装')
+        name = name.upper()
+        if not hasattr(talib, name):
+            raise ValueError(f'不支持的ta-lib指标: {name}')
+        func = getattr(talib, name)
+        import inspect
+        sig = inspect.signature(func)
+        call_args = {}
+        for k in sig.parameters:
+            if k in df.columns:
+                call_args[k] = df[k].values
+            elif k in params:
+                call_args[k] = params[k]
+            elif sig.parameters[k].default is not inspect.Parameter.empty:
+                call_args[k] = sig.parameters[k].default
+            else:
+                if 'close' in df.columns:
+                    call_args[k] = df['close'].values
+        result = func(**call_args)
+        if isinstance(result, tuple):
+            cols = [f"{name}_{i+1}" for i in range(len(result))]
+            return pd.DataFrame({col: v for col, v in zip(cols, result)}, index=df.index)
         else:
-            # 尝试用close
-            if 'close' in df.columns:
-                call_args[k] = df['close'].values
-    result = func(**call_args)
-    # 结果处理
-    if isinstance(result, tuple):
-        # 多输出，转DataFrame
-        cols = [f"{name}_{i+1}" for i in range(len(result))]
-        return pd.DataFrame({col: v for col, v in zip(cols, result)}, index=df.index)
-    else:
-        return pd.Series(result, index=df.index, name=name)
+            return pd.Series(result, index=df.index, name=name)
+    except Exception as e:
+        if isinstance(df, pd.DataFrame):
+            idx = df.index
+            n = len(df)
+        else:
+            idx = None
+            n = 0
+        # 返回空DataFrame或全NaN
+        return pd.DataFrame(index=idx) if idx is not None else pd.DataFrame()
 
 
 # --- ta-lib指标分类映射表 ---

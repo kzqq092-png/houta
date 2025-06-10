@@ -6,9 +6,9 @@ from datetime import datetime
 import hikyuu as hku
 from hikyuu.interactive import *
 from core.data_manager import data_manager
-from utils.performance_monitor import monitor_performance
 from core.logger import LogManager, LogLevel
 from hikyuu import KData, KRecord
+from utils.performance_monitor import monitor_performance
 
 
 class TradingSystem:
@@ -70,7 +70,7 @@ class TradingSystem:
     def calculate_signals(self, strategy: str = 'MA') -> List[Dict[str, Any]]:
         """计算交易信号，自动兼容KData和DataFrame"""
         try:
-            if not self.current_kdata:
+            if self.current_kdata is None or (hasattr(self.current_kdata, 'empty') and self.current_kdata.empty):
                 raise ValueError("未加载K线数据")
             kdata = self.current_kdata
             import pandas as pd
@@ -208,7 +208,8 @@ class TradingSystem:
             回测结果
         """
         try:
-            if not self.current_kdata:
+            # 修复DataFrame布尔判断错误
+            if self.current_kdata is None or (hasattr(self.current_kdata, 'empty') and self.current_kdata.empty):
                 raise ValueError("未加载K线数据")
 
             # 创建交易管理器

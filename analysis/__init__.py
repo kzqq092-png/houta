@@ -1,10 +1,9 @@
 """
-Analysis package for trading system
-Provides technical analysis, wave analysis and pattern recognition tools
+分析模块
+包含技术分析、形态识别等功能
 """
 
-from .technical_analysis import TechnicalAnalyzer
-from .wave_analysis import WaveAnalyzer
 from .pattern_recognition import PatternRecognizer
+from .pattern_manager import PatternManager, PatternConfig
 
-__all__ = ['TechnicalAnalyzer', 'WaveAnalyzer', 'PatternRecognizer']
+__all__ = ['PatternRecognizer', 'PatternManager', 'PatternConfig']

@@ -12,6 +12,7 @@ from threading import Lock
 from PyQt5.QtCore import QObject, pyqtSignal
 from core.logger import LogManager
 import traceback
+from utils.log_util import log_structured
 
 
 class IndustryManager(QObject):
@@ -29,7 +30,7 @@ class IndustryManager(QObject):
         """
         try:
             self.log_manager = log_manager or LogManager()
-            self.log_manager.info(f"初始化行业管理器")
+            log_structured(self.log_manager, "industry_manager_init", level="info", status="start")
             super().__init__()
             self.config_dir = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)), "config")
@@ -42,22 +43,22 @@ class IndustryManager(QObject):
                 try:
                     os.makedirs(self.config_dir, exist_ok=True)
                 except Exception as e:
-                    self.log_manager.error(f"创建配置目录失败: {str(e)}")
+                    log_structured(self.log_manager, "create_config_dir", level="error", status="fail", error=str(e))
             try:
                 self.load_cache()
             except Exception as e:
-                self.log_manager.error(f"加载行业数据缓存失败: {str(e)}")
+                log_structured(self.log_manager, "load_industry_cache", level="error", status="fail", error=str(e))
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"IndustryManager初始化异常: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+                log_structured(self.log_manager, "industry_manager_init", level="error", status="fail", error=str(e))
+                log_structured(self.log_manager, "traceback", level="error", status="fail", traceback=traceback.format_exc())
             else:
                 print(f"IndustryManager初始化异常: {e}")
 
     def load_cache(self) -> None:
         """加载缓存数据"""
         start_time = time.time()
-        self.log_manager.info("[IndustryManager.load_cache] 开始")
+        log_structured(self.log_manager, "load_cache", level="info", status="start")
         try:
             if os.path.exists(self.cache_file):
                 with self.cache_lock:
@@ -65,15 +66,14 @@ class IndustryManager(QObject):
                         content = f.read()
                         if not content.strip():
                             # 文件为空，自动重新拉取
-                            self.log_manager.warning("行业数据缓存文件为空，自动重新获取行业数据")
+                            log_structured(self.log_manager, "industry_cache_empty", level="warning", status="auto_update")
                             self.update_industry_data(True)
                             return
 
                         try:
                             data = json.loads(content)
                         except Exception as e:
-                            self.log_manager.error(
-                                f"行业数据缓存文件损坏，自动删除并重新获取: {str(e)}")
+                            log_structured(self.log_manager, "industry_cache_corrupted", level="error", status="auto_delete_and_update", error=str(e))
                             os.remove(self.cache_file)
                             self.update_industry_data(True)
                             return
@@ -84,14 +84,13 @@ class IndustryManager(QObject):
                             self.last_update_time = datetime.fromisoformat(
                                 last_update)
         except Exception as e:
-            self.log_manager.error(f"加载行业数据缓存失败: {str(e)}")
-            self.log_manager.info(f"自动重新获取行业数据！！！！")
+            log_structured(self.log_manager, "load_industry_cache", level="error", status="fail", error=str(e))
+            log_structured(self.log_manager, "auto_update_industry_data", level="info", status="auto_update")
             os.remove(self.cache_file)
             self.update_industry_data(True)
         finally:
             elapsed = int((time.time() - start_time) * 1000)
-            self.log_manager.performance(
-                f"[IndustryManager.load_cache] 结束，耗时: {elapsed} ms")
+            log_structured(self.log_manager, "load_cache", level="info", status="end", elapsed=elapsed)
 
     def save_cache(self) -> None:
         """保存缓存数据"""
@@ -104,7 +103,7 @@ class IndustryManager(QObject):
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            self.log_manager.error(f"保存行业数据缓存失败: {str(e)}")
+            log_structured(self.log_manager, "save_industry_cache", level="error", status="fail", error=str(e))
 
     def _get_eastmoney_industry_data(self) -> Dict:
         """获取东方财富行业分类和板块数据
@@ -250,12 +249,12 @@ class IndustryManager(QObject):
                                 'market': 'INDEX'
                             }
 
-            self.log_manager.info(f"获取东方财富数据完成，共 {len(result)} 条记录")
+            log_structured(self.log_manager, "get_eastmoney_industry_data", level="info", status="end", record_count=len(result))
             return result
 
         except Exception as e:
-            self.log_manager.error(f"获取东方财富数据失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, "get_eastmoney_industry_data", level="error", status="fail", error=str(e))
+            log_structured(self.log_manager, "traceback", level="error", status="fail", traceback=traceback.format_exc())
             return {}
 
     def update_industry_data(self, force: bool = False) -> bool:
@@ -305,7 +304,7 @@ class IndustryManager(QObject):
 
         except Exception as e:
             error_msg = f"更新行业数据失败: {str(e)}"
-            self.log_manager.error(error_msg)
+            log_structured(self.log_manager, "update_industry_data", level="error", status="fail", error=error_msg)
             self.update_error.emit(error_msg)
             return False
 
@@ -539,10 +538,10 @@ class IndustryManager(QObject):
                                 'turnover': item.get('f8'),
                                 'market': name
                             }
-            self.log_manager.info(f"获取东方财富板块数据条数: {len(result)}")
+            log_structured(self.log_manager, "get_eastmoney_board_data", level="info", status="end", record_count=len(result))
             return result
         except Exception as e:
-            self.log_manager.error(f"获取东方财富板块数据失败: {str(e)}")
+            log_structured(self.log_manager, "get_eastmoney_board_data", level="error", status="fail", error=str(e))
             return {}
 
     def get_eastmoney_board_list(self, board_type='index'):
@@ -565,7 +564,7 @@ class IndustryManager(QObject):
             if data['rc'] == 0 and 'data' in data and 'diff' in data['data']:
                 return [{'code': item['f12'], 'name': item['f14']} for item in data['data']['diff']]
         except Exception as e:
-            self.log_manager.error(f"获取{board_type}板块失败: {e}")
+            log_structured(self.log_manager, "get_eastmoney_board_list", level="error", status="fail", board_type=board_type, error=str(e))
         return []
 
     def get_eastmoney_board_members(self, board_code):
@@ -579,7 +578,7 @@ class IndustryManager(QObject):
             if data['rc'] == 0 and 'data' in data and 'diff' in data['data']:
                 return [{'code': item['f12'], 'name': item['f14']} for item in data['data']['diff']]
         except Exception as e:
-            self.log_manager.error(f"获取板块成分股失败: {e}")
+            log_structured(self.log_manager, "get_eastmoney_board_members", level="error", status="fail", board_code=board_code, error=str(e))
         return []
 
     def get_major_indices(self) -> Dict[str, dict]:
@@ -619,9 +618,9 @@ class IndustryManager(QObject):
                             'name': name,
                             'market': 'INDEX'
                         }
-                    self.log_manager.info(f"获取主流指数数据条数: {len(result)}")
+                    log_structured(self.log_manager, "get_major_indices", level="info", status="end", record_count=len(result))
                     return result
             return {}
         except Exception as e:
-            self.log_manager.error(f"获取主流指数数据失败: {str(e)}")
+            log_structured(self.log_manager, "get_major_indices", level="error", status="fail", error=str(e))
             return {}

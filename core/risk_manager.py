@@ -2,9 +2,9 @@
 风险管理模块
 """
 from typing import Dict, Optional
-from ..utils.logger import Logger
-from utils.performance import monitor_performance
+from core.logger import Logger
 from core.logger import LogManager, LogLevel
+from utils.performance_monitor import monitor_performance
 
 
 class RiskManager:

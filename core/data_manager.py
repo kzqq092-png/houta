@@ -20,6 +20,7 @@ import time
 import sqlite3
 import os
 from core.industry_manager import IndustryManager
+from utils.log_util import log_structured
 # import ptvsd
 
 DB_PATH = os.path.join(os.path.dirname(
@@ -40,14 +41,16 @@ class DataManager:
             log_manager=self.log_manager)  # 行业管理器
         # 自动加载和更新行业数据
         try:
-            self.log_manager.info("自动加载行业数据缓存...")
+            log_structured(self.log_manager, "load_industry_cache", level="info", status="start")
             self.industry_manager.load_cache()
-            self.log_manager.info("自动更新行业数据...")
+            log_structured(self.log_manager, "load_industry_cache", level="info", status="end")
+            log_structured(self.log_manager, "update_industry_data", level="info", status="start")
             self.industry_manager.update_industry_data()
-            self.log_manager.info("行业数据初始化完成")
+            log_structured(self.log_manager, "update_industry_data", level="info", status="end")
+            log_structured(self.log_manager, "industry_init", level="info", status="success")
         except Exception as e:
             if self.log_manager:
-                self.log_manager.warning(f"行业数据初始化异常: {str(e)}")
+                log_structured(self.log_manager, "industry_init", level="warning", status="fail", error=str(e))
 
     def get_config(self, key: str, default=None):
         cursor = self.conn.cursor()
@@ -76,10 +79,17 @@ class DataManager:
         row = cursor.fetchone()
         if row:
             import json
-            return {'name': row[0], 'type': row[1], 'config': json.loads(row[2]) if row[2] else {}, 'is_active': row[3]}
+            config = json.loads(row[2]) if row[2] else {}
+            # 防御性：config必须为dict
+            if not isinstance(config, dict):
+                config = {}
+            return {'name': row[0], 'type': row[1], 'config': config, 'is_active': row[3]}
         return None
 
     def set_data_source(self, name: str):
+        # 类型检查，防止传入非字符串
+        if not isinstance(name, str):
+            raise TypeError(f"set_data_source期望字符串，实际为{type(name)}")
         cursor = self.conn.cursor()
         cursor.execute('UPDATE data_source SET is_active=0')
         cursor.execute(
@@ -209,12 +219,11 @@ class DataManager:
                                                 industry_stocks[level].add(
                                                     code)
                     except Exception as e:
-                        self.log_manager.warning(
-                            f"获取股票 {code} 行业信息失败: {str(e)}")
+                        log_structured(self.log_manager, "get_industry_info", level="warning", status="fail", error=str(e))
                         continue
 
                 except Exception as e:
-                    self.log_manager.warning(f"处理股票数据失败: {code} - {str(e)}")
+                    log_structured(self.log_manager, "process_stock_data", level="warning", status="fail", error=f"{code} - {str(e)}")
                     continue
 
             # 缓存市场和行业数据
@@ -222,12 +231,12 @@ class DataManager:
             self.cache_manager.set('industry_stocks', industry_stocks)
             self.cache_manager.set('industry_data', industry_data)
 
-            self.log_manager.info(
-                f"市场和行业数据初始化完成: {len(market_data)} 个市场, {len(industry_data)} 个行业")
+            log_structured(self.log_manager, "market_industry_init", level="info", status="success",
+                           count=len(market_data), industry_count=len(industry_data))
 
         except Exception as e:
-            self.log_manager.error(f"初始化市场和行业数据失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, "market_industry_init", level="error", status="fail", error=str(e))
+            log_structured(self.log_manager, "traceback", level="error", error=traceback.format_exc())
 
     def get_markets(self) -> Dict[str, Dict]:
         """获取所有市场数据
@@ -302,7 +311,7 @@ class DataManager:
                 return dt.strftime('%Y-%m-%d')
             return str(dt)
         except Exception as e:
-            self.log_manager.warning(f"转换日期失败: {str(e)}")
+            log_structured(self.log_manager, "convert_date", level="warning", error=str(e))
             return None
 
     def get_k_data(self, code: str, freq: str = 'D',
@@ -315,8 +324,8 @@ class DataManager:
             f"[DataManager.get_k_data] 开始: code={code}, freq={freq}, start_date={start_date}, end_date={end_date}")
         try:
             # 检查股票代码格式
-            if not code:
-                self.log_manager.error("股票代码不能为空")
+            if not code or not isinstance(code, str):
+                self.log_manager.error("股票代码不能为空且必须为字符串")
                 return pd.DataFrame()
 
             # 标准化股票代码格式
@@ -347,6 +356,9 @@ class DataManager:
 
             try:
                 if self._current_source == 'hikyuu':
+                    if not hasattr(self, 'sm') or self.sm is None:
+                        self.log_manager.error("StockManager(sm)未初始化")
+                        return pd.DataFrame()
                     stock = self.sm[code]
                     if not stock.valid:
                         self.log_manager.warning(f"股票 {code} 无效")
@@ -409,14 +421,23 @@ class DataManager:
                         df['code'] = code
 
                 elif self._current_source == 'eastmoney':
+                    if 'eastmoney' not in self._data_sources or not hasattr(self._data_sources['eastmoney'], 'get_kdata'):
+                        self.log_manager.error("eastmoney数据源未初始化或无get_kdata方法")
+                        return pd.DataFrame()
                     df = self._data_sources['eastmoney'].get_kdata(
                         code, freq, start_date, end_date)
 
                 elif self._current_source == 'sina':
+                    if 'sina' not in self._data_sources or not hasattr(self._data_sources['sina'], 'get_kdata'):
+                        self.log_manager.error("sina数据源未初始化或无get_kdata方法")
+                        return pd.DataFrame()
                     df = self._data_sources['sina'].get_kdata(
                         code, freq, start_date, end_date)
 
                 elif self._current_source == 'tonghuashun':
+                    if 'tonghuashun' not in self._data_sources or not hasattr(self._data_sources['tonghuashun'], 'get_kdata'):
+                        self.log_manager.error("tonghuashun数据源未初始化或无get_kdata方法")
+                        return pd.DataFrame()
                     df = self._data_sources['tonghuashun'].get_kdata(
                         code, freq, start_date, end_date)
 
@@ -468,10 +489,10 @@ class DataManager:
                             if not df.empty:
                                 return df
                             self._current_source = old_source
-                        except:
+                        except Exception as e:
+                            self.log_manager.error(f"备用数据源 {source} 获取K线数据失败: {str(e)}")
                             continue
                 return pd.DataFrame()
-
         except Exception as e:
             self.log_manager.error(f"获取K线数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -1211,62 +1232,130 @@ class DataManager:
             f"获取财务数据成功: {code}, 数据长度: {len(result['finance_history'])}")
         return result
 
-    def df_to_kdata(self, df):
+    def df_to_kdata(self, df, log=True):
         """
         将pandas.DataFrame批量转换为hikyuu.KData对象，自动处理字段映射和类型。
+        优先使用DataFrame数据创建KData，而不是从hikyuu数据库获取。
         Args:
             df: DataFrame，需包含datetime、open、high、low、close、amount、volume列
+            log: 是否打印日志（默认True）
         Returns:
             KData对象
         """
-        # 新实现：直接通过 stock.get_kdata(Query(...)) 获得 KData，保证与主图数据一致
         try:
+            import pandas as pd
+            from hikyuu import KData, KRecord, Datetime
+
             if df is None or df.empty:
-                if hasattr(self, 'log_manager'):
+                if hasattr(self, 'log_manager') and log:
                     self.log_manager.warning("df_to_kdata收到空DataFrame")
-                from hikyuu import KData
                 return KData()
-            # 自动推断股票代码
+
+            # 自动补全 code 字段
             code = None
             if 'code' in df.columns:
                 code = df['code'].iloc[0]
             elif hasattr(df, 'code'):
                 code = df.code
-            # 如果没有 code 字段，无法自动获取，需用户保证 DataFrame 来源于某只股票
             if not code:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(
-                        "df_to_kdata无法推断股票代码，请确保DataFrame包含'code'字段或属性")
-                from hikyuu import KData
+                code = '000001'  # 使用默认代码
+                if hasattr(self, 'log_manager') and log:
+                    self.log_manager.warning("df_to_kdata无法推断股票代码，使用默认代码000001")
+
+            # 自动补全 datetime 字段
+            df_copy = df.copy()
+            if 'datetime' not in df_copy.columns:
+                if isinstance(df_copy.index, pd.DatetimeIndex):
+                    df_copy['datetime'] = df_copy.index
+                else:
+                    if hasattr(self, 'log_manager') and log:
+                        self.log_manager.error("df_to_kdata无法推断datetime字段，请确保DataFrame包含'datetime'列或索引")
+                    return KData()
+
+            # 检查必要字段
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            missing_columns = [col for col in required_columns if col not in df_copy.columns]
+            if missing_columns:
+                if hasattr(self, 'log_manager') and log:
+                    self.log_manager.error(f"df_to_kdata缺少必要列: {missing_columns}")
                 return KData()
-            # 自动推断起止日期，兼容 index 为 DatetimeIndex
-            if 'datetime' in df.columns:
-                start_date = str(df['datetime'].min())[:10]
-                end_date = str(df['datetime'].max())[:10]
-            elif isinstance(df.index, pd.DatetimeIndex):
-                # 自动恢复 datetime 列
-                df = df.copy()
-                df['datetime'] = df.index
-                start_date = str(df['datetime'].min())[:10]
-                end_date = str(df['datetime'].max())[:10]
-            else:
-                start_date = None
-                end_date = None
-            from hikyuu.interactive import sm
-            from hikyuu import Query, Datetime
-            stock = sm[code]
-            if start_date and end_date:
-                query = Query(Datetime(start_date), Datetime(end_date))
-            else:
-                query = Query(-len(df))
-            kdata = stock.get_kdata(query)
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(
-                    f"df_to_kdata已自动切换为stock.get_kdata(Query(...))方式，code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
-            return kdata
+
+            # 直接从DataFrame数据创建KData
+            try:
+                # 创建空的KData对象
+                kdata = KData()
+
+                # 确保datetime列是datetime类型
+                if not pd.api.types.is_datetime64_any_dtype(df_copy['datetime']):
+                    df_copy['datetime'] = pd.to_datetime(df_copy['datetime'])
+
+                # 按时间排序
+                df_copy = df_copy.sort_values('datetime')
+
+                # 逐行添加K线记录
+                for _, row in df_copy.iterrows():
+                    try:
+                        # 创建Datetime对象
+                        dt = Datetime(row['datetime'].strftime('%Y-%m-%d %H:%M:%S'))
+
+                        # 创建KRecord
+                        record = KRecord()
+                        record.datetime = dt
+                        record.open = float(row['open'])
+                        record.high = float(row['high'])
+                        record.low = float(row['low'])
+                        record.close = float(row['close'])
+                        record.volume = float(row['volume'])
+                        record.amount = float(row.get('amount', row['volume'] * row['close']))
+
+                        # 添加到KData
+                        kdata.append(record)
+
+                    except Exception as e:
+                        if hasattr(self, 'log_manager') and log:
+                            self.log_manager.warning(f"跳过无效K线记录: {e}")
+                        continue
+
+                if hasattr(self, 'log_manager') and log:
+                    start_date = df_copy['datetime'].min().strftime('%Y-%m-%d')
+                    end_date = df_copy['datetime'].max().strftime('%Y-%m-%d')
+                    self.log_manager.info(f"df_to_kdata转换成功: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
+
+                return kdata
+
+            except Exception as e:
+                # 如果直接创建失败，尝试从hikyuu数据库获取（兼容性方案）
+                if hasattr(self, 'log_manager') and log:
+                    self.log_manager.warning(f"直接创建KData失败，尝试从hikyuu数据库获取: {e}")
+
+                # 自动推断起止日期
+                start_date = str(df_copy['datetime'].min())[:10]
+                end_date = str(df_copy['datetime'].max())[:10]
+
+                from hikyuu.interactive import sm
+                from hikyuu import Query, Datetime
+
+                try:
+                    stock = sm[code]
+                    if start_date and end_date:
+                        query = Query(Datetime(start_date), Datetime(end_date))
+                    else:
+                        query = Query(-len(df_copy))
+                    kdata = stock.get_kdata(query)
+
+                    if hasattr(self, 'log_manager') and log:
+                        self.log_manager.info(f"df_to_kdata从hikyuu获取: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
+
+                    return kdata
+
+                except Exception as e2:
+                    if hasattr(self, 'log_manager') and log:
+                        self.log_manager.error(f"从hikyuu数据库获取KData也失败: {e2}")
+                    return KData()
+
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f'df_to_kdata自动切换KData失败: {str(e)}')
+            if hasattr(self, 'log_manager') and log:
+                self.log_manager.error(f'df_to_kdata转换KData失败: {str(e)}')
             from hikyuu import KData
             return KData()
 

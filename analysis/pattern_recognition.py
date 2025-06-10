@@ -63,99 +63,64 @@ class PatternRecognizer:
             max_pattern_size = 60
 
             for i in range(min_pattern_size, len(closes)-min_pattern_size):
-                # Find left shoulder
                 left_shoulder = np.max(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + \
-                    np.argmax(closes[i-min_pattern_size:i])
-
-                # Find head
+                left_shoulder_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
                 head = np.max(closes[i:i+min_pattern_size])
                 head_idx = i + np.argmax(closes[i:i+min_pattern_size])
-
-                # Find right shoulder
-                right_shoulder = np.max(
-                    closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + \
-                    np.argmax(closes[head_idx:head_idx+min_pattern_size])
-
-                # Validate pattern
-                if (head > left_shoulder and head > right_shoulder and
-                        abs(left_shoulder - right_shoulder) < threshold * head):
-
-                    # Find neckline
-                    neckline = min(
-                        closes[left_shoulder_idx:right_shoulder_idx+1]
-                    )
-
-                    # 计算对称性，防止分母为0
+                right_shoulder = np.max(closes[head_idx:head_idx+min_pattern_size])
+                right_shoulder_idx = head_idx + np.argmax(closes[head_idx:head_idx+min_pattern_size])
+                if (head > left_shoulder and head > right_shoulder and abs(left_shoulder - right_shoulder) < threshold * head):
+                    neckline = min(closes[left_shoulder_idx:right_shoulder_idx+1])
                     diffs = np.array([left_shoulder, head, right_shoulder])
                     mean_abs_diffs = np.mean(np.abs(diffs))
-                    if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
-                        symmetry = 0.0
-                    else:
-                        symmetry = 1 - np.std(diffs) / mean_abs_diffs
-
-                    patterns.append({
-                        'type': 'head_shoulders_top',
-                        'left_shoulder': (left_shoulder_idx, left_shoulder),
-                        'head': (head_idx, head),
-                        'right_shoulder': (right_shoulder_idx, right_shoulder),
-                        'neckline': neckline,
-                        'confidence': self._calculate_pattern_confidence(
-                            [left_shoulder, head, right_shoulder],
-                            neckline
-                        ),
-                        'symmetry': symmetry
-                    })
-
-                # Check inverse head and shoulders
+                    symmetry = 0.0 if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs) else 1 - np.std(diffs) / mean_abs_diffs
+                    # 统一字段
+                    patterns.append(self._make_pattern_dict(
+                        pat_type='head_shoulders_top',
+                        signal='sell',
+                        confidence=self._calculate_pattern_confidence([left_shoulder, head, right_shoulder], neckline),
+                        index=head_idx,
+                        datetime_val=str(kdata[head_idx].datetime) if hasattr(kdata[head_idx], 'datetime') else None,
+                        price=head,
+                        extra={
+                            'left_shoulder': (left_shoulder_idx, left_shoulder),
+                            'head': (head_idx, head),
+                            'right_shoulder': (right_shoulder_idx, right_shoulder),
+                            'neckline': neckline,
+                            'symmetry': symmetry
+                        }
+                    ))
                 left_shoulder = np.min(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + \
-                    np.argmin(closes[i-min_pattern_size:i])
-
+                left_shoulder_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
                 head = np.min(closes[i:i+min_pattern_size])
                 head_idx = i + np.argmin(closes[i:i+min_pattern_size])
-
-                right_shoulder = np.min(
-                    closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + \
-                    np.argmin(closes[head_idx:head_idx+min_pattern_size])
-
-                if (head < left_shoulder and head < right_shoulder and
-                        abs(left_shoulder - right_shoulder) < threshold * abs(head)):
-
-                    neckline = max(
-                        closes[left_shoulder_idx:right_shoulder_idx+1]
-                    )
-
+                right_shoulder = np.min(closes[head_idx:head_idx+min_pattern_size])
+                right_shoulder_idx = head_idx + np.argmin(closes[head_idx:head_idx+min_pattern_size])
+                if (head < left_shoulder and head < right_shoulder and abs(left_shoulder - right_shoulder) < threshold * abs(head)):
+                    neckline = max(closes[left_shoulder_idx:right_shoulder_idx+1])
                     diffs = np.array([left_shoulder, head, right_shoulder])
                     mean_abs_diffs = np.mean(np.abs(diffs))
-                    if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
-                        symmetry = 0.0
-                    else:
-                        symmetry = 1 - np.std(diffs) / mean_abs_diffs
-
-                    patterns.append({
-                        'type': 'head_shoulders_bottom',
-                        'left_shoulder': (left_shoulder_idx, left_shoulder),
-                        'head': (head_idx, head),
-                        'right_shoulder': (right_shoulder_idx, right_shoulder),
-                        'neckline': neckline,
-                        'confidence': self._calculate_pattern_confidence(
-                            [left_shoulder, head, right_shoulder],
-                            neckline
-                        ),
-                        'symmetry': symmetry
-                    })
-
+                    symmetry = 0.0 if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs) else 1 - np.std(diffs) / mean_abs_diffs
+                    patterns.append(self._make_pattern_dict(
+                        pat_type='head_shoulders_bottom',
+                        signal='buy',
+                        confidence=self._calculate_pattern_confidence([left_shoulder, head, right_shoulder], neckline),
+                        index=head_idx,
+                        datetime_val=str(kdata[head_idx].datetime) if hasattr(kdata[head_idx], 'datetime') else None,
+                        price=head,
+                        extra={
+                            'left_shoulder': (left_shoulder_idx, left_shoulder),
+                            'head': (head_idx, head),
+                            'right_shoulder': (right_shoulder_idx, right_shoulder),
+                            'neckline': neckline,
+                            'symmetry': symmetry
+                        }
+                    ))
             if not patterns:
-                print(
-                    f"[PatternRecognizer] find_head_shoulders: 未识别到任何形态，建议调整参数或更换股票。")
+                print(f"[PatternRecognizer] find_head_shoulders: 未识别到任何形态，建议调整参数或更换股票。")
             return patterns
-
         except Exception as e:
-            raise Exception(
-                f"Head and shoulders pattern recognition failed: {str(e)}")
+            raise Exception(f"Head and shoulders pattern recognition failed: {str(e)}")
 
     def find_double_tops_bottoms(self, kdata, threshold: float = 0.02) -> List[Dict]:
         """Find double top and bottom patterns
@@ -166,77 +131,65 @@ class PatternRecognizer:
             List of identified patterns
         """
         try:
+            # 类型安全转换：DataFrame转list
             if isinstance(kdata, pd.DataFrame):
                 if 'code' not in kdata.columns:
                     raise Exception(
                         "find_double_tops_bottoms: DataFrame 缺少 code 字段，请补全后再调用！建议补全 code 字段，或通过 main.py/core/trading_system.py/analysis_widget.py 自动补全。")
-                kdata = data_manager.df_to_kdata(kdata)
+                # 转为list对象，兼容后续索引
+                kdata = list(kdata.itertuples(index=False))
             if not kdata or len(kdata) < 10:
                 print(
                     "[PatternRecognizer] find_double_tops_bottoms: kdata为空或不足10条，跳过识别")
                 return []
 
-            closes = np.array([float(k.close) for k in kdata])
+            closes = np.array([float(getattr(k, 'close', k.close) if hasattr(k, 'close') else k[4]) for k in kdata])
             patterns = []
             min_pattern_size = 10
             max_pattern_size = 40
 
             for i in range(min_pattern_size, len(closes)-min_pattern_size):
-                # Find first peak
                 peak1 = np.max(closes[i-min_pattern_size:i])
-                peak1_idx = i - min_pattern_size + \
-                    np.argmax(closes[i-min_pattern_size:i])
-
-                # Find second peak
+                peak1_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
                 peak2 = np.max(closes[i:i+min_pattern_size])
                 peak2_idx = i + np.argmax(closes[i:i+min_pattern_size])
-
-                # Validate double top
                 if abs(peak1 - peak2) < threshold * peak1:
-                    # Find neckline
                     neckline = min(closes[peak1_idx:peak2_idx+1])
-
-                    patterns.append({
-                        'type': 'double_top',
-                        'peak1': (peak1_idx, peak1),
-                        'peak2': (peak2_idx, peak2),
-                        'neckline': neckline,
-                        'confidence': self._calculate_pattern_confidence(
-                            [peak1, peak2],
-                            neckline
-                        )
-                    })
-
-                # Find double bottom
+                    patterns.append(self._make_pattern_dict(
+                        pat_type='double_top',
+                        signal='sell',
+                        confidence=self._calculate_pattern_confidence([peak1, peak2], neckline),
+                        index=int(peak2_idx),
+                        datetime_val=str(getattr(kdata[peak2_idx], 'datetime', None)),
+                        price=peak2,
+                        extra={
+                            'peak1': (int(peak1_idx), peak1),
+                            'peak2': (int(peak2_idx), peak2),
+                            'neckline': neckline
+                        }
+                    ))
                 trough1 = np.min(closes[i-min_pattern_size:i])
-                trough1_idx = i - min_pattern_size + \
-                    np.argmin(closes[i-min_pattern_size:i])
-
+                trough1_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
                 trough2 = np.min(closes[i:i+min_pattern_size])
                 trough2_idx = i + np.argmin(closes[i:i+min_pattern_size])
-
                 if abs(trough1 - trough2) < threshold * trough1:
                     neckline = max(closes[trough1_idx:trough2_idx+1])
-
-                    patterns.append({
-                        'type': 'double_bottom',
-                        'trough1': (trough1_idx, trough1),
-                        'trough2': (trough2_idx, trough2),
-                        'neckline': neckline,
-                        'confidence': self._calculate_pattern_confidence(
-                            [trough1, trough2],
-                            neckline
-                        )
-                    })
-
-            if not patterns:
-                print(
-                    f"[PatternRecognizer] find_double_tops_bottoms: 未识别到任何形态，建议调整参数或更换股票。")
+                    patterns.append(self._make_pattern_dict(
+                        pat_type='double_bottom',
+                        signal='buy',
+                        confidence=self._calculate_pattern_confidence([trough1, trough2], neckline),
+                        index=int(trough2_idx),
+                        datetime_val=str(getattr(kdata[trough2_idx], 'datetime', None)),
+                        price=trough2,
+                        extra={
+                            'trough1': (int(trough1_idx), trough1),
+                            'trough2': (int(trough2_idx), trough2),
+                            'neckline': neckline
+                        }
+                    ))
             return patterns
-
         except Exception as e:
-            raise Exception(
-                f"Double top/bottom pattern recognition failed: {str(e)}")
+            raise Exception(f"Double tops/bottoms pattern recognition failed: {str(e)}")
 
     def find_triangles(self, kdata, threshold: float = 0.02) -> List[Dict]:
         """Find triangle patterns
@@ -384,6 +337,37 @@ class PatternRecognizer:
         Returns:
             List of pattern signal dicts
         """
+        import pandas as pd
+        from datetime import datetime
+        # --- 新增：datetime字段健壮性检查 ---
+        if isinstance(kdata, pd.DataFrame):
+            if 'datetime' not in kdata.columns:
+                print("[PatternRecognizer] K线数据缺少datetime字段，自动补全为当前时间")
+                kdata['datetime'] = pd.to_datetime(datetime.now()).strftime('%Y-%m-%d')
+            # 检查并修正datetime字段
+
+            def fix_datetime(val, prev):
+                try:
+                    if pd.isna(val) or val is None:
+                        return prev if prev else datetime.now().strftime('%Y-%m-%d')
+                    # 尝试标准化格式
+                    return pd.to_datetime(val).strftime('%Y-%m-%d')
+                except Exception as e:
+                    print(f"[PatternRecognizer] 修正datetime异常: {val}, 错误: {str(e)}")
+                    return prev if prev else datetime.now().strftime('%Y-%m-%d')
+            prev_dt = None
+            dt_list = []
+            for v in kdata['datetime']:
+                fixed = fix_datetime(v, prev_dt)
+                dt_list.append(fixed)
+                prev_dt = fixed
+            kdata['datetime'] = dt_list
+            # 过滤掉仍为None或空字符串的行
+            before = len(kdata)
+            kdata = kdata[kdata['datetime'].notna() & (kdata['datetime'] != '')]
+            after = len(kdata)
+            if after < before:
+                print(f"[PatternRecognizer] 已过滤{before-after}行无效datetime数据")
         if params:
             self.params.update(params)
         all_patterns = {
@@ -533,3 +517,24 @@ class PatternRecognizer:
         """
         # TODO: 实现统计分析逻辑
         return {}
+
+    def _make_pattern_dict(self, pat_type, signal, confidence, index, datetime_val, price, extra=None):
+        """统一生成形态信号字典，增加详细字段和置信度分级"""
+        if confidence >= 0.8:
+            confidence_level = '高'
+        elif confidence >= 0.5:
+            confidence_level = '中'
+        else:
+            confidence_level = '低'
+        d = {
+            'type': pat_type,
+            'signal': signal,
+            'confidence': confidence,
+            'confidence_level': confidence_level,
+            'index': index,
+            'datetime': datetime_val,
+            'price': price
+        }
+        if extra:
+            d.update(extra)
+        return d

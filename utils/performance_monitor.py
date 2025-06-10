@@ -13,7 +13,6 @@ import logging
 from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal, QThread
-from .config_types import PerformanceConfig
 from contextlib import contextmanager
 
 
@@ -153,3 +152,29 @@ class PerformanceMonitor(QObject):
             dict: 包含CPU、内存、磁盘使用率的字典
         """
         return self._metrics.copy()
+
+
+def monitor_performance(name: str = None, threshold_ms: int = 1000):
+    """
+    性能监控装饰器：用于监控函数/方法的执行耗时，超阈值自动日志告警。
+    Args:
+        name (str): 监控名称（可选）
+        threshold_ms (int): 超过该毫秒数则记录告警
+    """
+    def decorator(func):
+        import functools
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            import time
+            start = time.time()
+            result = func(*args, **kwargs)
+            elapsed = (time.time() - start) * 1000  # ms
+            func_name = name or func.__name__
+            if elapsed > threshold_ms:
+                logging.warning(f"[性能监控] {func_name} 执行耗时 {elapsed:.1f} ms 超过阈值 {threshold_ms} ms")
+            else:
+                logging.info(f"[性能监控] {func_name} 执行耗时 {elapsed:.1f} ms")
+            return result
+        return wrapper
+    return decorator

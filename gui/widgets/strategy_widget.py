@@ -10,6 +10,7 @@ from core.logger import LogManager, LogLevel
 import traceback
 from gui.widgets.log_widget import LogWidget
 from utils.theme import get_theme_manager
+from utils.log_util import log_structured
 
 
 class StrategyWidget(QWidget):
@@ -45,13 +46,12 @@ class StrategyWidget(QWidget):
             # 设置样式
             self.theme_manager = get_theme_manager()
 
-            self.log_manager.info("策略控件初始化完成")
+            log_structured(self.log_manager, "strategy_widget_init", level="info", status="success")
 
         except Exception as e:
             error_msg = f"初始化失败: {str(e)}"
             if self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+                log_structured(self.log_manager, "strategy_widget_init", level="error", status="fail", error=error_msg)
             self.error_occurred.emit(error_msg)
 
     def init_ui(self):
@@ -103,12 +103,11 @@ class StrategyWidget(QWidget):
 
             layout.addLayout(button_layout)
 
-            self.log_manager.info("策略控件UI初始化完成")
+            log_structured(self.log_manager, "strategy_widget_ui_init", level="info", status="success")
 
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, "strategy_widget_ui_init", level="error", status="fail", error=error_msg)
             self.error_occurred.emit(error_msg)
 
     def connect_signals(self):
@@ -123,12 +122,11 @@ class StrategyWidget(QWidget):
             self.reset_button.clicked.connect(self.reset_params)
             self.save_button.clicked.connect(self.save_strategy)
 
-            self.log_manager.info("信号连接完成")
+            log_structured(self.log_manager, "signal_connected", level="info", status="success")
 
         except Exception as e:
             error_msg = f"连接信号失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, "signal_connected", level="error", status="fail", error=error_msg)
             self.error_occurred.emit(error_msg)
 
     def on_strategy_changed(self, strategy: str):
@@ -140,12 +138,11 @@ class StrategyWidget(QWidget):
         try:
             self.current_strategy = strategy
             self.update_params()
-            self.log_manager.info(f"切换到策略: {strategy}")
+            log_structured(self.log_manager, f"切换到策略: {strategy}", level="info")
 
         except Exception as e:
             error_msg = f"切换策略失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"切换策略失败: {error_msg}", level="error")
             self.error_occurred.emit(error_msg)
 
     def update_params(self):
@@ -174,12 +171,11 @@ class StrategyWidget(QWidget):
             elif self.current_strategy == "自定义策略":
                 self._add_custom_params()
 
-            self.log_manager.info("参数控件更新完成")
+            log_structured(self.log_manager, "参数控件更新完成", level="info")
 
         except Exception as e:
             error_msg = f"更新参数控件失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"更新参数控件失败: {error_msg}", level="error")
             self.error_occurred.emit(error_msg)
 
     def _add_ma_params(self):
@@ -200,7 +196,7 @@ class StrategyWidget(QWidget):
             self.param_controls["slow_period"] = slow_period
 
         except Exception as e:
-            self.log_manager.error(f"添加均线参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加均线参数失败: {str(e)}", level="error")
 
     def _add_macd_params(self):
         """添加MACD策略参数"""
@@ -227,7 +223,7 @@ class StrategyWidget(QWidget):
             self.param_controls["signal_period"] = signal_period
 
         except Exception as e:
-            self.log_manager.error(f"添加MACD参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加MACD参数失败: {str(e)}", level="error")
 
     def _add_rsi_params(self):
         """添加RSI策略参数"""
@@ -254,7 +250,7 @@ class StrategyWidget(QWidget):
             self.param_controls["oversold"] = oversold
 
         except Exception as e:
-            self.log_manager.error(f"添加RSI参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加RSI参数失败: {str(e)}", level="error")
 
     def _add_boll_params(self):
         """添加布林带策略参数"""
@@ -275,7 +271,7 @@ class StrategyWidget(QWidget):
             self.param_controls["std"] = std
 
         except Exception as e:
-            self.log_manager.error(f"添加布林带参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加布林带参数失败: {str(e)}", level="error")
 
     def _add_kdj_params(self):
         """添加KDJ策略参数"""
@@ -304,7 +300,7 @@ class StrategyWidget(QWidget):
             self.param_controls["d_factor"] = d_factor
 
         except Exception as e:
-            self.log_manager.error(f"添加KDJ参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加KDJ参数失败: {str(e)}", level="error")
 
     def _add_custom_params(self):
         """添加自定义策略参数"""
@@ -320,7 +316,7 @@ class StrategyWidget(QWidget):
             self.param_controls["value"] = value
 
         except Exception as e:
-            self.log_manager.error(f"添加自定义参数失败: {str(e)}")
+            log_structured(self.log_manager, f"添加自定义参数失败: {str(e)}", level="error")
 
     def apply_strategy(self):
         """应用策略"""
@@ -336,12 +332,11 @@ class StrategyWidget(QWidget):
             # 发送策略变更信号
             self.strategy_changed.emit(self.current_strategy, params)
 
-            self.log_manager.info(f"应用策略: {self.current_strategy}")
+            log_structured(self.log_manager, f"应用策略: {self.current_strategy}", level="info")
 
         except Exception as e:
             error_msg = f"应用策略失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"应用策略失败: {error_msg}", level="error")
             self.error_occurred.emit(error_msg)
 
     def reset_params(self):
@@ -356,12 +351,11 @@ class StrategyWidget(QWidget):
                 elif isinstance(control, QLineEdit):
                     control.clear()
 
-            self.log_manager.info("参数已重置")
+            log_structured(self.log_manager, "参数已重置", level="info")
 
         except Exception as e:
             error_msg = f"重置参数失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"重置参数失败: {error_msg}", level="error")
             self.error_occurred.emit(error_msg)
 
     def save_strategy(self):
@@ -377,13 +371,12 @@ class StrategyWidget(QWidget):
 
             # TODO: 保存策略配置到文件
 
-            self.log_manager.info(f"保存策略: {self.current_strategy}")
+            log_structured(self.log_manager, f"保存策略: {self.current_strategy}", level="info")
             QMessageBox.information(self, "成功", "策略配置已保存")
 
         except Exception as e:
             error_msg = f"保存策略失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"保存策略失败: {error_msg}", level="error")
             self.error_occurred.emit(error_msg)
 
     def refresh(self) -> None:
@@ -394,8 +387,7 @@ class StrategyWidget(QWidget):
             self.update_params()
         except Exception as e:
             error_msg = f"刷新策略控件失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            log_structured(self.log_manager, f"刷新策略控件失败: {error_msg}", level="error")
             # 发射异常信号，主窗口可捕获弹窗
             self.error_occurred.emit(error_msg)
 

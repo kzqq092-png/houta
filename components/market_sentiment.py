@@ -175,7 +175,7 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         self.analyze_button.setStyleSheet(
             "background: #1976d2; color: white; font-weight: bold; border-radius: 8px; padding: 6px 18px;")
         self.analyze_button.setToolTip("点击进行市场情绪分析")
-        self.analyze_button.clicked.connect(self.on_analyze)
+        self.analyze_button.clicked.connect(self.on_sentiment_analyze)
         button_layout.addWidget(self.analyze_button)
 
         self.export_button = QPushButton("导出结果")
@@ -744,7 +744,7 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.status_label.setText(status)
             self.status_label.setStyleSheet("color: #666666;")  # 灰色
 
-    def on_analyze(self):
+    def on_sentiment_analyze(self):
         """分析前校验参数并强制拉取最新数据"""
         valid, msg = self.validate_params()
         if not valid:
@@ -764,13 +764,10 @@ class MarketSentimentWidget(BaseAnalysisPanel):
                     self.set_status_message("未获取到市场情绪数据", error=True)
                     self.log_manager.warning("分析未获取到数据")
             else:
-                self.set_status_message(
-                    "数据管理器未实现get_market_sentiment", error=True)
-                self.log_manager.error("数据管理器未实现get_market_sentiment")
+                self.set_status_message("数据管理器未实现get_market_sentiment", error=True)
         except Exception as e:
-            self.log_manager.error(f"分析失败: {str(e)}")
             self.set_status_message(f"分析失败: {str(e)}", error=True)
-            QMessageBox.critical(self, "分析错误", f"分析失败: {str(e)}")
+            self.log_manager.error(f"分析失败: {str(e)}")
 
     def show_template_manager_dialog(self):
         """显示模板管理对话框，支持模板的增删改查，详细日志"""
@@ -821,27 +818,53 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             QMessageBox.critical(self, "自定义指标错误", f"自定义指标对话框弹出失败: {str(e)}")
 
     def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
-        button.setEnabled(False)
-        self.show_progress("分析中，请稍候...")
+        original_text = button.text()
+        button.setText("取消")
+        button._interrupted = False
+
+        def on_cancel():
+            button._interrupted = True
+            button.setText(original_text)
+            button.setEnabled(True)
+            # 重新绑定分析逻辑
+            try:
+                button.clicked.disconnect()
+            except Exception:
+                pass
+            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+
+        try:
+            button.clicked.disconnect()
+        except Exception:
+            pass
+        button.clicked.connect(on_cancel)
 
         def task():
             try:
-                result = analysis_func(*args, **kwargs)
-                return result
+                if not getattr(button, '_interrupted', False):
+                    result = analysis_func(*args, **kwargs)
+                    return result
             except Exception as e:
                 if hasattr(self, 'log_manager'):
                     self.log_manager.error(f"分析异常: {str(e)}")
                 return None
+            finally:
+                QTimer.singleShot(0, lambda: on_done(None))
 
         def on_done(future):
+            button.setText(original_text)
             button.setEnabled(True)
-            self.hide_progress()
-            res = future.result()
+            # 重新绑定分析逻辑
+            try:
+                button.clicked.disconnect()
+            except Exception:
+                pass
+            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(task)
-        future.add_done_callback(
-            lambda f: QTimer.singleShot(0, lambda: on_done(f)))
+        if not hasattr(self, '_thread_pool'):
+            self._thread_pool = ThreadPoolExecutor(max_workers=2)
+        future = self._thread_pool.submit(task)
+        # 只需在finally中恢复，无需重复回调
 
     def analyze_sentiment(self):
         self._run_analysis_async(

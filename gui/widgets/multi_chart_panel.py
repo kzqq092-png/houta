@@ -47,7 +47,7 @@ class MultiChartPanel(QWidget):
         if self.layout() is None:
             self.main_layout = QVBoxLayout(self)
             self.main_layout.setContentsMargins(0, 0, 0, 0)
-            self.main_layout.setSpacing(4)
+            self.main_layout.setSpacing(2)
             self.setLayout(self.main_layout)
         else:
             self.main_layout = self.layout()
@@ -63,7 +63,7 @@ class MultiChartPanel(QWidget):
         self.main_layout.addWidget(self.single_chart)
         # 多屏区
         self.grid = QGridLayout()
-        self.grid.setSpacing(4)
+        self.grid.setSpacing(2)
         self.chart_widgets = []
         for r in range(self.rows):
             row_widgets = []

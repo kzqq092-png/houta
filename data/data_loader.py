@@ -497,20 +497,20 @@ def create_simulated_macroeconomic_data():
     return df
 
 
-def align_and_process_data(data, freq='D', method='ffill'):
+def align_and_process_data(kdata, freq='D', method='ffill'):
     """对数据进行对齐处理"""
-    if data.empty:
+    if kdata.empty:
         return None
 
     # 获取K线数据的时间范围
-    start_date = df_kdata.index.min()
-    end_date = df_kdata.index.max()
+    start_date = kdata.index.min()
+    end_date = kdata.index.max()
 
     # 创建完整的日期范围
     date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
 
     # 重新索引数据并填充缺失值
-    reindexed_data = data.reindex(date_range, method=method)
+    reindexed_data = kdata.reindex(date_range, method=method)
 
     # 将数据重采样到日频率
     if freq != 'D':
@@ -564,3 +564,91 @@ def fetch_fundamental_data_akshare(stock_code: str, use_cache: bool = True) -> p
     except Exception as e:
         print(f"akshare获取财务数据失败: {str(e)}")
         return pd.DataFrame()
+
+
+def generate_quality_report(df: pd.DataFrame, context: str = "数据质量") -> Dict[str, Any]:
+    """
+    生成数据质量报告，统计缺失、异常、分布、评分等，便于导出和UI展示。
+    参数：
+        df: 输入DataFrame
+        context: 场景说明
+    返回：
+        dict: 结构化报告
+    """
+    report = {
+        'context': context,
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'missing_fields': {},
+        'empty_ratio': {},
+        'anomaly_stats': {},
+        'type_errors': {},
+        'price_relation_errors': [],
+        'logic_errors': [],
+        'preprocess_fixes': [],
+        'field_distributions': {},
+        'quality_score': 100,
+        'warnings': [],
+        'errors': []
+    }
+    # 缺失字段统计
+    required_cols = ['open', 'high', 'low', 'close', 'volume', 'datetime', 'code']
+    for col in required_cols:
+        if col not in df.columns:
+            report['missing_fields'][col] = '缺失'
+            report['quality_score'] -= 10
+    # 空值分布
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        ratio = null_count / len(df) if len(df) > 0 else 0
+        if null_count > 0:
+            report['empty_ratio'][col] = {'count': int(null_count), 'ratio': float(ratio)}
+            report['quality_score'] -= min(5, int(ratio*100))
+    # 异常值统计
+    for col in df.select_dtypes(include=[np.number]).columns:
+        negatives = (df[col] < 0).sum()
+        extreme = ((df[col] > df[col].mean() + 5*df[col].std()) | (df[col] < df[col].mean() - 5*df[col].std())).sum()
+        if negatives > 0 or extreme > 0:
+            report['anomaly_stats'][col] = {'negatives': int(negatives), 'extreme': int(extreme)}
+            report['quality_score'] -= min(5, negatives+extreme)
+    # 类型检查
+    for col in df.columns:
+        if col in required_cols and col in df.columns:
+            if col in ['open', 'high', 'low', 'close', 'volume']:
+                if not np.issubdtype(df[col].dtype, np.number):
+                    report['type_errors'][col] = str(df[col].dtype)
+                    report['quality_score'] -= 5
+            if col == 'datetime':
+                try:
+                    pd.to_datetime(df['datetime'])
+                except Exception:
+                    report['type_errors'][col] = '非日期格式'
+                    report['quality_score'] -= 5
+    # 价格关系异常
+    if all(c in df.columns for c in ['high', 'low']):
+        if (df['high'] < df['low']).any():
+            report['price_relation_errors'].append('high < low')
+            report['quality_score'] -= 5
+    if all(c in df.columns for c in ['high', 'open', 'close']):
+        if ((df['high'] < df['open']) | (df['high'] < df['close'])).any():
+            report['price_relation_errors'].append('high < open/close')
+            report['quality_score'] -= 5
+    if all(c in df.columns for c in ['low', 'open', 'close']):
+        if ((df['low'] > df['open']) | (df['low'] > df['close'])).any():
+            report['price_relation_errors'].append('low > open/close')
+            report['quality_score'] -= 5
+    # 业务逻辑异常（如财务负值、比率超常）
+    for col in ['pe', 'pb', 'roe']:
+        if col in df.columns:
+            if (df[col] < 0).any():
+                report['logic_errors'].append(f'{col} 存在负值')
+                report['quality_score'] -= 2
+    # 字段分布统计
+    for col in ['close', 'volume', 'pe', 'pb']:
+        if col in df.columns:
+            desc = df[col].describe().to_dict()
+            report['field_distributions'][col] = desc
+    # 评分归一化
+    report['quality_score'] = max(0, min(100, report['quality_score']))
+    # 预处理修正记录（留空，后续补充）
+    return report

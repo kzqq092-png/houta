@@ -123,21 +123,58 @@ class EnhancedSignal(SignalBase):
                         indicators[name.upper()] = val
                 except Exception:
                     continue
-            ma_fast = indicators.get('MA', calc_ma(
-                k['close'], self.get_param("n_fast")))
-            ma_slow = indicators.get('EMA', calc_ma(
-                k['close'], self.get_param("n_slow")))
-            macd = indicators.get(
-                'MACD_1', None) or indicators.get('MACD', None)
-            rsi = indicators.get('RSI', None) or calc_rsi(
-                k['close'], self.get_param("rsi_window"))
-            volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
+            close_data = k['close']
+            n_fast = self.get_param("n_fast")
+            n_slow = self.get_param("n_slow")
+            if isinstance(close_data, pd.Series):
+                ma_fast = indicators.get('MA', calc_ma(close_data, n_fast))
+                ma_slow = indicators.get('EMA', calc_ma(close_data, n_slow))
+                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
+                if macd is None:
+                    from indicators_algo import calc_macd
+                    macd, _, _ = calc_macd(close_data)
+                rsi = indicators.get('RSI', None) or calc_rsi(close_data, self.get_param("rsi_window"))
+                volume_data = k['volume'] if 'volume' in k else None
+                if volume_data is not None and isinstance(volume_data, pd.Series):
+                    volume_ma = volume_data.rolling(window=self.get_param("volume_ma")).mean()
+                else:
+                    volume_ma = None
+            else:
+                ma_fast = indicators.get('MA', MA(close_data, n=n_fast))
+                ma_slow = indicators.get('EMA', MA(close_data, n=n_slow))
+                from hikyuu.indicator import MACD, RSI, VOL, MA
+                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
+                if macd is None:
+                    macd = MACD(close_data, n1=n_fast, n2=n_slow, n3=9)
+                rsi = indicators.get('RSI', None) or RSI(close_data, n=self.get_param("rsi_window"))
+                volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
             kdj = calc_kdj(k, self.get_param("kdj_n"))
-            boll = calc_boll(k['close'], self.get_param(
-                "boll_n"), self.get_param("boll_width"))
-            atr = calc_atr(k, self.get_param("atr_period"))
-            cci = calc_cci(k, self.get_param("cci_period"))
-            obv = calc_obv(k)
+            # --- 类型安全指标计算 ---
+            # BOLL
+            if isinstance(k['close'], pd.Series):
+                boll = calc_boll(k['close'], self.get_param("boll_n"), self.get_param("boll_width"))
+            else:
+                from hikyuu.indicator import BOLL
+                close_ind = CLOSE(k) if hasattr(k, 'to_df') else k['close']
+                boll = BOLL(close_ind, n=self.get_param("boll_n"), width=self.get_param("boll_width"))
+            # ATR
+            if hasattr(k, 'to_df'):
+                atr = calc_atr(k, self.get_param("atr_period"))
+            else:
+                from hikyuu.indicator import ATR
+                atr = ATR(k, n=self.get_param("atr_period"))
+            # CCI
+            if hasattr(k, 'to_df'):
+                cci = calc_cci(k, self.get_param("cci_period"))
+            else:
+                from hikyuu.indicator import CCI
+                cci = CCI(k, n=self.get_param("cci_period"))
+            # OBV
+            if hasattr(k, 'to_df'):
+                obv = calc_obv(k)
+            else:
+                from hikyuu.indicator import OBV
+                obv = OBV(k)
             obv_ma = MA(obv, n=self.get_param("obv_ma"))
             dmi = DMI(k, n=self.get_param("dmi_period"))
             self.market_regime = self._detect_market_regime(

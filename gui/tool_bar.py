@@ -16,6 +16,7 @@ import os
 import traceback
 from gui.widgets.log_widget import LogWidget
 from utils.theme import get_theme_manager
+from utils.log_util import log_structured
 
 
 class MainToolBar(QToolBar):
@@ -43,7 +44,7 @@ class MainToolBar(QToolBar):
             # 初始化UI
             self.init_ui()
 
-            self.log_manager.info("工具栏初始化完成")
+            log_structured(self.log_manager, "toolbar_init", level="info", status="success")
 
         except Exception as e:
             print(f"初始化工具栏失败: {str(e)}")

@@ -39,6 +39,7 @@ class ChartWidget(QWidget):
     zoom_changed = pyqtSignal(float)  # 缩放变更信号
     request_indicator_dialog = pyqtSignal()
     request_stat_dialog = pyqtSignal(tuple)  # (start_idx, end_idx)
+    pattern_selected = pyqtSignal(int)  # 新增：主图高亮信号，参数为K线索引
 
     def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None, theme_manager=None, log_manager=None, data_manager=None):
         """初始化图表控件
@@ -70,8 +71,8 @@ class ChartWidget(QWidget):
             self.cache_manager = Cache()  # 图表最多缓存100个
 
             # 启用双缓冲
-            # self.setAttribute(Qt.WA_PaintOnScreen, True)
-            self.setAttribute(Qt.WA_NoSystemBackground, True)
+            self.setAttribute(Qt.WA_OpaquePaintEvent)
+            self.setAttribute(Qt.WA_NoSystemBackground)
             self.setAutoFillBackground(True)
 
             # 初始化管理器
@@ -159,6 +160,15 @@ class ChartWidget(QWidget):
             # layout.addWidget(self.indicator_bar)
             self._init_zoom_interaction()  # 新增：自定义缩放交互
             self._optimize_display()  # 保证初始化后也显示网格和刻度
+            # 新增信号类型筛选、显隐、主副图切换按钮
+            self.signal_type_filter = QComboBox(self)
+            self.signal_type_filter.addItems(["全部", "double_top", "double_bottom"])  # 可动态生成
+            self.signal_type_filter.currentTextChanged.connect(self.on_signal_filter_changed)
+            self.signal_visible_checkbox = QCheckBox("显示信号标记", self)
+            self.signal_visible_checkbox.setChecked(True)
+            self.signal_visible_checkbox.stateChanged.connect(self.on_signal_filter_changed)
+            self.chart_mode_switch = QPushButton("主/副图切换", self)
+            self.chart_mode_switch.clicked.connect(self.toggle_chart_mode)
         except Exception as e:
             self.log_manager.error(f"初始化UI失败: {str(e)}")
 
@@ -267,8 +277,14 @@ class ChartWidget(QWidget):
                 xticklabels = [kdata.index[i].strftime(
                     '%Y-%m-%d') for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
-                self.indicator_ax.set_xticklabels(
-                    xticklabels, rotation=30, fontsize=8)
+                # 修复：确保tick数量和label数量一致
+                if len(xticks) == len(xticklabels):
+                    self.indicator_ax.set_xticklabels(xticklabels, rotation=30, fontsize=8)
+                else:
+                    # 自动补齐或截断
+                    min_len = min(len(xticks), len(xticklabels))
+                    self.indicator_ax.set_xticks(xticks[:min_len])
+                    self.indicator_ax.set_xticklabels(xticklabels[:min_len], rotation=30, fontsize=8)
             self.close_loading_dialog()
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.yaxis.set_tick_params(direction='in', pad=0)
@@ -1321,61 +1337,162 @@ class ChartWidget(QWidget):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def plot_signals(self, signals):
-        """绘制交易信号
-
-        Args:
-            signals: 信号数据列表
-        """
+    def plot_signals(self, signals, visible_range=None, signal_filter=None):
+        """绘制信号，支持密度自适应、聚合展示、气泡提示"""
         try:
-            if not signals:
-                self.log_manager.warning("信号数据为空")
+            if not hasattr(self, 'main_ax') or not self.main_ax:
                 return
 
-            # 将绘制信号任务加入队列
-            self.queue_update(self._plot_signals_impl, signals)
+            # 清除旧信号
+            for artist in getattr(self, '_signal_artists', []):
+                try:
+                    artist.remove()
+                except:
+                    pass
+            self._signal_artists = []
 
-        except Exception as e:
-            error_msg = f"绘制信号失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+            if not signals:
+                self.canvas.draw()
+                return
 
-    def _plot_signals_impl(self, signals):
-        """实际的绘制信号实现，节假日无数据自动跳过，X轴为等距序号。"""
-        try:
-            if hasattr(self, 'price_ax') and self.current_kdata is not None:
-                kdata = self.current_kdata
-                x = np.arange(len(kdata))
-                date_to_idx = {str(date): i for i,
-                               date in enumerate(kdata.index)}
-                ymin = getattr(self, '_ymin', None)
-                ymax = getattr(self, '_ymax', None)
+            # 获取当前可见区间
+            if visible_range is None:
+                visible_range = self.get_visible_range()
+
+            # 筛选可见区间内的信号
+            visible_signals = []
+            if visible_range:
+                start_idx, end_idx = visible_range
                 for signal in signals:
-                    idx = date_to_idx.get(str(signal['date']))
-                    if idx is None:
-                        continue
-                    price = signal['price']
-                    if ymin is not None and ymax is not None:
-                        price = max(ymin, min(price, ymax))
-                    marker = '^' if signal['type'] == 'buy' else 'v'
-                    color = 'r' if signal['type'] == 'buy' else 'g'
-                    label = '买入' if signal['type'] == 'buy' else '卖出'
-                    self.price_ax.plot(
-                        idx, price, marker=marker, color=color, markersize=8, label=label)
-                handles, labels = self.price_ax.get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                lines = self.price_ax.get_lines()
-                labels = [l.get_label() for l in lines]
-                if lines and labels and any(l.get_visible() for l in lines):
-                    self.price_ax.legend(
-                        by_label.values(), by_label.keys(), loc='upper left', fontsize=8)
-            self.log_manager.info("绘制信号完成")
+                    sig_idx = signal.get('index', 0)
+                    if start_idx <= sig_idx <= end_idx:
+                        visible_signals.append(signal)
+            else:
+                visible_signals = signals
+
+            # 信号密度自适应
+            max_signals_per_screen = 20  # 每屏最多显示信号数
+            if len(visible_signals) > max_signals_per_screen:
+                # 聚合展示：仅显示重要信号，其余用统计标记
+                important_signals = self._select_important_signals(visible_signals, max_signals_per_screen)
+                aggregated_count = len(visible_signals) - len(important_signals)
+                visible_signals = important_signals
+
+                # 在角落显示聚合信息
+                if aggregated_count > 0:
+                    agg_text = self.main_ax.text(0.02, 0.98, f"+ {aggregated_count} 个信号",
+                                                 transform=self.main_ax.transAxes,
+                                                 bbox=dict(boxstyle="round,pad=0.3", facecolor="orange", alpha=0.7),
+                                                 fontsize=9, verticalalignment='top')
+                    self._signal_artists.append(agg_text)
+
+            # 绘制可见信号
+            for signal in visible_signals:
+                self._plot_single_signal(signal)
+
+            # 启用气泡提示
+            self._enable_signal_tooltips(visible_signals)
+
+            self.canvas.draw()
+
         except Exception as e:
-            error_msg = f"绘制信号实现失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"绘制信号失败: {str(e)}")
+
+    def _select_important_signals(self, signals, max_count):
+        """选择重要信号，基于置信度、类型优先级等"""
+        # 按置信度排序，优先显示高置信度信号
+        sorted_signals = sorted(signals, key=lambda x: x.get('confidence', 0), reverse=True)
+        return sorted_signals[:max_count]
+
+    def _plot_single_signal(self, signal):
+        """绘制单个信号标记"""
+        try:
+            idx = signal.get('index', 0)
+            signal_type = signal.get('type', 'unknown')
+            confidence = signal.get('confidence', 0)
+            price = signal.get('price', 0)
+
+            # 根据信号类型设置颜色和标记
+            if signal_type == 'double_top':
+                color = 'red'
+                marker = 'v'
+                label = 'DT'
+            elif signal_type == 'double_bottom':
+                color = 'green'
+                marker = '^'
+                label = 'DB'
+            else:
+                color = 'blue'
+                marker = 'o'
+                label = signal_type[:2].upper()
+
+            # 信号标记
+            scatter = self.main_ax.scatter(idx, price, c=color, marker=marker, s=80,
+                                           alpha=0.8, edgecolors='white', linewidth=1)
+            self._signal_artists.append(scatter)
+
+            # 简洁文字标注（仅高置信度显示）
+            if confidence > 0.7:
+                text = self.main_ax.text(idx, price * 1.01, label,
+                                         fontsize=8, ha='center', va='bottom',
+                                         color=color, fontweight='bold',
+                                         bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                self._signal_artists.append(text)
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"绘制单个信号失败: {str(e)}")
+
+    def _enable_signal_tooltips(self, signals):
+        """启用信号气泡提示"""
+        try:
+            # 创建信号索引映射
+            signal_map = {signal.get('index', 0): signal for signal in signals}
+
+            def on_hover(event):
+                if event.inaxes != self.main_ax:
+                    return
+
+                # 查找最近的信号
+                x_data = event.xdata
+                if x_data is None:
+                    return
+
+                nearest_idx = int(round(x_data))
+                if nearest_idx in signal_map:
+                    signal = signal_map[nearest_idx]
+
+                    # 显示气泡提示
+                    tooltip_text = f"类型: {signal.get('type', 'unknown')}\\n"
+                    tooltip_text += f"置信度: {signal.get('confidence', 0):.2f}\\n"
+                    tooltip_text += f"价格: {signal.get('price', 0):.2f}\\n"
+                    tooltip_text += f"时间: {signal.get('datetime', '')}"
+
+                    # 清除旧提示
+                    for artist in getattr(self, '_tooltip_artists', []):
+                        try:
+                            artist.remove()
+                        except:
+                            pass
+
+                    # 新提示
+                    tooltip = self.main_ax.annotate(tooltip_text,
+                                                    xy=(nearest_idx, signal.get('price', 0)),
+                                                    xytext=(20, 20), textcoords='offset points',
+                                                    bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.9),
+                                                    arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'),
+                                                    fontsize=9)
+                    self._tooltip_artists = [tooltip]
+                    self.canvas.draw()
+
+            # 绑定鼠标事件
+            if hasattr(self, 'canvas'):
+                self.canvas.mpl_connect('motion_notify_event', on_hover)
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"启用信号提示失败: {str(e)}")
 
     def clear_indicators(self):
         """清除所有指标"""
@@ -1771,7 +1888,7 @@ class ChartWidget(QWidget):
         """
         self.refresh()
 
-    def plot_patterns(self, pattern_signals: list):
+    def plot_patterns(self, pattern_signals: list, highlight_index: int = None):
         """
         在K线主图上高亮形态K线、绘制标记（如箭头、圆圈、文字），并支持交互（点击/悬停显示形态详情）。
         Args:
@@ -1840,7 +1957,6 @@ class ChartWidget(QWidget):
 
             @cursor.connect("add")
             def on_add(sel):
-                # 最近的点
                 x = int(round(sel.target[0]))
                 for d in details:
                     if abs(d['x'] - x) <= 0:
@@ -1848,13 +1964,25 @@ class ChartWidget(QWidget):
                         if d['涨跌幅'] is not None:
                             info += f"\n后续涨跌幅: {d['涨跌幅']:.2%}"
                         sel.annotation.set_text(info)
+                        # 新增：发射pattern_selected信号
+                        self.pattern_selected.emit(x)
                         break
-        except Exception:
-            pass  # mplcursors为可选依赖
+        except Exception as e:
+            # PolyCollection不支持pick，警告可忽略，文档提示
+            if self.log_manager:
+                self.log_manager.warning(f"mplcursors交互警告: {str(e)}。如需更好交互体验，请使用Line2D等支持pick的对象。")
         self.canvas.draw_idle()
         # 预留：统计分析可视化接口
         # def plot_pattern_statistics(stats: dict):
         #     ...
+
+        self._current_pattern_signals = pattern_signals
+        self._highlight_index = highlight_index
+
+    def highlight_pattern(self, idx: int):
+        """外部调用高亮指定K线索引的形态"""
+        if hasattr(self, '_current_pattern_signals'):
+            self.plot_patterns(self._current_pattern_signals, highlight_index=idx)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -1999,3 +2127,108 @@ class ChartWidget(QWidget):
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"复制图表到剪贴板失败: {str(e)}")
+
+    def get_visible_range(self):
+        # 获取当前主图可见区间的K线索引范围（伪代码，需结合xlim等）
+        try:
+            xlim = self.indicator_ax.get_xlim()
+            return int(xlim[0]), int(xlim[1])
+        except Exception:
+            return None
+
+    def on_signal_filter_changed(self):
+        """信号类型筛选/显隐变化时，刷新主图信号展示"""
+        try:
+            filter_type = self.signal_type_filter.currentText() if hasattr(self, 'signal_type_filter') else "全部"
+            visible = self.signal_visible_checkbox.isChecked() if hasattr(self, 'signal_visible_checkbox') else True
+            signals = getattr(self, '_all_signals', [])
+            if filter_type != "全部":
+                signals = [s for s in signals if s.get('type') == filter_type]
+            if visible:
+                visible_range = self.get_visible_range() if hasattr(self, 'get_visible_range') else None
+                self.plot_signals(signals, visible_range=visible_range, signal_filter={filter_type} if filter_type != "全部" else None)
+            else:
+                self.plot_signals([])
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"on_signal_filter_changed异常: {str(e)}")
+
+    def toggle_chart_mode(self):
+        """主/副图切换功能（占位实现，可扩展）"""
+        try:
+            # 这里可扩展为主图、副图切换逻辑，目前仅弹窗提示
+            QMessageBox.information(self, "主/副图切换", "主/副图切换功能待实现，后续可扩展为多种主副图布局。")
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"toggle_chart_mode异常: {str(e)}")
+
+    def highlight_signals(self, signals):
+        """高亮指定信号"""
+        try:
+            # 清除旧高亮
+            self.clear_signal_highlight()
+
+            if not signals or not hasattr(self, 'main_ax') or not self.main_ax:
+                return
+
+            # 绘制高亮效果
+            highlight_artists = []
+            for signal in signals:
+                idx = signal.get('index', 0)
+                price = signal.get('price', 0)
+
+                # 高亮圆圈
+                highlight_circle = self.main_ax.scatter(idx, price, s=200,
+                                                        facecolors='none', edgecolors='yellow',
+                                                        linewidths=3, alpha=0.8, zorder=30)
+                highlight_artists.append(highlight_circle)
+
+                # 高亮文字
+                highlight_text = self.main_ax.text(idx, price * 1.03, f"选中: {signal.get('type', '')}",
+                                                   fontsize=10, ha='center', va='bottom',
+                                                   color='yellow', fontweight='bold',
+                                                   bbox=dict(boxstyle="round,pad=0.3", facecolor='black', alpha=0.7))
+                highlight_artists.append(highlight_text)
+
+            # 保存高亮对象用于清除
+            self._highlight_artists = highlight_artists
+
+            # 自动调整视图范围至高亮信号
+            if len(signals) == 1:
+                signal = signals[0]
+                idx = signal.get('index', 0)
+                current_xlim = self.main_ax.get_xlim()
+                window_size = current_xlim[1] - current_xlim[0]
+                new_center = idx
+                self.main_ax.set_xlim(new_center - window_size/2, new_center + window_size/2)
+
+            self.canvas.draw()
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"高亮信号失败: {str(e)}")
+
+    def clear_signal_highlight(self):
+        """清除信号高亮"""
+        try:
+            # 移除高亮对象
+            for artist in getattr(self, '_highlight_artists', []):
+                try:
+                    artist.remove()
+                except:
+                    pass
+            self._highlight_artists = []
+
+            # 清除气泡提示
+            for artist in getattr(self, '_tooltip_artists', []):
+                try:
+                    artist.remove()
+                except:
+                    pass
+            self._tooltip_artists = []
+
+            self.canvas.draw()
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"清除信号高亮失败: {str(e)}")

@@ -143,25 +143,23 @@ class TechnicalAnalyzer:
         try:
             import pandas as pd
             if isinstance(kdata, pd.DataFrame):
-                kdata = data_manager.df_to_kdata(kdata)
-            closes = np.array([float(k.close) for k in kdata])
-
-            # Calculate RSI
-            rsi = RSI(kdata.close, 14)
-
-            # Calculate MACD
-            macd = MACD(kdata.close)
-
-            # Calculate rate of change
+                closes = kdata['close'].values
+                from indicators_algo import calc_rsi, calc_macd
+                rsi = calc_rsi(kdata['close'], 14)
+                macd, _, _ = calc_macd(kdata['close'])
+            else:
+                closes = np.array([float(k.close) for k in kdata])
+                from hikyuu.indicator import RSI, MACD
+                close_ind = CLOSE(kdata)
+                rsi = RSI(close_ind, n=14)
+                macd = MACD(close_ind)
             roc = np.diff(closes) / closes[:-1] * 100
-
             return {
                 'rsi': rsi,
                 'macd': macd,
                 'roc': roc,
                 'momentum_score': self._calculate_momentum_score(rsi, macd, roc)
             }
-
         except Exception as e:
             raise Exception(f"Momentum analysis failed: {str(e)}")
 
