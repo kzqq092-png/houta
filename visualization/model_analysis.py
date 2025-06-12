@@ -272,7 +272,7 @@ class ModelAnalysis:
 
             # 绘制ROC曲线
             plt.plot(fpr, tpr, color='darkorange', lw=2,
-                     label=f'ROC curve (AUC = {roc_auc:.2f})')
+                     label=f'ROC curve (AUC = {roc_auc:.3f})')
 
             # 绘制对角线
             plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')

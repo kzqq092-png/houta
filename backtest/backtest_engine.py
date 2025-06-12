@@ -27,9 +27,21 @@ class StrategyBacktester:
         self.commission_pct = commission_pct
         self.slippage_pct = slippage_pct
 
-        # 确保数据有日期索引
-        if not isinstance(self.data.index, pd.DatetimeIndex):
-            raise ValueError("数据必须有日期索引")
+        # 预处理数据，确保格式正确
+        self.data = self._kdata_preprocess(self.data, context="回测引擎初始化")
+
+        # 确保数据有日期索引或datetime列
+        has_datetime = False
+        if isinstance(self.data.index, pd.DatetimeIndex):
+            has_datetime = True
+        elif 'datetime' in self.data.columns:
+            # 如果datetime在列中，设置为索引
+            self.data['datetime'] = pd.to_datetime(self.data['datetime'])
+            self.data = self.data.set_index('datetime')
+            has_datetime = True
+
+        if not has_datetime:
+            raise ValueError("数据必须有日期索引或datetime列")
 
         # 初始化结果数据
         self.results = None
@@ -476,23 +488,78 @@ class StrategyBacktester:
         plt.close(fig)
 
     def _kdata_preprocess(self, df, context="分析"):
+        """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""
+        if not isinstance(df, pd.DataFrame):
+            return df
+
+        # 检查datetime是否在索引中或列中
+        has_datetime = False
+        datetime_in_index = False
+
+        # 检查datetime是否在索引中
+        if isinstance(df.index, pd.DatetimeIndex) or (hasattr(df.index, 'name') and df.index.name == 'datetime'):
+            has_datetime = True
+            datetime_in_index = True
+        # 检查datetime是否在列中
+        elif 'datetime' in df.columns:
+            has_datetime = True
+            datetime_in_index = False
+
+        # 如果datetime不存在，尝试从索引推断或创建
+        if not has_datetime:
+            if isinstance(df.index, pd.DatetimeIndex):
+                # 索引是DatetimeIndex但名称不是datetime，复制到列中
+                df = df.copy()
+                df['datetime'] = df.index
+                has_datetime = True
+                print(f"[{context}] 从DatetimeIndex推断datetime字段")
+            else:
+                # 完全没有datetime信息，需要补全
+                print(f"[{context}] 缺少datetime字段，自动补全")
+                df = df.copy()
+                df['datetime'] = pd.date_range(start='2023-01-01', periods=len(df), freq='D')
+                has_datetime = True
+
+        # 检查其他必要字段
         required_cols = ['open', 'high', 'low', 'close', 'volume', 'signal']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             print(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
+            df = df.copy()
             for col in missing_cols:
                 if col == 'signal':
                     df['signal'] = 0
+                elif col == 'volume':
+                    df[col] = 0.0
+                elif col in ['open', 'high', 'low', 'close']:
+                    # 用收盘价填充其他价格字段
+                    if 'close' in df.columns:
+                        df[col] = df['close']
+                    else:
+                        df[col] = 0.0
                 else:
                     df[col] = 0.0
+
+        # 检查数值字段异常
         for col in ['open', 'high', 'low', 'close', 'volume']:
-            before = len(df)
-            df = df[df[col].notna() & (df[col] >= 0)]
-            after = len(df)
-            if after < before:
-                print(f"[{context}] 已过滤{before-after}行{col}异常数据")
+            if col in df.columns:
+                before = len(df)
+                df = df[df[col].notna() & (df[col] >= 0)]
+                after = len(df)
+                if after < before:
+                    print(f"[{context}] 已过滤{before-after}行{col}异常数据")
+
         if df.empty:
             print(f"[{context}] 数据全部无效，返回空")
+            return df
+
+        # 修复：如果datetime在索引中，确保在重置索引前将其复制到列中
+        if datetime_in_index and 'datetime' not in df.columns:
+            df = df.copy()
+            df['datetime'] = df.index
+            print(f"[{context}] 将索引中的datetime复制到列中")
+
+        # 重置索引，但保留datetime列
         return df.reset_index(drop=True)
 
 

@@ -294,7 +294,7 @@ class StockDetailDialog(QDialog):
                     if val is None or val == '' or (isinstance(val, float) and (pd.isna(val) or str(val) == 'nan')):
                         val_str = '-'
                     elif isinstance(val, (int, float)):
-                        val_str = f"{val:.2f}"
+                        val_str = f"{val:.3f}"
                     else:
                         val_str = str(val)
                     table.setItem(row, col, QTableWidgetItem(val_str))
@@ -322,7 +322,7 @@ class StockDetailDialog(QDialog):
                                 if val is None or val == '' or (isinstance(val, float) and (pd.isna(val) or str(val) == 'nan')):
                                     val_str = '-'
                                 elif isinstance(val, (int, float)):
-                                    val_str = f"{val:.2f}"
+                                    val_str = f"{val:.3f}"
                                 else:
                                     val_str = str(val)
                                 table.setItem(
@@ -357,7 +357,7 @@ class StockDetailDialog(QDialog):
             for col, key in enumerate(["open", "high", "low", "close", "volume"], start=1):
                 val = item.get(key, '')
                 if isinstance(val, (int, float)):
-                    val_str = f"{val:.2f}"
+                    val_str = f"{val:.3f}"
                 else:
                     val_str = str(val)
                 table.setItem(row, col, QTableWidgetItem(val_str))

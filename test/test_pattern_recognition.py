@@ -160,7 +160,7 @@ def create_test_kdata():
     df.set_index('datetime', inplace=True)
 
     print(f"✓ 创建了 {len(df)} 条K线数据")
-    print(f"价格范围: {df['close'].min():.2f} - {df['close'].max():.2f}")
+    print(f"价格范围: {df['close'].min():.3f} - {df['close'].max():.3f}")
     print(f"数据时间范围: {df.index[0]} 到 {df.index[-1]}")
 
     return df
@@ -220,7 +220,7 @@ def test_pattern_recognition(manager, kdata):
             for i, pattern in enumerate(patterns[:5]):
                 print(f"  {i+1}. {pattern.get('type', 'unknown')} - "
                       f"{pattern.get('signal', 'unknown')} - "
-                      f"置信度: {pattern.get('confidence', 0):.2f} - "
+                      f"置信度: {pattern.get('confidence', 0):.3f} - "
                       f"位置: {pattern.get('index', 'unknown')}")
         else:
             print("⚠ 未识别到任何形态")

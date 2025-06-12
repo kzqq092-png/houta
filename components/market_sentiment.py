@@ -427,10 +427,10 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             # 1. 情绪分数
             score = data.get('sentiment_index')
             if isinstance(score, (int, float)):
-                self.sentiment_score_label.setText(f"{score:.2f}")
+                self.sentiment_score_label.setText(f"{score:.3f}")
                 self.sentiment_score_label.setStyleSheet(
                     "font-size: 20px; font-weight: bold; color: #1976d2; padding: 4px 12px; border-radius: 8px; background: #e3f2fd;")
-                self.log_manager.info(f"市场情绪分数显示: {score:.2f}")
+                self.log_manager.info(f"市场情绪分数显示: {score:.3f}")
             else:
                 self.sentiment_score_label.setText("暂无数据")
                 self.sentiment_score_label.setStyleSheet(
@@ -539,7 +539,7 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         try:
             sentiment_index = data.get('sentiment_index', 0)
             if hasattr(self, 'sentiment_score_label'):
-                self.sentiment_score_label.setText(f"{sentiment_index:.2f}")
+                self.sentiment_score_label.setText(f"{sentiment_index:.3f}")
                 # 设置颜色
                 if sentiment_index >= 70:
                     self.sentiment_score_label.setStyleSheet(
@@ -595,7 +595,7 @@ class MarketSentimentWidget(BaseAnalysisPanel):
                 min_val = min(values)
                 mean_val = sum(values) / len(values)
                 # 通过QChart的title增强显示
-                self.sentiment_chart.setTitle(f"市场情绪（最大: {max_val:.2f}  最小: {min_val:.2f}  均值: {mean_val:.2f}）")
+                self.sentiment_chart.setTitle(f"市场情绪（最大: {max_val:.3f}  最小: {min_val:.3f}  均值: {mean_val:.3f}）")
             # 更新图表
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
@@ -897,19 +897,19 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         col_count = df.shape[1]
         # 均值行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.2f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
             item.setBackground(QColor("#fffde7"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df), j, item)
         # 最大行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{max_vals.iloc[j]:.2f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffe082"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df)+1, j, item)
         # 最小行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{min_vals.iloc[j]:.2f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffccbc"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df)+2, j, item)

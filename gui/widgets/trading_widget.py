@@ -329,7 +329,7 @@ class TradingWidget(QWidget):
                 )
                 self.signal_table.setItem(
                     row, 3,
-                    QTableWidgetItem(f"{signal['price']:.2f}")
+                    QTableWidgetItem(f"{signal['price']:.3f}")
                 )
                 self.signal_table.setItem(
                     row, 4,

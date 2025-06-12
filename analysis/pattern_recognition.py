@@ -1,540 +1,339 @@
 """
-Pattern Recognition Module for Trading System
-Provides various chart pattern recognition tools
+Enhanced Pattern Recognition Module for Trading System
+完全重构的形态识别模块，与新统一框架完全兼容
 """
 
 import numpy as np
-from typing import List, Dict, Tuple, Optional
-from datetime import datetime
 import pandas as pd
-from hikyuu import Datetime, Query, KData, MA
-from core.data_manager import data_manager
+from typing import List, Dict, Tuple, Optional, Any
+from datetime import datetime
+import traceback
+
+# 导入新的统一框架
+from analysis.pattern_base import (
+    BasePatternRecognizer, PatternResult, PatternConfig,
+    SignalType, PatternCategory, PatternAlgorithmFactory,
+    calculate_body_ratio, calculate_shadow_ratios,
+    is_bullish_candle, is_bearish_candle
+)
 
 
-class PatternRecognizer:
-    """Pattern recognition tools for trading system, now supports extensive candlestick and multi-bar patterns with parameter customization."""
+class EnhancedPatternRecognizer:
+    """
+    增强的形态识别器，完全兼容新统一框架
+    提供更好的错误处理、调试信息和性能优化
+    """
 
-    DEFAULT_PARAMS = {
-        # 单根K线
-        'hammer_shadow_ratio': 2.0,
-        'shooting_star_shadow_ratio': 2.0,
-        'doji_body_ratio': 0.1,
-        'marubozu_body_ratio': 0.9,
-        'long_line_body_ratio': 0.7,
-        'spinning_top_body_ratio': 0.3,
-        # 双根
-        'engulfing_min_body_ratio': 0.7,
-        'piercing_darkcloud_ratio': 0.5,
-        # 三根
-        'star_gap_ratio': 0.2,
-        # 通用
-        'min_pattern_size': 5,
-        'max_pattern_size': 60,
-        'threshold': 0.02,
-    }
-
-    def __init__(self, params: Optional[dict] = None):
-        self.cache = {}
-        self.params = self.DEFAULT_PARAMS.copy()
-        if params:
-            self.params.update(params)
-
-    def find_head_shoulders(self, kdata, threshold: float = 0.02) -> List[Dict]:
-        """Find head and shoulders patterns
-        Args:
-            kdata: KData对象或DataFrame
-            threshold: Price difference threshold
-        Returns:
-            List of identified patterns
+    def __init__(self, debug_mode: bool = False):
         """
+        初始化增强的形态识别器
+
+        Args:
+            debug_mode: 是否启用调试模式
+        """
+        self.debug_mode = debug_mode
+        self.execution_stats = {}
+
+        # 动态获取形态名称映射，避免硬编码
+        self._pattern_name_mapping = self._build_pattern_name_mapping()
+
+    def _build_pattern_name_mapping(self) -> Dict[str, str]:
+        """从数据库构建形态名称映射"""
         try:
-            if isinstance(kdata, pd.DataFrame):
-                if 'code' not in kdata.columns:
-                    raise Exception(
-                        "find_head_shoulders: DataFrame 缺少 code 字段，请补全后再调用！建议补全 code 字段，或通过 main.py/core/trading_system.py/analysis_widget.py 自动补全。")
-                kdata = data_manager.df_to_kdata(kdata)
-            if not kdata or len(kdata) < 20:
-                print("[PatternRecognizer] find_head_shoulders: kdata为空或不足20条，跳过识别")
-                return []
-
-            closes = np.array([float(k.close) for k in kdata])
-            patterns = []
-            min_pattern_size = 20
-            max_pattern_size = 60
-
-            for i in range(min_pattern_size, len(closes)-min_pattern_size):
-                left_shoulder = np.max(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
-                head = np.max(closes[i:i+min_pattern_size])
-                head_idx = i + np.argmax(closes[i:i+min_pattern_size])
-                right_shoulder = np.max(closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + np.argmax(closes[head_idx:head_idx+min_pattern_size])
-                if (head > left_shoulder and head > right_shoulder and abs(left_shoulder - right_shoulder) < threshold * head):
-                    neckline = min(closes[left_shoulder_idx:right_shoulder_idx+1])
-                    diffs = np.array([left_shoulder, head, right_shoulder])
-                    mean_abs_diffs = np.mean(np.abs(diffs))
-                    symmetry = 0.0 if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs) else 1 - np.std(diffs) / mean_abs_diffs
-                    # 统一字段
-                    patterns.append(self._make_pattern_dict(
-                        pat_type='head_shoulders_top',
-                        signal='sell',
-                        confidence=self._calculate_pattern_confidence([left_shoulder, head, right_shoulder], neckline),
-                        index=head_idx,
-                        datetime_val=str(kdata[head_idx].datetime) if hasattr(kdata[head_idx], 'datetime') else None,
-                        price=head,
-                        extra={
-                            'left_shoulder': (left_shoulder_idx, left_shoulder),
-                            'head': (head_idx, head),
-                            'right_shoulder': (right_shoulder_idx, right_shoulder),
-                            'neckline': neckline,
-                            'symmetry': symmetry
-                        }
-                    ))
-                left_shoulder = np.min(closes[i-min_pattern_size:i])
-                left_shoulder_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
-                head = np.min(closes[i:i+min_pattern_size])
-                head_idx = i + np.argmin(closes[i:i+min_pattern_size])
-                right_shoulder = np.min(closes[head_idx:head_idx+min_pattern_size])
-                right_shoulder_idx = head_idx + np.argmin(closes[head_idx:head_idx+min_pattern_size])
-                if (head < left_shoulder and head < right_shoulder and abs(left_shoulder - right_shoulder) < threshold * abs(head)):
-                    neckline = max(closes[left_shoulder_idx:right_shoulder_idx+1])
-                    diffs = np.array([left_shoulder, head, right_shoulder])
-                    mean_abs_diffs = np.mean(np.abs(diffs))
-                    symmetry = 0.0 if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs) else 1 - np.std(diffs) / mean_abs_diffs
-                    patterns.append(self._make_pattern_dict(
-                        pat_type='head_shoulders_bottom',
-                        signal='buy',
-                        confidence=self._calculate_pattern_confidence([left_shoulder, head, right_shoulder], neckline),
-                        index=head_idx,
-                        datetime_val=str(kdata[head_idx].datetime) if hasattr(kdata[head_idx], 'datetime') else None,
-                        price=head,
-                        extra={
-                            'left_shoulder': (left_shoulder_idx, left_shoulder),
-                            'head': (head_idx, head),
-                            'right_shoulder': (right_shoulder_idx, right_shoulder),
-                            'neckline': neckline,
-                            'symmetry': symmetry
-                        }
-                    ))
-            if not patterns:
-                print(f"[PatternRecognizer] find_head_shoulders: 未识别到任何形态，建议调整参数或更换股票。")
-            return patterns
+            import sqlite3
+            conn = sqlite3.connect('db/hikyuu_system.db')
+            cursor = conn.cursor()
+            cursor.execute("SELECT name, english_name FROM pattern_types")
+            mapping = {row[0]: row[1] for row in cursor.fetchall()}
+            conn.close()
+            return mapping
         except Exception as e:
-            raise Exception(f"Head and shoulders pattern recognition failed: {str(e)}")
+            if self.debug_mode:
+                print(f"构建形态名称映射失败: {e}")
+            return {}
 
-    def find_double_tops_bottoms(self, kdata, threshold: float = 0.02) -> List[Dict]:
-        """Find double top and bottom patterns
-        Args:
-            kdata: KData对象或DataFrame
-            threshold: Price difference threshold
-        Returns:
-            List of identified patterns
+    def identify_patterns(self, kdata: pd.DataFrame,
+                          confidence_threshold: float = 0.1,
+                          pattern_types: Optional[List[str]] = None) -> List[Dict]:
         """
-        try:
-            # 类型安全转换：DataFrame转list
-            if isinstance(kdata, pd.DataFrame):
-                if 'code' not in kdata.columns:
-                    raise Exception(
-                        "find_double_tops_bottoms: DataFrame 缺少 code 字段，请补全后再调用！建议补全 code 字段，或通过 main.py/core/trading_system.py/analysis_widget.py 自动补全。")
-                # 转为list对象，兼容后续索引
-                kdata = list(kdata.itertuples(index=False))
-            if not kdata or len(kdata) < 10:
-                print(
-                    "[PatternRecognizer] find_double_tops_bottoms: kdata为空或不足10条，跳过识别")
-                return []
+        识别K线形态
 
-            closes = np.array([float(getattr(k, 'close', k.close) if hasattr(k, 'close') else k[4]) for k in kdata])
-            patterns = []
-            min_pattern_size = 10
-            max_pattern_size = 40
-
-            for i in range(min_pattern_size, len(closes)-min_pattern_size):
-                peak1 = np.max(closes[i-min_pattern_size:i])
-                peak1_idx = i - min_pattern_size + np.argmax(closes[i-min_pattern_size:i])
-                peak2 = np.max(closes[i:i+min_pattern_size])
-                peak2_idx = i + np.argmax(closes[i:i+min_pattern_size])
-                if abs(peak1 - peak2) < threshold * peak1:
-                    neckline = min(closes[peak1_idx:peak2_idx+1])
-                    patterns.append(self._make_pattern_dict(
-                        pat_type='double_top',
-                        signal='sell',
-                        confidence=self._calculate_pattern_confidence([peak1, peak2], neckline),
-                        index=int(peak2_idx),
-                        datetime_val=str(getattr(kdata[peak2_idx], 'datetime', None)),
-                        price=peak2,
-                        extra={
-                            'peak1': (int(peak1_idx), peak1),
-                            'peak2': (int(peak2_idx), peak2),
-                            'neckline': neckline
-                        }
-                    ))
-                trough1 = np.min(closes[i-min_pattern_size:i])
-                trough1_idx = i - min_pattern_size + np.argmin(closes[i-min_pattern_size:i])
-                trough2 = np.min(closes[i:i+min_pattern_size])
-                trough2_idx = i + np.argmin(closes[i:i+min_pattern_size])
-                if abs(trough1 - trough2) < threshold * trough1:
-                    neckline = max(closes[trough1_idx:trough2_idx+1])
-                    patterns.append(self._make_pattern_dict(
-                        pat_type='double_bottom',
-                        signal='buy',
-                        confidence=self._calculate_pattern_confidence([trough1, trough2], neckline),
-                        index=int(trough2_idx),
-                        datetime_val=str(getattr(kdata[trough2_idx], 'datetime', None)),
-                        price=trough2,
-                        extra={
-                            'trough1': (int(trough1_idx), trough1),
-                            'trough2': (int(trough2_idx), trough2),
-                            'neckline': neckline
-                        }
-                    ))
-            return patterns
-        except Exception as e:
-            raise Exception(f"Double tops/bottoms pattern recognition failed: {str(e)}")
-
-    def find_triangles(self, kdata, threshold: float = 0.02) -> List[Dict]:
-        """Find triangle patterns
-        Args:
-            kdata: KData对象或DataFrame
-            threshold: Price difference threshold
-        Returns:
-            List of identified patterns
-        """
-        try:
-            if isinstance(kdata, pd.DataFrame):
-                if 'code' not in kdata.columns:
-                    raise Exception(
-                        "find_triangles: DataFrame 缺少 code 字段，请补全后再调用！建议补全 code 字段，或通过 main.py/core/trading_system.py/analysis_widget.py 自动补全。")
-                kdata = data_manager.df_to_kdata(kdata)
-            if not kdata or len(kdata) < 10:
-                print("[PatternRecognizer] find_triangles: kdata为空或不足10条，跳过识别")
-                return []
-
-            closes = np.array([float(k.close) for k in kdata])
-            highs = np.array([float(k.high) for k in kdata])
-            lows = np.array([float(k.low) for k in kdata])
-            patterns = []
-            min_pattern_size = 20
-
-            for i in range(min_pattern_size, len(closes)-min_pattern_size):
-                # Get local highs and lows
-                local_highs = []
-                local_lows = []
-
-                for j in range(i-min_pattern_size, i+min_pattern_size):
-                    if j > 0 and j < len(closes)-1:
-                        if highs[j] > highs[j-1] and highs[j] > highs[j+1]:
-                            local_highs.append((j, highs[j]))
-                        if lows[j] < lows[j-1] and lows[j] < lows[j+1]:
-                            local_lows.append((j, lows[j]))
-
-                if len(local_highs) >= 2 and len(local_lows) >= 2:
-                    # Fit lines to highs and lows
-                    high_slope = np.polyfit([x[0] for x in local_highs],
-                                            [x[1] for x in local_highs], 1)[0]
-                    low_slope = np.polyfit([x[0] for x in local_lows],
-                                           [x[1] for x in local_lows], 1)[0]
-
-                    # Identify triangle patterns
-                    if abs(high_slope) < 0.1 and abs(low_slope) < 0.1:
-                        # Symmetrical triangle
-                        if high_slope < 0 and low_slope > 0:
-                            patterns.append({
-                                'type': 'symmetrical_triangle',
-                                'start_idx': i-min_pattern_size,
-                                'end_idx': i+min_pattern_size,
-                                'highs': local_highs,
-                                'lows': local_lows,
-                                'confidence': self._calculate_pattern_confidence(
-                                    [x[1] for x in local_highs + local_lows],
-                                    np.mean([x[1]
-                                            for x in local_highs + local_lows])
-                                )
-                            })
-                        # Ascending triangle
-                        elif abs(high_slope) < 0.05 and low_slope > 0:
-                            patterns.append({
-                                'type': 'ascending_triangle',
-                                'start_idx': i-min_pattern_size,
-                                'end_idx': i+min_pattern_size,
-                                'highs': local_highs,
-                                'lows': local_lows,
-                                'confidence': self._calculate_pattern_confidence(
-                                    [x[1] for x in local_highs + local_lows],
-                                    np.mean([x[1] for x in local_highs])
-                                )
-                            })
-                        # Descending triangle
-                        elif high_slope < 0 and abs(low_slope) < 0.05:
-                            patterns.append({
-                                'type': 'descending_triangle',
-                                'start_idx': i-min_pattern_size,
-                                'end_idx': i+min_pattern_size,
-                                'highs': local_highs,
-                                'lows': local_lows,
-                                'confidence': self._calculate_pattern_confidence(
-                                    [x[1] for x in local_highs + local_lows],
-                                    np.mean([x[1] for x in local_lows])
-                                )
-                            })
-
-            if not patterns:
-                print(f"[PatternRecognizer] find_triangles: 未识别到任何形态，建议调整参数或更换股票。")
-            return patterns
-
-        except Exception as e:
-            raise Exception(f"Triangle pattern recognition failed: {str(e)}")
-
-    def _calculate_pattern_confidence(self, points: List[float],
-                                      reference: float) -> float:
-        """Calculate pattern confidence score
-
-        Args:
-            points: List of pattern points
-            reference: Reference price level
-
-        Returns:
-            Confidence score between 0 and 1
-        """
-        try:
-            # Calculate price volatility
-            mean_points = np.mean(points)
-            if mean_points == 0 or np.isnan(mean_points):
-                volatility = 0
-            else:
-                volatility = np.std(points) / mean_points
-
-            # Calculate price deviation from reference
-            if reference == 0 or np.isnan(reference):
-                deviation = 0
-            else:
-                deviation = np.mean(
-                    [abs(p - reference) / reference for p in points])
-
-            # Calculate pattern symmetry
-            diffs = np.diff(points)
-            mean_abs_diffs = np.mean(np.abs(diffs))
-            if mean_abs_diffs == 0 or np.isnan(mean_abs_diffs):
-                symmetry = 0
-            else:
-                symmetry = 1 - np.std(diffs) / mean_abs_diffs
-
-            # Combine factors
-            confidence = (0.4 * (1 - volatility) +
-                          0.4 * (1 - deviation) +
-                          0.2 * symmetry)
-
-            return max(0, min(1, confidence))
-
-        except Exception as e:
-            raise Exception(f"Pattern confidence calculation failed: {str(e)}")
-
-    def get_pattern_signals(self, kdata, pattern_types: Optional[list] = None, params: Optional[dict] = None) -> List[Dict]:
-        """Get trading signals based on selected pattern types and parameters.
-        Args:
-            kdata: KData or DataFrame
-            pattern_types: List of pattern type names (e.g. ['hammer', 'engulfing'])
-            params: Optional parameter overrides
-        Returns:
-            List of pattern signal dicts
-        """
-        import pandas as pd
-        from datetime import datetime
-        # --- 新增：datetime字段健壮性检查 ---
-        if isinstance(kdata, pd.DataFrame):
-            if 'datetime' not in kdata.columns:
-                print("[PatternRecognizer] K线数据缺少datetime字段，自动补全为当前时间")
-                kdata['datetime'] = pd.to_datetime(datetime.now()).strftime('%Y-%m-%d')
-            # 检查并修正datetime字段
-
-            def fix_datetime(val, prev):
-                try:
-                    if pd.isna(val) or val is None:
-                        return prev if prev else datetime.now().strftime('%Y-%m-%d')
-                    # 尝试标准化格式
-                    return pd.to_datetime(val).strftime('%Y-%m-%d')
-                except Exception as e:
-                    print(f"[PatternRecognizer] 修正datetime异常: {val}, 错误: {str(e)}")
-                    return prev if prev else datetime.now().strftime('%Y-%m-%d')
-            prev_dt = None
-            dt_list = []
-            for v in kdata['datetime']:
-                fixed = fix_datetime(v, prev_dt)
-                dt_list.append(fixed)
-                prev_dt = fixed
-            kdata['datetime'] = dt_list
-            # 过滤掉仍为None或空字符串的行
-            before = len(kdata)
-            kdata = kdata[kdata['datetime'].notna() & (kdata['datetime'] != '')]
-            after = len(kdata)
-            if after < before:
-                print(f"[PatternRecognizer] 已过滤{before-after}行无效datetime数据")
-        if params:
-            self.params.update(params)
-        all_patterns = {
-            # 单根
-            'hammer': self.find_hammer,
-            'shooting_star': self.find_shooting_star,
-            'doji': self.find_doji,
-            'marubozu': self.find_marubozu,
-            'spinning_top': self.find_spinning_top,
-            # 双根
-            'engulfing': self.find_engulfing,
-            'piercing': self.find_piercing,
-            'dark_cloud_cover': self.find_dark_cloud_cover,
-            # 三根
-            'morning_star': self.find_morning_star,
-            'evening_star': self.find_evening_star,
-            'three_white_soldiers': self.find_three_white_soldiers,
-            'three_black_crows': self.find_three_black_crows,
-            # 组合
-            'head_shoulders': self.find_head_shoulders,
-            'double_tops_bottoms': self.find_double_tops_bottoms,
-            'triangles': self.find_triangles,
-        }
-        if pattern_types is None:
-            pattern_types = list(all_patterns.keys())
-        signals = []
-        for pt in pattern_types:
-            if pt in all_patterns:
-                try:
-                    signals.extend(all_patterns[pt](kdata))
-                except Exception as e:
-                    print(f"[PatternRecognizer] {pt} 识别异常: {e}")
-        return signals
-
-    # --- 单根K线形态 ---
-    def find_hammer(self, kdata) -> List[Dict]:
-        """识别锤头线（Hammer）"""
-        # ...实现...
-        return []
-
-    def find_shooting_star(self, kdata) -> List[Dict]:
-        """识别射击之星（Shooting Star）"""
-        # ...实现...
-        return []
-
-    def find_doji(self, kdata) -> List[Dict]:
-        """识别十字星（Doji）"""
-        # ...实现...
-        return []
-
-    def find_marubozu(self, kdata) -> List[Dict]:
-        """识别光头光脚线（Marubozu）"""
-        # ...实现...
-        return []
-
-    def find_spinning_top(self, kdata) -> List[Dict]:
-        """识别纺锤线（Spinning Top）"""
-        # ...实现...
-        return []
-    # --- 双根形态 ---
-
-    def find_engulfing(self, kdata) -> List[Dict]:
-        """识别吞没形态（Engulfing）"""
-        # ...实现...
-        return []
-
-    def find_piercing(self, kdata) -> List[Dict]:
-        """识别刺透形态（Piercing Pattern）"""
-        # ...实现...
-        return []
-
-    def find_dark_cloud_cover(self, kdata) -> List[Dict]:
-        """识别乌云盖顶（Dark Cloud Cover）"""
-        # ...实现...
-        return []
-    # --- 三根形态 ---
-
-    def find_morning_star(self, kdata) -> List[Dict]:
-        """识别早晨之星（Morning Star）"""
-        # ...实现...
-        return []
-
-    def find_evening_star(self, kdata) -> List[Dict]:
-        """识别黄昏之星（Evening Star）"""
-        # ...实现...
-        return []
-
-    def find_three_white_soldiers(self, kdata) -> List[Dict]:
-        """识别三白兵（Three White Soldiers）"""
-        # ...实现...
-        return []
-
-    def find_three_black_crows(self, kdata) -> List[Dict]:
-        """识别三只乌鸦（Three Black Crows）"""
-        # ...实现...
-        return []
-
-    def find_inverted_hammer(self, kdata) -> List[Dict]:
-        """识别倒锤头形态"""
-        # TODO: 实现倒锤头识别逻辑
-        return []
-
-    def find_shooting_star(self, kdata) -> List[Dict]:
-        """识别流星线形态"""
-        # TODO: 实现流星线识别逻辑
-        return []
-
-    def find_tower_top(self, kdata) -> List[Dict]:
-        """识别塔形顶形态"""
-        # TODO: 实现塔形顶识别逻辑
-        return []
-
-    def find_tower_bottom(self, kdata) -> List[Dict]:
-        """识别塔形底形态"""
-        # TODO: 实现塔形底识别逻辑
-        return []
-
-    def find_flag(self, kdata) -> List[Dict]:
-        """识别旗形形态"""
-        # TODO: 实现旗形识别逻辑
-        return []
-
-    def find_wedge(self, kdata) -> List[Dict]:
-        """识别楔形形态"""
-        # TODO: 实现楔形识别逻辑
-        return []
-
-    def find_rectangle(self, kdata) -> List[Dict]:
-        """识别矩形整理形态"""
-        # TODO: 实现矩形整理识别逻辑
-        return []
-
-    def find_channel(self, kdata) -> List[Dict]:
-        """识别上升/下降通道形态"""
-        # TODO: 实现通道识别逻辑
-        return []
-
-    def get_pattern_statistics(self, kdata, pattern_types: Optional[list] = None, params: Optional[dict] = None) -> Dict:
-        """
-        统计分析：返回各形态出现次数、胜率、平均涨跌幅等统计信息
         Args:
             kdata: K线数据
-            pattern_types: 形态类型列表
-            params: 参数
-        Returns:
-            dict: {pattern: {count, win_rate, avg_return, ...}}
-        """
-        # TODO: 实现统计分析逻辑
-        return {}
+            confidence_threshold: 置信度阈值
+            pattern_types: 指定要识别的形态类型列表，None表示识别所有形态
 
-    def _make_pattern_dict(self, pat_type, signal, confidence, index, datetime_val, price, extra=None):
-        """统一生成形态信号字典，增加详细字段和置信度分级"""
-        if confidence >= 0.8:
-            confidence_level = '高'
-        elif confidence >= 0.5:
-            confidence_level = '中'
-        else:
-            confidence_level = '低'
-        d = {
-            'type': pat_type,
-            'signal': signal,
-            'confidence': confidence,
-            'confidence_level': confidence_level,
-            'index': index,
-            'datetime': datetime_val,
-            'price': price
+        Returns:
+            识别到的形态列表
+        """
+        if kdata is None or kdata.empty:
+            return []
+
+        results = []
+
+        try:
+            # 使用PatternManager进行识别
+            from analysis.pattern_manager import PatternManager
+            manager = PatternManager()
+
+            # 如果指定了形态类型，使用指定的类型
+            if pattern_types:
+                # 将中文名称转换为英文名称
+                english_pattern_types = []
+                for pattern_type in pattern_types:
+                    english_name = self._pattern_name_mapping.get(pattern_type, pattern_type)
+                    english_pattern_types.append(english_name)
+
+                patterns = manager.identify_patterns(
+                    kdata,
+                    confidence_threshold=confidence_threshold,
+                    pattern_types=english_pattern_types
+                )
+            else:
+                # 识别所有形态
+                patterns = manager.identify_all_patterns(
+                    kdata,
+                    confidence_threshold=confidence_threshold
+                )
+
+            results.extend(patterns)
+
+            if self.debug_mode:
+                print(f"PatternManager识别结果: {len(results)}个形态")
+
+        except Exception as e:
+            if self.debug_mode:
+                print(f"PatternManager识别失败: {e}")
+                import traceback
+                traceback.print_exc()
+
+        return results
+
+    # 保持向后兼容的方法，但移除硬编码
+    def find_hammer(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找锤头线形态"""
+        return self.identify_patterns(kdata, pattern_types=['锤头线'])
+
+    def find_doji(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找十字星形态"""
+        return self.identify_patterns(kdata, pattern_types=['十字星'])
+
+    def find_shooting_star(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找流星线形态"""
+        return self.identify_patterns(kdata, pattern_types=['流星线'])
+
+    def find_engulfing(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找吞没形态"""
+        return self.identify_patterns(kdata, pattern_types=['看涨吞没', '看跌吞没'])
+
+    def find_morning_star(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找早晨之星形态"""
+        return self.identify_patterns(kdata, pattern_types=['早晨之星'])
+
+    def find_evening_star(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找黄昏之星形态"""
+        return self.identify_patterns(kdata, pattern_types=['黄昏之星'])
+
+    def find_three_white_soldiers(self, kdata: pd.DataFrame) -> List[Dict]:
+        """查找三白兵形态"""
+        return self.identify_patterns(kdata, pattern_types=['三白兵'])
+
+
+# 专门的算法识别器类，用于数据库算法的执行
+class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
+    """
+    数据库算法识别器 - 修复执行环境问题
+    """
+
+    def recognize(self, kdata: pd.DataFrame) -> List[PatternResult]:
+        """执行数据库存储的算法代码"""
+        if not self.validate_data(kdata):
+            return []
+
+        try:
+            algorithm_code = self.config.algorithm_code
+            if not algorithm_code:
+                return []
+
+            # 创建增强的安全执行环境
+            safe_globals = self._create_safe_globals()
+            safe_locals = self._create_safe_locals(kdata)
+
+            # 执行算法代码
+            exec(algorithm_code, safe_globals, safe_locals)
+
+            # 获取结果并转换格式
+            raw_results = safe_locals.get('results', [])
+            return self._convert_results(raw_results)
+
+        except Exception as e:
+            print(f"[DatabaseAlgorithmRecognizer] 执行算法失败 {self.config.english_name}: {e}")
+            if hasattr(e, 'lineno'):
+                print(f"[DatabaseAlgorithmRecognizer] 错误位置: 第{e.lineno}行")
+            return []
+
+    def _create_safe_globals(self) -> Dict[str, Any]:
+        """创建安全的全局执行环境"""
+        return {
+            # 基础Python函数
+            'len': len,
+            'abs': abs,
+            'max': max,
+            'min': min,
+            'sum': sum,
+            'range': range,
+            'enumerate': enumerate,
+            'str': str,
+            'float': float,
+            'int': int,
+            'bool': bool,
+
+            # 数学和数据处理
+            'np': np,
+            'pd': pd,
+
+            # 形态识别相关类型
+            'SignalType': SignalType,
+            'PatternResult': PatternResult,
+            'PatternCategory': PatternCategory,
+
+            # 工具函数
+            'calculate_body_ratio': calculate_body_ratio,
+            'calculate_shadow_ratios': calculate_shadow_ratios,
+            'is_bullish_candle': is_bullish_candle,
+            'is_bearish_candle': is_bearish_candle,
         }
-        if extra:
-            d.update(extra)
-        return d
+
+    def _create_safe_locals(self, kdata: pd.DataFrame) -> Dict[str, Any]:
+        """创建安全的本地执行环境"""
+        return {
+            'kdata': kdata,
+            'config': self.config,
+            'parameters': self.parameters,
+            'results': [],
+            'create_result': self._create_result_function(),
+        }
+
+    def _create_result_function(self):
+        """创建结果创建函数"""
+        def create_result(pattern_type: str, signal_type, confidence: float,
+                          index: int, price: float, datetime_val: str = None,
+                          start_index: int = None, end_index: int = None,
+                          extra_data: Dict = None):
+            """创建形态识别结果"""
+            return {
+                'pattern_type': pattern_type,
+                'signal_type': signal_type,
+                'confidence': confidence,
+                'index': index,
+                'price': price,
+                'datetime_val': datetime_val,
+                'start_index': start_index,
+                'end_index': end_index,
+                'extra_data': extra_data or {}
+            }
+        return create_result
+
+    def _convert_results(self, raw_results: List[Dict]) -> List[PatternResult]:
+        """转换原始结果为PatternResult对象"""
+        converted_results = []
+
+        for raw_result in raw_results:
+            try:
+                # 确保signal_type是SignalType枚举
+                signal_type = raw_result.get('signal_type')
+                if isinstance(signal_type, str):
+                    signal_type = SignalType(signal_type)
+                elif not isinstance(signal_type, SignalType):
+                    signal_type = SignalType.NEUTRAL
+
+                result = PatternResult(
+                    pattern_type=raw_result.get('pattern_type', self.config.english_name),
+                    pattern_name=self.config.name,
+                    pattern_category=self.config.category.value,
+                    signal_type=signal_type,
+                    confidence=raw_result.get('confidence', 0.5),
+                    confidence_level=self.calculate_confidence_level(raw_result.get('confidence', 0.5)),
+                    index=raw_result.get('index', 0),
+                    datetime_val=raw_result.get('datetime_val'),
+                    price=raw_result.get('price', 0.0),
+                    extra_data=raw_result.get('extra_data')
+                )
+                converted_results.append(result)
+
+            except Exception as e:
+                print(f"[DatabaseAlgorithmRecognizer] 结果转换失败: {e}")
+                continue
+
+        return converted_results
+
+
+# 注册数据库算法识别器为默认识别器
+PatternAlgorithmFactory.register('default', DatabaseAlgorithmRecognizer)
+
+
+# 创建全局实例，保持向后兼容
+PatternRecognizer = EnhancedPatternRecognizer
+
+
+def create_pattern_recognizer(debug_mode: bool = False) -> EnhancedPatternRecognizer:
+    """
+    创建形态识别器实例
+
+    Args:
+        debug_mode: 是否启用调试模式
+
+    Returns:
+        形态识别器实例
+    """
+    return EnhancedPatternRecognizer(debug_mode=debug_mode)
+
+
+# 工具函数
+def validate_kdata(kdata) -> bool:
+    """验证K线数据有效性"""
+    if kdata is None:
+        return False
+
+    if isinstance(kdata, pd.DataFrame):
+        required_columns = ['open', 'high', 'low', 'close']
+        return all(col in kdata.columns for col in required_columns) and len(kdata) > 0
+
+    return len(kdata) > 0
+
+
+def get_pattern_recognizer_info() -> Dict[str, Any]:
+    """获取形态识别器信息"""
+    return {
+        'version': '2.0.0',
+        'framework': 'Enhanced Pattern Recognition Framework',
+        'compatible_with': 'hikyuu-ui unified pattern system',
+        'features': [
+            '统一框架兼容',
+            '增强错误处理',
+            '调试模式支持',
+            '执行统计',
+            '缓存机制',
+            '数据预处理',
+            '向后兼容'
+        ]
+    }
+
+
+if __name__ == "__main__":
+    # 测试代码
+    print("Enhanced Pattern Recognition Module")
+    print("=" * 50)
+
+    info = get_pattern_recognizer_info()
+    print(f"版本: {info['version']}")
+    print(f"框架: {info['framework']}")
+    print(f"特性: {', '.join(info['features'])}")
+
+    # 创建测试实例
+    recognizer = create_pattern_recognizer(debug_mode=True)
+    print(f"\n创建识别器成功，调试模式: {recognizer.debug_mode}")
+
+    # 显示统计信息
+    stats = recognizer.get_execution_stats()
+    print(f"执行统计: {stats}")

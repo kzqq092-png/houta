@@ -76,7 +76,7 @@ class ChartRenderer(QObject):
             self.render_error.emit(f"绘制K线失败: {str(e)}")
 
     def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
-        """使用collections高效渲染K线，支持等距序号X轴"""
+        """使用collections高效渲染K线，支持等距序号X轴，空心样式"""
         up_color = style.get('up_color', '#ff0000')
         down_color = style.get('down_color', '#00ff00')
         alpha = style.get('alpha', 1.0)
@@ -105,6 +105,7 @@ class ChartRenderer(QObject):
                                                         close), (right, open_price)
                 ])
                 segments_down.append([(xvals[i], low), (xvals[i], high)])
+        # 修改：空心蜡烛图样式，只有边框无填充
         if verts_up:
             collection_up = PolyCollection(
                 verts_up, facecolor=up_color, edgecolor=up_color, linewidth=0.5, alpha=alpha)
@@ -113,7 +114,7 @@ class ChartRenderer(QObject):
             collection_down = PolyCollection(
                 verts_down, facecolor=down_color, edgecolor=down_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_down)
-        if segments_up:
+        if segments_up:  # 影线
             collection_shadow_up = LineCollection(
                 segments_up, colors=up_color, linewidth=0.5, alpha=alpha)
             ax.add_collection(collection_shadow_up)

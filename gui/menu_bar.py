@@ -222,41 +222,70 @@ class MainMenuBar(QMenuBar):
         """初始化工具菜单"""
         try:
             # 计算器
-            self.calculator_action = QAction(
-                QIcon("icons/calculator.png"), "计算器", self)
+            self.calculator_action = QAction("计算器", self)
             self.calculator_action.setStatusTip("打开计算器")
             self.tools_menu.addAction(self.calculator_action)
 
-            # 单位转换
-            self.converter_action = QAction(
-                QIcon("icons/converter.png"), "单位转换", self)
+            # 单位转换器
+            self.converter_action = QAction("单位转换器", self)
             self.converter_action.setStatusTip("打开单位转换器")
             self.tools_menu.addAction(self.converter_action)
 
             self.tools_menu.addSeparator()
 
-            # 分布式节点管理
-            self.node_manager_action = QAction(QIcon("icons/network.png"), "分布式节点管理", self)
-            self.node_manager_action.setStatusTip("自动发现/管理分布式节点")
+            # 设置
+            self.settings_action = QAction("设置", self)
+            self.settings_action.setShortcut("Ctrl+,")
+            self.settings_action.setStatusTip("打开设置")
+            self.tools_menu.addAction(self.settings_action)
+
+            # 分布式/云API/指标市场/批量分析
+            self.node_manager_action = QAction("分布式节点管理", self)
+            self.cloud_api_action = QAction("云API管理", self)
+            self.indicator_market_action = QAction("指标市场", self)
+            self.batch_analysis_action = QAction("批量分析", self)
             self.tools_menu.addAction(self.node_manager_action)
-
-            # 云端API管理
-            self.cloud_api_action = QAction(QIcon("icons/cloud.png"), "云端API管理", self)
-            self.cloud_api_action.setStatusTip("配置/对接云端API")
             self.tools_menu.addAction(self.cloud_api_action)
-
-            # 指标市场
-            self.indicator_market_action = QAction(QIcon("icons/market.png"), "指标市场", self)
-            self.indicator_market_action.setStatusTip("浏览/安装/上传指标插件")
             self.tools_menu.addAction(self.indicator_market_action)
+            self.tools_menu.addAction(self.batch_analysis_action)
 
             self.tools_menu.addSeparator()
 
-            # 设置
-            self.settings_action = QAction(
-                QIcon("icons/settings.png"), "主题切换", self)
-            self.settings_action.setStatusTip("打开设置对话框")
-            self.tools_menu.addAction(self.settings_action)
+            # 形态识别算法优化系统
+            self.optimization_menu = self.tools_menu.addMenu("形态识别优化")
+
+            # 优化仪表板
+            self.optimization_dashboard_action = QAction("优化仪表板", self)
+            self.optimization_dashboard_action.setStatusTip("打开形态识别算法优化仪表板")
+            self.optimization_menu.addAction(self.optimization_dashboard_action)
+
+            # 一键优化
+            self.one_click_optimize_action = QAction("一键优化所有形态", self)
+            self.one_click_optimize_action.setStatusTip("自动优化所有形态识别算法")
+            self.optimization_menu.addAction(self.one_click_optimize_action)
+
+            # 智能优化
+            self.smart_optimize_action = QAction("智能优化", self)
+            self.smart_optimize_action.setStatusTip("智能识别需要优化的形态并自动优化")
+            self.optimization_menu.addAction(self.smart_optimize_action)
+
+            self.optimization_menu.addSeparator()
+
+            # 版本管理
+            self.version_manager_action = QAction("版本管理", self)
+            self.version_manager_action.setStatusTip("管理形态识别算法版本")
+            self.optimization_menu.addAction(self.version_manager_action)
+
+            # 性能评估
+            self.performance_evaluation_action = QAction("性能评估", self)
+            self.performance_evaluation_action.setStatusTip("评估形态识别算法性能")
+            self.optimization_menu.addAction(self.performance_evaluation_action)
+
+            # 系统状态
+            self.optimization_status_action = QAction("系统状态", self)
+            self.optimization_status_action.setStatusTip("查看优化系统状态")
+            self.optimization_menu.addAction(self.optimization_status_action)
+
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化工具菜单失败: {str(e)}")

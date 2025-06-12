@@ -217,17 +217,17 @@ class RiskAnalysis:
         min_vals = df.min(numeric_only=True)
         col_count = df.shape[1]
         for j in range(col_count):
-            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.2f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
             item.setBackground(QColor("#fffde7"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df), j, item)
         for j in range(col_count):
-            item = QTableWidgetItem(f"{max_vals.iloc[j]:.2f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffe082"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df)+1, j, item)
         for j in range(col_count):
-            item = QTableWidgetItem(f"{min_vals.iloc[j]:.2f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
+            item = QTableWidgetItem(f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffccbc"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df)+2, j, item)

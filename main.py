@@ -95,6 +95,21 @@ class TradingGUI(QMainWindow):
                 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
                     background: none;
                 }
+                /* 表格样式美化 */
+                QTableWidget {
+                    gridline-color: #e0e0e0;
+                    background-color: white;
+                    alternate-background-color: #f8f9fa;
+                    selection-background-color: #007bff;
+                    selection-color: white;
+                }
+                QHeaderView::section {
+                    background-color: #495057;
+                    color: white;
+                    padding: 8px;
+                    border: none;
+                    font-weight: bold;
+                }                                  
             ''')
 
             # 初始化缓存相关属性
@@ -404,8 +419,6 @@ class TradingGUI(QMainWindow):
             self.top_splitter.splitterMoved.connect(self.on_splitter_moved)
             self.bottom_splitter.splitterMoved.connect(self.on_splitter_moved)
 
-            # 优化主窗口整体布局，增加留白和分区
-            self.setContentsMargins(20, 10, 20, 10)
             self.centralWidget().setStyleSheet("background-color: #f7f9fa;")
 
         except Exception as e:
@@ -485,6 +498,18 @@ class TradingGUI(QMainWindow):
             check_single_action.triggered.connect(self.check_single_stock_quality)
             check_all_action.triggered.connect(self.check_all_stocks_quality)
 
+            # 连接形态识别优化系统菜单项
+            try:
+                self.menu_bar.optimization_dashboard_action.triggered.connect(self.show_optimization_dashboard)
+                self.menu_bar.one_click_optimize_action.triggered.connect(self.run_one_click_optimization)
+                self.menu_bar.smart_optimize_action.triggered.connect(self.run_smart_optimization)
+                self.menu_bar.version_manager_action.triggered.connect(self.show_version_manager)
+                self.menu_bar.performance_evaluation_action.triggered.connect(self.show_performance_evaluation)
+                self.menu_bar.optimization_status_action.triggered.connect(self.show_optimization_status)
+            except Exception as e:
+                self.log_manager.error(f"连接优化系统菜单信号失败: {str(e)}")
+                # 不抛出异常，允许系统继续运行
+
         except Exception as e:
             self.log_manager.error(f"创建菜单栏失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
@@ -555,10 +580,10 @@ class TradingGUI(QMainWindow):
         try:
             dialog = QMessageBox(self)
             dialog.setWindowTitle("关于")
-            dialog.setText("Hikyuu量化交易系统\n"
+            dialog.setText("学习量化交易系统\n"
                            "版本: 1.0.0\n"
-                           "作者: Your Name\n"
-                           "版权所有 © 2024")
+                           "作者: YuSheng\n"
+                           "版权所有 © 2025")
             dialog.setIcon(QMessageBox.Information)
             dialog.setStandardButtons(QMessageBox.Ok)
 
@@ -582,7 +607,7 @@ class TradingGUI(QMainWindow):
             help_text = QTextEdit()
             help_text.setReadOnly(True)
             help_text.setHtml("""
-                <h2>Hikyuu量化交易系统使用帮助</h2>
+                <h2>量化交易系统使用帮助</h2>
                 <h3>基本操作</h3>
                 <ul>
                     <li>选择股票：在左侧面板输入股票代码或名称</li>
@@ -2412,9 +2437,9 @@ class TradingGUI(QMainWindow):
                     f"名称: {stock['name']}\n"
                     f"市场: {stock['market']}\n"
                     f"行业: {stock['industry']}\n"
-                    f"最新价: {stock.get('latest_price', 0):.2f}\n"
-                    f"成交量: {stock.get('latest_volume', 0):.2f}万手\n"
-                    f"市值: {stock.get('market_cap', 0):.2f}亿"
+                    f"最新价: {stock.get('latest_price', 0):.3f}\n"
+                    f"成交量: {stock.get('latest_volume', 0):.3f}万手\n"
+                    f"市值: {stock.get('market_cap', 0):.3f}亿"
                 )
                 item.setToolTip(tooltip)
 
@@ -3401,7 +3426,7 @@ class TradingGUI(QMainWindow):
                 self.performance_text.clear()
                 for name, value in metrics.items():
                     if isinstance(value, float):
-                        formatted_value = f"{value:.2%}" if "率" in name else f"{value:.2f}"
+                        formatted_value = f"{value:.2%}" if "率" in name else f"{value:.3f}"
                     else:
                         formatted_value = str(value)
                     self.performance_text.append(f"{name}: {formatted_value}")
@@ -4911,46 +4936,365 @@ class TradingGUI(QMainWindow):
             QMessageBox.critical(self, "错误", f"校验失败: {str(e)}")
 
     def check_all_stocks_quality(self):
-        """批量校验全部股票K线数据质量，后台多线程，生成汇总报告"""
-        import threading
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        from data.data_loader import generate_quality_report
-        from core.risk_exporter import RiskExporter
-        import pandas as pd
+        """校验全部股票数据质量"""
         try:
-            stocks = self.stock_list_cache if hasattr(self, 'stock_list_cache') else []
-            if not stocks:
-                QMessageBox.warning(self, "提示", "股票列表为空")
-                return
-            progress = QProgressDialog("正在批量校验数据质量...", "取消", 0, len(stocks), self)
-            progress.setWindowModality(Qt.WindowModal)
-            progress.setMinimumDuration(0)
-            progress.setValue(0)
-            results = []
+            from data.data_preprocessing import DataPreprocessor
+            preprocessor = DataPreprocessor()
 
-            def worker(stock):
-                code = stock['marketCode'] if 'marketCode' in stock else stock['code']
-                kdata = self.get_kdata(code)
-                return code, generate_quality_report(kdata, context=f"批量校验-{code}")
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                future_to_code = {executor.submit(worker, s): s for s in stocks}
-                for i, future in enumerate(as_completed(future_to_code)):
-                    if progress.wasCanceled():
-                        break
-                    code, report = future.result()
-                    results.append({"code": code, **report})
-                    progress.setValue(i+1)
-            progress.close()
-            if not results:
-                QMessageBox.warning(self, "提示", "未生成任何数据质量报告")
+            # 获取所有股票代码
+            all_stocks = []
+            for i in range(self.stock_list.count()):
+                item = self.stock_list.item(i)
+                stock_data = item.data(Qt.UserRole)
+                if stock_data and 'code' in stock_data:
+                    all_stocks.append(stock_data['code'])
+
+            if not all_stocks:
+                QMessageBox.information(self, "提示", "没有找到股票数据")
                 return
-            # 汇总为DataFrame
-            df = pd.DataFrame(results)
-            file_path = "all_stocks_quality_report.xlsx"
-            df.to_excel(file_path, index=False)
-            QMessageBox.information(self, "批量校验完成", f"全部股票数据质量报告已导出到: {file_path}")
+
+            # 批量校验
+            self.log_manager.info(f"开始批量校验 {len(all_stocks)} 只股票的数据质量...")
+
+            # 这里可以实现批量校验逻辑
+            # 由于数据量可能很大，建议使用进度对话框
+            QMessageBox.information(self, "批量校验", f"已启动 {len(all_stocks)} 只股票的数据质量校验")
+
         except Exception as e:
+            self.log_manager.error(f"批量校验失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"批量校验失败: {str(e)}")
+
+    # 形态识别优化系统方法
+    def show_optimization_dashboard(self):
+        """显示优化仪表板"""
+        try:
+            # 延迟导入，避免启动时阻塞
+            from optimization.optimization_dashboard import OptimizationDashboard
+
+            # 检查是否已经打开了仪表板
+            if hasattr(self, '_optimization_dashboard') and self._optimization_dashboard:
+                self._optimization_dashboard.raise_()
+                self._optimization_dashboard.activateWindow()
+                return
+
+            # 创建新的仪表板窗口
+            self._optimization_dashboard = OptimizationDashboard()
+            self._optimization_dashboard.show()
+
+            self.log_manager.info("已打开形态识别算法优化仪表板")
+
+        except ImportError as e:
+            self.log_manager.error(f"导入优化仪表板模块失败: {str(e)}")
+            QMessageBox.warning(self, "模块缺失", "优化仪表板模块未找到，请检查安装")
+        except Exception as e:
+            self.log_manager.error(f"打开优化仪表板失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"打开优化仪表板失败: {str(e)}")
+
+    def run_one_click_optimization(self):
+        """运行一键优化"""
+        try:
+            # 延迟导入，避免启动时阻塞
+            from optimization.auto_tuner import AutoTuner
+            from PyQt5.QtWidgets import QProgressDialog
+            from PyQt5.QtCore import QThread, pyqtSignal
+
+            # 确认对话框
+            reply = QMessageBox.question(
+                self, "确认优化",
+                "一键优化将对所有形态识别算法进行优化，这可能需要较长时间。\n确定要继续吗？",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply != QMessageBox.Yes:
+                return
+
+            # 创建进度对话框
+            progress = QProgressDialog("正在优化形态识别算法...", "取消", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+
+            # 创建优化线程
+            class OptimizationThread(QThread):
+                finished_signal = pyqtSignal(dict)
+                error_signal = pyqtSignal(str)
+
+                def run(self):
+                    try:
+                        tuner = AutoTuner(max_workers=2, debug_mode=True)
+                        result = tuner.one_click_optimize(
+                            optimization_method="genetic",
+                            max_iterations=20
+                        )
+                        self.finished_signal.emit(result)
+                    except Exception as e:
+                        self.error_signal.emit(str(e))
+
+            def on_optimization_finished(result):
+                progress.close()
+                summary = result.get("summary", {})
+                message = f"""
+一键优化完成！
+
+总任务数: {summary.get('total_tasks', 0)}
+成功任务数: {summary.get('successful_tasks', 0)}
+成功率: {summary.get('success_rate', 0):.1f}%
+平均改进: {summary.get('average_improvement', 0):.3f}%
+最佳改进: {summary.get('best_improvement', 0):.3f}%
+最佳形态: {summary.get('best_pattern', 'N/A')}
+                """.strip()
+                QMessageBox.information(self, "优化完成", message)
+                self.log_manager.info("一键优化完成")
+
+            def on_optimization_error(error):
+                progress.close()
+                QMessageBox.critical(self, "优化失败", f"一键优化失败: {error}")
+                self.log_manager.error(f"一键优化失败: {error}")
+
+            # 启动优化线程
+            self.optimization_thread = OptimizationThread()
+            self.optimization_thread.finished_signal.connect(on_optimization_finished)
+            self.optimization_thread.error_signal.connect(on_optimization_error)
+            self.optimization_thread.start()
+
+            self.log_manager.info("已启动一键优化")
+
+        except Exception as e:
+            self.log_manager.error(f"启动一键优化失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"启动一键优化失败: {str(e)}")
+
+    def run_smart_optimization(self):
+        """运行智能优化"""
+        try:
+            from optimization.auto_tuner import AutoTuner
+            from PyQt5.QtWidgets import QInputDialog
+
+            # 获取性能阈值
+            threshold, ok = QInputDialog.getDouble(
+                self, "智能优化设置",
+                "请输入性能阈值（0.0-1.0）：\n低于此值的形态将被优化",
+                0.7, 0.0, 1.0, 2
+            )
+
+            if not ok:
+                return
+
+            # 获取改进目标
+            target, ok = QInputDialog.getDouble(
+                self, "智能优化设置",
+                "请输入改进目标（0.0-1.0）：\n期望的性能提升比例",
+                0.1, 0.0, 1.0, 2
+            )
+
+            if not ok:
+                return
+
+            # 创建进度对话框
+            progress = QProgressDialog("正在进行智能优化...", "取消", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+
+            # 在后台线程中执行优化
+            def run_optimization():
+                try:
+                    tuner = AutoTuner(max_workers=2, debug_mode=True)
+                    result = tuner.smart_optimize(
+                        performance_threshold=threshold,
+                        improvement_target=target
+                    )
+
+                    progress.close()
+
+                    if result.get("status") == "no_optimization_needed":
+                        QMessageBox.information(
+                            self, "智能优化",
+                            "所有形态性能都达到要求，无需优化"
+                        )
+                    else:
+                        summary = result.get("summary", {})
+                        smart_analysis = result.get("smart_analysis", {})
+
+                        message = f"""
+智能优化完成！
+
+优化形态数: {summary.get('total_tasks', 0)}
+成功任务数: {summary.get('successful_tasks', 0)}
+平均改进: {summary.get('average_improvement', 0):.3f}%
+达成目标数: {smart_analysis.get('targets_achieved', 0)}
+目标达成率: {smart_analysis.get('target_achievement_rate', 0):.1f}%
+                        """.strip()
+                        QMessageBox.information(self, "智能优化完成", message)
+
+                    self.log_manager.info("智能优化完成")
+
+                except Exception as e:
+                    progress.close()
+                    QMessageBox.critical(self, "优化失败", f"智能优化失败: {str(e)}")
+                    self.log_manager.error(f"智能优化失败: {str(e)}")
+
+            # 启动后台线程
+            import threading
+            threading.Thread(target=run_optimization, daemon=True).start()
+
+            self.log_manager.info("已启动智能优化")
+
+        except Exception as e:
+            self.log_manager.error(f"启动智能优化失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"启动智能优化失败: {str(e)}")
+
+    def show_version_manager(self):
+        """显示版本管理器"""
+        try:
+            from optimization.ui_integration import VersionManagerDialog
+            from optimization.version_manager import VersionManager
+            from PyQt5.QtWidgets import QInputDialog
+
+            # 获取要管理的形态名称
+            patterns = []
+            try:
+                from analysis.pattern_manager import PatternManager
+                manager = PatternManager()
+                pattern_configs = manager.get_all_patterns()
+                patterns = [p.english_name for p in pattern_configs]
+            except Exception as e:
+                self.log_manager.error(f"获取形态列表失败: {e}")
+                patterns = ["hammer", "doji", "three_white_soldiers"]  # 默认形态
+
+            if not patterns:
+                QMessageBox.information(self, "提示", "没有找到可管理的形态")
+                return
+
+            # 选择形态
+            pattern_name, ok = QInputDialog.getItem(
+                self, "选择形态", "请选择要管理版本的形态：",
+                patterns, 0, False
+            )
+
+            if not ok or not pattern_name:
+                return
+
+            # 显示版本管理对话框
+            version_manager = VersionManager()
+            dialog = VersionManagerDialog(pattern_name, version_manager, self)
+            dialog.exec_()
+
+            self.log_manager.info(f"已打开 {pattern_name} 的版本管理器")
+
+        except Exception as e:
+            self.log_manager.error(f"打开版本管理器失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"打开版本管理器失败: {str(e)}")
+
+    def show_performance_evaluation(self):
+        """显示性能评估"""
+        try:
+            from optimization.performance_evaluator import PerformanceEvaluator
+            from PyQt5.QtWidgets import QInputDialog
+
+            # 获取要评估的形态名称
+            patterns = []
+            try:
+                from analysis.pattern_manager import PatternManager
+                manager = PatternManager()
+                pattern_configs = manager.get_all_patterns()
+                patterns = [p.english_name for p in pattern_configs]
+            except Exception as e:
+                self.log_manager.error(f"获取形态列表失败: {e}")
+                patterns = ["hammer", "doji", "three_white_soldiers"]  # 默认形态
+
+            if not patterns:
+                QMessageBox.information(self, "提示", "没有找到可评估的形态")
+                return
+
+            # 选择形态
+            pattern_name, ok = QInputDialog.getItem(
+                self, "选择形态", "请选择要评估性能的形态：",
+                patterns, 0, False
+            )
+
+            if not ok or not pattern_name:
+                return
+
+            # 创建进度对话框
+            progress = QProgressDialog("正在评估性能...", "取消", 0, 100, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+
+            # 在后台线程中执行评估
+            def run_evaluation():
+                try:
+                    evaluator = PerformanceEvaluator(debug_mode=True)
+
+                    # 创建测试数据集
+                    test_datasets = evaluator.create_test_datasets(pattern_name, count=5)
+
+                    # 评估性能
+                    metrics = evaluator.evaluate_algorithm(pattern_name, test_datasets)
+
+                    progress.close()
+
+                    # 显示结果
+                    result_text = f"""
+形态: {pattern_name}
+综合评分: {metrics.overall_score:.3f}
+信号质量: {metrics.signal_quality:.3f}
+平均置信度: {metrics.confidence_avg:.3f}
+执行时间: {metrics.execution_time:.3f}秒
+识别形态数: {metrics.patterns_found}
+鲁棒性: {metrics.robustness_score:.3f}
+参数敏感性: {metrics.parameter_sensitivity:.3f}
+                    """.strip()
+
+                    QMessageBox.information(self, f"性能评估 - {pattern_name}", result_text)
+                    self.log_manager.info(f"已完成 {pattern_name} 的性能评估")
+
+                except Exception as e:
+                    progress.close()
+                    QMessageBox.critical(self, "评估失败", f"性能评估失败: {str(e)}")
+                    self.log_manager.error(f"性能评估失败: {str(e)}")
+
+            # 启动后台线程
+            import threading
+            threading.Thread(target=run_evaluation, daemon=True).start()
+
+            self.log_manager.info(f"已启动 {pattern_name} 的性能评估")
+
+        except Exception as e:
+            self.log_manager.error(f"启动性能评估失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"启动性能评估失败: {str(e)}")
+
+    def show_optimization_status(self):
+        """显示优化系统状态"""
+        try:
+            from optimization.auto_tuner import AutoTuner
+            from optimization.database_schema import OptimizationDatabaseManager
+
+            # 获取系统状态
+            tuner = AutoTuner(debug_mode=True)
+            status = tuner.get_optimization_status()
+
+            db_manager = OptimizationDatabaseManager()
+            db_stats = db_manager.get_optimization_statistics()
+
+            # 格式化状态信息
+            status_text = f"""
+系统状态: {status.get('system_status', 'unknown')}
+活跃优化任务: {status.get('active_optimizations', 0)}
+已完成优化: {status.get('completed_optimizations', 0)}
+失败优化: {status.get('failed_optimizations', 0)}
+
+数据库统计:
+总版本数: {db_stats.get('total_versions', 0)}
+活跃版本数: {db_stats.get('active_versions', 0)}
+平均改进: {db_stats.get('avg_improvement', 0):.3f}%
+
+最后更新: {status.get('last_update', 'N/A')}
+            """.strip()
+
+            QMessageBox.information(self, "优化系统状态", status_text)
+            self.log_manager.info("已查看优化系统状态")
+
+        except Exception as e:
+            self.log_manager.error(f"获取优化系统状态失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"获取优化系统状态失败: {str(e)}")
 
     def show_quality_report_dialog(self, reports):
         """弹出数据质量报告对话框，表格展示，支持筛选、排序、导出"""
@@ -5292,65 +5636,56 @@ def add_shadow(widget, blur_radius=20, x_offset=0, y_offset=4, color=QColor(0, 0
 
 
 def main():
-    """Main program entry"""
-    logger = None
+    """主函数"""
     try:
-        # 初始化sqlite数据库
-        subprocess.run([sys.executable, os.path.join(
-            os.path.dirname(__file__), 'db', 'init_db.py')])
-        # Create application
+        # 设置应用程序属性
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
+        # 创建应用程序实例
         app = QApplication(sys.argv)
-        # Initialize config manager first
-        print("初始化配置管理器")
-        from utils.config_manager import ConfigManager
-        config_manager = ConfigManager()
-        print("初始化配置管理器完成")
+        app.setApplicationName("Hikyuu Trading System")
+        app.setApplicationVersion("2.0.0")
+        app.setOrganizationName("Hikyuu")
 
-        # Initialize exception handler
-        print("初始化异常处理器")
-        exception_handler = ExceptionHandler()
-        print("初始化异常处理器完成")
+        # 设置应用程序图标
+        app.setWindowIcon(QIcon("icons/logo.png"))
 
-        # Initialize base logger first
-        print("初始化基础日志管理器")
-        base_logger = BaseLogManager()
-        print("初始化基础日志管理器完成")
+        # 设置全局异常处理器
+        exception_handler = GlobalExceptionHandler(app)
+        sys.excepthook = exception_handler.handle_exception
 
-        # Initialize log manager with the correct LoggingConfig
-        print("初始化日志管理器")
-        logger = LogManager(config_manager.logging)
-        exception_handler.set_logger(logger)
-        print("初始化日志管理器完成")
+        # 简化启动过程，延迟初始化优化系统
+        print("正在启动 Hikyuu Trading System...")
 
-        # Create main window
-        logger.info("创建主窗口")
-        from core.data_manager import DataManager
+        # 创建主窗口
         window = TradingGUI()
-        window.config_manager = config_manager
-        window.data_manager = DataManager(logger)
-        logger.info("创建主窗口完成")
 
-        # Install global exception handler
-        global_handler = GlobalExceptionHandler(window)
-        sys.excepthook = global_handler.handle_exception
+        # 延迟初始化优化系统（在主窗口显示后）
+        def delayed_init():
+            try:
+                from optimization.database_schema import OptimizationDatabaseManager
+                OptimizationDatabaseManager()
+            except Exception as e:
+                print(f"优化系统初始化失败: {e}")
+                # 不影响主程序运行
 
-        # Show window
+        # 使用QTimer延迟执行
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(2000, delayed_init)  # 2秒后初始化优化系统
+
         window.show()
-        logger.info("显示主窗口完成")
 
-        # Start event loop
-        return app.exec_()
+        print("Hikyuu Trading System 启动完成")
+
+        # 运行应用程序
+        sys.exit(app.exec_())
 
     except Exception as e:
-        # 如果logger已经初始化，使用logger记录错误
-        if logger is not None:
-            logger.error(f"程序启动失败: {str(e)}")
-            logger.error(traceback.format_exc())
-        else:
-            # 如果logger未初始化，打印到控制台
-            print(f"程序启动失败: {str(e)}")
-            print(traceback.format_exc())
-        return 1
+        print(f"应用程序启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':

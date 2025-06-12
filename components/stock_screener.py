@@ -1084,7 +1084,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 score_min = df['score'].min()
                 score_mean = df['score'].mean()
                 score_std = df['score'].std()
-                ax.text(0.5, 0.95, f"最大: {score_max:.2f}  最小: {score_min:.2f}  均值: {score_mean:.2f}  标准差: {score_std:.2f}",
+                ax.text(0.5, 0.95, f"最大: {score_max:.3f}  最小: {score_min:.3f}  均值: {score_mean:.3f}  标准差: {score_std:.3f}",
                         transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
             elif chart_type == "涨跌幅分布图":
                 ax.hist(df['change_percent'], bins=20, alpha=0.7)
@@ -1096,7 +1096,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 chg_min = df['change_percent'].min()
                 chg_mean = df['change_percent'].mean()
                 chg_std = df['change_percent'].std()
-                ax.text(0.5, 0.95, f"最大: {chg_max:.2f}%  最小: {chg_min:.2f}%  均值: {chg_mean:.2f}%  标准差: {chg_std:.2f}%",
+                ax.text(0.5, 0.95, f"最大: {chg_max:.3f}%  最小: {chg_min:.3f}%  均值: {chg_mean:.3f}%  标准差: {chg_std:.3f}%",
                         transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#e53935')
             else:  # 价格分布图
                 ax.hist(df['close'], bins=20, alpha=0.7)
@@ -1108,7 +1108,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 close_min = df['close'].min()
                 close_mean = df['close'].mean()
                 close_std = df['close'].std()
-                ax.text(0.5, 0.95, f"最大: {close_max:.2f}  最小: {close_min:.2f}  均值: {close_mean:.2f}  标准差: {close_std:.2f}",
+                ax.text(0.5, 0.95, f"最大: {close_max:.3f}  最小: {close_min:.3f}  均值: {close_mean:.3f}  标准差: {close_std:.3f}",
                         transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#43a047')
             # 调整布局
             self.figure.tight_layout()
@@ -1374,14 +1374,14 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.paged_table.table.setItem(i, 1, name_item)
 
                     # 设置最新价
-                    close_item = QTableWidgetItem(f"{row['close']:.2f}")
+                    close_item = QTableWidgetItem(f"{row['close']:.3f}")
                     close_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     self.paged_table.table.setItem(i, 2, close_item)
 
                     # 设置涨跌幅
                     change_item = QTableWidgetItem(
-                        f"{row['change_percent']:.2f}%")
+                        f"{row['change_percent']:.3f}%")
                     change_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     if row['change_percent'] > 0:
@@ -1391,7 +1391,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.paged_table.table.setItem(i, 3, change_item)
 
                     # 设置筛选得分
-                    score_item = QTableWidgetItem(f"{row['score']:.2f}")
+                    score_item = QTableWidgetItem(f"{row['score']:.3f}")
                     score_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     self.paged_table.table.setItem(i, 4, score_item)
@@ -1407,8 +1407,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     # 均值行
                     mean_items = [QTableWidgetItem("均值"), QTableWidgetItem(""),
                                   QTableWidgetItem(""),
-                                  QTableWidgetItem(f"{change_arr.mean():.2f}%"),
-                                  QTableWidgetItem(f"{score_arr.mean():.2f}")]
+                                  QTableWidgetItem(f"{change_arr.mean():.3f}%"),
+                                  QTableWidgetItem(f"{score_arr.mean():.3f}")]
                     for j, item in enumerate(mean_items):
                         item.setBackground(QColor("#fffde7"))
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -1417,8 +1417,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     max_idx = np.argmax(score_arr)
                     max_items = [QTableWidgetItem("最大"), QTableWidgetItem(""),
                                  QTableWidgetItem(""),
-                                 QTableWidgetItem(f"{change_arr[max_idx]:.2f}%"),
-                                 QTableWidgetItem(f"{score_arr[max_idx]:.2f}")]
+                                 QTableWidgetItem(f"{change_arr[max_idx]:.3f}%"),
+                                 QTableWidgetItem(f"{score_arr[max_idx]:.3f}")]
                     for j, item in enumerate(max_items):
                         item.setBackground(QColor("#ffe082"))
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -1427,8 +1427,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     min_idx = np.argmin(score_arr)
                     min_items = [QTableWidgetItem("最小"), QTableWidgetItem(""),
                                  QTableWidgetItem(""),
-                                 QTableWidgetItem(f"{change_arr[min_idx]:.2f}%"),
-                                 QTableWidgetItem(f"{score_arr[min_idx]:.2f}")]
+                                 QTableWidgetItem(f"{change_arr[min_idx]:.3f}%"),
+                                 QTableWidgetItem(f"{score_arr[min_idx]:.3f}")]
                     for j, item in enumerate(min_items):
                         item.setBackground(QColor("#ffccbc"))
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -1451,14 +1451,14 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.paged_table.table.setItem(i, 1, name_item)
 
                     # 设置最新价
-                    close_item = QTableWidgetItem(f"{result['close']:.2f}")
+                    close_item = QTableWidgetItem(f"{result['close']:.3f}")
                     close_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     self.paged_table.table.setItem(i, 2, close_item)
 
                     # 设置涨跌幅
                     change_item = QTableWidgetItem(
-                        f"{result['change_percent']:.2f}%")
+                        f"{result['change_percent']:.3f}%")
                     change_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     if result['change_percent'] > 0:
@@ -1468,7 +1468,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.paged_table.table.setItem(i, 3, change_item)
 
                     # 设置筛选得分
-                    score_item = QTableWidgetItem(f"{result['score']:.2f}")
+                    score_item = QTableWidgetItem(f"{result['score']:.3f}")
                     score_item.setTextAlignment(
                         Qt.AlignRight | Qt.AlignVCenter)
                     self.paged_table.table.setItem(i, 4, score_item)
@@ -1817,13 +1817,13 @@ class StockScreenerWidget(BaseAnalysisPanel):
                             str(info.get("code", code)),
                             strategy,
                             "买入" if info.get("change", 0) > 0 else "观望",  # 示例信号
-                            f"{info.get('score', 0):.2f}" if 'score' in info else "-",
-                            f"{info.get('change', 0):.2f}%" if 'change' in info else "-",
-                            f"{info.get('pe', 0):.2f}" if 'pe' in info else "-",
-                            f"{info.get('pb', 0):.2f}" if 'pb' in info else "-",
-                            f"{info.get('roe', 0):.2f}" if 'roe' in info else "-",
-                            f"{info.get('main_force', 0):.2f}" if 'main_force' in info else "-",
-                            f"{info.get('north_money', 0):.2f}" if 'north_money' in info else "-",
+                            f"{info.get('score', 0):.3f}" if 'score' in info else "-",
+                            f"{info.get('change', 0):.3f}%" if 'change' in info else "-",
+                            f"{info.get('pe', 0):.3f}" if 'pe' in info else "-",
+                            f"{info.get('pb', 0):.3f}" if 'pb' in info else "-",
+                            f"{info.get('roe', 0):.3f}" if 'roe' in info else "-",
+                            f"{info.get('main_force', 0):.3f}" if 'main_force' in info else "-",
+                            f"{info.get('north_money', 0):.3f}" if 'north_money' in info else "-",
                         ]
                     else:
                         items = [code, strategy, "无信号", "-", "-", "-", "-", "-", "-", "-"]
@@ -1944,10 +1944,10 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.multi_factor_result.setItem(i, 0, QTableWidgetItem(str(row['code'])))
                 self.multi_factor_result.setItem(i, 1, QTableWidgetItem(str(row['name'])))
                 self.multi_factor_result.setItem(i, 2, QTableWidgetItem(str(row['industry'])))
-                self.multi_factor_result.setItem(i, 3, QTableWidgetItem(f"{row['close']:.2f}"))
-                self.multi_factor_result.setItem(i, 4, QTableWidgetItem(f"{row['change']:.2f}%" if 'change' in row else '-'))
-                self.multi_factor_result.setItem(i, 5, QTableWidgetItem(f"{row['pe']:.2f}" if 'pe' in row else '-'))
-                self.multi_factor_result.setItem(i, 6, QTableWidgetItem(f"{row['pb']:.2f}" if 'pb' in row else '-'))
+                self.multi_factor_result.setItem(i, 3, QTableWidgetItem(f"{row['close']:.3f}"))
+                self.multi_factor_result.setItem(i, 4, QTableWidgetItem(f"{row['change']:.3f}%" if 'change' in row else '-'))
+                self.multi_factor_result.setItem(i, 5, QTableWidgetItem(f"{row['pe']:.3f}" if 'pe' in row else '-'))
+                self.multi_factor_result.setItem(i, 6, QTableWidgetItem(f"{row['pb']:.3f}" if 'pb' in row else '-'))
                 self.multi_factor_result.setItem(i, 7, QTableWidgetItem(f"{row['score']:.4f}"))
             self.multi_factor_result.resizeColumnsToContents()
             QMessageBox.information(self, "多因子选股完成", "多因子选股已完成，结果已展示。")

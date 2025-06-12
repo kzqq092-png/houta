@@ -5,29 +5,20 @@
 
 import sqlite3
 import os
+import json
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 import pandas as pd
 from analysis.pattern_recognition import PatternRecognizer
-
-
-@dataclass
-class PatternConfig:
-    """形态配置数据类"""
-    id: int
-    name: str
-    english_name: str
-    category: str
-    signal_type: str
-    description: str
-    min_periods: int
-    max_periods: int
-    confidence_threshold: float
-    is_active: bool
+from analysis.pattern_base import (
+    BasePatternRecognizer, PatternConfig, PatternResult,
+    PatternAlgorithmFactory, GenericPatternRecognizer,
+    SignalType, PatternCategory
+)
 
 
 class PatternManager:
-    """形态管理器"""
+    """形态管理器 - 增强版，支持数据库算法和统一接口"""
 
     def __init__(self, db_path: Optional[str] = None):
         """
@@ -43,6 +34,57 @@ class PatternManager:
 
         self.pattern_recognizer = PatternRecognizer()
         self._patterns_cache = None
+        self._ensure_database_schema()
+
+    def _ensure_database_schema(self):
+        """确保数据库表结构正确"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 检查并添加新字段
+        try:
+            cursor.execute('ALTER TABLE pattern_types ADD COLUMN algorithm_code TEXT')
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute('ALTER TABLE pattern_types ADD COLUMN parameters TEXT')
+        except sqlite3.OperationalError:
+            pass
+
+        # 创建形态历史表（用于效果统计）
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pattern_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_type TEXT NOT NULL,
+                stock_code TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                trigger_date TEXT NOT NULL,
+                trigger_price REAL NOT NULL,
+                result_date TEXT,
+                result_price REAL,
+                return_rate REAL,
+                is_successful INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # 创建通达信形态导入表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tdx_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                formula TEXT NOT NULL,
+                description TEXT,
+                category TEXT,
+                signal_type TEXT,
+                imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
 
     def get_pattern_configs(self, category: Optional[str] = None,
                             signal_type: Optional[str] = None,
@@ -83,11 +125,38 @@ class PatternManager:
 
         patterns = []
         for row in rows:
+            # 解析参数
+            parameters = {}
+            if len(row) > 13 and row[13]:  # parameters字段是第13个字段（索引13）
+                try:
+                    parameters = json.loads(row[13])
+                except json.JSONDecodeError:
+                    parameters = {}
+
+            # 转换枚举类型
+            try:
+                category_enum = PatternCategory(row[3])
+            except ValueError:
+                category_enum = PatternCategory.COMPLEX
+
+            try:
+                signal_enum = SignalType(row[4])
+            except ValueError:
+                signal_enum = SignalType.NEUTRAL
+
             patterns.append(PatternConfig(
-                id=row[0], name=row[1], english_name=row[2],
-                category=row[3], signal_type=row[4], description=row[5],
-                min_periods=row[6], max_periods=row[7],
-                confidence_threshold=row[8], is_active=bool(row[9])
+                id=row[0],
+                name=row[1],
+                english_name=row[2],
+                category=category_enum,
+                signal_type=signal_enum,
+                description=row[5],
+                min_periods=row[6],
+                max_periods=row[7],
+                confidence_threshold=row[8],
+                algorithm_code=row[12] if len(row) > 12 else "",  # 修复：algorithm_code是第12个字段（索引12）
+                parameters=parameters,
+                is_active=bool(row[9])
             ))
 
         return patterns
@@ -102,23 +171,10 @@ class PatternManager:
         Returns:
             形态配置或None
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT * FROM pattern_types WHERE name = ? OR english_name = ?",
-            (name, name)
-        )
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            return PatternConfig(
-                id=row[0], name=row[1], english_name=row[2],
-                category=row[3], signal_type=row[4], description=row[5],
-                min_periods=row[6], max_periods=row[7],
-                confidence_threshold=row[8], is_active=bool(row[9])
-            )
+        configs = self.get_pattern_configs(active_only=False)
+        for config in configs:
+            if config.name == name or config.english_name == name:
+                return config
         return None
 
     def get_categories(self) -> List[str]:
@@ -146,7 +202,7 @@ class PatternManager:
     def identify_all_patterns(self, kdata, selected_patterns: Optional[List[str]] = None,
                               confidence_threshold: float = 0.5) -> List[Dict]:
         """
-        识别所有配置的形态，支持DataFrame和KData两种数据格式
+        识别所有配置的形态，使用新的统一框架
 
         Args:
             kdata: K线数据（DataFrame或KData对象）
@@ -161,11 +217,10 @@ class PatternManager:
 
         # 数据格式检查和预处理
         import pandas as pd
-        original_data = kdata
 
         # 如果是DataFrame，确保包含必要字段
         if isinstance(kdata, pd.DataFrame):
-            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            required_columns = ['open', 'high', 'low', 'close']
             missing_columns = [col for col in required_columns if col not in kdata.columns]
             if missing_columns:
                 print(f"DataFrame缺少必要列: {missing_columns}")
@@ -177,112 +232,127 @@ class PatternManager:
                     kdata = kdata.copy()
                     kdata['datetime'] = kdata.index
                     print("[PatternManager] 使用DatetimeIndex作为datetime字段")
-                elif hasattr(kdata.index, 'name') and kdata.index.name == 'datetime':
-                    # 如果index的名称是datetime，尝试转换
-                    try:
-                        kdata = kdata.copy()
-                        kdata['datetime'] = pd.to_datetime(kdata.index)
-                        print("[PatternManager] 从index名称推断datetime字段")
-                    except Exception as e:
-                        print(f"[PatternManager] 从index转换datetime失败: {e}")
-                        # 使用序列号生成datetime
-                        kdata = kdata.copy()
-                        kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
-                        print(f"[PatternManager] 自动生成datetime序列，长度: {len(kdata)}")
                 else:
                     # 如果没有datetime信息，生成序列
-                    print("[PatternManager] K线数据缺少datetime字段，自动补全为当前时间")
+                    print("[PatternManager] K线数据缺少datetime字段，自动补全")
                     kdata = kdata.copy()
                     kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
-                    print(f"[PatternManager] 自动生成datetime序列，长度: {len(kdata)}")
             else:
                 # 确保datetime列是正确的时间格式
                 try:
-                    kdata = kdata.copy()
                     kdata['datetime'] = pd.to_datetime(kdata['datetime'])
-                    print(f"[PatternManager] 转换现有datetime列为时间格式")
                 except Exception as e:
-                    print(f"[PatternManager] 转换datetime列失败: {e}, 将生成新的时间序列")
+                    print(f"[PatternManager] datetime字段转换失败: {e}")
                     kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
+        else:
+            # 如果是其他格式，尝试转换为DataFrame
+            try:
+                from core.data_manager import data_manager
+                kdata = data_manager.kdata_to_df(kdata)
+            except Exception as e:
+                print(f"[PatternManager] 数据转换失败: {e}")
+                return []
 
-            # 自动补全code字段
-            if 'code' not in kdata.columns:
-                kdata = kdata.copy()
-                kdata['code'] = '000001'  # 默认代码
-
-        patterns = self.get_pattern_configs(active_only=True)
+        # 获取要识别的形态配置
+        all_configs = self.get_pattern_configs()
         if selected_patterns:
-            patterns = [p for p in patterns if p.english_name in selected_patterns]
+            configs = [c for c in all_configs if c.english_name in selected_patterns]
+        else:
+            configs = all_configs
 
         all_results = []
 
-        print(f"[PatternManager] 开始识别形态，数据长度: {len(kdata)}, 形态类型数: {len(patterns)}")
+        # 使用新框架识别形态
+        for config in configs:
+            # 修复：只有当传入的阈值大于配置阈值时才跳过
+            # 这样可以确保高质量的形态配置不会被低阈值请求忽略
+            if confidence_threshold > config.confidence_threshold:
+                # 如果请求的阈值比配置要求的还高，使用请求的阈值
+                effective_threshold = confidence_threshold
+            else:
+                # 否则使用配置的阈值
+                effective_threshold = config.confidence_threshold
 
-        # 处理不同类别的形态
-        for pattern in patterns:
             try:
-                results = self._identify_single_pattern(original_data, pattern, confidence_threshold)
-                all_results.extend(results)
-                print(f"[PatternManager] 形态 {pattern.name} 识别结果: {len(results)} 个")
+                # 创建识别器实例
+                recognizer = PatternAlgorithmFactory.create(config)
+
+                # 执行识别
+                results = recognizer.recognize(kdata)
+
+                # 过滤置信度 - 使用有效阈值
+                filtered_results = [
+                    r for r in results
+                    if r.confidence >= effective_threshold
+                ]
+
+                # 转换为字典格式
+                for result in filtered_results:
+                    all_results.append(result.to_dict())
+
             except Exception as e:
-                print(f"识别形态 {pattern.name} 时出错: {e}")
+                print(f"[PatternManager] 形态识别失败 {config.english_name}: {e}")
                 continue
 
-        print(f"[PatternManager] 形态识别完成，总计: {len(all_results)} 个形态")
+        # 按置信度排序
+        all_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
+
         return all_results
 
-    def _identify_single_pattern(self, kdata, pattern_config: PatternConfig,
-                                 confidence_threshold: float) -> List[Dict]:
+    def add_pattern_config(self, name: str, english_name: str, category: str,
+                           signal_type: str, description: str,
+                           algorithm_code: str = "", parameters: Dict = None,
+                           **kwargs) -> Optional[int]:
         """
-        识别单个形态类型
+        添加新的形态配置
 
         Args:
-            kdata: K线数据
-            pattern_config: 形态配置
-            confidence_threshold: 置信度阈值
+            name: 中文名称
+            english_name: 英文名称
+            category: 形态类别
+            signal_type: 信号类型
+            description: 描述
+            algorithm_code: 算法代码
+            parameters: 参数字典
+            **kwargs: 其他参数
 
         Returns:
-            识别结果列表
+            新增记录的ID，失败返回None
         """
-        english_name = pattern_config.english_name
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-        # 根据形态类型调用相应的识别方法
-        if english_name in ['double_top', 'double_bottom']:
-            results = self.pattern_recognizer.find_double_tops_bottoms(kdata)
-            # 过滤特定类型
-            if english_name == 'double_top':
-                results = [r for r in results if r.get('type') == 'double_top']
-            else:
-                results = [r for r in results if r.get('type') == 'double_bottom']
+        try:
+            min_periods = kwargs.get('min_periods', 5)
+            max_periods = kwargs.get('max_periods', 60)
+            confidence_threshold = kwargs.get('confidence_threshold', 0.5)
+            is_active = kwargs.get('is_active', True)
 
-        elif english_name in ['head_shoulders_top', 'head_shoulders_bottom']:
-            results = self.pattern_recognizer.find_head_shoulders(kdata)
-            if english_name == 'head_shoulders_top':
-                results = [r for r in results if r.get('type') == 'head_shoulders_top']
-            else:
-                results = [r for r in results if r.get('type') == 'head_shoulders_bottom']
+            parameters_json = json.dumps(parameters or {})
 
-        elif english_name in ['ascending_triangle', 'descending_triangle', 'symmetrical_triangle']:
-            results = self.pattern_recognizer.find_triangles(kdata)
-            results = [r for r in results if r.get('type') == english_name]
+            cursor.execute('''
+                INSERT INTO pattern_types 
+                (name, english_name, category, signal_type, description, 
+                 min_periods, max_periods, confidence_threshold, is_active,
+                 algorithm_code, parameters)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (name, english_name, category, signal_type, description,
+                  min_periods, max_periods, confidence_threshold, is_active,
+                  algorithm_code, parameters_json))
 
-        else:
-            # 使用通用形态识别方法
-            results = self.pattern_recognizer.get_pattern_signals(
-                kdata, pattern_types=[english_name]
-            )
+            pattern_id = cursor.lastrowid
+            conn.commit()
 
-        # 过滤置信度并添加形态信息
-        filtered_results = []
-        for result in results:
-            if result.get('confidence', 0) >= confidence_threshold:
-                # 添加形态配置信息
-                result['pattern_name'] = pattern_config.name
-                result['pattern_category'] = pattern_config.category
-                result['pattern_description'] = pattern_config.description
-                filtered_results.append(result)
+            # 清除缓存
+            self._patterns_cache = None
 
-        return filtered_results
+            return pattern_id
+
+        except Exception as e:
+            print(f"添加形态配置失败: {e}")
+            return None
+        finally:
+            conn.close()
 
     def update_pattern_config(self, pattern_id: int, **kwargs) -> bool:
         """
@@ -293,124 +363,436 @@ class PatternManager:
             **kwargs: 要更新的字段
 
         Returns:
-            是否更新成功
+            是否成功
         """
-        if not kwargs:
-            return False
-
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 构建更新语句
-        set_clause = ", ".join([f"{key} = ?" for key in kwargs.keys()])
-        values = list(kwargs.values()) + [pattern_id]
-
         try:
-            cursor.execute(
-                f"UPDATE pattern_types SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                values
-            )
+            # 构建更新语句
+            update_fields = []
+            values = []
+
+            for field, value in kwargs.items():
+                if field == 'parameters' and isinstance(value, dict):
+                    value = json.dumps(value)
+                update_fields.append(f"{field} = ?")
+                values.append(value)
+
+            if not update_fields:
+                return False
+
+            values.append(pattern_id)
+            query = f"UPDATE pattern_types SET {', '.join(update_fields)} WHERE id = ?"
+
+            cursor.execute(query, values)
             conn.commit()
-            success = cursor.rowcount > 0
+
+            # 清除缓存
+            self._patterns_cache = None
+
+            return cursor.rowcount > 0
+
         except Exception as e:
             print(f"更新形态配置失败: {e}")
-            success = False
+            return False
         finally:
             conn.close()
 
-        return success
-
-    def add_pattern_config(self, name: str, english_name: str, category: str,
-                           signal_type: str, description: str, **kwargs) -> Optional[int]:
+    def delete_pattern_config(self, pattern_id: int) -> bool:
         """
-        添加新的形态配置
+        删除形态配置
+
+        Args:
+            pattern_id: 形态ID
+
+        Returns:
+            是否成功
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("DELETE FROM pattern_types WHERE id = ?", (pattern_id,))
+            conn.commit()
+
+            # 清除缓存
+            self._patterns_cache = None
+
+            return cursor.rowcount > 0
+
+        except Exception as e:
+            print(f"删除形态配置失败: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def import_tdx_formula(self, name: str, formula: str) -> bool:
+        """导入通达信公式
 
         Args:
             name: 形态名称
-            english_name: 英文名称
-            category: 类别
-            signal_type: 信号类型
-            description: 描述
-            **kwargs: 其他配置参数
+            formula: 通达信公式代码
 
         Returns:
-            新添加的形态ID，失败返回None
+            是否导入成功
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # 设置默认值
-        defaults = {
-            'min_periods': 5,
-            'max_periods': 60,
-            'confidence_threshold': 0.5,
-            'is_active': 1
-        }
-        defaults.update(kwargs)
-
         try:
-            cursor.execute(
-                """INSERT INTO pattern_types 
-                   (name, english_name, category, signal_type, description, 
-                    min_periods, max_periods, confidence_threshold, is_active)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (name, english_name, category, signal_type, description,
-                 defaults['min_periods'], defaults['max_periods'],
-                 defaults['confidence_threshold'], defaults['is_active'])
-            )
-            conn.commit()
-            pattern_id = cursor.lastrowid
-        except Exception as e:
-            print(f"添加形态配置失败: {e}")
-            pattern_id = None
-        finally:
-            conn.close()
+            # 转换通达信公式为Python代码
+            python_code = self._convert_tdx_formula(formula)
 
-        return pattern_id
+            if not python_code:
+                return False
+
+            # 创建新的形态配置
+            config = PatternConfig(
+                id=0,  # 将由数据库自动分配
+                name=name,
+                english_name=name.lower().replace(' ', '_'),
+                category=PatternCategory.COMPLEX,
+                signal_type=SignalType.NEUTRAL,
+                description=f"通达信导入的形态: {name}",
+                min_periods=1,
+                max_periods=100,
+                confidence_threshold=0.5,
+                algorithm_code=python_code,
+                parameters={},
+                is_active=True
+            )
+
+            # 保存到数据库
+            return self._save_pattern_config(config)
+
+        except Exception as e:
+            print(f"导入通达信公式失败: {e}")
+            return False
+
+    def _save_pattern_config(self, config: PatternConfig) -> bool:
+        """保存形态配置到数据库"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO pattern_types (
+                    name, english_name, category, signal_type, description,
+                    min_periods, max_periods, confidence_threshold,
+                    algorithm_code, parameters, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                config.name,
+                config.english_name,
+                config.category.value,
+                config.signal_type.value,
+                config.description,
+                config.min_periods,
+                config.max_periods,
+                config.confidence_threshold,
+                config.algorithm_code,
+                json.dumps(config.parameters),
+                config.is_active
+            ))
+
+            conn.commit()
+            conn.close()
+            return True
+
+        except Exception as e:
+            print(f"保存形态配置失败: {e}")
+            return False
+
+    def _convert_tdx_formula(self, formula: str) -> str:
+        """
+        转换通达信公式为Python代码
+
+        Args:
+            formula: 通达信公式
+
+        Returns:
+            Python算法代码
+        """
+        # 这是一个简化的转换器，实际应用中需要更复杂的解析
+        # 通达信常用函数映射
+        tdx_mappings = {
+            'C': "k['close']",
+            'O': "k['open']",
+            'H': "k['high']",
+            'L': "k['low']",
+            'V': "k['volume']",
+            'REF(': 'kdata.iloc[i-',
+            'MA(': 'kdata.rolling(',
+            'AND': 'and',
+            'OR': 'or',
+            'NOT': 'not',
+        }
+
+        # 基础转换
+        python_code = formula
+        for tdx_func, py_func in tdx_mappings.items():
+            python_code = python_code.replace(tdx_func, py_func)
+
+        # 生成完整的算法代码模板
+        algorithm_template = f'''
+# 通达信公式转换: {formula}
+for i in range(len(kdata)):
+    k = kdata.iloc[i]
+    
+    try:
+        # 转换后的条件判断
+        condition = {python_code}
+        
+        if condition:
+            confidence = 0.6  # 默认置信度
+            datetime_val = str(kdata.iloc[i]['datetime']) if 'datetime' in kdata.columns else None
+            
+            result = create_result(
+                pattern_type='tdx_pattern',
+                signal_type=SignalType.NEUTRAL,
+                confidence=confidence,
+                index=i,
+                price=k['close'],
+                datetime_val=datetime_val,
+                extra_data={{'original_formula': '{formula}'}}
+            )
+            results.append(result)
+    except Exception as e:
+        # 忽略单个K线的计算错误
+        continue
+'''
+
+        return algorithm_template
 
     def get_pattern_statistics(self, kdata, pattern_name: str = None) -> Dict:
         """
-        获取形态识别统计信息
+        获取形态统计信息
 
         Args:
             kdata: K线数据
-            pattern_name: 特定形态名称，None表示全部
+            pattern_name: 特定形态名称，None表示所有形态
 
         Returns:
             统计信息字典
         """
-        patterns = self.identify_all_patterns(kdata)
-
-        if pattern_name:
-            patterns = [p for p in patterns if p.get('pattern_name') == pattern_name]
-
-        stats = {
-            'total_patterns': len(patterns),
-            'by_category': {},
-            'by_signal': {},
-            'confidence_distribution': {
-                'high': 0,  # >= 0.8
-                'medium': 0,  # 0.5-0.8
-                'low': 0  # < 0.5
-            }
-        }
-
-        for pattern in patterns:
-            # 按类别统计
-            category = pattern.get('pattern_category', 'unknown')
-            stats['by_category'][category] = stats['by_category'].get(category, 0) + 1
-
-            # 按信号统计
-            signal = pattern.get('signal', 'unknown')
-            stats['by_signal'][signal] = stats['by_signal'].get(signal, 0) + 1
-
-            # 置信度分布
-            confidence = pattern.get('confidence', 0)
-            if confidence >= 0.8:
-                stats['confidence_distribution']['high'] += 1
-            elif confidence >= 0.5:
-                stats['confidence_distribution']['medium'] += 1
+        try:
+            # 识别形态
+            if pattern_name:
+                patterns = self.identify_all_patterns(kdata, [pattern_name])
             else:
-                stats['confidence_distribution']['low'] += 1
+                patterns = self.identify_all_patterns(kdata)
 
-        return stats
+            if not patterns:
+                return {
+                    'total_patterns': 0,
+                    'by_category': {},
+                    'by_signal': {},
+                    'confidence_distribution': {'high': 0, 'medium': 0, 'low': 0}
+                }
+
+            # 统计分析
+            stats = {
+                'total_patterns': len(patterns),
+                'by_category': {},
+                'by_signal': {},
+                'confidence_distribution': {'high': 0, 'medium': 0, 'low': 0}
+            }
+
+            for pattern in patterns:
+                # 按类别统计
+                category = pattern.get('pattern_category', '未分类')
+                stats['by_category'][category] = stats['by_category'].get(category, 0) + 1
+
+                # 按信号统计
+                signal = pattern.get('signal', 'neutral')
+                signal_cn = {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, signal)
+                stats['by_signal'][signal_cn] = stats['by_signal'].get(signal_cn, 0) + 1
+
+                # 按置信度统计
+                confidence = pattern.get('confidence', 0)
+                if confidence >= 0.8:
+                    stats['confidence_distribution']['high'] += 1
+                elif confidence >= 0.5:
+                    stats['confidence_distribution']['medium'] += 1
+                else:
+                    stats['confidence_distribution']['low'] += 1
+
+            return stats
+
+        except Exception as e:
+            print(f"获取形态统计失败: {e}")
+            return {
+                'total_patterns': 0,
+                'by_category': {},
+                'by_signal': {},
+                'confidence_distribution': {'high': 0, 'medium': 0, 'low': 0}
+            }
+
+    def get_pattern_effectiveness(self, pattern_type: str, days: int = 30) -> Dict:
+        """
+        获取形态有效性统计
+
+        Args:
+            pattern_type: 形态类型
+            days: 统计天数
+
+        Returns:
+            有效性统计
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_count,
+                    AVG(return_rate) as avg_return,
+                    COUNT(CASE WHEN is_successful = 1 THEN 1 END) as success_count,
+                    AVG(confidence) as avg_confidence
+                FROM pattern_history 
+                WHERE pattern_type = ? 
+                AND trigger_date >= date('now', '-{} days')
+            '''.format(days), (pattern_type,))
+
+            row = cursor.fetchone()
+            if row and row[0] > 0:
+                return {
+                    'total_signals': row[0],
+                    'success_rate': (row[2] / row[0]) * 100 if row[0] > 0 else 0,
+                    'average_return': row[1] or 0,
+                    'average_confidence': row[3] or 0
+                }
+            else:
+                return {
+                    'total_signals': 0,
+                    'success_rate': 0,
+                    'average_return': 0,
+                    'average_confidence': 0
+                }
+
+        except Exception as e:
+            print(f"获取形态有效性失败: {e}")
+            return {
+                'total_signals': 0,
+                'success_rate': 0,
+                'average_return': 0,
+                'average_confidence': 0
+            }
+        finally:
+            conn.close()
+
+    def record_pattern_result(self, pattern_type: str, stock_code: str,
+                              signal_type: str, confidence: float,
+                              trigger_date: str, trigger_price: float,
+                              result_date: str = None, result_price: float = None) -> bool:
+        """
+        记录形态识别结果（用于效果统计）
+
+        Args:
+            pattern_type: 形态类型
+            stock_code: 股票代码
+            signal_type: 信号类型
+            confidence: 置信度
+            trigger_date: 触发日期
+            trigger_price: 触发价格
+            result_date: 结果日期
+            result_price: 结果价格
+
+        Returns:
+            是否成功
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # 计算收益率和成功标志
+            return_rate = None
+            is_successful = None
+
+            if result_price is not None and trigger_price > 0:
+                return_rate = (result_price - trigger_price) / trigger_price * 100
+
+                # 根据信号类型判断是否成功
+                if signal_type == 'buy':
+                    is_successful = 1 if return_rate > 0 else 0
+                elif signal_type == 'sell':
+                    is_successful = 1 if return_rate < 0 else 0
+                else:
+                    is_successful = 1 if abs(return_rate) < 2 else 0  # 中性信号，波动小于2%算成功
+
+            cursor.execute('''
+                INSERT INTO pattern_history 
+                (pattern_type, stock_code, signal_type, confidence, 
+                 trigger_date, trigger_price, result_date, result_price, 
+                 return_rate, is_successful)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (pattern_type, stock_code, signal_type, confidence,
+                  trigger_date, trigger_price, result_date, result_price,
+                  return_rate, is_successful))
+
+            conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"记录形态结果失败: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_recommended_patterns(self, top_n: int = 10) -> List[Dict]:
+        """
+        获取推荐形态（基于历史效果）
+
+        Args:
+            top_n: 返回前N个推荐形态
+
+        Returns:
+            推荐形态列表
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute('''
+                SELECT 
+                    pattern_type,
+                    COUNT(*) as total_count,
+                    AVG(return_rate) as avg_return,
+                    COUNT(CASE WHEN is_successful = 1 THEN 1 END) * 1.0 / COUNT(*) as success_rate,
+                    AVG(confidence) as avg_confidence
+                FROM pattern_history 
+                WHERE trigger_date >= date('now', '-90 days')
+                GROUP BY pattern_type
+                HAVING total_count >= 5
+                ORDER BY success_rate DESC, avg_return DESC
+                LIMIT ?
+            ''', (top_n,))
+
+            recommendations = []
+            for row in cursor.fetchall():
+                recommendations.append({
+                    'pattern_type': row[0],
+                    'total_signals': row[1],
+                    'average_return': round(row[2] or 0, 2),
+                    'success_rate': round(row[3] * 100, 2),
+                    'average_confidence': round(row[4] or 0, 3),
+                    'recommendation_score': round((row[3] * 0.6 + (row[2] or 0) * 0.004 + (row[4] or 0) * 0.4), 3)
+                })
+
+            return recommendations
+
+        except Exception as e:
+            print(f"获取推荐形态失败: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def get_all_patterns(self, active_only: bool = True) -> List[PatternConfig]:
+        """
+        获取所有形态配置（兼容优化系统接口）
+
+        Args:
+            active_only: 是否只返回激活的形态
+
+        Returns:
+            形态配置列表
+        """
+        return self.get_pattern_configs(active_only=active_only)

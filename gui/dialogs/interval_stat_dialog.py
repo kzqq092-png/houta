@@ -264,10 +264,10 @@ class IntervalStatDialog(QDialog):
         strong_bear = rules.get('strong_bear', -15)
         if ret > strong_bull and up_ratio > 65 and max_up_seq >= 4:
             advices["操作建议"].append(
-                ("多头极强，顺势做多为主，关注回调低吸机会。", "#388e3c", "📈", "#e8f5e9"))
+                ("多头极强，顺势做多为主，关注回调低吸机会。", "#388e3c", "↑", "#e8f5e9"))
         elif ret < strong_bear and up_ratio < 35 and max_down_seq >= 4:
             advices["风险提示"].append(
-                ("空头极强，谨慎抄底，防止持续下跌。", "#d32f2f", "📉", "#ffebee"))
+                ("空头极强，谨慎抄底，防止持续下跌。", "#d32f2f", "↓", "#ffebee"))
         elif abs(ret) < 3 and abs(up_ratio-50) < 10:
             advices["操作建议"].append(
                 ("区间震荡，观望为主，短线高抛低吸。", "#1976d2", "🔄", "#e3f2fd"))
@@ -309,7 +309,7 @@ class IntervalStatDialog(QDialog):
                 ("区间内多次创新高，多头突破，关注追涨机会。", "#388e3c", "🚀", "#e8f5e9"))
         if close_new_low > total_days * 0.3:
             advices["风险提示"].append(
-                ("区间内多次新低，空头主导，谨慎操作。", "#d32f2f", "📉", "#ffebee"))
+                ("区间内多次新低，空头主导，谨慎操作。", "#d32f2f", "↓", "#ffebee"))
         # --- 主力异动 ---
         if vol_max > 2 * vol_mean and vol_mean > 0:
             advices["操作建议"].append(
@@ -353,7 +353,7 @@ class IntervalStatDialog(QDialog):
             close_max = df['close'].max()
             close_min = df['close'].min()
             close_mean = df['close'].mean()
-            ax.text(0.5, 0.95, f"最高: {close_max:.2f}  最低: {close_min:.2f}  均值: {close_mean:.2f}",
+            ax.text(0.5, 0.95, f"最高: {close_max:.3f}  最低: {close_min:.3f}  均值: {close_mean:.3f}",
                     transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)
@@ -389,7 +389,7 @@ class IntervalStatDialog(QDialog):
             ret_max = returns.max()
             ret_min = returns.min()
             ret_mean = returns.mean()
-            ax.text(0.5, 0.95, f"最大: {ret_max:.2f}%  最小: {ret_min:.2f}%  均值: {ret_mean:.2f}%",
+            ax.text(0.5, 0.95, f"最大: {ret_max:.3f}%  最小: {ret_min:.3f}%  均值: {ret_mean:.3f}%",
                     transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
         canvas = FigureCanvas(fig)
         layout.addWidget(canvas)

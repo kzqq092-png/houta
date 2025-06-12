@@ -699,7 +699,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             for name, value in self.performance_metrics.items():
                 if name in self.metric_labels:
                     if isinstance(value, float):
-                        formatted_value = f"{value:.2%}" if "率" in name else f"{value:.2f}"
+                        formatted_value = f"{value:.2%}" if "率" in name else f"{value:.3f}"
                     else:
                         formatted_value = str(value)
                     self.metric_labels[name].setText(formatted_value)
@@ -1745,7 +1745,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 else:
                     item.setIcon(QIcon(':/icons/pending.png'))
                 if step.duration:
-                    item.setText(item.text() + f"  ⏱{step.duration:.2f}s")
+                    item.setText(item.text() + f"  ⏱{step.duration:.3f}s")
                 # 鼠标悬停显示日志/错误
                 tooltip = step.log or ''
                 if step.error:
@@ -1764,7 +1764,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             for step in steps:
                 text = f"{step.name}（{step.step_id}）：{step.status}"
                 if step.duration:
-                    text += f"，耗时：{step.duration:.2f}s"
+                    text += f"，耗时：{step.duration:.3f}s"
                 layout.addWidget(QLabel(text))
         btn = QPushButton("关闭")
         btn.clicked.connect(dialog.accept)
@@ -1782,7 +1782,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 for step in steps:
                     text = f"  {step.name}（{step.step_id}）：{step.status}"
                     if step.duration:
-                        text += f"，耗时：{step.duration:.2f}s"
+                        text += f"，耗时：{step.duration:.3f}s"
                     layout.addWidget(QLabel(text))
         btn = QPushButton("关闭")
         btn.clicked.connect(dialog.accept)
@@ -1802,12 +1802,12 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 if writer:
                     writer.writerow(["步骤", "状态", "耗时(s)", "日志", "错误"])
                     for step in steps:
-                        writer.writerow([step.name, step.status, f"{step.duration:.2f}" if step.duration else '', step.log, step.error])
+                        writer.writerow([step.name, step.status, f"{step.duration:.3f}" if step.duration else '', step.log, step.error])
                 else:
                     for step in steps:
                         f.write(f"{step.name}（{step.step_id}）：{step.status}")
                         if step.duration:
-                            f.write(f"，耗时：{step.duration:.2f}s")
+                            f.write(f"，耗时：{step.duration:.3f}s")
                         if step.log:
                             f.write(f"\n日志：{step.log}")
                         if step.error:
@@ -1840,7 +1840,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                     fig.add_trace(go.Scatter(x=node_x, y=node_y, mode='markers+text',
                                              marker=dict(size=40, color=node_colors),
                                              text=[
-                                                 f"{step.name}<br>{step.status}<br>{step.duration:.2f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
+                                                 f"{step.name}<br>{step.status}<br>{step.duration:.3f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
                                              textposition='bottom center',
                                              customdata=[json.dumps({"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
                                              hovertemplate='%{text}<br>点击查看详情',
@@ -1869,7 +1869,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 fig.add_trace(go.Scatter(x=node_x, y=node_y, mode='markers+text',
                                          marker=dict(size=40, color=node_colors),
                                          text=[
-                                             f"{step.name}<br>{step.status}<br>{step.duration:.2f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
+                                             f"{step.name}<br>{step.status}<br>{step.duration:.3f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
                                          textposition='bottom center',
                                          customdata=[json.dumps({"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
                                          hovertemplate='%{text}<br>点击查看详情',

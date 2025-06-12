@@ -255,7 +255,7 @@ class ChartOptimizer:
         # 添加数值标注
         for i in range(len(corr_matrix.columns)):
             for j in range(len(corr_matrix.columns)):
-                text = ax.text(j, i, f'{corr_matrix.iloc[i, j]:.2f}',
+                text = ax.text(j, i, f'{corr_matrix.iloc[i, j]:.3f}',
                                ha='center', va='center')
 
     @staticmethod

@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import mplfinance as mpf
 import mplcursors
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 
 from core.logger import LogManager
@@ -231,6 +231,37 @@ class ChartWidget(QWidget):
         idx = np.linspace(0, len(kdata)-1, max_points).astype(int)
         return kdata.iloc[idx]
 
+    def _safe_format_date(self, row, idx, kdata):
+        """安全地格式化日期，处理数值索引和datetime索引的情况"""
+        try:
+            # 优先从kdata的实际索引获取datetime
+            if hasattr(kdata.index[idx], 'strftime'):
+                return kdata.index[idx].strftime('%Y-%m-%d')
+            elif hasattr(row.name, 'strftime'):
+                # 如果索引本身是datetime
+                return row.name.strftime('%Y-%m-%d')
+            else:
+                # 如果都不是datetime，检查是否有datetime列
+                if 'datetime' in kdata.columns:
+                    try:
+                        date_val = pd.to_datetime(kdata.iloc[idx]['datetime'])
+                        return date_val.strftime('%Y-%m-%d')
+                    except:
+                        pass
+
+                # 尝试转换索引
+                try:
+                    date_val = pd.to_datetime(kdata.index[idx])
+                    return date_val.strftime('%Y-%m-%d')
+                except:
+                    # 最后的兜底方案：使用索引位置生成相对日期
+                    from datetime import datetime, timedelta
+                    base_date = datetime(2024, 1, 1)
+                    actual_date = base_date + timedelta(days=idx)
+                    return actual_date.strftime('%Y-%m-%d')
+        except Exception:
+            return f"第{idx}根K线"
+
     def update_chart(self, data: dict = None):
         """唯一K线渲染实现，X轴为等距序号，彻底消除节假日断层。"""
         try:
@@ -274,8 +305,7 @@ class ChartWidget(QWidget):
                 # 设置X轴刻度和标签（间隔显示，防止过密）
                 step = max(1, len(kdata)//8)
                 xticks = np.arange(0, len(kdata), step)
-                xticklabels = [kdata.index[i].strftime(
-                    '%Y-%m-%d') for i in xticks]
+                xticklabels = [self._safe_format_date(kdata.iloc[i], i, kdata) for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
                 # 修复：确保tick数量和label数量一致
                 if len(xticks) == len(xticklabels):
@@ -380,12 +410,42 @@ class ChartWidget(QWidget):
                 self._crosshair_lines[1].set_ydata([y_val, y_val])
                 self._crosshair_lines[1].set_visible(True)
                 # 信息内容（多行详细信息）
+                date_str = self._safe_format_date(row, idx, kdata)
                 info = (
-                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
-                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
-                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"日期: {date_str}\n"
+                    f"开盘: {row.open:.3f}  收盘: {row.close:.3f}\n"
+                    f"最高: {row.high:.3f}  最低: {row.low:.3f}\n"
                     f"成交量: {row.volume:.0f}"
                 )
+
+                # 增加形态信息显示（如果当前K线有形态信号）
+                if hasattr(self, '_pattern_info') and idx in self._pattern_info:
+                    pattern_info = self._pattern_info[idx]
+                    info += (
+                        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"形态: {pattern_info['pattern_name']}\n"
+                        f"信号: {pattern_info['signal_cn']}\n"
+                        f"置信度: {pattern_info['confidence']:.1%}\n"
+                        f"价格: {pattern_info['price']:.3f}"
+                    )
+
+                # 计算涨跌幅和涨跌额（相对前一日）
+                if idx > 0:
+                    prev_close = kdata.iloc[idx-1]['close']
+                    change = row.close - prev_close
+                    change_pct = (change / prev_close) * 100
+                    change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+                    info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+
+                # 计算振幅
+                amplitude = ((row.high - row.low) / row.close) * 100
+                info += f"\n振幅: {amplitude:.3f}%"
+
+                # 计算换手率（如果有流通股本数据）
+                if hasattr(row, 'amount') and row.amount > 0:
+                    turnover = (row.volume / 100000000) * 100  # 简化计算，实际需要流通股本
+                    info += f"\n换手: {turnover:.3f}%"
+
                 # 信息框位置：在十字点右上角偏移一点
                 ax = event.inaxes
                 xlim = ax.get_xlim()
@@ -407,11 +467,12 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
+                date_text = self._safe_format_date(row, idx, kdata)
                 if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
                     self._crosshair_xtext = self.indicator_ax.text(
                         x_val, self.indicator_ax.get_ylim(
                         )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
-                        row.name.strftime('%Y-%m-%d'),
+                        date_text,
                         ha='center', va='top', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
@@ -419,8 +480,7 @@ class ChartWidget(QWidget):
                     )
                 else:
                     self._crosshair_xtext.set_x(x_val)
-                    self._crosshair_xtext.set_text(
-                        row.name.strftime('%Y-%m-%d'))
+                    self._crosshair_xtext.set_text(date_text)
                     self._crosshair_xtext.set_visible(True)
                     self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
                                                 1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
@@ -431,7 +491,7 @@ class ChartWidget(QWidget):
                 # 在price_ax左侧动态覆盖当前y_val位置的Y轴刻度（半透明白底，数字在上方）
                 if not hasattr(self, '_crosshair_ytext') or self._crosshair_ytext is None:
                     self._crosshair_ytext = self.price_ax.text(
-                        -0.5, y_val, f'{y_val:.2f}',
+                        -0.5, y_val, f'{y_val:.3f}',
                         ha='right', va='center', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
@@ -439,7 +499,7 @@ class ChartWidget(QWidget):
                     )
                 else:
                     self._crosshair_ytext.set_y(y_val)
-                    self._crosshair_ytext.set_text(f'{y_val:.2f}')
+                    self._crosshair_ytext.set_text(f'{y_val:.3f}')
                     self._crosshair_ytext.set_visible(True)
                 self._crosshair_ytext.set_color(primary_color)
                 self._crosshair_ytext.set_bbox(dict(
@@ -456,8 +516,7 @@ class ChartWidget(QWidget):
             if not self.current_kdata.empty:
                 step = max(1, len(self.current_kdata)//8)
                 xticks = np.arange(0, len(self.current_kdata), step)
-                xticklabels = [self.current_kdata.index[i].strftime(
-                    '%Y-%m-%d') for i in xticks]
+                xticklabels = [self._safe_format_date(self.current_kdata.iloc[i], i, self.current_kdata) for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=0, fontsize=7)
@@ -828,12 +887,42 @@ class ChartWidget(QWidget):
                 self._crosshair_lines[1].set_ydata([y_val, y_val])
                 self._crosshair_lines[1].set_visible(True)
                 # 信息内容（多行详细信息）
+                date_str = self._safe_format_date(row, idx, kdata)
                 info = (
-                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
-                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
-                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"日期: {date_str}\n"
+                    f"开盘: {row.open:.3f}  收盘: {row.close:.3f}\n"
+                    f"最高: {row.high:.3f}  最低: {row.low:.3f}\n"
                     f"成交量: {row.volume:.0f}"
                 )
+
+                # 增加形态信息显示（如果当前K线有形态信号）
+                if hasattr(self, '_pattern_info') and idx in self._pattern_info:
+                    pattern_info = self._pattern_info[idx]
+                    info += (
+                        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"形态: {pattern_info['pattern_name']}\n"
+                        f"信号: {pattern_info['signal_cn']}\n"
+                        f"置信度: {pattern_info['confidence']:.1%}\n"
+                        f"价格: {pattern_info['price']:.3f}"
+                    )
+
+                # 计算涨跌幅和涨跌额（相对前一日）
+                if idx > 0:
+                    prev_close = kdata.iloc[idx-1]['close']
+                    change = row.close - prev_close
+                    change_pct = (change / prev_close) * 100
+                    change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+                    info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+
+                # 计算振幅
+                amplitude = ((row.high - row.low) / row.close) * 100
+                info += f"\n振幅: {amplitude:.3f}%"
+
+                # 计算换手率（如果有流通股本数据）
+                if hasattr(row, 'amount') and row.amount > 0:
+                    turnover = (row.volume / 100000000) * 100  # 简化计算，实际需要流通股本
+                    info += f"\n换手: {turnover:.3f}%"
+
                 # 信息框位置：在十字点右上角偏移一点
                 ax = event.inaxes
                 xlim = ax.get_xlim()
@@ -855,11 +944,12 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
+                date_text = self._safe_format_date(row, idx, kdata)
                 if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
                     self._crosshair_xtext = self.indicator_ax.text(
                         x_val, self.indicator_ax.get_ylim(
                         )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
-                        row.name.strftime('%Y-%m-%d'),
+                        date_text,
                         ha='center', va='top', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
@@ -867,8 +957,7 @@ class ChartWidget(QWidget):
                     )
                 else:
                     self._crosshair_xtext.set_x(x_val)
-                    self._crosshair_xtext.set_text(
-                        row.name.strftime('%Y-%m-%d'))
+                    self._crosshair_xtext.set_text(date_text)
                     self._crosshair_xtext.set_visible(True)
                     self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
                                                 1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
@@ -879,7 +968,7 @@ class ChartWidget(QWidget):
                 # 在price_ax左侧动态覆盖当前y_val位置的Y轴刻度（半透明白底，数字在上方）
                 if not hasattr(self, '_crosshair_ytext') or self._crosshair_ytext is None:
                     self._crosshair_ytext = self.price_ax.text(
-                        -0.5, y_val, f'{y_val:.2f}',
+                        -0.5, y_val, f'{y_val:.3f}',
                         ha='right', va='center', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
@@ -887,7 +976,7 @@ class ChartWidget(QWidget):
                     )
                 else:
                     self._crosshair_ytext.set_y(y_val)
-                    self._crosshair_ytext.set_text(f'{y_val:.2f}')
+                    self._crosshair_ytext.set_text(f'{y_val:.3f}')
                     self._crosshair_ytext.set_visible(True)
                 self._crosshair_ytext.set_color(primary_color)
                 self._crosshair_ytext.set_bbox(dict(
@@ -904,8 +993,7 @@ class ChartWidget(QWidget):
             if not self.current_kdata.empty:
                 step = max(1, len(self.current_kdata)//8)
                 xticks = np.arange(0, len(self.current_kdata), step)
-                xticklabels = [self.current_kdata.index[i].strftime(
-                    '%Y-%m-%d') for i in xticks]
+                xticklabels = [self._safe_format_date(self.current_kdata.iloc[i], i, self.current_kdata) for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=0, fontsize=7)
@@ -940,7 +1028,7 @@ class ChartWidget(QWidget):
             indicator_str = ', '.join(indicator_names)
             if indicator_str:
                 self._indicator_info_text = self.price_ax.text(
-                    0.01, 0.95, indicator_str,
+                    0.01, 0.9, indicator_str,
                     transform=self.price_ax.transAxes,
                     va='top', ha='left',
                     fontsize=8,
@@ -1153,12 +1241,42 @@ class ChartWidget(QWidget):
                 self._crosshair_lines[1].set_ydata([y_val, y_val])
                 self._crosshair_lines[1].set_visible(True)
                 # 信息内容（多行详细信息）
+                date_str = self._safe_format_date(row, idx, kdata)
                 info = (
-                    f"日期: {row.name.strftime('%Y-%m-%d')}\n"
-                    f"开盘: {row.open:.2f}  收盘: {row.close:.2f}\n"
-                    f"最高: {row.high:.2f}  最低: {row.low:.2f}\n"
+                    f"日期: {date_str}\n"
+                    f"开盘: {row.open:.3f}  收盘: {row.close:.3f}\n"
+                    f"最高: {row.high:.3f}  最低: {row.low:.3f}\n"
                     f"成交量: {row.volume:.0f}"
                 )
+
+                # 增加形态信息显示（如果当前K线有形态信号）
+                if hasattr(self, '_pattern_info') and idx in self._pattern_info:
+                    pattern_info = self._pattern_info[idx]
+                    info += (
+                        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"形态: {pattern_info['pattern_name']}\n"
+                        f"信号: {pattern_info['signal_cn']}\n"
+                        f"置信度: {pattern_info['confidence']:.1%}\n"
+                        f"价格: {pattern_info['price']:.3f}"
+                    )
+
+                # 计算涨跌幅和涨跌额（相对前一日）
+                if idx > 0:
+                    prev_close = kdata.iloc[idx-1]['close']
+                    change = row.close - prev_close
+                    change_pct = (change / prev_close) * 100
+                    change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+                    info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+
+                # 计算振幅
+                amplitude = ((row.high - row.low) / row.close) * 100
+                info += f"\n振幅: {amplitude:.3f}%"
+
+                # 计算换手率（如果有流通股本数据）
+                if hasattr(row, 'amount') and row.amount > 0:
+                    turnover = (row.volume / 100000000) * 100  # 简化计算，实际需要流通股本
+                    info += f"\n换手: {turnover:.3f}%"
+
                 # 信息框位置：在十字点右上角偏移一点
                 ax = event.inaxes
                 xlim = ax.get_xlim()
@@ -1180,20 +1298,20 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
+                date_text = self._safe_format_date(row, idx, kdata)
                 if not hasattr(self, '_crosshair_xtext') or self._crosshair_xtext is None:
                     self._crosshair_xtext = self.indicator_ax.text(
                         x_val, self.indicator_ax.get_ylim(
                         )[1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]),
-                        row.name.strftime('%Y-%m-%d'),
-                        ha='center', va='bottom', fontsize=8, color=primary_color,
+                        date_text,
+                        ha='center', va='top', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
                         zorder=350, clip_on=False
                     )
                 else:
                     self._crosshair_xtext.set_x(x_val)
-                    self._crosshair_xtext.set_text(
-                        row.name.strftime('%Y-%m-%d'))
+                    self._crosshair_xtext.set_text(date_text)
                     self._crosshair_xtext.set_visible(True)
                     self._crosshair_xtext.set_y(self.indicator_ax.get_ylim()[
                                                 1] + 0.08 * (self.indicator_ax.get_ylim()[1] - self.indicator_ax.get_ylim()[0]))
@@ -1204,7 +1322,7 @@ class ChartWidget(QWidget):
                 # 在price_ax左侧动态覆盖当前y_val位置的Y轴刻度（半透明白底，数字在上方）
                 if not hasattr(self, '_crosshair_ytext') or self._crosshair_ytext is None:
                     self._crosshair_ytext = self.price_ax.text(
-                        -0.5, y_val, f'{y_val:.2f}',
+                        -0.5, y_val, f'{y_val:.3f}',
                         ha='right', va='center', fontsize=8, color=primary_color,
                         bbox=dict(facecolor='#fff', edgecolor='none',
                                   alpha=0.85, boxstyle='round,pad=0.15', linewidth=0),
@@ -1212,7 +1330,7 @@ class ChartWidget(QWidget):
                     )
                 else:
                     self._crosshair_ytext.set_y(y_val)
-                    self._crosshair_ytext.set_text(f'{y_val:.2f}')
+                    self._crosshair_ytext.set_text(f'{y_val:.3f}')
                     self._crosshair_ytext.set_visible(True)
                 self._crosshair_ytext.set_color(primary_color)
                 self._crosshair_ytext.set_bbox(dict(
@@ -1465,8 +1583,8 @@ class ChartWidget(QWidget):
 
                     # 显示气泡提示
                     tooltip_text = f"类型: {signal.get('type', 'unknown')}\\n"
-                    tooltip_text += f"置信度: {signal.get('confidence', 0):.2f}\\n"
-                    tooltip_text += f"价格: {signal.get('price', 0):.2f}\\n"
+                    tooltip_text += f"置信度: {signal.get('confidence', 0):.3f}\\n"
+                    tooltip_text += f"价格: {signal.get('price', 0):.3f}\\n"
                     tooltip_text += f"时间: {signal.get('datetime', '')}"
 
                     # 清除旧提示
@@ -1890,92 +2008,106 @@ class ChartWidget(QWidget):
 
     def plot_patterns(self, pattern_signals: list, highlight_index: int = None):
         """
-        在K线主图上高亮形态K线、绘制标记（如箭头、圆圈、文字），并支持交互（点击/悬停显示形态详情）。
+        专业化形态信号显示：使用彩色箭头标记，默认隐藏浮窗，集成到十字光标显示
         Args:
             pattern_signals: List[dict]，每个dict至少包含 'index', 'pattern', 'signal', 'confidence' 等字段
         """
         import matplotlib.patches as mpatches
         import matplotlib.pyplot as plt
-        import mplcursors
+
         if not hasattr(self, 'price_ax') or self.current_kdata is None or not pattern_signals:
             return
+
         ax = self.price_ax
         kdata = self.current_kdata
         x = np.arange(len(kdata))
-        # 颜色和样式映射
-        pattern_colors = {
-            'hammer': '#1976d2',
-            'inverted_hammer': '#0097a7',
-            'shooting_star': '#d32f2f',
-            'doji': '#ff9800',
-            'marubozu': '#388e3c',
-            'spinning_top': '#7b1fa2',
-            'engulfing': '#0288d1',
-            'piercing': '#c2185b',
-            'dark_cloud_cover': '#ffa000',
-            'morning_star': '#43a047',
-            'evening_star': '#e64a19',
-            'three_white_soldiers': '#00bcd4',
-            'three_black_crows': '#607d8b',
-            'tower_top': '#fbc02d',
-            'tower_bottom': '#ffd600',
-            'flag': '#8bc34a',
-            'wedge': '#5d4037',
-            'rectangle': '#00bfae',
-            'channel': '#ff4081',
-            'head_shoulders': '#fbc02d',
-            'double_tops_bottoms': '#8d6e63',
-            'triangles': '#009688',
+
+        # 专业化颜色配置 - 参考同花顺、东方财富等软件
+        signal_colors = {
+            'buy': '#FF4444',      # 买入信号 - 红色箭头向上
+            'sell': '#00AA00',     # 卖出信号 - 绿色箭头向下
+            'neutral': '#FFB000'   # 中性信号 - 橙色圆点
         }
-        details = []
+
+        # 置信度透明度映射
+        def get_alpha(confidence):
+            if confidence >= 0.8:
+                return 1.0
+            elif confidence >= 0.6:
+                return 0.8
+            else:
+                return 0.6
+
+        # 存储形态信息供十字光标使用
+        self._pattern_info = {}
+
+        # 统计有效和无效的形态信号
+        valid_patterns = 0
+        invalid_patterns = 0
+
         for pat in pattern_signals:
             idx = pat.get('index')
-            if idx is None or idx < 0 or idx >= len(kdata):
+            if idx is None:
+                invalid_patterns += 1
                 continue
-            pattern = pat.get('pattern', 'pattern')
-            signal = pat.get('signal', '')
-            conf = pat.get('confidence', 0)
-            price = kdata.iloc[idx]['close'] if 'close' in kdata.columns else None
-            color = pattern_colors.get(pattern, '#1976d2')
-            # 高亮K线（半透明背景）
-            ax.axvspan(idx-0.4, idx+0.4, color=color, alpha=0.18, zorder=10)
-            # 标记形态
-            marker = '↑' if signal == 'buy' else '↓' if signal == 'sell' else '●'
-            ax.text(idx, price, marker, color=color, fontsize=14, fontweight='bold',
-                    ha='center', va='bottom' if signal == 'buy' else 'top', zorder=20)
-            # 形态名称和置信度
-            ax.text(idx, price, f"{pattern}\n{conf:.2f}", color=color, fontsize=7,
-                    ha='center', va='top' if signal == 'buy' else 'bottom', alpha=0.7, zorder=21)
-            # 收集详情用于交互
-            details.append({
-                'x': idx, 'y': price, 'pattern': pattern, 'signal': signal, 'confidence': conf,
-                '涨跌幅': pat.get('return', None), '详情': pat
-            })
-        # 支持交互：点击/悬停显示形态详情
-        try:
-            cursor = mplcursors.cursor(ax, hover=True)
 
-            @cursor.connect("add")
-            def on_add(sel):
-                x = int(round(sel.target[0]))
-                for d in details:
-                    if abs(d['x'] - x) <= 0:
-                        info = f"形态: {d['pattern']}\n信号: {d['signal']}\n置信度: {d['confidence']:.2f}"
-                        if d['涨跌幅'] is not None:
-                            info += f"\n后续涨跌幅: {d['涨跌幅']:.2%}"
-                        sel.annotation.set_text(info)
-                        # 新增：发射pattern_selected信号
-                        self.pattern_selected.emit(x)
-                        break
-        except Exception as e:
-            # PolyCollection不支持pick，警告可忽略，文档提示
-            if self.log_manager:
-                self.log_manager.warning(f"mplcursors交互警告: {str(e)}。如需更好交互体验，请使用Line2D等支持pick的对象。")
+            # 修复：严格的索引边界检查
+            if not isinstance(idx, (int, float)) or idx < 0 or idx >= len(kdata):
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning(f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
+                invalid_patterns += 1
+                continue
+
+            # 确保索引为整数
+            idx = int(idx)
+            valid_patterns += 1
+
+            pattern_name = pat.get('pattern_name', pat.get('pattern', 'Unknown'))
+            signal = pat.get('signal', 'neutral')
+            confidence = pat.get('confidence', 0)
+            price = kdata.iloc[idx]['high'] if signal == 'buy' else kdata.iloc[idx]['low']
+
+            # 获取颜色和透明度
+            color = signal_colors.get(signal, signal_colors['neutral'])
+            alpha = get_alpha(confidence)
+
+            # 绘制专业箭头标记
+            if signal == 'buy':
+                # 买入信号：空心向上三角，位于K线下方
+                arrow_y = kdata.iloc[idx]['low'] - (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                ax.scatter(idx, arrow_y, marker='^', s=80, facecolors='none',
+                           edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
+            elif signal == 'sell':
+                # 卖出信号：空心向下三角，位于K线上方
+                arrow_y = kdata.iloc[idx]['high'] + (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                ax.scatter(idx, arrow_y, marker='v', s=80, facecolors='none',
+                           edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
+            else:
+                # 中性信号：空心圆点，位于收盘价位置
+                ax.scatter(idx, kdata.iloc[idx]['close'], marker='o', s=60, facecolors='none',
+                           edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
+
+            # 存储形态信息供十字光标显示
+            self._pattern_info[idx] = {
+                'pattern_name': pattern_name,
+                'signal': signal,
+                'confidence': confidence,
+                'signal_cn': {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, signal),
+                'price': kdata.iloc[idx]['close'],
+                'datetime': kdata.index[idx].strftime('%Y-%m-%d') if hasattr(kdata.index[idx], 'strftime') else str(kdata.index[idx])
+            }
+
+        # 记录绘制结果
+        if hasattr(self, 'log_manager') and self.log_manager:
+            self.log_manager.info(f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
+
+        # 高亮特定形态（如果指定）
+        if highlight_index is not None and highlight_index in self._pattern_info:
+            # 添加高亮背景
+            ax.axvspan(highlight_index-0.4, highlight_index+0.4,
+                       color='yellow', alpha=0.2, zorder=50)
+
         self.canvas.draw_idle()
-        # 预留：统计分析可视化接口
-        # def plot_pattern_statistics(stats: dict):
-        #     ...
-
         self._current_pattern_signals = pattern_signals
         self._highlight_index = highlight_index
 

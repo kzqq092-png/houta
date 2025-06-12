@@ -293,7 +293,7 @@ class SentimentStockSelectorDialog(QDialog):
             for i, fut in enumerate(as_completed(futures)):
                 try:
                     sig, param, score = fut.result()
-                    result += f"{sig}\t{param}\t{score:.2f}\n"
+                    result += f"{sig}\t{param}\t{score:.3f}\n"
                     if (target == "最大收益" and score > best_score) or (target == "最小回撤" and score < best_score) or (target == "夏普比率" and score > best_score):
                         best_score = score
                         best_param = param
@@ -304,7 +304,7 @@ class SentimentStockSelectorDialog(QDialog):
             self.signal_config[best_signal] = best_param
             save_signal_config(self.signal_config)
             QMessageBox.information(
-                self, "调优完成", f"最优信号: {best_signal}, 参数: {best_param}, {target}: {best_score:.2f}")
+                self, "调优完成", f"最优信号: {best_signal}, 参数: {best_param}, {target}: {best_score:.3f}")
         self.backtest_result.setText(result)
 
     def _simulate_score(self, sig, param, target):

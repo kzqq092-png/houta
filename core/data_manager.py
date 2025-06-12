@@ -314,6 +314,118 @@ class DataManager:
             log_structured(self.log_manager, "convert_date", level="warning", error=str(e))
             return None
 
+    def _standardize_kdata_format(self, df: pd.DataFrame, code: str) -> pd.DataFrame:
+        """标准化K线数据格式，统一处理所有数据源的返回格式
+
+        Args:
+            df: 原始DataFrame
+            code: 股票代码
+
+        Returns:
+            pd.DataFrame: 标准化后的DataFrame，datetime作为索引
+        """
+        if df is None or df.empty:
+            return df
+
+        df_copy = df.copy()
+
+        # 处理datetime字段
+        datetime_col_name = None
+        datetime_in_index = False
+
+        # 检查datetime是否在列中
+        for col in ['datetime', 'date', 'time', 'timestamp']:
+            if col in df_copy.columns:
+                datetime_col_name = col
+                break
+
+        # 检查datetime是否在索引中
+        if datetime_col_name is None and isinstance(df_copy.index, pd.DatetimeIndex):
+            datetime_in_index = True
+        elif datetime_col_name is None and hasattr(df_copy.index, 'name') and df_copy.index.name in ['datetime', 'date', 'time']:
+            datetime_in_index = True
+
+        # 如果datetime既不在列中也不在索引中，尝试从索引推断
+        if datetime_col_name is None and not datetime_in_index:
+            try:
+                # 尝试将索引转换为datetime
+                df_copy.index = pd.to_datetime(df_copy.index)
+                datetime_in_index = True
+            except:
+                # 如果无法转换，添加默认datetime列
+                self.log_manager.warning(f"股票 {code} 无法推断datetime字段，使用默认日期")
+                df_copy['datetime'] = pd.date_range(start='2020-01-01', periods=len(df_copy), freq='D')
+                datetime_col_name = 'datetime'
+
+        # 标准化列名映射
+        column_mapping = {
+            'open': 'open',
+            'high': 'high',
+            'low': 'low',
+            'close': 'close',
+            'volume': 'volume',
+            'vol': 'volume',  # 兼容性映射
+            'amount': 'amount',
+            'amt': 'amount',  # 兼容性映射
+            'turnover': 'amount'  # 兼容性映射
+        }
+
+        # 重命名列
+        for old_name, new_name in column_mapping.items():
+            if old_name in df_copy.columns and old_name != new_name:
+                df_copy = df_copy.rename(columns={old_name: new_name})
+
+        # 确保datetime作为索引
+        if datetime_col_name and not datetime_in_index:
+            # datetime在列中，需要设置为索引
+            df_copy[datetime_col_name] = pd.to_datetime(df_copy[datetime_col_name])
+            df_copy = df_copy.set_index(datetime_col_name)
+        elif not datetime_in_index:
+            # 既不在列中也不在索引中，这种情况已经在上面处理了
+            pass
+
+        # 确保索引名称为datetime
+        if df_copy.index.name != 'datetime':
+            df_copy.index.name = 'datetime'
+
+        # 确保必要的数值列存在并转换为数值类型
+        required_numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+        for col in required_numeric_cols:
+            if col not in df_copy.columns:
+                if col == 'volume' and 'vol' in df_copy.columns:
+                    df_copy[col] = df_copy['vol']
+                elif col == 'amount' and 'amt' in df_copy.columns:
+                    df_copy[col] = df_copy['amt']
+                else:
+                    # 为缺失的列填充默认值
+                    if col == 'volume':
+                        df_copy[col] = 0
+                    elif col == 'amount':
+                        df_copy[col] = df_copy.get('close', 0) * df_copy.get('volume', 0)
+                    else:
+                        df_copy[col] = df_copy.get('close', 0)  # 用收盘价填充其他价格字段
+
+            # 转换为数值类型
+            if col in df_copy.columns:
+                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+
+        # 添加amount列（如果不存在）
+        if 'amount' not in df_copy.columns:
+            df_copy['amount'] = df_copy['close'] * df_copy['volume']
+
+        # 确保code字段存在
+        if 'code' not in df_copy.columns:
+            df_copy['code'] = code
+
+        # 数据清洗
+        df_copy = df_copy.replace([np.inf, -np.inf], np.nan)
+        df_copy = df_copy.dropna(subset=['close'])  # 至少要有收盘价
+
+        # 按时间排序
+        df_copy = df_copy.sort_index()
+
+        return df_copy
+
     def get_k_data(self, code: str, freq: str = 'D',
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
@@ -446,19 +558,40 @@ class DataManager:
                     self.log_manager.warning(f"获取股票 {code} 的K线数据为空")
                     return pd.DataFrame()
 
+                # 使用新的标准化函数处理数据格式
+                df = self._standardize_kdata_format(df, code)
+
+                # 重新验证标准化后的数据
+                if df is None or df.empty:
+                    self.log_manager.warning(f"股票 {code} 的K线数据标准化后为空")
+                    return pd.DataFrame()
+
+                # 修改验证逻辑：检查datetime是否在索引中或列中
                 required_columns = ['open', 'high', 'low', 'close', 'volume']
-                missing_columns = [
-                    col for col in required_columns if col not in df.columns]
+                has_datetime = False
+
+                # 检查datetime是否存在（在索引中或列中）
+                if isinstance(df.index, pd.DatetimeIndex) or (hasattr(df.index, 'name') and df.index.name == 'datetime'):
+                    has_datetime = True
+                elif 'datetime' in df.columns:
+                    has_datetime = True
+
+                if not has_datetime:
+                    self.log_manager.warning(f"股票 {code} 的K线数据缺少datetime字段")
+                    return pd.DataFrame()
+
+                # 检查其他必要列
+                missing_columns = [col for col in required_columns if col not in df.columns]
                 if missing_columns:
                     self.log_manager.warning(
                         f"股票 {code} 的K线数据缺少必要列: {missing_columns}")
                     return pd.DataFrame()
 
-                # 数据清洗
+                # 数据清洗（已在标准化函数中处理，这里保留兼容性）
                 df = df.replace([np.inf, -np.inf], np.nan)
                 df = df.dropna(subset=['close'])  # 至少要有收盘价
 
-                # 自动补全 code 字段
+                # 自动补全 code 字段（已在标准化函数中处理，这里保留兼容性）
                 if 'code' not in df.columns:
                     df['code'] = code
 
