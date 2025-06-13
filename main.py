@@ -4804,12 +4804,17 @@ class TradingGUI(QMainWindow):
         self.update_chart()  # 只刷新主入口
 
     def on_splitter_moved(self, pos, index):
-        if not hasattr(self, '_splitter_refresh_timer'):
-            self._splitter_refresh_timer = QTimer(self)
-            self._splitter_refresh_timer.setSingleShot(True)
-            self._splitter_refresh_timer.timeout.connect(
-                self.refresh_all_charts)
-        self._splitter_refresh_timer.start(200)  # 拖动结束200ms后刷新
+        """分割线移动事件处理 - 仅处理UI布局，不触发数据刷新"""
+        # 移除自动刷新逻辑，分割线拖动只是UI布局调整，不应该触发数据分析
+        # 如果需要刷新图表，用户可以通过其他方式触发（如重新选择股票、指标等）
+        # if not hasattr(self, '_splitter_refresh_timer'):
+        #     self._splitter_refresh_timer = QTimer(self)
+        #     self._splitter_refresh_timer.setSingleShot(True)
+        #     self._splitter_refresh_timer.timeout.connect(
+        #         self.refresh_all_charts)
+        # self._splitter_refresh_timer.start(200)  # 拖动结束200ms后刷新
+
+        pass
 
     def refresh_all_charts(self):
         """只刷新主控端一次，分屏同步由主控端驱动"""

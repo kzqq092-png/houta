@@ -98,9 +98,6 @@ class ChartWidget(QWidget):
             # 初始化UI
             self.init_ui()
 
-            # 连接信号
-            self.connect_signals()
-
             # 创建更新定时器
             self._update_timer = QTimer()
             self._update_timer.timeout.connect(self._process_update_queue)
@@ -160,23 +157,9 @@ class ChartWidget(QWidget):
             # layout.addWidget(self.indicator_bar)
             self._init_zoom_interaction()  # 新增：自定义缩放交互
             self._optimize_display()  # 保证初始化后也显示网格和刻度
-            # 新增信号类型筛选、显隐、主副图切换按钮
-            self.signal_type_filter = QComboBox(self)
-            self.signal_type_filter.addItems(["全部", "double_top", "double_bottom"])  # 可动态生成
-            self.signal_type_filter.currentTextChanged.connect(self.on_signal_filter_changed)
-            self.signal_visible_checkbox = QCheckBox("显示信号标记", self)
-            self.signal_visible_checkbox.setChecked(True)
-            self.signal_visible_checkbox.stateChanged.connect(self.on_signal_filter_changed)
-            self.chart_mode_switch = QPushButton("主/副图切换", self)
-            self.chart_mode_switch.clicked.connect(self.toggle_chart_mode)
+
         except Exception as e:
             self.log_manager.error(f"初始化UI失败: {str(e)}")
-
-    def connect_signals(self):
-        """连接信号（ChartWidget只负责自身信号定义和发射，不直接连接外部UI控件）"""
-        # 此处不再连接period_combo、indicator_combo、clear_button等UI控件的信号
-        # 这些控件应由主窗口负责创建和信号连接
-        self.log_manager.info("ChartWidget信号连接完成（无UI控件连接）")
 
     def _process_update_queue(self):
         """处理更新队列中的任务"""
@@ -2267,32 +2250,6 @@ class ChartWidget(QWidget):
             return int(xlim[0]), int(xlim[1])
         except Exception:
             return None
-
-    def on_signal_filter_changed(self):
-        """信号类型筛选/显隐变化时，刷新主图信号展示"""
-        try:
-            filter_type = self.signal_type_filter.currentText() if hasattr(self, 'signal_type_filter') else "全部"
-            visible = self.signal_visible_checkbox.isChecked() if hasattr(self, 'signal_visible_checkbox') else True
-            signals = getattr(self, '_all_signals', [])
-            if filter_type != "全部":
-                signals = [s for s in signals if s.get('type') == filter_type]
-            if visible:
-                visible_range = self.get_visible_range() if hasattr(self, 'get_visible_range') else None
-                self.plot_signals(signals, visible_range=visible_range, signal_filter={filter_type} if filter_type != "全部" else None)
-            else:
-                self.plot_signals([])
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"on_signal_filter_changed异常: {str(e)}")
-
-    def toggle_chart_mode(self):
-        """主/副图切换功能（占位实现，可扩展）"""
-        try:
-            # 这里可扩展为主图、副图切换逻辑，目前仅弹窗提示
-            QMessageBox.information(self, "主/副图切换", "主/副图切换功能待实现，后续可扩展为多种主副图布局。")
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"toggle_chart_mode异常: {str(e)}")
 
     def highlight_signals(self, signals):
         """高亮指定信号"""

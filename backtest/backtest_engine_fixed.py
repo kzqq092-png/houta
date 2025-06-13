@@ -284,8 +284,11 @@ class FixedStrategyBacktester:
         trade_state['shares'] = shares
         trade_state['entry_value'] = actual_trade_value
 
-        # 扣除手续费
-        trade_state['current_capital'] -= commission
+        # 修复：开仓时扣除交易金额和手续费
+        if signal == 1:  # 买入：扣除买入金额和手续费
+            trade_state['current_capital'] -= (actual_trade_value + commission)
+        else:  # 卖空：获得卖出金额，扣除手续费
+            trade_state['current_capital'] += (actual_trade_value - commission)
 
         # 记录到结果中
         results.loc[results.index[i], 'position'] = trade_state['position']
@@ -325,14 +328,13 @@ class FixedStrategyBacktester:
         # 计算手续费
         commission = max(actual_trade_value * self.commission_pct, self.min_commission)
 
-        # 计算交易收益
-        if trade_state['position'] == 1:  # 平多头
+        # 修复：平仓时正确处理资金流
+        if trade_state['position'] == 1:  # 平多头：卖出获得资金，扣除手续费
+            trade_state['current_capital'] += (actual_trade_value - commission)
             trade_profit = actual_trade_value - trade_state['entry_value'] - commission
-        else:  # 平空头
+        else:  # 平空头：买入需要资金，加上手续费
+            trade_state['current_capital'] -= (actual_trade_value + commission)
             trade_profit = trade_state['entry_value'] - actual_trade_value - commission
-
-        # 更新资金（修复：正确计算平仓后的资金）
-        trade_state['current_capital'] += trade_profit
 
         # 记录到结果中
         results.loc[results.index[i], 'position'] = 0

@@ -9,6 +9,7 @@ from datetime import *
 import pandas as pd
 from PyQt5.QtGui import QColor, QKeySequence
 
+from .matplot_lib_widget import *
 import akshare as ak
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -694,8 +695,8 @@ class AnalysisWidget(QWidget):
                             macd = self.calculate_macd(params)
                             if macd is not None and isinstance(macd, tuple) and len(macd) == 3:
                                 dif, dea, hist = macd
-                                value = f"DIF:{dif[-1]:.3f} DEA:{dea[-1]:.3f}"
-                                if dif[-1] > dea[-1]:
+                                value = f"DIF:{dif.iloc[-1] if isinstance(dif, pd.Series) else dif[-1]:.3f} DEA:{dea.iloc[-1] if isinstance(dea, pd.Series) else dea[-1]:.3f}"
+                                if dif.iloc[-1] if isinstance(dif, pd.Series) else dif[-1] > dea.iloc[-1] if isinstance(dea, pd.Series) else dea[-1]:
                                     status = "金叉"
                                     suggestion = "买入"
                                 else:
@@ -705,8 +706,8 @@ class AnalysisWidget(QWidget):
                             kdj = self.calculate_kdj(params)
                             if kdj is not None and isinstance(kdj, tuple) and len(kdj) == 3:
                                 k, d, j = kdj
-                                value = f"K:{k[-1]:.3f} D:{d[-1]:.3f} J:{j[-1]:.3f}"
-                                if k[-1] > d[-1]:
+                                value = f"K:{k.iloc[-1] if isinstance(k, pd.Series) else k[-1]:.3f} D:{d.iloc[-1] if isinstance(d, pd.Series) else d[-1]:.3f} J:{j[-1]:.3f}"
+                                if k.iloc[-1] if isinstance(k, pd.Series) else k[-1] > d.iloc[-1] if isinstance(d, pd.Series) else d[-1]:
                                     status = "多头"
                                     suggestion = "买入"
                                 else:
@@ -729,7 +730,7 @@ class AnalysisWidget(QWidget):
                             boll = self.calculate_boll(params)
                             if boll is not None and isinstance(boll, tuple) and len(boll) == 3:
                                 mid, upper, lower = boll
-                                value = f"中轨:{mid[-1]:.3f} 上轨:{upper[-1]:.3f} 下轨:{lower[-1]:.3f}"
+                                value = f"中轨:{mid.iloc[-1] if isinstance(d, pd.Series) else d[-1]:.3f} 上轨:{upper[-1]:.3f} 下轨:{lower[-1]:.3f}"
                                 close = self.current_kdata['close']
                                 if close[-1] > upper[-1]:
                                     status = "突破上轨"
@@ -1142,6 +1143,7 @@ class AnalysisWidget(QWidget):
 
         # 结果表格
         self.pattern_table = QTableWidget(0, 10)
+        self.pattern_table.verticalHeader().setVisible(False)
         self.pattern_table.setHorizontalHeaderLabels([
             "序号", "形态名称", "形态类别", "信号类型", "置信度", "置信度等级",
             "K线索引", "出现时间", "价格", "描述"
@@ -2113,6 +2115,41 @@ class AnalysisWidget(QWidget):
 
         return tab
 
+    def update_trend_statistics(self, trend_results):
+        """更新趋势统计指示器"""
+        if not trend_results:
+            return
+
+        # 计算趋势统计
+        total_trends = len(trend_results)
+        up_trends = sum(1 for r in trend_results if r.get('trend') in ['上升', '多头', '超卖'])
+        down_trends = sum(1 for r in trend_results if r.get('trend') in ['下降', '空头', '超买'])
+        neutral_trends = total_trends - up_trends - down_trends
+
+        # 计算平均强度
+        strengths = [r.get('strength', 0) for r in trend_results if isinstance(r.get('strength'), (int, float))]
+        avg_strength = sum(strengths) / len(strengths) if strengths else 0
+
+        # 计算平均置信度
+        confidences = [r.get('confidence', 50) for r in trend_results if isinstance(r.get('confidence'), (int, float))]
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 50
+
+        # 更新UI指示器
+        if hasattr(self, 'trend_strength_label') and self.trend_strength_label:
+            self.trend_strength_label.setText(f"{avg_strength:.1f}%")
+
+        if hasattr(self, 'trend_direction_label') and self.trend_direction_label:
+            if up_trends > down_trends:
+                direction = "看涨"
+            elif down_trends > up_trends:
+                direction = "看跌"
+            else:
+                direction = "中性"
+            self.trend_direction_label.setText(direction)
+
+        if hasattr(self, 'trend_confidence_label') and self.trend_confidence_label:
+            self.trend_confidence_label.setText(f"{avg_confidence:.1f}%")
+
     def refresh_trend_data(self):
         """强制刷新趋势分析Tab缓存和数据，异步执行分析"""
         self.current_kdata = None
@@ -2139,11 +2176,23 @@ class AnalysisWidget(QWidget):
             period = self.trend_period_spin.value()
             threshold = self.trend_threshold_spin.value()
             sensitivity = self.trend_sensitivity_spin.value()
-            self.analyze_price_trend(period, threshold, sensitivity)
-            self.analyze_volume_trend(period, threshold, sensitivity)
-            self.analyze_macd_trend(period, threshold, sensitivity)
-            self.analyze_kdj_trend(period, threshold, sensitivity)
-            self.analyze_rsi_trend(period, threshold, sensitivity)
+
+            # 获取当前时间
+            import datetime
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # 存储分析结果用于统计
+            trend_results = []
+
+            self.analyze_price_trend(period, threshold, sensitivity, current_time, trend_results)
+            self.analyze_volume_trend(period, threshold, sensitivity, current_time, trend_results)
+            self.analyze_macd_trend(period, threshold, sensitivity, current_time, trend_results)
+            self.analyze_kdj_trend(period, threshold, sensitivity, current_time, trend_results)
+            self.analyze_rsi_trend(period, threshold, sensitivity, current_time, trend_results)
+
+            # 更新趋势统计
+            self.update_trend_statistics(trend_results)
+
             if self.trend_table.rowCount() == 0:
                 self.trend_table.setRowCount(1)
                 for col in range(self.trend_table.columnCount()):
@@ -2153,64 +2202,191 @@ class AnalysisWidget(QWidget):
             self.log_manager.error(f"趋势分析异常: {str(e)}")
             QMessageBox.warning(self, "错误", f"趋势分析异常: {str(e)}")
 
-    def analyze_price_trend(self, period: int, threshold: float, sensitivity: float):
-        """分析价格趋势
+    # def analyze_price_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: List[Dict]):
+    #     """分析价格趋势
 
-        Args:
-            period: 趋势周期
-            threshold: 趋势阈值
-            sensitivity: 敏感度
-        """
+    #     Args:
+    #         period: 趋势周期
+    #         threshold: 趋势阈值
+    #         sensitivity: 敏感度
+    #         current_time: 当前时间
+    #         trend_results: 存储分析结果的列表
+    #     """
+    #     try:
+    #         # 兼容DataFrame和KData
+
+    #         if isinstance(self.current_kdata, pd.DataFrame):
+
+    #             close = self.current_kdata['close']
+
+    #             from indicators_algo import calc_ma
+
+    #             ma = calc_ma(close, period)
+
+    #         else:
+
+    #             from hikyuu.indicator import MA, CLOSE
+
+    #             close_ind = CLOSE(self.current_kdata)
+
+    #             ma = MA(close_ind, period)
+
+    #             close = close_ind
+
+    #         # 计算趋势
+    #         # 使用iloc避免FutureWarning
+
+    #         if isinstance(self.current_kdata, pd.DataFrame):
+
+    #             trend = "上升" if float(close.iloc[-1]) > float(ma.iloc[-1]) else "下降"
+
+    #         else:
+
+    #             trend = "上升" if float(close[-1]) > float(ma[-1]) else "下降"
+
+    #         # 计算趋势强度
+    #         # 使用iloc避免FutureWarning
+
+    #         if isinstance(self.current_kdata, pd.DataFrame):
+
+    #             strength = abs(float(close.iloc[-1]) -
+    #                            float(ma.iloc[-1])) / float(ma.iloc[-1]) * 100
+
+    #         else:
+
+    #             strength = abs(float(close[-1]) -
+    #                            float(ma[-1])) / float(ma[-1]) * 100
+
+    #         # 添加结果
+    #         row = self.trend_table.rowCount()
+    #         self.trend_table.insertRow(row)
+
+    #         self.trend_table.setItem(
+    #             row, 0,
+    #             QTableWidgetItem("价格")
+    #         )
+
+    #         trend_item = QTableWidgetItem(trend)
+    #         trend_item.setForeground(
+    #             Qt.red if trend == "上升" else Qt.green
+    #         )
+    #         self.trend_table.setItem(row, 1, trend_item)
+
+    #         self.trend_table.setItem(
+    #             row, 2,
+    #             QTableWidgetItem(f"{strength:.1f}%")
+    #         )
+
+    #         suggestion = "买入" if trend == "上升" else "卖出"
+    #         suggestion_item = QTableWidgetItem(suggestion)
+    #         suggestion_item.setForeground(
+    #             Qt.red if trend == "上升" else Qt.green
+    #         )
+    #         self.trend_table.setItem(row, 3, suggestion_item)
+
+    #         trend_results.append({
+    #             'time': current_time,
+    #             'type': '价格趋势',
+    #             'trend': trend,
+    #             'strength': strength,
+    #             'suggestion': suggestion
+    #         })
+
+    #     except Exception as e:
+    #         self.log_manager.log(
+    #             f"分析价格趋势失败: {str(e)}", LogLevel.ERROR)
+
+    def analyze_price_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: list):
+        """修复后的价格趋势分析 - 正确的列索引和参数使用"""
         try:
-            close = self.current_kdata.close
-            ma = MA(close, period)
+            # 兼容DataFrame和KData
+            if isinstance(self.current_kdata, pd.DataFrame):
+                close = self.current_kdata['close']
+                from indicators_algo import calc_ma
+                ma = calc_ma(close, period)
+            else:
+                from hikyuu.indicator import MA, CLOSE
+                close_ind = CLOSE(self.current_kdata)
+                ma = MA(close_ind, period)
+                close = close_ind
 
             # 计算趋势
-            trend = "上升" if float(close[-1]) > float(ma[-1]) else "下降"
+            if isinstance(self.current_kdata, pd.DataFrame):
+                current_price = float(close.iloc[-1])
+                ma_value = float(ma.iloc[-1])
+            else:
+                current_price = float(close[-1])
+                ma_value = float(ma[-1])
 
-            # 计算趋势强度
-            strength = abs(float(close[-1]) -
-                           float(ma[-1])) / float(ma[-1]) * 100
+            # 计算趋势强度（百分比）
+            strength_pct = abs(current_price - ma_value) / ma_value * 100
 
-            # 添加结果
+            # 使用阈值和敏感度参数
+            adjusted_threshold = threshold * sensitivity
+
+            if strength_pct < adjusted_threshold:
+                trend = "震荡"
+                confidence = 50.0  # 震荡时置信度较低
+            else:
+                trend = "上升" if current_price > ma_value else "下降"
+                # 置信度基于强度和阈值的比例
+                confidence = min(95.0, 50.0 + (strength_pct / adjusted_threshold) * 30.0)
+
+            # 添加结果到表格 - 修复列索引
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
 
-            self.trend_table.setItem(
-                row, 0,
-                QTableWidgetItem("价格")
-            )
+            # 时间列 (第0列)
+            self.trend_table.setItem(row, 0, QTableWidgetItem(current_time or ""))
 
+            # 类型列 (第1列)
+            self.trend_table.setItem(row, 1, QTableWidgetItem("价格"))
+
+            # 趋势列 (第2列)
             trend_item = QTableWidgetItem(trend)
-            trend_item.setForeground(
-                Qt.red if trend == "上升" else Qt.green
-            )
-            self.trend_table.setItem(row, 1, trend_item)
+            if trend == "上升":
+                trend_item.setForeground(Qt.red)
+            elif trend == "下降":
+                trend_item.setForeground(Qt.green)
+            else:
+                trend_item.setForeground(Qt.blue)
+            self.trend_table.setItem(row, 2, trend_item)
 
-            self.trend_table.setItem(
-                row, 2,
-                QTableWidgetItem(f"{strength:.1f}%")
-            )
+            # 强度列 (第3列)
+            self.trend_table.setItem(row, 3, QTableWidgetItem(f"{strength_pct:.1f}%"))
 
-            suggestion = "买入" if trend == "上升" else "卖出"
+            # 置信度列 (第4列)
+            self.trend_table.setItem(row, 4, QTableWidgetItem(f"{confidence:.1f}%"))
+
+            # 建议列 (第5列)
+            if trend == "上升" and confidence > 70:
+                suggestion = "买入"
+                color = Qt.red
+            elif trend == "下降" and confidence > 70:
+                suggestion = "卖出"
+                color = Qt.green
+            else:
+                suggestion = "观望"
+                color = Qt.black
+
             suggestion_item = QTableWidgetItem(suggestion)
-            suggestion_item.setForeground(
-                Qt.red if trend == "上升" else Qt.green
-            )
-            self.trend_table.setItem(row, 3, suggestion_item)
+            suggestion_item.setForeground(color)
+            self.trend_table.setItem(row, 5, suggestion_item)
+
+            # 添加到结果列表
+            trend_results.append({
+                'type': '价格',
+                'trend': trend,
+                'strength': strength_pct,
+                'confidence': confidence,
+                'suggestion': suggestion
+            })
 
         except Exception as e:
-            self.log_manager.log(
-                f"分析价格趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析价格趋势失败: {str(e)}", LogLevel.ERROR)
 
-    def analyze_volume_trend(self, period: int, threshold: float, sensitivity: float):
-        """分析成交量趋势
-
-        Args:
-            period: 趋势周期
-            threshold: 趋势阈值
-            sensitivity: 敏感度
-        """
+    def analyze_volume_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: List[Dict]):
+        """修复后的成交量趋势分析 - 修复NoneType错误"""
         try:
             # 兼容DataFrame和KData
             if hasattr(self.current_kdata, 'volume'):
@@ -2222,34 +2398,72 @@ class AnalysisWidget(QWidget):
             else:
                 from hikyuu import VOL
                 volume = VOL(self.current_kdata)
+
             from indicators_algo import calc_ma
             ma = calc_ma(volume, period)
 
-            trend = "放量" if float(volume[-1]) > float(ma[-1]) else "缩量"
-            strength = abs(float(volume[-1]) -
-                           float(ma[-1])) / float(ma[-1]) * 100
+            # 使用iloc避免FutureWarning
+            current_volume = float(volume.iloc[-1] if isinstance(volume, pd.Series) else volume[-1])
+            ma_value = float(ma.iloc[-1] if isinstance(ma, pd.Series) else ma[-1])
 
+            # 使用阈值和敏感度参数
+            volume_threshold = threshold * sensitivity
+            volume_change_pct = abs(current_volume - ma_value) / ma_value * 100
+
+            if volume_change_pct < volume_threshold:
+                trend = "正常"
+                strength = volume_change_pct
+            else:
+                trend = "放量" if current_volume > ma_value else "缩量"
+                strength = volume_change_pct
+
+            # 计算置信度
+            confidence = min(95.0, 40.0 + (strength / volume_threshold) * 30.0)
+
+            # 添加结果到表格
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
+
             self.trend_table.setItem(row, 0, QTableWidgetItem("成交量"))
             trend_item = QTableWidgetItem(trend)
-            trend_item.setForeground(Qt.red if trend == "放量" else Qt.green)
+            trend_item.setForeground(Qt.red if trend == "放量" else Qt.green if trend == "缩量" else Qt.blue)
             self.trend_table.setItem(row, 1, trend_item)
-            self.trend_table.setItem(
-                row, 2, QTableWidgetItem(f"{strength:.1f}%"))
-            price_trend = self.trend_table.item(0, 1).text()
+            self.trend_table.setItem(row, 2, QTableWidgetItem(f"{strength:.1f}%"))
+
+            # 修复NoneType错误 - 安全地获取价格趋势
+            price_trend = "中性"  # 默认值
+            if self.trend_table.rowCount() > 1:  # 确保有价格趋势行
+                price_item = self.trend_table.item(0, 1)  # 假设价格趋势在第0行第1列
+                if price_item is not None:
+                    price_trend = price_item.text()
+
             if price_trend == "上升":
                 suggestion = "买入" if trend == "放量" else "观望"
-            else:
+            elif price_trend == "下降":
                 suggestion = "卖出" if trend == "放量" else "观望"
+            else:
+                suggestion = "观望"
+
             suggestion_item = QTableWidgetItem(suggestion)
             suggestion_item.setForeground(
                 Qt.red if suggestion == "买入" else Qt.green if suggestion == "卖出" else Qt.black)
             self.trend_table.setItem(row, 3, suggestion_item)
-        except Exception as e:
-            self.log_manager.log(f"分析成交量趋势失败: {str(e)}", LogLevel.ERROR)
 
-    def analyze_macd_trend(self, period: int, threshold: float, sensitivity: float):
+            # 添加到结果列表
+            trend_results.append({
+                'time': current_time,
+                'type': '成交量趋势',
+                'trend': trend,
+                'strength': strength,
+                'confidence': confidence,
+                'suggestion': suggestion
+            })
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.log(f"分析成交量趋势失败: {str(e)}", "ERROR")
+
+    def analyze_macd_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: List[Dict]):
         """分析MACD趋势"""
         try:
             # 兼容DataFrame和KData
@@ -2266,8 +2480,10 @@ class AnalysisWidget(QWidget):
                     dif, dea = macd[0], macd[1]
                 else:
                     raise ValueError("MACD结果格式不支持")
-            trend = "多头" if float(dif[-1]) > float(dea[-1]) else "空头"
-            strength = abs(float(dif[-1]) - float(dea[-1])) * 100
+            trend = "多头" if float(dif.iloc[-1] if isinstance(dif, pd.Series) else dif[-1]
+                                  ) > float(dea.iloc[-1] if isinstance(dea, pd.Series) else dea[-1]) else "空头"
+            strength = abs(float(dif.iloc[-1] if isinstance(dif, pd.Series) else dif[-1]) -
+                           float(dea.iloc[-1] if isinstance(dea, pd.Series) else dea[-1])) * 100
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
             self.trend_table.setItem(row, 0, QTableWidgetItem("MACD"))
@@ -2281,16 +2497,27 @@ class AnalysisWidget(QWidget):
             suggestion_item.setForeground(
                 Qt.red if suggestion == "多头" else Qt.green)
             self.trend_table.setItem(row, 3, suggestion_item)
+
+            trend_results.append({
+                'time': current_time,
+                'type': 'MACD趋势',
+                'trend': trend,
+                'strength': strength,
+                'suggestion': suggestion
+            })
+
         except Exception as e:
             self.log_manager.log(f"分析MACD趋势失败: {str(e)}", LogLevel.ERROR)
 
-    def analyze_kdj_trend(self, period: int, threshold: float, sensitivity: float):
+    def analyze_kdj_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: List[Dict]):
         """分析KDJ趋势
 
         Args:
             period: 趋势周期
             threshold: 趋势阈值
             sensitivity: 敏感度
+            current_time: 当前时间
+            trend_results: 存储分析结果的列表
         """
         try:
             # 兼容DataFrame和KData
@@ -2306,8 +2533,9 @@ class AnalysisWidget(QWidget):
                     k, d = kdj[0], kdj[1]
                 else:
                     raise ValueError("KDJ结果格式不支持")
-            trend = "多头" if float(k[-1]) > float(d[-1]) else "空头"
-            strength = abs(float(k[-1]) - float(d[-1]))
+            trend = "多头" if float(k.iloc[-1] if isinstance(k, pd.Series) else k[-1]) > float(d.iloc[-1]
+                                                                                             if isinstance(d, pd.Series) else d[-1]) else "空头"
+            strength = abs(float(k.iloc[-1] if isinstance(k, pd.Series) else k[-1]) - float(d.iloc[-1] if isinstance(d, pd.Series) else d[-1]))
             row = self.trend_table.rowCount()
             self.trend_table.insertRow(row)
             self.trend_table.setItem(row, 0, QTableWidgetItem("KDJ"))
@@ -2324,13 +2552,15 @@ class AnalysisWidget(QWidget):
         except Exception as e:
             self.log_manager.log(f"分析KDJ趋势失败: {str(e)}", LogLevel.ERROR)
 
-    def analyze_rsi_trend(self, period: int, threshold: float, sensitivity: float):
+    def analyze_rsi_trend(self, period: int, threshold: float, sensitivity: float, current_time: str, trend_results: List[Dict]):
         """分析RSI趋势
 
         Args:
             period: 趋势周期
             threshold: 趋势阈值
             sensitivity: 敏感度
+            current_time: 当前时间
+            trend_results: 存储分析结果的列表
         """
         try:
             period = period if period else 14
@@ -2345,21 +2575,28 @@ class AnalysisWidget(QWidget):
                 rsi = RSI(close_ind, n=period)
                 last_rsi = float(rsi[-1]) if len(rsi) > 0 else float('nan')
 
+            # 使用阈值和敏感度参数
+            overbought_level = 70 + (threshold * sensitivity)
+            oversold_level = 30 - (threshold * sensitivity)
+
             # 计算趋势
-            if last_rsi > 70:
+            if last_rsi > overbought_level:
                 trend = "超买"
-            elif last_rsi < 30:
+                strength = (last_rsi - overbought_level) / (100 - overbought_level) * 100
+            elif last_rsi < oversold_level:
                 trend = "超卖"
+                strength = (oversold_level - last_rsi) / oversold_level * 100
             else:
                 trend = "中性"
-
-            # 计算趋势强度
-            if trend == "超买":
-                strength = (last_rsi - 70) / 30 * 100
-            elif trend == "超卖":
-                strength = (30 - last_rsi) / 30 * 100
-            else:
                 strength = 0
+
+            # 计算置信度
+            if trend == "超买":
+                confidence = min(95.0, 50.0 + strength * 0.5)
+            elif trend == "超卖":
+                confidence = min(95.0, 50.0 + strength * 0.5)
+            else:
+                confidence = 30.0
 
             # 添加结果
             row = self.trend_table.rowCount()
@@ -2390,18 +2627,35 @@ class AnalysisWidget(QWidget):
             )
             self.trend_table.setItem(row, 3, suggestion_item)
 
+            # 添加到结果列表
+            trend_results.append({
+                'time': current_time,
+                'type': 'RSI趋势',
+                'trend': trend,
+                'strength': strength,
+                'confidence': confidence,
+                'suggestion': suggestion
+            })
+
         except Exception as e:
-            self.log_manager.log(
-                f"分析RSI趋势失败: {str(e)}", LogLevel.ERROR)
+            self.log_manager.log(f"分析RSI趋势失败: {str(e)}", LogLevel.ERROR)
 
     def clear_trend(self):
-        """清除趋势分析结果"""
+        """修复后的清除趋势分析结果"""
         try:
+            # 清除表格
             self.trend_table.setRowCount(0)
+
+            # 重置趋势统计指示器
+            self.trend_strength_label.setText("未分析")
+            self.trend_direction_label.setText("未分析")
+            self.trend_confidence_label.setText("未分析")
+
+            # 重置样式
+            self.trend_direction_label.setStyleSheet("QLabel { font-size: 16px; font-weight: bold; color: #28a745; }")
+
         except Exception as e:
-            self.log_manager.log(
-                f"清除趋势分析结果失败: {str(e)}", LogLevel.ERROR)
-            raise
+            self.log_manager.log(f"清除趋势分析结果失败: {str(e)}", LogLevel.ERROR)
 
     def create_wave_tab(self) -> QWidget:
         """创建波浪分析Tab，采用卡片式布局，分区展示波浪类型、参数控制、结果展示"""
@@ -2625,102 +2879,110 @@ class AnalysisWidget(QWidget):
             sensitivity: 灵敏度
         """
         try:
-            high = self.current_kdata.high
-            low = self.current_kdata.low
-            close = self.current_kdata.close
+            # 数据预处理 - 确保使用iloc访问
+            if isinstance(self.current_kdata, pd.DataFrame):
+                high = self.current_kdata['high']
+                low = self.current_kdata['low']
+                close = self.current_kdata['close']
+                # 添加日志
+                self.log_manager.log("波浪分析将索引中的datetime复制到列中", LogLevel.INFO)
+            else:
+                high = self.current_kdata.high
+                low = self.current_kdata.low
+                close = self.current_kdata.close
 
-            # 寻找关键转折点
-            peaks = []
-            troughs = []
+                # 寻找关键转折点
+                peaks = []
+                troughs = []
 
-            for i in range(1, len(high)-1):
-                # 寻找峰顶
-                if high[i] > high[i-1] and high[i] > high[i+1]:
-                    peaks.append((i, float(high[i])))
+                for i in range(1, len(high)-1):
+                    # 寻找峰顶
+                    if high.iloc[i] > high[i-1] and high.iloc[i] > high[i+1]:
+                        peaks.append((i, float(high.iloc[i])))
 
-                # 寻找谷底
-                if low[i] < low[i-1] and low[i] < low[i+1]:
-                    troughs.append((i, float(low[i])))
+                    # 寻找谷底
+                    if low.iloc[i] < low[i-1] and low.iloc[i] < low[i+1]:
+                        troughs.append((i, float(low.iloc[i])))
 
-            # 识别推动浪
-            for i in range(len(peaks)-2):
-                # 获取连续3个峰顶点
-                p1, p2, p3 = peaks[i:i+3]
+                # 识别推动浪
+                for i in range(len(peaks)-2):
+                    # 获取连续3个峰顶点
+                    p1, p2, p3 = peaks[i:i+3]
 
-                # 检查是否满足推动浪特征
-                if (p2[1] > p1[1] and p3[1] > p2[1] and  # 价格逐步上升
-                    p2[0] - p1[0] >= period and  # 波浪间隔满足周期要求
-                        p3[0] - p2[0] >= period):
+                    # 检查是否满足推动浪特征
+                    if (p2[1] > p1[1] and p3[1] > p2[1] and  # 价格逐步上升
+                        p2[0] - p1[0] >= period and  # 波浪间隔满足周期要求
+                            p3[0] - p2[0] >= period):
 
-                    # 计算波浪强度
-                    strength = (p3[1] - p1[1]) / p1[1] * 100
+                        # 计算波浪强度
+                        strength = (p3[1] - p1[1]) / p1[1] * 100
 
-                    if strength >= sensitivity:
-                        # 添加识别结果
-                        row = self.wave_table.rowCount()
-                        self.wave_table.insertRow(row)
+                        if strength >= sensitivity:
+                            # 添加识别结果
+                            row = self.wave_table.rowCount()
+                            self.wave_table.insertRow(row)
 
-                        self.wave_table.setItem(
-                            row, 0,
-                            QTableWidgetItem("推动浪")
-                        )
+                            self.wave_table.setItem(
+                                row, 0,
+                                QTableWidgetItem("推动浪")
+                            )
 
-                        position = f"{p1[0]}-{p3[0]}"
-                        self.wave_table.setItem(
-                            row, 1,
-                            QTableWidgetItem(position)
-                        )
+                            position = f"{p1[0]}-{p3[0]}"
+                            self.wave_table.setItem(
+                                row, 1,
+                                QTableWidgetItem(position)
+                            )
 
-                        feature = f"上升{strength:.1f}%"
-                        self.wave_table.setItem(
-                            row, 2,
-                            QTableWidgetItem(feature)
-                        )
+                            feature = f"上升{strength:.1f}%"
+                            self.wave_table.setItem(
+                                row, 2,
+                                QTableWidgetItem(feature)
+                            )
 
-                        suggestion = "买入"
-                        suggestion_item = QTableWidgetItem(suggestion)
-                        suggestion_item.setForeground(Qt.red)
-                        self.wave_table.setItem(row, 3, suggestion_item)
+                            suggestion = "买入"
+                            suggestion_item = QTableWidgetItem(suggestion)
+                            suggestion_item.setForeground(Qt.red)
+                            self.wave_table.setItem(row, 3, suggestion_item)
 
-            # 识别调整浪
-            for i in range(len(troughs)-2):
-                # 获取连续3个谷底点
-                t1, t2, t3 = troughs[i:i+3]
+                # 识别调整浪
+                for i in range(len(troughs)-2):
+                    # 获取连续3个谷底点
+                    t1, t2, t3 = troughs[i:i+3]
 
-                # 检查是否满足调整浪特征
-                if (t2[1] < t1[1] and t3[1] < t2[1] and  # 价格逐步下降
-                    t2[0] - t1[0] >= period and  # 波浪间隔满足周期要求
-                        t3[0] - t2[0] >= period):
+                    # 检查是否满足调整浪特征
+                    if (t2[1] < t1[1] and t3[1] < t2[1] and  # 价格逐步下降
+                        t2[0] - t1[0] >= period and  # 波浪间隔满足周期要求
+                            t3[0] - t2[0] >= period):
 
-                    # 计算波浪强度
-                    strength = (t1[1] - t3[1]) / t1[1] * 100
+                        # 计算波浪强度
+                        strength = (t1[1] - t3[1]) / t1[1] * 100
 
-                    if strength >= sensitivity:
-                        # 添加识别结果
-                        row = self.wave_table.rowCount()
-                        self.wave_table.insertRow(row)
+                        if strength >= sensitivity:
+                            # 添加识别结果
+                            row = self.wave_table.rowCount()
+                            self.wave_table.insertRow(row)
 
-                        self.wave_table.setItem(
-                            row, 0,
-                            QTableWidgetItem("调整浪")
-                        )
+                            self.wave_table.setItem(
+                                row, 0,
+                                QTableWidgetItem("调整浪")
+                            )
 
-                        position = f"{t1[0]}-{t3[0]}"
-                        self.wave_table.setItem(
-                            row, 1,
-                            QTableWidgetItem(position)
-                        )
+                            position = f"{t1[0]}-{t3[0]}"
+                            self.wave_table.setItem(
+                                row, 1,
+                                QTableWidgetItem(position)
+                            )
 
-                        feature = f"下降{strength:.1f}%"
-                        self.wave_table.setItem(
-                            row, 2,
-                            QTableWidgetItem(feature)
-                        )
+                            feature = f"下降{strength:.1f}%"
+                            self.wave_table.setItem(
+                                row, 2,
+                                QTableWidgetItem(feature)
+                            )
 
-                        suggestion = "卖出"
-                        suggestion_item = QTableWidgetItem(suggestion)
-                        suggestion_item.setForeground(Qt.green)
-                        self.wave_table.setItem(row, 3, suggestion_item)
+                            suggestion = "卖出"
+                            suggestion_item = QTableWidgetItem(suggestion)
+                            suggestion_item.setForeground(Qt.green)
+                            self.wave_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
             self.log_manager.log(f"分析艾略特波浪失败: {str(e)}", LogLevel.ERROR)
@@ -2733,93 +2995,99 @@ class AnalysisWidget(QWidget):
             sensitivity: 灵敏度
         """
         try:
-            high = self.current_kdata.high
-            low = self.current_kdata.low
-            close = self.current_kdata.close
+            # 数据预处理 - 确保使用iloc访问
+            if isinstance(self.current_kdata, pd.DataFrame):
+                high = self.current_kdata['high']
+                low = self.current_kdata['low']
+                close = self.current_kdata['close']
+            else:
+                high = self.current_kdata.high
+                low = self.current_kdata.low
+                close = self.current_kdata.close
 
-            # 计算江恩角度线
-            last_close = float(close[-1])
-            angles = [
-                (45, last_close * (1 + 1/1)),   # 1:1线
-                (63.75, last_close * (1 + 2/1)),  # 2:1线
-                (26.25, last_close * (1 + 1/2)),  # 1:2线
-                (71.25, last_close * (1 + 3/1)),  # 3:1线
-                (18.75, last_close * (1 + 1/3))  # 1:3线
-            ]
+                # 计算江恩角度线
+                last_close = float(close[-1])
+                angles = [
+                    (45, last_close * (1 + 1/1)),   # 1:1线
+                    (63.75, last_close * (1 + 2/1)),  # 2:1线
+                    (26.25, last_close * (1 + 1/2)),  # 1:2线
+                    (71.25, last_close * (1 + 3/1)),  # 3:1线
+                    (18.75, last_close * (1 + 1/3))  # 1:3线
+                ]
 
-            # 检查价格与角度线的关系
-            for angle, target in angles:
-                # 计算当前价格偏离角度线的百分比
-                deviation = abs(target - last_close) / last_close * 100
+                # 检查价格与角度线的关系
+                for angle, target in angles:
+                    # 计算当前价格偏离角度线的百分比
+                    deviation = abs(target - last_close) / last_close * 100
 
-                if deviation <= sensitivity:
-                    # 添加识别结果
-                    row = self.wave_table.rowCount()
-                    self.wave_table.insertRow(row)
+                    if deviation <= sensitivity:
+                        # 添加识别结果
+                        row = self.wave_table.rowCount()
+                        self.wave_table.insertRow(row)
 
-                    self.wave_table.setItem(
-                        row, 0,
-                        QTableWidgetItem(f"{angle}°角度线")
-                    )
+                        self.wave_table.setItem(
+                            row, 0,
+                            QTableWidgetItem(f"{angle}°角度线")
+                        )
 
-                    position = "当前"
-                    self.wave_table.setItem(
-                        row, 1,
-                        QTableWidgetItem(position)
-                    )
+                        position = "当前"
+                        self.wave_table.setItem(
+                            row, 1,
+                            QTableWidgetItem(position)
+                        )
 
-                    feature = f"偏离{deviation:.1f}%"
-                    self.wave_table.setItem(
-                        row, 2,
-                        QTableWidgetItem(feature)
-                    )
+                        feature = f"偏离{deviation:.1f}%"
+                        self.wave_table.setItem(
+                            row, 2,
+                            QTableWidgetItem(feature)
+                        )
 
-                    if last_close < target:
-                        suggestion = "买入"
-                        color = Qt.red
-                    else:
-                        suggestion = "卖出"
-                        color = Qt.green
+                        if last_close < target:
+                            suggestion = "买入"
+                            color = Qt.red
+                        else:
+                            suggestion = "卖出"
+                            color = Qt.green
 
-                    suggestion_item = QTableWidgetItem(suggestion)
-                    suggestion_item.setForeground(color)
-                    self.wave_table.setItem(row, 3, suggestion_item)
+                        suggestion_item = QTableWidgetItem(suggestion)
+                        suggestion_item.setForeground(color)
+                        self.wave_table.setItem(row, 3, suggestion_item)
 
-            # 计算江恩时间周期
-            key_dates = [
-                (90, "季度周期"),
-                (180, "半年周期"),
-                (360, "年度周期")
-            ]
+                # 计算江恩时间周期
+                key_dates = [
+                    (90, "季度周期"),
+                    (180, "半年周期"),
+                    (360, "年度周期")
+                ]
 
-            current_index = len(close) - 1
-            for days, cycle_name in key_dates:
-                if current_index % days <= sensitivity * 10:
-                    # 添加识别结果
-                    row = self.wave_table.rowCount()
-                    self.wave_table.insertRow(row)
+                current_index = len(close) - 1
+                for days, cycle_name in key_dates:
+                    if current_index % days <= sensitivity * 10:
+                        # 添加识别结果
+                        row = self.wave_table.rowCount()
+                        self.wave_table.insertRow(row)
 
-                    self.wave_table.setItem(
-                        row, 0,
-                        QTableWidgetItem(cycle_name)
-                    )
+                        self.wave_table.setItem(
+                            row, 0,
+                            QTableWidgetItem(cycle_name)
+                        )
 
-                    position = "当前"
-                    self.wave_table.setItem(
-                        row, 1,
-                        QTableWidgetItem(position)
-                    )
+                        position = "当前"
+                        self.wave_table.setItem(
+                            row, 1,
+                            QTableWidgetItem(position)
+                        )
 
-                    feature = f"周期拐点"
-                    self.wave_table.setItem(
-                        row, 2,
-                        QTableWidgetItem(feature)
-                    )
+                        feature = f"周期拐点"
+                        self.wave_table.setItem(
+                            row, 2,
+                            QTableWidgetItem(feature)
+                        )
 
-                    suggestion = "关注"
-                    suggestion_item = QTableWidgetItem(suggestion)
-                    suggestion_item.setForeground(Qt.black)
-                    self.wave_table.setItem(row, 3, suggestion_item)
+                        suggestion = "关注"
+                        suggestion_item = QTableWidgetItem(suggestion)
+                        suggestion_item.setForeground(Qt.black)
+                        self.wave_table.setItem(row, 3, suggestion_item)
 
         except Exception as e:
             self.log_manager.log(f"分析江恩理论失败: {str(e)}", LogLevel.ERROR)
@@ -2842,12 +3110,12 @@ class AnalysisWidget(QWidget):
 
             for i in range(1, len(high)-1):
                 # 寻找峰顶
-                if high[i] > high[i-1] and high[i] > high[i+1]:
-                    peaks.append((i, float(high[i])))
+                if high.iloc[i] > high[i-1] and high.iloc[i] > high[i+1]:
+                    peaks.append((i, float(high.iloc[i])))
 
                 # 寻找谷底
-                if low[i] < low[i-1] and low[i] < low[i+1]:
-                    troughs.append((i, float(low[i])))
+                if low.iloc[i] < low[i-1] and low.iloc[i] < low[i+1]:
+                    troughs.append((i, float(low.iloc[i])))
 
             # 聚类相近的价格水平
             def cluster_levels(levels, sensitivity):
@@ -4532,6 +4800,55 @@ class AnalysisWidget(QWidget):
             else:
                 print(f"分析龙头股失败: {str(e)}")
 
+    # 导出功能实现
+
+    def export_trend_analysis(self, format_type="Excel"):
+        """导出趋势分析结果"""
+        try:
+            if self.trend_table.rowCount() == 0:
+                QMessageBox.warning(self, "提示", "没有可导出的数据")
+                return
+
+            # 收集表格数据
+            headers = ['时间', '类型', '趋势', '强度', '置信度', '建议']
+            data = []
+
+            for row in range(self.trend_table.rowCount()):
+                row_data = []
+                for col in range(self.trend_table.columnCount()):
+                    item = self.trend_table.item(row, col)
+                    row_data.append(item.text() if item else "")
+                data.append(row_data)
+
+            # 创建DataFrame
+            import pandas as pd
+            df = pd.DataFrame(data, columns=headers)
+
+            # 选择保存路径
+            from PyQt5.QtWidgets import QFileDialog
+            if format_type == "Excel":
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "导出趋势分析", "趋势分析结果.xlsx", "Excel files (*.xlsx)")
+                if file_path:
+                    df.to_excel(file_path, index=False)
+            elif format_type == "CSV":
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "导出趋势分析", "趋势分析结果.csv", "CSV files (*.csv)")
+                if file_path:
+                    df.to_csv(file_path, index=False, encoding='utf-8-sig')
+            elif format_type == "JSON":
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "导出趋势分析", "趋势分析结果.json", "JSON files (*.json)")
+                if file_path:
+                    df.to_json(file_path, orient='records', force_ascii=False, indent=2)
+
+            if file_path:
+                QMessageBox.information(self, "成功", f"趋势分析结果已导出到: {file_path}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
+            self.log_manager.error(f"导出趋势分析失败: {str(e)}")
+
     def clear_hotspot(self):
         """清除热点分析结果"""
         try:
@@ -5473,7 +5790,7 @@ class AnalysisWidget(QWidget):
                         status_text += f" | 时间范围: {start_date} 至 {end_date}"
                     except Exception as e:
                         status_text += f" | ⚠️ datetime格式异常: {str(e)[:20]}"
-
+            self.log_manager.info(status_text)
             if hasattr(self, 'data_status_label'):
                 self.data_status_label.setText(status_text)
 
@@ -5887,35 +6204,3 @@ def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
     from indicators_algo import get_all_indicators_by_category
     return get_all_indicators_by_category()
-
-
-class MatplotlibWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.figure = Figure(figsize=(2, 2))
-        self.canvas = FigureCanvas(self.figure)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.canvas)
-        self.setLayout(layout)
-
-    def plot_pie(self, data):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        from collections import Counter
-        counter = Counter(data)
-        labels, sizes = zip(*counter.items()) if counter else ([], [])
-        if sizes:
-            ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
-        ax.set_title('类型分布')
-        self.canvas.draw()
-
-    def plot_bar(self, data):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        from collections import Counter
-        counter = Counter(data)
-        labels, sizes = zip(*sorted(counter.items())) if counter else ([], [])
-        if sizes:
-            ax.bar(labels, sizes)
-        ax.set_title('价格区间分布')
-        self.canvas.draw()
