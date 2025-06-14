@@ -602,7 +602,11 @@ class ChartWidget(QWidget):
                 elif group == 'talib':
                     try:
                         import talib
-                        func = getattr(talib, name)
+                        # 如果name是中文名称，需要转换为英文名称
+                        from indicators_algo import get_indicator_english_name
+                        english_name = get_indicator_english_name(name)
+
+                        func = getattr(talib, english_name)
                         # 只传递非空参数
                         func_params = {k: v for k,
                                        v in params.items() if v != ''}
@@ -613,13 +617,16 @@ class ChartWidget(QWidget):
                             for j, arr in enumerate(result):
                                 arr = np.asarray(arr)
                                 arr = arr[~np.isnan(arr)]
-                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(name, i+j)['color'],
-                                                       linewidth=0.7, alpha=0.85, label=f'{name}-{j}')
+                                # 使用中文名称作为标签显示
+                                display_name = name
+                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(display_name, i+j)['color'],
+                                                       linewidth=0.7, alpha=0.85, label=f'{display_name}-{j}')
                         else:
                             arr = np.asarray(result)
                             arr = arr[~np.isnan(arr)]
+                            display_name = name
                             self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
-                                                   linewidth=0.7, alpha=0.85, label=name)
+                                                   linewidth=0.7, alpha=0.85, label=display_name)
                     except Exception as e:
                         self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
                 elif group == 'custom' and formula:

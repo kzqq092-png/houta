@@ -4,7 +4,7 @@
 复利计算修复验证测试
 """
 
-from backtest.backtest_engine_fixed import FixedStrategyBacktester
+from backtest.unified_backtest_engine import FixedStrategyBacktester
 import sys
 import os
 import numpy as np

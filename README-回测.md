@@ -36,3 +36,7 @@ Apply
 ⚠️ 重要提醒
 强烈建议使用修复版回测引擎 (backtest_engine_fixed.py)，原版本存在多个已知bug。
 这次优化工作显著提升了HIkyuu-UI系统的可靠性和专业性，为用户提供了一个真正可信赖的量化交易分析平台！
+
+2. **`test_backtest_bug_fixes.py`** - 全面的测试验证体系
+3. **`test_compound_fix.py`** - 复利计算专项测试
+4. **`BACKTEST_BUG_FIXES_REPORT.md`** - 详细的修复报告

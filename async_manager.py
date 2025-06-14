@@ -10,7 +10,9 @@ async_manager.py
     print(future.result())
     am.shutdown()
 """
+from asyncio import base_events
 from concurrent.futures import ThreadPoolExecutor, Future
+import os
 from typing import Callable, Any, Optional
 import threading
 
@@ -23,7 +25,7 @@ class AsyncManager:
         executor: 线程池执行器
     """
 
-    def __init__(self, max_workers: int = 8):
+    def __init__(self, max_workers: int = os.cpu_count() * 3):
         """
         初始化异步任务管理器
         :param max_workers: 最大线程数
@@ -37,7 +39,7 @@ class AsyncManager:
         :param pause_event: 可选的threading.Event对象，任务内部需定期检查pause_event.is_set()
         :return: Future对象
         """
-        if pause_event is not None:
+        if base_events is not None:
             def wrapped_func(*a, **kw):
                 while pause_event.is_set():
                     import time

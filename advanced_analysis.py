@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum, auto
+from hikyuu.indicator import *
 
 
 @dataclass

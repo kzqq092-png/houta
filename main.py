@@ -3865,7 +3865,7 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def backtest(self):
-        """执行回测，统一调用ImprovedBacktest，支持所有策略，参数标准化，结果自动刷新到UI"""
+        """执行回测，使用统一回测引擎，支持所有策略，参数标准化，结果自动刷新到UI"""
         try:
             if not self.current_stock:
                 self.log_manager.warning("请先选择股票")
@@ -3884,28 +3884,68 @@ class TradingGUI(QMainWindow):
                 elif isinstance(widget, QDoubleSpinBox):
                     params[label] = widget.value()
 
-            # 标准化参数
-            params['strategy'] = strategy
-            params['stock'] = self.current_stock
-            params['start_date'] = self.start_date.date().strftime('%Y-%m-%d')
-            params['end_date'] = self.end_date.date().strftime('%Y-%m-%d')
-            params['initial_cash'] = getattr(self, 'initial_cash_spin', None).value() if hasattr(self, 'initial_cash_spin') else 100000.0
-            params['commission_rate'] = getattr(self, 'commission_spin', None).value() if hasattr(self, 'commission_spin') else 0.0003
-            params['slippage'] = getattr(self, 'slippage_spin', None).value() if hasattr(self, 'slippage_spin') else 0.0001
+            # 获取股票数据
+            kdata = self.get_kdata(self.current_stock)
+            if kdata is None or kdata.empty:
+                self.log_manager.error("无法获取股票数据")
+                return
+
+            # 生成交易信号（简化版，实际应该根据策略生成）
+            signal_data = kdata.copy()
+            signal_data['signal'] = 0  # 默认无信号
+
+            # 根据策略生成信号
+            if strategy == "均线策略":
+                ma_short = signal_data['close'].rolling(window=params.get('快线周期', 5)).mean()
+                ma_long = signal_data['close'].rolling(window=params.get('慢线周期', 20)).mean()
+                signal_data.loc[ma_short > ma_long, 'signal'] = 1
+                signal_data.loc[ma_short < ma_long, 'signal'] = -1
+            elif strategy == "MACD策略":
+                exp1 = signal_data['close'].ewm(span=params.get('快线周期', 12), adjust=False).mean()
+                exp2 = signal_data['close'].ewm(span=params.get('慢线周期', 26), adjust=False).mean()
+                macd = exp1 - exp2
+                signal = macd.ewm(span=params.get('信号周期', 9), adjust=False).mean()
+                signal_data.loc[macd > signal, 'signal'] = 1
+                signal_data.loc[macd < signal, 'signal'] = -1
 
             self.log_manager.info(f"开始回测 - 策略: {strategy}")
 
-            from improved_backtest import ImprovedBacktest
-            backtester = ImprovedBacktest(params)
-            backtester.run(
-                stock_code=self.current_stock,
-                start_date=self.start_date.date().toPyDate(),
-                end_date=self.end_date.date().toPyDate()
+            # 使用统一回测引擎
+            from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
+
+            # 创建回测引擎
+            engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+
+            # 运行回测
+            result = engine.run_backtest(
+                data=signal_data,
+                initial_capital=self.initial_cash_spin.value() if hasattr(self, 'initial_cash_spin') and self.initial_cash_spin is not None else 100000.0,
+                position_size=0.9,
+                commission_pct=self.commission_spin.value() if hasattr(self, 'commission_spin') and self.commission_spin is not None else 0.0003,
+                slippage_pct=self.slippage_spin.value() if hasattr(self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
             )
-            metrics = backtester.get_metrics()
+
+            # 提取结果
+            backtest_result = result['backtest_result']
+            risk_metrics = result['risk_metrics']
+
+            # 转换为兼容格式
+            metrics = {
+                'total_return': risk_metrics.total_return,
+                'annual_return': risk_metrics.annualized_return,
+                'max_drawdown': risk_metrics.max_drawdown,
+                'sharpe_ratio': risk_metrics.sharpe_ratio,
+                'volatility': risk_metrics.volatility,
+                'win_rate': getattr(risk_metrics, 'win_rate', 0),
+                'profit_loss_ratio': getattr(risk_metrics, 'profit_loss_ratio', 0),
+                'final_capital': backtest_result['capital'].iloc[-1],
+                'total_trades': len(backtest_result[backtest_result['signal'] != 0])
+            }
+
             self.update_performance_metrics(metrics)
             self.performance_updated.emit(metrics)
             self.log_manager.info("回测完成")
+
         except Exception as e:
             error_msg = f"回测失败: {str(e)}"
             self.log_manager.error(error_msg)
@@ -4745,14 +4785,14 @@ class TradingGUI(QMainWindow):
 
     def get_current_indicators(self):
         """
-        获取当前激活的所有指标及其参数，兼容ta-lib、自有、自定义，修复无指标问题
+        获取当前激活的所有指标及其参数，兼容ta-lib、自有、自定义，修复无指标问题，支持中文名称
         Returns:
             List[dict]: [{"name": 指标名, "params": 参数字典, "type": 类型, "group": 分组}, ...]
         """
         indicators = []
-        from indicators_algo import get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+        from indicators_algo import get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, get_indicator_english_name
         talib_list = get_talib_indicator_list()
-        category_map = get_all_indicators_by_category()
+        category_map = get_all_indicators_by_category(use_chinese=True)
         if not talib_list or not category_map:
             import logging
             logging.error("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
@@ -4761,34 +4801,43 @@ class TradingGUI(QMainWindow):
         if not hasattr(self, 'param_controls') or self.param_controls is None:
             self.param_controls = {}
         for item in selected_items:
-            indicator = item.text()
+            indicator_chinese = item.text()
             ind_type = item.data(Qt.UserRole)
+
+            # 将中文名称转换为英文名称用于后台处理
+            indicator_english = get_indicator_english_name(indicator_chinese)
+
             params = {}
             group = "builtin"
             if ind_type == "ta-lib" or ind_type == "形态识别" or ind_type == "其他":
                 group = "talib"
-                import inspect
-                import talib
-                func = getattr(talib, indicator, None)
-                if func:
-                    sig = inspect.signature(func)
-                    for k in sig.parameters:
-                        if k in self.param_controls:
-                            params[k] = self.param_controls[k].value()
+                try:
+                    import inspect
+                    import talib
+                    func = getattr(talib, indicator_english, None)
+                    if func:
+                        sig = inspect.signature(func)
+                        for k in sig.parameters:
+                            if k in self.param_controls:
+                                params[k] = self.param_controls[k].value()
+                except Exception as e:
+                    self.log_manager.warning(f"获取指标 {indicator_english} 参数失败: {e}")
             indicators.append({
-                "name": indicator,
+                "name": indicator_english,  # 后台使用英文名
+                "display_name": indicator_chinese,  # 前端显示中文名
                 "params": params,
-                "type": get_talib_category(indicator),
+                "type": get_talib_category(indicator_english),
                 "group": group
             })
         return indicators
 
     def update_indicator_list(self):
         """
-        整理指标筛选列表，确保与ta-lib分类一一映射，筛选功能正常，只展示有指标的分类
+        整理指标筛选列表，确保与ta-lib分类一一映射，筛选功能正常，只展示有指标的分类，支持中文显示
         """
         from indicators_algo import get_all_indicators_by_category
-        category_map = get_all_indicators_by_category()
+        # 使用中文名称显示指标
+        category_map = get_all_indicators_by_category(use_chinese=True)
         self.indicator_list.clear()
         for cat, names in category_map.items():
             for name in names:

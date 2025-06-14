@@ -743,18 +743,71 @@ class TradingWidget(QWidget):
             params['stock'] = self.current_stock.strip()
             params['start_date'] = getattr(self, 'start_date', None).date().strftime('%Y-%m-%d') if hasattr(self, 'start_date') else ''
             params['end_date'] = getattr(self, 'end_date', None).date().strftime('%Y-%m-%d') if hasattr(self, 'end_date') else ''
-            params['initial_cash'] = getattr(self, 'initial_cash_spin', None).value() if hasattr(self, 'initial_cash_spin') else 100000.0
-            params['commission_rate'] = getattr(self, 'commission_spin', None).value() if hasattr(self, 'commission_spin') else 0.0003
-            params['slippage'] = getattr(self, 'slippage_spin', None).value() if hasattr(self, 'slippage_spin') else 0.0001
+            params['initial_cash'] = self.initial_cash_spin.value() if hasattr(
+                self, 'initial_cash_spin') and self.initial_cash_spin is not None else 100000.0
+            params['commission_rate'] = self.commission_spin.value() if hasattr(
+                self, 'commission_spin') and self.commission_spin is not None else 0.0003
+            params['slippage'] = self.slippage_spin.value() if hasattr(self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
             log_structured(self.log_manager, f"开始回测 - 策略: {strategy}", level="info")
-            from improved_backtest import ImprovedBacktest
-            backtester = ImprovedBacktest(params)
-            backtester.run(
-                stock_code=self.current_stock.strip(),
-                start_date=params['start_date'],
-                end_date=params['end_date']
-            )
-            metrics = backtester.get_metrics()
+
+            # 使用统一回测引擎
+            from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
+
+            # 获取股票数据并生成信号
+            from main import TradingGUI
+            main_window = None
+            for w in QApplication.topLevelWidgets():
+                if isinstance(w, TradingGUI):
+                    main_window = w
+                    break
+
+            if main_window and hasattr(main_window, 'get_kdata'):
+                kdata = main_window.get_kdata(self.current_stock.strip())
+                if kdata is None or kdata.empty:
+                    raise ValueError("无法获取股票数据")
+
+                # 生成交易信号（简化版）
+                signal_data = kdata.copy()
+                signal_data['signal'] = 0
+
+                # 根据策略生成信号
+                if strategy == "均线策略":
+                    ma_short = signal_data['close'].rolling(window=5).mean()
+                    ma_long = signal_data['close'].rolling(window=20).mean()
+                    signal_data.loc[ma_short > ma_long, 'signal'] = 1
+                    signal_data.loc[ma_short < ma_long, 'signal'] = -1
+
+                # 创建回测引擎
+                engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+
+                # 运行回测
+                result = engine.run_backtest(
+                    data=signal_data,
+                    initial_capital=params['initial_cash'],
+                    position_size=0.9,
+                    commission_pct=params['commission_rate'],
+                    slippage_pct=params['slippage']
+                )
+
+                # 提取结果
+                backtest_result = result['backtest_result']
+                risk_metrics = result['risk_metrics']
+
+                # 转换为兼容格式
+                metrics = {
+                    'total_return': risk_metrics.total_return,
+                    'annual_return': risk_metrics.annualized_return,
+                    'max_drawdown': risk_metrics.max_drawdown,
+                    'sharpe_ratio': risk_metrics.sharpe_ratio,
+                    'volatility': risk_metrics.volatility,
+                    'win_rate': getattr(risk_metrics, 'win_rate', 0),
+                    'profit_loss_ratio': getattr(risk_metrics, 'profit_loss_ratio', 0),
+                    'final_capital': backtest_result['capital'].iloc[-1],
+                    'total_trades': len(backtest_result[backtest_result['signal'] != 0])
+                }
+            else:
+                raise ValueError("无法获取主窗口或股票数据")
+
             self.update_backtest_results(metrics)
             log_structured(self.log_manager, "回测完成", level="info")
         except Exception as e:

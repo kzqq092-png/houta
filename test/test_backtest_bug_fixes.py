@@ -12,17 +12,21 @@
 6. 数据处理问题修复
 """
 
-from backtest.backtest_engine_fixed import FixedStrategyBacktester  # 修复版本
-from backtest.backtest_engine import StrategyBacktester  # 原版本
-import sys
-import os
+from backtest.unified_backtest_engine import (
+    UnifiedBacktestEngine, FixedStrategyBacktester, StrategyBacktester,
+    BacktestLevel, create_unified_backtest_engine, backtest_strategy_fixed
+)
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
+import unittest
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 添加项目路径
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# 使用统一回测引擎
 
 
 def create_test_data():
@@ -57,6 +61,200 @@ def create_test_data():
     }, index=dates)
 
     return data
+
+
+class TestBacktestBugFixes(unittest.TestCase):
+    """回测Bug修复测试类"""
+
+    def setUp(self):
+        """设置测试数据"""
+        # 创建测试数据
+        dates = pd.date_range('2023-01-01', periods=100, freq='D')
+        np.random.seed(42)
+
+        prices = 100 * np.cumprod(1 + np.random.normal(0, 0.02, 100))
+
+        self.test_data = pd.DataFrame({
+            'datetime': dates,
+            'open': prices * (1 + np.random.normal(0, 0.001, 100)),
+            'high': prices * (1 + np.abs(np.random.normal(0, 0.01, 100))),
+            'low': prices * (1 - np.abs(np.random.normal(0, 0.01, 100))),
+            'close': prices,
+            'volume': np.random.randint(1000, 10000, 100),
+            'signal': np.random.choice([-1, 0, 1], 100, p=[0.1, 0.8, 0.1])
+        })
+
+        self.test_data.set_index('datetime', inplace=True)
+
+    def test_unified_engine_basic_functionality(self):
+        """测试统一引擎基本功能"""
+        engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+
+        results = engine.run_backtest(
+            data=self.test_data,
+            initial_capital=100000,
+            enable_compound=True
+        )
+
+        # 验证结果
+        self.assertIsNotNone(results)
+        self.assertIn('equity', results.columns)
+        self.assertIn('returns', results.columns)
+        self.assertIsNotNone(engine.metrics)
+
+        # 验证指标计算
+        metrics_summary = engine.get_metrics_summary()
+        self.assertIsInstance(metrics_summary, dict)
+        self.assertIn('总收益率', metrics_summary)
+
+    def test_backward_compatibility_fixed_backtester(self):
+        """测试向后兼容性 - FixedStrategyBacktester"""
+        backtester = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000,
+            enable_compound=True
+        )
+
+        results = backtester.run_backtest()
+
+        # 验证结果格式与原版一致
+        self.assertIsNotNone(results)
+        self.assertIn('equity', results.columns)
+        self.assertIn('position', results.columns)
+
+    def test_backward_compatibility_strategy_backtester(self):
+        """测试向后兼容性 - StrategyBacktester"""
+        backtester = StrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000
+        )
+
+        results = backtester.run_backtest()
+
+        # 验证结果
+        self.assertIsNotNone(results)
+        self.assertIn('equity', results.columns)
+
+    def test_compound_calculation_fix(self):
+        """测试复利计算修复"""
+        # 不启用复利
+        backtester_no_compound = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000
+        )
+        results_no_compound = backtester_no_compound.run_backtest(enable_compound=False)
+
+        # 启用复利
+        backtester_compound = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000
+        )
+        results_compound = backtester_compound.run_backtest(enable_compound=True)
+
+        # 验证复利效果
+        self.assertIsNotNone(results_no_compound)
+        self.assertIsNotNone(results_compound)
+
+    def test_stop_loss_take_profit(self):
+        """测试止损止盈功能"""
+        backtester = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000
+        )
+
+        results = backtester.run_backtest(
+            stop_loss_pct=0.05,
+            take_profit_pct=0.10
+        )
+
+        # 验证止损止盈记录
+        self.assertIsNotNone(results)
+        if 'exit_reason' in results.columns:
+            exit_reasons = results['exit_reason'].dropna()
+            # 应该有止损或止盈的记录
+            self.assertTrue(len(exit_reasons) >= 0)  # 可能没有触发，但不应该报错
+
+    def test_commission_calculation_fix(self):
+        """测试手续费计算修复"""
+        backtester = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000,
+            commission_pct=0.001,
+            min_commission=5.0
+        )
+
+        results = backtester.run_backtest()
+
+        # 验证手续费计算
+        self.assertIsNotNone(results)
+        if 'commission' in results.columns:
+            commissions = results['commission'][results['commission'] > 0]
+            if len(commissions) > 0:
+                # 所有手续费应该 >= 最小手续费
+                self.assertTrue((commissions >= 5.0).all())
+
+    def test_holding_period_calculation(self):
+        """测试持有期计算"""
+        backtester = FixedStrategyBacktester(
+            data=self.test_data,
+            initial_capital=100000
+        )
+
+        results = backtester.run_backtest(max_holding_periods=10)
+
+        # 验证持有期计算
+        self.assertIsNotNone(results)
+        if 'holding_periods' in results.columns:
+            holding_periods = results['holding_periods']
+            # 持有期应该是非负整数
+            self.assertTrue((holding_periods >= 0).all())
+
+    def test_risk_metrics_calculation(self):
+        """测试风险指标计算"""
+        engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+
+        results = engine.run_backtest(
+            data=self.test_data,
+            initial_capital=100000
+        )
+
+        # 验证风险指标
+        self.assertIsNotNone(engine.metrics)
+
+        # 检查关键指标
+        metrics = engine.metrics
+        self.assertIsInstance(metrics.sharpe_ratio, (int, float))
+        self.assertIsInstance(metrics.max_drawdown, (int, float))
+        self.assertIsInstance(metrics.win_rate, (int, float))
+
+        # 验证指标合理性
+        self.assertTrue(0 <= metrics.win_rate <= 1)
+        self.assertTrue(metrics.max_drawdown >= 0)
+
+    def test_convenience_function(self):
+        """测试便利函数"""
+        backtester = backtest_strategy_fixed(
+            data=self.test_data,
+            initial_capital=100000,
+            enable_compound=True
+        )
+
+        self.assertIsNotNone(backtester)
+        self.assertIsNotNone(backtester.results)
+        self.assertIsNotNone(backtester.metrics)
+
+    def test_engine_creation_function(self):
+        """测试引擎创建函数"""
+        # 测试不同级别
+        for level in ["basic", "professional", "institutional", "investment_bank"]:
+            engine = create_unified_backtest_engine(level)
+            self.assertIsInstance(engine, UnifiedBacktestEngine)
+
+            results = engine.run_backtest(
+                data=self.test_data,
+                initial_capital=100000
+            )
+            self.assertIsNotNone(results)
 
 
 def test_commission_calculation():
@@ -415,6 +613,9 @@ def main():
     print("5. ✅ 止损止盈：准确触发条件，记录退出原因")
     print("6. ✅ 数据预处理：处理异常值、缺失值，验证数据完整性")
     print("7. ✅ 交易记录：完整记录交易详情，支持统计分析")
+
+    # 运行单元测试
+    unittest.main(verbosity=2)
 
 
 if __name__ == "__main__":

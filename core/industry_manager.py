@@ -7,7 +7,7 @@ import time
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from threading import Lock
 from PyQt5.QtCore import QObject, pyqtSignal
 from core.logger import LogManager
@@ -582,17 +582,39 @@ class IndustryManager(QObject):
         return []
 
     def get_major_indices(self) -> Dict[str, dict]:
+        """获取主要指数信息"""
+        try:
+            indices = {
+                "000001": {"name": "上证指数", "market": "SH"},
+                "399001": {"name": "深证成指", "market": "SZ"},
+                "399006": {"name": "创业板指", "market": "SZ"},
+                "000300": {"name": "沪深300", "market": "SH"},
+                "000905": {"name": "中证500", "market": "SH"},
+                "000852": {"name": "中证1000", "market": "SH"}
+            }
+            return indices
+        except Exception as e:
+            log_structured(self.log_manager, "get_major_indices", level="error", status="fail", error=str(e))
+            return {}
+
+    def get_industry_performance(self, period: str = "1d") -> Dict[str, Any]:
         """
-        获取主流指数/板块数据（如上证指数、沪深300等）
+        获取行业表现数据
+
+        Args:
+            period: 时间周期 ('1d', '5d', '1m', '3m', '6m', '1y')
+
         Returns:
-            dict: {指数名称: {code, name, market, ...}}
+            Dict: 行业表现数据
         """
         try:
+            log_structured(self.log_manager, "get_industry_performance", level="info", status="start", period=period)
+
+            # 获取行业板块数据
+            industry_performance = {}
+
+            # 使用东方财富API获取行业表现
             url = "http://push2.eastmoney.com/api/qt/clist/get"
-            headers = {
-                "User-Agent": "Mozilla/5.0"
-            }
-            # 这里的fs参数可根据东财文档调整，包含主流指数
             params = {
                 "pn": "1",
                 "pz": "100",
@@ -602,25 +624,448 @@ class IndustryManager(QObject):
                 "fltt": "2",
                 "invt": "2",
                 "fid": "f3",
-                "fs": "m:1+t:2,m:1+t:23,m:1+t:24,m:1+t:25,m:1+t:26,m:1+t:27,m:1+t:28,m:1+t:29,m:1+t:30,m:1+t:31,m:1+t:32,m:1+t:33,m:1+t:34,m:1+t:35,m:1+t:36,m:1+t:37,m:1+t:38,m:1+t:39",  # 常见指数
-                "fields": "f12,f14"
+                "fs": "m:90+t:2",  # 行业板块
+                "fields": "f12,f14,f2,f3,f4,f5,f6,f7,f15,f16,f17,f18"
             }
-            response = requests.get(url, headers=headers, params=params)
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+
+            response = requests.get(url, headers=headers, params=params, timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                if data['rc'] == 0 and 'data' in data and 'diff' in data['data']:
-                    result = {}
+                if data.get('rc') == 0 and 'data' in data and 'diff' in data['data']:
                     for item in data['data']['diff']:
-                        code = item['f12']
-                        name = item['f14']
-                        result[name] = {
-                            'code': code,
-                            'name': name,
-                            'market': 'INDEX'
+                        industry_code = item.get('f12', '')
+                        industry_name = item.get('f14', '')
+                        current_price = item.get('f2', 0)
+                        change_percent = item.get('f3', 0)
+                        change_amount = item.get('f4', 0)
+                        volume = item.get('f5', 0)
+                        turnover = item.get('f6', 0)
+                        amplitude = item.get('f7', 0)
+
+                        industry_performance[industry_code] = {
+                            'name': industry_name,
+                            'current_price': current_price,
+                            'change_percent': change_percent / 100 if change_percent else 0,
+                            'change_amount': change_amount,
+                            'volume': volume,
+                            'turnover': turnover,
+                            'amplitude': amplitude / 100 if amplitude else 0,
+                            'period': period
                         }
-                    log_structured(self.log_manager, "get_major_indices", level="info", status="end", record_count=len(result))
-                    return result
-            return {}
+
+            log_structured(self.log_manager, "get_industry_performance", level="info", status="success",
+                           industries_count=len(industry_performance))
+            return industry_performance
+
         except Exception as e:
-            log_structured(self.log_manager, "get_major_indices", level="error", status="fail", error=str(e))
+            log_structured(self.log_manager, "get_industry_performance", level="error", status="fail", error=str(e))
             return {}
+
+    def analyze_industry_trends(self, days: int = 30) -> Dict[str, Any]:
+        """
+        分析行业趋势
+
+        Args:
+            days: 分析天数
+
+        Returns:
+            Dict: 行业趋势分析结果
+        """
+        try:
+            log_structured(self.log_manager, "analyze_industry_trends", level="info", status="start", days=days)
+
+            # 获取多个时间周期的行业表现
+            periods = ['1d', '5d', '1m']
+            trend_analysis = {}
+
+            for period in periods:
+                performance = self.get_industry_performance(period)
+
+                # 计算趋势强度
+                for industry_code, data in performance.items():
+                    if industry_code not in trend_analysis:
+                        trend_analysis[industry_code] = {
+                            'name': data['name'],
+                            'trend_strength': 0,
+                            'consistency': 0,
+                            'momentum': 0,
+                            'periods': {}
+                        }
+
+                    trend_analysis[industry_code]['periods'][period] = data['change_percent']
+
+            # 计算综合趋势指标
+            for industry_code, analysis in trend_analysis.items():
+                periods_data = analysis['periods']
+
+                if len(periods_data) >= 2:
+                    # 趋势强度：各周期涨跌幅的平均值
+                    trend_strength = sum(periods_data.values()) / len(periods_data)
+
+                    # 一致性：各周期方向的一致性
+                    positive_periods = sum(1 for v in periods_data.values() if v > 0)
+                    consistency = positive_periods / len(periods_data)
+
+                    # 动量：短期相对长期的表现
+                    momentum = periods_data.get('1d', 0) - periods_data.get('1m', 0)
+
+                    analysis['trend_strength'] = trend_strength
+                    analysis['consistency'] = consistency
+                    analysis['momentum'] = momentum
+
+            # 排序并分类
+            sorted_industries = sorted(trend_analysis.items(),
+                                       key=lambda x: x[1]['trend_strength'], reverse=True)
+
+            result = {
+                'analysis_date': datetime.now().isoformat(),
+                'total_industries': len(trend_analysis),
+                'top_performers': sorted_industries[:10],
+                'bottom_performers': sorted_industries[-10:],
+                'trending_up': [item for item in sorted_industries if item[1]['trend_strength'] > 0.02],
+                'trending_down': [item for item in sorted_industries if item[1]['trend_strength'] < -0.02],
+                'stable': [item for item in sorted_industries if -0.02 <= item[1]['trend_strength'] <= 0.02]
+            }
+
+            log_structured(self.log_manager, "analyze_industry_trends", level="info", status="success",
+                           top_performers=len(result['top_performers']),
+                           trending_up=len(result['trending_up']))
+
+            return result
+
+        except Exception as e:
+            log_structured(self.log_manager, "analyze_industry_trends", level="error", status="fail", error=str(e))
+            return {}
+
+    def get_industry_rotation_signals(self) -> Dict[str, Any]:
+        """
+        获取行业轮动信号
+
+        Returns:
+            Dict: 行业轮动信号
+        """
+        try:
+            log_structured(self.log_manager, "get_industry_rotation_signals", level="info", status="start")
+
+            # 获取行业趋势分析
+            trend_analysis = self.analyze_industry_trends()
+
+            if not trend_analysis:
+                return {}
+
+            rotation_signals = {
+                'rotation_date': datetime.now().isoformat(),
+                'signals': []
+            }
+
+            # 分析轮动信号
+            for industry_code, analysis in trend_analysis.get('trending_up', []):
+                signal_strength = analysis['trend_strength'] * analysis['consistency']
+
+                if signal_strength > 0.03:  # 强信号阈值
+                    rotation_signals['signals'].append({
+                        'industry_code': industry_code,
+                        'industry_name': analysis['name'],
+                        'signal_type': 'BUY',
+                        'signal_strength': signal_strength,
+                        'trend_strength': analysis['trend_strength'],
+                        'consistency': analysis['consistency'],
+                        'momentum': analysis['momentum'],
+                        'confidence': min(0.95, signal_strength * 10)  # 置信度
+                    })
+
+            for industry_code, analysis in trend_analysis.get('trending_down', []):
+                signal_strength = abs(analysis['trend_strength']) * analysis['consistency']
+
+                if signal_strength > 0.03:  # 强信号阈值
+                    rotation_signals['signals'].append({
+                        'industry_code': industry_code,
+                        'industry_name': analysis['name'],
+                        'signal_type': 'SELL',
+                        'signal_strength': signal_strength,
+                        'trend_strength': analysis['trend_strength'],
+                        'consistency': analysis['consistency'],
+                        'momentum': analysis['momentum'],
+                        'confidence': min(0.95, signal_strength * 10)  # 置信度
+                    })
+
+            # 按信号强度排序
+            rotation_signals['signals'].sort(key=lambda x: x['signal_strength'], reverse=True)
+
+            log_structured(self.log_manager, "get_industry_rotation_signals", level="info", status="success",
+                           signals_count=len(rotation_signals['signals']))
+
+            return rotation_signals
+
+        except Exception as e:
+            log_structured(self.log_manager, "get_industry_rotation_signals", level="error", status="fail", error=str(e))
+            return {}
+
+    def get_industry_valuation_metrics(self) -> Dict[str, Any]:
+        """
+        获取行业估值指标
+
+        Returns:
+            Dict: 行业估值指标
+        """
+        try:
+            log_structured(self.log_manager, "get_industry_valuation_metrics", level="info", status="start")
+
+            valuation_metrics = {}
+
+            # 获取行业基本信息
+            for industry_code, industry_info in self.industry_data.items():
+                if isinstance(industry_info, dict) and 'name' in industry_info:
+                    # 这里可以集成更多的估值数据源
+                    # 目前提供基础框架
+                    valuation_metrics[industry_code] = {
+                        'name': industry_info['name'],
+                        'pe_ratio': None,  # 市盈率
+                        'pb_ratio': None,  # 市净率
+                        'ps_ratio': None,  # 市销率
+                        'dividend_yield': None,  # 股息率
+                        'roe': None,  # 净资产收益率
+                        'debt_ratio': None,  # 负债率
+                        'valuation_level': 'UNKNOWN'  # 估值水平
+                    }
+
+            log_structured(self.log_manager, "get_industry_valuation_metrics", level="info", status="success",
+                           metrics_count=len(valuation_metrics))
+
+            return valuation_metrics
+
+        except Exception as e:
+            log_structured(self.log_manager, "get_industry_valuation_metrics", level="error", status="fail", error=str(e))
+            return {}
+
+    def screen_industries_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        根据条件筛选行业
+
+        Args:
+            criteria: 筛选条件
+                - min_change_percent: 最小涨跌幅
+                - max_change_percent: 最大涨跌幅
+                - min_volume: 最小成交量
+                - trend_direction: 趋势方向 ('up', 'down', 'stable')
+                - momentum_threshold: 动量阈值
+
+        Returns:
+            List: 符合条件的行业列表
+        """
+        try:
+            log_structured(self.log_manager, "screen_industries_by_criteria", level="info", status="start", criteria=criteria)
+
+            # 获取行业表现数据
+            performance_data = self.get_industry_performance()
+            trend_analysis = self.analyze_industry_trends()
+
+            filtered_industries = []
+
+            for industry_code, performance in performance_data.items():
+                # 基本筛选条件
+                if 'min_change_percent' in criteria:
+                    if performance['change_percent'] < criteria['min_change_percent']:
+                        continue
+
+                if 'max_change_percent' in criteria:
+                    if performance['change_percent'] > criteria['max_change_percent']:
+                        continue
+
+                if 'min_volume' in criteria:
+                    if performance['volume'] < criteria['min_volume']:
+                        continue
+
+                # 趋势方向筛选
+                if 'trend_direction' in criteria and industry_code in trend_analysis:
+                    trend_data = None
+                    for item in trend_analysis.get('trending_up', []) + trend_analysis.get('trending_down', []) + trend_analysis.get('stable', []):
+                        if item[0] == industry_code:
+                            trend_data = item[1]
+                            break
+
+                    if trend_data:
+                        if criteria['trend_direction'] == 'up' and trend_data['trend_strength'] <= 0:
+                            continue
+                        elif criteria['trend_direction'] == 'down' and trend_data['trend_strength'] >= 0:
+                            continue
+                        elif criteria['trend_direction'] == 'stable' and abs(trend_data['trend_strength']) > 0.02:
+                            continue
+
+                # 动量阈值筛选
+                if 'momentum_threshold' in criteria and industry_code in trend_analysis:
+                    trend_data = None
+                    for item in trend_analysis.get('trending_up', []) + trend_analysis.get('trending_down', []) + trend_analysis.get('stable', []):
+                        if item[0] == industry_code:
+                            trend_data = item[1]
+                            break
+
+                    if trend_data and abs(trend_data['momentum']) < criteria['momentum_threshold']:
+                        continue
+
+                # 添加到结果列表
+                industry_result = {
+                    'code': industry_code,
+                    'name': performance['name'],
+                    'current_price': performance['current_price'],
+                    'change_percent': performance['change_percent'],
+                    'volume': performance['volume'],
+                    'turnover': performance['turnover'],
+                    'amplitude': performance['amplitude']
+                }
+
+                # 添加趋势数据
+                if industry_code in trend_analysis:
+                    for item in trend_analysis.get('trending_up', []) + trend_analysis.get('trending_down', []) + trend_analysis.get('stable', []):
+                        if item[0] == industry_code:
+                            industry_result.update({
+                                'trend_strength': item[1]['trend_strength'],
+                                'consistency': item[1]['consistency'],
+                                'momentum': item[1]['momentum']
+                            })
+                            break
+
+                filtered_industries.append(industry_result)
+
+            # 按涨跌幅排序
+            filtered_industries.sort(key=lambda x: x['change_percent'], reverse=True)
+
+            log_structured(self.log_manager, "screen_industries_by_criteria", level="info", status="success",
+                           filtered_count=len(filtered_industries))
+
+            return filtered_industries
+
+        except Exception as e:
+            log_structured(self.log_manager, "screen_industries_by_criteria", level="error", status="fail", error=str(e))
+            return []
+
+    def get_industry_correlation_matrix(self) -> Dict[str, Any]:
+        """
+        获取行业相关性矩阵
+
+        Returns:
+            Dict: 行业相关性数据
+        """
+        try:
+            log_structured(self.log_manager, "get_industry_correlation_matrix", level="info", status="start")
+
+            # 这里需要历史数据来计算相关性
+            # 目前提供基础框架，实际实现需要更多历史数据
+            correlation_matrix = {
+                'calculation_date': datetime.now().isoformat(),
+                'period': '30d',
+                'correlations': {},
+                'clusters': [],
+                'diversification_suggestions': []
+            }
+
+            log_structured(self.log_manager, "get_industry_correlation_matrix", level="info", status="success")
+
+            return correlation_matrix
+
+        except Exception as e:
+            log_structured(self.log_manager, "get_industry_correlation_matrix", level="error", status="fail", error=str(e))
+            return {}
+
+    def generate_industry_report(self) -> Dict[str, Any]:
+        """
+        生成行业分析报告
+
+        Returns:
+            Dict: 行业分析报告
+        """
+        try:
+            log_structured(self.log_manager, "generate_industry_report", level="info", status="start")
+
+            # 收集各种分析数据
+            performance_data = self.get_industry_performance()
+            trend_analysis = self.analyze_industry_trends()
+            rotation_signals = self.get_industry_rotation_signals()
+            valuation_metrics = self.get_industry_valuation_metrics()
+
+            report = {
+                'report_date': datetime.now().isoformat(),
+                'summary': {
+                    'total_industries': len(performance_data),
+                    'trending_up_count': len(trend_analysis.get('trending_up', [])),
+                    'trending_down_count': len(trend_analysis.get('trending_down', [])),
+                    'rotation_signals_count': len(rotation_signals.get('signals', []))
+                },
+                'performance_overview': performance_data,
+                'trend_analysis': trend_analysis,
+                'rotation_signals': rotation_signals,
+                'valuation_overview': valuation_metrics,
+                'recommendations': self._generate_industry_recommendations(
+                    performance_data, trend_analysis, rotation_signals
+                )
+            }
+
+            log_structured(self.log_manager, "generate_industry_report", level="info", status="success")
+
+            return report
+
+        except Exception as e:
+            log_structured(self.log_manager, "generate_industry_report", level="error", status="fail", error=str(e))
+            return {}
+
+    def _generate_industry_recommendations(self, performance_data: Dict,
+                                           trend_analysis: Dict,
+                                           rotation_signals: Dict) -> List[Dict[str, Any]]:
+        """
+        生成行业投资建议
+
+        Args:
+            performance_data: 行业表现数据
+            trend_analysis: 趋势分析数据
+            rotation_signals: 轮动信号数据
+
+        Returns:
+            List: 投资建议列表
+        """
+        recommendations = []
+
+        try:
+            # 基于轮动信号生成建议
+            for signal in rotation_signals.get('signals', [])[:5]:  # 取前5个信号
+                if signal['signal_type'] == 'BUY' and signal['confidence'] > 0.7:
+                    recommendations.append({
+                        'type': 'BUY',
+                        'industry_code': signal['industry_code'],
+                        'industry_name': signal['industry_name'],
+                        'reason': f"强势上涨趋势，信号强度: {signal['signal_strength']:.3f}",
+                        'confidence': signal['confidence'],
+                        'time_horizon': 'short_term',
+                        'risk_level': 'medium'
+                    })
+                elif signal['signal_type'] == 'SELL' and signal['confidence'] > 0.7:
+                    recommendations.append({
+                        'type': 'SELL',
+                        'industry_code': signal['industry_code'],
+                        'industry_name': signal['industry_name'],
+                        'reason': f"下跌趋势明显，信号强度: {signal['signal_strength']:.3f}",
+                        'confidence': signal['confidence'],
+                        'time_horizon': 'short_term',
+                        'risk_level': 'high'
+                    })
+
+            # 基于趋势分析生成长期建议
+            for industry_code, analysis in trend_analysis.get('trending_up', [])[:3]:
+                if analysis['consistency'] > 0.8:
+                    recommendations.append({
+                        'type': 'HOLD',
+                        'industry_code': industry_code,
+                        'industry_name': analysis['name'],
+                        'reason': f"持续上涨趋势，一致性: {analysis['consistency']:.2f}",
+                        'confidence': analysis['consistency'],
+                        'time_horizon': 'long_term',
+                        'risk_level': 'low'
+                    })
+
+        except Exception as e:
+            log_structured(self.log_manager, "_generate_industry_recommendations", level="error", status="fail", error=str(e))
+
+        return recommendations
