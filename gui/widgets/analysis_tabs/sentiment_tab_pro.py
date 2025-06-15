@@ -167,21 +167,12 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         layout.addWidget(toolbar)
 
     def _get_button_style(self, color):
-        """获取按钮样式"""
-        return f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 {color}, stop:1 {self._darken_color(color)});
-                color: white; font-weight: bold; padding: 8px 16px;
-                border-radius: 6px; border: none; min-width: 120px;
-            }}
-            QPushButton:hover {{ background: {self._darken_color(color)}; }}
-            QPushButton:pressed {{ background: {self._darken_color(color, 0.2)}; }}
-        """
+        """获取按钮样式 - 使用基类统一方法"""
+        return self.get_button_style(color)
 
     def _darken_color(self, color, factor=0.1):
-        """颜色加深"""
-        return color
+        """颜色加深 - 使用基类统一方法"""
+        return self.darken_color(color, factor)
 
     def _create_control_panel(self):
         """创建控制面板"""
@@ -458,8 +449,7 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def realtime_sentiment_analysis(self):
         """实时情绪分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行实时情绪分析...")
@@ -522,8 +512,7 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def panic_index_analysis(self):
         """恐慌指数分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在分析恐慌指数...")
@@ -568,8 +557,7 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def greed_index_analysis(self):
         """贪婪指数分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在分析贪婪指数...")
@@ -590,8 +578,7 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def ai_sentiment_prediction(self):
         """AI情绪预测"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行AI情绪预测...")
@@ -639,8 +626,7 @@ AI预测仅供参考，实际投资需结合多方面因素。
 
     def comprehensive_sentiment_analysis(self):
         """综合情绪分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行综合情绪分析...")

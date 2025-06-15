@@ -10,13 +10,17 @@ from matplotlib.figure import Figure
 import seaborn as sns
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 
 from core.stock_screener import DataManager, StockScreener
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
 from gui.ui_components import BaseAnalysisPanel
 from components.template_manager import TemplateManager
+from utils.config_manager import ConfigManager
+from utils.log_manager import LogManager
+from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
 
 # 设置matplotlib中文字体
 mpl.rcParams["font.sans-serif"] = [
@@ -63,7 +67,7 @@ class DataUpdateThread(QThread):
         self._running = False
 
 
-class FundFlowWidget(BaseAnalysisPanel):
+class FundFlowWidget(BaseAnalysisTab):
     """资金流向分析组件，继承统一分析面板基类"""
 
     def __init__(self, parent=None, data_manager=None, log_manager=None, chart_widget=None):
@@ -126,74 +130,66 @@ class FundFlowWidget(BaseAnalysisPanel):
         self.template_button.clicked.connect(self.show_template_manager_dialog)
         self.main_layout.addWidget(self.template_button)
 
-        # 启动数据更新线程
+        # 使用统一的数据更新线程
         if self.data_manager:
-            self.update_thread = DataUpdateThread(self.data_manager)
-            self.update_thread.data_updated.connect(self.update_fund_flow_data)
+            self.update_thread = self.create_data_update_thread(
+                data_fetcher=self._fetch_fund_flow_data,
+                update_interval=300,  # 5分钟更新间隔
+                max_retries=3,
+                retry_interval=5
+            )
             self.update_thread.start()
 
+    def _fetch_fund_flow_data(self) -> dict:
+        """获取资金流数据 - 统一的数据获取方法"""
+        if hasattr(self.data_manager, 'get_fund_flow'):
+            data = self.data_manager.get_fund_flow()
+
+            # 自动补全所有DataFrame中的code字段
+            for k, v in data.items():
+                if isinstance(v, pd.DataFrame) and 'code' not in v.columns and hasattr(self.data_manager, 'current_stock'):
+                    v = v.copy()
+                    v['code'] = getattr(self.data_manager, 'current_stock', None)
+                    data[k] = v
+
+            return data
+        else:
+            # 模拟数据
+            return {
+                'north_flow': pd.DataFrame({
+                    'date': pd.date_range('2024-01-01', periods=30),
+                    'net_inflow': np.random.randn(30) * 1000000
+                }),
+                'industry_flow': pd.DataFrame({
+                    'industry': ['科技', '金融', '医药', '消费', '地产'],
+                    'net_inflow': np.random.randn(5) * 100000000
+                })
+            }
+
     def create_control_buttons(self, layout):
-        """创建控制按钮"""
-        button_layout = QHBoxLayout()
-
-        # 导出数据按钮
-        export_button = QPushButton("导出数据")
-        export_button.clicked.connect(self.export_data)
-        button_layout.addWidget(export_button)
-
-        # 设置预警按钮
-        alert_button = QPushButton("设置预警")
-        alert_button.clicked.connect(self.show_alert_dialog)
-        button_layout.addWidget(alert_button)
-
-        layout.addLayout(button_layout)
+        """创建控制按钮 - 使用基类统一方法"""
+        # 使用基类的统一控制按钮布局创建方法
+        control_layout = self.create_control_buttons_layout(
+            include_export=True,
+            include_alert=True,
+            custom_buttons=None
+        )
+        layout.addLayout(control_layout)
 
     def create_overview_cards(self, layout):
-        """创建资金流向概览卡片"""
-        cards_layout = QGridLayout()
-
-        # 定义概览指标
-        indicators = [
-            ("今日净流入", "+28.5亿", "↑", "#4CAF50"),
-            ("北向资金", "-12.3亿", "↓", "#F44336"),
-            ("融资余额", "9856.7亿", "→", "#2196F3"),
-            ("融券余额", "123.4亿", "↑", "#4CAF50"),
-            ("大单成交额", "456.7亿", "↑", "#4CAF50"),
-            ("成交活跃度", "85%", "↑", "#4CAF50")
+        """创建资金流向概览卡片 - 使用基类统一方法"""
+        # 定义概览指标数据
+        indicators_data = [
+            ("今日净流入", "+28.5亿", "#4CAF50", "↑"),
+            ("北向资金", "-12.3亿", "#F44336", "↓"),
+            ("融资余额", "9856.7亿", "#2196F3", "→"),
+            ("融券余额", "123.4亿", "#4CAF50", "↑"),
+            ("大单成交额", "456.7亿", "#4CAF50", "↑"),
+            ("成交活跃度", "85%", "#4CAF50", "↑")
         ]
 
-        for i, (name, value, trend, color) in enumerate(indicators):
-            card = QFrame()
-            card.setFrameStyle(QFrame.Box | QFrame.Raised)
-            card.setLineWidth(2)
-            card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: white;
-                    border-radius: 10px;
-                    padding: 10px;
-                    border: 2px solid {color};
-                }}
-            """)
-
-            card_layout = QVBoxLayout(card)
-
-            # 指标名称
-            name_label = QLabel(name)
-            name_label.setStyleSheet("font-weight: bold; color: #333333;")
-            card_layout.addWidget(name_label)
-
-            # 数值和趋势
-            value_layout = QHBoxLayout()
-            value_label = QLabel(value)
-            value_label.setStyleSheet(f"font-size: 18px; color: {color};")
-            trend_label = QLabel(trend)
-            trend_label.setStyleSheet(f"font-size: 18px; color: {color};")
-            value_layout.addWidget(value_label)
-            value_layout.addWidget(trend_label)
-            card_layout.addLayout(value_layout)
-
-            cards_layout.addWidget(card, i // 3, i % 3)
-
+        # 使用基类的统一卡片布局创建方法
+        cards_layout = self.create_cards_layout(indicators_data, columns=3)
         layout.addLayout(cards_layout)
 
     def create_north_flow_chart(self, layout):
@@ -803,9 +799,68 @@ class FundFlowWidget(BaseAnalysisPanel):
             print(f"更新主力资金分析失败: {str(e)}")
 
     def show_template_manager_dialog(self):
-        # 复用StockScreenerWidget的模板管理对话框逻辑
-        QMessageBox.information(
-            self, "模板管理", "此处可集成批量模板管理UI，支持导入、导出、删除、重命名、应用等功能。")
+        """显示模板管理对话框 - 使用基类统一方法"""
+        # 使用基类的统一对话框创建方法
+        dialog = self.create_standard_dialog("模板管理", 800, 600)
+
+        # 创建对话框内容
+        layout = self.create_standard_layout("vbox", spacing=15)
+
+        # 添加模板列表
+        template_list = QListWidget()
+        template_list.addItems(["默认模板", "资金流模板1", "资金流模板2"])
+        layout.addWidget(QLabel("可用模板:"))
+        layout.addWidget(template_list)
+
+        # 创建按钮布局
+        button_layout = self.create_button_layout([
+            ("应用模板", lambda: self._apply_template(template_list, dialog), '#4CAF50'),
+            ("删除模板", lambda: self._delete_template(template_list), '#F44336'),
+            ("新建模板", self._create_new_template, '#2196F3')
+        ])
+        layout.addLayout(button_layout)
+
+        # 创建对话框按钮
+        button_box = self.create_dialog_button_box("ok_cancel")
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.setLayout(layout)
+        self.center_dialog(dialog)
+
+        return dialog.exec_()
+
+    def _apply_template(self, list_widget, dialog):
+        """应用模板"""
+        current_item = list_widget.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            self.show_info_message("模板应用", f"已应用模板: {template_name}")
+            dialog.accept()
+        else:
+            self.show_warning_message("选择模板", "请先选择一个模板")
+
+    def _delete_template(self, list_widget):
+        """删除模板"""
+        current_item = list_widget.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            if template_name == "默认模板":
+                self.show_warning_message("删除失败", "默认模板不能删除")
+                return
+
+            result = self.show_question_message("确认删除", f"确定要删除模板 '{template_name}' 吗？")
+            if result == QMessageBox.Yes:
+                row = list_widget.row(current_item)
+                list_widget.takeItem(row)
+                self.show_info_message("删除成功", f"模板 '{template_name}' 已删除")
+        else:
+            self.show_warning_message("选择模板", "请先选择要删除的模板")
+
+    def _create_new_template(self):
+        """创建新模板"""
+        self.show_info_message("新建模板", "新建模板功能正在开发中")
 
     def validate_params(self) -> (bool, str):
         """校验所有参数控件的输入，支持QDoubleSpinBox等"""

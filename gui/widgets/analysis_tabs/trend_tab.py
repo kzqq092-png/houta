@@ -173,22 +173,12 @@ class TrendAnalysisTab(BaseAnalysisTab):
         return toolbar
 
     def _get_button_style(self, color):
-        """获取按钮样式"""
-        return f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 {color}, stop:1 {self._darken_color(color)});
-                color: white; font-weight: bold; padding: 8px 16px;
-                border-radius: 6px; border: none; min-width: 120px;
-            }}
-            QPushButton:hover {{ background: {self._darken_color(color)}; }}
-            QPushButton:pressed {{ background: {self._darken_color(color, 0.2)}; }}
-        """
+        """获取按钮样式 - 使用基类统一方法"""
+        return self.get_button_style(color)
 
     def _darken_color(self, color, factor=0.1):
-        """颜色加深"""
-        # 简化实现，实际可以使用更复杂的颜色处理
-        return color.replace('#', '#').lower()
+        """颜色加深 - 使用基类统一方法"""
+        return self.darken_color(color, factor)
 
     def _create_control_panel(self):
         """创建控制面板"""
@@ -422,8 +412,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def comprehensive_trend_analysis(self):
         """综合趋势分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行综合趋势分析...")
@@ -757,8 +746,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def multi_timeframe_analysis(self):
         """多时间框架分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行多时间框架分析...")
@@ -1015,8 +1003,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def trend_prediction(self):
         """趋势预测"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在生成趋势预测...")
@@ -1032,8 +1019,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def support_resistance_analysis(self):
         """支撑阻力分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在分析支撑阻力位...")
@@ -1050,7 +1036,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def export_trend_results(self):
         """导出趋势结果"""
         if self.trend_table.rowCount() == 0:
-            QMessageBox.warning(self, "警告", "没有可导出的趋势分析数据")
+            self.show_no_data_warning("趋势分析数据")
             return
 
         filename, _ = QFileDialog.getSaveFileName(
@@ -1063,7 +1049,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
             try:
                 export_data = self.export_data('json')
                 if filename.endswith('.json'):
-                    import json
                     with open(filename, 'w', encoding='utf-8') as f:
                         json.dump(export_data, f, ensure_ascii=False, indent=2)
                 elif filename.endswith('.xlsx'):
@@ -1078,7 +1063,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _export_to_excel(self, filename):
         """导出到Excel"""
         try:
-            import pandas as pd
 
             # 收集表格数据
             data = []
@@ -1096,28 +1080,12 @@ class TrendAnalysisTab(BaseAnalysisTab):
             df = pd.DataFrame(data)
             df.to_excel(filename, index=False)
         except ImportError:
-            QMessageBox.warning(self, "警告", "需要安装pandas库才能导出Excel文件")
+            self.show_library_warning("pandas", "Excel文件导出")
+            return
 
     def _export_to_csv(self, filename):
         """导出到CSV"""
-        import csv
-
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-
-            # 写入表头
-            headers = []
-            for col in range(self.trend_table.columnCount()):
-                headers.append(self.trend_table.horizontalHeaderItem(col).text())
-            writer.writerow(headers)
-
-            # 写入数据
-            for row in range(self.trend_table.rowCount()):
-                row_data = []
-                for col in range(self.trend_table.columnCount()):
-                    item = self.trend_table.item(row, col)
-                    row_data.append(item.text() if item else "")
-                writer.writerow(row_data)
+        self.export_table_to_csv(self.trend_table, filename)
 
     def _update_results_display(self, results):
         """更新结果显示"""
@@ -1155,17 +1123,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _update_trend_table(self, trend_results):
         """更新趋势表格"""
-        self.trend_table.setRowCount(len(trend_results))
-
-        for row, trend in enumerate(trend_results):
-            self.trend_table.setItem(row, 0, QTableWidgetItem(trend.get('timeframe', '')))
-            self.trend_table.setItem(row, 1, QTableWidgetItem(trend.get('direction', '')))
-            self.trend_table.setItem(row, 2, QTableWidgetItem(trend.get('strength', '')))
-            self.trend_table.setItem(row, 3, QTableWidgetItem(trend.get('confidence', '')))
-            self.trend_table.setItem(row, 4, QTableWidgetItem(trend.get('duration', '')))
-            self.trend_table.setItem(row, 5, QTableWidgetItem(trend.get('target_price', '')))
-            self.trend_table.setItem(row, 6, QTableWidgetItem(trend.get('risk_level', '')))
-            self.trend_table.setItem(row, 7, QTableWidgetItem(trend.get('recommendation', '')))
+        column_keys = ['timeframe', 'direction', 'strength', 'confidence', 'duration', 'target_price', 'risk_level', 'recommendation']
+        self.update_table_data(self.trend_table, trend_results, column_keys)
 
     def _update_trend_statistics_display(self, stats):
         """更新趋势统计显示"""
@@ -1181,15 +1140,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _update_multi_timeframe_table(self, multi_tf_results):
         """更新多时间框架表格"""
-        self.multi_tf_table.setRowCount(len(multi_tf_results))
-
-        for row, result in enumerate(multi_tf_results):
-            self.multi_tf_table.setItem(row, 0, QTableWidgetItem(result.get('timeframe', '')))
-            self.multi_tf_table.setItem(row, 1, QTableWidgetItem(result.get('direction', '')))
-            self.multi_tf_table.setItem(row, 2, QTableWidgetItem(result.get('strength', '')))
-            self.multi_tf_table.setItem(row, 3, QTableWidgetItem(result.get('consistency', '')))
-            self.multi_tf_table.setItem(row, 4, QTableWidgetItem(f"{result.get('weight', 0):.2f}"))
-            self.multi_tf_table.setItem(row, 5, QTableWidgetItem(f"{result.get('score', 0):.1f}"))
+        column_keys = ['timeframe', 'direction', 'strength', 'consistency', 'weight', 'score']
+        self.update_table_data(self.multi_tf_table, multi_tf_results, column_keys)
 
     def _update_prediction_display(self, predictions):
         """更新预测显示"""
@@ -1225,14 +1177,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _update_support_resistance_table(self, sr_levels):
         """更新支撑阻力表格"""
-        self.sr_table.setRowCount(len(sr_levels))
-
-        for row, level in enumerate(sr_levels):
-            self.sr_table.setItem(row, 0, QTableWidgetItem(level.get('type', '')))
-            self.sr_table.setItem(row, 1, QTableWidgetItem(level.get('price', '')))
-            self.sr_table.setItem(row, 2, QTableWidgetItem(level.get('strength', '')))
-            self.sr_table.setItem(row, 3, QTableWidgetItem(str(level.get('test_count', 0))))
-            self.sr_table.setItem(row, 4, QTableWidgetItem(level.get('validity', '')))
+        column_keys = ['type', 'price', 'strength', 'test_count', 'validity']
+        self.update_table_data(self.sr_table, sr_levels, column_keys)
 
     def _update_alerts_display(self, alerts):
         """更新预警显示"""
@@ -1257,10 +1203,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _do_clear_data(self):
         """数据清除处理"""
-        self.trend_table.setRowCount(0)
-        self.multi_tf_table.setRowCount(0)
+        self.clear_multiple_tables(self.trend_table, self.multi_tf_table, self.sr_table)
         self.prediction_text.clear()
-        self.sr_table.setRowCount(0)
         self.alert_list.clear()
         self.trend_stats_label.setText("等待分析...")
 

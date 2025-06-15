@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import random
+import os
 
 from .base_tab import BaseAnalysisTab
 from core.logger import LogManager, LogLevel
@@ -308,7 +310,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         """分析VIX恐慌指数"""
         try:
             # 模拟VIX数据（实际应用中应从数据源获取）
-            import random
             current_vix = random.uniform(15, 35)
             historical_avg = 20.0
 
@@ -342,7 +343,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         """分析贪婪恐惧指数"""
         try:
             # 模拟贪婪恐惧指数
-            import random
             current_index = random.uniform(0, 100)
 
             if current_index > 75:
@@ -377,7 +377,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         """分析投资者情绪指数"""
         try:
             # 模拟投资者情绪调查数据
-            import random
             bullish_pct = random.uniform(20, 80)
             bearish_pct = random.uniform(20, 80)
             neutral_pct = 100 - bullish_pct - bearish_pct
@@ -462,7 +461,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         """分析新闻情绪"""
         try:
             # 模拟新闻情绪分析结果
-            import random
             positive_news = random.uniform(0, 100)
             negative_news = random.uniform(0, 100)
             neutral_news = 100 - positive_news - negative_news
@@ -493,7 +491,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         """分析社交媒体情绪"""
         try:
             # 模拟社交媒体情绪分析结果
-            import random
             social_score = random.uniform(-1, 1)
 
             if social_score > 0.5:
@@ -613,7 +610,6 @@ class SentimentAnalysisTab(BaseAnalysisTab):
             self.show_loading("正在分析历史情绪...")
 
             # 模拟历史情绪数据
-            import random
             self.sentiment_history = []
 
             for i in range(30):  # 30天历史数据

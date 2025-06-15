@@ -73,7 +73,6 @@ class TradingSystem:
             if self.current_kdata is None or (hasattr(self.current_kdata, 'empty') and self.current_kdata.empty):
                 raise ValueError("未加载K线数据")
             kdata = self.current_kdata
-            import pandas as pd
             if isinstance(kdata, pd.DataFrame):
                 try:
                     kdata = data_manager.df_to_kdata(kdata)

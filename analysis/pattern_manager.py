@@ -12,8 +12,7 @@ import pandas as pd
 from analysis.pattern_recognition import PatternRecognizer
 from analysis.pattern_base import (
     BasePatternRecognizer, PatternConfig, PatternResult,
-    PatternAlgorithmFactory, GenericPatternRecognizer,
-    SignalType, PatternCategory
+    PatternAlgorithmFactory, SignalType, PatternCategory
 )
 
 
@@ -216,7 +215,6 @@ class PatternManager:
             return []
 
         # 数据格式检查和预处理
-        import pandas as pd
 
         # 如果是DataFrame，确保包含必要字段
         if isinstance(kdata, pd.DataFrame):

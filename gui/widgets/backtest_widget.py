@@ -51,22 +51,54 @@ except ImportError:
 
 # 导入核心模块
 try:
-    from core.logger import LogManager, LogLevel
+    from core.logger import LogManager
     from utils.config_manager import ConfigManager
+    CORE_MODULES_AVAILABLE = True
 except ImportError:
-    # 创建简单的日志管理器
-    class LogLevel:
-        INFO = "INFO"
-        WARNING = "WARNING"
-        ERROR = "ERROR"
+    # 如果核心模块不可用，使用简化版本
+    try:
+        # 尝试导入基础日志管理器
+        from core.base_logger import BaseLogManager as LogManager
+    except ImportError:
+        class LogManager:
+            def log(self, message, level):
+                print(f"[{level}] {message}")
 
-    class LogManager:
-        def log(self, message, level):
-            print(f"[{level}] {message}")
+            def info(self, message):
+                print(f"[INFO] {message}")
 
+            def warning(self, message):
+                print(f"[WARNING] {message}")
+
+            def error(self, message):
+                print(f"[ERROR] {message}")
+
+    # 简化版配置管理器
     class ConfigManager:
         def __init__(self):
-            pass
+            self.config = {
+                'backtest': {
+                    'initial_capital': 100000,
+                    'commission_pct': 0.001,
+                    'slippage_pct': 0.001
+                },
+                'ui': {
+                    'theme': 'dark',
+                    'update_interval': 1000
+                }
+            }
+
+        def get(self, key, default=None):
+            keys = key.split('.')
+            value = self.config
+            for k in keys:
+                if isinstance(value, dict) and k in value:
+                    value = value[k]
+                else:
+                    return default
+            return value
+
+    CORE_MODULES_AVAILABLE = False
 
 
 class RealTimeChart(QWidget):

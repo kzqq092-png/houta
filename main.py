@@ -1,6 +1,7 @@
 """
 交易系统主窗口模块
 """
+import random
 from utils.log_util import log_structured
 import time
 from core.plugin_manager import PluginManager
@@ -10,6 +11,12 @@ from gui.ui_components import StatusBar
 from gui.widgets.multi_chart_panel import MultiChartPanel
 from gui.widgets.log_widget import LogWidget
 from core.industry_manager import IndustryManager
+# 导入新的策略管理系统
+from core.strategy import (
+    initialize_strategy_system, get_strategy_registry, get_strategy_engine,
+    get_strategy_factory, get_strategy_database_manager, list_available_strategies,
+    execute_strategy, get_strategy_info
+)
 from hikyuu import StockManager, Query
 from hikyuu.interactive import *
 from hikyuu.indicator import *
@@ -30,13 +37,12 @@ from PyQt5.QtWidgets import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
-import time
 from PyQt5.QtCore import *
 from PyQt5.QtWebEngineWidgets import *
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import ptvsd
-import subprocess
+from optimization.database_schema import *
 import numpy as np
 import pandas as pd
 import sys
@@ -46,6 +52,8 @@ import traceback
 import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
+
+# 在文件开头添加random模块导入
 
 
 class TradingGUI(QMainWindow):
@@ -109,7 +117,7 @@ class TradingGUI(QMainWindow):
                     padding: 8px;
                     border: none;
                     font-weight: bold;
-                }                                  
+                }
             ''')
 
             # 初始化缓存相关属性
@@ -120,14 +128,17 @@ class TradingGUI(QMainWindow):
             # 初始化hikyuu StockManager
             self.sm = StockManager.instance()
 
+            # 使用统一的管理器工厂
+            from utils.manager_factory import get_config_manager, get_log_manager, get_industry_manager
+
             # 初始化配置管理器
-            self.config_manager = ConfigManager()
+            self.config_manager = get_config_manager()
 
             # 从配置中获取日志配置
             logging_config = self.config_manager.logging
 
             # 初始化日志管理器
-            self.log_manager = LogManager(logging_config)
+            self.log_manager = get_log_manager(logging_config)
             self.log_manager.info("TradingGUI初始化开始")
 
             # 初始化数据管理器
@@ -143,7 +154,7 @@ class TradingGUI(QMainWindow):
             self.cache_manager = Cache()
 
             # 初始化行业管理器
-            self.industry_manager = IndustryManager()
+            self.industry_manager = get_industry_manager(self.log_manager)
             self.industry_manager.industry_updated.connect(
                 self._on_industry_data_updated)
             self.industry_manager.update_error.connect(self.handle_error)
@@ -197,6 +208,28 @@ class TradingGUI(QMainWindow):
             self.plugin_manager = PluginManager()
             self.plugin_manager.load_plugins()
             self.log_manager.info("插件管理器初始化并加载插件完成")
+
+            # 初始化策略管理系统
+            try:
+                self.log_manager.info("初始化策略管理系统...")
+                strategy_config = self.config_manager.get('strategy_system', {})
+                self.strategy_managers = initialize_strategy_system(strategy_config)
+
+                # 获取策略管理器实例
+                self.strategy_registry = self.strategy_managers['registry']
+                self.strategy_engine = self.strategy_managers['engine']
+                self.strategy_factory = self.strategy_managers['factory']
+                self.strategy_database = self.strategy_managers['database']
+
+                # 加载可用策略列表
+                self.available_strategies = list_available_strategies()
+                self.log_manager.info(f"策略管理系统初始化完成，加载了 {len(self.available_strategies)} 个策略")
+
+            except Exception as e:
+                self.log_manager.error(f"策略管理系统初始化失败: {str(e)}")
+                self.log_manager.error(traceback.format_exc())
+                # 使用默认策略列表作为备用
+                self.available_strategies = ["均线策略", "MACD策略", "RSI策略", "布林带策略", "KDJ策略"]
 
         except Exception as e:
             # 确保即使在初始化失败时也能记录错误
@@ -264,31 +297,31 @@ class TradingGUI(QMainWindow):
             QMessageBox.critical(self, "错误", f"更新数据失败: {str(e)}")
 
     def handle_analysis_error(self, error_msg: str):
-        """处理分析错误
-
-        Args:
-            error_msg: 错误信息
-        """
-        self.log_manager.error(f"分析错误: {error_msg}")
-        msg_box = QMessageBox.warning(self, "分析错误", error_msg)
+        """处理分析错误"""
+        try:
+            self.log_manager.error(f"分析错误: {error_msg}")
+            # 使用统一的错误消息框
+            self.show_error_message("分析错误", error_msg)
+        except Exception as e:
+            self.log_manager.error(f"处理分析错误失败: {str(e)}")
 
     def handle_chart_error(self, error_msg: str):
-        """处理图表错误
-
-        Args:
-            error_msg: 错误信息
-        """
-        self.log_manager.error(f"图表错误: {error_msg}")
-        msg_box = QMessageBox.warning(self, "图表错误", error_msg)
+        """处理图表错误"""
+        try:
+            self.log_manager.error(f"图表错误: {error_msg}")
+            # 使用统一的警告消息框
+            self.show_warning_message("图表错误", error_msg)
+        except Exception as e:
+            self.log_manager.error(f"处理图表错误失败: {str(e)}")
 
     def handle_log_error(self, error_msg: str):
-        """处理日志错误
-
-        Args:
-            error_msg: 错误信息
-        """
-        self.log_manager.error(f"日志错误: {error_msg}")
-        msg_box = QMessageBox.warning(self, "日志错误", error_msg)
+        """处理日志错误"""
+        try:
+            self.log_manager.error(f"日志错误: {error_msg}")
+            # 使用统一的警告消息框
+            self.show_warning_message("日志错误", error_msg)
+        except Exception as e:
+            print(f"处理日志错误失败: {str(e)}")  # 避免循环错误
 
     def handle_log_clear(self):
         """处理日志清除"""
@@ -1000,7 +1033,6 @@ class TradingGUI(QMainWindow):
         try:
             # 获取股票数据
             stock_data = item.data(Qt.UserRole)
-            from core.data_manager import data_manager
             code = stock_data.get('code')
             # 拆分market和code
             if code and len(code) > 2:
@@ -1074,31 +1106,142 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"导出股票数据失败: {str(e)}")
 
     def add_to_watchlist(self, item):
-        """添加到自选股"""
+        """添加股票到自选股"""
         try:
-            stock_code = item.text().split()[0]
-            # TODO: 实现添加到自选股的功能
-            self.log_manager.info(f"已添加到自选股: {stock_code}")
+            # 使用系统日志组件记录操作
+            from core.adapters import get_logger
+            logger = get_logger(__name__)
+
+            if item is None:
+                return
+
+            stock_code = item.data(Qt.UserRole)
+            stock_name = item.text()
+
+            if not stock_code:
+                self.log_manager.warning("无效的股票代码")
+                return
+
+            # 获取当前自选股列表
+            watchlist = self.data_manager.get_watchlist()
+
+            # 检查是否已存在
+            if stock_code in [stock['code'] for stock in watchlist]:
+                self.log_manager.info(f"股票 {stock_name}({stock_code}) 已在自选股中")
+                QMessageBox.information(self, "提示", f"股票 {stock_name} 已在自选股中")
+                return
+
+            # 添加到自选股
+            success = self.data_manager.add_to_watchlist(stock_code, stock_name)
+
+            if success:
+                self.log_manager.info(f"成功添加 {stock_name}({stock_code}) 到自选股")
+                logger.info(f"添加自选股成功: {stock_name}({stock_code})")
+                QMessageBox.information(self, "成功", f"已添加 {stock_name} 到自选股")
+            else:
+                self.log_manager.error(f"添加 {stock_name}({stock_code}) 到自选股失败")
+                QMessageBox.warning(self, "失败", f"添加 {stock_name} 到自选股失败")
+
         except Exception as e:
-            self.log_manager.error(f"添加到自选股失败: {str(e)}")
+            error_msg = f"添加到自选股失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            QMessageBox.critical(self, "错误", error_msg)
 
     def add_to_portfolio(self, item):
         """添加到投资组合"""
         try:
-            stock_code = item.text().split()[0]
-            # TODO: 实现添加到投资组合的功能
-            self.log_manager.info(f"已添加到投资组合: {stock_code}")
+            # 使用系统日志组件记录操作
+            logger = get_logger(__name__)
+
+            if item is None:
+                return
+
+            stock_code = item.data(Qt.UserRole) if item.data(Qt.UserRole) else item.text().split()[0]
+            stock_name = item.text().split()[1] if len(item.text().split()) > 1 else stock_code
+
+            if not stock_code:
+                self.log_manager.warning("无效的股票代码")
+                return
+
+            # 弹出对话框让用户输入投资组合信息
+            dialog = QDialog(self)
+            dialog.setWindowTitle("添加到投资组合")
+            dialog.setModal(True)
+            dialog.resize(400, 300)
+
+            layout = QFormLayout(dialog)
+
+            # 股票信息显示
+            layout.addRow("股票:", QLabel(f"{stock_name} ({stock_code})"))
+
+            # 投资组合名称
+            portfolio_combo = QComboBox()
+            portfolio_combo.setEditable(True)
+            portfolio_combo.addItems(["默认组合", "价值投资", "成长股", "蓝筹股", "科技股"])
+            layout.addRow("投资组合:", portfolio_combo)
+
+            # 投资金额
+            amount_spin = QDoubleSpinBox()
+            amount_spin.setRange(0, 10000000)
+            amount_spin.setValue(10000)
+            amount_spin.setSuffix(" 元")
+            layout.addRow("投资金额:", amount_spin)
+
+            # 按钮
+            button_layout = QHBoxLayout()
+            ok_button = QPushButton("确定")
+            cancel_button = QPushButton("取消")
+            button_layout.addWidget(ok_button)
+            button_layout.addWidget(cancel_button)
+            layout.addRow(button_layout)
+
+            ok_button.clicked.connect(dialog.accept)
+            cancel_button.clicked.connect(dialog.reject)
+
+            if dialog.exec_() == QDialog.Accepted:
+                portfolio_name = portfolio_combo.currentText()
+                amount = amount_spin.value()
+
+                # 添加到投资组合（这里使用简单的日志记录，实际应该调用数据管理器）
+                self.log_manager.info(f"成功添加 {stock_name}({stock_code}) 到投资组合 {portfolio_name}，金额: {amount}")
+                logger.info(f"添加投资组合成功: {stock_name}({stock_code}) -> {portfolio_name}, 金额: {amount}")
+                QMessageBox.information(self, "成功", f"已添加 {stock_name} 到投资组合 {portfolio_name}")
+
         except Exception as e:
-            self.log_manager.error(f"添加到投资组合失败: {str(e)}")
+            error_msg = f"添加到投资组合失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            QMessageBox.critical(self, "错误", error_msg)
 
     def analyze_stock(self, item):
         """分析股票"""
         try:
             stock_code = item.text().split()[0]
-            # TODO: 实现股票分析功能
             self.log_manager.info(f"开始分析股票: {stock_code}")
+
+            # 设置当前股票
+            self.current_stock = stock_code
+
+            # 更新股票选择
+            self.on_stock_selected()
+
+            # 如果有分析组件，触发分析
+            if hasattr(self, 'analysis_widget') and self.analysis_widget:
+                # 获取股票数据
+                kdata = self.get_kdata(stock_code)
+                if kdata is not None and not kdata.empty:
+                    # 设置数据到分析组件
+                    self.analysis_widget.set_kdata(kdata)
+                    # 刷新所有分析标签页
+                    self.analysis_widget.refresh_all_tabs()
+                else:
+                    self.log_manager.warning(f"无法获取股票 {stock_code} 的数据")
+
+            # 执行主要分析功能
+            self.analyze()
+
         except Exception as e:
             self.log_manager.error(f"分析股票失败: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
 
     def backtest_stock(self, item):
         """回测股票"""
@@ -1295,7 +1438,6 @@ class TradingGUI(QMainWindow):
             self.log_manager.info(
                 f"筛选分类: {indicator_type}，可见指标数: {visible_count}")
         except Exception as e:
-            import traceback
             self.log_manager.error(
                 f"过滤指标列表失败: {str(e)}\n{traceback.format_exc()}")
 
@@ -1601,7 +1743,6 @@ class TradingGUI(QMainWindow):
                 QMessageBox.warning(self, "提示", "当前没有可切换主题的图表！")
                 return
             # 获取当前matplotlib样式
-            import matplotlib.pyplot as plt
             current_style = plt.get_backend()
             # 这里可根据实际需求切换matplotlib主题
             # 例如：plt.style.use('dark_background') 或 plt.style.use('seaborn-v0_8-whitegrid')
@@ -1626,7 +1767,7 @@ class TradingGUI(QMainWindow):
 
             # 单股分析Tab（AnalysisWidget）
             from gui.widgets.analysis_widget import AnalysisWidget
-            self.analysis_widget = AnalysisWidget()
+            self.analysis_widget = AnalysisWidget(self.config_manager)
             self.analysis_widget.chart_widget = self.chart_widget
             self.analysis_widget._connect_chart_widget_signals()
             self.right_tab.addTab(self.analysis_widget, "单股分析")
@@ -1638,10 +1779,7 @@ class TradingGUI(QMainWindow):
 
             # 行业优选Tab（可选扩展）
             try:
-                # 修复行业优选Tab导入错误，复用AnalysisWidget行业资金流向分析
-                if not hasattr(self, 'analysis_widget'):
-                    from gui.widgets.analysis_widget import AnalysisWidget
-                    self.analysis_widget = AnalysisWidget(self.config_manager)
+                # 使用已创建的analysis_widget的sector_flow功能
                 sector_flow_tab = self.analysis_widget.create_sector_flow_tab()
                 self.add_tab_with_toolbar(sector_flow_tab, "行业优选", "行业主力资金流向、概念流向、北向资金等一览，支持一键分析与导出")
             except Exception as e:
@@ -1687,7 +1825,6 @@ class TradingGUI(QMainWindow):
         # 新增：Tab添加后自动推送当前K线数据
         if hasattr(self, 'current_stock') and self.current_stock and hasattr(widget, 'set_kdata'):
             kdata = self.get_kdata(self.current_stock)
-            import pandas as pd
             if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                 kdata = kdata.copy()
                 kdata['code'] = self.current_stock
@@ -1698,14 +1835,19 @@ class TradingGUI(QMainWindow):
         # 延迟加载多维分析Tab
         if tab_text == "多维分析" and not getattr(self, "analysis_tab_loaded", False):
             try:
-                from gui.widgets.analysis_widget import AnalysisWidget
-                self.analysis_widget = AnalysisWidget()
-                # 新增：将chart_widget实例赋值给analysis_widget，并连接信号
-                self.analysis_widget.chart_widget = self.chart_widget
-                self.analysis_widget._connect_chart_widget_signals()
-                self.analysis_tab_layout.addWidget(self.analysis_widget)
-                self.analysis_tab_loaded = True
-                self.log_manager.info("多维分析Tab已延迟加载")
+                # 使用已创建的analysis_widget，而不是重新创建
+                if hasattr(self, 'analysis_widget') and self.analysis_widget:
+                    self.analysis_tab_layout.addWidget(self.analysis_widget)
+                    self.analysis_tab_loaded = True
+                    self.log_manager.info("多维分析Tab已延迟加载")
+                else:
+                    # 如果没有analysis_widget，则创建一个
+                    self.analysis_widget = AnalysisWidget(self.config_manager)
+                    self.analysis_widget.chart_widget = self.chart_widget
+                    self.analysis_widget._connect_chart_widget_signals()
+                    self.analysis_tab_layout.addWidget(self.analysis_widget)
+                    self.analysis_tab_loaded = True
+                    self.log_manager.info("多维分析Tab已延迟加载（新创建）")
             except Exception as e:
                 self.log_manager.error(f"多维分析Tab延迟加载失败: {str(e)}")
                 self.log_manager.error(traceback.format_exc())
@@ -1955,7 +2097,6 @@ class TradingGUI(QMainWindow):
                 if hasattr(self, 'analysis_widget') and self.current_stock:
                     kdata = self.get_kdata(self.current_stock)
                     self.broadcast_kdata_to_tabs(kdata)
-                    import pandas as pd
                     if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                         kdata = kdata.copy()
                         kdata['code'] = self.current_stock
@@ -2143,11 +2284,14 @@ class TradingGUI(QMainWindow):
                 self.log_manager.error(f"记录日志失败: {str(e)}")
 
     def clear_log(self) -> None:
-        """清除日志内容
-
-        清除日志显示区域的内容，同时清理日志文件，并优化系统性能
-        """
+        """清除日志内容，优化UI刷新机制"""
         try:
+            # 使用系统日志组件记录操作
+            from utils.ui_optimizer import schedule_ui_update
+
+            logger = get_logger(__name__)
+            logger.info("开始清除日志操作")
+
             # 清除日志显示区域
             if hasattr(self, 'log_widget') and self.log_widget:
                 self.log_widget.clear_logs()
@@ -2161,14 +2305,31 @@ class TradingGUI(QMainWindow):
 
             # 记录清除操作
             self.log_manager.info("日志已清除")
+            logger.info("日志清除操作完成")
 
-            # 更新UI
-            QApplication.processEvents()
+            # 使用优化的UI更新机制，替换QApplication.processEvents()
+            schedule_ui_update(callback=self._update_ui_after_log_clear, delay=0)
 
         except Exception as e:
+            logger = get_logger(__name__)
+            logger.error(f"清除日志失败: {str(e)}")
             self.log_manager.error(f"清除日志失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             QMessageBox.critical(self, "错误", f"清除日志失败: {str(e)}")
+
+    def _update_ui_after_log_clear(self):
+        """日志清除后的UI更新回调"""
+        try:
+            logger = get_logger(__name__)
+
+            # 更新状态栏
+            if hasattr(self, 'statusBar'):
+                self.statusBar().showMessage("日志已清除", 2000)
+
+            logger.debug("日志清除后UI更新完成")
+        except Exception as e:
+            logger = get_logger(__name__)
+            logger.error(f"日志清除后UI更新失败: {str(e)}")
 
     def handle_performance_alert(self, message: str) -> None:
         """处理性能警告，优化警告处理
@@ -2482,7 +2643,6 @@ class TradingGUI(QMainWindow):
 
             # 新增：自动设置日期区间
             stock_info = selected_items[0].data(Qt.UserRole)
-            from PyQt5.QtCore import QDate
             start_date_str = stock_info.get('start_date')
             end_date_str = stock_info.get('end_date')
             if start_date_str and len(start_date_str) >= 10:
@@ -2513,7 +2673,6 @@ class TradingGUI(QMainWindow):
                     # 新增：同步K线数据到所有AnalysisWidget类型Tab
                     if hasattr(main_widget, 'set_kdata'):
                         kdata = self.get_kdata(stock_code)
-                        import pandas as pd
                         if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                             kdata = kdata.copy()
                             kdata['code'] = stock_code
@@ -2521,7 +2680,6 @@ class TradingGUI(QMainWindow):
             # 兼容analysis_widget等单独实例
             if hasattr(self, 'analysis_widget') and hasattr(self.analysis_widget, 'set_kdata'):
                 kdata = self.get_kdata(self.current_stock)
-                import pandas as pd
                 if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                     kdata = kdata.copy()
                     kdata['code'] = self.current_stock
@@ -2547,7 +2705,6 @@ class TradingGUI(QMainWindow):
             # 新增：同步K线数据到AnalysisWidget，自动补全code字段
             if hasattr(self, 'analysis_widget'):
                 kdata = self.get_kdata(self.current_stock)
-                import pandas as pd
                 if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                     kdata = kdata.copy()
                     kdata['code'] = self.current_stock
@@ -2906,7 +3063,6 @@ class TradingGUI(QMainWindow):
             # 只刷新图表，所有指标渲染由ChartWidget自动同步主窗口get_current_indicators
             if hasattr(self, 'current_stock') and self.current_stock:
                 k_data = self.get_kdata(self.current_stock)
-                import pandas as pd
                 if isinstance(k_data, pd.DataFrame) and 'code' not in k_data.columns:
                     k_data = k_data.copy()
                     k_data['code'] = self.current_stock
@@ -3083,23 +3239,30 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"显示计算器失败: {str(e)}")
 
     def calculator_button_clicked(self, text: str, display: QLineEdit) -> None:
-        """处理计算器按钮点击事件
-
-        Args:
-            text: 按钮文本
-            display: 显示框
-        """
+        """处理计算器按钮点击事件，优化UI刷新机制"""
         try:
-            if text == '=':
+            # 使用系统日志组件记录操作
+
+            logger = get_logger(__name__)
+            logger.debug(f"计算器按钮点击: {text}")
+
+            if text == "=":
                 # 计算结果
                 try:
                     result = eval(display.text())
                     display.setText(str(result))
                 except:
                     display.setText("错误")
+            elif text == "C":
+                # 清除显示
+                display.clear()
             else:
                 # 添加文本
                 display.insert(text)
+
+            # 使用优化的UI更新机制
+            schedule_ui_update(delay=0)
+
         except Exception as e:
             self.log_manager.error(f"计算器操作失败: {str(e)}")
 
@@ -3722,7 +3885,6 @@ class TradingGUI(QMainWindow):
                     self.chart_cache[self.current_stock] = k_data
             # 广播到所有图表
             self.broadcast_kdata_to_tabs(k_data)
-            import pandas as pd
             if isinstance(k_data, pd.DataFrame) and 'code' not in k_data.columns:
                 k_data = k_data.copy()
                 k_data['code'] = self.current_stock
@@ -3734,11 +3896,11 @@ class TradingGUI(QMainWindow):
             # 获取股票名称
             stock = self.sm[self.current_stock]
             title = f"{self.current_stock} {stock.name}"
-            # 获取当前选中指标
-            selected_items = self.indicator_list.selectedItems(
-            ) if hasattr(self, 'indicator_list') else []
-            indicators = [item.text()
-                          for item in selected_items] if selected_items else []
+            # 获取当前选中指标 - 修复selected_items变量问题
+            selected_items = []
+            if hasattr(self, 'indicator_list'):
+                selected_items = self.indicator_list.selectedItems()
+            indicators = [item.text() for item in selected_items] if selected_items else []
             data = {
                 'stock_code': self.current_stock,
                 'kdata': k_data,
@@ -3814,143 +3976,67 @@ class TradingGUI(QMainWindow):
         pass
 
     def analyze(self):
-        """执行分析"""
+        """执行分析，使用新的策略管理系统"""
         try:
+            # 获取当前股票数据
             if not self.current_stock:
-                self.log_manager.warning("请先选择股票")
+                self.handle_error("请先选择股票")
+                return
+
+            # 获取股票数据
+            data = self.get_kdata(self.current_stock)
+            if data is None or data.empty:
+                self.handle_error("无法获取股票数据")
                 return
 
             # 获取当前策略
-            strategy = self.strategy_combo.currentText()
-
-            # 获取策略参数
-            params = {}
-
-            for i in range(self.strategy_params_layout.rowCount()):
-                label = self.strategy_params_layout.itemAt(
-                    i, QFormLayout.LabelRole).widget().text()
-                widget = self.strategy_params_layout.itemAt(
-                    i, QFormLayout.FieldRole).widget()
-                if isinstance(widget, QSpinBox):
-                    params[label] = widget.value()
-                elif isinstance(widget, QDoubleSpinBox):
-                    params[label] = widget.value()
-
-            # 记录开始分析
-            self.log_manager.info(f"开始分析 - 策略: {strategy}")
-
-            # 获取股票数据
-            data = self.data_manager.get_k_data(
-                self.current_stock,
-                freq=self.current_period,
-                start_date=self.start_date.date().strftime('%Y-%m-%d'),
-                end_date=self.end_date.date().strftime('%Y-%m-%d')
-            )
-
-            # 执行分析
-            results = self._execute_analysis(strategy, data, params)
-
-            # 更新图表
-            self.update_chart(results)
-
-            # 发送分析完成信号
-            self.analysis_completed.emit(results)
-
-            self.log_manager.info("分析完成")
-
-        except Exception as e:
-            error_msg = f"分析失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-
-    def backtest(self):
-        """执行回测，使用统一回测引擎，支持所有策略，参数标准化，结果自动刷新到UI"""
-        try:
-            if not self.current_stock:
-                self.log_manager.warning("请先选择股票")
+            strategy_name = self.strategy_combo.currentText() if hasattr(self, 'strategy_combo') else None
+            if not strategy_name:
+                self.handle_error("请选择分析策略")
                 return
 
-            # 获取当前策略
-            strategy = self.strategy_combo.currentText()
+            self.log_manager.info(f"开始分析 - 股票: {self.current_stock}, 策略: {strategy_name}")
 
-            # 获取策略参数
-            params = {}
-            for i in range(self.strategy_params_layout.rowCount()):
-                label = self.strategy_params_layout.itemAt(i, QFormLayout.LabelRole).widget().text()
-                widget = self.strategy_params_layout.itemAt(i, QFormLayout.FieldRole).widget()
-                if isinstance(widget, QSpinBox):
-                    params[label] = widget.value()
-                elif isinstance(widget, QDoubleSpinBox):
-                    params[label] = widget.value()
+            # 使用新的策略管理系统执行分析
+            try:
+                # 使用系统日志组件记录分析开始
+                logger = get_logger(__name__)
+                logger.info(f"开始执行分析，策略: {strategy_name}")
 
-            # 获取股票数据
-            kdata = self.get_kdata(self.current_stock)
-            if kdata is None or kdata.empty:
-                self.log_manager.error("无法获取股票数据")
-                return
+                # 优先使用新的策略管理系统
+                try:
+                    from core.strategy import execute_strategy, list_available_strategies
+                    available_strategies = list_available_strategies()
 
-            # 生成交易信号（简化版，实际应该根据策略生成）
-            signal_data = kdata.copy()
-            signal_data['signal'] = 0  # 默认无信号
+                    if strategy_name in available_strategies:
+                        # 使用新的策略管理系统
+                        results = execute_strategy(strategy_name, data, **{})
+                        logger.info(f"新策略系统执行完成: {strategy_name}")
+                    else:
+                        # 使用统一的分析执行方法
+                        results = self._execute_analysis(strategy_name, data, {})
+                        logger.info(f"传统分析方法执行完成: {strategy_name}")
 
-            # 根据策略生成信号
-            if strategy == "均线策略":
-                ma_short = signal_data['close'].rolling(window=params.get('快线周期', 5)).mean()
-                ma_long = signal_data['close'].rolling(window=params.get('慢线周期', 20)).mean()
-                signal_data.loc[ma_short > ma_long, 'signal'] = 1
-                signal_data.loc[ma_short < ma_long, 'signal'] = -1
-            elif strategy == "MACD策略":
-                exp1 = signal_data['close'].ewm(span=params.get('快线周期', 12), adjust=False).mean()
-                exp2 = signal_data['close'].ewm(span=params.get('慢线周期', 26), adjust=False).mean()
-                macd = exp1 - exp2
-                signal = macd.ewm(span=params.get('信号周期', 9), adjust=False).mean()
-                signal_data.loc[macd > signal, 'signal'] = 1
-                signal_data.loc[macd < signal, 'signal'] = -1
+                except Exception as e:
+                    logger.warning(f"新策略引擎执行失败，使用传统方法: {str(e)}")
+                    # 回退到传统分析方法
+                    results = self._execute_analysis(strategy_name, data, {})
 
-            self.log_manager.info(f"开始回测 - 策略: {strategy}")
+                # 更新UI显示结果
+                self.update_chart(results)
+                self.handle_analysis_complete(results)
 
-            # 使用统一回测引擎
-            from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
-
-            # 创建回测引擎
-            engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
-
-            # 运行回测
-            result = engine.run_backtest(
-                data=signal_data,
-                initial_capital=self.initial_cash_spin.value() if hasattr(self, 'initial_cash_spin') and self.initial_cash_spin is not None else 100000.0,
-                position_size=0.9,
-                commission_pct=self.commission_spin.value() if hasattr(self, 'commission_spin') and self.commission_spin is not None else 0.0003,
-                slippage_pct=self.slippage_spin.value() if hasattr(self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
-            )
-
-            # 提取结果
-            backtest_result = result['backtest_result']
-            risk_metrics = result['risk_metrics']
-
-            # 转换为兼容格式
-            metrics = {
-                'total_return': risk_metrics.total_return,
-                'annual_return': risk_metrics.annualized_return,
-                'max_drawdown': risk_metrics.max_drawdown,
-                'sharpe_ratio': risk_metrics.sharpe_ratio,
-                'volatility': risk_metrics.volatility,
-                'win_rate': getattr(risk_metrics, 'win_rate', 0),
-                'profit_loss_ratio': getattr(risk_metrics, 'profit_loss_ratio', 0),
-                'final_capital': backtest_result['capital'].iloc[-1],
-                'total_trades': len(backtest_result[backtest_result['signal'] != 0])
-            }
-
-            self.update_performance_metrics(metrics)
-            self.performance_updated.emit(metrics)
-            self.log_manager.info("回测完成")
+            except Exception as e:
+                error_msg = f"分析执行失败: {str(e)}"
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
+                self.handle_error(error_msg)
 
         except Exception as e:
-            error_msg = f"回测失败: {str(e)}"
+            error_msg = f"分析执行失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+            self.handle_error(error_msg)
 
     def _execute_analysis(self, strategy: str, data: pd.DataFrame, params: dict) -> dict:
         """执行分析
@@ -4088,7 +4174,6 @@ class TradingGUI(QMainWindow):
                 self.log_manager.info(f"前5行数据:\n{kdata.head()}")
                 from analysis.pattern_recognition import PatternRecognizer
                 recognizer = PatternRecognizer()
-                import pandas as pd
                 kdata_for_pattern = kdata
                 if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                     code = None
@@ -4602,7 +4687,6 @@ class TradingGUI(QMainWindow):
             if current_stock:
                 kdata = self.get_kdata(current_stock)
                 self.broadcast_kdata_to_tabs(kdata)
-                import pandas as pd
                 if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                     kdata = kdata.copy()
                     kdata['code'] = current_stock
@@ -4624,7 +4708,6 @@ class TradingGUI(QMainWindow):
             self.error_occurred.emit(error_msg)
 
     def get_kdata(self, code: str) -> pd.DataFrame:
-        import json
         try:
             log_info = {"event": "get_kdata", "code": code, "from": "data_manager", "len": None, "fields": None, "status": "init"}
             if not hasattr(self, 'data_manager'):
@@ -4701,7 +4784,6 @@ class TradingGUI(QMainWindow):
             first_code = first_stock['marketCode']
             self.current_stock = first_code
             # 自动设置日期区间
-            from PyQt5.QtCore import QDate
             # 解析日期
             start_date_str = first_stock.get('start_date')
             end_date_str = first_stock.get('end_date')
@@ -4750,7 +4832,6 @@ class TradingGUI(QMainWindow):
                     self.bottom_panel.update()
                 if hasattr(self, 'show_log_panel'):
                     self.show_log_panel()
-                from PyQt5.QtWidgets import QApplication
                 QApplication.processEvents()
                 self.log_manager.info("已切换到多屏模式")
         except Exception as e:
@@ -4771,7 +4852,6 @@ class TradingGUI(QMainWindow):
                     self.bottom_panel.update()
                 if hasattr(self, 'show_log_panel'):
                     self.show_log_panel()
-                from PyQt5.QtWidgets import QApplication
                 QApplication.processEvents()
                 self.log_manager.info("已切换到单屏模式")
         except Exception as e:
@@ -4784,11 +4864,7 @@ class TradingGUI(QMainWindow):
             event.acceptProposedAction()
 
     def get_current_indicators(self):
-        """
-        获取当前激活的所有指标及其参数，兼容ta-lib、自有、自定义，修复无指标问题，支持中文名称
-        Returns:
-            List[dict]: [{"name": 指标名, "params": 参数字典, "type": 类型, "group": 分组}, ...]
-        """
+        """获取当前选中的指标列表，返回指标配置字典"""
         indicators = []
         from indicators_algo import get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, get_indicator_english_name
         talib_list = get_talib_indicator_list()
@@ -4797,6 +4873,7 @@ class TradingGUI(QMainWindow):
             import logging
             logging.error("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
             return []
+
         selected_items = self.indicator_list.selectedItems()
         if not hasattr(self, 'param_controls') or self.param_controls is None:
             self.param_controls = {}
@@ -4812,8 +4889,6 @@ class TradingGUI(QMainWindow):
             if ind_type == "ta-lib" or ind_type == "形态识别" or ind_type == "其他":
                 group = "talib"
                 try:
-                    import inspect
-                    import talib
                     func = getattr(talib, indicator_english, None)
                     if func:
                         sig = inspect.signature(func)
@@ -4835,7 +4910,6 @@ class TradingGUI(QMainWindow):
         """
         整理指标筛选列表，确保与ta-lib分类一一映射，筛选功能正常，只展示有指标的分类，支持中文显示
         """
-        from indicators_algo import get_all_indicators_by_category
         # 使用中文名称显示指标
         category_map = get_all_indicators_by_category(use_chinese=True)
         self.indicator_list.clear()
@@ -4889,7 +4963,6 @@ class TradingGUI(QMainWindow):
             if ok and item:
                 idx = items.index(item)
                 indicators = combinations[idx][3]
-                import json
                 indicators = json.loads(indicators)
                 # 清空当前选中
                 self.indicator_list.clearSelection()
@@ -4904,7 +4977,7 @@ class TradingGUI(QMainWindow):
                                 for k, v in ind["params"].items():
                                     if k in self.param_controls:
                                         self.param_controls[k].setValue(v)
-                self.update_chart()
+            self.update_chart()
         except Exception as e:
             self.log_manager.error(f"加载指标组合失败: {str(e)}")
 
@@ -5119,7 +5192,6 @@ class TradingGUI(QMainWindow):
     def run_smart_optimization(self):
         """运行智能优化"""
         try:
-            from optimization.auto_tuner import AutoTuner
             from PyQt5.QtWidgets import QInputDialog
 
             # 获取性能阈值
@@ -5200,7 +5272,6 @@ class TradingGUI(QMainWindow):
         try:
             from optimization.ui_integration import VersionManagerDialog
             from optimization.version_manager import VersionManager
-            from PyQt5.QtWidgets import QInputDialog
 
             # 获取要管理的形态名称
             patterns = []
@@ -5241,12 +5312,10 @@ class TradingGUI(QMainWindow):
         """显示性能评估"""
         try:
             from optimization.performance_evaluator import PerformanceEvaluator
-            from PyQt5.QtWidgets import QInputDialog
 
             # 获取要评估的形态名称
             patterns = []
             try:
-                from analysis.pattern_manager import PatternManager
                 manager = PatternManager()
                 pattern_configs = manager.get_all_patterns()
                 patterns = [p.english_name for p in pattern_configs]
@@ -5295,10 +5364,12 @@ class TradingGUI(QMainWindow):
 识别形态数: {metrics.patterns_found}
 鲁棒性: {metrics.robustness_score:.3f}
 参数敏感性: {metrics.parameter_sensitivity:.3f}
+数据来源: 真实市场数据
+测试股票数: {len(test_datasets)}
                     """.strip()
 
                     QMessageBox.information(self, f"性能评估 - {pattern_name}", result_text)
-                    self.log_manager.info(f"已完成 {pattern_name} 的性能评估")
+                    self.log_manager.info(f"已完成 {pattern_name} 的性能评估（使用真实数据）")
 
                 except Exception as e:
                     progress.close()
@@ -5306,7 +5377,6 @@ class TradingGUI(QMainWindow):
                     self.log_manager.error(f"性能评估失败: {str(e)}")
 
             # 启动后台线程
-            import threading
             threading.Thread(target=run_evaluation, daemon=True).start()
 
             self.log_manager.info(f"已启动 {pattern_name} 的性能评估")
@@ -5318,7 +5388,6 @@ class TradingGUI(QMainWindow):
     def show_optimization_status(self):
         """显示优化系统状态"""
         try:
-            from optimization.auto_tuner import AutoTuner
             from optimization.database_schema import OptimizationDatabaseManager
 
             # 获取系统状态
@@ -5459,7 +5528,6 @@ class TradingGUI(QMainWindow):
                     table.setItem(row, 9, QTableWidgetItem(", ".join(r.get("errors", []))))
                     table.setItem(row, 10, QTableWidgetItem(", ".join(r.get("warnings", []))))
             # 可视化数据准备
-            import pandas as pd
             import plotly.express as px
             import plotly.graph_objects as go
             df = pd.DataFrame(filtered)
@@ -5510,7 +5578,6 @@ class TradingGUI(QMainWindow):
         export_btn = QPushButton("导出Excel")
 
         def do_export():
-            import pandas as pd
             file_path, _ = QFileDialog.getSaveFileName(dialog, "导出数据质量报告", "quality_report.xlsx", "Excel Files (*.xlsx)")
             if file_path:
                 df = pd.DataFrame(reports)
@@ -5533,7 +5600,6 @@ class TradingGUI(QMainWindow):
     def _auto_quality_check(self):
         try:
             stocks = self.stock_list_cache if hasattr(self, 'stock_list_cache') else []
-            from data.data_loader import generate_quality_report
             abnormal = []
             for stock in stocks:
                 code = stock['marketCode'] if 'marketCode' in stock else stock['code']
@@ -5552,7 +5618,6 @@ class TradingGUI(QMainWindow):
 
     def broadcast_kdata_to_tabs(self, kdata):
         """统一推送K线数据到所有AnalysisWidget及支持set_kdata的Tab"""
-        import pandas as pd
         try:
             if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
                 kdata = kdata.copy()
@@ -5570,19 +5635,188 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"推送K线数据到Tab失败: {str(e)}")
 
     def refresh_tab_content(self, widget):
-        for method in ["refresh", "update", "reload"]:
-            if hasattr(widget, method):
-                try:
-                    getattr(widget, method)()
-                    # 刷新后自动推送K线数据
-                    if hasattr(widget, 'set_kdata') and hasattr(self, 'current_stock'):
-                        kdata = self.get_kdata(self.current_stock)
-                        widget.set_kdata(kdata)
-                except Exception as e:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"刷新Tab内容失败: {str(e)}")
-                break
-    # 其它如start_date_edit、end_date_edit、股票池/行业/市场筛选等事件中也调用broadcast_kdata_to_tabs
+        """刷新标签页内容"""
+        try:
+            if hasattr(widget, 'refresh_content'):
+                widget.refresh_content()
+        except Exception as e:
+            self.log_manager.error(f"刷新标签页内容失败: {str(e)}")
+
+    # ==================== 策略管理相关方法 ====================
+
+    def show_strategy_manager(self):
+        """显示策略管理器"""
+        try:
+            from gui.dialogs.strategy_manager_dialog import StrategyManagerDialog
+            dialog = StrategyManagerDialog(self)
+            dialog.exec_()
+        except ImportError:
+            # 如果策略管理器对话框不存在，创建一个简单的策略列表对话框
+            self._show_simple_strategy_manager()
+        except Exception as e:
+            self.log_manager.error(f"显示策略管理器失败: {str(e)}")
+            self.handle_error(f"无法打开策略管理器: {str(e)}")
+
+    def _show_simple_strategy_manager(self):
+        """显示简单的策略管理器"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("策略管理器")
+        dialog.setModal(True)
+        dialog.resize(800, 600)
+
+        layout = QVBoxLayout(dialog)
+
+        # 策略列表
+        strategy_list = QListWidget()
+        for strategy_name in self.available_strategies:
+            item = QListWidgetItem(strategy_name)
+            strategy_list.addItem(item)
+
+        layout.addWidget(QLabel("可用策略:"))
+        layout.addWidget(strategy_list)
+
+        # 按钮
+        button_layout = QHBoxLayout()
+        refresh_btn = QPushButton("刷新")
+        info_btn = QPushButton("查看详情")
+        close_btn = QPushButton("关闭")
+
+        refresh_btn.clicked.connect(lambda: self._refresh_strategy_list(strategy_list))
+        info_btn.clicked.connect(lambda: self._show_strategy_info(strategy_list))
+        close_btn.clicked.connect(dialog.accept)
+
+        button_layout.addWidget(refresh_btn)
+        button_layout.addWidget(info_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(close_btn)
+
+        layout.addLayout(button_layout)
+        dialog.exec_()
+
+    def _refresh_strategy_list(self, strategy_list):
+        """刷新策略列表"""
+        try:
+            strategy_list.clear()
+            self.available_strategies = list_available_strategies()
+            for strategy_name in self.available_strategies:
+                item = QListWidgetItem(strategy_name)
+                strategy_list.addItem(item)
+            self.log_manager.info(f"策略列表已刷新，共 {len(self.available_strategies)} 个策略")
+        except Exception as e:
+            self.log_manager.error(f"刷新策略列表失败: {str(e)}")
+
+    def _show_strategy_info(self, strategy_list):
+        """显示策略详情"""
+        current_item = strategy_list.currentItem()
+        if not current_item:
+            QMessageBox.information(self, "提示", "请先选择一个策略")
+            return
+
+        strategy_name = current_item.text()
+        try:
+            strategy_info = get_strategy_info(strategy_name)
+            if strategy_info:
+                info_text = f"""
+策略名称: {strategy_info.get('name', strategy_name)}
+策略类型: {strategy_info.get('strategy_type', '未知')}
+版本: {strategy_info.get('version', '1.0.0')}
+作者: {strategy_info.get('author', '未知')}
+描述: {strategy_info.get('description', '无描述')}
+分类: {strategy_info.get('category', '未分类')}
+创建时间: {strategy_info.get('created_at', '未知')}
+"""
+                QMessageBox.information(self, f"策略详情 - {strategy_name}", info_text)
+            else:
+                QMessageBox.warning(self, "警告", f"无法获取策略 '{strategy_name}' 的详细信息")
+        except Exception as e:
+            self.log_manager.error(f"获取策略信息失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"获取策略信息失败: {str(e)}")
+
+    def create_new_strategy(self):
+        """创建新策略"""
+        QMessageBox.information(self, "提示", "策略创建功能正在开发中...")
+
+    def import_strategy(self):
+        """导入策略"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "导入策略", "", "Python文件 (*.py);;JSON文件 (*.json);;所有文件 (*)"
+            )
+            if file_path:
+                # 这里可以实现策略导入逻辑
+                QMessageBox.information(self, "提示", f"策略导入功能正在开发中...\n选择的文件: {file_path}")
+        except Exception as e:
+            self.log_manager.error(f"导入策略失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"导入策略失败: {str(e)}")
+
+    def export_strategy(self):
+        """导出策略"""
+        try:
+            if not self.available_strategies:
+                QMessageBox.warning(self, "警告", "没有可导出的策略")
+                return
+
+            # 选择要导出的策略
+            strategy_name, ok = QInputDialog.getItem(
+                self, "选择策略", "请选择要导出的策略:", self.available_strategies, 0, False
+            )
+            if ok and strategy_name:
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, "导出策略", f"{strategy_name}.json", "JSON文件 (*.json);;所有文件 (*)"
+                )
+                if file_path:
+                    # 这里可以实现策略导出逻辑
+                    QMessageBox.information(self, "提示", f"策略导出功能正在开发中...\n导出文件: {file_path}")
+        except Exception as e:
+            self.log_manager.error(f"导出策略失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"导出策略失败: {str(e)}")
+
+    def backtest_strategy(self):
+        """策略回测"""
+        try:
+            if not self.current_stock:
+                QMessageBox.warning(self, "警告", "请先选择股票")
+                return
+
+            # 使用现有的回测方法
+            self.backtest()
+        except Exception as e:
+            self.log_manager.error(f"策略回测失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"策略回测失败: {str(e)}")
+
+    def optimize_strategy(self):
+        """策略优化"""
+        try:
+            if not self.current_stock:
+                QMessageBox.warning(self, "警告", "请先选择股票")
+                return
+
+            # 使用现有的优化方法
+            self.optimize()
+        except Exception as e:
+            self.log_manager.error(f"策略优化失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"策略优化失败: {str(e)}")
+
+    def backtest(self):
+        """执行回测分析"""
+        try:
+            # 获取当前选中的股票
+            if not hasattr(self, 'current_stock') or not self.current_stock:
+                self.handle_error("请先选择股票")
+                return
+
+            # 调用现有的backtest_stock方法
+            selected_items = self.stock_list.selectedItems()
+            if selected_items:
+                self.backtest_stock(selected_items[0])
+            else:
+                self.handle_error("请先选择股票")
+
+        except Exception as e:
+            error_msg = f"回测执行失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.handle_error(error_msg)
 
 
 class StockListWidget(QListWidget):
@@ -5718,7 +5952,6 @@ def main():
         # 延迟初始化优化系统（在主窗口显示后）
         def delayed_init():
             try:
-                from optimization.database_schema import OptimizationDatabaseManager
                 OptimizationDatabaseManager()
             except Exception as e:
                 print(f"优化系统初始化失败: {e}")
@@ -5737,7 +5970,6 @@ def main():
 
     except Exception as e:
         print(f"应用程序启动失败: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
 

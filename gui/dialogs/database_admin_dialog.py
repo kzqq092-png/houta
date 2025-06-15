@@ -372,7 +372,6 @@ class DatabaseAdminDialog(QDialog):
             self, "导入CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-        import csv
         with open(path, encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = next(reader)

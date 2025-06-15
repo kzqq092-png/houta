@@ -1578,7 +1578,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 for cat, inds in categories.items():
                     for ind in inds:
                         try:
-                            from indicators_algo import calc_talib_indicator
                             res = calc_talib_indicator(ind, kdata)
                         except Exception:
                             continue
@@ -1797,7 +1796,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
         headers = ["股票代码", "策略", "信号", "得分", "涨跌幅", "PE", "PB", "ROE", "主力净流入", "北向资金"]
         self.compare_table.setColumnCount(len(headers))
         self.compare_table.setHorizontalHeaderLabels(headers)
-        from core.stock_screener import StockScreener
         screener = StockScreener(self.data_manager, self.log_manager)
         row = 0
         for code in codes:
@@ -1956,7 +1954,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
 
     def export_multi_factor_results(self):
         try:
-            import pandas as pd
             row_count = self.multi_factor_result.rowCount()
             if row_count == 0:
                 QMessageBox.warning(self, "无数据", "没有可导出的多因子选股结果")
@@ -2021,7 +2018,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
             except Exception:
                 pass
             button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
         future = self._thread_pool.submit(task)

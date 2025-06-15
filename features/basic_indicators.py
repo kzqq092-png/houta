@@ -119,7 +119,6 @@ def calculate_base_indicators(df):
         df['MA20'] = calc_ma(close_data, 20)
         df['MA60'] = calc_ma(close_data, 60)
     else:
-        from hikyuu.indicator import MA
         df['MA5'] = MA(close_data, n=5)
         df['MA10'] = MA(close_data, n=10)
         df['MA20'] = MA(close_data, n=20)
@@ -195,7 +194,6 @@ def calculate_base_indicators(df):
         df['signal_line'] = df['macd'].ewm(span=9, adjust=False).mean()
         df['macd_hist'] = df['macd'] - df['signal_line']
     else:
-        from hikyuu.indicator import MACD
         macd = MACD(close_data, n1=12, n2=26, n3=9)
         df['macd'] = macd.dif if hasattr(macd, 'dif') else macd
         df['signal_line'] = macd.dea if hasattr(macd, 'dea') else None

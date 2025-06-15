@@ -166,7 +166,6 @@ def monitor_performance(name: str = None, threshold_ms: int = 1000):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            import time
             start = time.time()
             result = func(*args, **kwargs)
             elapsed = (time.time() - start) * 1000  # ms

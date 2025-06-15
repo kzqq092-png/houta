@@ -88,72 +88,86 @@ class ModelAnalysis:
             figsize: tuple，图形大小
         """
         try:
-            if signal_col not in df.columns:
-                raise ValueError(f"DataFrame中缺少信号列: {signal_col}")
+            # 使用统一的可视化模块
+            from visualization.common_visualization import CommonVisualization
 
-            # 确保索引是日期类型
-            if not isinstance(df.index, pd.DatetimeIndex):
-                raise ValueError("DataFrame的索引必须是日期类型")
+            common_viz = CommonVisualization()
+            return common_viz.plot_signal_distribution(df, signal_col=signal_col, figsize=figsize)
 
-            # 创建包含年月信息的DataFrame
-            signal_df = pd.DataFrame({
-                'year': df.index.year,
-                'month': df.index.month,
-                'signal': df[signal_col]
-            })
-
-            # 按年月分组统计信号数量
-            pivot_buy = signal_df[signal_df['signal'] == 1].groupby(
-                ['year', 'month']).size().unstack(fill_value=0)
-            pivot_sell = signal_df[signal_df['signal'] == -
-                                   1].groupby(['year', 'month']).size().unstack(fill_value=0)
-
-            # 计算信号比例（买-卖）/总量
-            pivot_ratio = (pivot_buy - pivot_sell) / \
-                (pivot_buy + pivot_sell + 1e-10)  # 添加小数避免除零
-
-            # 创建图形
-            fig, ax = plt.subplots(figsize=figsize)
-
-            # 绘制热力图
-            cmap = plt.cm.RdYlGn  # 红色表示多卖出，绿色表示多买入
-            im = ax.imshow(pivot_ratio, cmap=cmap,
-                           aspect='auto', vmin=-1, vmax=1)
-
-            # 设置坐标轴标签
-            ax.set_xticks(np.arange(len(pivot_ratio.columns)))
-            ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-            ax.set_yticks(np.arange(len(pivot_ratio.index)))
-            ax.set_yticklabels(pivot_ratio.index)
-
-            # 添加标题
-            plt.title('Signal Distribution Over Time', fontsize=15)
-
-            # 添加颜色条
-            cbar = plt.colorbar(im, ax=ax)
-            cbar.set_label('Signal Ratio (Buy - Sell) / Total')
-
-            # 在每个单元格添加文本
-            for i in range(len(pivot_ratio.index)):
-                for j in range(len(pivot_ratio.columns)):
-                    buy_count = pivot_buy.iloc[i, j]
-                    sell_count = pivot_sell.iloc[i, j]
-                    text = f"{buy_count}-{sell_count}"
-                    ax.text(j, i, text, ha="center",
-                            va="center", color="black")
-            # 顶部显示买卖信号总和
-            total_buy = pivot_buy.values.sum()
-            total_sell = pivot_sell.values.sum()
-            ax.text(0.5, 0.95, f"总买入信号: {int(total_buy)}  总卖出信号: {int(total_sell)}",
-                    transform=ax.transAxes, ha='center', va='bottom', fontsize=12, color='#d32f2f')
-            plt.tight_layout()
-
-            return plt.gcf()
-
+        except ImportError:
+            # 如果无法导入统一模块，使用原有实现作为后备
+            logger.warning("无法导入统一可视化模块，使用后备实现")
+            return self._plot_signal_over_time_fallback(df, signal_col, figsize)
         except Exception as e:
             logger.error(f"绘制信号时间分布图失败: {str(e)}")
             raise
+
+    def _plot_signal_over_time_fallback(self, df, signal_col='signal', figsize=(15, 8)):
+        """
+        后备的信号时间分布绘制实现
+        """
+        if signal_col not in df.columns:
+            raise ValueError(f"DataFrame中缺少信号列: {signal_col}")
+
+        # 确保索引是日期类型
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError("DataFrame的索引必须是日期类型")
+
+        # 创建包含年月信息的DataFrame
+        signal_df = pd.DataFrame({
+            'year': df.index.year,
+            'month': df.index.month,
+            'signal': df[signal_col]
+        })
+
+        # 按年月分组统计信号数量
+        pivot_buy = signal_df[signal_df['signal'] == 1].groupby(
+            ['year', 'month']).size().unstack(fill_value=0)
+        pivot_sell = signal_df[signal_df['signal'] == -
+                               1].groupby(['year', 'month']).size().unstack(fill_value=0)
+
+        # 计算信号比例（买-卖）/总量
+        pivot_ratio = (pivot_buy - pivot_sell) / \
+            (pivot_buy + pivot_sell + 1e-10)  # 添加小数避免除零
+
+        # 创建图形
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # 绘制热力图
+        cmap = plt.cm.RdYlGn  # 红色表示多卖出，绿色表示多买入
+        im = ax.imshow(pivot_ratio, cmap=cmap,
+                       aspect='auto', vmin=-1, vmax=1)
+
+        # 设置坐标轴标签
+        ax.set_xticks(np.arange(len(pivot_ratio.columns)))
+        ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+        ax.set_yticks(np.arange(len(pivot_ratio.index)))
+        ax.set_yticklabels(pivot_ratio.index)
+
+        # 添加标题
+        plt.title('Signal Distribution Over Time', fontsize=15)
+
+        # 添加颜色条
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Signal Ratio (Buy - Sell) / Total')
+
+        # 在每个单元格添加文本
+        for i in range(len(pivot_ratio.index)):
+            for j in range(len(pivot_ratio.columns)):
+                buy_count = pivot_buy.iloc[i, j]
+                sell_count = pivot_sell.iloc[i, j]
+                text = f"{buy_count}-{sell_count}"
+                ax.text(j, i, text, ha="center",
+                        va="center", color="black")
+        # 顶部显示买卖信号总和
+        total_buy = pivot_buy.values.sum()
+        total_sell = pivot_sell.values.sum()
+        ax.text(0.5, 0.95, f"总买入信号: {int(total_buy)}  总卖出信号: {int(total_sell)}",
+                transform=ax.transAxes, ha='center', va='bottom', fontsize=12, color='#d32f2f')
+        plt.tight_layout()
+
+        return plt.gcf()
 
     def plot_model_performance(self, performance_metrics, model_names, figsize=(12, 8)):
         """

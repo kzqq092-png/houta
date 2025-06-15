@@ -258,7 +258,6 @@ class SentimentStockSelectorDialog(QDialog):
         best_score = -1e9 if target == "最大收益" or target == "夏普比率" else 1e9
         best_signal = None
         result = "信号\t参数\t目标值\n"
-        import random
         tasks = []
         with ThreadPoolExecutor(max_workers=4) as executor:
             for sig in signals:
@@ -308,7 +307,6 @@ class SentimentStockSelectorDialog(QDialog):
         self.backtest_result.setText(result)
 
     def _simulate_score(self, sig, param, target):
-        import random
         if target == "最大收益":
             score = random.uniform(-5, 20)
         elif target == "最小回撤":
@@ -319,7 +317,6 @@ class SentimentStockSelectorDialog(QDialog):
 
     def export_report(self):
         # 导出更丰富的回测报告
-        import pandas as pd
         rows = []
         for i in range(self.backtest_table.rowCount()):
             row = []

@@ -13,7 +13,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import mplfinance as mpf
-import mplcursors
+import time
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 
@@ -238,7 +238,6 @@ class ChartWidget(QWidget):
                     return date_val.strftime('%Y-%m-%d')
                 except:
                     # 最后的兜底方案：使用索引位置生成相对日期
-                    from datetime import datetime, timedelta
                     base_date = datetime(2024, 1, 1)
                     actual_date = base_date + timedelta(days=idx)
                     return actual_date.strftime('%Y-%m-%d')
@@ -352,7 +351,6 @@ class ChartWidget(QWidget):
             # ...找到 on_mouse_move ...
 
             def on_mouse_move(event):
-                import time
                 now = int(time.time() * 1000)
                 if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
                     return
@@ -836,7 +834,6 @@ class ChartWidget(QWidget):
             # 在 on_mouse_move 事件中，x_text 固定为X轴下方边界
             # ...找到 on_mouse_move ...
             def on_mouse_move(event):
-                import time
                 now = int(time.time() * 1000)
                 if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
                     return
@@ -1157,7 +1154,6 @@ class ChartWidget(QWidget):
 
     def enable_crosshair(self, force_rebind=False):
         """自动启用十字线，竖线、横线、信息框随鼠标移动，且每次都可强制重新绑定事件，x轴与K线对齐，y轴同步动态显示"""
-        import matplotlib.dates as mdates
         theme_colors = self.theme_manager.get_theme_colors()
         primary_color = theme_colors.get('primary', '#1976d2')
         if force_rebind or not hasattr(self, '_crosshair_initialized') or not self._crosshair_initialized:
@@ -1190,7 +1186,6 @@ class ChartWidget(QWidget):
             self._orig_ytick_color = None
 
             def on_mouse_move(event):
-                import time
                 now = int(time.time() * 1000)
                 if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
                     return
@@ -1693,7 +1688,6 @@ class ChartWidget(QWidget):
         self.canvas.draw_idle()
 
     def _on_zoom_motion(self, event):
-        import time
         if self._zoom_press_x is None or event.inaxes != self.price_ax or event.button != 1:
             return
         now = int(time.time() * 1000)
@@ -1759,7 +1753,6 @@ class ChartWidget(QWidget):
     def _on_zoom_right_click(self, event):
         # 右键单击支持K线拖拽和平移，右键双击还原初始状态
         if event.inaxes == self.price_ax and event.button == 3:
-            import time
             if not hasattr(self, '_last_right_click_time'):
                 self._last_right_click_time = 0
             now = time.time()
@@ -2003,7 +1996,6 @@ class ChartWidget(QWidget):
             pattern_signals: List[dict]，每个dict至少包含 'index', 'pattern', 'signal', 'confidence' 等字段
         """
         import matplotlib.patches as mpatches
-        import matplotlib.pyplot as plt
 
         if not hasattr(self, 'price_ax') or self.current_kdata is None or not pattern_signals:
             return
@@ -2151,7 +2143,6 @@ class ChartWidget(QWidget):
 
     def export_kline_and_indicators(self):
         try:
-            import pandas as pd
             if self.current_kdata is None or self.current_kdata.empty:
                 QMessageBox.warning(self, "提示", "当前无K线数据可导出！")
                 return

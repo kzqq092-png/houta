@@ -141,7 +141,6 @@ def test_technical_indicators():
     print("=" * 60)
 
     try:
-        from indicators_algo import (
             calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll,
             calc_atr, calc_obv, calc_cci, calc_talib_indicator
         )
@@ -324,8 +323,6 @@ def test_system_call_analysis():
 
         # 分析数据获取调用量
         try:
-            from core.data_manager import DataManager
-            from core.logger import LogManager
 
             log_manager = LogManager()
             data_manager = DataManager(log_manager)

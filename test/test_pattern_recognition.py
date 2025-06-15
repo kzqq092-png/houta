@@ -256,7 +256,6 @@ def test_pattern_recognition(manager, kdata):
 
     except Exception as e:
         print(f"✗ 模式识别测试失败: {e}")
-        import traceback
         traceback.print_exc()
         return False
 

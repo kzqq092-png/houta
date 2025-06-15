@@ -51,7 +51,6 @@ class ConfigManager(QObject):
         cursor.execute('SELECT value FROM config WHERE key=?', (key,))
         row = cursor.fetchone()
         if row:
-            import json
             try:
                 return json.loads(row[0])
             except Exception:
@@ -59,7 +58,6 @@ class ConfigManager(QObject):
         return default
 
     def set(self, key: str, value):
-        import json
         value_str = json.dumps(value, ensure_ascii=False)
         cursor = self.conn.cursor()
         cursor.execute(
@@ -71,7 +69,6 @@ class ConfigManager(QObject):
         cursor.execute('SELECT key, value FROM config')
         rows = cursor.fetchall()
         result = {}
-        import json
         for k, v in rows:
             try:
                 result[k] = json.loads(v)

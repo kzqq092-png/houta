@@ -167,8 +167,6 @@ def test_analysis_widget():
     print("=" * 60)
 
     try:
-        from gui.widgets.analysis_widget import AnalysisWidget
-        from utils.config_manager import ConfigManager
 
         config_manager = ConfigManager()
         widget = AnalysisWidget(config_manager)

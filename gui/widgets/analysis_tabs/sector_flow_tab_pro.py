@@ -192,21 +192,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
         layout.addWidget(toolbar)
 
     def _get_button_style(self, color):
-        """获取按钮样式"""
-        return f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 {color}, stop:1 {self._darken_color(color)});
-                color: white; font-weight: bold; padding: 8px 16px;
-                border-radius: 6px; border: none; min-width: 120px;
-            }}
-            QPushButton:hover {{ background: {self._darken_color(color)}; }}
-            QPushButton:pressed {{ background: {self._darken_color(color, 0.2)}; }}
-        """
+        """获取按钮样式 - 使用基类统一方法"""
+        return self.get_button_style(color)
 
     def _darken_color(self, color, factor=0.1):
-        """颜色加深"""
-        return color
+        """颜色加深 - 使用基类统一方法"""
+        return self.darken_color(color, factor)
 
     def _create_control_panel(self):
         """创建控制面板"""
@@ -380,33 +371,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
         return widget
 
     def _create_stat_card(self, title, value, color):
-        """创建统计卡片"""
-        card = QFrame()
-        card.setFrameStyle(QFrame.StyledPanel)
-        card.setStyleSheet(f"""
-            QFrame {{ 
-                background-color: white; 
-                border: 1px solid #dee2e6; 
-                border-radius: 8px; 
-                padding: 10px;
-            }}
-        """)
+        """创建统计卡片 - 使用基类统一方法"""
+        card = self.create_stat_card(title, value, color)
 
-        layout = QVBoxLayout(card)
-
-        title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 12px; color: #6c757d;")
-
-        value_label = QLabel(value)
-        value_label.setAlignment(Qt.AlignCenter)
-        value_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {color};")
-
-        layout.addWidget(title_label)
-        layout.addWidget(value_label)
-
-        # 保存值标签引用
-        setattr(self, f"{title.replace('总', '').replace('净', '').replace('活跃', 'active')}_label", value_label)
+        # 保存值标签引用（兼容原有逻辑）
+        label_name = f"{title.replace('总', '').replace('净', '').replace('活跃', 'active')}_label"
+        setattr(self, label_name, card.value_label)
 
         return card
 
@@ -482,8 +452,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def realtime_monitoring(self):
         """实时监控"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在启动实时监控...")
@@ -518,8 +487,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def sector_rotation_analysis(self):
         """板块轮动分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在分析板块轮动...")
@@ -556,8 +524,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def smart_money_analysis(self):
         """聪明资金分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在分析聪明资金...")
@@ -594,8 +561,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def comprehensive_flow_analysis(self):
         """综合资金流分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行综合资金流分析...")
@@ -652,8 +618,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def flow_prediction(self):
         """资金流预测"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在生成资金流预测...")

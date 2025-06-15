@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import random
+import os
 
 from .base_tab import BaseAnalysisTab
 from core.logger import LogManager, LogLevel
@@ -437,8 +439,6 @@ class SentimentReportTab(BaseAnalysisTab):
         """收集情绪数据"""
         try:
             # 模拟情绪数据收集
-            import random
-
             data = {
                 'period': period,
                 'collection_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -601,8 +601,6 @@ class SentimentReportTab(BaseAnalysisTab):
     def save_report(self, report_name: str, content: str, format_type: str):
         """保存报告"""
         try:
-            import os
-
             # 创建报告目录
             reports_dir = "reports"
             if not os.path.exists(reports_dir):
@@ -634,8 +632,6 @@ class SentimentReportTab(BaseAnalysisTab):
     def add_report_to_list(self, report_name: str, report_file: str, period: int):
         """添加报告到列表"""
         try:
-            import os
-
             file_size = "0 KB"
             if os.path.exists(report_file):
                 size_bytes = os.path.getsize(report_file)

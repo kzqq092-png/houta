@@ -41,7 +41,6 @@ class AdvancedAnalyzer:
         - 趋势强度指数(ADX)
         """
         try:
-            import pandas as pd
             if isinstance(kdata, pd.DataFrame):
                 from indicators_algo import calc_ma, calc_macd
                 ma_periods = [5, 10, 20, 60, 120]

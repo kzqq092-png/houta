@@ -169,21 +169,12 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
         layout.addWidget(toolbar)
 
     def _get_button_style(self, color):
-        """获取按钮样式"""
-        return f"""
-            QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 {color}, stop:1 {self._darken_color(color)});
-                color: white; font-weight: bold; padding: 8px 16px;
-                border-radius: 6px; border: none; min-width: 120px;
-            }}
-            QPushButton:hover {{ background: {self._darken_color(color)}; }}
-            QPushButton:pressed {{ background: {self._darken_color(color, 0.2)}; }}
-        """
+        """获取按钮样式 - 使用基类统一方法"""
+        return self.get_button_style(color)
 
     def _darken_color(self, color, factor=0.1):
-        """颜色加深"""
-        return color.replace('#', '#').lower()
+        """颜色加深 - 使用基类统一方法"""
+        return self.darken_color(color, factor)
 
     def _create_control_panel(self):
         """创建控制面板"""
@@ -377,8 +368,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
     def elliott_wave_analysis(self):
         """艾略特波浪分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行艾略特波浪分析...")
@@ -452,8 +442,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
     def gann_analysis(self):
         """江恩分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行江恩分析...")
@@ -494,8 +483,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
     def fibonacci_analysis(self):
         """斐波那契分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行斐波那契分析...")
@@ -545,8 +533,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
     def comprehensive_wave_analysis(self):
         """综合波浪分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在进行综合波浪分析...")
@@ -598,8 +585,7 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
     def wave_prediction(self):
         """波浪预测"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("正在生成波浪预测...")

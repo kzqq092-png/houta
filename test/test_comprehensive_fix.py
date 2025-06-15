@@ -94,7 +94,6 @@ def test_pattern_statistics_generation():
     print("\n=== 测试统计数据生成 ===")
 
     try:
-        from gui.widgets.analysis_widget import AnalysisWidget
         from PyQt5.QtWidgets import QApplication
 
         # 创建应用程序（如果不存在）
@@ -190,8 +189,6 @@ def test_chart_integration():
     print("\n=== 测试图表集成 ===")
 
     try:
-        from gui.widgets.analysis_widget import AnalysisWidget
-        from PyQt5.QtWidgets import QApplication
 
         # 创建应用程序（如果不存在）
         app = QApplication.instance()
@@ -250,7 +247,6 @@ def test_chart_integration():
 
     except Exception as e:
         print(f"❌ 图表集成测试失败: {e}")
-        import traceback
         traceback.print_exc()
         return False
 

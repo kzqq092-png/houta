@@ -15,3 +15,5 @@
 .cursorrules
 .cursour
 __pycache__
+reports/*
+logs/*

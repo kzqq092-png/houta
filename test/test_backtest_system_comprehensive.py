@@ -46,24 +46,52 @@ except ImportError as e:
     GUI_MODULES_AVAILABLE = False
 
 try:
-    from core.logger import LogManager, LogLevel
+    from core.logger import LogManager
     from utils.config_manager import ConfigManager
     CORE_MODULES_AVAILABLE = True
 except ImportError:
-    # 创建模拟类
-    class LogLevel:
-        INFO = "INFO"
-        WARNING = "WARNING"
-        ERROR = "ERROR"
-        DEBUG = "DEBUG"
+    # 如果核心模块不可用，使用简化版本
+    try:
+        # 尝试导入基础日志管理器
+        from core.base_logger import BaseLogManager as LogManager
+    except ImportError:
+        class LogManager:
+            def log(self, message, level):
+                print(f"[{level}] {message}")
 
-    class LogManager:
-        def log(self, message, level):
-            print(f"[{level}] {message}")
+            def info(self, message):
+                print(f"[INFO] {message}")
 
+            def warning(self, message):
+                print(f"[WARNING] {message}")
+
+            def error(self, message):
+                print(f"[ERROR] {message}")
+
+    # 简化版配置管理器
     class ConfigManager:
         def __init__(self):
-            self.config = {}
+            self.config = {
+                'backtest': {
+                    'initial_capital': 100000,
+                    'commission_pct': 0.001,
+                    'slippage_pct': 0.001
+                },
+                'risk': {
+                    'max_position_size': 0.95,
+                    'stop_loss_pct': 0.05
+                }
+            }
+
+        def get(self, key, default=None):
+            keys = key.split('.')
+            value = self.config
+            for k in keys:
+                if isinstance(value, dict) and k in value:
+                    value = value[k]
+                else:
+                    return default
+            return value
 
     CORE_MODULES_AVAILABLE = False
 
@@ -455,7 +483,6 @@ class UISystemTest(unittest.TestCase):
 
         try:
             # 模拟QApplication环境
-            import sys
             from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
@@ -822,7 +849,6 @@ def main():
     try:
         import pandas
         import numpy
-        import psutil
     except ImportError as e:
         missing_deps.append(str(e))
 

@@ -1,7 +1,14 @@
+"""
+高级技术指标计算模块
+提供各种高级技术指标的计算功能
+"""
+
 import pandas as pd
 import numpy as np
 from scipy import stats
 from datetime import datetime
+from typing import Dict, List, Optional, Any
+from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess, validate_kdata
 
 
 def calculate_advanced_indicators(df):
@@ -17,6 +24,7 @@ def calculate_advanced_indicators(df):
     df = _kdata_preprocess(df, context="高级指标")
     if df is None or df.empty:
         return df
+
     # MACD
     exp12 = df['close'].ewm(span=12, adjust=False).mean()
     exp26 = df['close'].ewm(span=26, adjust=False).mean()
@@ -55,16 +63,13 @@ def calculate_advanced_indicators(df):
     df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
 
     # Chaikin Money Flow
-    clv = ((df['close'] - df['low']) - (df['high'] -
-           df['close'])) / (df['high'] - df['low'])
+    clv = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
     clv = clv.replace([np.inf, -np.inf], np.nan).fillna(0)
-    df['cmf'] = (clv * df['volume']).rolling(window=20).sum() / \
-        df['volume'].rolling(window=20).sum()
+    df['cmf'] = (clv * df['volume']).rolling(window=20).sum() / df['volume'].rolling(window=20).sum()
 
     # OBV (On-Balance Volume)
     df['daily_ret'] = df['close'].pct_change()
-    df['direction'] = np.where(
-        df['daily_ret'] > 0, 1, np.where(df['daily_ret'] < 0, -1, 0))
+    df['direction'] = np.where(df['daily_ret'] > 0, 1, np.where(df['daily_ret'] < 0, -1, 0))
     df['direction_volume'] = df['direction'] * df['volume']
     df['obv'] = df['direction_volume'].cumsum()
 
@@ -85,8 +90,7 @@ def calculate_advanced_indicators(df):
     # CCI (Commodity Channel Index)
     typical_price = (df['high'] + df['low'] + df['close']) / 3
     moving_avg = typical_price.rolling(window=20).mean()
-    mean_deviation = np.abs(
-        typical_price - moving_avg).rolling(window=20).mean()
+    mean_deviation = np.abs(typical_price - moving_avg).rolling(window=20).mean()
     df['cci'] = (typical_price - moving_avg) / (0.015 * mean_deviation)
 
     # ROC (Rate of Change)
@@ -103,10 +107,8 @@ def calculate_advanced_indicators(df):
     raw_money_flow = typical_price * df['volume']
 
     # 计算Positive和Negative Money Flow
-    money_flow_positive = raw_money_flow.where(
-        typical_price > typical_price.shift(1), 0)
-    money_flow_negative = raw_money_flow.where(
-        typical_price < typical_price.shift(1), 0)
+    money_flow_positive = raw_money_flow.where(typical_price > typical_price.shift(1), 0)
+    money_flow_negative = raw_money_flow.where(typical_price < typical_price.shift(1), 0)
 
     # 计算14天的money flow ratio
     pos_flow_sum = money_flow_positive.rolling(window=14).sum()
@@ -140,6 +142,7 @@ def create_pattern_recognition_features(df):
     df = _kdata_preprocess(df, context="形态特征")
     if df is None or df.empty:
         return df
+
     # 确保有必要的列
     required_cols = ['open', 'high', 'low', 'close']
     if not all(col in df.columns for col in required_cols):
@@ -151,10 +154,8 @@ def create_pattern_recognition_features(df):
 
     # 计算各部分的大小
     df_new['body_size'] = np.abs(df_new['close'] - df_new['open'])
-    df_new['upper_shadow'] = df_new['high'] - \
-        np.maximum(df_new['open'], df_new['close'])
-    df_new['lower_shadow'] = np.minimum(
-        df_new['open'], df_new['close']) - df_new['low']
+    df_new['upper_shadow'] = df_new['high'] - np.maximum(df_new['open'], df_new['close'])
+    df_new['lower_shadow'] = np.minimum(df_new['open'], df_new['close']) - df_new['low']
     df_new['total_range'] = df_new['high'] - df_new['low']
 
     # 计算相对大小
@@ -187,264 +188,124 @@ def create_pattern_recognition_features(df):
                                    (df_new['close'] > df_new['close'].shift(1))).astype(int)
 
     # 启明星 (三日看涨反转形态)
-    # 简化版，完整实现需要考虑更多条件
     df_new['morning_star'] = ((df_new['close'].shift(2) < df_new['open'].shift(2)) &  # 第一日阴线
                               (np.abs(df_new['close'].shift(1) - df_new['open'].shift(1)) <
                                df_new['body_size'].shift(2) * 0.3) &  # 第二日小实体
-                              # 第二日收盘价低于第一日
-                              (df_new['close'].shift(1) < df_new['close'].shift(2)) &
+                              (df_new['close'].shift(1) < df_new['close'].shift(2)) &  # 第二日收盘价低于第一日
                               (df_new['close'] > df_new['open']) &  # 第三日阳线
-                              (df_new['close'] > (df_new['open'].shift(2) +
-                                                  df_new['close'].shift(2)) / 2)  # 第三日收盘价回补第一日部分
+                              (df_new['close'] > (df_new['open'].shift(2) + df_new['close'].shift(2)) / 2)  # 第三日收盘价回补第一日部分
                               ).astype(int)
 
     # 黄昏星 (三日看跌反转形态)
     df_new['evening_star'] = ((df_new['close'].shift(2) > df_new['open'].shift(2)) &  # 第一日阳线
                               (np.abs(df_new['close'].shift(1) - df_new['open'].shift(1)) <
                                df_new['body_size'].shift(2) * 0.3) &  # 第二日小实体
-                              # 第二日收盘价高于第一日
-                              (df_new['close'].shift(1) > df_new['close'].shift(2)) &
+                              (df_new['close'].shift(1) > df_new['close'].shift(2)) &  # 第二日收盘价高于第一日
                               (df_new['close'] < df_new['open']) &  # 第三日阴线
-                              (df_new['close'] < (df_new['open'].shift(2) +
-                                                  df_new['close'].shift(2)) / 2)  # 第三日收盘价回补第一日部分
+                              (df_new['close'] < (df_new['open'].shift(2) + df_new['close'].shift(2)) / 2)  # 第三日收盘价回补第一日部分
                               ).astype(int)
 
     # 三白兵 (三日看涨持续形态)
     df_new['three_white_soldiers'] = ((df_new['close'] > df_new['open']) &  # 今日阳线
-                                      # 昨日阳线
-                                      (df_new['close'].shift(1) > df_new['open'].shift(1)) &
-                                      # 前日阳线
-                                      (df_new['close'].shift(2) > df_new['open'].shift(2)) &
-                                      # 今日收盘价高于昨日
-                                      (df_new['close'] > df_new['close'].shift(1)) &
-                                      # 昨日收盘价高于前日
-                                      (df_new['close'].shift(1) > df_new['close'].shift(2)) &
-                                      # 今日开盘价高于昨日
-                                      (df_new['open'] > df_new['open'].shift(1)) &
-                                      # 昨日开盘价高于前日
-                                      (df_new['open'].shift(1) >
-                                       df_new['open'].shift(2))
+                                      (df_new['close'].shift(1) > df_new['open'].shift(1)) &  # 昨日阳线
+                                      (df_new['close'].shift(2) > df_new['open'].shift(2)) &  # 前日阳线
+                                      (df_new['close'] > df_new['close'].shift(1)) &  # 今日收盘价高于昨日
+                                      (df_new['close'].shift(1) > df_new['close'].shift(2)) &  # 昨日收盘价高于前日
+                                      (df_new['open'] > df_new['open'].shift(1)) &  # 今日开盘价高于昨日
+                                      (df_new['open'].shift(1) > df_new['open'].shift(2))  # 昨日开盘价高于前日
                                       ).astype(int)
 
     # 三只乌鸦 (三日看跌持续形态)
     df_new['three_black_crows'] = ((df_new['close'] < df_new['open']) &  # 今日阴线
-                                   # 昨日阴线
-                                   (df_new['close'].shift(1) < df_new['open'].shift(1)) &
-                                   # 前日阴线
-                                   (df_new['close'].shift(2) < df_new['open'].shift(2)) &
-                                   # 今日收盘价低于昨日
-                                   (df_new['close'] < df_new['close'].shift(1)) &
-                                   # 昨日收盘价低于前日
-                                   (df_new['close'].shift(1) < df_new['close'].shift(2)) &
-                                   # 今日开盘价低于昨日
-                                   (df_new['open'] < df_new['open'].shift(1)) &
-                                   (df_new['open'].shift(1) <
-                                    df_new['open'].shift(2))  # 昨日开盘价低于前日
+                                   (df_new['close'].shift(1) < df_new['open'].shift(1)) &  # 昨日阴线
+                                   (df_new['close'].shift(2) < df_new['open'].shift(2)) &  # 前日阴线
+                                   (df_new['close'] < df_new['close'].shift(1)) &  # 今日收盘价低于昨日
+                                   (df_new['close'].shift(1) < df_new['close'].shift(2)) &  # 昨日收盘价低于前日
+                                   (df_new['open'] < df_new['open'].shift(1)) &  # 今日开盘价低于昨日
+                                   (df_new['open'].shift(1) < df_new['open'].shift(2))  # 昨日开盘价低于前日
                                    ).astype(int)
-
-    # 星线形态 (小实体，与前一日实体有价格跳空)
-    df_new['is_star'] = ((df_new['rel_body_size'] < 0.2) &
-                         ((df_new['open'] > df_new['close'].shift(1)) |
-                          (df_new['close'] < df_new['open'].shift(1)))).astype(int)
-
-    # 创建综合形态分数
-    df_new['bullish_pattern_score'] = (df_new['bullish_engulfing'] * 1 +
-                                       df_new['morning_star'] * 2 +
-                                       df_new['three_white_soldiers'] * 2 +
-                                       (df_new['is_hammer'] & (df_new['close'] < df_new['close'].rolling(window=10).mean())) * 1)
-
-    df_new['bearish_pattern_score'] = (df_new['bearish_engulfing'] * 1 +
-                                       df_new['evening_star'] * 2 +
-                                       df_new['three_black_crows'] * 2 +
-                                       (df_new['is_hammer'] & (df_new['close'] > df_new['close'].rolling(window=10).mean())) * 1)
-
-    # 新增形态特征
-    df_new['hammer'] = ((df_new['high'] - df_new['low'] > 3 * (df_new['open'] - df_new['close'])) & ((df_new['close'] - df_new['low']) / (.001 +
-                        df_new['high'] - df_new['low']) > 0.6) & ((df_new['open'] - df_new['low']) / (.001 + df_new['high'] - df_new['low']) > 0.6)).astype(int)
-    df_new['inverted_hammer'] = ((df_new['high'] - df_new['low'] > 3 * (df_new['open'] - df_new['close'])) & ((df_new['high'] - df_new['close']) /
-                                 (.001 + df_new['high'] - df_new['low']) > 0.6) & ((df_new['high'] - df_new['open']) / (.001 + df_new['high'] - df_new['low']) > 0.6)).astype(int)
-    df_new['bullish_engulfing'] = ((df_new['close'] > df_new['open']) & (df_new['close'].shift(1) < df_new['open'].shift(
-        1)) & (df_new['close'] > df_new['open'].shift(1)) & (df_new['open'] < df_new['close'].shift(1))).astype(int)
-    df_new['bearish_engulfing'] = ((df_new['close'] < df_new['open']) & (df_new['close'].shift(1) > df_new['open'].shift(
-        1)) & (df_new['open'] > df_new['close'].shift(1)) & (df_new['close'] < df_new['open'].shift(1))).astype(int)
-    df_new['morning_star'] = ((df_new['close'].shift(2) < df_new['open'].shift(2)) & (df_new['close'].shift(
-        1) < df_new['open'].shift(1)) & (df_new['close'] > df_new['open']) & (df_new['close'] > df_new['open'].shift(1))).astype(int)
-    df_new['evening_star'] = ((df_new['close'].shift(2) > df_new['open'].shift(2)) & (df_new['close'].shift(
-        1) > df_new['open'].shift(1)) & (df_new['close'] < df_new['open']) & (df_new['close'] < df_new['open'].shift(1))).astype(int)
-    df_new['three_white_soldiers'] = ((df_new['close'] > df_new['open']) & (df_new['close'].shift(
-        1) > df_new['open'].shift(1)) & (df_new['close'].shift(2) > df_new['open'].shift(2))).astype(int)
-    df_new['three_black_crows'] = ((df_new['close'] < df_new['open']) & (df_new['close'].shift(
-        1) < df_new['open'].shift(1)) & (df_new['close'].shift(2) < df_new['open'].shift(2))).astype(int)
-    df_new['doji'] = (abs(df_new['close'] - df_new['open']) <
-                      (df_new['high'] - df_new['low']) * 0.1).astype(int)
-    df_new['shooting_star'] = ((df_new['high'] - df_new['close'] > 2 * (
-        df_new['open'] - df_new['close'])) & (df_new['open'] > df_new['close'])).astype(int)
-
-    # 移除临时列以保持DataFrame整洁
-    temp_cols = ['body_size', 'upper_shadow', 'lower_shadow', 'total_range',
-                 'rel_body_size', 'rel_upper_shadow', 'rel_lower_shadow']
-
-    # 如果要保留这些列，请注释下一行
-    # df_new.drop(columns=temp_cols, inplace=True)
 
     return df_new
 
 
 def create_market_regime_features(df):
     """
-    创建市场状态识别特征
+    创建市场状态特征
 
     参数:
-        df: 输入DataFrame，包含价格数据和技术指标
+        df: 输入DataFrame，包含OHLCV数据
 
     返回:
         DataFrame: 添加了市场状态特征的DataFrame
     """
-    # 复制DataFrame以避免修改原始数据
-    df_new = df.copy()
+    df = _kdata_preprocess(df, context="市场状态")
+    if df is None or df.empty:
+        return df
 
-    # 趋势强度指标 (基于移动平均线)
-    if 'MA20' in df_new.columns and 'MA60' in df_new.columns:
-        # 计算短期和长期MA的差距
-        df_new['ma_gap_20_60'] = (
-            df_new['MA20'] - df_new['MA60']) / df_new['MA60']
+    # 计算收益率
+    df['returns'] = df['close'].pct_change()
 
-        # 趋势强度 - 基于MA差距的变化
-        df_new['trend_strength'] = df_new['ma_gap_20_60'].abs()
+    # 波动率 (20日滚动标准差)
+    df['volatility_20'] = df['returns'].rolling(window=20).std()
 
-        # 趋势方向
-        df_new['trend_direction'] = np.sign(df_new['ma_gap_20_60'])
+    # 趋势强度 (ADX简化版)
+    high_low = df['high'] - df['low']
+    high_close = np.abs(df['high'] - df['close'].shift())
+    low_close = np.abs(df['low'] - df['close'].shift())
+    true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
 
-    # 基于ADX的趋势识别（简化版）
-    if 'atr' in df_new.columns:
-        # 计算+DI和-DI
-        high_diff = df_new['high'] - df_new['high'].shift(1)
-        low_diff = df_new['low'].shift(1) - df_new['low']
+    plus_dm = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']),
+                       np.maximum(df['high'] - df['high'].shift(), 0), 0)
+    minus_dm = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()),
+                        np.maximum(df['low'].shift() - df['low'], 0), 0)
 
-        plus_dm = np.where((high_diff > 0) & (
-            high_diff > low_diff), high_diff, 0)
-        minus_dm = np.where((low_diff > 0) & (
-            low_diff > high_diff), low_diff, 0)
+    plus_di = 100 * pd.Series(plus_dm).rolling(window=14).mean() / true_range.rolling(window=14).mean()
+    minus_di = 100 * pd.Series(minus_dm).rolling(window=14).mean() / true_range.rolling(window=14).mean()
 
-        # 平滑处理
-        alpha = 1/14
-        plus_di = 100 * pd.Series(plus_dm).ewm(alpha=alpha,
-                                               adjust=False).mean() / df_new['atr']
-        minus_di = 100 * \
-            pd.Series(minus_dm).ewm(
-                alpha=alpha, adjust=False).mean() / df_new['atr']
-
-        # 计算DX和ADX
-        dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di)
-        adx = pd.Series(dx).ewm(alpha=alpha, adjust=False).mean()
-
-        # 保存指标
-        df_new['plus_di'] = plus_di
-        df_new['minus_di'] = minus_di
-        df_new['adx'] = adx
-
-        # 定义趋势状态
-        df_new['adx_trend'] = 0  # 默认为无趋势
-        df_new.loc[df_new['adx'] > 25, 'adx_trend'] = 1  # 趋势存在
-
-        # 结合方向
-        df_new['adx_bull_trend'] = ((df_new['adx_trend'] == 1) & (
-            df_new['plus_di'] > df_new['minus_di'])).astype(int)
-        df_new['adx_bear_trend'] = ((df_new['adx_trend'] == 1) & (
-            df_new['plus_di'] < df_new['minus_di'])).astype(int)
-
-    # 基于波动性的市场分类
-    if 'volatility_20d' in df_new.columns:
-        # 计算长期波动率分位数
-        df_new['vol_percentile'] = df_new['volatility_20d'].rolling(window=252).apply(
-            lambda x: pd.Series(x).rank(
-                pct=True).iloc[-1] if len(x) > 0 else np.nan
-        )
-
-        # 基于波动率分位数的市场状态
-        df_new['high_vol_regime'] = (
-            df_new['vol_percentile'] > 0.8).astype(int)
-        df_new['low_vol_regime'] = (df_new['vol_percentile'] < 0.2).astype(int)
-        df_new['normal_vol_regime'] = ((df_new['vol_percentile'] >= 0.2) &
-                                       (df_new['vol_percentile'] <= 0.8)).astype(int)
-
-    # 基于RSI的市场超买超卖状态
-    if 'rsi' in df_new.columns:
-        df_new['overbought'] = (df_new['rsi'] > 70).astype(int)
-        df_new['oversold'] = (df_new['rsi'] < 30).astype(int)
-        df_new['neutral_rsi'] = ((df_new['rsi'] >= 30) & (
-            df_new['rsi'] <= 70)).astype(int)
-
-    # 综合市场状态评分
-    df_new['market_regime_score'] = 0
-
-    # 添加多个市场状态指标的影响
-    if 'adx_bull_trend' in df_new.columns:
-        df_new['market_regime_score'] += df_new['adx_bull_trend'] * 1
-    if 'adx_bear_trend' in df_new.columns:
-        df_new['market_regime_score'] -= df_new['adx_bear_trend'] * 1
-    if 'overbought' in df_new.columns:
-        df_new['market_regime_score'] -= df_new['overbought'] * 0.5
-    if 'oversold' in df_new.columns:
-        df_new['market_regime_score'] += df_new['oversold'] * 0.5
-    if 'trend_direction' in df_new.columns:
-        df_new['market_regime_score'] += df_new['trend_direction'] * 0.5
-    if 'high_vol_regime' in df_new.columns:
-        df_new['market_regime_score'] -= df_new['high_vol_regime'] * 0.3
-
-    # 归一化市场状态评分到[-1, 1]范围
-    max_abs_score = max(abs(df_new['market_regime_score'].max()), abs(
-        df_new['market_regime_score'].min()))
-    if max_abs_score > 0:
-        df_new['market_regime_normalized'] = df_new['market_regime_score'] / max_abs_score
-    else:
-        df_new['market_regime_normalized'] = 0
+    dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di)
+    df['adx'] = dx.rolling(window=14).mean()
 
     # 市场状态分类
-    df_new['market_state'] = 0  # 中性市场
-    df_new.loc[df_new['market_regime_normalized']
-               > 0.5, 'market_state'] = 1  # 看涨市场
-    df_new.loc[df_new['market_regime_normalized']
-               < -0.5, 'market_state'] = -1  # 看跌市场
+    df['market_regime'] = 'sideways'  # 默认横盘
+    df.loc[(df['adx'] > 25) & (plus_di > minus_di), 'market_regime'] = 'uptrend'  # 上升趋势
+    df.loc[(df['adx'] > 25) & (plus_di < minus_di), 'market_regime'] = 'downtrend'  # 下降趋势
+    df.loc[df['volatility_20'] > df['volatility_20'].rolling(window=60).mean() * 1.5, 'market_regime'] = 'high_volatility'  # 高波动
 
-    return df_new
+    # 支撑阻力位
+    df['resistance'] = df['high'].rolling(window=20).max()
+    df['support'] = df['low'].rolling(window=20).min()
+
+    # 价格相对位置
+    df['price_position'] = (df['close'] - df['support']) / (df['resistance'] - df['support'])
+
+    return df
 
 
 def add_advanced_indicators(df):
     """
-    添加高级技术指标
+    添加所有高级指标的综合函数
 
     参数:
-        df: 输入DataFrame，需包含OHLCV数据
+        df: 输入DataFrame，包含OHLCV数据
 
     返回:
-        DataFrame: 添加了高级技术指标的DataFrame
+        DataFrame: 添加了所有高级指标的DataFrame
     """
+    df = _kdata_preprocess(df, context="综合指标")
+    if df is None or df.empty:
+        return df
+
+    # 基础技术指标
+    df = calculate_advanced_indicators(df)
+
+    # K线形态特征
+    df = create_pattern_recognition_features(df)
+
+    # 市场状态特征
+    df = create_market_regime_features(df)
+
+    # 额外的高级指标
     result = df.copy()
-
-    # 计算趋势强度指数 (ADX)
-    high = result['high']
-    low = result['low']
-    close = result['close']
-
-    # 计算真实范围 (True Range)
-    tr1 = high - low
-    tr2 = abs(high - close.shift(1))
-    tr3 = abs(low - close.shift(1))
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-    # 平均真实范围 (ATR)
-    result['atr'] = tr.rolling(window=14).mean()
-
-    # 方向性移动 (Directional Movement)
-    up_move = high - high.shift(1)
-    down_move = low.shift(1) - low
-
-    pos_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
-    neg_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-
-    # Smoothed Directional Movement
-    result['adx'] = 0  # 简化处理
 
     # 计算相对强弱指数 (RSI) - 多周期
     for window in [6, 14, 21]:
@@ -462,8 +323,7 @@ def add_advanced_indicators(df):
         result[f'rsi_{window}'] = 100 - (100 / (1 + rs))
 
     # 计算枢轴点
-    result['pivot_point'] = (
-        result['high'] + result['low'] + result['close']) / 3
+    result['pivot_point'] = (result['high'] + result['low'] + result['close']) / 3
     result['pivot_r1'] = 2 * result['pivot_point'] - result['low']  # 阻力位1
     result['pivot_s1'] = 2 * result['pivot_point'] - result['high']  # 支撑位1
 
@@ -498,10 +358,12 @@ def add_advanced_indicators(df):
     result['bollinger_mid'] = mid_band
     result['bollinger_high'] = mid_band + 2 * std_dev
     result['bollinger_low'] = mid_band - 2 * std_dev
-    result['bollinger_width'] = (
-        result['bollinger_high'] - result['bollinger_low']) / result['bollinger_mid']
+    result['bollinger_width'] = (result['bollinger_high'] - result['bollinger_low']) / result['bollinger_mid']
 
     # 钱德动量摆动指标 (CMO)
+    delta = result['close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
     up_sum = gain.rolling(window=14).sum()
     down_sum = loss.rolling(window=14).sum()
 
@@ -509,14 +371,12 @@ def add_advanced_indicators(df):
 
     # 计算顺势指标 (CCI)
     typical_price = (result['high'] + result['low'] + result['close']) / 3
-    mean_deviation = abs(
-        typical_price - typical_price.rolling(window=20).mean()).rolling(window=20).mean()
+    mean_deviation = abs(typical_price - typical_price.rolling(window=20).mean()).rolling(window=20).mean()
 
     # 避免除以零
     mean_deviation = mean_deviation.replace(0, 0.00001)
 
-    result['cci'] = (
-        typical_price - typical_price.rolling(window=20).mean()) / (0.015 * mean_deviation)
+    result['cci'] = (typical_price - typical_price.rolling(window=20).mean()) / (0.015 * mean_deviation)
 
     # 计算威廉姆累积/派发线 (Williams A/D)
     result['willad'] = np.nan
@@ -569,79 +429,3 @@ def add_advanced_indicators(df):
     result = result.fillna(method='bfill').fillna(method='ffill').fillna(0)
 
     return result
-
-
-def _kdata_preprocess(df, context="分析"):
-    """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""
-    import pandas as pd
-
-    if not isinstance(df, pd.DataFrame):
-        return df
-
-    # 检查datetime是否在索引中或列中
-    has_datetime = False
-    datetime_in_index = False
-
-    # 检查datetime是否在索引中
-    if isinstance(df.index, pd.DatetimeIndex) or (hasattr(df.index, 'name') and df.index.name == 'datetime'):
-        has_datetime = True
-        datetime_in_index = True
-    # 检查datetime是否在列中
-    elif 'datetime' in df.columns:
-        has_datetime = True
-        datetime_in_index = False
-
-    # 如果datetime不存在，尝试从索引推断或创建
-    if not has_datetime:
-        if isinstance(df.index, pd.DatetimeIndex):
-            # 索引是DatetimeIndex但名称不是datetime，复制到列中
-            df = df.copy()
-            df['datetime'] = df.index
-            has_datetime = True
-            print(f"[{context}] 从DatetimeIndex推断datetime字段")
-        else:
-            # 完全没有datetime信息，需要补全
-            print(f"[{context}] 缺少datetime字段，自动补全")
-            df = df.copy()
-            df['datetime'] = pd.date_range(start='2023-01-01', periods=len(df), freq='D')
-            has_datetime = True
-
-    # 检查其他必要字段
-    required_cols = ['open', 'high', 'low', 'close', 'volume']
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        print(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
-        df = df.copy()
-        for col in missing_cols:
-            if col == 'volume':
-                df[col] = 0.0
-            elif col in ['open', 'high', 'low', 'close']:
-                # 用收盘价填充其他价格字段
-                if 'close' in df.columns:
-                    df[col] = df['close']
-                else:
-                    df[col] = 0.0
-            else:
-                df[col] = 0.0
-
-    # 检查数值字段异常
-    for col in ['open', 'high', 'low', 'close', 'volume']:
-        if col in df.columns:
-            before = len(df)
-            df = df[df[col].notna() & (df[col] >= 0)]
-            after = len(df)
-            if after < before:
-                print(f"[{context}] 已过滤{before-after}行{col}异常数据")
-
-    if df.empty:
-        print(f"[{context}] 数据全部无效，返回空")
-        return df
-
-    # 修复：如果datetime在索引中，确保在重置索引前将其复制到列中
-    if datetime_in_index and 'datetime' not in df.columns:
-        df = df.copy()
-        df['datetime'] = df.index
-        print(f"[{context}] 将索引中的datetime复制到列中")
-
-    # 重置索引，但保留datetime列
-    return df.reset_index(drop=True)

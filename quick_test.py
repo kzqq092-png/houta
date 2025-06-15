@@ -87,7 +87,6 @@ def test_all_tabs():
     print("\n🚀 测试所有标签页...")
 
     try:
-        from utils.config_manager import ConfigManager
         from gui.widgets.analysis_tabs import (
             TechnicalAnalysisTab, PatternAnalysisTab, TrendAnalysisTab,
             WaveAnalysisTab, SentimentAnalysisTab, SectorFlowTab,

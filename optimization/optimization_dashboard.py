@@ -584,7 +584,6 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
             # 获取所有版本信息
             conn = self.db_manager.db_path
-            import sqlite3
 
             db_conn = sqlite3.connect(conn)
             cursor = db_conn.cursor()

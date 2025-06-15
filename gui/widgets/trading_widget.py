@@ -463,8 +463,6 @@ class TradingWidget(QWidget):
     def show_detail_dialog(self, results: dict):
         """弹出详细结果对话框，整合所有分组表格和图表，主UI可并行操作"""
         from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QPushButton
-        import plotly.graph_objs as go
-        import plotly.io as pio
         dialog = QDialog(self)
         dialog.setWindowTitle("回测详细结果")
         layout = QVBoxLayout(dialog)
@@ -524,8 +522,6 @@ class TradingWidget(QWidget):
         if returns is not None:
             fig.add_trace(go.Bar(y=returns, name='收益分布', marker_color='orange'))
         fig.update_layout(title='回测结果可视化', template='plotly_white')
-        import plotly.io as pio
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
         chart = QWebEngineView()
         html = pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
         chart.setHtml(html)
@@ -536,7 +532,6 @@ class TradingWidget(QWidget):
         layout.addWidget(export_btn)
 
         def export():
-            import pandas as pd
             from PyQt5.QtWidgets import QFileDialog
             file, _ = QFileDialog.getSaveFileName(dialog, "导出回测结果", "backtest_results.xlsx", "Excel Files (*.xlsx)")
             if file:
@@ -553,7 +548,6 @@ class TradingWidget(QWidget):
     def export_backtest_results(self):
         """一键导出全部回测结果（绩效、风险、交易、持仓、图表）"""
         try:
-            import pandas as pd
             file_path, _ = QFileDialog.getSaveFileName(self, "导出回测结果", "回测结果", "Excel Files (*.xlsx);;CSV Files (*.csv)")
             if not file_path:
                 return
@@ -892,7 +886,6 @@ class TradingWidget(QWidget):
 
     def _execute_analysis(self, strategy: str, params: dict) -> dict:
         """优化分析逻辑，提升性能和健壮性，标准化结果结构。"""
-        import pandas as pd
         import numpy as np
         import threading
         results = {'strategy': strategy, 'signals': None, 'indicators': {}, 'metrics': {}, 'error': None}
@@ -937,7 +930,6 @@ class TradingWidget(QWidget):
             data = self._kdata_cache.get(cache_key)
             if data is None or data.empty:
                 # 优先尝试主窗口的get_kdata
-                from main import TradingGUI
                 main_window = None
                 for w in QApplication.topLevelWidgets():
                     if isinstance(w, TradingGUI):
@@ -1074,7 +1066,6 @@ class TradingWidget(QWidget):
             results: 批量分析结果列表
             filename: 导出文件名（可选）
         """
-        import pandas as pd
         if not results:
             return
         df = pd.DataFrame([{
@@ -1100,7 +1091,6 @@ class TradingWidget(QWidget):
             group_by: 分组字段
             metric: 绩效指标字段
         """
-        import pandas as pd
         import matplotlib.pyplot as plt
         if not results:
             return
@@ -1132,14 +1122,12 @@ class TradingWidget(QWidget):
         Returns:
             results: 所有分析结果列表
         """
-        import threading
         results = []
         total = len(stock_list) * len(strategy_list) * len(param_grid)
         if distributed_backend == 'dask':
             try:
                 from dask.distributed import Client
                 client = Client(remote_nodes[0] if remote_nodes else None)
-                import pandas as pd
                 import dask.dataframe as dd
                 import dask
 
@@ -1171,7 +1159,6 @@ class TradingWidget(QWidget):
 
                 @ray.remote
                 def single_task(code, strategy, params):
-                    from core.trading_system import TradingSystem
                     ts = TradingSystem()
                     ts.set_stock(code)
                     ts.load_kdata()
@@ -1194,7 +1181,6 @@ class TradingWidget(QWidget):
                 # 需预先配置celery worker和broker
 
                 def single_task(code, strategy, params):
-                    from core.trading_system import TradingSystem
                     ts = TradingSystem()
                     ts.set_stock(code)
                     ts.load_kdata()
@@ -1215,7 +1201,6 @@ class TradingWidget(QWidget):
             # 本地多线程
             def worker():
                 done = 0
-                from core.trading_system import TradingSystem
                 for code in stock_list:
                     for strategy in strategy_list:
                         for params in param_grid:

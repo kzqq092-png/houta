@@ -10,18 +10,28 @@ RESTful API主服务
     # 回测
     curl -X POST http://localhost:8000/api/backtest -H "Content-Type: application/json" -d '{"code": "sh600000", "strategy": "MA"}'
 """
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from typing import List, Dict, Any
 import uvicorn
 from ai_stock_selector import AIStockSelector
 import pandas as pd
+from core.data_manager import DataManager
+from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 
 # 假设有全局data_manager实例
-from core.data_manager import DataManager
-
 data_manager = DataManager()
 
-app = FastAPI(title="HIkyuu-UI API", description="量化交易系统开放API", version="1.0")
+app = FastAPI(title="HIkyuu量化交易API", version="1.0.0")
+
+
+@app.get("/")
+def read_root():
+    return {"message": "HIkyuu量化交易API服务"}
+
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "hikyuu-api"}
 
 
 @app.get("/api/stock/list", response_model=List[Dict[str, Any]])
@@ -154,7 +164,6 @@ def ai_diagnosis(params: Dict[str, Any]):
 
 def _kdata_preprocess(df, context="分析"):
     """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""
-    import pandas as pd
 
     if not isinstance(df, pd.DataFrame):
         return df

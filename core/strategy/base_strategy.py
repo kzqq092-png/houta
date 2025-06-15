@@ -1,0 +1,319 @@
+"""
+策略基础框架 - 统一策略基类和接口规范
+
+提供所有策略的基础接口和通用功能
+"""
+
+import pandas as pd
+import numpy as np
+from abc import ABC, abstractmethod
+from typing import Dict, List, Any, Optional, Union, Tuple
+from datetime import datetime
+from enum import Enum
+from dataclasses import dataclass, field
+import json
+import hashlib
+from pathlib import Path
+
+
+class StrategyType(Enum):
+    """策略类型枚举"""
+    TREND_FOLLOWING = "trend_following"      # 趋势跟踪
+    MEAN_REVERSION = "mean_reversion"        # 均值回归
+    MOMENTUM = "momentum"                    # 动量策略
+    ARBITRAGE = "arbitrage"                  # 套利策略
+    TECHNICAL = "technical"                  # 技术指标
+    FUNDAMENTAL = "fundamental"              # 基本面
+    QUANTITATIVE = "quantitative"            # 量化策略
+    MACHINE_LEARNING = "machine_learning"    # 机器学习
+    CUSTOM = "custom"                        # 自定义策略
+
+
+class StrategyStatus(Enum):
+    """策略状态枚举"""
+    INACTIVE = "inactive"        # 未激活
+    ACTIVE = "active"           # 激活中
+    RUNNING = "running"         # 运行中
+    PAUSED = "paused"          # 暂停
+    STOPPED = "stopped"        # 已停止
+    ERROR = "error"            # 错误状态
+    COMPLETED = "completed"    # 已完成
+
+
+class SignalType(Enum):
+    """信号类型枚举"""
+    BUY = "buy"                # 买入信号
+    SELL = "sell"              # 卖出信号
+    HOLD = "hold"              # 持有信号
+    CLOSE_LONG = "close_long"  # 平多信号
+    CLOSE_SHORT = "close_short"  # 平空信号
+
+
+@dataclass
+class StrategySignal:
+    """策略信号数据类"""
+    timestamp: datetime
+    signal_type: SignalType
+    price: float
+    confidence: float
+    strategy_name: str
+    reason: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    position_size: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            'timestamp': self.timestamp.isoformat() if isinstance(self.timestamp, datetime) else str(self.timestamp),
+            'signal_type': self.signal_type.value if isinstance(self.signal_type, SignalType) else str(self.signal_type),
+            'price': float(self.price),
+            'confidence': float(self.confidence),
+            'strategy_name': str(self.strategy_name),
+            'reason': str(self.reason),
+            'metadata': self.metadata,
+            'stop_loss': float(self.stop_loss) if self.stop_loss is not None else None,
+            'take_profit': float(self.take_profit) if self.take_profit is not None else None,
+            'position_size': float(self.position_size) if self.position_size is not None else None
+        }
+
+
+@dataclass
+class StrategyParameter:
+    """策略参数定义"""
+    name: str
+    value: Any
+    param_type: type
+    description: str = ""
+    min_value: Optional[Union[int, float]] = None
+    max_value: Optional[Union[int, float]] = None
+    choices: Optional[List[Any]] = None
+    required: bool = True
+
+    def validate(self, value: Any) -> bool:
+        """验证参数值"""
+        try:
+            # 类型检查
+            if not isinstance(value, self.param_type):
+                if self.param_type in (int, float) and isinstance(value, (int, float)):
+                    value = self.param_type(value)
+                else:
+                    return False
+
+            # 范围检查
+            if self.min_value is not None and value < self.min_value:
+                return False
+            if self.max_value is not None and value > self.max_value:
+                return False
+
+            # 选择检查
+            if self.choices is not None and value not in self.choices:
+                return False
+
+            return True
+        except:
+            return False
+
+
+class BaseStrategy(ABC):
+    """策略基类 - 所有策略的统一接口"""
+
+    def __init__(self, name: str, strategy_type: StrategyType = StrategyType.CUSTOM):
+        """初始化策略
+
+        Args:
+            name: 策略名称
+            strategy_type: 策略类型
+        """
+        self.name = name
+        self.strategy_type = strategy_type
+        self.status = StrategyStatus.INACTIVE
+        self.parameters: Dict[str, StrategyParameter] = {}
+        self.metadata: Dict[str, Any] = {}
+        self.performance_metrics: Dict[str, Any] = {}
+        self.created_at = datetime.now()
+        self.last_updated = datetime.now()
+        self._cache = {}
+
+        # 初始化默认参数
+        self._init_default_parameters()
+
+    @abstractmethod
+    def _init_default_parameters(self):
+        """初始化默认参数 - 子类必须实现"""
+        pass
+
+    @abstractmethod
+    def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
+        """生成交易信号 - 子类必须实现
+
+        Args:
+            data: 市场数据DataFrame
+
+        Returns:
+            交易信号列表
+        """
+        pass
+
+    def add_parameter(self, name: str, value: Any, param_type: type,
+                      description: str = "", min_value=None, max_value=None,
+                      choices=None, required=True):
+        """添加策略参数"""
+        self.parameters[name] = StrategyParameter(
+            name=name,
+            value=value,
+            param_type=param_type,
+            description=description,
+            min_value=min_value,
+            max_value=max_value,
+            choices=choices,
+            required=required
+        )
+
+    def set_parameter(self, name: str, value: Any) -> bool:
+        """设置参数值"""
+        if name not in self.parameters:
+            return False
+
+        param = self.parameters[name]
+        if param.validate(value):
+            param.value = value
+            self.last_updated = datetime.now()
+            self._clear_cache()
+            return True
+        return False
+
+    def get_parameter(self, name: str, default=None) -> Any:
+        """获取参数值"""
+        if name in self.parameters:
+            return self.parameters[name].value
+        return default
+
+    def get_parameters_dict(self) -> Dict[str, Any]:
+        """获取所有参数的字典"""
+        return {name: param.value for name, param in self.parameters.items()}
+
+    def validate_parameters(self) -> Tuple[bool, List[str]]:
+        """验证所有参数"""
+        errors = []
+        for name, param in self.parameters.items():
+            if param.required and param.value is None:
+                errors.append(f"Required parameter '{name}' is missing")
+            elif param.value is not None and not param.validate(param.value):
+                errors.append(f"Parameter '{name}' has invalid value: {param.value}")
+
+        return len(errors) == 0, errors
+
+    def calculate_confidence(self, data: pd.DataFrame, signal_index: int) -> float:
+        """计算信号置信度 - 可被子类重写"""
+        return 0.5  # 默认置信度
+
+    def preprocess_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """数据预处理 - 可被子类重写"""
+        return data.copy()
+
+    def postprocess_signals(self, signals: List[StrategySignal]) -> List[StrategySignal]:
+        """信号后处理 - 可被子类重写"""
+        return signals
+
+    def get_required_columns(self) -> List[str]:
+        """获取策略所需的数据列 - 可被子类重写"""
+        return ['open', 'high', 'low', 'close', 'volume']
+
+    def validate_data(self, data: pd.DataFrame) -> Tuple[bool, List[str]]:
+        """验证输入数据"""
+        errors = []
+        required_columns = self.get_required_columns()
+
+        for col in required_columns:
+            if col not in data.columns:
+                errors.append(f"Required column '{col}' is missing")
+
+        if len(data) == 0:
+            errors.append("Data is empty")
+
+        return len(errors) == 0, errors
+
+    def get_strategy_info(self) -> Dict[str, Any]:
+        """获取策略信息"""
+        return {
+            'name': self.name,
+            'type': self.strategy_type.value,
+            'status': self.status.value,
+            'parameters': {name: param.value for name, param in self.parameters.items()},
+            'metadata': self.metadata,
+            'performance_metrics': self.performance_metrics,
+            'created_at': self.created_at.isoformat(),
+            'last_updated': self.last_updated.isoformat()
+        }
+
+    def save_config(self, filepath: Union[str, Path]) -> bool:
+        """保存策略配置"""
+        try:
+            config = {
+                'name': self.name,
+                'type': self.strategy_type.value,
+                'parameters': {
+                    name: {
+                        'value': param.value,
+                        'type': param.param_type.__name__,
+                        'description': param.description,
+                        'min_value': param.min_value,
+                        'max_value': param.max_value,
+                        'choices': param.choices,
+                        'required': param.required
+                    }
+                    for name, param in self.parameters.items()
+                },
+                'metadata': self.metadata,
+                'created_at': self.created_at.isoformat(),
+                'last_updated': self.last_updated.isoformat()
+            }
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+
+            return True
+        except Exception as e:
+            print(f"Failed to save strategy config: {e}")
+            return False
+
+    def load_config(self, filepath: Union[str, Path]) -> bool:
+        """加载策略配置"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            # 加载参数
+            for name, param_config in config.get('parameters', {}).items():
+                if name in self.parameters:
+                    self.parameters[name].value = param_config['value']
+
+            # 加载元数据
+            self.metadata.update(config.get('metadata', {}))
+
+            self.last_updated = datetime.now()
+            self._clear_cache()
+
+            return True
+        except Exception as e:
+            print(f"Failed to load strategy config: {e}")
+            return False
+
+    def get_cache_key(self, data: pd.DataFrame) -> str:
+        """生成缓存键"""
+        # 基于数据哈希和参数生成缓存键
+        data_hash = hashlib.md5(str(data.values.tobytes()).encode()).hexdigest()[:8]
+        params_hash = hashlib.md5(str(self.get_parameters_dict()).encode()).hexdigest()[:8]
+        return f"{self.name}_{data_hash}_{params_hash}"
+
+    def _clear_cache(self):
+        """清空缓存"""
+        self._cache.clear()
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(name='{self.name}', type='{self.strategy_type.value}', status='{self.status.value}')"
+
+    def __repr__(self) -> str:
+        return self.__str__()

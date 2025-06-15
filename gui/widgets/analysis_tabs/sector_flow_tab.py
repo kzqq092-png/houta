@@ -72,50 +72,82 @@ class SectorFlowTab(SectorFlowTabPro):
 
     def _update_ranking_table(self, ranking_data):
         """更新排行表格"""
-        self.ranking_table.setRowCount(len(ranking_data))
-        for i, data in enumerate(ranking_data):
-            self.ranking_table.setItem(i, 0, QTableWidgetItem(str(data.get('rank', ''))))
-            self.ranking_table.setItem(i, 1, QTableWidgetItem(str(data.get('sector', ''))))
-            self.ranking_table.setItem(i, 2, QTableWidgetItem(f"{data.get('net_inflow', 0):.0f}"))
-            self.ranking_table.setItem(i, 3, QTableWidgetItem(f"{data.get('inflow_intensity', 0):.2f}"))
-            self.ranking_table.setItem(i, 4, QTableWidgetItem(f"{data.get('activity', 0):.2f}"))
-            self.ranking_table.setItem(i, 5, QTableWidgetItem(f"{data.get('change_pct', 0):.2f}%"))
-            self.ranking_table.setItem(i, 6, QTableWidgetItem(str(data.get('leading_stock', ''))))
-            self.ranking_table.setItem(i, 7, QTableWidgetItem(str(data.get('status', ''))))
+        column_keys = ['rank', 'sector', 'net_inflow', 'inflow_intensity', 'activity', 'change_pct', 'leading_stock', 'status']
+
+        # 预处理数据
+        processed_data = []
+        for data in ranking_data:
+            processed_item = {
+                'rank': str(data.get('rank', '')),
+                'sector': str(data.get('sector', '')),
+                'net_inflow': f"{data.get('net_inflow', 0):.0f}",
+                'inflow_intensity': f"{data.get('inflow_intensity', 0):.2f}",
+                'activity': f"{data.get('activity', 0):.2f}",
+                'change_pct': f"{data.get('change_pct', 0):.2f}%",
+                'leading_stock': str(data.get('leading_stock', '')),
+                'status': str(data.get('status', ''))
+            }
+            processed_data.append(processed_item)
+
+        self.update_table_data(self.ranking_table, processed_data, column_keys)
 
     def _update_rotation_table(self, rotation_data):
         """更新轮动表格"""
-        self.rotation_table.setRowCount(len(rotation_data))
-        for i, data in enumerate(rotation_data):
-            self.rotation_table.setItem(i, 0, QTableWidgetItem(str(data.get('direction', ''))))
-            self.rotation_table.setItem(i, 1, QTableWidgetItem(str(data.get('outflow_sector', ''))))
-            self.rotation_table.setItem(i, 2, QTableWidgetItem(str(data.get('inflow_sector', ''))))
-            self.rotation_table.setItem(i, 3, QTableWidgetItem(f"{data.get('amount', 0):.0f}"))
-            self.rotation_table.setItem(i, 4, QTableWidgetItem(str(data.get('strength', ''))))
-            self.rotation_table.setItem(i, 5, QTableWidgetItem(str(data.get('time', ''))))
+        column_keys = ['direction', 'outflow_sector', 'inflow_sector', 'amount', 'strength', 'time']
+
+        # 预处理数据
+        processed_data = []
+        for data in rotation_data:
+            processed_item = {
+                'direction': str(data.get('direction', '')),
+                'outflow_sector': str(data.get('outflow_sector', '')),
+                'inflow_sector': str(data.get('inflow_sector', '')),
+                'amount': f"{data.get('amount', 0):.0f}",
+                'strength': str(data.get('strength', '')),
+                'time': str(data.get('time', ''))
+            }
+            processed_data.append(processed_item)
+
+        self.update_table_data(self.rotation_table, processed_data, column_keys)
 
     def _update_smart_money_table(self, smart_money_data):
         """更新聪明资金表格"""
-        self.smart_money_table.setRowCount(len(smart_money_data))
-        for i, data in enumerate(smart_money_data):
-            self.smart_money_table.setItem(i, 0, QTableWidgetItem(str(data.get('time', ''))))
-            self.smart_money_table.setItem(i, 1, QTableWidgetItem(str(data.get('sector', ''))))
-            self.smart_money_table.setItem(i, 2, QTableWidgetItem(str(data.get('money_type', ''))))
-            self.smart_money_table.setItem(i, 3, QTableWidgetItem(f"{data.get('amount', 0):.0f}"))
-            self.smart_money_table.setItem(i, 4, QTableWidgetItem(str(data.get('direction', ''))))
-            self.smart_money_table.setItem(i, 5, QTableWidgetItem(f"{data.get('confidence', 0):.2f}"))
-            self.smart_money_table.setItem(i, 6, QTableWidgetItem(str(data.get('impact', ''))))
+        column_keys = ['time', 'sector', 'money_type', 'amount', 'direction', 'confidence', 'impact']
+
+        # 预处理数据
+        processed_data = []
+        for data in smart_money_data:
+            processed_item = {
+                'time': str(data.get('time', '')),
+                'sector': str(data.get('sector', '')),
+                'money_type': str(data.get('money_type', '')),
+                'amount': f"{data.get('amount', 0):.0f}",
+                'direction': str(data.get('direction', '')),
+                'confidence': f"{data.get('confidence', 0):.2f}",
+                'impact': str(data.get('impact', ''))
+            }
+            processed_data.append(processed_item)
+
+        self.update_table_data(self.smart_money_table, processed_data, column_keys)
 
     def _update_monitor_table(self, monitor_data):
         """更新监控表格"""
-        self.monitor_table.setRowCount(len(monitor_data))
-        for i, data in enumerate(monitor_data):
-            self.monitor_table.setItem(i, 0, QTableWidgetItem(str(data.get('time', ''))))
-            self.monitor_table.setItem(i, 1, QTableWidgetItem(str(data.get('sector', ''))))
-            self.monitor_table.setItem(i, 2, QTableWidgetItem(str(data.get('event', ''))))
-            self.monitor_table.setItem(i, 3, QTableWidgetItem(f"{data.get('amount', 0):.0f}"))
-            self.monitor_table.setItem(i, 4, QTableWidgetItem(str(data.get('impact', ''))))
-            self.monitor_table.setItem(i, 5, QTableWidgetItem(str(data.get('status', ''))))
+        column_keys = ['time', 'sector', 'event', 'amount', 'impact', 'status']
+
+        # 预处理数据
+        processed_data = []
+        for data in monitor_data:
+            processed_item = {
+                'time': str(data.get('time', '')),
+                'sector': str(data.get('sector', '')),
+                'event': str(data.get('event', '')),
+                'amount': f"{data.get('amount', 0):.0f}",
+                'impact': str(data.get('impact', '')),
+                'status': str(data.get('status', ''))
+            }
+            processed_data.append(processed_item)
+
+        self.update_table_data(self.monitor_table, processed_data, column_keys)
 
     def _update_statistics(self, ranking_data):
         """更新统计数据"""

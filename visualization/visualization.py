@@ -1,18 +1,16 @@
+from utils.imports import get_plotly
 import sys
 import os
 import logging
 from datetime import datetime
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-from sklearn.metrics import confusion_matrix
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+# 使用统一的导入管理模块
+from utils.imports import (
+    pd, np, plt, mdates, sns, go, FigureCanvas,
+    sklearn_metrics
+)
+
 from hikyuu import *
-import logging
 
 from .chart_utils import ChartUtils
 from .indicators import TechnicalIndicators
@@ -22,6 +20,13 @@ from .model_analysis import ModelAnalysis
 from .common_visualization import CommonVisualization
 
 logger = logging.getLogger(__name__)
+
+# 获取sklearn.metrics中的具体函数
+confusion_matrix = getattr(sklearn_metrics, 'confusion_matrix', None) if sklearn_metrics else None
+
+# 获取plotly子模块
+_plotly_modules = get_plotly()
+make_subplots = getattr(_plotly_modules.get('subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
 
 
 class Visualization:

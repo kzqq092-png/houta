@@ -65,7 +65,6 @@ class DataManager:
         return default
 
     def set_config(self, key: str, value):
-        import json
         value_str = json.dumps(value, ensure_ascii=False)
         cursor = self.conn.cursor()
         cursor.execute(
@@ -78,7 +77,6 @@ class DataManager:
             'SELECT name, type, config, is_active FROM data_source WHERE is_active=1')
         row = cursor.fetchone()
         if row:
-            import json
             config = json.loads(row[2]) if row[2] else {}
             # 防御性：config必须为dict
             if not isinstance(config, dict):
@@ -1066,7 +1064,6 @@ class DataManager:
 
             # 初始化东方财富数据源
             try:
-                from .eastmoney_source import EastMoneyDataSource
                 self._data_sources['eastmoney'] = EastMoneyDataSource()
                 self.log_manager.info("东方财富数据源初始化成功")
             except Exception as e:
@@ -1074,7 +1071,6 @@ class DataManager:
 
             # 初始化新浪数据源
             try:
-                from .sina_source import SinaDataSource
                 self._data_sources['sina'] = SinaDataSource()
                 self.log_manager.info("新浪数据源初始化成功")
             except Exception as e:
@@ -1082,7 +1078,6 @@ class DataManager:
 
             # 初始化同花顺数据源
             try:
-                from .tonghuashun_source import TongHuaShunDataSource
                 self._data_sources['tonghuashun'] = TongHuaShunDataSource()
                 self.log_manager.info("同花顺数据源初始化成功")
             except Exception as e:
@@ -1376,7 +1371,6 @@ class DataManager:
             KData对象
         """
         try:
-            import pandas as pd
             from hikyuu import KData, KRecord, Datetime
 
             if df is None or df.empty:
@@ -1500,7 +1494,6 @@ class DataManager:
         Returns:
             DataFrame
         """
-        import pandas as pd
         if kdata is None or len(kdata) == 0:
             if hasattr(self, 'log_manager'):
                 self.log_manager.warning("kdata_to_df收到空KData")
@@ -1526,7 +1519,6 @@ class DataManager:
         return df
 
     def save_indicator_combination(self, name: str, user_id: str, indicators: list, extra: str = None):
-        import json
         cursor = self.conn.cursor()
         indicators_json = json.dumps(indicators, ensure_ascii=False)
         cursor.execute('''INSERT INTO indicator_combination (name, user_id, indicators, created_at, extra) VALUES (?, ?, ?, datetime('now'), ?)''',
@@ -1542,7 +1534,6 @@ class DataManager:
             cursor.execute(
                 '''SELECT id, name, user_id, indicators, created_at, extra FROM indicator_combination''')
         rows = cursor.fetchall()
-        import json
         result = []
         for row in rows:
             indicators = json.loads(row[3]) if row[3] else []
@@ -1565,7 +1556,6 @@ class DataManager:
 
 # 全局唯一数据管理器实例，供全系统import使用
 try:
-    from core.base_logger import BaseLogManager
     data_manager = DataManager(BaseLogManager())
 except Exception:
     data_manager = DataManager()

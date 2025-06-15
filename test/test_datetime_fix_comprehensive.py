@@ -96,7 +96,6 @@ def test_analysis_widget_preprocess():
     try:
         # 模拟AnalysisWidget的_kdata_preprocess函数
         def mock_kdata_preprocess(kdata, context="分析"):
-            import pandas as pd
             from datetime import datetime
             if not isinstance(kdata, pd.DataFrame):
                 return kdata
@@ -157,7 +156,7 @@ def test_pattern_recognition():
     print("=" * 60)
 
     try:
-        from analysis.pattern_base import GenericPatternRecognizer, PatternConfig, SignalType, PatternCategory
+        from analysis.pattern_base import PatternConfig, SignalType, PatternCategory
 
         # 创建测试配置
         config = PatternConfig(

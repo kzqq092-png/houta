@@ -375,7 +375,6 @@ class RealTimeBacktestMonitor:
     def _get_cpu_usage(self) -> float:
         """获取CPU使用率"""
         try:
-            import psutil
             return psutil.cpu_percent(interval=0.1)
         except Exception:
             return 0.0

@@ -155,7 +155,7 @@ class BasePatternRecognizer(ABC):
 
 
 class PatternAlgorithmFactory:
-    """形态算法工厂"""
+    """形态算法工厂 - 优化版，统一使用DatabaseAlgorithmRecognizer"""
 
     _algorithms = {}
 
@@ -166,11 +166,15 @@ class PatternAlgorithmFactory:
 
     @classmethod
     def create(cls, config: PatternConfig) -> BasePatternRecognizer:
-        """创建算法实例"""
+        """创建算法实例 - 优化版，统一使用DatabaseAlgorithmRecognizer"""
         algorithm_class = cls._algorithms.get(config.english_name)
         if algorithm_class is None:
-            # 如果没有专门的算法类，使用通用算法
-            algorithm_class = GenericPatternRecognizer
+            # 统一使用DatabaseAlgorithmRecognizer作为默认实现
+            try:
+                from analysis.pattern_recognition import DatabaseAlgorithmRecognizer
+                algorithm_class = DatabaseAlgorithmRecognizer
+            except ImportError:
+                raise ImportError(f"无法找到形态算法实现: {config.english_name}")
 
         return algorithm_class(config)
 
@@ -178,186 +182,6 @@ class PatternAlgorithmFactory:
     def get_available_algorithms(cls) -> List[str]:
         """获取可用算法列表"""
         return list(cls._algorithms.keys())
-
-
-class GenericPatternRecognizer(BasePatternRecognizer):
-    """通用形态识别器，基于数据库存储的算法代码 - 修复版本"""
-
-    def recognize(self, kdata: pd.DataFrame) -> List[PatternResult]:
-        """执行通用形态识别 - 使用增强的执行环境"""
-        if not self.validate_data(kdata):
-            return []
-
-        try:
-            # 执行存储在数据库中的算法代码
-            algorithm_code = self.config.algorithm_code
-            if not algorithm_code:
-                return []
-
-            # 清理算法代码 - 移除开头的空行和多余的空白
-            algorithm_code = algorithm_code.strip()
-            if not algorithm_code:
-                return []
-
-            # 创建增强的安全执行环境
-            safe_globals = self._create_enhanced_safe_globals()
-            safe_locals = self._create_enhanced_safe_locals(kdata)
-
-            # 调试信息：确认kdata在执行环境中
-            if 'kdata' not in safe_locals:
-                print(f"[GenericPatternRecognizer] 警告: kdata未在safe_locals中找到")
-                safe_locals['kdata'] = kdata
-
-            # 验证kdata的有效性
-            if safe_locals['kdata'] is None or len(safe_locals['kdata']) == 0:
-                print(f"[GenericPatternRecognizer] 警告: kdata为空或无效")
-                return []
-
-            # 额外保险：将kdata也放入globals中，确保算法代码能访问到
-            safe_globals['kdata'] = kdata
-
-            # 执行算法代码
-            exec(algorithm_code, safe_globals, safe_locals)
-
-            # 获取结果并转换格式
-            raw_results = safe_locals.get('results', [])
-            return self._convert_raw_results(raw_results)
-
-        except NameError as e:
-            print(f"[GenericPatternRecognizer] 变量未定义错误 {self.config.english_name}: {e}")
-            print(f"[GenericPatternRecognizer] 可用变量: {list(safe_locals.keys()) if 'safe_locals' in locals() else '未知'}")
-            # 尝试修复：重新创建执行环境并强制设置kdata
-            try:
-                safe_globals = self._create_enhanced_safe_globals()
-                safe_locals = self._create_enhanced_safe_locals(kdata)
-
-                # 强制确保kdata在两个作用域中都存在
-                safe_locals['kdata'] = kdata
-                safe_globals['kdata'] = kdata
-
-                print(f"[GenericPatternRecognizer] 重试执行，kdata类型: {type(kdata)}, 长度: {len(kdata)}")
-
-                exec(algorithm_code, safe_globals, safe_locals)
-                raw_results = safe_locals.get('results', [])
-                return self._convert_raw_results(raw_results)
-            except Exception as retry_e:
-                print(f"[GenericPatternRecognizer] 重试执行也失败: {retry_e}")
-                # 最后的调试信息
-                print(f"[GenericPatternRecognizer] 算法代码前50字符: {repr(algorithm_code[:50])}")
-                return []
-        except Exception as e:
-            print(f"[GenericPatternRecognizer] 执行形态算法失败 {self.config.english_name}: {e}")
-            if hasattr(e, 'lineno'):
-                print(f"[GenericPatternRecognizer] 错误位置: 第{e.lineno}行")
-            # 调试信息
-            if hasattr(e, 'text') and e.text:
-                print(f"[GenericPatternRecognizer] 错误文本: {repr(e.text)}")
-            return []
-
-    def _create_enhanced_safe_globals(self) -> Dict[str, Any]:
-        """创建增强的安全执行环境"""
-        return {
-            # 基础Python函数
-            'len': len,
-            'abs': abs,
-            'max': max,
-            'min': min,
-            'sum': sum,
-            'range': range,
-            'enumerate': enumerate,
-            'str': str,
-            'float': float,
-            'int': int,
-            'bool': bool,
-
-            # 数学和数据处理
-            'np': np,
-            'pd': pd,
-
-            # 形态识别相关类型
-            'SignalType': SignalType,
-            'PatternResult': PatternResult,
-            'PatternCategory': PatternCategory,
-
-            # 工具函数
-            'calculate_body_ratio': calculate_body_ratio,
-            'calculate_shadow_ratios': calculate_shadow_ratios,
-            'is_bullish_candle': is_bullish_candle,
-            'is_bearish_candle': is_bearish_candle,
-        }
-
-    def _create_enhanced_safe_locals(self, kdata: pd.DataFrame) -> Dict[str, Any]:
-        """创建增强的本地执行环境"""
-        # 确保kdata不为None且有效
-        if kdata is None:
-            raise ValueError("kdata不能为None")
-
-        locals_dict = {
-            'kdata': kdata,
-            'config': self.config,
-            'parameters': self.parameters,
-            'results': [],
-            'create_result': self._create_enhanced_result_function(),
-        }
-
-        # 调试信息：确认kdata已正确设置
-        if 'kdata' not in locals_dict or locals_dict['kdata'] is None:
-            print(f"[GenericPatternRecognizer] 错误: kdata未正确设置到locals_dict中")
-
-        return locals_dict
-
-    def _create_enhanced_result_function(self):
-        """创建增强的结果创建函数"""
-        def create_result(pattern_type: str, signal_type, confidence: float,
-                          index: int, price: float, datetime_val: str = None,
-                          start_index: int = None, end_index: int = None,
-                          extra_data: Dict = None):
-            """创建形态识别结果"""
-            return {
-                'pattern_type': pattern_type,
-                'signal_type': signal_type,
-                'confidence': confidence,
-                'index': index,
-                'price': price,
-                'datetime_val': datetime_val,
-                'start_index': start_index,
-                'end_index': end_index,
-                'extra_data': extra_data or {}
-            }
-        return create_result
-
-    def _convert_raw_results(self, raw_results: List[Dict]) -> List[PatternResult]:
-        """转换原始结果为PatternResult对象"""
-        converted_results = []
-
-        for raw_result in raw_results:
-            try:
-                # 确保signal_type是SignalType枚举
-                signal_type = raw_result.get('signal_type')
-                if isinstance(signal_type, str):
-                    signal_type = SignalType(signal_type)
-                elif not isinstance(signal_type, SignalType):
-                    signal_type = SignalType.NEUTRAL
-
-                result = PatternResult(
-                    pattern_type=raw_result.get('pattern_type', self.config.english_name),
-                    pattern_name=self.config.name,
-                    pattern_category=self.config.category.value,
-                    signal_type=signal_type,
-                    confidence=raw_result.get('confidence', 0.5),
-                    confidence_level=self.calculate_confidence_level(raw_result.get('confidence', 0.5)),
-                    index=raw_result.get('index', 0),
-                    datetime_val=raw_result.get('datetime_val'),
-                    price=raw_result.get('price', 0.0),
-                    extra_data=raw_result.get('extra_data')
-                )
-                converted_results.append(result)
-
-            except Exception as e:
-                print(f"[GenericPatternRecognizer] 结果转换失败: {e}")
-                continue
-
-        return converted_results
 
 
 def register_pattern_algorithm(pattern_type: str):
@@ -368,19 +192,19 @@ def register_pattern_algorithm(pattern_type: str):
     return decorator
 
 
-# 工具函数
+# 工具函数 - 性能优化版
 def calculate_body_ratio(open_price: float, close_price: float, high_price: float, low_price: float) -> float:
-    """计算实体比例"""
+    """计算实体比例 - 优化版"""
     body_size = abs(close_price - open_price)
     total_range = high_price - low_price
-    return body_size / total_range if total_range > 0 else 0
+    return body_size / total_range if total_range > 0 else 0.0
 
 
 def calculate_shadow_ratios(open_price: float, close_price: float, high_price: float, low_price: float) -> Tuple[float, float]:
-    """计算上下影线比例"""
+    """计算上下影线比例 - 优化版"""
     total_range = high_price - low_price
-    if total_range == 0:
-        return 0, 0
+    if total_range <= 0:
+        return 0.0, 0.0
 
     upper_shadow = high_price - max(open_price, close_price)
     lower_shadow = min(open_price, close_price) - low_price
@@ -402,35 +226,148 @@ def is_bearish_candle(open_price: float, close_price: float) -> bool:
 
 
 def find_local_extremes(prices: np.ndarray, window: int = 5) -> Tuple[List[int], List[int]]:
-    """寻找局部极值点"""
+    """
+    寻找局部极值点 - 性能优化版
+
+    Args:
+        prices: 价格数组
+        window: 窗口大小
+
+    Returns:
+        (peaks, troughs) 峰值和谷值的索引列表
+    """
+    if len(prices) < 2 * window + 1:
+        return [], []
+
     peaks = []
     troughs = []
 
+    # 使用向量化操作提升性能
     for i in range(window, len(prices) - window):
-        # 寻找峰值
-        if all(prices[i] >= prices[i-j] for j in range(1, window+1)) and \
-           all(prices[i] >= prices[i+j] for j in range(1, window+1)):
+        # 检查是否为峰值
+        left_max = np.max(prices[i-window:i])
+        right_max = np.max(prices[i+1:i+window+1])
+        if prices[i] >= left_max and prices[i] >= right_max:
             peaks.append(i)
 
-        # 寻找谷值
-        if all(prices[i] <= prices[i-j] for j in range(1, window+1)) and \
-           all(prices[i] <= prices[i+j] for j in range(1, window+1)):
+        # 检查是否为谷值
+        left_min = np.min(prices[i-window:i])
+        right_min = np.min(prices[i+1:i+window+1])
+        if prices[i] <= left_min and prices[i] <= right_min:
             troughs.append(i)
 
     return peaks, troughs
 
 
 def calculate_trend_strength(prices: np.ndarray, window: int = 20) -> float:
-    """计算趋势强度"""
-    if len(prices) < window:
-        return 0
+    """
+    计算趋势强度 - 性能优化版
 
+    Args:
+        prices: 价格数组
+        window: 计算窗口
+
+    Returns:
+        趋势强度 (-1到1之间，正值表示上升趋势，负值表示下降趋势)
+    """
+    if len(prices) < window:
+        return 0.0
+
+    # 使用最近的数据窗口
     recent_prices = prices[-window:]
-    slope = np.polyfit(range(len(recent_prices)), recent_prices, 1)[0]
+
+    # 使用numpy的线性回归计算趋势
+    x = np.arange(len(recent_prices))
+
+    # 计算线性回归系数
+    coeffs = np.polyfit(x, recent_prices, 1)
+    slope = coeffs[0]
 
     # 标准化斜率
-    price_range = np.max(recent_prices) - np.min(recent_prices)
-    if price_range == 0:
-        return 0
+    price_range = np.ptp(recent_prices)  # 使用ptp获取范围，性能更好
+    if price_range > 0:
+        normalized_slope = slope / price_range * window
+        return np.clip(normalized_slope, -1.0, 1.0)
 
-    return slope / price_range
+    return 0.0
+
+
+def calculate_volatility(prices: np.ndarray, window: int = 20) -> float:
+    """
+    计算价格波动率 - 新增性能优化函数
+
+    Args:
+        prices: 价格数组
+        window: 计算窗口
+
+    Returns:
+        波动率 (标准差/均值)
+    """
+    if len(prices) < window:
+        return 0.0
+
+    recent_prices = prices[-window:]
+    mean_price = np.mean(recent_prices)
+
+    if mean_price > 0:
+        std_price = np.std(recent_prices)
+        return std_price / mean_price
+
+    return 0.0
+
+
+def calculate_momentum(prices: np.ndarray, period: int = 10) -> float:
+    """
+    计算价格动量 - 新增性能优化函数
+
+    Args:
+        prices: 价格数组
+        period: 计算周期
+
+    Returns:
+        动量值 (当前价格相对于period前价格的变化率)
+    """
+    if len(prices) < period + 1:
+        return 0.0
+
+    current_price = prices[-1]
+    past_price = prices[-period-1]
+
+    if past_price > 0:
+        return (current_price - past_price) / past_price
+
+    return 0.0
+
+
+def calculate_rsi(prices: np.ndarray, period: int = 14) -> float:
+    """
+    计算RSI指标 - 新增性能优化函数
+
+    Args:
+        prices: 价格数组
+        period: 计算周期
+
+    Returns:
+        RSI值 (0-100)
+    """
+    if len(prices) < period + 1:
+        return 50.0
+
+    # 计算价格变化
+    price_changes = np.diff(prices[-period-1:])
+
+    # 分离上涨和下跌
+    gains = np.where(price_changes > 0, price_changes, 0)
+    losses = np.where(price_changes < 0, -price_changes, 0)
+
+    # 计算平均收益和损失
+    avg_gain = np.mean(gains)
+    avg_loss = np.mean(losses)
+
+    if avg_loss == 0:
+        return 100.0
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi

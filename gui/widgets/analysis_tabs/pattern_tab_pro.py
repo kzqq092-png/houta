@@ -4,12 +4,271 @@
 import json
 import numpy as np
 import pandas as pd
+import traceback
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from .base_tab import BaseAnalysisTab
+
+
+class AnalysisThread(QThread):
+    """高性能分析线程 - 异步执行形态识别"""
+
+    progress_updated = pyqtSignal(int, str)  # 进度更新信号
+    analysis_completed = pyqtSignal(dict)    # 分析完成信号
+    error_occurred = pyqtSignal(str)         # 错误发生信号
+
+    def __init__(self, kdata, sensitivity=0.7, enable_ml=True, enable_alerts=True, config_manager=None):
+        super().__init__()
+        self.kdata = kdata
+        self.sensitivity = sensitivity
+        self.enable_ml = enable_ml
+        self.enable_alerts = enable_alerts
+        self.config_manager = config_manager
+
+    def run(self):
+        """执行分析任务"""
+        try:
+            results = {
+                'patterns': [],
+                'predictions': {},
+                'statistics': {},
+                'alerts': []
+            }
+
+            # 步骤1: 形态识别 (40%)
+            self.progress_updated.emit(10, "正在识别形态...")
+            patterns = self._detect_patterns()
+            results['patterns'] = patterns
+            self.progress_updated.emit(40, f"识别到 {len(patterns)} 个形态")
+
+            # 步骤2: 机器学习预测 (30%)
+            if self.enable_ml and patterns:
+                self.progress_updated.emit(50, "正在进行AI预测...")
+                predictions = self._generate_ml_predictions(patterns)
+                results['predictions'] = predictions
+                self.progress_updated.emit(70, "AI预测完成")
+
+            # 步骤3: 统计分析 (20%)
+            self.progress_updated.emit(75, "正在计算统计数据...")
+            statistics = self._calculate_statistics(patterns)
+            results['statistics'] = statistics
+            self.progress_updated.emit(90, "统计分析完成")
+
+            # 步骤4: 生成预警 (10%)
+            if self.enable_alerts and patterns:
+                self.progress_updated.emit(95, "正在生成预警...")
+                alerts = self._generate_alerts(patterns)
+                results['alerts'] = alerts
+
+            self.progress_updated.emit(100, "分析完成")
+            self.analysis_completed.emit(results)
+
+        except Exception as e:
+            error_msg = f"分析过程中发生错误: {str(e)}"
+            print(f"[AnalysisThread] {error_msg}")
+            print(f"[AnalysisThread] 错误详情: {traceback.format_exc()}")
+            self.error_occurred.emit(error_msg)
+
+    def _detect_patterns(self) -> List[Dict]:
+        """检测形态 - 高性能版本"""
+        try:
+            # 导入形态识别器
+            from analysis.pattern_recognition import EnhancedPatternRecognizer
+
+            # 使用增强的形态识别器
+            recognizer = EnhancedPatternRecognizer()
+
+            # 执行形态识别
+            patterns = recognizer.identify_patterns(
+                self.kdata,
+                confidence_threshold=self.sensitivity * 0.5,  # 根据灵敏度调整阈值
+                pattern_types=None  # 识别所有类型
+            )
+
+            # 转换为字典格式
+            pattern_dicts = []
+            for pattern in patterns:
+                if hasattr(pattern, 'to_dict'):
+                    pattern_dicts.append(pattern.to_dict())
+                else:
+                    # 如果是字典格式，直接使用
+                    pattern_dicts.append(pattern)
+
+            return pattern_dicts
+
+        except Exception as e:
+            print(f"[AnalysisThread] 形态检测失败: {e}")
+            return []
+
+    def _generate_ml_predictions(self, patterns: List[Dict]) -> Dict:
+        """生成机器学习预测 - 增强版"""
+        try:
+            predictions = {
+                'trend_prediction': '震荡',
+                'confidence': 0.5,
+                'target_price': 0.0,
+                'risk_level': '中等',
+                'time_horizon': '5-10个交易日',
+                'support_level': 0.0,
+                'resistance_level': 0.0
+            }
+
+            if patterns and len(self.kdata) > 0:
+                # 基于形态数量和置信度进行预测
+                avg_confidence = np.mean([p.get('confidence', 0.5) for p in patterns])
+                buy_signals = len([p for p in patterns if p.get('signal', '') == 'buy'])
+                sell_signals = len([p for p in patterns if p.get('signal', '') == 'sell'])
+
+                # 计算当前价格和目标价格
+                current_price = float(self.kdata['close'].iloc[-1])
+
+                if buy_signals > sell_signals:
+                    predictions['trend_prediction'] = '上升'
+                    predictions['confidence'] = min(0.9, avg_confidence + 0.2)
+                    predictions['target_price'] = current_price * (1 + avg_confidence * 0.1)
+                    predictions['risk_level'] = '低' if avg_confidence > 0.7 else '中等'
+                elif sell_signals > buy_signals:
+                    predictions['trend_prediction'] = '下降'
+                    predictions['confidence'] = min(0.9, avg_confidence + 0.2)
+                    predictions['target_price'] = current_price * (1 - avg_confidence * 0.1)
+                    predictions['risk_level'] = '高' if avg_confidence > 0.7 else '中等'
+                else:
+                    predictions['trend_prediction'] = '震荡'
+                    predictions['confidence'] = avg_confidence
+                    predictions['target_price'] = current_price
+
+                # 计算支撑阻力位
+                recent_highs = self.kdata['high'].tail(20)
+                recent_lows = self.kdata['low'].tail(20)
+                predictions['resistance_level'] = float(recent_highs.max())
+                predictions['support_level'] = float(recent_lows.min())
+
+            return predictions
+
+        except Exception as e:
+            print(f"[AnalysisThread] ML预测失败: {e}")
+            return {}
+
+    def _calculate_statistics(self, patterns: List[Dict]) -> Dict:
+        """计算统计数据 - 增强版"""
+        try:
+            if not patterns:
+                return {
+                    'total_patterns': 0,
+                    'pattern_distribution': {},
+                    'signal_distribution': {},
+                    'confidence_stats': {}
+                }
+
+            # 基础统计
+            total_patterns = len(patterns)
+            buy_patterns = len([p for p in patterns if p.get('signal', '') == 'buy'])
+            sell_patterns = len([p for p in patterns if p.get('signal', '') == 'sell'])
+            neutral_patterns = total_patterns - buy_patterns - sell_patterns
+
+            # 置信度统计
+            confidences = [p.get('confidence', 0.5) for p in patterns]
+            avg_confidence = np.mean(confidences)
+            max_confidence = np.max(confidences)
+            min_confidence = np.min(confidences)
+
+            # 形态类型分布
+            pattern_types = {}
+            for pattern in patterns:
+                ptype = pattern.get('pattern_name', '未知')
+                pattern_types[ptype] = pattern_types.get(ptype, 0) + 1
+
+            # 信号强度分析
+            high_confidence_patterns = len([p for p in patterns if p.get('confidence', 0) >= 0.8])
+            medium_confidence_patterns = len([p for p in patterns if 0.5 <= p.get('confidence', 0) < 0.8])
+            low_confidence_patterns = len([p for p in patterns if p.get('confidence', 0) < 0.5])
+
+            statistics = {
+                'total_patterns': total_patterns,
+                'buy_patterns': buy_patterns,
+                'sell_patterns': sell_patterns,
+                'neutral_patterns': neutral_patterns,
+                'buy_ratio': buy_patterns / total_patterns if total_patterns > 0 else 0,
+                'sell_ratio': sell_patterns / total_patterns if total_patterns > 0 else 0,
+                'pattern_distribution': pattern_types,
+                'signal_distribution': {
+                    'buy': buy_patterns,
+                    'sell': sell_patterns,
+                    'neutral': neutral_patterns
+                },
+                'confidence_stats': {
+                    'average': avg_confidence,
+                    'maximum': max_confidence,
+                    'minimum': min_confidence,
+                    'high_confidence': high_confidence_patterns,
+                    'medium_confidence': medium_confidence_patterns,
+                    'low_confidence': low_confidence_patterns
+                }
+            }
+
+            return statistics
+
+        except Exception as e:
+            print(f"[AnalysisThread] 统计计算失败: {e}")
+            return {}
+
+    def _generate_alerts(self, patterns: List[Dict]) -> List[Dict]:
+        """生成预警信息 - 增强版"""
+        try:
+            alerts = []
+
+            for pattern in patterns:
+                confidence = pattern.get('confidence', 0.5)
+                signal = pattern.get('signal', 'neutral')
+                pattern_name = pattern.get('pattern_name', '未知形态')
+
+                # 高置信度形态生成预警
+                if confidence >= 0.8:
+                    alert = {
+                        'type': 'high_confidence',
+                        'level': 'warning',
+                        'message': f"发现高置信度形态: {pattern_name} (置信度: {confidence:.2%})",
+                        'confidence': confidence,
+                        'signal': signal,
+                        'pattern_name': pattern_name,
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'action_required': True
+                    }
+                    alerts.append(alert)
+
+                # 强烈买入/卖出信号
+                if signal in ['buy', 'sell'] and confidence >= 0.7:
+                    action = '买入' if signal == 'buy' else '卖出'
+                    alert = {
+                        'type': 'strong_signal',
+                        'level': 'info',
+                        'message': f"强烈{action}信号: {pattern_name}",
+                        'confidence': confidence,
+                        'signal': signal,
+                        'pattern_name': pattern_name,
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'action_required': True
+                    }
+                    alerts.append(alert)
+
+            # 综合预警
+            if len(patterns) > 5:
+                alerts.append({
+                    'type': 'pattern_cluster',
+                    'level': 'info',
+                    'message': f"检测到形态集群: 共{len(patterns)}个形态，建议重点关注",
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'action_required': False
+                })
+
+            return alerts
+
+        except Exception as e:
+            print(f"[AnalysisThread] 预警生成失败: {e}")
+            return []
 
 
 class PatternAnalysisTabPro(BaseAnalysisTab):
@@ -469,16 +728,73 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         return names.get(category, category)
 
     def one_click_analysis(self):
-        """一键分析"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
-            return
+        """一键分析 - 性能优化版"""
+        try:
+            # 显示进度条
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setValue(0)
+            self.status_label.setText("正在初始化分析...")
 
-        self.show_loading("正在进行专业形态分析...")
-        self.status_label.setText("执行一键分析...")
+            # 检查数据有效性
+            if not hasattr(self, 'kdata') or self.kdata is None or len(self.kdata) == 0:
+                QMessageBox.warning(self, "警告", "请先选择股票数据")
+                self.progress_bar.setVisible(False)
+                return
 
-        # 异步执行分析
-        self.run_analysis_async(self._comprehensive_analysis)
+            # 获取分析参数
+            sensitivity = self.sensitivity_slider.value() / 100.0
+            enable_ml = self.enable_ml_cb.isChecked()
+            enable_alerts = self.enable_alerts_cb.isChecked()
+
+            # 启动异步分析
+            self.analysis_thread = AnalysisThread(
+                kdata=self.kdata,
+                sensitivity=sensitivity,
+                enable_ml=enable_ml,
+                enable_alerts=enable_alerts,
+                config_manager=self.config_manager
+            )
+
+            # 连接信号
+            self.analysis_thread.progress_updated.connect(self.update_progress)
+            self.analysis_thread.analysis_completed.connect(self.on_analysis_completed)
+            self.analysis_thread.error_occurred.connect(self.on_analysis_error)
+
+            # 开始分析
+            self.analysis_thread.start()
+
+        except Exception as e:
+            self.progress_bar.setVisible(False)
+            QMessageBox.critical(self, "错误", f"启动分析失败: {str(e)}")
+            print(f"[PatternAnalysisTabPro] 一键分析失败: {e}")
+
+    def update_progress(self, value, message):
+        """更新进度显示"""
+        self.progress_bar.setValue(value)
+        self.status_label.setText(message)
+
+    def on_analysis_completed(self, results):
+        """分析完成处理"""
+        try:
+            self.progress_bar.setVisible(False)
+            self.status_label.setText("分析完成")
+
+            # 更新结果显示
+            self._update_results_display(results)
+
+            # 发送信号
+            if results.get('patterns'):
+                self.pattern_detected.emit(results)
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"处理分析结果失败: {str(e)}")
+            print(f"[PatternAnalysisTabPro] 处理分析结果失败: {e}")
+
+    def on_analysis_error(self, error_message):
+        """分析错误处理"""
+        self.progress_bar.setVisible(False)
+        self.status_label.setText("分析失败")
+        QMessageBox.critical(self, "分析错误", error_message)
 
     def _comprehensive_analysis(self):
         """综合分析"""
@@ -661,8 +977,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def ai_prediction(self):
         """AI预测"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("AI正在分析预测...")
@@ -678,8 +993,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def professional_scan(self):
         """专业扫描"""
-        if not self._validate_kdata(self.current_kdata):
-            QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
+        if not self.validate_kdata_with_warning():
             return
 
         self.show_loading("执行专业级形态扫描...")
@@ -730,21 +1044,22 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def _update_patterns_table(self, patterns):
         """更新形态表格"""
-        self.patterns_table.setRowCount(len(patterns))
+        column_keys = ['name', 'category', 'confidence', 'success_rate', 'risk_level',
+                       'start_date', 'end_date', 'price_change', 'target_price', 'recommendation']
 
+        # 预处理数据，转换category为显示名称
+        processed_patterns = []
+        for pattern in patterns:
+            processed_pattern = pattern.copy()
+            processed_pattern['category'] = self._get_category_name(pattern['category'])
+            processed_pattern['confidence'] = f"{pattern['confidence']:.2%}"
+            processed_pattern['success_rate'] = f"{pattern['success_rate']:.2%}"
+            processed_patterns.append(processed_pattern)
+
+        self.update_table_data(self.patterns_table, processed_patterns, column_keys)
+
+        # 设置行颜色
         for row, pattern in enumerate(patterns):
-            self.patterns_table.setItem(row, 0, QTableWidgetItem(pattern['name']))
-            self.patterns_table.setItem(row, 1, QTableWidgetItem(self._get_category_name(pattern['category'])))
-            self.patterns_table.setItem(row, 2, QTableWidgetItem(f"{pattern['confidence']:.2%}"))
-            self.patterns_table.setItem(row, 3, QTableWidgetItem(f"{pattern['success_rate']:.2%}"))
-            self.patterns_table.setItem(row, 4, QTableWidgetItem(pattern['risk_level']))
-            self.patterns_table.setItem(row, 5, QTableWidgetItem(pattern['start_date']))
-            self.patterns_table.setItem(row, 6, QTableWidgetItem(pattern['end_date']))
-            self.patterns_table.setItem(row, 7, QTableWidgetItem(pattern['price_change']))
-            self.patterns_table.setItem(row, 8, QTableWidgetItem(pattern['target_price']))
-            self.patterns_table.setItem(row, 9, QTableWidgetItem(pattern['recommendation']))
-
-            # 根据风险等级设置行颜色
             if pattern['risk_level'] == 'high':
                 for col in range(10):
                     item = self.patterns_table.item(row, col)
@@ -832,10 +1147,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         pass
 
     def _get_export_specific_data(self):
-        """获取导出数据"""
+        """获取形态分析特定的导出数据"""
         return {
-            'professional_patterns': self.professional_patterns,
-            'ml_config': self.ml_config,
-            'pattern_cache': len(self.pattern_cache),
-            'ml_predictions': self.ml_predictions
+            'analysis_type': 'pattern_analysis',
+            'professional_patterns': getattr(self, 'professional_patterns', []),
+            'ml_config': getattr(self, 'ml_config', {}),
+            'pattern_cache_size': len(getattr(self, 'pattern_cache', {})),
+            'ml_predictions': getattr(self, 'ml_predictions', {}),
+            'pattern_statistics': getattr(self, 'pattern_statistics', {}),
+            'current_sensitivity': getattr(self, 'sensitivity_slider', {}).value() if hasattr(self, 'sensitivity_slider') else 0.5,
+            'realtime_enabled': getattr(self, 'realtime_cb', {}).isChecked() if hasattr(self, 'realtime_cb') else False
         }

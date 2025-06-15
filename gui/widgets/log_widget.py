@@ -5,8 +5,8 @@
 """
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
-from PyQt5.QtGui import QTextBlock, QColor, QTextCursor, QCursor
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 from datetime import datetime
 from core.logger import LogManager, LogLevel
 import traceback
@@ -138,10 +138,12 @@ class LogWidget(QWidget):
             toolbar_layout.addWidget(self.module_combo)
             # 时间区间筛选
             self.time_start = QDateTimeEdit()
+            self.time_start.setDateTime(QDateTime.currentDateTime())
             self.time_start.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
             self.time_start.setCalendarPopup(True)
             self.time_end = QDateTimeEdit()
             self.time_end.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+            self.time_end.setDateTime(QDateTime.currentDateTime().addDays(1))
             self.time_end.setCalendarPopup(True)
             toolbar_layout.addWidget(QLabel("起止时间:"))
             toolbar_layout.addWidget(self.time_start)

@@ -141,7 +141,6 @@ class TechnicalAnalyzer:
             Dict containing momentum analysis results
         """
         try:
-            import pandas as pd
             if isinstance(kdata, pd.DataFrame):
                 closes = kdata['close'].values
                 from indicators_algo import calc_rsi, calc_macd

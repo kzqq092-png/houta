@@ -67,37 +67,61 @@ class WaveAnalysisTab(WaveAnalysisTabPro):
 
     def _update_elliott_table(self, waves):
         """更新艾略特波浪表格"""
-        self.elliott_table.setRowCount(len(waves))
-        for i, wave in enumerate(waves):
-            self.elliott_table.setItem(i, 0, QTableWidgetItem(str(wave.get('wave', ''))))
-            self.elliott_table.setItem(i, 1, QTableWidgetItem(str(wave.get('type', ''))))
-            self.elliott_table.setItem(i, 2, QTableWidgetItem(str(wave.get('start', {}).get('date', ''))))
-            self.elliott_table.setItem(i, 3, QTableWidgetItem(str(wave.get('end', {}).get('date', ''))))
-            self.elliott_table.setItem(i, 4, QTableWidgetItem(f"{wave.get('amplitude', 0)*100:.2f}%"))
-            self.elliott_table.setItem(i, 5, QTableWidgetItem(str(wave.get('time', ''))))
-            self.elliott_table.setItem(i, 6, QTableWidgetItem(f"{wave.get('confidence', 0):.2f}"))
-            self.elliott_table.setItem(i, 7, QTableWidgetItem(str(wave.get('status', ''))))
+        column_keys = ['wave', 'type', 'start_date', 'end_date', 'amplitude', 'time', 'confidence', 'status']
+
+        # 预处理数据
+        processed_waves = []
+        for wave in waves:
+            processed_wave = {
+                'wave': str(wave.get('wave', '')),
+                'type': str(wave.get('type', '')),
+                'start_date': str(wave.get('start', {}).get('date', '')),
+                'end_date': str(wave.get('end', {}).get('date', '')),
+                'amplitude': f"{wave.get('amplitude', 0)*100:.2f}%",
+                'time': str(wave.get('time', '')),
+                'confidence': f"{wave.get('confidence', 0):.2f}",
+                'status': str(wave.get('status', ''))
+            }
+            processed_waves.append(processed_wave)
+
+        self.update_table_data(self.elliott_table, processed_waves, column_keys)
 
     def _update_gann_table(self, levels):
         """更新江恩表格"""
-        self.gann_table.setRowCount(len(levels))
-        for i, level in enumerate(levels):
-            self.gann_table.setItem(i, 0, QTableWidgetItem(str(level.get('type', ''))))
-            self.gann_table.setItem(i, 1, QTableWidgetItem(f"{level.get('angle', 0):.1f}°"))
-            self.gann_table.setItem(i, 2, QTableWidgetItem(f"{level.get('price', 0):.2f}"))
-            self.gann_table.setItem(i, 3, QTableWidgetItem(str(level.get('time', ''))))
-            self.gann_table.setItem(i, 4, QTableWidgetItem(str(level.get('strength', ''))))
-            self.gann_table.setItem(i, 5, QTableWidgetItem(str(level.get('status', ''))))
+        column_keys = ['type', 'angle', 'price', 'time', 'strength', 'status']
+
+        # 预处理数据
+        processed_levels = []
+        for level in levels:
+            processed_level = {
+                'type': str(level.get('type', '')),
+                'angle': f"{level.get('angle', 0):.1f}°",
+                'price': f"{level.get('price', 0):.2f}",
+                'time': str(level.get('time', '')),
+                'strength': str(level.get('strength', '')),
+                'status': str(level.get('status', ''))
+            }
+            processed_levels.append(processed_level)
+
+        self.update_table_data(self.gann_table, processed_levels, column_keys)
 
     def _update_fibonacci_table(self, levels):
         """更新斐波那契表格"""
-        self.fibonacci_table.setRowCount(len(levels))
-        for i, level in enumerate(levels):
-            self.fibonacci_table.setItem(i, 0, QTableWidgetItem(str(level.get('ratio', ''))))
-            self.fibonacci_table.setItem(i, 1, QTableWidgetItem(f"{level.get('price', 0):.2f}"))
-            self.fibonacci_table.setItem(i, 2, QTableWidgetItem(str(level.get('type', ''))))
-            self.fibonacci_table.setItem(i, 3, QTableWidgetItem(str(level.get('strength', ''))))
-            self.fibonacci_table.setItem(i, 4, QTableWidgetItem(str(level.get('validity', ''))))
+        column_keys = ['ratio', 'price', 'type', 'strength', 'validity']
+
+        # 预处理数据
+        processed_levels = []
+        for level in levels:
+            processed_level = {
+                'ratio': str(level.get('ratio', '')),
+                'price': f"{level.get('price', 0):.2f}",
+                'type': str(level.get('type', '')),
+                'strength': str(level.get('strength', '')),
+                'validity': str(level.get('validity', ''))
+            }
+            processed_levels.append(processed_level)
+
+        self.update_table_data(self.fibonacci_table, processed_levels, column_keys)
 
     # 保持向后兼容的方法
     def analyze_wave(self):

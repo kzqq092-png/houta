@@ -19,6 +19,7 @@ import psutil
 from datetime import datetime
 import traceback
 from core.logger import LogManager
+from gui.widgets.trading_widget import TradingWidget
 from utils.config_types import LoggingConfig
 from typing import Optional, Dict, Any
 import csv
@@ -123,7 +124,6 @@ class BaseAnalysisPanel(QWidget):
 
     def on_base_panel_analyze(self):
         """重定向到trading_widget的标准on_analyze实现，避免重复。"""
-        from gui.widgets.trading_widget import TradingWidget
         if hasattr(self, 'trading_widget') and isinstance(self.trading_widget, TradingWidget):
             # 若有参数控件，先同步参数
             if hasattr(self, 'param_controls') and hasattr(self.trading_widget, 'set_parameters'):
@@ -242,13 +242,11 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             if hasattr(parent, 'log_manager'):
                 self.log_manager = parent.log_manager
             else:
-                from core.logger import LogManager
                 self.log_manager = LogManager()
 
             self.log_manager.info("初始化策略回测UI组件")
             super().__init__(parent)
             # 集成TradingWidget实例（仅作分析逻辑调用，不显示UI）
-            from gui.widgets.trading_widget import TradingWidget
             self.trading_widget = TradingWidget()
             # 初始化UI
             try:
@@ -288,12 +286,35 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             strategy_group = QGroupBox("策略选择")
             strategy_layout = QVBoxLayout()
             self.strategy_combo = QComboBox()
-            self.strategy_combo.addItems([
-                '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
-                'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
-                'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
-                'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略'
-            ])
+
+            # 使用新的策略管理系统获取策略列表
+            try:
+                from core.strategy import list_available_strategies
+                available_strategies = list_available_strategies()
+                if available_strategies:
+                    self.strategy_combo.addItems(available_strategies)
+                    self.log_manager.info(f"从策略管理系统加载了 {len(available_strategies)} 个策略")
+                else:
+                    # 如果新系统没有策略，使用默认策略列表
+                    default_strategies = [
+                        '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
+                        'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
+                        'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
+                        'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略'
+                    ]
+                    self.strategy_combo.addItems(default_strategies)
+                    self.log_manager.warning("策略管理系统未返回策略，使用默认策略列表")
+            except Exception as e:
+                # 如果导入失败，使用默认策略列表
+                default_strategies = [
+                    '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
+                    'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
+                    'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
+                    'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略'
+                ]
+                self.strategy_combo.addItems(default_strategies)
+                self.log_manager.error(f"加载策略管理系统失败，使用默认策略列表: {str(e)}")
+
             strategy_layout.addWidget(self.strategy_combo)
             strategy_group.setLayout(strategy_layout)
             layout.addWidget(strategy_group)
@@ -334,12 +355,35 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             batch_layout.addWidget(self.batch_stock_input)
             self.batch_strategy_list = QListWidget()
             self.batch_strategy_list.setSelectionMode(QListWidget.MultiSelection)
-            for s in [
-                '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
-                'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
-                'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
-                    'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略']:
-                self.batch_strategy_list.addItem(s)
+
+            # 使用新的策略管理系统获取策略列表
+            try:
+                available_strategies = list_available_strategies()
+                if available_strategies:
+                    for strategy in available_strategies:
+                        self.batch_strategy_list.addItem(strategy)
+                    self.log_manager.info(f"批量策略列表加载了 {len(available_strategies)} 个策略")
+                else:
+                    # 如果新系统没有策略，使用默认策略列表
+                    default_strategies = [
+                        '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
+                        'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
+                        'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
+                        'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略'
+                    ]
+                    for strategy in default_strategies:
+                        self.batch_strategy_list.addItem(strategy)
+            except Exception as e:
+                # 如果导入失败，使用默认策略列表
+                default_strategies = [
+                    '双均线策略', 'MACD策略', 'KDJ策略', 'RSI策略', 'BOLL策略',
+                    'CCI策略', 'ATR策略', 'OBV策略', 'WR策略', 'DMI策略',
+                    'SAR策略', 'ROC策略', 'TRIX策略', 'MFI策略', 'ADX策略',
+                    'BBW策略', 'AD策略', 'CMO策略', 'DX策略', '自定义策略'
+                ]
+                for strategy in default_strategies:
+                    self.batch_strategy_list.addItem(strategy)
+                self.log_manager.error(f"批量策略列表加载失败，使用默认策略: {str(e)}")
             batch_layout.addWidget(QLabel("批量策略选择："))
             batch_layout.addWidget(self.batch_strategy_list)
             self.param_grid_table = QTableWidget(0, 3)
@@ -1045,8 +1089,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         """
         一键推荐策略：自动获取股票特征和历史表现，调用API，展示推荐结果。
         """
-        import requests
-        from PyQt5.QtWidgets import QApplication
         self.ai_strategy_run_btn.setEnabled(False)
         self.ai_strategy_run_btn.setText("推荐中...")
         QApplication.processEvents()
@@ -1207,8 +1249,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 生成任务
         self.batch_table.setRowCount(0)
         self.batch_tasks = []
-        self._task_events = []  # 每个任务一个Event
-        self._task_threads = []  # 线程句柄
+        _task_events = []  # 每个任务一个Event
+        _task_threads = []  # 线程句柄
         max_retries = 3  # 可扩展为UI参数
         for stock in stocks:
             for strategy in strategies:
@@ -1287,12 +1329,10 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         self.batch_task_trace_ids = []
 
         def worker(task, idx):
-            import uuid
             trace_id = str(uuid.uuid4())
             self.batch_task_trace_ids.append(trace_id)
             try:
                 self.log_manager.info(f"批量任务开始: {task}", trace_id=trace_id)
-                import time
                 row = task['row']
                 task['status'] = '进行中'
                 task['start_time'] = time.time()
@@ -1514,7 +1554,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                         for _ in range(10):
                             if pause_event.is_set():
                                 while pause_event.is_set():
-                                    import time
                                     time.sleep(0.2)
                         from core.trading_system import run_backtest
                         res = run_backtest(code, strategy, params)
@@ -1522,7 +1561,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                     except Exception as e:
                         if attempt == max_retries:
                             return (code, strategy, params, None, f"{str(e)} (重试{attempt}次后失败)")
-                        import time
                         time.sleep(1)  # 重试间隔
                 return (code, strategy, params, None, "未知错误")
 
@@ -1595,7 +1633,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
 
             if distributed_backend == 'dask':
                 try:
-                    from gui.widgets.trading_widget import TradingWidget
                     tw = TradingWidget()
                     results = tw.run_batch_analysis(codes, strategies, param_combos, distributed_backend='dask', remote_nodes=remote_nodes)
                     # 结果填充到表格
@@ -1791,7 +1828,6 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
 
     def export_process_report(self, filename=None):
         if not filename:
-            from PyQt5.QtWidgets import QFileDialog
             filename, _ = QFileDialog.getSaveFileName(self, "导出分析流程报告", "", "CSV Files (*.csv);;Text Files (*.txt)")
             if not filename:
                 return
@@ -1956,7 +1992,6 @@ document.addEventListener('DOMContentLoaded', function() {
     def update_progress_chart(self):
         if self.batch_start_time is None:
             return
-        import time
         elapsed = int(time.time() - self.batch_start_time)
         total = self.batch_progress.maximum() if hasattr(self, 'batch_progress') else 100
         current = self.batch_progress.value() if hasattr(self, 'batch_progress') else 0
@@ -2213,7 +2248,6 @@ document.addEventListener('DOMContentLoaded', function() {
         self.update_task_queue()
         self.batch_table.setItem(row, 3, QTableWidgetItem("进行中"))
         self.batch_table.setItem(row, 4, QTableWidgetItem("分析中"))
-        import time
         for i in range(10):
             if task['terminate_flag'].is_set():
                 task['status'] = '已终止'
@@ -2316,10 +2350,6 @@ document.addEventListener('DOMContentLoaded', function() {
         """
         一键AI选股：分批异步调用API，防止UI卡顿。
         """
-        import requests
-        import time
-        from PyQt5.QtWidgets import QApplication
-        from concurrent.futures import ThreadPoolExecutor, as_completed
         self.ai_stock_run_btn.setEnabled(False)
         self.ai_stock_run_btn.setText("选股中...")
         QApplication.processEvents()
@@ -2464,10 +2494,6 @@ document.addEventListener('DOMContentLoaded', function() {
         """
         一键参数优化：分批异步调用API，防止UI卡顿。
         """
-        import requests
-        import time
-        from PyQt5.QtWidgets import QApplication
-        from concurrent.futures import ThreadPoolExecutor, as_completed
         self.ai_optimizer_run_btn.setEnabled(False)
         self.ai_optimizer_run_btn.setText("优化中...")
         QApplication.processEvents()
@@ -2555,8 +2581,6 @@ document.addEventListener('DOMContentLoaded', function() {
         可视化AI参数优化结果，柱状图展示各股票最优参数分布。
         """
         try:
-            import plotly.graph_objs as go
-            from PyQt5.QtWebEngineWidgets import QWebEngineView
             from PyQt5.QtWidgets import QDialog, QVBoxLayout
             # 统计最优参数分布
             param_count = {}
@@ -2623,7 +2647,6 @@ document.addEventListener('DOMContentLoaded', function() {
             result = getattr(self, 'recent_analysis_result', None)
             if result is None and hasattr(self.parent(), 'analysis_tools'):
                 result = getattr(self.parent().analysis_tools, 'recent_analysis_result', None)
-            import json
             if result:
                 self.ai_diagnosis_input.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
                 QMessageBox.information(self, "已填充", "已自动填充最近回测/分析结果")
@@ -2636,8 +2659,6 @@ document.addEventListener('DOMContentLoaded', function() {
         """
         一键智能诊断：调用API，展示AI诊断建议和风险提示。
         """
-        import requests
-        from PyQt5.QtWidgets import QApplication
         self.ai_diagnosis_run_btn.setEnabled(False)
         self.ai_diagnosis_run_btn.setText("诊断中...")
         QApplication.processEvents()
@@ -2646,7 +2667,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if not input_text:
                 QMessageBox.warning(self, "输入错误", "请粘贴回测/分析结果JSON")
                 return
-            import json
             try:
                 result_data = json.loads(input_text)
             except Exception as e:
@@ -2676,7 +2696,6 @@ document.addEventListener('DOMContentLoaded', function() {
         导出AI诊断报告为txt文件。
         """
         try:
-            from PyQt5.QtWidgets import QFileDialog
             text = self.ai_diagnosis_result.toPlainText()
             if not text:
                 QMessageBox.warning(self, "无内容", "请先完成AI诊断")
@@ -2694,9 +2713,6 @@ document.addEventListener('DOMContentLoaded', function() {
         可视化AI策略推荐结果，分组柱状图展示各策略推荐数量。
         """
         try:
-            import plotly.graph_objs as go
-            from PyQt5.QtWebEngineWidgets import QWebEngineView
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout
             # 统计推荐策略分布
             strat_count = {}
             for row in range(self.ai_strategy_result_table.rowCount()):
@@ -2721,9 +2737,6 @@ document.addEventListener('DOMContentLoaded', function() {
         可视化AI选股结果，饼图展示各推荐理由分布。
         """
         try:
-            import plotly.graph_objs as go
-            from PyQt5.QtWebEngineWidgets import QWebEngineView
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout
             # 统计推荐理由分布
             reason_count = {}
             for row in range(self.ai_stock_result_table.rowCount()):
@@ -2765,7 +2778,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if hasattr(self, 'last_trace_id') and self.last_trace_id:
             log_content = self.log_manager.get_last_trace_log(self.last_trace_id)
             # 可弹窗显示或保存为文件
-            from PyQt5.QtWidgets import QFileDialog
             filename, _ = QFileDialog.getSaveFileName(self, "导出调用链日志", f"trace_{self.last_trace_id}.log", "Log Files (*.log)")
             if filename:
                 with open(filename, 'w', encoding='utf-8') as f:
@@ -2783,11 +2795,57 @@ document.addEventListener('DOMContentLoaded', function() {
         for tid in trace_ids:
             log_content += f"\n--- trace_id={tid} ---\n"
             log_content += self.log_manager.get_last_trace_log(tid)
-        from PyQt5.QtWidgets import QFileDialog
         filename, _ = QFileDialog.getSaveFileName(self, "导出队列日志", "batch_trace.log", "Log Files (*.log)")
         if filename:
             with open(filename, 'w', encoding='utf-8') as f:
                 f.write(log_content)
+
+    def refresh_strategy_list(self):
+        """刷新策略列表"""
+        try:
+            # 清空现有策略
+            self.strategy_combo.clear()
+            self.batch_strategy_list.clear()
+
+            # 重新加载策略
+            available_strategies = list_available_strategies()
+
+            if available_strategies:
+                # 更新单个策略选择
+                self.strategy_combo.addItems(available_strategies)
+
+                # 更新批量策略选择
+                for strategy in available_strategies:
+                    self.batch_strategy_list.addItem(strategy)
+
+                self.log_manager.info(f"策略列表已刷新，共 {len(available_strategies)} 个策略")
+
+                # 发送状态更新信号
+                if hasattr(self, 'set_status_message'):
+                    self.set_status_message(f"策略列表已刷新，共 {len(available_strategies)} 个策略")
+
+            else:
+                self.log_manager.warning("策略管理系统未返回任何策略")
+                if hasattr(self, 'set_status_message'):
+                    self.set_status_message("未找到可用策略", error=True)
+
+        except Exception as e:
+            error_msg = f"刷新策略列表失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            if hasattr(self, 'set_status_message'):
+                self.set_status_message(error_msg, error=True)
+
+    def get_selected_strategy(self):
+        """获取当前选择的策略"""
+        return self.strategy_combo.currentText() if self.strategy_combo else None
+
+    def get_selected_batch_strategies(self):
+        """获取批量选择的策略列表"""
+        if not self.batch_strategy_list:
+            return []
+
+        selected_items = self.batch_strategy_list.selectedItems()
+        return [item.text() for item in selected_items]
 
 
 class StatusBar(QStatusBar):

@@ -654,7 +654,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             category_map = get_all_indicators_by_category(use_chinese=True)
 
             if not all_indicators:
-                QMessageBox.warning(self, "警告", "未检测到ta-lib指标，请检查ta-lib安装")
+                self.show_library_warning("ta-lib", "指标计算")
                 return
 
             # 创建指标数据列表
@@ -853,71 +853,17 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.auto_calculate = state == Qt.Checked
 
     def _validate_kdata(self, kdata) -> bool:
-        """验证K线数据的有效性"""
-        try:
-            if kdata is None:
-                self.log_manager.warning("K线数据为空")
-                return False
-
-            if not isinstance(kdata, pd.DataFrame):
-                self.log_manager.warning("K线数据不是DataFrame格式")
-                return False
-
-            if len(kdata) == 0:
-                self.log_manager.warning("K线数据长度为0")
-                return False
-
-            # 检查必要的列
-            required_columns = ['open', 'high', 'low', 'close']
-            missing_columns = [col for col in required_columns if col not in kdata.columns]
-            if missing_columns:
-                self.log_manager.warning(f"K线数据缺少必要列: {missing_columns}")
-                return False
-
-            # 检查数据质量
-            for col in required_columns:
-                if kdata[col].isna().all():
-                    self.log_manager.warning(f"列 {col} 全部为空值")
-                    return False
-
-            # 检查OHLC逻辑
-            invalid_ohlc = (kdata['high'] < kdata['low']) | \
-                (kdata['high'] < kdata['open']) | \
-                (kdata['high'] < kdata['close']) | \
-                (kdata['low'] > kdata['open']) | \
-                (kdata['low'] > kdata['close'])
-
-            if invalid_ohlc.any():
-                invalid_count = invalid_ohlc.sum()
-                self.log_manager.warning(f"发现 {invalid_count} 行OHLC数据逻辑错误")
-                # 不直接返回False，只是警告
-
-            # 检查数据点数量是否足够
-            if len(kdata) < 10:
-                self.log_manager.warning("K线数据点数量过少，可能影响指标计算准确性")
-                return False
-
-            # 检查时间连续性（如果有时间索引）
-            if hasattr(kdata.index, 'to_pydatetime'):
-                time_diffs = kdata.index.to_series().diff().dropna()
-                if len(time_diffs) > 0:
-                    max_gap = time_diffs.max()
-                    if max_gap > pd.Timedelta(days=30):
-                        self.log_manager.warning(f"发现较大时间间隔: {max_gap}")
-
-            self.log_manager.info("K线数据验证通过")
-            return True
-
-        except Exception as e:
-            self.log_manager.error(f"K线数据验证失败: {str(e)}")
-            return False
+        """验证K线数据的有效性 - 已移至BaseAnalysisTab统一实现"""
+        # 此函数已在BaseAnalysisTab中统一实现，无需重复定义
+        # 调用父类的统一验证方法
+        return super()._validate_kdata(kdata)
 
     def calculate_indicators(self):
         """技术指标分析 - 增强版"""
         try:
             self.log_manager.info("开始计算技术指标...")
 
-            # 验证数据
+            # 验证数据 - 使用继承自BaseAnalysisTab的统一验证
             if not self._validate_kdata(self.current_kdata):
                 self.log_manager.warning("无有效K线数据，无法进行技术分析")
                 QMessageBox.warning(self, "提示", "无有效K线数据，无法进行技术分析\n请先加载股票数据")
@@ -1034,7 +980,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.hide_loading()
             error_msg = f"技术指标计算过程出错: {str(e)}"
             self.log_manager.error(error_msg)
-            import traceback
             self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
             QMessageBox.critical(self, "错误", error_msg)
 
@@ -1074,7 +1019,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         except Exception as e:
             self.log_manager.error(f"计算指标 {indicator_name} 时出错: {str(e)}")
-            import traceback
             self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
             return None
 
@@ -1126,7 +1070,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         except Exception as e:
             self.log_manager.error(f"处理指标结果时出错: {str(e)}")
-            import traceback
             self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
             return {"name": indicator_name, "error": str(e)}
 
@@ -1544,7 +1487,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'technical_table'):
                 self.technical_table.setSortingEnabled(True)
             self.log_manager.error(f"添加指标到表格时出错: {str(e)}")
-            import traceback
             self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
 
     def clear_cache(self):
@@ -1559,8 +1501,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.log_manager.info("技术指标已清除")
 
     def _get_export_specific_data(self) -> Optional[Dict[str, Any]]:
-        """获取特定的导出数据"""
+        """获取技术分析特定的导出数据"""
         return {
+            'analysis_type': 'technical_indicators',
             'indicator_results': self.indicator_results,
             'current_parameters': self.get_current_params(),
             'batch_mode': self.batch_checkbox.isChecked(),
@@ -1568,120 +1511,128 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             'cache_size': len(self.indicator_cache),
             'selected_indicator': self.indicator_combo.currentText(),
             'selected_category': self.category_combo.currentText(),
-            'batch_indicators': self.batch_indicators
+            'batch_indicators': self.batch_indicators,
+            'table_data': self._get_table_data() if hasattr(self, 'technical_table') else None
         }
 
-    # 保持原有的导出功能...
-    def create_export_section(self):
-        """创建导出功能区域"""
-        export_group = QGroupBox("数据导出")
-        export_layout = QHBoxLayout(export_group)
-
-        # 导出格式选择
-        export_layout.addWidget(QLabel("导出格式:"))
-        self.export_format_combo = QComboBox()
-        self.export_format_combo.addItems(["Excel", "CSV", "JSON"])
-        export_layout.addWidget(self.export_format_combo)
-
-        # 导出按钮
-        export_btn = QPushButton("导出技术分析结果")
-        export_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; }")
-        export_btn.clicked.connect(self.export_technical_data)
-        export_layout.addWidget(export_btn)
-
-        export_layout.addStretch()
-        return export_group
-
-    def export_technical_data(self):
-        """导出技术分析数据"""
+    def _get_table_data(self) -> List[Dict[str, Any]]:
+        """获取表格数据用于导出"""
         try:
             if not hasattr(self, 'technical_table') or self.technical_table.rowCount() == 0:
-                QMessageBox.warning(self, "警告", "没有可导出的技术分析数据")
+                return []
+
+            table_data = []
+            headers = []
+
+            # 获取表头
+            for col in range(self.technical_table.columnCount()):
+                header_item = self.technical_table.horizontalHeaderItem(col)
+                headers.append(header_item.text() if header_item else f"Column_{col}")
+
+            # 获取数据行
+            for row in range(self.technical_table.rowCount()):
+                row_data = {}
+                for col in range(self.technical_table.columnCount()):
+                    item = self.technical_table.item(row, col)
+                    row_data[headers[col]] = item.text() if item else ""
+                table_data.append(row_data)
+
+            return table_data
+
+        except Exception as e:
+            self.log_manager.error(f"获取表格数据失败: {e}")
+            return []
+
+    def export_technical_data(self):
+        """导出技术分析数据 - 使用统一的导出接口"""
+        try:
+            if not hasattr(self, 'technical_table') or self.technical_table.rowCount() == 0:
+                self.show_no_data_warning("技术分析数据")
                 return
 
-            format_type = self.export_format_combo.currentText()
+            format_type = self.export_format_combo.currentText().lower()
 
             # 获取保存文件路径
             from PyQt5.QtWidgets import QFileDialog
-            if format_type == "Excel":
-                filename, _ = QFileDialog.getSaveFileName(
-                    self, "导出技术分析数据", f"technical_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    "Excel files (*.xlsx)")
-            elif format_type == "CSV":
-                filename, _ = QFileDialog.getSaveFileName(
-                    self, "导出技术分析数据", f"technical_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    "CSV files (*.csv)")
-            else:  # JSON
-                filename, _ = QFileDialog.getSaveFileName(
-                    self, "导出技术分析数据", f"technical_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    "JSON files (*.json)")
 
+            file_extensions = {
+                'excel': ('Excel files (*.xlsx)', '.xlsx'),
+                'csv': ('CSV files (*.csv)', '.csv'),
+                'json': ('JSON files (*.json)', '.json')
+            }
+
+            if format_type not in file_extensions:
+                QMessageBox.warning(self, "错误", f"不支持的导出格式: {format_type}")
+                return
+
+            ext_desc, ext = file_extensions[format_type]
+            default_filename = f"technical_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+
+            filename, _ = QFileDialog.getSaveFileName(self, "导出技术分析数据", default_filename, ext_desc)
             if not filename:
                 return
 
-            # 使用基类的导出功能
-            export_data = self.export_data(format_type.lower())
-            if export_data:
-                if format_type == "JSON":
-                    with open(filename, 'w', encoding='utf-8') as f:
-                        json.dump(export_data, f, ensure_ascii=False, indent=2)
-                else:
-                    # 收集表格数据用于Excel/CSV导出
-                    table_data = []
-                    headers = []
-                    for col in range(self.technical_table.columnCount()):
-                        headers.append(self.technical_table.horizontalHeaderItem(col).text())
+            # 使用基类的统一导出功能
+            if format_type == 'json':
+                success = self.export_to_file(filename, 'json')
+            elif format_type == 'csv':
+                success = self.export_to_file(filename, 'csv')
+            elif format_type == 'excel':
+                # Excel需要特殊处理
+                success = self._export_to_excel_enhanced(filename)
+            else:
+                success = False
 
-                    for row in range(self.technical_table.rowCount()):
-                        row_data = {}
-                        for col in range(self.technical_table.columnCount()):
-                            item = self.technical_table.item(row, col)
-                            row_data[headers[col]] = item.text() if item else ""
-                        table_data.append(row_data)
-
-                    if format_type == "Excel":
-                        self._export_to_excel(filename, table_data, headers)
-                    else:
-                        self._export_to_csv(filename, table_data, headers)
-
+            if success:
                 QMessageBox.information(self, "成功", f"技术分析数据已导出到: {filename}")
+            else:
+                QMessageBox.critical(self, "错误", "导出失败，请检查文件路径和权限")
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
 
-    def _export_to_excel(self, filename, data, headers):
-        """导出到Excel文件"""
+    def _export_to_excel_enhanced(self, filename: str) -> bool:
+        """增强版Excel导出"""
         try:
-            import pandas as pd
-            df = pd.DataFrame(data)
 
-            # 添加元数据
+            # 获取完整的导出数据
+            export_data = self.export_data('excel')
+            if not export_data:
+                return False
+
             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-                # 写入技术分析数据
-                df.to_excel(writer, sheet_name='技术分析', index=False)
+                # 导出技术指标表格数据
+                table_data = export_data.get('specific_data', {}).get('table_data', [])
+                if table_data:
+                    df_indicators = pd.DataFrame(table_data)
+                    df_indicators.to_excel(writer, sheet_name='技术指标', index=False)
 
-                # 写入元数据
-                metadata = {
-                    '导出时间': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-                    '数据类型': ['技术分析'],
-                    '指标数量': [len(data)],
-                    '股票代码': [getattr(self.current_kdata, 'stock', {}).get('code', 'N/A') if self.current_kdata else 'N/A']
-                }
-                meta_df = pd.DataFrame(metadata)
-                meta_df.to_excel(writer, sheet_name='元数据', index=False)
+                # 导出元数据
+                metadata = export_data.get('metadata', {})
+                df_meta = pd.DataFrame([metadata])
+                df_meta.to_excel(writer, sheet_name='元数据', index=False)
+
+                # 导出性能统计
+                perf_stats = export_data.get('performance_stats', {})
+                if perf_stats:
+                    df_perf = pd.DataFrame([perf_stats])
+                    df_perf.to_excel(writer, sheet_name='性能统计', index=False)
+
+                # 导出数据统计（如果有）
+                data_stats = export_data.get('data_statistics', {})
+                if data_stats:
+                    df_stats = pd.DataFrame(data_stats)
+                    df_stats.to_excel(writer, sheet_name='数据统计', index=False)
+
+            return True
 
         except ImportError:
-            # 如果没有pandas，使用基础方法
-            import csv
-            self._export_to_csv(filename.replace('.xlsx', '.csv'), data, headers)
-
-    def _export_to_csv(self, filename, data, headers):
-        """导出到CSV文件"""
-        import csv
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=headers)
-            writer.writeheader()
-            writer.writerows(data)
+            # 如果没有pandas，回退到CSV
+            csv_filename = filename.replace('.xlsx', '.csv')
+            return self.export_to_file(csv_filename, 'csv')
+        except Exception as e:
+            self.log_manager.error(f"Excel导出失败: {e}")
+            return False
 
     def apply_batch_selection(self, dialog):
         """应用批量选择 - 保持向后兼容"""
@@ -1746,3 +1697,23 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         font = QFont()
         font.setBold(True)
         return font
+
+    def create_export_section(self):
+        """创建导出功能区域"""
+        export_group = QGroupBox("数据导出")
+        export_layout = QHBoxLayout(export_group)
+
+        # 导出格式选择
+        export_layout.addWidget(QLabel("导出格式:"))
+        self.export_format_combo = QComboBox()
+        self.export_format_combo.addItems(["Excel", "CSV", "JSON"])
+        export_layout.addWidget(self.export_format_combo)
+
+        # 导出按钮
+        export_btn = QPushButton("导出技术分析结果")
+        export_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; }")
+        export_btn.clicked.connect(self.export_technical_data)
+        export_layout.addWidget(export_btn)
+
+        export_layout.addStretch()
+        return export_group

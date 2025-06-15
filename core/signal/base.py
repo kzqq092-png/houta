@@ -43,7 +43,6 @@ class BaseSignal(SignalBase):
     def _calculate_indicators(self, k) -> Dict[str, Any]:
         """计算技术指标"""
         indicators = {}
-        import pandas as pd
         if hasattr(k, 'to_df'):
             df = k.to_df()
             if isinstance(df['close'], pd.Series):

@@ -11,10 +11,8 @@ from utils import (
     Theme,
     ConfigManager,
     ThemeConfig,
-    ChartConfig,
     TradingConfig,
     DataConfig,
-    UIConfig,
     LoggingConfig
 )
 
@@ -23,10 +21,8 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'ConfigManager',
     'ThemeConfig',
-    'ChartConfig',
     'TradingConfig',
     'DataConfig',
-    'UIConfig',
     'LoggingConfig',
     'Theme',
     'config_manager',
@@ -55,10 +51,8 @@ def validate_config(config: Dict[str, Any]) -> bool:
         # 验证必需的配置部分
         required_sections = {
             'theme': ThemeConfig,
-            'chart': ChartConfig,
             'trading': TradingConfig,
             'data': DataConfig,
-            'ui': UIConfig,
             'logging': LoggingConfig
         }
 
@@ -85,13 +79,6 @@ def validate_config(config: Dict[str, Any]) -> bool:
                 return False
             if not 0 <= trading_config.get('position_ratio', 0) <= 1:
                 logger.error("仓位比例必须在0到1之间")
-                return False
-
-        # 验证图表配置
-        if 'chart' in config:
-            chart_config = config['chart']
-            if chart_config.get('update_interval', 0) < 1:
-                logger.error("图表更新间隔必须大于0")
                 return False
 
         return True
@@ -124,7 +111,7 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
         if config['version'] == '1.1.0':
             # 迁移到 1.2.0
             if 'ui' not in config:
-                config['ui'] = UIConfig().to_dict()
+                config['ui'] = {'theme': 'default', 'language': 'zh_CN'}
             if 'logging' not in config:
                 config['logging'] = LoggingConfig().to_dict()
             # 更新交易配置
@@ -235,9 +222,22 @@ config_manager = ConfigManager()
 # 验证和迁移配置
 if not validate_config(config_manager.get_all()):
     logger.warning("配置验证失败，使用默认配置")
-    config_manager.reset_all()
+    # 重置为默认配置
+    config_manager._config = {
+        'version': '1.3.0',
+        'theme': ThemeConfig().to_dict(),
+        'trading': TradingConfig().to_dict(),
+        'data': DataConfig().to_dict(),
+        'logging': LoggingConfig().to_dict(),
+        'ui': {'theme': 'default', 'language': 'zh_CN'}
+    }
+    # 保存各个配置项
+    for key, value in config_manager._config.items():
+        config_manager.set(key, value)
 else:
     migrated_config = migrate_config(
         config_manager.get_all(), config_manager.get('version', '1.0.0'))
     config_manager._config = migrated_config
-    config_manager.save()
+    # 保存迁移后的配置
+    for key, value in migrated_config.items():
+        config_manager.set(key, value)

@@ -186,7 +186,6 @@ def test_algorithm_execution():
 
     except Exception as e:
         print(f"❌ 算法执行失败: {e}")
-        import traceback
         traceback.print_exc()
         return False
 

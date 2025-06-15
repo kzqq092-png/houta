@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import random
+import os
 
 from .base_tab import BaseAnalysisTab
 from core.logger import LogManager, LogLevel
@@ -388,7 +390,6 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             ]
 
             self.sector_rankings = []
-            import random
 
             for sector in sectors:
                 # 模拟板块数据
@@ -440,7 +441,6 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             ]
 
             self.leading_stocks = []
-            import random
 
             for code, name, sector, base_gain, base_volume, base_index, market_cap, status in leading_stocks_data:
                 # 添加随机波动
@@ -475,7 +475,6 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             ]
 
             self.theme_opportunities = []
-            import random
 
             for theme in themes:
                 heat_score = random.uniform(60, 95)
@@ -513,7 +512,6 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         try:
             # 模拟资金流向数据
             self.capital_flow = []
-            import random
 
             for sector_data in self.sector_rankings[:10]:  # 取前10个板块
                 sector_name = sector_data['板块名称']

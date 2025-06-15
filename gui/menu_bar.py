@@ -57,6 +57,7 @@ class MainMenuBar(QMenuBar):
         self.edit_menu = self.addMenu("编辑(&E)")
         self.view_menu = self.addMenu("视图(&V)")
         self.analysis_menu = self.addMenu("分析(&A)")
+        self.strategy_menu = self.addMenu("策略(&S)")
         self.data_menu = self.addMenu("数据(&D)")
         self.tools_menu = self.addMenu("工具(&T)")
         self.debug_menu = self.addMenu("调试(&G)")
@@ -65,6 +66,7 @@ class MainMenuBar(QMenuBar):
         self.init_edit_menu()
         self.init_view_menu()
         self.init_analysis_menu()
+        self.init_strategy_menu()
         self.init_data_menu()
         self.init_tools_menu()
         self.init_debug_menu()
@@ -200,6 +202,61 @@ class MainMenuBar(QMenuBar):
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化分析菜单失败: {str(e)}")
+
+    def init_strategy_menu(self):
+        """初始化策略菜单"""
+        try:
+            # 策略管理
+            self.strategy_manager_action = QAction(QIcon("icons/strategy.png"), "策略管理器", self)
+            self.strategy_manager_action.setStatusTip("打开策略管理器")
+            self.strategy_menu.addAction(self.strategy_manager_action)
+
+            self.strategy_menu.addSeparator()
+
+            # 策略创建
+            self.create_strategy_action = QAction("创建新策略", self)
+            self.create_strategy_action.setStatusTip("创建新的交易策略")
+            self.strategy_menu.addAction(self.create_strategy_action)
+
+            # 策略导入
+            self.import_strategy_action = QAction("导入策略", self)
+            self.import_strategy_action.setStatusTip("从文件导入策略")
+            self.strategy_menu.addAction(self.import_strategy_action)
+
+            # 策略导出
+            self.export_strategy_action = QAction("导出策略", self)
+            self.export_strategy_action.setStatusTip("导出策略到文件")
+            self.strategy_menu.addAction(self.export_strategy_action)
+
+            self.strategy_menu.addSeparator()
+
+            # 策略回测
+            self.strategy_backtest_action = QAction("策略回测", self)
+            self.strategy_backtest_action.setStatusTip("对策略进行历史回测")
+            self.strategy_menu.addAction(self.strategy_backtest_action)
+
+            # 策略优化
+            self.strategy_optimize_action = QAction("策略优化", self)
+            self.strategy_optimize_action.setStatusTip("优化策略参数")
+            self.strategy_menu.addAction(self.strategy_optimize_action)
+
+            # 连接信号
+            if hasattr(self.parent, 'show_strategy_manager'):
+                self.strategy_manager_action.triggered.connect(self.parent.show_strategy_manager)
+            if hasattr(self.parent, 'create_new_strategy'):
+                self.create_strategy_action.triggered.connect(self.parent.create_new_strategy)
+            if hasattr(self.parent, 'import_strategy'):
+                self.import_strategy_action.triggered.connect(self.parent.import_strategy)
+            if hasattr(self.parent, 'export_strategy'):
+                self.export_strategy_action.triggered.connect(self.parent.export_strategy)
+            if hasattr(self.parent, 'backtest_strategy'):
+                self.strategy_backtest_action.triggered.connect(self.parent.backtest_strategy)
+            if hasattr(self.parent, 'optimize_strategy'):
+                self.strategy_optimize_action.triggered.connect(self.parent.optimize_strategy)
+
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化策略菜单失败: {str(e)}")
 
     def init_data_menu(self):
         """初始化数据菜单（含数据源切换）"""

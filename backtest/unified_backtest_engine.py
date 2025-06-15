@@ -269,49 +269,16 @@ class UnifiedBacktestEngine:
             data = data[data[price_col] > 0]
 
     def _kdata_preprocess(self, df: pd.DataFrame, context: str = "分析") -> pd.DataFrame:
-        """
-        K线数据预处理（修复版逻辑）
-        """
-        if df is None or df.empty:
-            self.logger.warning(f"{context}: 输入数据为空")
-            return df
-
+        """K线数据预处理"""
         try:
-            # 确保数值列为float类型
-            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
-            for col in numeric_columns:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-
-            # 移除包含NaN的行
-            initial_len = len(df)
-            df = df.dropna()
-            final_len = len(df)
-
-            if initial_len != final_len:
-                self.logger.info(f"{context}: 移除了 {initial_len - final_len} 行无效数据")
-
-            # 验证价格数据的逻辑性
-            if 'high' in df.columns and 'low' in df.columns:
-                invalid_hl = df['high'] < df['low']
-                if invalid_hl.any():
-                    self.logger.warning(f"{context}: 发现 {invalid_hl.sum()} 行高价低于低价的异常数据")
-                    df = df[~invalid_hl]
-
-            # 验证开盘价、收盘价在高低价范围内
-            for price_col in ['open', 'close']:
-                if price_col in df.columns and 'high' in df.columns and 'low' in df.columns:
-                    invalid_price = (df[price_col] > df['high']) | (df[price_col] < df['low'])
-                    if invalid_price.any():
-                        self.logger.warning(f"{context}: 发现 {invalid_price.sum()} 行{price_col}价格超出高低价范围")
-                        # 修正异常价格
-                        df.loc[df[price_col] > df['high'], price_col] = df.loc[df[price_col] > df['high'], 'high']
-                        df.loc[df[price_col] < df['low'], price_col] = df.loc[df[price_col] < df['low'], 'low']
-
+            from utils.data_preprocessing import kdata_preprocess
+            return kdata_preprocess(df, context)
+        except ImportError:
+            # 如果导入失败，返回原数据
+            self.logger.warning("无法导入统一的数据预处理模块，使用原数据")
             return df
-
         except Exception as e:
-            self.logger.error(f"{context}: 数据预处理失败 - {e}")
+            self.logger.error(f"数据预处理失败: {str(e)}")
             return df
 
     def _run_core_backtest(self, data: pd.DataFrame, signal_col: str, price_col: str,

@@ -36,9 +36,8 @@ from features.advanced_indicators import create_pattern_recognition_features, AL
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 from data.data_loader import generate_quality_report
 from core.risk_exporter import RiskExporter
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QWidget
+from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 
 # 导入新的模块化标签页组件
 from .analysis_tabs import (
@@ -54,6 +53,9 @@ from .analysis_tabs import (
 
 # 新增导入形态管理器
 from analysis.pattern_manager import PatternManager
+
+# 使用统一的管理器工厂
+from utils.manager_factory import get_config_manager, get_log_manager
 
 
 class AnalysisWidget(QWidget):
@@ -75,8 +77,10 @@ class AnalysisWidget(QWidget):
         """
 
         super().__init__()
-        self.config_manager = config_manager or ConfigManager()
-        self.log_manager = LogManager()
+
+        # 使用统一的管理器工厂
+        self.config_manager = config_manager or get_config_manager()
+        self.log_manager = get_log_manager()
 
         # 初始化形态管理器
         try:

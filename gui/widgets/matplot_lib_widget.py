@@ -27,7 +27,6 @@ class MatplotlibWidget(QWidget):
     def plot_bar(self, data):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        from collections import Counter
         counter = Counter(data)
         labels, sizes = zip(*sorted(counter.items())) if counter else ([], [])
         if sizes:

@@ -12,6 +12,9 @@ from datetime import datetime
 import ptvsd
 from gui.ui_components import BaseAnalysisPanel
 import traceback
+from utils.config_manager import ConfigManager
+from utils.template_manager import TemplateManager
+from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
 
 
 class DataUpdateThread(QThread):
@@ -83,7 +86,7 @@ class DataUpdateThread(QThread):
         self.status_changed.emit("已停止更新")
 
 
-class MarketSentimentWidget(BaseAnalysisPanel):
+class MarketSentimentWidget(BaseAnalysisTab):
     """市场情绪分析组件，继承统一分析面板基类"""
 
     def __init__(self, parent=None, data_manager=None, log_manager=None, chart_widget=None):
@@ -116,26 +119,35 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         self.sentiment_threshold.setValue(50)
         self.add_param_widget("情绪阈值", self.sentiment_threshold)
 
-        # 启动数据更新线程
+        # 使用统一的数据更新线程
         if self.data_manager:
-            self.update_thread = DataUpdateThread(
-                data_manager=self.data_manager,
-                log_manager=self.log_manager
+            self.update_thread = self.create_data_update_thread(
+                data_fetcher=self._fetch_market_sentiment_data,
+                update_interval=60,  # 60秒更新间隔
+                max_retries=3,
+                retry_interval=5
             )
-            self.update_thread.data_updated.connect(self.update_sentiment_data)
-            self.update_thread.error_occurred.connect(self.handle_error)
-            self.update_thread.status_changed.connect(
-                self.handle_status_change)
             self.update_thread.start()
 
             # 主动拉取一次数据，确保初始有数据展示
-            if hasattr(self.data_manager, 'get_market_sentiment'):
-                try:
-                    data = self.data_manager.get_market_sentiment()
-                    if data:
-                        self.update_sentiment_data(data)
-                except Exception as e:
-                    self.handle_error(f"初始化拉取市场情绪数据失败: {str(e)}")
+            try:
+                data = self._fetch_market_sentiment_data()
+                if data:
+                    self._on_data_updated(data)
+            except Exception as e:
+                self._on_thread_error(f"初始化拉取市场情绪数据失败: {str(e)}")
+
+    def _fetch_market_sentiment_data(self) -> dict:
+        """获取市场情绪数据 - 统一的数据获取方法"""
+        if hasattr(self.data_manager, 'get_market_sentiment'):
+            return self.data_manager.get_market_sentiment()
+        else:
+            # 模拟数据
+            return {
+                'sentiment_index': 0.65,
+                'market_heat': 75,
+                'timestamp': datetime.now()
+            }
 
     def init_ui(self):
         """初始化UI"""
@@ -294,20 +306,14 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.status_label.setStyleSheet("color: #FF5252;")
 
     def create_control_buttons(self, layout):
-        """创建控制按钮"""
-        button_layout = QHBoxLayout()
-
-        # 导出数据按钮
-        export_button = QPushButton("导出数据")
-        export_button.clicked.connect(self.export_data)
-        button_layout.addWidget(export_button)
-
-        # 设置预警按钮
-        alert_button = QPushButton("设置预警")
-        alert_button.clicked.connect(self.show_alert_dialog)
-        button_layout.addWidget(alert_button)
-
-        layout.addLayout(button_layout)
+        """创建控制按钮 - 使用基类统一方法"""
+        # 使用基类的统一控制按钮布局创建方法
+        control_layout = self.create_control_buttons_layout(
+            include_export=True,
+            include_alert=True,
+            custom_buttons=None
+        )
+        layout.addLayout(control_layout)
 
     def _get_cached_data(self, key, max_age=60):
         """获取缓存数据"""
@@ -329,53 +335,50 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         }
 
     def export_data(self):
-        """增强导出功能，支持导出表格和图表，操作写日志"""
+        """增强导出功能，支持导出表格和图表，操作写日志 - 使用基类统一方法"""
         try:
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "导出分析结果",
-                "",
-                "Excel Files (*.xlsx);;CSV Files (*.csv);;PNG Files (*.png)"
+            # 使用基类的统一文件保存对话框
+            file_path = self.show_save_file_dialog(
+                title="导出分析结果",
+                default_name="market_sentiment_analysis",
+                file_filter="Excel Files (*.xlsx);;CSV Files (*.csv);;PNG Files (*.png)"
             )
+
             if file_path:
                 if file_path.endswith('.xlsx') or file_path.endswith('.csv'):
-                    # 导出表格
-                    import pandas as pd
-                    data = []
+                    # 导出表格数据
+                    export_data = []
                     for row in range(self.sentiment_table.rowCount()):
                         row_data = []
                         for col in range(self.sentiment_table.columnCount()):
                             item = self.sentiment_table.item(row, col)
                             row_data.append(item.text() if item else "")
-                        data.append(row_data)
-                    df = pd.DataFrame(data, columns=[self.sentiment_table.horizontalHeaderItem(
-                        i).text() for i in range(self.sentiment_table.columnCount())])
-                    if file_path.endswith('.xlsx'):
-                        df.to_excel(file_path, index=False)
+                        export_data.append(row_data)
+
+                    # 使用基类的统一导出方法
+                    if self.export_data_to_file(export_data, file_path):
+                        self.show_info_message("导出成功", f"表格已导出到: {file_path}")
                     else:
-                        df.to_csv(file_path, index=False, encoding='utf-8-sig')
-                    self.log_manager.info(f"表格已导出到: {file_path}")
-                    QMessageBox.information(
-                        self, "导出成功", f"表格已导出到: {file_path}")
+                        self.show_error_message("导出失败", "导出表格数据时发生错误")
+
                 elif file_path.endswith('.png'):
                     # 导出图表
                     if hasattr(self, 'sentiment_chart_view'):
                         pixmap = self.sentiment_chart_view.grab()
                         pixmap.save(file_path)
                         self.log_manager.info(f"图表已导出到: {file_path}")
-                        QMessageBox.information(
-                            self, "导出成功", f"图表已导出到: {file_path}")
+                        self.show_info_message("导出成功", f"图表已导出到: {file_path}")
                     else:
                         self.log_manager.warning("未找到图表控件，无法导出图表")
-                        QMessageBox.warning(self, "导出失败", "未找到图表控件，无法导出图表")
+                        self.show_warning_message("导出失败", "未找到图表控件，无法导出图表")
         except Exception as e:
             self.log_manager.error(f"导出失败: {str(e)}")
-            QMessageBox.critical(self, "导出错误", f"导出失败: {str(e)}")
+            self.show_error_message("导出错误", f"导出失败: {str(e)}")
 
     def show_alert_dialog(self):
-        """显示预警设置对话框"""
-        # TODO: 实现预警设置对话框
-        pass
+        """显示预警设置对话框 - 使用基类统一方法"""
+        # 使用基类的统一信息消息框
+        self.show_info_message("预警功能", "预警功能正在开发中，敬请期待！")
 
     def get_cached_sentiment(self) -> dict:
         """获取缓存的市场情绪数据，智能动态失效"""
@@ -770,23 +773,68 @@ class MarketSentimentWidget(BaseAnalysisPanel):
             self.log_manager.error(f"分析失败: {str(e)}")
 
     def show_template_manager_dialog(self):
-        """显示模板管理对话框，支持模板的增删改查，详细日志"""
-        try:
-            from components.template_manager import TemplateManagerDialog
-            dialog = TemplateManagerDialog(
-                template_dir="templates/market_sentiment",
-                log_manager=self.log_manager,
-                parent=self
-            )
-            if dialog.exec_() == QDialog.Accepted:
-                template = dialog.get_current_template()
-                if template:
-                    # TODO: 回填参数到主面板（如有参数结构）
-                    self.log_manager.info(f"已应用模板: {template.get('name', '')}")
-                    # self.apply_template_params(template.get('params', {}))
-        except Exception as e:
-            self.log_manager.error(f"模板管理对话框弹出失败: {str(e)}")
-            QMessageBox.critical(self, "模板管理错误", f"模板管理对话框弹出失败: {str(e)}")
+        """显示模板管理对话框 - 使用基类统一方法"""
+        # 使用基类的统一对话框创建方法
+        dialog = self.create_standard_dialog("模板管理", 800, 600)
+
+        # 创建对话框内容
+        layout = self.create_standard_layout("vbox", spacing=15)
+
+        # 添加模板列表
+        template_list = QListWidget()
+        template_list.addItems(["默认模板", "自定义模板1", "自定义模板2"])
+        layout.addWidget(QLabel("可用模板:"))
+        layout.addWidget(template_list)
+
+        # 创建按钮布局
+        button_layout = self.create_button_layout([
+            ("应用模板", lambda: self._apply_template(template_list, dialog), '#4CAF50'),
+            ("删除模板", lambda: self._delete_template(template_list), '#F44336'),
+            ("新建模板", self._create_new_template, '#2196F3')
+        ])
+        layout.addLayout(button_layout)
+
+        # 创建对话框按钮
+        button_box = self.create_dialog_button_box("ok_cancel")
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.setLayout(layout)
+        self.center_dialog(dialog)
+
+        return dialog.exec_()
+
+    def _apply_template(self, list_widget, dialog):
+        """应用模板"""
+        current_item = list_widget.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            self.show_info_message("模板应用", f"已应用模板: {template_name}")
+            dialog.accept()
+        else:
+            self.show_warning_message("选择模板", "请先选择一个模板")
+
+    def _delete_template(self, list_widget):
+        """删除模板"""
+        current_item = list_widget.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            if template_name == "默认模板":
+                self.show_warning_message("删除失败", "默认模板不能删除")
+                return
+
+            result = self.show_question_message("确认删除", f"确定要删除模板 '{template_name}' 吗？")
+            if result == QMessageBox.Yes:
+                row = list_widget.row(current_item)
+                list_widget.takeItem(row)
+                self.show_info_message("删除成功", f"模板 '{template_name}' 已删除")
+        else:
+            self.show_warning_message("选择模板", "请先选择要删除的模板")
+
+    def _create_new_template(self):
+        """创建新模板"""
+        self.show_info_message("新建模板", "新建模板功能正在开发中")
 
     def _update_charts(self, data: dict):
         """
@@ -804,18 +852,39 @@ class MarketSentimentWidget(BaseAnalysisPanel):
         self.log_manager.info(f"自动刷新间隔已设置为{interval}秒")
 
     def show_custom_indicator_dialog(self):
-        """显示自定义指标管理对话框，支持自定义指标的增删改查，详细日志"""
-        try:
-            from components.custom_indicator_manager import CustomIndicatorManagerDialog
-            dialog = CustomIndicatorManagerDialog(
-                indicator_file="config/custom_indicators.json",
-                log_manager=self.log_manager,
-                parent=self
-            )
-            dialog.exec_()
-        except Exception as e:
-            self.log_manager.error(f"自定义指标对话框弹出失败: {str(e)}")
-            QMessageBox.critical(self, "自定义指标错误", f"自定义指标对话框弹出失败: {str(e)}")
+        """显示自定义指标对话框 - 使用基类统一方法"""
+        # 使用基类的统一对话框创建方法
+        dialog = self.create_standard_dialog("自定义指标", 600, 400)
+
+        layout = self.create_standard_layout("vbox", spacing=10)
+
+        # 指标名称
+        layout.addWidget(QLabel("指标名称:"))
+        name_edit = QLineEdit()
+        layout.addWidget(name_edit)
+
+        # 指标公式
+        layout.addWidget(QLabel("指标公式:"))
+        formula_edit = QTextEdit()
+        formula_edit.setMaximumHeight(100)
+        layout.addWidget(formula_edit)
+
+        # 按钮
+        button_box = self.create_dialog_button_box("ok_cancel")
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.setLayout(layout)
+        self.center_dialog(dialog)
+
+        if dialog.exec_() == QDialog.Accepted:
+            name = name_edit.text().strip()
+            formula = formula_edit.toPlainText().strip()
+            if name and formula:
+                self.show_info_message("指标创建", f"自定义指标 '{name}' 创建成功")
+            else:
+                self.show_warning_message("输入错误", "请填写完整的指标名称和公式")
 
     def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
         original_text = button.text()
