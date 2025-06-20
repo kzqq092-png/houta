@@ -18,10 +18,12 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import json
 import traceback
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
-from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
+from gui.panels.base_analysis_panel import BaseAnalysisPanel
+from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+from gui.panels import *
 import time
 from concurrent.futures import ThreadPoolExecutor
+from utils.async_analysis import get_async_analysis_manager
 
 
 class PagedTableWidget(QWidget):
@@ -1190,7 +1192,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.log_manager.performance(
                     f"[StockScreenerWidget.screen_stocks] 结束，耗时: {elapsed} ms")
             progress.setValue(total_stocks)
-            QTimer.singleShot(500, progress.close)
+            QTimer.singleShot(500, lambda: progress.close() if hasattr(progress, 'close') and callable(progress.close) else None)
 
     def check_technical_condition(self, stock_data, condition_params):
         """检查技术指标条件，支持多种指标"""
@@ -1210,7 +1212,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 talib_list = get_talib_indicator_list()
                 if ind in talib_list:
                     try:
-                        from indicators_algo import calc_talib_indicator
+                        from core.indicators_algo import calc_talib_indicator
                         df = stock_data.copy()
                         res = calc_talib_indicator(ind, df)
                         if isinstance(res, pd.DataFrame):
@@ -1555,7 +1557,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
 
     def get_available_indicators(self):
         """获取所有可用指标分类及其指标列表，确保与后端ta-lib分类一致"""
-        from indicators_algo import get_all_indicators_by_category
+        from core.indicators_algo import get_all_indicators_by_category
         categories = get_all_indicators_by_category()
         # 强制所有分类名和指标名为str类型，防止类型对比异常
         categories = {str(cat): [str(ind) for ind in inds]
@@ -1976,52 +1978,27 @@ class StockScreenerWidget(BaseAnalysisPanel):
             QMessageBox.critical(self, "导出失败", f"导出多因子选股结果失败: {str(e)}")
 
     def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
-        original_text = button.text()
-        button.setText("取消")
-        button._interrupted = False
-
-        def on_cancel():
-            button._interrupted = True
-            button.setText(original_text)
-            button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-
+        """统一的异步分析方法 - 使用AsyncAnalysisManager避免重复连接"""
         try:
-            button.clicked.disconnect()
-        except Exception:
-            pass
-        button.clicked.connect(on_cancel)
+            # 获取或创建异步分析管理器
+            if not hasattr(self, '_async_manager'):
+                self._async_manager = get_async_analysis_manager(self.log_manager)
 
-        def task():
-            try:
-                if not getattr(button, '_interrupted', False):
-                    result = analysis_func(*args, **kwargs)
-                    return result
-            except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
-                return None
-            finally:
-                QTimer.singleShot(0, lambda: on_done(None))
+            # 使用统一的异步分析方法
+            self._async_manager.run_analysis_async(
+                button, analysis_func, *args, **kwargs
+            )
 
-        def on_done(future):
-            button.setText(original_text)
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"异步分析启动失败: {str(e)}")
+            else:
+                print(f"异步分析启动失败: {str(e)}")
+
+            # 恢复按钮状态
+            if hasattr(button, 'setText'):
+                button.setText(button.text().replace("中...", ""))
             button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-        if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
-        future = self._thread_pool.submit(task)
-        # 只需在finally中恢复，无需重复回调
 
     def on_screener_analyze(self):
         """选股分析入口，参数校验、日志、调用主分析逻辑，自动适配所有策略和UI刷新。"""

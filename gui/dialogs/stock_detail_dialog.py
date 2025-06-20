@@ -245,7 +245,7 @@ class StockDetailDialog(QDialog):
         table.verticalHeader().setVisible(False)
         table.setContentsMargins(0, 0, 0, 0)
         basic_info = [
-            ("股票代码", self.stock_data['code']),
+            ("股票代码", self.stock_data['display_code']),
             ("股票名称", self.stock_data['name']),
             ("所属市场", self.stock_data['market']),
             ("所属行业", self.stock_data.get('industry', '未知')),
@@ -371,7 +371,7 @@ class StockDetailDialog(QDialog):
             # 创建DataFrame
             data = {
                 '基本信息': pd.DataFrame([
-                    {'项目': '股票代码', '值': self.stock_data['code']},
+                    {'项目': '股票代码', '值': self.stock_data['display_code']},
                     {'项目': '股票名称', '值': self.stock_data['name']},
                     {'项目': '所属市场', '值': self.stock_data['market']},
                     {'项目': '所属行业', '值': self.stock_data.get('industry', '未知')},
@@ -392,7 +392,7 @@ class StockDetailDialog(QDialog):
             }
 
             # 导出到Excel
-            filename = f"stock_{self.stock_data['code']}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+            filename = f"stock_{self.stock_data['display_code']}_{datetime.now().strftime('%Y%m%d')}.xlsx"
             with pd.ExcelWriter(filename) as writer:
                 for sheet_name, df in data.items():
                     df.to_excel(writer, sheet_name=sheet_name, index=False)

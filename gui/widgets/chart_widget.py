@@ -21,7 +21,7 @@ from core.logger import LogManager
 from utils.theme import get_theme_manager, Theme
 from utils.config_manager import ConfigManager
 import traceback
-from indicators_algo import *
+from core.indicators_algo import *
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .async_data_processor import AsyncDataProcessor
 from .chart_renderer import ChartRenderer
@@ -547,98 +547,407 @@ class ChartWidget(QWidget):
             self.close_loading_dialog()
 
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
-        """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
+        """
+        渲染技术指标，确保主图指标显示在主图上，副图指标显示在副图上
+        """
         try:
             indicators = getattr(self, 'active_indicators', [])
             if not indicators:
+                # 如果没有激活的指标，尝试从主窗口获取
+                indicators = self._get_active_indicators()
+
+            if not indicators:
                 return
+
             if x is None:
                 x = np.arange(len(kdata))
-            for i, indicator in enumerate(indicators):
-                name = indicator.get('name', '')
-                group = indicator.get('group', '')
-                params = indicator.get('params', {})
-                formula = indicator.get('formula', None)
-                style = self._get_indicator_style(name, i)
-                # 内置MA
-                if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
-                    period = int(params.get('n', name[2:]) or 5)
-                    ma = kdata['close'].rolling(period).mean().dropna()
-                    self.price_ax.plot(x[-len(ma):], ma.values, color=style['color'],
-                                       linewidth=style['linewidth'], alpha=style['alpha'], label=name)
-                elif name == 'MACD' and group == 'builtin':
-                    macd, sig, hist = self._calculate_macd(kdata)
-                    macd = macd.dropna()
-                    sig = sig.dropna()
-                    hist = hist.dropna()
-                    self.indicator_ax.plot(x[-len(macd):], macd.values, color=self._get_indicator_style('MACD', i)['color'],
-                                           linewidth=0.7, alpha=0.85, label='MACD')
-                    self.indicator_ax.plot(x[-len(sig):], sig.values, color=self._get_indicator_style('MACD-Signal', i+1)['color'],
-                                           linewidth=0.7, alpha=0.85, label='Signal')
-                    if not hist.empty:
-                        colors = ['red' if h >= 0 else 'green' for h in hist]
-                        self.indicator_ax.bar(
-                            x[-len(hist):], hist.values, color=colors, alpha=0.5)
-                elif name == 'RSI' and group == 'builtin':
-                    period = int(params.get('n', 14))
-                    rsi = self._calculate_rsi(kdata, period).dropna()
-                    self.indicator_ax.plot(x[-len(rsi):], rsi.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label='RSI')
-                elif name == 'BOLL' and group == 'builtin':
-                    n = int(params.get('n', 20))
-                    p = float(params.get('p', 2))
-                    mid, upper, lower = self._calculate_boll(kdata, n, p)
-                    mid = mid.dropna()
-                    upper = upper.dropna()
-                    lower = lower.dropna()
-                    self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style('BOLL-Mid', i)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Mid')
-                    self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style('BOLL-Upper', i+1)['color'],
-                                       linewidth=0.7, alpha=0.85, label='BOLL-Upper')
-                    self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style('BOLL-Lower', i+2)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Lower')
-                elif group == 'talib':
-                    try:
-                        import talib
-                        # 如果name是中文名称，需要转换为英文名称
-                        from indicators_algo import get_indicator_english_name
-                        english_name = get_indicator_english_name(name)
 
-                        func = getattr(talib, english_name)
-                        # 只传递非空参数
-                        func_params = {k: v for k,
-                                       v in params.items() if v != ''}
-                        # 传递收盘价等
-                        result = func(
-                            kdata['close'].values, **{k: float(v) if v else None for k, v in func_params.items()})
-                        if isinstance(result, tuple):
-                            for j, arr in enumerate(result):
-                                arr = np.asarray(arr)
-                                arr = arr[~np.isnan(arr)]
-                                # 使用中文名称作为标签显示
-                                display_name = name
-                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(display_name, i+j)['color'],
-                                                       linewidth=0.7, alpha=0.85, label=f'{display_name}-{j}')
-                        else:
-                            arr = np.asarray(result)
-                            arr = arr[~np.isnan(arr)]
-                            display_name = name
-                            self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
-                                                   linewidth=0.7, alpha=0.85, label=display_name)
-                    except Exception as e:
-                        self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
-                elif group == 'custom' and formula:
-                    try:
-                        # 安全地用pandas.eval计算表达式
-                        local_vars = {col: kdata[col] for col in kdata.columns}
-                        arr = pd.eval(formula, local_dict=local_vars)
-                        arr = arr.dropna()
-                        self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label=name)
-                    except Exception as e:
-                        self.error_occurred.emit(f"自定义公式渲染失败: {str(e)}")
+            # 分类指标：主图指标 vs 副图指标
+            main_chart_indicators = []  # 在主图显示的指标（如MA, BOLL等）
+            sub_chart_indicators = []   # 在副图显示的指标（如MACD, RSI等）
+
+            for indicator in indicators:
+                name = indicator.get('name', '').upper()
+
+                # 判断指标应该显示在主图还是副图
+                if (name.startswith('MA') or name.startswith('EMA') or name.startswith('SMA') or
+                        name.startswith('WMA') or name in ['BOLL', 'BBANDS', 'SAR', 'KAMA']):
+                    main_chart_indicators.append(indicator)
+                else:
+                    sub_chart_indicators.append(indicator)
+
+            # 渲染主图指标
+            for i, indicator in enumerate(main_chart_indicators):
+                try:
+                    name = indicator.get('name', '').upper()
+                    group = indicator.get('group', '')
+                    params = indicator.get('params', {})
+                    style = self._get_indicator_style(name, i)
+
+                    # 处理均线类指标（应该显示在主图上）
+                    if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
+                        period = int(params.get('n', name[2:]) or 5)
+                        if period > 0 and period <= len(kdata):
+                            ma = kdata['close'].rolling(period).mean().dropna()
+                            if not ma.empty:
+                                self.price_ax.plot(x[-len(ma):], ma.values,
+                                                   color=style['color'], linewidth=style['linewidth'],
+                                                   alpha=style['alpha'], label=f'{name}({period})')
+
+                    # 处理EMA指标
+                    elif name.startswith('EMA'):
+                        period = int(params.get('n', name[3:]) or 12)
+                        if period > 0:
+                            ema = kdata['close'].ewm(span=period).mean().dropna()
+                            if not ema.empty:
+                                self.price_ax.plot(x[-len(ema):], ema.values,
+                                                   color=style['color'], linewidth=style['linewidth'],
+                                                   alpha=style['alpha'], label=f'{name}({period})')
+
+                    # 处理布林带指标（应该显示在主图上）
+                    elif name in ['BOLL', 'BBANDS']:
+                        period = int(params.get('period', 20))
+                        std_dev = float(params.get('std', 2.0))
+                        mid, upper, lower = self._calculate_boll(kdata, period, std_dev)
+                        if not mid.empty:
+                            # 布林带中线
+                            self.price_ax.plot(x[-len(mid):], mid.values,
+                                               color=style['color'], linewidth=0.8, alpha=0.7,
+                                               label=f'BOLL-MID({period})')
+                            # 布林带上轨
+                            upper_color = self._get_indicator_style(f'{name}-UPPER', i+1)['color']
+                            self.price_ax.plot(x[-len(upper):], upper.values,
+                                               color=upper_color, linewidth=0.6, alpha=0.6,
+                                               label=f'BOLL-UPPER({period})')
+                            # 布林带下轨
+                            lower_color = self._get_indicator_style(f'{name}-LOWER', i+2)['color']
+                            self.price_ax.plot(x[-len(lower):], lower.values,
+                                               color=lower_color, linewidth=0.6, alpha=0.6,
+                                               label=f'BOLL-LOWER({period})')
+                            # 填充区域
+                            self.price_ax.fill_between(x[-len(upper):], upper.values, lower.values,
+                                                       alpha=0.1, color=style['color'])
+
+                    # 处理ta-lib指标（主图部分）
+                    elif group == 'ta-lib':
+                        try:
+                            import talib
+                            # 获取英文名称
+                            english_name = indicator.get('name', name)
+
+                            # 准备ta-lib计算所需的数组
+                            high = kdata['high'].values
+                            low = kdata['low'].values
+                            close = kdata['close'].values
+                            open_price = kdata['open'].values
+                            volume = kdata['volume'].values
+
+                            # 根据指标类型计算
+                            if english_name in ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA']:
+                                # 移动平均类指标
+                                period = int(params.get('timeperiod', params.get('n', 20)))
+                                if english_name == 'SMA':
+                                    result = talib.SMA(close, timeperiod=period)
+                                elif english_name == 'EMA':
+                                    result = talib.EMA(close, timeperiod=period)
+                                elif english_name == 'WMA':
+                                    result = talib.WMA(close, timeperiod=period)
+                                elif english_name == 'DEMA':
+                                    result = talib.DEMA(close, timeperiod=period)
+                                elif english_name == 'TEMA':
+                                    result = talib.TEMA(close, timeperiod=period)
+                                elif english_name == 'TRIMA':
+                                    result = talib.TRIMA(close, timeperiod=period)
+                                elif english_name == 'KAMA':
+                                    result = talib.KAMA(close, timeperiod=period)
+                                elif english_name == 'MAMA':
+                                    mama, fama = talib.MAMA(close)
+                                    result = mama
+
+                                # 绘制单线指标
+                                if isinstance(result, np.ndarray) and not np.all(np.isnan(result)):
+                                    valid_data = pd.Series(result).dropna()
+                                    if not valid_data.empty:
+                                        x_data = x[-len(valid_data):]
+                                        display_name = f"{english_name}({period})"
+                                        self.price_ax.plot(x_data, valid_data.values,
+                                                           color=style['color'], linewidth=0.8, alpha=0.9,
+                                                           label=display_name)
+
+                            elif english_name == 'BBANDS':
+                                # 布林带
+                                period = int(params.get('timeperiod', 20))
+                                nbdevup = float(params.get('nbdevup', 2))
+                                nbdevdn = float(params.get('nbdevdn', 2))
+                                upperband, middleband, lowerband = talib.BBANDS(close, timeperiod=period,
+                                                                                nbdevup=nbdevup, nbdevdn=nbdevdn)
+
+                                # 绘制布林带三条线
+                                if not np.all(np.isnan(middleband)):
+                                    valid_mid = pd.Series(middleband).dropna()
+                                    if not valid_mid.empty:
+                                        self.price_ax.plot(x[-len(valid_mid):], valid_mid.values,
+                                                           color=style['color'], linewidth=0.8, alpha=0.8,
+                                                           label=f'BB-MID({period})')
+
+                                if not np.all(np.isnan(upperband)):
+                                    valid_upper = pd.Series(upperband).dropna()
+                                    if not valid_upper.empty:
+                                        upper_color = self._get_indicator_style(f'{english_name}-UPPER', i+1)['color']
+                                        self.price_ax.plot(x[-len(valid_upper):], valid_upper.values,
+                                                           color=upper_color, linewidth=0.6, alpha=0.6,
+                                                           label=f'BB-UPPER({period})')
+
+                                if not np.all(np.isnan(lowerband)):
+                                    valid_lower = pd.Series(lowerband).dropna()
+                                    if not valid_lower.empty:
+                                        lower_color = self._get_indicator_style(f'{english_name}-LOWER', i+2)['color']
+                                        self.price_ax.plot(x[-len(valid_lower):], valid_lower.values,
+                                                           color=lower_color, linewidth=0.6, alpha=0.6,
+                                                           label=f'BB-LOWER({period})')
+
+                            elif english_name == 'SAR':
+                                # 抛物线SAR
+                                acceleration = float(params.get('acceleration', 0.02))
+                                maximum = float(params.get('maximum', 0.2))
+                                result = talib.SAR(high, low, acceleration=acceleration, maximum=maximum)
+
+                                if not np.all(np.isnan(result)):
+                                    valid_data = pd.Series(result).dropna()
+                                    if not valid_data.empty:
+                                        self.price_ax.scatter(x[-len(valid_data):], valid_data.values,
+                                                              color=style['color'], s=8, alpha=0.8,
+                                                              label=f'SAR({acceleration:.2f})')
+
+                        except ImportError:
+                            self.log_manager.warning("ta-lib库未安装，跳过ta-lib指标渲染")
+                        except Exception as e:
+                            self.log_manager.warning(f"ta-lib主图指标 {english_name} 计算失败: {str(e)}")
+
+                except Exception as e:
+                    self.log_manager.warning(f"渲染主图指标 {name} 失败: {str(e)}")
+
+            # 渲染副图指标
+            for i, indicator in enumerate(sub_chart_indicators):
+                try:
+                    name = indicator.get('name', '').upper()
+                    group = indicator.get('group', '')
+                    params = indicator.get('params', {})
+                    formula = indicator.get('formula', None)
+                    style = self._get_indicator_style(name, i)
+
+                    # 处理内置MACD指标
+                    if name == 'MACD' and group == 'builtin':
+                        macd, sig, hist = self._calculate_macd(kdata)
+                        macd = macd.dropna()
+                        sig = sig.dropna()
+                        hist = hist.dropna()
+
+                        if not macd.empty:
+                            self.indicator_ax.plot(x[-len(macd):], macd.values,
+                                                   color=self._get_indicator_style('MACD', i)['color'],
+                                                   linewidth=0.7, alpha=0.85, label='MACD')
+                        if not sig.empty:
+                            self.indicator_ax.plot(x[-len(sig):], sig.values,
+                                                   color=self._get_indicator_style('MACD-Signal', i+1)['color'],
+                                                   linewidth=0.7, alpha=0.85, label='Signal')
+                        if not hist.empty:
+                            colors = ['red' if h >= 0 else 'green' for h in hist]
+                            self.indicator_ax.bar(x[-len(hist):], hist.values, color=colors, alpha=0.5)
+
+                    # 处理内置RSI指标
+                    elif name == 'RSI' and group == 'builtin':
+                        period = int(params.get('period', 14))
+                        rsi = self._calculate_rsi(kdata, period).dropna()
+                        if not rsi.empty:
+                            self.indicator_ax.plot(x[-len(rsi):], rsi.values,
+                                                   color=style['color'], linewidth=0.8, alpha=0.9,
+                                                   label=f'RSI({period})')
+                            # 添加RSI参考线
+                            self.indicator_ax.axhline(y=70, color='red', linestyle='--', alpha=0.5)
+                            self.indicator_ax.axhline(y=30, color='green', linestyle='--', alpha=0.5)
+                            self.indicator_ax.set_ylim(0, 100)
+
+                    # 处理ta-lib副图指标
+                    elif group == 'ta-lib':
+                        try:
+                            import talib
+                            english_name = indicator.get('name', name)
+
+                            # 准备数据
+                            high = kdata['high'].values
+                            low = kdata['low'].values
+                            close = kdata['close'].values
+                            open_price = kdata['open'].values
+                            volume = kdata['volume'].values
+
+                            # 根据指标类型计算和渲染
+                            if english_name == 'MACD':
+                                fastperiod = int(params.get('fastperiod', 12))
+                                slowperiod = int(params.get('slowperiod', 26))
+                                signalperiod = int(params.get('signalperiod', 9))
+                                macd, macdsignal, macdhist = talib.MACD(close, fastperiod=fastperiod,
+                                                                        slowperiod=slowperiod, signalperiod=signalperiod)
+
+                                if not np.all(np.isnan(macd)):
+                                    valid_macd = pd.Series(macd).dropna()
+                                    if not valid_macd.empty:
+                                        self.indicator_ax.plot(x[-len(valid_macd):], valid_macd.values,
+                                                               color=style['color'], linewidth=0.8, alpha=0.9,
+                                                               label=f'MACD({fastperiod},{slowperiod},{signalperiod})')
+
+                                if not np.all(np.isnan(macdsignal)):
+                                    valid_signal = pd.Series(macdsignal).dropna()
+                                    if not valid_signal.empty:
+                                        signal_color = self._get_indicator_style('MACD-Signal', i+1)['color']
+                                        self.indicator_ax.plot(x[-len(valid_signal):], valid_signal.values,
+                                                               color=signal_color, linewidth=0.8, alpha=0.9,
+                                                               label='MACD-Signal')
+
+                                if not np.all(np.isnan(macdhist)):
+                                    valid_hist = pd.Series(macdhist).dropna()
+                                    if not valid_hist.empty:
+                                        colors = ['red' if h >= 0 else 'green' for h in valid_hist]
+                                        self.indicator_ax.bar(x[-len(valid_hist):], valid_hist.values,
+                                                              color=colors, alpha=0.5)
+
+                            elif english_name == 'RSI':
+                                period = int(params.get('timeperiod', 14))
+                                result = talib.RSI(close, timeperiod=period)
+
+                                if not np.all(np.isnan(result)):
+                                    valid_data = pd.Series(result).dropna()
+                                    if not valid_data.empty:
+                                        self.indicator_ax.plot(x[-len(valid_data):], valid_data.values,
+                                                               color=style['color'], linewidth=0.8, alpha=0.9,
+                                                               label=f'RSI({period})')
+                                        # 添加RSI参考线
+                                        self.indicator_ax.axhline(y=70, color='red', linestyle='--', alpha=0.5)
+                                        self.indicator_ax.axhline(y=30, color='green', linestyle='--', alpha=0.5)
+                                        self.indicator_ax.set_ylim(0, 100)
+
+                            elif english_name in ['STOCH', 'STOCHF']:
+                                # 随机指标KDJ
+                                fastk_period = int(params.get('fastk_period', 9))
+                                slowk_period = int(params.get('slowk_period', 3))
+                                slowd_period = int(params.get('slowd_period', 3))
+
+                                if english_name == 'STOCH':
+                                    slowk, slowd = talib.STOCH(high, low, close, fastk_period=fastk_period,
+                                                               slowk_period=slowk_period, slowd_period=slowd_period)
+                                else:
+                                    fastk, fastd = talib.STOCHF(high, low, close, fastk_period=fastk_period,
+                                                                fastd_period=slowd_period)
+                                    slowk, slowd = fastk, fastd
+
+                                if not np.all(np.isnan(slowk)):
+                                    valid_k = pd.Series(slowk).dropna()
+                                    if not valid_k.empty:
+                                        self.indicator_ax.plot(x[-len(valid_k):], valid_k.values,
+                                                               color=style['color'], linewidth=0.8, alpha=0.9,
+                                                               label=f'K({fastk_period})')
+
+                                if not np.all(np.isnan(slowd)):
+                                    valid_d = pd.Series(slowd).dropna()
+                                    if not valid_d.empty:
+                                        d_color = self._get_indicator_style('KDJ-D', i+1)['color']
+                                        self.indicator_ax.plot(x[-len(valid_d):], valid_d.values,
+                                                               color=d_color, linewidth=0.8, alpha=0.9,
+                                                               label=f'D({slowd_period})')
+
+                            # 其他通用ta-lib指标
+                            else:
+                                # 动态调用ta-lib函数
+                                if hasattr(talib, english_name):
+                                    func = getattr(talib, english_name)
+
+                                    # 尝试不同的参数组合
+                                    try:
+                                        # 只需要close价格的指标
+                                        if english_name in ['CCI', 'WILLR', 'ROC', 'MOM', 'CMO', 'TRIX']:
+                                            if english_name == 'CCI':
+                                                result = func(high, low, close, timeperiod=params.get('timeperiod', 14))
+                                            elif english_name == 'WILLR':
+                                                result = func(high, low, close, timeperiod=params.get('timeperiod', 14))
+                                            else:
+                                                result = func(close, timeperiod=params.get('timeperiod', 14))
+
+                                        # 需要成交量的指标
+                                        elif english_name in ['OBV', 'AD', 'ADOSC']:
+                                            if english_name == 'OBV':
+                                                result = func(close, volume)
+                                            elif english_name == 'AD':
+                                                result = func(high, low, close, volume)
+                                            elif english_name == 'ADOSC':
+                                                result = func(high, low, close, volume,
+                                                              fastperiod=params.get('fastperiod', 3),
+                                                              slowperiod=params.get('slowperiod', 10))
+                                        else:
+                                            # 默认尝试close价格
+                                            result = func(close)
+
+                                        # 渲染结果
+                                        if isinstance(result, tuple):
+                                            # 多返回值的指标
+                                            for j, single_result in enumerate(result):
+                                                if not np.all(np.isnan(single_result)):
+                                                    valid_data = pd.Series(single_result).dropna()
+                                                    if not valid_data.empty:
+                                                        display_name = f"{english_name}-{j+1}"
+                                                        color = self._get_indicator_style(display_name, i+j)['color']
+                                                        self.indicator_ax.plot(x[-len(valid_data):], valid_data.values,
+                                                                               color=color, linewidth=0.8, alpha=0.9,
+                                                                               label=display_name)
+                                        elif isinstance(result, np.ndarray):
+                                            # 单返回值的指标
+                                            if not np.all(np.isnan(result)):
+                                                valid_data = pd.Series(result).dropna()
+                                                if not valid_data.empty:
+                                                    self.indicator_ax.plot(x[-len(valid_data):], valid_data.values,
+                                                                           color=style['color'], linewidth=0.8, alpha=0.9,
+                                                                           label=english_name)
+
+                                    except Exception as param_error:
+                                        self.log_manager.warning(f"ta-lib指标 {english_name} 参数错误: {str(param_error)}")
+
+                        except ImportError:
+                            self.log_manager.warning("ta-lib库未安装，无法使用ta-lib指标")
+                        except Exception as e:
+                            self.log_manager.error(f"ta-lib副图指标 {english_name} 渲染失败: {str(e)}")
+
+                    # 处理自定义指标
+                    elif group == 'custom' and formula:
+                        try:
+                            # 安全地用pandas.eval计算表达式
+                            local_vars = {col: kdata[col] for col in kdata.columns}
+                            arr = pd.eval(formula, local_dict=local_vars)
+                            arr = arr.dropna()
+                            if not arr.empty:
+                                self.indicator_ax.plot(x[-len(arr):], arr.values, color=style['color'],
+                                                       linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+                        except Exception as e:
+                            self.log_manager.error(f"自定义指标渲染失败: {str(e)}")
+
+                except Exception as e:
+                    self.log_manager.warning(f"渲染副图指标 {name} 失败: {str(e)}")
+
+            # 设置图例 - 修复警告：只有当确实有带标签的对象时才创建图例
+            if main_chart_indicators:
+                # 检查主图是否有带标签的艺术家对象
+                handles, labels = self.price_ax.get_legend_handles_labels()
+                if handles and labels:
+                    self.price_ax.legend(loc='upper left', fontsize=8)
+
+            if sub_chart_indicators:
+                # 检查副图是否有带标签的艺术家对象
+                handles, labels = self.indicator_ax.get_legend_handles_labels()
+                if handles and labels:
+                    self.indicator_ax.legend(loc='upper left', fontsize=8)
+
         except Exception as e:
-            self.error_occurred.emit(f"渲染指标失败: {str(e)}")
+            self.log_manager.error(f"渲染指标失败: {str(e)}")
+            import traceback
+            self.log_manager.error(traceback.format_exc())
 
     def _get_chart_style(self) -> Dict[str, Any]:
         """获取图表样式，所有颜色从theme_manager.get_theme_colors获取"""
@@ -1107,7 +1416,7 @@ class ChartWidget(QWidget):
                 self.figure.tight_layout()
 
                 # 更新画布
-                QTimer.singleShot(0, self.canvas.draw)
+                QTimer.singleShot(0, lambda: self.canvas.draw_idle() if hasattr(self, 'canvas') and self.canvas is not None else None)
 
             self.log_manager.info("图表已清除")
             self._optimize_display()  # 保证清除后也显示网格和刻度
@@ -1395,18 +1704,38 @@ class ChartWidget(QWidget):
             label.set_fontsize(8)
 
     def add_indicator(self, indicator_data):
-        """添加技术指标
+        """添加技术指标 - 增强版本，支持指标计算和显示
 
         Args:
-            indicator_data: 指标数据
+            indicator_data: 指标数据，可以是字符串名称或字典格式
         """
         try:
             if indicator_data is None:
                 self.log_manager.warning("指标数据为空")
                 return
 
+            # 标准化指标数据格式
+            if isinstance(indicator_data, str):
+                # 如果是字符串，转换为标准格式
+                indicator_info = {
+                    'name': indicator_data,
+                    'chinese_name': indicator_data,
+                    'type': 'builtin',
+                    'params': {}
+                }
+            elif isinstance(indicator_data, dict):
+                indicator_info = indicator_data
+            else:
+                self.log_manager.warning(f"不支持的指标数据类型: {type(indicator_data)}")
+                return
+
+            # 检查是否有K线数据
+            if not hasattr(self, 'current_kdata') or self.current_kdata is None or self.current_kdata.empty:
+                self.log_manager.warning("没有K线数据，无法计算指标")
+                return
+
             # 将添加指标任务加入队列
-            self.queue_update(self._add_indicator_impl, indicator_data)
+            self.queue_update(self._add_indicator_impl, indicator_info)
 
         except Exception as e:
             error_msg = f"添加指标失败: {str(e)}"
@@ -1414,31 +1743,224 @@ class ChartWidget(QWidget):
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
-    def _add_indicator_impl(self, indicator_data, indicator_colors: list = None):
+    def _add_indicator_impl(self, indicator_info, indicator_colors: list = None):
+        """添加指标的具体实现"""
         try:
-            self.current_indicator = indicator_data
-            if hasattr(self, 'price_ax'):
-                color_map = indicator_colors or [
-                    '#fbc02d', '#ab47bc', '#1976d2', '#43a047', '#e53935', '#00bcd4', '#ff9800']
-                for i, (name, series) in enumerate(indicator_data.items()):
-                    self.price_ax.plot(
-                        series.index, series.values,
-                        color=color_map[i % len(color_map)],
-                        linewidth=0.7, alpha=0.85, label=name, solid_capstyle='round'
-                    )
-                # 添加指标后更新图例
-                lines = self.price_ax.get_lines()
-                labels = [l.get_label() for l in lines]
-                if lines and labels and any(l.get_visible() for l in lines):
-                    self.price_ax.legend(
-                        loc='upper left', fontsize=9, frameon=False)
-                QTimer.singleShot(0, self.canvas.draw)
-            self.log_manager.info(f"添加指标 {indicator_data.name} 完成")
+            if not hasattr(self, 'current_kdata') or self.current_kdata is None or self.current_kdata.empty:
+                self.log_manager.warning("没有K线数据，跳过指标计算")
+                return
+
+            indicator_name = indicator_info.get('name', '')
+            indicator_params = indicator_info.get('params', {})
+            chinese_name = indicator_info.get('chinese_name', indicator_name)
+
+            # 计算指标值
+            indicator_values = self._calculate_indicator(indicator_name, self.current_kdata, indicator_params)
+
+            if indicator_values is None:
+                self.log_manager.warning(f"无法计算指标: {indicator_name}")
+                return
+
+            # 绘制指标
+            self._plot_indicator(indicator_name, indicator_values, chinese_name, indicator_colors)
+
+            # 更新图例
+            self._update_legend()
+
+            # 重新绘制图表
+            QTimer.singleShot(0, lambda: self.canvas.draw_idle() if hasattr(self, 'canvas') and self.canvas is not None else None)
+
+            self.log_manager.info(f"成功添加指标: {chinese_name} ({indicator_name})")
+
         except Exception as e:
             error_msg = f"添加指标实现失败: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
+
+    def _calculate_indicator(self, indicator_name: str, kdata: pd.DataFrame, params: dict):
+        """计算技术指标值 - 使用系统现有的indicators_algo模块"""
+        try:
+            # 导入系统指标算法模块
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+            try:
+                from core.indicators_algo import (
+                    calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr,
+                    calc_obv, calc_cci, calc_talib_indicator, get_talib_indicator_list
+                )
+            except ImportError as e:
+                self.log_manager.error(f"导入指标算法模块失败: {str(e)}")
+                return None
+
+            # 确保数据格式正确
+            if 'close' not in kdata.columns:
+                self.log_manager.error("K线数据缺少close列")
+                return None
+
+            indicator_name_upper = indicator_name.upper()
+
+            # 使用系统内置的指标计算函数
+            if indicator_name_upper in ['MA', 'SMA']:
+                period = params.get('period', 20)
+                ma_result = calc_ma(kdata['close'], n=period)
+                return {'MA': ma_result}
+
+            elif indicator_name_upper == 'MACD':
+                fast = params.get('fast', 12)
+                slow = params.get('slow', 26)
+                signal = params.get('signal', 9)
+                macd_line, signal_line, histogram = calc_macd(kdata['close'], fast=fast, slow=slow, signal=signal)
+                return {
+                    'MACD': macd_line,
+                    'Signal': signal_line,
+                    'Histogram': histogram
+                }
+
+            elif indicator_name_upper == 'RSI':
+                period = params.get('period', 14)
+                rsi_result = calc_rsi(kdata['close'], n=period)
+                return {'RSI': rsi_result}
+
+            elif indicator_name_upper == 'KDJ':
+                k_period = params.get('k_period', 9)
+                d_period = params.get('d_period', 3)
+                j_period = params.get('j_period', 3)
+                k, d, j = calc_kdj(kdata, n=k_period, m1=d_period, m2=j_period)
+                return {'K': k, 'D': d, 'J': j}
+
+            elif indicator_name_upper in ['BOLL', 'BBANDS']:
+                period = params.get('period', 20)
+                std = params.get('std', 2)
+                upper, middle, lower = calc_boll(kdata['close'], n=period, width=std)
+                return {
+                    'BOLL_UPPER': upper,
+                    'BOLL_MID': middle,
+                    'BOLL_LOWER': lower
+                }
+
+            elif indicator_name_upper == 'ATR':
+                period = params.get('period', 14)
+                atr_result = calc_atr(kdata, n=period)
+                return {'ATR': atr_result}
+
+            elif indicator_name_upper == 'OBV':
+                obv_result = calc_obv(kdata)
+                return {'OBV': obv_result}
+
+            elif indicator_name_upper == 'CCI':
+                period = params.get('period', 14)
+                cci_result = calc_cci(kdata, n=period)
+                return {'CCI': cci_result}
+
+            else:
+                # 尝试使用ta-lib计算其他指标
+                try:
+                    talib_indicators = get_talib_indicator_list()
+                    if indicator_name_upper in talib_indicators:
+                        result = calc_talib_indicator(indicator_name_upper, kdata, **params)
+                        if isinstance(result, pd.DataFrame):
+                            # 如果返回DataFrame，转换为字典格式
+                            return {col: result[col] for col in result.columns}
+                        elif isinstance(result, pd.Series):
+                            # 如果返回Series，使用指标名作为key
+                            return {indicator_name_upper: result}
+                        else:
+                            self.log_manager.warning(f"ta-lib指标返回了未知格式: {type(result)}")
+                            return None
+                    else:
+                        self.log_manager.warning(f"不支持的指标: {indicator_name}")
+                        return None
+                except Exception as e:
+                    self.log_manager.warning(f"ta-lib计算指标失败: {str(e)}")
+                    return None
+
+        except Exception as e:
+            self.log_manager.error(f"计算指标失败: {str(e)}")
+            import traceback
+            self.log_manager.error(traceback.format_exc())
+            return None
+
+    def _plot_indicator(self, indicator_name: str, indicator_values: dict, chinese_name: str, colors: list = None):
+        """绘制指标到图表上"""
+        try:
+            if not indicator_values:
+                return
+
+            # 默认颜色列表
+            default_colors = ['#fbc02d', '#ab47bc', '#1976d2', '#43a047', '#e53935', '#00bcd4', '#ff9800']
+            colors = colors or default_colors
+
+            # 创建X轴数据（索引）
+            x_data = np.arange(len(self.current_kdata))
+
+            # 根据指标类型选择合适的子图
+            if indicator_name.upper() in ['RSI', 'KDJ', 'CCI', 'WILLR', 'ADX', 'MOM', 'ROC']:
+                # 振荡器类指标绘制在独立子图
+                target_ax = self.indicator_ax if hasattr(self, 'indicator_ax') and self.indicator_ax else self.volume_ax
+            else:
+                # 价格类指标绘制在主图
+                target_ax = self.price_ax
+
+            # 绘制指标线
+            for i, (name, series) in enumerate(indicator_values.items()):
+                if series is None or series.empty:
+                    continue
+
+                color = colors[i % len(colors)]
+
+                # 特殊处理MACD柱状图
+                if name == 'Histogram':
+                    # 绘制MACD柱状图
+                    positive_mask = series > 0
+                    negative_mask = series <= 0
+
+                    target_ax.bar(x_data[positive_mask], series[positive_mask],
+                                  color='red', alpha=0.6, width=0.8, label=f'{chinese_name}_柱')
+                    target_ax.bar(x_data[negative_mask], series[negative_mask],
+                                  color='green', alpha=0.6, width=0.8)
+                else:
+                    # 绘制普通线条
+                    line_label = f'{chinese_name}_{name}' if len(indicator_values) > 1 else chinese_name
+                    target_ax.plot(x_data, series.values, color=color, linewidth=1.2,
+                                   alpha=0.85, label=line_label, solid_capstyle='round')
+
+            # 为振荡器类指标添加参考线
+            if indicator_name.upper() == 'RSI':
+                target_ax.axhline(y=70, color='red', linestyle='--', alpha=0.5, linewidth=0.8)
+                target_ax.axhline(y=30, color='green', linestyle='--', alpha=0.5, linewidth=0.8)
+                target_ax.axhline(y=50, color='gray', linestyle='-', alpha=0.3, linewidth=0.6)
+                target_ax.set_ylim(0, 100)
+            elif indicator_name.upper() == 'KDJ':
+                target_ax.axhline(y=80, color='red', linestyle='--', alpha=0.5, linewidth=0.8)
+                target_ax.axhline(y=20, color='green', linestyle='--', alpha=0.5, linewidth=0.8)
+                target_ax.axhline(y=50, color='gray', linestyle='-', alpha=0.3, linewidth=0.6)
+                target_ax.set_ylim(0, 100)
+
+        except Exception as e:
+            self.log_manager.error(f"绘制指标失败: {str(e)}")
+
+    def _update_legend(self):
+        """更新图例显示"""
+        try:
+            # 更新主图图例
+            if hasattr(self, 'price_ax'):
+                handles, labels = self.price_ax.get_legend_handles_labels()
+                if handles and labels:
+                    self.price_ax.legend(loc='upper left', fontsize=8, frameon=True,
+                                         fancybox=True, shadow=True, framealpha=0.8)
+
+            # 更新指标图图例
+            if hasattr(self, 'indicator_ax') and self.indicator_ax:
+                handles, labels = self.indicator_ax.get_legend_handles_labels()
+                if handles and labels:
+                    self.indicator_ax.legend(loc='upper left', fontsize=8, frameon=True,
+                                             fancybox=True, shadow=True, framealpha=0.8)
+
+        except Exception as e:
+            self.log_manager.error(f"更新图例失败: {str(e)}")
 
     def plot_signals(self, signals, visible_range=None, signal_filter=None):
         """绘制信号，支持密度自适应、聚合展示、气泡提示"""
@@ -1598,24 +2120,100 @@ class ChartWidget(QWidget):
                 self.log_manager.error(f"启用信号提示失败: {str(e)}")
 
     def clear_indicators(self):
-        """清除所有指标"""
+        """清除所有指标 - 增强版本，正确清除指标线条和图例"""
         try:
             self.current_indicator = None
+
+            # 清除主图上的指标线条（保留K线数据）
             if hasattr(self, 'price_ax'):
-                # 保留主图K线，清除其他线条
-                # 只需注释或删除相关行即可
-                # lines = self.price_ax.get_lines()
-                # if len(lines) > 0:
-                #     for line in lines[1:]:  # 跳过第一条K线
-                #         line.remove()
+                # 获取所有线条
+                lines = self.price_ax.get_lines()
+                # 获取所有柱状图
+                bars = [child for child in self.price_ax.get_children()
+                        if hasattr(child, 'get_label') and
+                        any(indicator in child.get_label() for indicator in
+                            ['MA', 'EMA', 'BOLL', 'MACD', '移动平均', '指数平均', '布林', 'RSI', 'KDJ'])]
 
-                # 更新图例
-                self.price_ax.legend(loc='upper left', fontsize=8)
+                # 移除指标线条（跳过K线相关的线条）
+                for line in lines:
+                    label = line.get_label()
+                    # 只移除指标线条，保留K线相关线条
+                    if (label and label != '_nolegend_' and
+                        any(indicator in label for indicator in
+                            ['MA', 'EMA', 'BOLL', 'MACD', 'Signal', 'Histogram',
+                             '移动平均', '指数平均', '布林', 'RSI', 'KDJ', 'CCI', 'ATR', 'ADX'])):
+                        line.remove()
 
-                # 更新画布
-                QTimer.singleShot(0, self.canvas.draw)
+                # 移除指标柱状图
+                for bar in bars:
+                    bar.remove()
 
-            self.log_manager.info("清除指标完成")
+                # 清除图例中的指标项
+                handles, labels = self.price_ax.get_legend_handles_labels()
+                if handles and labels:
+                    # 过滤掉指标相关的图例项
+                    filtered_handles = []
+                    filtered_labels = []
+                    for handle, label in zip(handles, labels):
+                        if not any(indicator in label for indicator in
+                                   ['MA', 'EMA', 'BOLL', 'MACD', 'Signal', 'Histogram',
+                                    '移动平均', '指数平均', '布林', 'RSI', 'KDJ', 'CCI', 'ATR', 'ADX']):
+                            filtered_handles.append(handle)
+                            filtered_labels.append(label)
+
+                    # 更新图例
+                    if filtered_handles and filtered_labels:
+                        self.price_ax.legend(filtered_handles, filtered_labels,
+                                             loc='upper left', fontsize=8, frameon=True,
+                                             fancybox=True, shadow=True, framealpha=0.8)
+                    else:
+                        # 如果没有图例项，移除图例
+                        legend = self.price_ax.get_legend()
+                        if legend:
+                            legend.remove()
+
+            # 清除指标子图上的所有内容
+            if hasattr(self, 'indicator_ax') and self.indicator_ax:
+                # 清除所有线条
+                for line in self.indicator_ax.get_lines():
+                    line.remove()
+
+                # 清除所有柱状图
+                for child in self.indicator_ax.get_children():
+                    if hasattr(child, 'remove') and hasattr(child, 'get_label'):
+                        try:
+                            child.remove()
+                        except:
+                            pass
+
+                # 清除图例
+                legend = self.indicator_ax.get_legend()
+                if legend:
+                    legend.remove()
+
+                # 清除参考线
+                for line in self.indicator_ax.lines:
+                    if hasattr(line, 'get_linestyle') and line.get_linestyle() == '--':
+                        line.remove()
+
+            # 清除成交量图上的指标（如果有）
+            if hasattr(self, 'volume_ax') and self.volume_ax:
+                # 只清除指标线条，保留成交量柱状图
+                lines_to_remove = []
+                for line in self.volume_ax.get_lines():
+                    label = line.get_label()
+                    if (label and label != '_nolegend_' and
+                        any(indicator in label for indicator in
+                            ['MA', 'EMA', 'BOLL', 'MACD', 'RSI', 'KDJ'])):
+                        lines_to_remove.append(line)
+
+                for line in lines_to_remove:
+                    line.remove()
+
+            # 重新绘制图表
+            QTimer.singleShot(0, lambda: self.canvas.draw_idle() if hasattr(self, 'canvas') and self.canvas is not None else None)
+
+            self.log_manager.info("成功清除所有指标")
             self._optimize_display()  # 保证清除后也显示网格和刻度
 
         except Exception as e:
@@ -1814,7 +2412,7 @@ class ChartWidget(QWidget):
             return
         kdata = data['kdata']
         if len(kdata) <= 100 or n_segments <= 1:
-            QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}))
+            QTimer.singleShot(0, lambda: self.update_chart({'kdata': kdata}) if hasattr(self, 'update_chart') else None)
             return
 
         # 分段
@@ -1827,7 +2425,7 @@ class ChartWidget(QWidget):
             res = self._downsample_kdata(segment, max_points=1200)
             # 实时更新进度
             QTimer.singleShot(0, lambda: self.update_loading_progress(
-                min((idx+1)*progress_step, 100), f"正在处理第{idx+1}/{n_segments}段..."))
+                min((idx+1)*progress_step, 100), f"正在处理第{idx+1}/{n_segments}段...") if hasattr(self, 'update_loading_progress') else None)
             return res
 
         with ThreadPoolExecutor(max_workers=n_segments) as executor:
@@ -1844,7 +2442,7 @@ class ChartWidget(QWidget):
         title = data.get('title', '')
         stock_code = data.get('stock_code', '')
         QTimer.singleShot(0, lambda: self.update_chart(
-            {'kdata': merged_df, 'title': title, 'stock_code': stock_code}))
+            {'kdata': merged_df, 'title': title, 'stock_code': stock_code}) if hasattr(self, 'update_chart') else None)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasText() or event.mimeData().hasFormat("text/plain"):

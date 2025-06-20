@@ -237,9 +237,11 @@ class ChartRenderer(QObject):
         # 设置轴范围
         ax.autoscale_view()
 
-        # 添加图例
+        # 添加图例 - 修复警告：只有当确实有带标签的对象时才创建图例
         if label:
-            ax.legend()
+            handles, labels = ax.get_legend_handles_labels()
+            if handles and labels:
+                ax.legend()
 
     def _get_view_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """获取当前视图范围内的数据

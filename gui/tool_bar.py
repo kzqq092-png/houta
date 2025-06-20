@@ -17,6 +17,7 @@ import traceback
 from gui.widgets.log_widget import LogWidget
 from utils.theme import get_theme_manager
 from utils.log_util import log_structured
+from .tools import Calculator, UnitConverter
 
 
 class MainToolBar(QToolBar):
@@ -30,8 +31,11 @@ class MainToolBar(QToolBar):
         """
         try:
             super().__init__(parent)
+            self.setWindowTitle("主工具栏")
+            self.setObjectName("MainToolBar")
 
             # 初始化日志管理器
+            self.log_manager = None
             if hasattr(parent, 'log_manager'):
                 self.log_manager = parent.log_manager
             else:
@@ -56,9 +60,10 @@ class MainToolBar(QToolBar):
         """Initialize the UI"""
         try:
             # 设置工具栏属性
-            self.setMovable(False)
-            self.setIconSize(QSize(24, 24))
-            self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            self.setMovable(True)
+            self.setFloatable(True)
+            self.setIconSize(QSize(32, 32))
+            self.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
 
             # 创建工具栏按钮
             self.create_actions()
@@ -70,36 +75,45 @@ class MainToolBar(QToolBar):
         """创建工具栏按钮"""
         # 文件操作
         self.new_action = QAction(QIcon("icons/new.png"), "新建", self)
-        self.new_action.setStatusTip("创建新的策略")
+        self.new_action.setStatusTip("创建新文件")
         self.new_action.setShortcut("Ctrl+N")
+        self.new_action.triggered.connect(self.new_file)
         self.addAction(self.new_action)
 
         self.open_action = QAction(QIcon("icons/open.png"), "打开", self)
-        self.open_action.setStatusTip("打开策略文件")
+        self.open_action.setStatusTip("打开文件")
         self.open_action.setShortcut("Ctrl+O")
+        self.open_action.triggered.connect(self.open_file)
         self.addAction(self.open_action)
 
         self.save_action = QAction(QIcon("icons/save.png"), "保存", self)
-        self.save_action.setStatusTip("保存当前策略")
+        self.save_action.setStatusTip("保存文件")
         self.save_action.setShortcut("Ctrl+S")
+        self.save_action.triggered.connect(self.save_file)
         self.addAction(self.save_action)
 
         self.addSeparator()
 
         # 分析工具
         self.analyze_action = QAction(QIcon("icons/analyze.png"), "分析", self)
-        self.analyze_action.setStatusTip("分析当前股票")
+        self.analyze_action.setStatusTip("执行技术分析")
         self.analyze_action.setShortcut("F5")
+        if hasattr(self.parent(), 'analyze'):
+            self.analyze_action.triggered.connect(self.parent().analyze)
         self.addAction(self.analyze_action)
 
         self.backtest_action = QAction(QIcon("icons/backtest.png"), "回测", self)
-        self.backtest_action.setStatusTip("回测当前策略")
+        self.backtest_action.setStatusTip("执行策略回测")
         self.backtest_action.setShortcut("F6")
+        if hasattr(self.parent(), 'backtest'):
+            self.backtest_action.triggered.connect(self.parent().backtest)
         self.addAction(self.backtest_action)
 
         self.optimize_action = QAction(QIcon("icons/optimize.png"), "优化", self)
-        self.optimize_action.setStatusTip("优化策略参数")
+        self.optimize_action.setStatusTip("参数优化")
         self.optimize_action.setShortcut("F7")
+        if hasattr(self.parent(), 'optimize'):
+            self.optimize_action.triggered.connect(self.parent().optimize)
         self.addAction(self.optimize_action)
 
         self.addSeparator()
@@ -129,21 +143,22 @@ class MainToolBar(QToolBar):
         self.addSeparator()
 
         # 常用工具
-        self.calculator_action = QAction(
-            QIcon("icons/calculator.png"), "计算器", self)
+        self.calculator_action = QAction(QIcon("icons/calculator.png"), "计算器", self)
         self.calculator_action.setStatusTip("打开计算器")
-        self.calculator_action.setShortcut("Ctrl+K")
+        self.calculator_action.setShortcut("Ctrl+Shift+C")
+        self.calculator_action.triggered.connect(self.show_calculator)
         self.addAction(self.calculator_action)
 
-        self.converter_action = QAction(
-            QIcon("icons/converter.png"), "单位转换", self)
+        self.converter_action = QAction(QIcon("icons/converter.png"), "单位转换", self)
         self.converter_action.setStatusTip("打开单位转换器")
         self.converter_action.setShortcut("Ctrl+U")
+        self.converter_action.triggered.connect(self.show_converter)
         self.addAction(self.converter_action)
 
         self.settings_action = QAction(QIcon("icons/settings.png"), "设置", self)
         self.settings_action.setStatusTip("打开设置对话框")
         self.settings_action.setShortcut("Ctrl+,")
+        self.settings_action.triggered.connect(self.show_settings)
         self.addAction(self.settings_action)
 
         # 搜索框
@@ -180,7 +195,6 @@ class MainToolBar(QToolBar):
     def new_file(self):
         """Create a new file"""
         try:
-            # Create a new empty file
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "新建文件",
@@ -191,10 +205,13 @@ class MainToolBar(QToolBar):
             if file_path:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write("")
-                msg_box = QMessageBox.information(self, "成功", "文件创建成功")
+                QMessageBox.information(self, "成功", "文件创建成功")
+                self.log_message(f"创建文件成功: {file_path}")
 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"创建文件失败: {str(e)}")
+            error_msg = f"创建文件失败: {str(e)}"
+            QMessageBox.critical(self, "错误", error_msg)
+            self.log_message(error_msg, "error")
 
     def open_file(self):
         """Open a file"""
@@ -209,11 +226,13 @@ class MainToolBar(QToolBar):
             if file_path:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                # TODO: Process file content
-                msg_box = QMessageBox.information(self, "成功", "文件打开成功")
+                QMessageBox.information(self, "成功", "文件打开成功")
+                self.log_message(f"打开文件成功: {file_path}")
 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"打开文件失败: {str(e)}")
+            error_msg = f"打开文件失败: {str(e)}"
+            QMessageBox.critical(self, "错误", error_msg)
+            self.log_message(error_msg, "error")
 
     def save_file(self):
         """Save current file"""
@@ -226,109 +245,41 @@ class MainToolBar(QToolBar):
             )
 
             if file_path:
-                # TODO: Get current content and save
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write("")
                 QMessageBox.information(self, "成功", "文件保存成功")
+                self.log_message(f"保存文件成功: {file_path}")
 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存文件失败: {str(e)}")
+            error_msg = f"保存文件失败: {str(e)}"
+            QMessageBox.critical(self, "错误", error_msg)
+            self.log_message(error_msg, "error")
 
     def show_settings(self):
         """Show settings dialog"""
         try:
             if hasattr(self.parent(), 'show_settings'):
                 self.parent().show_settings()
+            else:
+                self.log_message("设置功能暂未实现", "warning")
         except Exception as e:
-            self.log_manager.error(f"显示设置对话框失败: {str(e)}")
+            error_msg = f"显示设置对话框失败: {str(e)}"
+            self.log_message(error_msg, "error")
 
     def show_calculator(self):
-        """Show calculator"""
+        """Show calculator using the new Calculator tool"""
         try:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("计算器")
-            dialog.setMinimumSize(300, 400)
-
-            layout = QVBoxLayout(dialog)
-            layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(10)
-
-            # Add calculator display
-            display = QLineEdit()
-            display.setReadOnly(True)
-            display.setAlignment(Qt.AlignRight)
-            layout.addWidget(display)
-
-            # Add calculator buttons
-            buttons = [
-                ['7', '8', '9', '/'],
-                ['4', '5', '6', '*'],
-                ['1', '2', '3', '-'],
-                ['0', '.', '=', '+']
-            ]
-
-            for row in buttons:
-                button_row = QHBoxLayout()
-                for text in row:
-                    button = QPushButton(text)
-                    button.setMinimumSize(50, 50)
-                    button_row.addWidget(button)
-                layout.addLayout(button_row)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-            dialog.exec_()
-
+            Calculator.show_calculator(self)
+            self.log_message("打开计算器")
         except Exception as e:
-            self.log_manager.error(f"显示计算器失败: {str(e)}")
+            error_msg = f"显示计算器失败: {str(e)}"
+            self.log_message(error_msg, "error")
 
     def show_converter(self):
-        """Show unit converter"""
+        """Show unit converter using the new UnitConverter tool"""
         try:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("单位转换器")
-            dialog.setMinimumSize(400, 300)
-
-            layout = QVBoxLayout(dialog)
-            layout.setContentsMargins(10, 10, 10, 10)
-            layout.setSpacing(10)
-
-            # Add input fields
-            input_group = QGroupBox("输入")
-            input_layout = QFormLayout(input_group)
-
-            input_value = QLineEdit()
-            input_value.setAlignment(Qt.AlignRight)
-            input_unit = QComboBox()
-            input_unit.addItems(["元", "美元", "欧元", "英镑"])
-            input_layout.addRow("数值:", input_value)
-            input_layout.addRow("单位:", input_unit)
-
-            layout.addWidget(input_group)
-
-            # Add output fields
-            output_group = QGroupBox("输出")
-            output_layout = QFormLayout(output_group)
-
-            output_value = QLineEdit()
-            output_value.setReadOnly(True)
-            output_value.setAlignment(Qt.AlignRight)
-            output_unit = QComboBox()
-            output_unit.addItems(["元", "美元", "欧元", "英镑"])
-            output_layout.addRow("数值:", output_value)
-            output_layout.addRow("单位:", output_unit)
-
-            layout.addWidget(output_group)
-
-            # Add convert button
-            convert_button = QPushButton("转换")
-            layout.addWidget(convert_button)
-
-            # 显示对话框并居中
-            dialog.show()
-            LogWidget().center_dialog(dialog, self)
-            dialog.exec_()
-
+            UnitConverter.show_converter(self)
+            self.log_message("打开单位转换器")
         except Exception as e:
-            self.log_manager.error(f"显示单位转换器失败: {str(e)}")
+            error_msg = f"显示单位转换器失败: {str(e)}"
+            self.log_message(error_msg, "error")

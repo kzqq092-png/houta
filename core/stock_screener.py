@@ -14,7 +14,7 @@ from core.data_manager import DataManager
 from core.logger import LogManager, LogLevel
 import os
 import json
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
 import ptvsd
 
 
@@ -540,5 +540,5 @@ class StockScreener:
 
     def get_indicator_categories(self):
         """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
-        from indicators_algo import get_all_indicators_by_category
+        from core.indicators_algo import get_all_indicators_by_category
         return get_all_indicators_by_category()

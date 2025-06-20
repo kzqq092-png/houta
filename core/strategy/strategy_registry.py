@@ -141,6 +141,25 @@ class StrategyRegistry:
 
             return strategy_class
 
+    def get_strategy(self, strategy_name: str) -> Optional[BaseStrategy]:
+        """
+        获取策略实例
+
+        Args:
+            strategy_name: 策略名称
+
+        Returns:
+            策略实例或None
+        """
+        strategy_class = self.get_strategy_class(strategy_name)
+        if strategy_class:
+            try:
+                return strategy_class()
+            except Exception as e:
+                self.logger.error(f"创建策略实例失败 {strategy_name}: {e}")
+                return None
+        return None
+
     def get_strategy_metadata(self, strategy_name: str) -> Optional[Dict[str, Any]]:
         """
         获取策略元数据

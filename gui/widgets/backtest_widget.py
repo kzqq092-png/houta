@@ -179,7 +179,10 @@ class RealTimeChart(QWidget):
                                       color='#00ff88', linewidth=2, label='累积收益')
                         self.ax1.set_title('累积收益率 (%)', color='white')
                         self.ax1.grid(True, alpha=0.3)
-                        self.ax1.legend()
+                        # 检查是否有带标签的对象才创建图例
+                        handles, labels = self.ax1.get_legend_handles_labels()
+                        if handles and labels:
+                            self.ax1.legend()
 
                     # 更新回撤图
                     if 'current_drawdown' in df.columns:
@@ -187,7 +190,10 @@ class RealTimeChart(QWidget):
                                               color='#ff4b4b', alpha=0.7, label='当前回撤')
                         self.ax2.set_title('回撤分析 (%)', color='white')
                         self.ax2.grid(True, alpha=0.3)
-                        self.ax2.legend()
+                        # 检查是否有带标签的对象才创建图例
+                        handles, labels = self.ax2.get_legend_handles_labels()
+                        if handles and labels:
+                            self.ax2.legend()
 
                     # 更新风险指标图
                     if 'sharpe_ratio' in df.columns:
@@ -195,7 +201,10 @@ class RealTimeChart(QWidget):
                                       color='#00d4ff', linewidth=2, label='Sharpe比率')
                         self.ax3.set_title('Sharpe比率', color='white')
                         self.ax3.grid(True, alpha=0.3)
-                        self.ax3.legend()
+                        # 检查是否有带标签的对象才创建图例
+                        handles, labels = self.ax3.get_legend_handles_labels()
+                        if handles and labels:
+                            self.ax3.legend()
 
                     # 设置样式
                     for ax in [self.ax1, self.ax2, self.ax3]:
@@ -832,7 +841,8 @@ class ProfessionalBacktestWidget(QWidget):
                     self.chart_widget.add_data(monitoring_data)
 
                     # 更新指标面板
-                    QTimer.singleShot(0, lambda: self.metrics_panel.update_metrics(monitoring_data))
+                    QTimer.singleShot(0, lambda: self.metrics_panel.update_metrics(monitoring_data)
+                                      if hasattr(self, 'metrics_panel') and self.metrics_panel is not None else None)
 
                     # 检查预警
                     self._check_alerts(monitoring_data)
@@ -919,25 +929,25 @@ class ProfessionalBacktestWidget(QWidget):
             if drawdown > 0.15:
                 QTimer.singleShot(0, lambda: self.alerts_panel.add_alert(
                     'critical', f'回撤过大: {drawdown:.2%}'
-                ))
+                ) if hasattr(self, 'alerts_panel') and self.alerts_panel is not None else None)
             elif drawdown > 0.1:
                 QTimer.singleShot(0, lambda: self.alerts_panel.add_alert(
                     'warning', f'回撤警告: {drawdown:.2%}'
-                ))
+                ) if hasattr(self, 'alerts_panel') and self.alerts_panel is not None else None)
 
             # 检查Sharpe比率预警
             sharpe = data.get('sharpe_ratio', 0)
             if sharpe < 0:
                 QTimer.singleShot(0, lambda: self.alerts_panel.add_alert(
                     'warning', f'Sharpe比率为负: {sharpe:.3f}'
-                ))
+                ) if hasattr(self, 'alerts_panel') and self.alerts_panel is not None else None)
 
             # 检查波动率预警
             volatility = data.get('volatility', 0)
             if volatility > 0.3:
                 QTimer.singleShot(0, lambda: self.alerts_panel.add_alert(
                     'warning', f'波动率过高: {volatility:.2%}'
-                ))
+                ) if hasattr(self, 'alerts_panel') and self.alerts_panel is not None else None)
 
         except Exception as e:
             self.log_manager.log(f"检查预警失败: {e}", LogLevel.ERROR)

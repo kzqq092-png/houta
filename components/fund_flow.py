@@ -16,11 +16,12 @@ from typing import Optional, Dict, Any
 from core.stock_screener import DataManager, StockScreener
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
-from gui.ui_components import BaseAnalysisPanel
-from components.template_manager import TemplateManager
+from gui.panels.base_analysis_panel import BaseAnalysisPanel
+from utils.template_manager import TemplateManager
 from utils.config_manager import ConfigManager
-from utils.log_manager import LogManager
+from core.logger import LogManager
 from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
+from utils.async_analysis import get_async_analysis_manager
 
 # 设置matplotlib中文字体
 mpl.rcParams["font.sans-serif"] = [
@@ -367,53 +368,27 @@ class FundFlowWidget(BaseAnalysisTab):
         }
 
     def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
-        original_text = button.text()
-        button.setText("取消")
-        button._interrupted = False
-
-        def on_cancel():
-            button._interrupted = True
-            button.setText(original_text)
-            button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-
+        """统一的异步分析方法 - 使用AsyncAnalysisManager避免重复连接"""
         try:
-            button.clicked.disconnect()
-        except Exception:
-            pass
-        button.clicked.connect(on_cancel)
+            # 获取或创建异步分析管理器
+            if not hasattr(self, '_async_manager'):
+                self._async_manager = get_async_analysis_manager(self.log_manager)
 
-        def task():
-            try:
-                if not getattr(button, '_interrupted', False):
-                    result = analysis_func(*args, **kwargs)
-                    return result
-            except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
-                return None
-            finally:
-                QTimer.singleShot(0, lambda: on_done(None))
+            # 使用统一的异步分析方法
+            self._async_manager.run_analysis_async(
+                button, analysis_func, *args, **kwargs
+            )
 
-        def on_done(future):
-            button.setText(original_text)
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"异步分析启动失败: {str(e)}")
+            else:
+                print(f"异步分析启动失败: {str(e)}")
+
+            # 恢复按钮状态
+            if hasattr(button, 'setText'):
+                button.setText(button.text().replace("中...", ""))
             button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
-        if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
-        future = self._thread_pool.submit(task)
-        # 只需在finally中恢复，无需重复回调
 
     def analyze_fund_flow(self):
         self._run_analysis_async(
@@ -470,7 +445,8 @@ class FundFlowWidget(BaseAnalysisTab):
         """
         try:
             # 使用QTimer.singleShot确保在主线程中更新UI
-            QTimer.singleShot(0, lambda: self._update_ui_safely(data))
+            QTimer.singleShot(0, lambda: self._update_ui_safely(data) if hasattr(
+                self, '_update_ui_safely') and callable(self._update_ui_safely) else None)
 
         except Exception as e:
             self.log_manager.log(f"更新资金流向数据失败: {e}", LogLevel.ERROR)

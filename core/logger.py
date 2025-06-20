@@ -27,10 +27,21 @@ class LogManager(BaseLogManager):
         """
         try:
             super().__init__()
-            self.config = config or LoggingConfig()
-            is_valid, error_msg = self.config.validate()
-            if not is_valid:
-                print(f"日志配置无效: {error_msg}")
+            # 确保config是LoggingConfig对象
+            if config is None:
+                self.config = LoggingConfig()
+            elif isinstance(config, dict):
+                # 如果传入的是字典，创建LoggingConfig对象
+                self.config = LoggingConfig(**config)
+            else:
+                self.config = config
+
+            # 验证配置
+            if hasattr(self.config, 'validate') and callable(self.config.validate):
+                is_valid, error_msg = self.config.validate()
+                if not is_valid:
+                    print(f"日志配置无效: {error_msg}")
+
             self._setup_logger()
             if self.config.async_logging:
                 from concurrent.futures import ThreadPoolExecutor
@@ -39,6 +50,9 @@ class LogManager(BaseLogManager):
                     max_workers=self.config.worker_threads)
         except Exception as e:
             print(f"LogManager初始化异常: {e}")
+            # 创建默认配置作为后备
+            self.config = LoggingConfig()
+            self._setup_logger()
 
     def _setup_logger(self):
         """设置日志记录器"""

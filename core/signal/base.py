@@ -46,7 +46,7 @@ class BaseSignal(SignalBase):
         if hasattr(k, 'to_df'):
             df = k.to_df()
             if isinstance(df['close'], pd.Series):
-                from indicators_algo import calc_ma, calc_macd, calc_rsi
+                from core.indicators_algo import calc_ma, calc_macd, calc_rsi
                 indicators['ma_fast'] = calc_ma(df['close'], self.get_param("n_fast", 12))
                 indicators['ma_slow'] = calc_ma(df['close'], self.get_param("n_slow", 26))
                 macd, _, _ = calc_macd(df['close'], self.get_param("n_fast", 12), self.get_param("n_slow", 26), self.get_param("n_signal", 9))

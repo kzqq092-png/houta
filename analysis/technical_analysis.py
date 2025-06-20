@@ -143,7 +143,7 @@ class TechnicalAnalyzer:
         try:
             if isinstance(kdata, pd.DataFrame):
                 closes = kdata['close'].values
-                from indicators_algo import calc_rsi, calc_macd
+                from core.indicators_algo import calc_rsi, calc_macd
                 rsi = calc_rsi(kdata['close'], 14)
                 macd, _, _ = calc_macd(kdata['close'])
             else:

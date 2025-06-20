@@ -26,7 +26,7 @@ from utils.config_manager import ConfigManager
 from hikyuu.indicator import *
 from hikyuu import sm
 from hikyuu import Query
-from indicators_algo import get_talib_indicator_list, get_talib_category, calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_all_indicators_by_category, calc_talib_indicator
+from core.indicators_algo import get_talib_indicator_list, get_talib_category, calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_all_indicators_by_category, calc_talib_indicator
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
@@ -114,7 +114,7 @@ class AnalysisWidget(QWidget):
         self.setup_shortcuts()
 
         # 初始化形态过滤器选项（在所有UI创建完成后）
-        QTimer.singleShot(100, self._init_pattern_filters)
+        QTimer.singleShot(100, lambda: self._init_pattern_filters() if hasattr(self, '_init_pattern_filters') else None)
 
     def _init_pattern_filters(self):
         """延迟初始化形态过滤器选项"""
@@ -610,7 +610,7 @@ class AnalysisWidget(QWidget):
 def get_indicator_categories():
     """获取指标分类 - 兼容原接口"""
     try:
-        from indicators_algo import get_all_indicators_by_category
+        from core.indicators_algo import get_all_indicators_by_category
         return get_all_indicators_by_category()
     except Exception:
         return {

@@ -175,11 +175,9 @@ class LogWidget(QWidget):
             toolbar_layout.addWidget(self.clear_button)
             self.export_button = QPushButton("导出日志")
             # self.export_button.setFixedWidth(60)
-            self.export_button.clicked.connect(self.export_logs)
             toolbar_layout.addWidget(self.export_button)
             self.visual_button = QPushButton("日志可视化")
             # self.visual_button.setFixedWidth(60)
-            self.visual_button.clicked.connect(self.show_log_stats)
             toolbar_layout.addWidget(self.visual_button)
             layout.addLayout(toolbar_layout)
             if self.log_text is None:
@@ -256,7 +254,7 @@ class LogWidget(QWidget):
             self.setVisible(True)
             self.update()
             if self.log_text is not None:
-                QTimer.singleShot(0, lambda: self.log_text.moveCursor(QTextCursor.End))
+                QTimer.singleShot(0, lambda: self._safe_move_cursor() if hasattr(self, 'log_text') and self.log_text is not None else None)
         except Exception as e:
             error_msg = f"添加日志失败: {str(e)}"
             if self.log_text is None:
@@ -282,7 +280,7 @@ class LogWidget(QWidget):
             self.log_text.setStyleSheet(
                 orig_style + "background-color: #ffebee;")
             QTimer.singleShot(
-                500, lambda: self.log_text.setStyleSheet(orig_style))
+                500, lambda: self._safe_set_style(orig_style) if hasattr(self, 'log_text') and self.log_text is not None else None)
         except Exception as e:
             self.log_manager.error(f"闪烁错误提示失败: {str(e)}")
 
@@ -351,7 +349,29 @@ class LogWidget(QWidget):
                 logs = [l for l in self._all_logs if isinstance(l[0], dict)]
                 if not logs:
                     return
-                df = pd.DataFrame([dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
+                df_data = []
+                for d in logs:
+                    try:
+                        # 安全地合并字典，避免重复键冲突
+                        log_dict = d[0] if isinstance(d[0], dict) else {}
+                        row_data = log_dict.copy()  # 先复制原始数据
+
+                        # 安全地添加level和timestamp，避免重复键
+                        if 'level' not in row_data:
+                            row_data['level'] = d[1]
+                        else:
+                            row_data['log_level'] = d[1]  # 使用不同的键名
+
+                        if 'timestamp' not in row_data:
+                            row_data['timestamp'] = d[2]
+                        else:
+                            row_data['log_timestamp'] = d[2]  # 使用不同的键名
+
+                        df_data.append(row_data)
+                    except Exception as e:
+                        self.log_manager.warning(f"处理日志数据时出错: {str(e)}")
+                        continue
+                df = pd.DataFrame(df_data)
                 if fmt == "csv":
                     df.to_csv(file_path, index=False)
                 else:
@@ -572,21 +592,28 @@ class LogWidget(QWidget):
 
             export_btn.clicked.connect(do_export)
 
-            # 右键菜单
-            menu = QMenu(self.popup_dialog)
-            copy_action = menu.addAction("复制")
-            select_all_action = menu.addAction("全选")
-            clear_action = menu.addAction("清空")
-            export_action = menu.addAction("导出")
-            action = menu.exec_(log_text.mapToGlobal(pos))
-            if action == copy_action:
-                log_text.copy()
-            elif action == select_all_action:
-                log_text.selectAll()
-            elif action == clear_action:
-                log_text.clear()
-            elif action == export_action:
-                do_export()
+            # 设置右键菜单
+            log_text.setContextMenuPolicy(Qt.CustomContextMenu)
+
+            def show_context_menu(pos):
+                """弹窗日志文本的右键菜单"""
+                menu = QMenu(self.popup_dialog)
+                copy_action = menu.addAction("复制")
+                select_all_action = menu.addAction("全选")
+                clear_action = menu.addAction("清空")
+                export_action = menu.addAction("导出")
+
+                action = menu.exec_(log_text.mapToGlobal(pos))
+                if action == copy_action:
+                    log_text.copy()
+                elif action == select_all_action:
+                    log_text.selectAll()
+                elif action == clear_action:
+                    log_text.clear()
+                elif action == export_action:
+                    do_export()
+
+            log_text.customContextMenuRequested.connect(show_context_menu)
 
             def on_close():
                 self.popup_dialog = None
@@ -676,17 +703,24 @@ class LogWidget(QWidget):
 
     def restore_scroll_position(self, scroll_to_end: bool = False):
         """刷新后还原滚动条位置或自动滚动到底部，供所有日志区/弹窗复用"""
-        scrollbar = self.log_text.verticalScrollBar()
-        if scroll_to_end:
-            QTimer.singleShot(
-                0, lambda: scrollbar.setValue(scrollbar.maximum()))
-        elif self.pause_scroll:
-            # 恢复原有滚动条相对位置（防止跳到顶部）
-            def restore():
-                new_max = scrollbar.maximum()
-                new_value = int(self._last_scroll_ratio * new_max)
-                scrollbar.setValue(new_value)
-            QTimer.singleShot(0, restore)
+        try:
+            if not self._is_log_text_valid():
+                return
+
+            scrollbar = self.log_text.verticalScrollBar()
+            if scroll_to_end:
+                QTimer.singleShot(
+                    0, lambda: self._safe_scroll_to_max(scrollbar) if scrollbar is not None else None)
+            elif self.pause_scroll:
+                # 恢复原有滚动条相对位置（防止跳到顶部）
+                def restore():
+                    if scrollbar is not None:
+                        new_max = scrollbar.maximum()
+                        new_value = int(self._last_scroll_ratio * new_max)
+                        self._safe_set_scrollbar_value(scrollbar, new_value)
+                QTimer.singleShot(0, restore)
+        except Exception as e:
+            self.log_manager.error(f"恢复滚动位置失败: {str(e)}")
 
     def refresh_display(self, scroll_to_end: bool = False):
         """根据所有筛选条件刷新日志显示"""
@@ -759,7 +793,7 @@ class LogWidget(QWidget):
         if self.log_text is not None:
             self.log_text.setHtml("".join(html_logs))
             if scroll_to_end or not self.pause_scroll:
-                QTimer.singleShot(0, lambda: self.log_text.moveCursor(QTextCursor.End))
+                QTimer.singleShot(0, lambda: self._safe_move_cursor() if hasattr(self, 'log_text') and self.log_text is not None else None)
 
     def refresh(self) -> None:
         """
@@ -784,41 +818,248 @@ class LogWidget(QWidget):
 
     def show_log_stats(self):
         """嵌入式日志统计图，支持交互"""
-        logs = [l for l in self._all_logs if isinstance(l[0], dict)]
-        if not logs:
-            return
-        df = pd.DataFrame([dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
-        dialog = QDialog(self)
-        dialog.setWindowTitle("日志统计可视化")
-        layout = QVBoxLayout(dialog)
-        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-        from matplotlib.figure import Figure
-        fig = Figure(figsize=(8, 6))
-        canvas = FigureCanvas(fig)
-        layout.addWidget(canvas)
-        ax1 = fig.add_subplot(221)
-        ax2 = fig.add_subplot(222)
-        ax3 = fig.add_subplot(212)
-        # 事件分布
-        if "event" in df:
-            df["event"].value_counts().plot(kind="bar", ax=ax1, title="事件分布")
-        # 级别分布
-        if "level" in df:
-            df["level"].value_counts().plot(kind="pie", ax=ax2, autopct="%1.1f%%", title="日志级别分布")
-        # 时间趋势
-        if "timestamp" in df:
-            df["timestamp"] = pd.to_datetime(df["timestamp"])
-            df.set_index("timestamp").resample("min").size().plot(ax=ax3, title="日志时间趋势")
-        fig.tight_layout()
-        # 支持导出图片
-        btn_export = QPushButton("导出统计图")
+        try:
+            self.log_manager.info("开始显示日志统计可视化")
 
-        def do_export():
-            file_path, _ = QFileDialog.getSaveFileName(dialog, "导出统计图", "", "PNG Files (*.png)")
-            if file_path:
-                fig.savefig(file_path)
-        btn_export.clicked.connect(do_export)
-        layout.addWidget(btn_export)
-        dialog.setLayout(layout)
-        dialog.resize(900, 700)
-        dialog.exec_()
+            # 检查是否有日志数据
+            if not self._all_logs:
+                self.log_manager.warning("没有日志数据可供统计")
+                QMessageBox.information(self, "提示", "暂无日志数据可供统计分析")
+                return
+
+            # 过滤结构化日志数据
+            logs = [l for l in self._all_logs if isinstance(l[0], dict)]
+            if not logs:
+                self.log_manager.warning("没有结构化日志数据可供统计")
+                # 如果没有结构化日志，显示基本统计
+                self._show_basic_log_stats()
+                return
+
+            self.log_manager.info(f"找到 {len(logs)} 条结构化日志数据")
+
+            # 创建DataFrame
+            df_data = []
+            for d in logs:
+                try:
+                    # 安全地合并字典，避免重复键冲突
+                    log_dict = d[0] if isinstance(d[0], dict) else {}
+                    row_data = log_dict.copy()  # 先复制原始数据
+
+                    # 安全地添加level和timestamp，避免重复键
+                    if 'level' not in row_data:
+                        row_data['level'] = d[1]
+                    else:
+                        row_data['log_level'] = d[1]  # 使用不同的键名
+
+                    if 'timestamp' not in row_data:
+                        row_data['timestamp'] = d[2]
+                    else:
+                        row_data['log_timestamp'] = d[2]  # 使用不同的键名
+
+                    df_data.append(row_data)
+                except Exception as e:
+                    self.log_manager.warning(f"处理日志数据时出错: {str(e)}")
+                    continue
+
+            if not df_data:
+                self.log_manager.warning("无法处理日志数据")
+                return
+
+            df = pd.DataFrame(df_data)
+            self.log_manager.info(f"创建DataFrame成功，包含 {len(df)} 行数据")
+
+            # 创建对话框
+            dialog = QDialog(self)
+            dialog.setWindowTitle("日志统计可视化")
+            layout = QVBoxLayout(dialog)
+
+            try:
+                # 导入matplotlib组件
+                from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+                from matplotlib.figure import Figure
+
+                # 创建图表
+                fig = Figure(figsize=(12, 8))
+                canvas = FigureCanvas(fig)
+                layout.addWidget(canvas)
+
+                # 创建子图
+                ax1 = fig.add_subplot(221)
+                ax2 = fig.add_subplot(222)
+                ax3 = fig.add_subplot(212)
+
+                # 绘制事件分布
+                if "event" in df.columns and not df["event"].empty:
+                    try:
+                        event_counts = df["event"].value_counts()
+                        if len(event_counts) > 0:
+                            event_counts.plot(kind="bar", ax=ax1, title="事件分布")
+                            ax1.tick_params(axis='x', rotation=45)
+                        else:
+                            ax1.text(0.5, 0.5, '无事件数据', ha='center', va='center', transform=ax1.transAxes)
+                            ax1.set_title("事件分布")
+                    except Exception as e:
+                        self.log_manager.error(f"绘制事件分布失败: {str(e)}")
+                        ax1.text(0.5, 0.5, '事件分布绘制失败', ha='center', va='center', transform=ax1.transAxes)
+                        ax1.set_title("事件分布")
+                else:
+                    ax1.text(0.5, 0.5, '无事件数据', ha='center', va='center', transform=ax1.transAxes)
+                    ax1.set_title("事件分布")
+
+                # 绘制级别分布
+                if "level" in df.columns and not df["level"].empty:
+                    try:
+                        level_counts = df["level"].value_counts()
+                        if len(level_counts) > 0:
+                            level_counts.plot(kind="pie", ax=ax2, autopct="%1.1f%%", title="日志级别分布")
+                        else:
+                            ax2.text(0.5, 0.5, '无级别数据', ha='center', va='center', transform=ax2.transAxes)
+                            ax2.set_title("日志级别分布")
+                    except Exception as e:
+                        self.log_manager.error(f"绘制级别分布失败: {str(e)}")
+                        ax2.text(0.5, 0.5, '级别分布绘制失败', ha='center', va='center', transform=ax2.transAxes)
+                        ax2.set_title("日志级别分布")
+                else:
+                    ax2.text(0.5, 0.5, '无级别数据', ha='center', va='center', transform=ax2.transAxes)
+                    ax2.set_title("日志级别分布")
+
+                # 绘制时间趋势
+                if "timestamp" in df.columns and not df["timestamp"].empty:
+                    try:
+                        df["timestamp"] = pd.to_datetime(df["timestamp"])
+                        time_series = df.set_index("timestamp").resample("min").size()
+                        if len(time_series) > 0:
+                            time_series.plot(ax=ax3, title="日志时间趋势")
+                            ax3.tick_params(axis='x', rotation=45)
+                        else:
+                            ax3.text(0.5, 0.5, '无时间数据', ha='center', va='center', transform=ax3.transAxes)
+                            ax3.set_title("日志时间趋势")
+                    except Exception as e:
+                        self.log_manager.error(f"绘制时间趋势失败: {str(e)}")
+                        ax3.text(0.5, 0.5, '时间趋势绘制失败', ha='center', va='center', transform=ax3.transAxes)
+                        ax3.set_title("日志时间趋势")
+                else:
+                    ax3.text(0.5, 0.5, '无时间数据', ha='center', va='center', transform=ax3.transAxes)
+                    ax3.set_title("日志时间趋势")
+
+                fig.tight_layout()
+
+                # 支持导出图片
+                btn_export = QPushButton("导出统计图")
+
+                def do_export():
+                    try:
+                        file_path, _ = QFileDialog.getSaveFileName(dialog, "导出统计图", "", "PNG Files (*.png)")
+                        if file_path:
+                            fig.savefig(file_path, dpi=300, bbox_inches='tight')
+                            self.log_manager.info(f"统计图已导出到: {file_path}")
+                            QMessageBox.information(dialog, "成功", f"统计图已导出到:\n{file_path}")
+                    except Exception as e:
+                        self.log_manager.error(f"导出统计图失败: {str(e)}")
+                        QMessageBox.warning(dialog, "错误", f"导出统计图失败: {str(e)}")
+
+                btn_export.clicked.connect(do_export)
+                layout.addWidget(btn_export)
+
+                dialog.setLayout(layout)
+                dialog.resize(900, 700)
+
+                self.log_manager.info("日志统计可视化对话框创建成功")
+                dialog.exec_()
+
+            except ImportError as e:
+                self.log_manager.error(f"matplotlib导入失败: {str(e)}")
+                QMessageBox.warning(self, "错误", "无法导入matplotlib库，请确保已安装matplotlib")
+
+        except Exception as e:
+            error_msg = f"显示日志统计失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            QMessageBox.warning(self, "错误", error_msg)
+
+    def _show_basic_log_stats(self):
+        """显示基本日志统计（当没有结构化日志时）"""
+        try:
+            # 统计基本信息
+            total_logs = len(self._all_logs)
+            level_counts = {}
+            for msg, level, ts in self._all_logs:
+                level_counts[level] = level_counts.get(level, 0) + 1
+
+            # 创建简单的统计对话框
+            dialog = QDialog(self)
+            dialog.setWindowTitle("基本日志统计")
+            layout = QVBoxLayout(dialog)
+
+            # 添加统计信息
+            info_text = f"总日志数: {total_logs}\n\n级别分布:\n"
+            for level, count in sorted(level_counts.items()):
+                info_text += f"  {level}: {count}\n"
+
+            text_edit = QTextEdit()
+            text_edit.setPlainText(info_text)
+            text_edit.setReadOnly(True)
+            layout.addWidget(text_edit)
+
+            # 关闭按钮
+            btn_close = QPushButton("关闭")
+            btn_close.clicked.connect(dialog.accept)
+            layout.addWidget(btn_close)
+
+            dialog.resize(400, 300)
+            dialog.exec_()
+
+        except Exception as e:
+            self.log_manager.error(f"显示基本日志统计失败: {str(e)}")
+
+    def _safe_move_cursor(self):
+        """安全地移动光标到末尾，处理Qt对象生命周期问题"""
+        try:
+            if hasattr(self, 'log_text') and self.log_text is not None:
+                # 尝试检查对象是否仍然有效
+                try:
+                    # 通过调用一个简单的方法来检查对象是否有效
+                    self.log_text.document()
+                    self.log_text.moveCursor(QTextCursor.End)
+                except RuntimeError:
+                    # Qt对象已被删除，忽略错误
+                    pass
+        except Exception:
+            # 任何其他异常也忽略
+            pass
+
+    def _safe_set_style(self, style):
+        """安全地设置日志文本区的样式"""
+        try:
+            if hasattr(self, 'log_text') and self.log_text is not None:
+                self.log_text.setStyleSheet(style)
+        except Exception:
+            # 忽略所有异常，包括RuntimeError
+            pass
+
+    def _is_log_text_valid(self):
+        """检查log_text是否有效"""
+        try:
+            if hasattr(self, 'log_text') and self.log_text is not None:
+                # 通过调用一个简单的方法来检查对象是否有效
+                self.log_text.document()
+                return True
+        except (RuntimeError, AttributeError):
+            pass
+        return False
+
+    def _safe_scroll_to_max(self, scrollbar):
+        """安全地滚动到最大值"""
+        try:
+            if scrollbar is not None:
+                scrollbar.setValue(scrollbar.maximum())
+        except Exception:
+            pass
+
+    def _safe_set_scrollbar_value(self, scrollbar, value):
+        """安全地设置滚动条值"""
+        try:
+            if scrollbar is not None:
+                scrollbar.setValue(value)
+        except Exception:
+            pass

@@ -10,11 +10,12 @@ from core.data_manager import DataManager
 from core.logger import LogManager, LogLevel
 from datetime import datetime
 import ptvsd
-from gui.ui_components import BaseAnalysisPanel
+from gui.panels import BaseAnalysisPanel
 import traceback
 from utils.config_manager import ConfigManager
 from utils.template_manager import TemplateManager
 from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
+from utils.async_analysis import get_async_analysis_manager
 
 
 class DataUpdateThread(QThread):
@@ -887,53 +888,29 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 self.show_warning_message("输入错误", "请填写完整的指标名称和公式")
 
     def _run_analysis_async(self, button, analysis_func, *args, **kwargs):
-        original_text = button.text()
-        button.setText("取消")
-        button._interrupted = False
-
-        def on_cancel():
-            button._interrupted = True
-            button.setText(original_text)
-            button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-
+        """统一的异步分析方法 - 使用AsyncAnalysisManager避免重复连接"""
         try:
-            button.clicked.disconnect()
-        except Exception:
-            pass
-        button.clicked.connect(on_cancel)
+            # 获取或创建异步分析管理器
+            if not hasattr(self, '_async_manager'):
+                self._async_manager = get_async_analysis_manager(self.log_manager)
 
-        def task():
-            try:
-                if not getattr(button, '_interrupted', False):
-                    result = analysis_func(*args, **kwargs)
-                    return result
-            except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
-                return None
-            finally:
-                QTimer.singleShot(0, lambda: on_done(None))
+            # 使用统一的异步分析方法
+            self._async_manager.run_analysis_async(
+                button, analysis_func, *args, **kwargs
+            )
 
-        def on_done(future):
-            button.setText(original_text)
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"异步分析启动失败: {str(e)}")
+            else:
+                print(f"异步分析启动失败: {str(e)}")
+
+            # 恢复按钮状态
             button.setEnabled(True)
-            # 重新绑定分析逻辑
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
-        if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
-        future = self._thread_pool.submit(task)
-        # 只需在finally中恢复，无需重复回调
+            if hasattr(button, '_original_text'):
+                button.setText(button._original_text)
+            else:
+                button.setText("开始分析")
 
     def analyze_sentiment(self):
         self._run_analysis_async(

@@ -423,22 +423,39 @@ class ProfessionalPerformanceOptimizer:
 
 # 装饰器函数
 def performance_monitor(optimizer: ProfessionalPerformanceOptimizer):
-    """性能监控装饰器"""
+    """
+    性能监控装饰器
+
+    **注意：此装饰器已弃用，请使用 core.unified_performance_manager.performance_monitor**
+    为保持向后兼容性，此装饰器将重定向到统一性能管理器。
+    """
     def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            optimizer.start_monitoring()
-            try:
-                result = func(*args, **kwargs)
-                return result
-            finally:
-                metrics = optimizer.stop_monitoring()
-                optimizer.log_manager.log(
-                    f"函数 {func.__name__} 执行完成 - 耗时: {metrics.execution_time:.3f}s, "
-                    f"内存: {metrics.memory_usage:.1f}%, CPU: {metrics.cpu_usage:.1f}%",
-                    LogLevel.INFO
-                )
-        return wrapper
+        import logging
+        from functools import wraps
+
+        # 弃用警告
+        logging.warning(f"core.performance_optimizer.performance_monitor 装饰器已弃用，请使用 core.unified_performance_manager.performance_monitor")
+
+        # 重定向到统一性能管理器
+        try:
+            from core.unified_performance_manager import performance_monitor as unified_monitor
+            return unified_monitor(func.__name__)(func)
+        except ImportError:
+            # 如果统一性能管理器不可用，使用原有实现作为备用
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                optimizer.start_monitoring()
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    metrics = optimizer.stop_monitoring()
+                    optimizer.log_manager.log(
+                        f"函数 {func.__name__} 执行完成 - 耗时: {metrics.execution_time:.3f}s, "
+                        f"内存: {metrics.memory_usage:.1f}%, CPU: {metrics.cpu_usage:.1f}%",
+                        LogLevel.INFO
+                    )
+            return wrapper
     return decorator
 
 

@@ -1,4 +1,5 @@
 from utils.performance_monitor import monitor_performance
+from core.unified_performance_manager import performance_monitor
 
 
 @monitor_performance(name="get_buy_num", threshold_ms=500)

@@ -1,3 +1,5 @@
+from utils.manager_factory import get_log_manager as _get_log_manager
+
 """
 数据预处理工具模块
 统一处理K线数据的预处理逻辑，避免重复代码
@@ -253,39 +255,6 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
 
     log_manager.debug(f"[{context}] 数据验证通过")
     return True
-
-
-def standardize_stock_code(code: str) -> str:
-    """
-    标准化股票代码格式
-
-    Args:
-        code: 原始股票代码
-
-    Returns:
-        str: 标准化后的股票代码
-    """
-    if not code or not isinstance(code, str):
-        return ''
-
-    code = code.strip().upper()
-
-    # 如果已经有市场前缀，直接返回
-    if code.startswith(('SH', 'SZ', 'BJ', 'HK', 'US')):
-        return code.lower()
-
-    # 根据代码规则添加市场前缀
-    if code.startswith('6'):
-        return f'sh{code}'
-    elif code.startswith(('0', '3')):
-        return f'sz{code}'
-    elif code.startswith('8') or code.startswith('43'):
-        return f'bj{code}'
-    elif code.startswith('9'):
-        return f'hk{code}'
-    else:
-        # 默认深圳市场
-        return f'sz{code}'
 
 
 def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:

@@ -1,6 +1,8 @@
 from utils.imports import np, pd
 from hikyuu import *
 
+from utils.manager_factory import get_log_manager as _get_log_manager
+
 # 全局日志管理器
 _log_manager = None
 

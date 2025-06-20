@@ -318,7 +318,7 @@ class KDJStrategy(BaseStrategy):
         self.add_parameter("d_period", 3, int, "D值平滑周期", 1, 10)
         self.add_parameter("oversold", 20, float, "超卖阈值", 10, 30)
         self.add_parameter("overbought", 80, float, "超买阈值", 70, 90)
-        self.add_parameter("min_confidence", 0.6, float, "最小置信度", 0.0, 1.0)
+        self.add_parameter("min_confidence", 0.3, float, "最小置信度", 0.0, 1.0)  # 降低置信度要求
 
     def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
         """生成KDJ信号"""
@@ -339,7 +339,11 @@ class KDJStrategy(BaseStrategy):
         low_min = data['low'].rolling(window=period).min()
         high_max = data['high'].rolling(window=period).max()
 
-        data['rsv'] = (data['close'] - low_min) / (high_max - low_min) * 100
+        # 避免除零错误
+        range_val = high_max - low_min
+        range_val = range_val.replace(0, 0.0001)
+
+        data['rsv'] = (data['close'] - low_min) / range_val * 100
         data['k'] = data['rsv'].ewm(alpha=1/k_period).mean()
         data['d'] = data['k'].ewm(alpha=1/d_period).mean()
         data['j'] = 3 * data['k'] - 2 * data['d']
@@ -347,38 +351,97 @@ class KDJStrategy(BaseStrategy):
         for i in range(period + k_period + d_period, len(data)):
             k_val = data.iloc[i]['k']
             d_val = data.iloc[i]['d']
+            j_val = data.iloc[i]['j']
             prev_k = data.iloc[i-1]['k']
             prev_d = data.iloc[i-1]['d']
 
-            # 金叉且在超卖区
-            if prev_k <= prev_d and k_val > d_val and k_val < oversold + 10:
-                confidence = self.calculate_confidence(data, i)
-                if confidence >= min_confidence:
+            # 跳过无效数据
+            if pd.isna(k_val) or pd.isna(d_val) or pd.isna(prev_k) or pd.isna(prev_d):
+                continue
+
+            confidence = self.calculate_confidence(data, i)
+            if confidence < min_confidence:
+                continue
+
+            # 信号1：KDJ金叉买入（放宽条件）
+            if prev_k <= prev_d and k_val > d_val:
+                # 增强条件：在超卖区或接近超卖区
+                if k_val < oversold + 20:  # 放宽超卖区域
                     signals.append(StrategySignal(
                         timestamp=data.index[i],
                         signal_type=SignalType.BUY,
                         price=data.iloc[i]['close'],
                         confidence=confidence,
                         strategy_name=self.name,
-                        reason="KDJ金叉且处于超卖区",
+                        reason=f"KDJ金叉买入(K:{k_val:.1f},D:{d_val:.1f})",
                         stop_loss=data.iloc[i]['close'] * 0.95,
                         take_profit=data.iloc[i]['close'] * 1.1
                     ))
 
-            # 死叉且在超买区
-            elif prev_k >= prev_d and k_val < d_val and k_val > overbought - 10:
-                confidence = self.calculate_confidence(data, i)
-                if confidence >= min_confidence:
+            # 信号2：KDJ死叉卖出（放宽条件）
+            elif prev_k >= prev_d and k_val < d_val:
+                # 增强条件：在超买区或接近超买区
+                if k_val > overbought - 20:  # 放宽超买区域
                     signals.append(StrategySignal(
                         timestamp=data.index[i],
                         signal_type=SignalType.SELL,
                         price=data.iloc[i]['close'],
                         confidence=confidence,
                         strategy_name=self.name,
-                        reason="KDJ死叉且处于超买区",
+                        reason=f"KDJ死叉卖出(K:{k_val:.1f},D:{d_val:.1f})",
                         stop_loss=data.iloc[i]['close'] * 1.05,
                         take_profit=data.iloc[i]['close'] * 0.9
                     ))
+
+            # 信号3：超卖区买入
+            elif k_val < oversold and d_val < oversold and k_val > prev_k:
+                signals.append(StrategySignal(
+                    timestamp=data.index[i],
+                    signal_type=SignalType.BUY,
+                    price=data.iloc[i]['close'],
+                    confidence=confidence * 0.8,  # 稍低置信度
+                    strategy_name=self.name,
+                    reason=f"KDJ超卖区反弹(K:{k_val:.1f},D:{d_val:.1f})",
+                    stop_loss=data.iloc[i]['close'] * 0.97,
+                    take_profit=data.iloc[i]['close'] * 1.05
+                ))
+
+            # 信号4：超买区卖出
+            elif k_val > overbought and d_val > overbought and k_val < prev_k:
+                signals.append(StrategySignal(
+                    timestamp=data.index[i],
+                    signal_type=SignalType.SELL,
+                    price=data.iloc[i]['close'],
+                    confidence=confidence * 0.8,  # 稍低置信度
+                    strategy_name=self.name,
+                    reason=f"KDJ超买区回调(K:{k_val:.1f},D:{d_val:.1f})",
+                    stop_loss=data.iloc[i]['close'] * 1.03,
+                    take_profit=data.iloc[i]['close'] * 0.95
+                ))
+
+            # 信号5：J值极值信号
+            elif j_val < 0 and j_val > data.iloc[i-1]['j']:  # J值从负值反弹
+                signals.append(StrategySignal(
+                    timestamp=data.index[i],
+                    signal_type=SignalType.BUY,
+                    price=data.iloc[i]['close'],
+                    confidence=confidence * 0.7,
+                    strategy_name=self.name,
+                    reason=f"J值极值反弹(J:{j_val:.1f})",
+                    stop_loss=data.iloc[i]['close'] * 0.98,
+                    take_profit=data.iloc[i]['close'] * 1.03
+                ))
+            elif j_val > 100 and j_val < data.iloc[i-1]['j']:  # J值从高位回落
+                signals.append(StrategySignal(
+                    timestamp=data.index[i],
+                    signal_type=SignalType.SELL,
+                    price=data.iloc[i]['close'],
+                    confidence=confidence * 0.7,
+                    strategy_name=self.name,
+                    reason=f"J值极值回落(J:{j_val:.1f})",
+                    stop_loss=data.iloc[i]['close'] * 1.02,
+                    take_profit=data.iloc[i]['close'] * 0.97
+                ))
 
         return signals
 

@@ -12,6 +12,7 @@ from utils.theme import get_theme_manager
 from core.trading_system import trading_system
 from utils.config_manager import ConfigManager
 from utils.log_util import log_structured
+from gui.panels import BaseAnalysisPanel
 
 
 class AnalysisStep:
@@ -587,52 +588,33 @@ class TradingWidget(QWidget):
                 print(f"清除数据失败: {str(e)}")
 
     def _run_analysis_async(self, button, analysis_func, *args, progress_callback=None, **kwargs):
-        original_text = button.text()
-        button.setText("取消")
-        button._interrupted = False
-
-        def on_cancel():
-            button._interrupted = True
-            button.setText(original_text)
-            button.setEnabled(True)
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
+        """统一的异步分析方法 - 使用AsyncAnalysisManager避免重复连接"""
         try:
-            button.clicked.disconnect()
-        except Exception:
-            pass
-        button.clicked.connect(on_cancel)
+            # 导入异步分析管理器
+            from utils.async_analysis import get_async_analysis_manager
 
-        def task():
-            try:
-                if not getattr(button, '_interrupted', False):
-                    result = analysis_func(*args, progress_callback=progress_callback, **kwargs)
-                    return result
-            except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    log_structured(self.log_manager, f"分析异常: {str(e)}", level="error")
-                return None
-            finally:
-                QTimer.singleShot(0, lambda: on_done(None))
+            # 获取或创建异步分析管理器
+            if not hasattr(self, '_async_manager'):
+                self._async_manager = get_async_analysis_manager(self.log_manager)
 
-        def on_done(future):
-            button.setText(original_text)
+            # 使用统一的异步分析方法
+            self._async_manager.run_analysis_async(
+                button, analysis_func, *args,
+                progress_callback=progress_callback, **kwargs
+            )
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                log_structured(self.log_manager, f"异步分析启动失败: {str(e)}", level="error")
+            else:
+                print(f"异步分析启动失败: {str(e)}")
+
+            # 恢复按钮状态
             button.setEnabled(True)
-            try:
-                button.clicked.disconnect()
-            except Exception:
-                pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
-        if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
-        future = self._thread_pool.submit(task)
-        # 支持进度回调
-        if progress_callback:
-            progress_callback(0, 1)  # 单任务时直接回调100%
+            if hasattr(button, '_original_text'):
+                button.setText(button._original_text)
+            else:
+                button.setText("开始分析")
 
     def calculate_signals(self):
         self._run_analysis_async(self.signal_btn, self._calculate_signals_impl)
@@ -747,18 +729,19 @@ class TradingWidget(QWidget):
             # 使用统一回测引擎
             from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
 
-            # 获取股票数据并生成信号
-            from main import TradingGUI
+            # 获取股票数据并生成信号 - 修复循环导入问题
+            # 不再直接导入main模块，而是通过类型检查和属性检查来确定主窗口
             main_window = None
             for w in QApplication.topLevelWidgets():
-                if isinstance(w, TradingGUI):
+                # 通过类名检查而不是isinstance，避免循环导入
+                if w.__class__.__name__ == 'TradingGUI' and hasattr(w, 'get_kdata'):
                     main_window = w
                     break
 
             if main_window and hasattr(main_window, 'get_kdata'):
                 kdata = main_window.get_kdata(self.current_stock.strip())
                 if kdata is None or kdata.empty:
-                    raise ValueError("无法获取股票数据")
+                    raise ValueError("回测无法获取股票数据")
 
                 # 生成交易信号（简化版）
                 signal_data = kdata.copy()
@@ -929,10 +912,11 @@ class TradingWidget(QWidget):
                 self._kdata_cache = {}
             data = self._kdata_cache.get(cache_key)
             if data is None or data.empty:
-                # 优先尝试主窗口的get_kdata
+                # 优先尝试主窗口的get_kdata - 修复循环导入问题
                 main_window = None
                 for w in QApplication.topLevelWidgets():
-                    if isinstance(w, TradingGUI):
+                    # 通过类名检查而不是isinstance，避免循环导入
+                    if w.__class__.__name__ == 'TradingGUI' and hasattr(w, 'get_kdata'):
                         main_window = w
                         break
                 if main_window and hasattr(main_window, 'get_kdata'):
@@ -1227,7 +1211,6 @@ class TradingWidget(QWidget):
             name: 指标名称
             func: 计算函数
         """
-        from gui.ui_components import BaseAnalysisPanel
         BaseAnalysisPanel.register_custom_indicator(name, func)
 
     def update_results(self, results: dict):

@@ -1,2 +1,15 @@
 # Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
 *.log*
+*.pyc*
+*.pyo*
+*.pyd*
+*.pyw*
+*.pyz*
+*.pywz*
+*.pyzw*
+.vscode*
+.git*
+.idea*
+.pytest_cache*
+.cache*
+.DS_Store*

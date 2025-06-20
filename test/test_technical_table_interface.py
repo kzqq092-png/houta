@@ -5,7 +5,7 @@
 验证ta-lib指标的动态获取和表格展示功能
 """
 
-from indicators_algo import (
+from core.indicators_algo import (
     get_all_indicators_by_category, get_indicator_english_name,
     get_indicator_params_config, calc_talib_indicator, get_talib_indicator_list
 )

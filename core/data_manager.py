@@ -433,19 +433,10 @@ class DataManager:
         self.log_manager.info(
             f"[DataManager.get_k_data] 开始: code={code}, freq={freq}, start_date={start_date}, end_date={end_date}")
         try:
-            # 检查股票代码格式
-            if not code or not isinstance(code, str):
-                self.log_manager.error("股票代码不能为空且必须为字符串")
-                return pd.DataFrame()
 
-            # 标准化股票代码格式
-            if not code.startswith(('sh', 'sz', 'bj')):
-                if code.startswith('6'):
-                    code = f'sh{code}'
-                elif code.startswith(('0', '3')):
-                    code = f'sz{code}'
-                elif code.startswith('8'):
-                    code = f'bj{code}'
+            # 验证代码格式是否正确
+            if len(code) < 8:  # 最少应该是 sh000001 格式
+                self.log_manager.warning(f"股票代码格式可能不正确: {code}")
 
             # 生成缓存键
             cache_key = f"kdata_{code}_{freq}_{start_date}_{end_date}_{str(query)}"
@@ -1552,6 +1543,58 @@ class DataManager:
         cursor.execute(
             '''DELETE FROM indicator_combination WHERE id=?''', (comb_id,))
         self.conn.commit()
+
+    def get_kdata(self, code: str, period: str = 'D', **kwargs) -> Optional[pd.DataFrame]:
+        """
+        获取K线数据，使用统一性能管理器优化缓存和性能监控
+        """
+        from core.unified_performance_manager import get_performance_manager, performance_monitor, cached_operation
+
+        # 使用性能监控装饰器
+        @performance_monitor("get_kdata")
+        @cached_operation(lambda c, p, **kw: f"kdata_{c}_{p}", ttl=1800)  # 30分钟缓存
+        def _get_kdata_impl(code: str, period: str) -> Optional[pd.DataFrame]:
+            try:
+
+                # 直接从hikyuu获取数据
+                stock = hku.get_stock(code)
+                if stock.is_null():
+                    raise ValueError(f"无法找到股票代码: {code}")
+
+                # 获取K线数据
+                kdata = stock.get_kdata(hku.Query(-2000))  # 获取最近2000条数据
+                if kdata is None or len(kdata) == 0:
+                    raise ValueError(f"股票 {code} 没有K线数据")
+
+                # 转换为DataFrame
+                data = []
+                for i in range(len(kdata)):
+                    k = kdata[i]
+                    data.append({
+                        'datetime': k.datetime.python_datetime(),
+                        'open': k.open_price,
+                        'high': k.high_price,
+                        'low': k.low_price,
+                        'close': k.close_price,
+                        'volume': k.volume,
+                        'amount': k.amount
+                    })
+
+                df = pd.DataFrame(data)
+                if df.empty:
+                    raise ValueError(f"转换后的数据为空: {code}")
+
+                # 设置索引和添加代码列
+                df.set_index('datetime', inplace=True)
+                df['code'] = code
+
+                return df
+
+            except Exception as e:
+                self.log_manager.error(f"获取K线数据失败 [{code}]: {str(e)}")
+                return None
+
+        return _get_kdata_impl(code, period)
 
 
 # 全局唯一数据管理器实例，供全系统import使用

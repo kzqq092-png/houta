@@ -4,7 +4,7 @@
 测试各个模块的_kdata_preprocess函数是否能正确处理datetime字段
 """
 
-from utils.data_preprocessing import kdata_preprocess, validate_kdata, standardize_stock_code
+from utils.data_preprocessing import kdata_preprocess, validate_kdata
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -136,27 +136,6 @@ def test_data_validation():
     print(f"无效数据验证结果: {'❌ 正确识别为无效' if not is_invalid else '✅ 错误通过'}")
 
 
-def test_stock_code_standardization():
-    """测试股票代码标准化功能"""
-    print("\n=== 测试股票代码标准化 ===")
-
-    test_codes = [
-        '000001',    # 深圳股票
-        '600000',    # 上海股票
-        '300001',    # 创业板
-        '688001',    # 科创板
-        'sh600000',  # 已有前缀
-        'sz000001',  # 已有前缀
-        '830001',    # 北交所
-        '',          # 空代码
-        None         # None值
-    ]
-
-    for code in test_codes:
-        standardized = standardize_stock_code(code)
-        print(f"   {code} -> {standardized}")
-
-
 def test_backward_compatibility():
     """测试向后兼容性"""
     print("\n=== 测试向后兼容性 ===")
@@ -180,7 +159,6 @@ def main():
     try:
         test_unified_preprocessing()
         test_data_validation()
-        test_stock_code_standardization()
         test_backward_compatibility()
 
         print("\n=== 测试总结 ===")

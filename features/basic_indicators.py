@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
-from indicators_algo import calc_ma
+from core.indicators_algo import calc_ma
 
 
 def add_basic_indicators(df):
@@ -201,21 +201,21 @@ def calculate_base_indicators(df):
 
     # 添加ATR指标
     if isinstance(df['close'], pd.Series):
-        from indicators_algo import calc_atr
+        from core.indicators_algo import calc_atr
         df['atr'] = calc_atr(df, 14)
     else:
         from hikyuu.indicator import ATR
         df['atr'] = ATR(df, n=14)
     # 添加OBV指标
     if isinstance(df['close'], pd.Series):
-        from indicators_algo import calc_obv
+        from core.indicators_algo import calc_obv
         df['obv'] = calc_obv(df)
     else:
         from hikyuu.indicator import OBV
         df['obv'] = OBV(df)
     # 添加CCI指标
     if isinstance(df['close'], pd.Series):
-        from indicators_algo import calc_cci
+        from core.indicators_algo import calc_cci
         df['cci'] = calc_cci(df, 14)
     else:
         from hikyuu.indicator import CCI

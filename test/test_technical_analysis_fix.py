@@ -29,7 +29,7 @@ def test_talib_chinese_mapping():
     print("=" * 60)
 
     try:
-        from indicators_algo import (
+        from core.indicators_algo import (
             get_talib_indicator_list,
             get_talib_chinese_name,
             get_indicator_english_name,
@@ -239,7 +239,7 @@ def test_ui_backend_integration():
 
     try:
         # 测试指标名称转换
-        from indicators_algo import get_indicator_english_name, get_talib_chinese_name
+        from core.indicators_algo import get_indicator_english_name, get_talib_chinese_name
 
         test_cases = [
             ('移动平均线', 'MA'),
@@ -307,7 +307,7 @@ def test_system_call_analysis():
 
     try:
         import time
-        from indicators_algo import get_talib_indicator_list, get_all_indicators_by_category
+        from core.indicators_algo import get_talib_indicator_list, get_all_indicators_by_category
 
         # 分析指标获取调用量
         start_time = time.time()
@@ -342,7 +342,7 @@ def test_system_call_analysis():
             print(f"⚠️ 数据获取性能测试失败: {e}")
 
         # 分析指标计算调用量
-        from indicators_algo import calc_ma, calc_macd, calc_rsi
+        from core.indicators_algo import calc_ma, calc_macd, calc_rsi
 
         # 创建测试数据
         test_data = pd.Series(range(100, 200))

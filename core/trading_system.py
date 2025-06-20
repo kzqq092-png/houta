@@ -9,6 +9,7 @@ from core.data_manager import data_manager
 from core.logger import LogManager, LogLevel
 from hikyuu import KData, KRecord
 from utils.performance_monitor import monitor_performance
+from core.unified_performance_manager import performance_monitor
 
 
 class TradingSystem:

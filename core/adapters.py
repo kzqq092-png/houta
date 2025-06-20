@@ -8,10 +8,10 @@
 import logging
 from typing import Dict, Any, Optional
 from .logger import LogManager
-from .config import ConfigManager
+from analysis.pattern_recognition import get_performance_monitor
+from utils.config_manager import ConfigManager as UtilsConfigManager
 from .data_validator import ProfessionalDataValidator, ValidationLevel
-from .performance_monitor import get_performance_monitor
-from utils import ConfigManager as UtilsConfigManager
+from .unified_performance_manager import get_performance_manager
 
 # 全局实例
 _log_manager = None
@@ -163,5 +163,6 @@ __all__ = [
     'get_logger',
     'get_config',
     'get_data_validator',
-    'get_performance_monitor'
+    'get_performance_monitor',
+    'get_performance_manager'
 ]

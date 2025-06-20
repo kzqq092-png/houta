@@ -62,11 +62,11 @@ class UIOptimizer(QObject):
 
             if callback:
                 # 使用QTimer调度回调
-                QTimer.singleShot(delay, callback)
+                QTimer.singleShot(delay, lambda: callback() if callable(callback) else None)
                 self.logger.debug(f"调度UI回调，延迟: {delay}ms")
             else:
                 # 调度基本UI更新
-                QTimer.singleShot(delay, self._perform_safe_ui_update)
+                QTimer.singleShot(delay, lambda: self._perform_safe_ui_update() if hasattr(self, '_perform_safe_ui_update') else None)
                 self.logger.debug(f"调度UI更新，延迟: {delay}ms")
 
             self._last_update_time = current_time
@@ -86,7 +86,7 @@ class UIOptimizer(QObject):
     def _handle_delayed_action(self, callback: Callable, delay: int):
         """处理延迟动作"""
         try:
-            QTimer.singleShot(delay, callback)
+            QTimer.singleShot(delay, lambda: callback() if callable(callback) else None)
             self.logger.debug(f"处理延迟动作，延迟: {delay}ms")
         except Exception as e:
             self.logger.error(f"处理延迟动作失败: {e}")
@@ -132,7 +132,7 @@ class UIOptimizer(QObject):
             else:
                 # 如果调用太频繁，使用QTimer延迟执行
                 remaining_delay = delay - (current_time - last_call_time[0])
-                QTimer.singleShot(int(remaining_delay), lambda: func(*args, **kwargs))
+                QTimer.singleShot(int(remaining_delay), lambda: func(*args, **kwargs) if callable(func) else None)
 
         return throttled_func
 

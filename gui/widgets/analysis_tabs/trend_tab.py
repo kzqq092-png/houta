@@ -454,7 +454,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 results['alerts'] = alerts
 
             # 6. 更新显示
-            QTimer.singleShot(100, lambda: self._update_results_display(results))
+            QTimer.singleShot(100, lambda: self._update_results_display(results) if hasattr(
+                self, '_update_results_display') and callable(self._update_results_display) else None)
 
             return results
 

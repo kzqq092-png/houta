@@ -6,7 +6,7 @@ This module contains the menu bar implementation for the trading system.
 
 from PyQt5.QtWidgets import (
     QMenuBar, QMenu, QAction, QFileDialog, QMessageBox,
-    QInputDialog, QShortcut, QDialog
+    QInputDialog, QShortcut, QDialog, QActionGroup
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
@@ -199,6 +199,52 @@ class MainMenuBar(QMenuBar):
             self.batch_analysis_action = QAction(QIcon("icons/batch.png"), "批量/分布式分析", self)
             self.batch_analysis_action.setStatusTip("批量/分布式回测与分析")
             self.analysis_menu.addAction(self.batch_analysis_action)
+
+            # 节点管理器
+            self.node_manager_action = QAction(QIcon("icons/node.png"), "节点管理器", self)
+            self.node_manager_action.setStatusTip("管理分布式计算节点")
+            self.analysis_menu.addAction(self.node_manager_action)
+
+            # 云API管理器
+            self.cloud_api_action = QAction(QIcon("icons/cloud.png"), "云API管理器", self)
+            self.cloud_api_action.setStatusTip("管理云端API接口")
+            self.analysis_menu.addAction(self.cloud_api_action)
+
+            # 指标市场
+            self.indicator_market_action = QAction(QIcon("icons/market.png"), "指标市场", self)
+            self.indicator_market_action.setStatusTip("浏览和下载技术指标")
+            self.analysis_menu.addAction(self.indicator_market_action)
+
+            self.analysis_menu.addSeparator()
+
+            # 优化相关菜单
+            optimization_menu = self.analysis_menu.addMenu("优化系统")
+
+            self.optimization_dashboard_action = QAction(QIcon("icons/dashboard.png"), "优化仪表板", self)
+            self.optimization_dashboard_action.setStatusTip("显示优化仪表板")
+            optimization_menu.addAction(self.optimization_dashboard_action)
+
+            self.one_click_optimize_action = QAction(QIcon("icons/one_click.png"), "一键优化", self)
+            self.one_click_optimize_action.setStatusTip("执行一键优化")
+            optimization_menu.addAction(self.one_click_optimize_action)
+
+            self.smart_optimize_action = QAction(QIcon("icons/smart.png"), "智能优化", self)
+            self.smart_optimize_action.setStatusTip("执行智能优化")
+            optimization_menu.addAction(self.smart_optimize_action)
+
+            self.optimization_status_action = QAction(QIcon("icons/status.png"), "优化状态", self)
+            self.optimization_status_action.setStatusTip("查看优化状态")
+            optimization_menu.addAction(self.optimization_status_action)
+
+            # 版本管理和性能评估
+            self.version_manager_action = QAction(QIcon("icons/version.png"), "版本管理", self)
+            self.version_manager_action.setStatusTip("管理策略版本")
+            self.analysis_menu.addAction(self.version_manager_action)
+
+            self.performance_evaluation_action = QAction(QIcon("icons/performance.png"), "性能评估", self)
+            self.performance_evaluation_action.setStatusTip("评估策略性能")
+            self.analysis_menu.addAction(self.performance_evaluation_action)
+
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化分析菜单失败: {str(e)}")
@@ -279,69 +325,57 @@ class MainMenuBar(QMenuBar):
         """初始化工具菜单"""
         try:
             # 计算器
-            self.calculator_action = QAction("计算器", self)
+            self.calculator_action = QAction(QIcon("icons/calculator.png"), "计算器", self)
             self.calculator_action.setStatusTip("打开计算器")
             self.tools_menu.addAction(self.calculator_action)
 
             # 单位转换器
-            self.converter_action = QAction("单位转换器", self)
+            self.converter_action = QAction(QIcon("icons/converter.png"), "单位转换器", self)
             self.converter_action.setStatusTip("打开单位转换器")
             self.tools_menu.addAction(self.converter_action)
 
             self.tools_menu.addSeparator()
 
-            # 设置
-            self.settings_action = QAction("设置", self)
-            self.settings_action.setShortcut("Ctrl+,")
-            self.settings_action.setStatusTip("打开设置")
-            self.tools_menu.addAction(self.settings_action)
-
-            # 分布式/云API/指标市场/批量分析
-            self.node_manager_action = QAction("分布式节点管理", self)
-            self.cloud_api_action = QAction("云API管理", self)
-            self.indicator_market_action = QAction("指标市场", self)
-            self.batch_analysis_action = QAction("批量分析", self)
-            self.tools_menu.addAction(self.node_manager_action)
-            self.tools_menu.addAction(self.cloud_api_action)
-            self.tools_menu.addAction(self.indicator_market_action)
-            self.tools_menu.addAction(self.batch_analysis_action)
+            # 插件管理器
+            self.plugin_manager_action = QAction(QIcon("icons/plugin.png"), "插件管理器", self)
+            self.plugin_manager_action.setStatusTip("管理系统插件")
+            self.tools_menu.addAction(self.plugin_manager_action)
 
             self.tools_menu.addSeparator()
 
-            # 形态识别算法优化系统
-            self.optimization_menu = self.tools_menu.addMenu("形态识别优化")
+            # 语言设置
+            self.language_menu = self.tools_menu.addMenu("语言设置")
+            self.language_menu.setIcon(QIcon("icons/language.png"))
 
-            # 优化仪表板
-            self.optimization_dashboard_action = QAction("优化仪表板", self)
-            self.optimization_dashboard_action.setStatusTip("打开形态识别算法优化仪表板")
-            self.optimization_menu.addAction(self.optimization_dashboard_action)
+            # 创建语言动作组，确保互斥选择
+            self.language_group = QActionGroup(self)
+            self.language_group.setExclusive(True)
 
-            # 一键优化
-            self.one_click_optimize_action = QAction("一键优化所有形态", self)
-            self.one_click_optimize_action.setStatusTip("自动优化所有形态识别算法")
-            self.optimization_menu.addAction(self.one_click_optimize_action)
+            # 添加支持的语言选项
+            self.language_actions = {}
+            languages = {
+                "zh_CN": "简体中文",
+                "en_US": "English",
+                "zh_TW": "繁體中文",
+                "ja_JP": "日本語"
+            }
 
-            # 智能优化
-            self.smart_optimize_action = QAction("智能优化", self)
-            self.smart_optimize_action.setStatusTip("智能识别需要优化的形态并自动优化")
-            self.optimization_menu.addAction(self.smart_optimize_action)
+            for lang_code, lang_name in languages.items():
+                action = QAction(lang_name, self)
+                action.setCheckable(True)
+                action.setData(lang_code)
 
-            self.optimization_menu.addSeparator()
+                # 添加到动作组
+                self.language_group.addAction(action)
+                self.language_menu.addAction(action)
+                self.language_actions[lang_code] = action
 
-            # 版本管理
-            self.version_manager_action = QAction("版本管理", self)
-            self.version_manager_action.setStatusTip("管理形态识别算法版本")
-            self.optimization_menu.addAction(self.version_manager_action)
+            self.tools_menu.addSeparator()
 
-            # 性能评估
-            self.performance_evaluation_action = QAction("性能评估", self)
-            self.performance_evaluation_action.setStatusTip("评估形态识别算法性能")
-            self.optimization_menu.addAction(self.performance_evaluation_action)
-
-            # 系统状态
-            self.optimization_status_action = QAction("系统状态", self)
-            self.optimization_status_action.setStatusTip("查看优化系统状态")
-            self.optimization_menu.addAction(self.optimization_status_action)
+            # 设置
+            self.settings_action = QAction(QIcon("icons/settings.png"), "设置", self)
+            self.settings_action.setStatusTip("打开系统设置")
+            self.tools_menu.addAction(self.settings_action)
 
         except Exception as e:
             if self.log_manager:
@@ -559,14 +593,24 @@ class MainMenuBar(QMenuBar):
             self.parent().show_settings()
 
     def show_calculator(self):
-        """Show calculator"""
-        # TODO: Implement calculator
-        pass
+        """Show calculator using the new Calculator tool"""
+        try:
+            from .tools import Calculator
+            Calculator.show_calculator(self)
+            self.log_message("打开计算器")
+        except Exception as e:
+            error_msg = f"显示计算器失败: {str(e)}"
+            self.log_message(error_msg, "error")
 
     def show_converter(self):
-        """Show unit converter"""
-        # TODO: Implement unit converter
-        pass
+        """Show unit converter using the new UnitConverter tool"""
+        try:
+            from .tools import UnitConverter
+            UnitConverter.show_converter(self)
+            self.log_message("打开单位转换器")
+        except Exception as e:
+            error_msg = f"显示单位转换器失败: {str(e)}"
+            self.log_message(error_msg, "error")
 
     def show_documentation(self):
         """Show documentation"""
@@ -581,6 +625,8 @@ class MainMenuBar(QMenuBar):
         menu_selected = colors.get('highlight', '#1976d2')
         menu_hover = colors.get('hover_bg', '#23293a')
         menu_border = colors.get('border', '#23293a')
+
+        # 优化菜单栏样式，解决重叠问题
         self.setStyleSheet(f'''
             QMenuBar {{
                 background: {menu_bg};
@@ -588,32 +634,66 @@ class MainMenuBar(QMenuBar):
                 border-bottom: 1px solid {menu_border};
                 font-weight: bold;
                 font-size: 12px;
+                spacing: 8px;  /* 增加菜单项间距 */
+                padding: 4px 8px;  /* 增加内边距 */
+                margin: 0px;
+                height: 32px;  /* 稍微增加高度 */
+                min-height: 32px;  /* 确保最小高度 */
             }}
             QMenuBar::item {{
                 background: transparent;
                 color: {menu_text};
-                padding: 6px 18px;
-                border-radius: 6px 6px 0 0;
+                padding: 6px 16px;  /* 增加内边距避免重叠 */
+                margin: 2px 4px;    /* 增加外边距分隔菜单项 */
+                border-radius: 4px;
+                min-width: 80px;    /* 增加最小宽度 */
+                max-width: 120px;   /* 限制最大宽度 */
+                text-align: center;
+                border: 1px solid transparent;  /* 添加透明边框 */
             }}
             QMenuBar::item:selected {{
                 background: {menu_selected};
-                color: #ffd600;
+                color: white;
+                border: 1px solid {menu_selected};
             }}
             QMenuBar::item:pressed {{
                 background: {menu_selected};
-                color: #ffd600;
+                color: white;
+                border: 1px solid {menu_selected};
+            }}
+            QMenuBar::item:hover {{
+                background: {menu_hover};
+                color: white;
+                border: 1px solid {menu_hover};
             }}
             QMenu {{
                 background: {menu_bg};
                 color: {menu_text};
                 border: 1px solid {menu_border};
-                font-size: 13px;
+                font-size: 12px;
+                padding: 4px;  /* 增加内边距 */
+                margin: 1px;
+                border-radius: 4px;  /* 添加圆角 */
+            }}
+            QMenu::item {{
+                background: transparent;
+                color: {menu_text};
+                padding: 8px 24px;  /* 增加内边距 */
+                margin: 1px 2px;    /* 增加外边距 */
+                border-radius: 3px;
+                min-height: 20px;   /* 确保最小高度 */
             }}
             QMenu::item:selected {{
                 background: {menu_selected};
-                color: #ffd600;
+                color: white;
             }}
             QMenu::item:disabled {{
                 color: #888;
+                background: transparent;
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: {menu_border};
+                margin: 6px 4px;  /* 增加分隔符边距 */
             }}
         ''')

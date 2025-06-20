@@ -474,7 +474,8 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
     def launch_both_ui(self):
         """同时启动两个界面"""
         self.launch_web_ui()
-        QTimer.singleShot(2000, self.launch_desktop_ui)  # 延迟2秒启动桌面界面
+        QTimer.singleShot(2000, lambda: self.launch_desktop_ui() if hasattr(self, 'launch_desktop_ui')
+                          and callable(self.launch_desktop_ui) else None)  # 延迟2秒启动桌面界面
 
     def on_web_ui_started(self):
         """Web界面启动成功"""

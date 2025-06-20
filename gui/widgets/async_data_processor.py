@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
-from indicators_algo import *
+from core.indicators_algo import *
+import logging
 
 
 class AsyncDataProcessor(QObject):

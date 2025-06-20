@@ -3,7 +3,7 @@ import pandas as pd
 from hikyuu import *
 from hikyuu.trade_sys import SignalBase
 from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
 
 
 class EnhancedSignal(SignalBase):
@@ -131,7 +131,7 @@ class EnhancedSignal(SignalBase):
                 ma_slow = indicators.get('EMA', calc_ma(close_data, n_slow))
                 macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
                 if macd is None:
-                    from indicators_algo import calc_macd
+                    from core.indicators_algo import calc_macd
                     macd, _, _ = calc_macd(close_data)
                 rsi = indicators.get('RSI', None) or calc_rsi(close_data, self.get_param("rsi_window"))
                 volume_data = k['volume'] if 'volume' in k else None

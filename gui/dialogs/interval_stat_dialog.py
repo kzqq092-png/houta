@@ -348,7 +348,10 @@ class IntervalStatDialog(QDialog):
             ax.set_title('区间K线走势')
             ax.set_xlabel('序号')
             ax.set_ylabel('价格')
-            ax.legend()
+            # 检查是否有带标签的对象才创建图例
+            handles, labels = ax.get_legend_handles_labels()
+            if handles and labels:
+                ax.legend()
             # 顶部显示收盘价最大/最小/均值
             close_max = df['close'].max()
             close_min = df['close'].min()

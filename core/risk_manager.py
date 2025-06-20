@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from core.logger import Logger
 from core.logger import LogManager, LogLevel
 from utils.performance_monitor import monitor_performance
+from core.unified_performance_manager import performance_monitor
 
 
 class RiskManager:

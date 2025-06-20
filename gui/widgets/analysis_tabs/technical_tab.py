@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QKeySequence, QFont
 from .base_tab import BaseAnalysisTab
-from indicators_algo import (
+from core.indicators_algo import (
     get_talib_indicator_list, get_all_indicators_by_category,
     calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci,
     get_talib_chinese_name, get_indicator_english_name, get_indicator_params_config,
@@ -1006,7 +1006,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     return None
 
             # 调用ta-lib计算指标 - 直接传递DataFrame
-            from indicators_algo import calc_talib_indicator
+            from core.indicators_algo import calc_talib_indicator
             result = calc_talib_indicator(english_name, self.current_kdata, **params)
 
             if result is None:

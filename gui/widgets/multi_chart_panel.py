@@ -338,4 +338,4 @@ class MultiChartPanel(QWidget):
             if hasattr(chart, 'resizeEvent'):
                 chart.resizeEvent(QResizeEvent(chart.size(), chart.size()))
         QTimer.singleShot(30, lambda: self._refresh_chart_batch(
-            charts, idx+batch_size, batch_size))
+            charts, idx+batch_size, batch_size) if hasattr(self, '_refresh_chart_batch') else None)

@@ -77,7 +77,7 @@ class MarketEnvironment(EnvironmentBase):
             df = k.to_df()
             # 计算移动平均线
             if isinstance(df['close'], pd.Series):
-                from indicators_algo import calc_ma, calc_macd, calc_rsi
+                from core.indicators_algo import calc_ma, calc_macd, calc_rsi
                 ma_short = calc_ma(df['close'], self.get_param("ma_short"))
                 ma_mid = calc_ma(df['close'], self.get_param("ma_mid"))
                 ma_long = calc_ma(df['close'], self.get_param("ma_long"))
@@ -106,7 +106,7 @@ class MarketEnvironment(EnvironmentBase):
                 volume = VOL(k)
             # --- 类型安全指标计算 ---
             if isinstance(df['close'], pd.Series):
-                from indicators_algo import calc_boll, calc_atr, calc_obv, calc_cci
+                from core.indicators_algo import calc_boll, calc_atr, calc_obv, calc_cci
                 boll = calc_boll(df['close'], self.get_param("boll_period"), self.get_param("boll_width"))
                 atr = calc_atr(df, self.get_param("atr_period"))
                 obv = calc_obv(df)
