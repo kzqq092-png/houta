@@ -21,12 +21,20 @@ from concurrent.futures import *
 import numba
 import json
 from core.logger import LogManager, LogLevel
+
+# 更新：优先使用新的指标服务架构
+try:
+    from core.services import get_indicator_ui_adapter
+    _use_new_architecture = True
+except ImportError:
+    get_indicator_ui_adapter = None
+    _use_new_architecture = False
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
 from hikyuu.indicator import *
 from hikyuu import sm
 from hikyuu import Query
-from core.indicators_algo import get_talib_indicator_list, get_talib_category, calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_all_indicators_by_category, calc_talib_indicator
+# 移除旧的indicators_algo导入，使用统一指标管理器
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
@@ -56,6 +64,9 @@ from analysis.pattern_manager import PatternManager
 
 # 使用统一的管理器工厂
 from utils.manager_factory import get_config_manager, get_log_manager
+
+# 使用新的指标服务架构
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
 
 
 class AnalysisWidget(QWidget):
@@ -92,6 +103,10 @@ class AnalysisWidget(QWidget):
         except Exception as e:
             self.pattern_manager = None
             self.log_manager.error(f"初始化PatternManager失败: {e}")
+
+        # 使用新的指标服务架构
+        self.indicator_adapter = IndicatorUIAdapter()
+        self.log_manager.info("AnalysisWidget: 使用新的指标服务架构")
 
         self.current_kdata = None
         self.analysis_futures = []  # 存储分析任务的future对象
@@ -608,16 +623,28 @@ class AnalysisWidget(QWidget):
 
 # 保持向后兼容性的函数
 def get_indicator_categories():
-    """获取指标分类 - 兼容原接口"""
+    """获取指标分类（全局函数）"""
     try:
-        from core.indicators_algo import get_all_indicators_by_category
-        return get_all_indicators_by_category()
-    except Exception:
+        # 优先使用新的指标服务架构
+        if _use_new_architecture and get_indicator_ui_adapter:
+            adapter = get_indicator_ui_adapter()
+            return adapter.get_indicators_by_category(use_chinese=True)
+        else:
+            # 备用方案：返回默认分类
+            return {
+                "趋势指标": ["MA", "EMA", "SMA"],
+                "动量指标": ["RSI", "MACD", "KDJ"],
+                "波动率指标": ["BOLL", "ATR"],
+                "成交量指标": ["OBV", "VOL"]
+            }
+    except Exception as e:
+        # 最终备用方案
         return {
-            "趋势指标": ["MA", "EMA", "MACD"],
-            "震荡指标": ["RSI", "KDJ", "CCI"],
-            "成交量指标": ["OBV", "VOLUME"],
-            "波动率指标": ["ATR", "BOLL"]
+            "重叠研究": ["SMA", "EMA", "WMA", "BBANDS", "SAR"],
+            "动量指标": ["MACD", "RSI", "STOCH", "WILLR", "CCI"],
+            "成交量": ["OBV", "AD", "ADOSC"],
+            "波动率": ["ATR", "NATR"],
+            "其他": ["DMI", "BIAS", "PSY"]
         }
 
 

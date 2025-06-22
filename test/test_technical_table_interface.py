@@ -6,8 +6,8 @@
 """
 
 from core.indicators_algo import (
-    get_all_indicators_by_category, get_indicator_english_name,
-    get_indicator_params_config, calc_talib_indicator, get_talib_indicator_list
+    get_indicators_by_category, get_indicator_english_name,
+    get_indicator_params_config, calc_talib_indicator, get_indicator_list
 )
 import sys
 import os
@@ -27,7 +27,7 @@ def test_talib_indicators_table():
     print("=" * 60)
 
     # 获取所有指标分类
-    all_indicators = get_all_indicators_by_category(use_chinese=True)
+    all_indicators = get_indicators_by_category(use_chinese=True)
 
     print(f"📊 指标分类统计:")
     total_count = 0
@@ -95,10 +95,10 @@ def test_indicator_calculation():
 
     # 测试几个常用指标
     test_indicators = [
-        ("移动平均线", "SMA", {"timeperiod": 20}),
-        ("相对强弱指标", "RSI", {"timeperiod": 14}),
-        ("MACD指标", "MACD", {"fastperiod": 12, "slowperiod": 26, "signalperiod": 9}),
-        ("布林带", "BBANDS", {"timeperiod": 20, "nbdevup": 2, "nbdevdn": 2}),
+        ("移动平均线", "SMA", {'period': 20}),
+        ("相对强弱指标", "RSI", {'period': 14}),
+        ("MACD指标", "MACD", {'fast_period': 12, 'slow_period': 26, 'signal_period': 9}),
+        ("布林带", "BBANDS", {'period': 20, 'std_dev': 2, 'std_dev': 2}),
     ]
 
     print(f"\n🧮 测试指标计算:")
@@ -144,7 +144,7 @@ def test_table_interface_simulation():
     print("=" * 60)
 
     # 模拟指标选择表格数据
-    all_indicators = get_all_indicators_by_category(use_chinese=True)
+    all_indicators = get_indicators_by_category(use_chinese=True)
 
     # 模拟用户选择的指标
     selected_indicators = [
@@ -217,7 +217,7 @@ def test_search_and_filter():
     print("测试搜索和筛选功能")
     print("=" * 60)
 
-    all_indicators = get_all_indicators_by_category(use_chinese=True)
+    all_indicators = get_indicators_by_category(use_chinese=True)
 
     # 测试分类筛选
     print(f"🔍 分类筛选测试:")

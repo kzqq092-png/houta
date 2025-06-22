@@ -1,0 +1,18 @@
+{
+  "ui": {
+    "theme": "light",
+    "language": "zh_CN"
+  },
+  "data": {
+    "cache_dir": ".cache",
+    "data_dir": "data"
+  },
+  "indicators": {
+    "cache_size": 1000,
+    "default_period": 20
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log"
+  }
+}

@@ -19,7 +19,8 @@ from matplotlib.figure import Figure
 import json
 import traceback
 from gui.panels.base_analysis_panel import BaseAnalysisPanel
-from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
+from core.indicator_manager import get_indicator_manager  # 兼容层
 from gui.panels import *
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -119,6 +120,11 @@ class StockScreenerWidget(BaseAnalysisPanel):
         super().__init__(parent)
         self.data_manager = data_manager
         self.log_manager = log_manager
+
+        # 获取指标管理器
+        self.indicator_adapter = IndicatorUIAdapter()
+        self.compat_indicator_manager = get_indicator_manager()  # 兼容层
+
         # 先初始化所有依赖属性
         self.template_manager = TemplateManager(
             template_dir="templates/stock_screener")
@@ -1205,87 +1211,221 @@ class StockScreenerWidget(BaseAnalysisPanel):
             if not match:
                 return False
             ind1, op, ind2 = match.groups()
-            # 计算第一个指标
 
+            # 计算第一个指标
             def get_value(ind):
-                # 优先支持ta-lib指标
-                talib_list = get_talib_indicator_list()
-                if ind in talib_list:
-                    try:
-                        from core.indicators_algo import calc_talib_indicator
-                        df = stock_data.copy()
-                        res = calc_talib_indicator(ind, df)
-                        if isinstance(res, pd.DataFrame):
-                            return res.iloc[-1, 0]
+                try:
+                    # 优先使用新架构
+                    if ind.startswith('MA'):
+                        period = int(ind[2:]) if len(ind) > 2 and ind[2:].isdigit() else 5
+                        response = self.indicator_adapter.calculate_indicator('MA', stock_data, period=period)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'MACD':
+                        response = self.indicator_adapter.calculate_indicator('MACD', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if isinstance(result, dict):
+                                return result.get('main', 0)
+                            elif hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'RSI':
+                        response = self.indicator_adapter.calculate_indicator('RSI', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'KDJ':
+                        response = self.indicator_adapter.calculate_indicator('KDJ', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if isinstance(result, dict):
+                                return result.get('j', 0)  # 返回J值
+                            elif hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'BOLL':
+                        response = self.indicator_adapter.calculate_indicator('BOLL', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if isinstance(result, dict):
+                                return result.get('upper', 0)  # 返回上轨
+                            elif hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'ATR':
+                        response = self.indicator_adapter.calculate_indicator('ATR', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'OBV':
+                        response = self.indicator_adapter.calculate_indicator('OBV', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'CCI':
+                        response = self.indicator_adapter.calculate_indicator('CCI', stock_data)
+                        result = response.get('data') if response and response.get('success') else None
+                        if result is not None:
+                            if hasattr(result, 'iloc'):
+                                return result.iloc[-1]
+                            else:
+                                return result[-1] if hasattr(result, '__getitem__') else result
+
+                    elif ind == 'close':
+                        # 特殊处理收盘价
+                        if isinstance(stock_data, pd.DataFrame) and 'close' in stock_data.columns:
+                            return stock_data['close'].iloc[-1]
                         else:
-                            return res.iloc[-1]
-                    except Exception:
-                        return None
-                # 内置指标全部用ta-lib封装
-                if ind.startswith('MA'):
-                    period = int(ind[2:]) if len(
-                        ind) > 2 and ind[2:].isdigit() else 5
-                    close_data = stock_data['close']
-                    if isinstance(close_data, pd.Series):
-                        return calc_ma(close_data, period).iloc[-1]
+                            from hikyuu.indicator import CLOSE
+                            return CLOSE(stock_data)[-1]
+
                     else:
-                        from hikyuu.indicator import MA
-                        return MA(close_data, n=period)[-1]
-                if ind == 'MACD':
-                    close_data = stock_data['close']
-                    if isinstance(close_data, pd.Series):
-                        macd, _, _ = calc_macd(close_data)
-                        return macd.iloc[-1]
-                    else:
-                        from hikyuu.indicator import MACD
-                        macd = MACD(close_data, n1=12, n2=26, n3=9)
-                        return macd.dif[-1] if hasattr(macd, 'dif') else macd[-1]
-                if ind == 'RSI':
-                    return calc_rsi(stock_data['close']).iloc[-1]
-                if ind == 'KDJ':
-                    k, d, j = calc_kdj(stock_data)
-                    return j.iloc[-1]
-                if ind == 'BOLL':
-                    close_data = stock_data['close']
-                    if isinstance(close_data, pd.Series):
-                        _, upper, lower = calc_boll(close_data)
-                        return upper.iloc[-1]
-                    else:
-                        from hikyuu.indicator import BOLL
-                        boll = BOLL(close_data, n=20, width=2)
-                        return boll.upper[-1] if hasattr(boll, 'upper') else boll[-1]
-                if ind == 'ATR':
-                    if isinstance(stock_data['close'], pd.Series):
-                        return calc_atr(stock_data).iloc[-1]
-                    else:
-                        from hikyuu.indicator import ATR
-                        return ATR(stock_data, n=14)[-1]
-                if ind == 'OBV':
-                    if isinstance(stock_data['close'], pd.Series):
-                        return calc_obv(stock_data).iloc[-1]
-                    else:
-                        from hikyuu.indicator import OBV
-                        return OBV(stock_data)[-1]
-                if ind == 'CCI':
-                    if isinstance(stock_data['close'], pd.Series):
-                        return calc_cci(stock_data).iloc[-1]
-                    else:
-                        from hikyuu.indicator import CCI
-                        return CCI(stock_data, n=14)[-1]
-                return None
+                        # 尝试作为数值处理
+                        try:
+                            return float(ind)
+                        except ValueError:
+                            # 回退到兼容层
+                            return self._get_value_fallback(ind, stock_data)
+
+                except Exception as e:
+                    print(f"统一指标管理器计算失败，回退到兼容层: {str(e)}")
+                    return self._get_value_fallback(ind, stock_data)
+
             v1 = get_value(ind1)
             v2 = get_value(ind2)
+
             if v1 is None or v2 is None:
                 return False
+
             if op == '>':
                 return v1 > v2
             elif op == '<':
                 return v1 < v2
             elif op == '=':
-                return v1 == v2
+                return abs(v1 - v2) < 1e-6  # 浮点数比较
             return False
+
+        except Exception as e:
+            print(f"技术指标条件检查错误: {str(e)}")
+            return False
+
+    def _get_value_fallback(self, ind, stock_data):
+        """回退方案：使用兼容层指标管理器"""
+        try:
+            if ind.startswith('MA'):
+                period = int(ind[2:]) if len(ind) > 2 and ind[2:].isdigit() else 5
+                result = self.compat_indicator_manager.calc_ma(stock_data['close'], period)
+                return result.iloc[-1] if hasattr(result, 'iloc') else result[-1]
+
+            elif ind == 'MACD':
+                macd, _, _ = self.compat_indicator_manager.calc_macd(stock_data['close'])
+                return macd.iloc[-1] if hasattr(macd, 'iloc') else macd[-1]
+
+            elif ind == 'RSI':
+                result = self.compat_indicator_manager.calc_rsi(stock_data['close'])
+                return result.iloc[-1] if hasattr(result, 'iloc') else result[-1]
+
+            elif ind == 'KDJ':
+                k, d, j = self.compat_indicator_manager.calc_kdj(stock_data)
+                return j.iloc[-1] if hasattr(j, 'iloc') else j[-1]
+
+            elif ind == 'BOLL':
+                _, upper, lower = self.compat_indicator_manager.calc_boll(stock_data['close'])
+                return upper.iloc[-1] if hasattr(upper, 'iloc') else upper[-1]
+
+            elif ind == 'ATR':
+                result = self.compat_indicator_manager.calc_atr(stock_data)
+                return result.iloc[-1] if hasattr(result, 'iloc') else result[-1]
+
+            elif ind == 'OBV':
+                result = self.compat_indicator_manager.calc_obv(stock_data)
+                return result.iloc[-1] if hasattr(result, 'iloc') else result[-1]
+
+            elif ind == 'CCI':
+                result = self.compat_indicator_manager.calc_cci(stock_data)
+                return result.iloc[-1] if hasattr(result, 'iloc') else result[-1]
+
+            else:
+                # 最后回退到hikyuu指标
+                return self._get_value_hikyuu(ind, stock_data)
+
+        except Exception as e:
+            print(f"兼容层指标计算失败: {str(e)}")
+            return None
+
+    def _get_value_hikyuu(self, ind, stock_data):
+        """最终回退方案：使用hikyuu指标"""
+        try:
+            from hikyuu.indicator import MA, MACD, RSI, BOLL, ATR, OBV, CCI, CLOSE
+
+            if ind.startswith('MA'):
+                period = int(ind[2:]) if len(ind) > 2 and ind[2:].isdigit() else 5
+                close_ind = CLOSE(stock_data)
+                return MA(close_ind, n=period)[-1]
+
+            elif ind == 'MACD':
+                close_ind = CLOSE(stock_data)
+                macd = MACD(close_ind, n1=12, n2=26, n3=9)
+                return macd.dif[-1] if hasattr(macd, 'dif') else macd[-1]
+
+            elif ind == 'RSI':
+                close_ind = CLOSE(stock_data)
+                return RSI(close_ind, n=14)[-1]
+
+            elif ind == 'BOLL':
+                close_ind = CLOSE(stock_data)
+                boll = BOLL(close_ind, n=20, width=2)
+                return boll.upper[-1] if hasattr(boll, 'upper') else boll[-1]
+
+            elif ind == 'ATR':
+                return ATR(stock_data, n=14)[-1]
+
+            elif ind == 'OBV':
+                return OBV(stock_data)[-1]
+
+            elif ind == 'CCI':
+                return CCI(stock_data, n=14)[-1]
+
+            else:
+                return None
+
+        except Exception as e:
+            print(f"hikyuu指标计算失败: {str(e)}")
+            return None
+
+    def get_available_indicators(self):
+        """获取可用指标列表"""
+        try:
+            # 从新架构获取指标列表
+            indicators = self.indicator_adapter.get_all_indicators()
+            return list(indicators.keys())
         except Exception:
-            return False
+            # 回退到默认指标列表
+            return ['MA', 'EMA', 'MACD', 'RSI', 'KDJ', 'BOLL', 'ATR', 'OBV', 'CCI']
 
     def check_fundamental_condition(self, stock, condition_params):
         """检查基本面条件"""
@@ -1554,59 +1694,6 @@ class StockScreenerWidget(BaseAnalysisPanel):
             dialog.move(x, y)
         except Exception as e:
             self.log_manager.log(f"设置弹窗位置失败: {str(e)}", LogLevel.ERROR)
-
-    def get_available_indicators(self):
-        """获取所有可用指标分类及其指标列表，确保与后端ta-lib分类一致"""
-        from core.indicators_algo import get_all_indicators_by_category
-        categories = get_all_indicators_by_category()
-        # 强制所有分类名和指标名为str类型，防止类型对比异常
-        categories = {str(cat): [str(ind) for ind in inds]
-                      for cat, inds in categories.items()}
-        for cat, inds in categories.items():
-            self.log_manager.log(
-                f"筛选分类: {cat}，可见指标数: {len(inds)}", LogLevel.INFO)
-        return categories
-
-    def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
-        """技术指标筛选，全部用ta-lib封装，分类、筛选用统一接口"""
-        results = []
-        categories = self.get_available_indicators()
-        # 示例：遍历所有分类和指标，实际可按params指定分类/指标筛选
-        for stock in stock_list:
-            try:
-                kdata = self.data_manager.get_kdata(stock)
-                if kdata.empty:
-                    continue
-                for cat, inds in categories.items():
-                    for ind in inds:
-                        try:
-                            res = calc_talib_indicator(ind, kdata)
-                        except Exception:
-                            continue
-                # ...原有条件判断和结果收集逻辑...
-                ma_short = calc_ma(kdata['close'], params.get('ma_short', 5))
-                ma_long = calc_ma(kdata['close'], params.get('ma_long', 20))
-                macd, _, _ = calc_macd(kdata['close'])
-                rsi = calc_rsi(kdata['close'])
-                if ma_short.iloc[-1] > ma_long.iloc[-1] and macd.iloc[-1] > 0 and rsi.iloc[-1] > params.get('rsi_value', 50):
-                    info = self.data_manager.get_stock_info(stock)
-                    results.append({
-                        'code': stock,
-                        'name': info['name'],
-                        'industry': info['industry'],
-                        'price': kdata['close'].iloc[-1],
-                        'change': (kdata['close'].iloc[-1] / kdata['close'].iloc[-2] - 1) * 100,
-                        'pe': info['pe'],
-                        'pb': info['pb'],
-                        'roe': info['roe'],
-                        'main_force': self.get_main_force(stock),
-                        'north_money': self.get_north_money(stock)
-                    })
-            except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
-                continue
-        return pd.DataFrame(results)
 
     def show_screener_guide(self):
         """显示选股器操作引导"""

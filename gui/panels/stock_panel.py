@@ -28,6 +28,11 @@ from core.data_manager import data_manager
 from gui.components.custom_widgets import add_shadow, safe_strftime
 from core.adapters import get_logger
 from gui.dialogs.advanced_search_dialog import AdvancedSearchDialog
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
+from core.indicator_manager import get_indicator_manager  # 兼容层
+
+# 使用新的指标服务架构
+_use_new_architecture = True
 
 
 class StockManagementPanel(QWidget):
@@ -51,6 +56,10 @@ class StockManagementPanel(QWidget):
         self.data_cache = {}
         self.cache_manager = getattr(parent, 'cache_manager', None)
         self.max_cache_size = 100
+
+        # 初始化指标服务架构
+        self.indicator_adapter = IndicatorUIAdapter()
+        self.log_manager.info("股票面板使用新的指标服务架构")
 
         # 初始化数据
         self.market_block_mapping = {}
@@ -238,10 +247,16 @@ class StockManagementPanel(QWidget):
             sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
             try:
-                from core.indicators_algo import get_all_indicators_by_category, get_talib_chinese_name
+                # 移除旧的indicators_algo导入，使用统一指标管理器
 
-                # 获取系统指标分类
-                indicators_by_category = get_all_indicators_by_category(use_chinese=True)
+                # 使用新的指标服务架构获取系统指标分类
+                try:
+                    from core.services.indicator_ui_adapter import get_indicator_ui_adapter
+                    ui_adapter = get_indicator_ui_adapter()
+                    indicators_by_category = ui_adapter.get_indicators_by_category(use_chinese=True)
+                except ImportError:
+                    # 向后兼容：使用统一指标管理器
+                    indicators_by_category = get_indicators_by_category(use_chinese=True)
 
                 # 清空现有数据
                 self.indicator_list.clear()
@@ -263,8 +278,26 @@ class StockManagementPanel(QWidget):
 
                     # 添加该分类下的指标
                     for indicator in indicators:
-                        # 获取中文名称
-                        chinese_name = get_talib_chinese_name(indicator)
+                        # 使用新的指标服务架构获取中文名称
+                        try:
+                            from core.services.indicator_ui_adapter import get_indicator_ui_adapter
+                            ui_adapter = get_indicator_ui_adapter()
+                            indicators_list = ui_adapter.get_indicator_list_for_ui()
+
+                            # 查找指标信息
+                            chinese_name = indicator
+                            for ind_info in indicators_list:
+                                if isinstance(ind_info, dict) and ind_info.get('id') == indicator:
+                                    chinese_name = ind_info.get('name', indicator)
+                                    break
+                                elif hasattr(ind_info, 'id') and ind_info.id == indicator:
+                                    chinese_name = ind_info.name
+                                    break
+                        except ImportError:
+                            # 使用指标适配器获取中文名称
+                            indicator_info = self.indicator_adapter.get_indicator_info(indicator)
+                            chinese_name = indicator_info.get('chinese_name', indicator) if indicator_info else indicator
+
                         if chinese_name == indicator:
                             # 如果没有中文名称，使用英文名称
                             display_name = indicator
@@ -649,13 +682,12 @@ class StockManagementPanel(QWidget):
             self.log_manager.error(f"处理股票选择失败: {str(e)}")
 
     def on_indicators_changed(self):
-        """指标选择变化事件 - 增强版本，确保指标能正确显示在图表上"""
+        """指标选择变化事件 - 修复版本，避免重复处理，只通过信号传递"""
         try:
             selected_items = self.indicator_list.selectedItems()
             if not selected_items:
-                # 如果没有选中指标，清除图表上的指标
-                if hasattr(self.parent_gui, 'chart_widget'):
-                    self.parent_gui.chart_widget.clear_indicators()
+                # 如果没有选中指标，发送清除信号
+                self.indicator_changed.emit("clear_all", {})
                 return
 
             # 提取选中的指标信息
@@ -682,17 +714,8 @@ class StockManagementPanel(QWidget):
                     selected_indicators.append(indicator_info)
 
             if selected_indicators:
-                # 发送指标变化信号给主窗口
+                # 只发送指标变化信号给主窗口，不直接调用图表控件
                 self.indicator_changed.emit("multiple", {"indicators": selected_indicators})
-
-                # 直接调用图表控件的指标更新方法
-                if hasattr(self.parent_gui, 'chart_widget'):
-                    for indicator_info in selected_indicators:
-                        self.parent_gui.chart_widget.add_indicator(indicator_info)
-
-                # 强制更新图表
-                if hasattr(self.parent_gui, 'update_chart'):
-                    self.parent_gui.update_chart()
 
                 indicator_names = [ind['chinese_name'] for ind in selected_indicators]
                 self.log_manager.info(f"已选择指标: {', '.join(indicator_names)}")
@@ -710,23 +733,22 @@ class StockManagementPanel(QWidget):
             sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
             try:
-                from core.indicators_algo import get_indicator_default_params, get_indicator_params_config
+                # 移除旧的indicators_algo导入，使用统一指标管理器
 
-                # 首先尝试从系统配置获取
-                system_params = get_indicator_default_params(indicator_name)
-                if system_params:
-                    return system_params
+                # 优先使用新的指标服务架构
+                try:
+                    from core.services import get_indicator_ui_adapter
+                    adapter = get_indicator_ui_adapter()
+                    indicator_info = adapter.get_indicator_info(indicator_name)
+                    if indicator_info and indicator_info.parameters:
+                        return indicator_info.parameters
+                except ImportError:
+                    pass
 
-                # 如果系统配置没有，尝试获取参数配置
-                params_config = get_indicator_params_config(indicator_name)
-                if params_config:
-                    # 从配置中提取默认值
-                    default_params = {}
-                    for param_name, param_info in params_config.items():
-                        if isinstance(param_info, dict) and 'default' in param_info:
-                            default_params[param_name] = param_info['default']
-                    if default_params:
-                        return default_params
+                # 使用指标适配器获取参数
+                indicator_info = self.indicator_adapter.get_indicator_info(indicator_name)
+                if indicator_info and indicator_info.get('parameters'):
+                    return indicator_info['parameters']
 
             except ImportError as e:
                 self.log_manager.warning(f"导入指标算法模块失败: {str(e)}")
@@ -738,8 +760,8 @@ class StockManagementPanel(QWidget):
                 'EMA': {'period': 12},
                 'WMA': {'period': 20},
                 'MACD': {'fast': 12, 'slow': 26, 'signal': 9},
-                'BOLL': {'period': 20, 'std': 2},
-                'BBANDS': {'period': 20, 'std': 2},
+                'BOLL': {'period': 20, 'std_dev': 2},
+                'BBANDS': {'period': 20, 'std_dev': 2},
                 'RSI': {'period': 14},
                 'KDJ': {'k_period': 9, 'd_period': 3, 'j_period': 3},
                 'STOCH': {'k_period': 14, 'd_period': 3},

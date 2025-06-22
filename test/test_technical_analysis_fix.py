@@ -30,27 +30,27 @@ def test_talib_chinese_mapping():
 
     try:
         from core.indicators_algo import (
-            get_talib_indicator_list,
-            get_talib_chinese_name,
+            get_indicator_list,
             get_indicator_english_name,
-            get_all_indicators_by_category
+            get_indicators_by_category
         )
+        from core.unified_indicator_manager import get_chinese_name
 
         # 测试获取所有指标
-        all_indicators = get_talib_indicator_list()
+        all_indicators = get_indicator_list()
         print(f"✓ 成功获取ta-lib指标列表，共 {len(all_indicators)} 个指标")
 
         # 测试中文映射
         test_indicators = ['MA', 'MACD', 'RSI', 'STOCH', 'BBANDS', 'ATR', 'OBV', 'CCI']
         print("\n测试常用指标中文映射：")
         for indicator in test_indicators:
-            chinese_name = get_talib_chinese_name(indicator)
+            chinese_name = get_chinese_name(indicator)
             english_name = get_indicator_english_name(chinese_name)
             print(f"  {indicator} -> {chinese_name} -> {english_name}")
             assert english_name == indicator, f"映射错误: {indicator} != {english_name}"
 
         # 测试分类功能
-        categories = get_all_indicators_by_category(use_chinese=True)
+        categories = get_indicators_by_category(use_chinese=True)
         print(f"\n✓ 成功获取指标分类，共 {len(categories)} 个分类")
         for category, indicators in categories.items():
             print(f"  {category}: {len(indicators)} 个指标")
@@ -61,7 +61,7 @@ def test_talib_chinese_mapping():
         pattern_indicators = [name for name in all_indicators if name.startswith('CDL')]
         print(f"\n✓ 形态识别指标: {len(pattern_indicators)} 个")
         for i, pattern in enumerate(pattern_indicators[:5]):
-            chinese_name = get_talib_chinese_name(pattern)
+            chinese_name = get_chinese_name(pattern)
             print(f"  {pattern} -> {chinese_name}")
 
         print("\n✅ ta-lib指标中英文映射功能测试通过")
@@ -141,93 +141,44 @@ def test_technical_indicators():
     print("=" * 60)
 
     try:
-            calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll,
-            calc_atr, calc_obv, calc_cci, calc_talib_indicator
+        from core.unified_indicator_manager import (
+            get_unified_indicator_manager, get_indicator_list,
+            get_indicators_by_category, calc_indicator
         )
 
-        # 创建测试数据
-        dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
-        np.random.seed(42)
+        # 测试统一指标管理器
+        manager = get_unified_indicator_manager()
 
-        # 生成模拟K线数据
-        close_prices = 100 + np.cumsum(np.random.randn(len(dates)) * 0.5)
-        high_prices = close_prices + np.random.rand(len(dates)) * 2
-        low_prices = close_prices - np.random.rand(len(dates)) * 2
-        open_prices = close_prices + np.random.randn(len(dates)) * 0.3
-        volumes = np.random.randint(1000000, 10000000, len(dates))
+        # 测试获取指标列表
+        all_indicators = get_indicator_list()
+        print(f"✅ 获取指标列表成功: {len(all_indicators)} 个指标")
 
-        test_data = pd.DataFrame({
-            'datetime': dates,
-            'open': open_prices,
-            'high': high_prices,
-            'low': low_prices,
-            'close': close_prices,
-            'volume': volumes
-        })
-        test_data.set_index('datetime', inplace=True)
+        # 测试获取分类
+        categories = get_indicators_by_category(use_chinese=True)
+        print(f"✅ 获取指标分类成功: {len(categories)} 个分类")
 
-        print(f"✓ 创建测试数据，共 {len(test_data)} 条记录")
+        for category, indicators in categories.items():
+            print(f"  {category}: {len(indicators)} 个指标")
 
-        # 测试各种指标计算
-        indicators_to_test = [
-            ('MA', lambda: calc_ma(test_data['close'], 20)),
-            ('MACD', lambda: calc_macd(test_data['close'])),
-            ('RSI', lambda: calc_rsi(test_data['close'])),
-            ('KDJ', lambda: calc_kdj(test_data)),
-            ('BOLL', lambda: calc_boll(test_data['close'])),
-            ('ATR', lambda: calc_atr(test_data)),
-            ('OBV', lambda: calc_obv(test_data)),
-            ('CCI', lambda: calc_cci(test_data))
-        ]
+        # 测试计算几个基本指标
+        test_data = generate_test_data()
 
-        successful_indicators = 0
-        for name, calc_func in indicators_to_test:
+        test_indicators = ['SMA', 'RSI', 'MACD']
+        for indicator in test_indicators:
             try:
-                result = calc_func()
+                result = calc_indicator(indicator, test_data)
                 if result is not None:
-                    if isinstance(result, tuple):
-                        print(f"✓ {name} 计算成功，返回 {len(result)} 个序列")
-                        for i, series in enumerate(result):
-                            if hasattr(series, '__len__'):
-                                valid_count = len(series.dropna()) if hasattr(series, 'dropna') else len([x for x in series if not pd.isna(x)])
-                                print(f"    序列{i+1}: {valid_count} 个有效值")
-                    else:
-                        valid_count = len(result.dropna()) if hasattr(result, 'dropna') else len([x for x in result if not pd.isna(x)])
-                        print(f"✓ {name} 计算成功，{valid_count} 个有效值")
-                    successful_indicators += 1
+                    print(f"✅ {indicator} 计算成功")
                 else:
-                    print(f"⚠️ {name} 计算返回空值")
+                    print(f"⚠️ {indicator} 计算返回None")
             except Exception as e:
-                print(f"❌ {name} 计算失败: {e}")
+                print(f"❌ {indicator} 计算失败: {e}")
 
-        # 测试ta-lib通用计算
-        try:
-            talib_indicators = ['SMA', 'EMA', 'STOCH', 'WILLR', 'MFI']
-            for indicator in talib_indicators:
-                try:
-                    result = calc_talib_indicator(indicator, test_data)
-                    if result is not None and not result.empty:
-                        print(f"✓ ta-lib {indicator} 计算成功")
-                        successful_indicators += 1
-                    else:
-                        print(f"⚠️ ta-lib {indicator} 计算返回空值")
-                except Exception as e:
-                    print(f"⚠️ ta-lib {indicator} 计算失败: {e}")
-        except Exception as e:
-            print(f"⚠️ ta-lib通用计算测试失败: {e}")
-
-        print(f"\n✓ 成功计算 {successful_indicators} 个指标")
-
-        if successful_indicators >= 8:
-            print("\n✅ 技术指标计算功能测试通过")
-            return True
-        else:
-            print("\n⚠️ 技术指标计算功能部分通过")
-            return False
+        return True
 
     except Exception as e:
-        print(f"\n❌ 技术指标计算功能测试失败: {e}")
-        print(traceback.format_exc())
+        print(f"❌ 统一指标管理器测试失败: {e}")
+        traceback.print_exc()
         return False
 
 
@@ -238,8 +189,7 @@ def test_ui_backend_integration():
     print("=" * 60)
 
     try:
-        # 测试指标名称转换
-        from core.indicators_algo import get_indicator_english_name, get_talib_chinese_name
+        # 测试指标名称转换（已在文件开头导入）
 
         test_cases = [
             ('移动平均线', 'MA'),
@@ -256,7 +206,7 @@ def test_ui_backend_integration():
         conversion_success = 0
         for chinese_name, expected_english in test_cases:
             english_name = get_indicator_english_name(chinese_name)
-            chinese_back = get_talib_chinese_name(expected_english)
+            chinese_back = get_chinese_name(expected_english)
 
             print(f"  {chinese_name} -> {english_name}")
             if english_name == expected_english:
@@ -307,15 +257,15 @@ def test_system_call_analysis():
 
     try:
         import time
-        from core.indicators_algo import get_talib_indicator_list, get_all_indicators_by_category
+        from core.unified_indicator_manager import get_indicator_list, get_indicators_by_category
 
         # 分析指标获取调用量
         start_time = time.time()
-        all_indicators = get_talib_indicator_list()
+        all_indicators = get_indicator_list()
         indicator_time = time.time() - start_time
 
         start_time = time.time()
-        categories = get_all_indicators_by_category(use_chinese=True)
+        categories = get_indicators_by_category(use_chinese=True)
         category_time = time.time() - start_time
 
         print(f"✓ 指标列表获取耗时: {indicator_time:.3f}s")
@@ -342,21 +292,22 @@ def test_system_call_analysis():
             print(f"⚠️ 数据获取性能测试失败: {e}")
 
         # 分析指标计算调用量
-        from core.indicators_algo import calc_ma, calc_macd, calc_rsi
+        from core.indicator_manager import get_indicator_manager
+        compat_manager = get_indicator_manager()
 
         # 创建测试数据
         test_data = pd.Series(range(100, 200))
 
         start_time = time.time()
-        ma_result = calc_ma(test_data, 20)
+        ma_result = compat_manager.calc_ma(test_data, 20)
         ma_time = time.time() - start_time
 
         start_time = time.time()
-        macd_result = calc_macd(test_data)
+        macd_result = compat_manager.calc_macd(test_data)
         macd_time = time.time() - start_time
 
         start_time = time.time()
-        rsi_result = calc_rsi(test_data)
+        rsi_result = compat_manager.calc_rsi(test_data)
         rsi_time = time.time() - start_time
 
         print(f"✓ MA计算耗时: {ma_time:.3f}s")

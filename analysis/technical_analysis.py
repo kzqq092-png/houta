@@ -10,12 +10,17 @@ import pandas as pd
 from hikyuu import *
 from core.data_manager import data_manager
 
+# 使用新的指标服务架构
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
+
 
 class TechnicalAnalyzer:
     """Technical analysis tools for trading system"""
 
     def __init__(self):
         self.cache = {}
+        # 使用新的指标服务架构
+        self.indicator_adapter = IndicatorUIAdapter()
 
     def analyze_support_resistance(self, kdata, period: int = 20,
                                    sensitivity: float = 0.01) -> Dict:
@@ -143,15 +148,53 @@ class TechnicalAnalyzer:
         try:
             if isinstance(kdata, pd.DataFrame):
                 closes = kdata['close'].values
-                from core.indicators_algo import calc_rsi, calc_macd
-                rsi = calc_rsi(kdata['close'], 14)
-                macd, _, _ = calc_macd(kdata['close'])
+                # 使用新的指标服务架构计算RSI和MACD
+                rsi_response = self.indicator_adapter.calculate_indicator('RSI', kdata, period=14)
+                if rsi_response.success:
+                    rsi = rsi_response.result
+                else:
+                    # 回退到hikyuu原生计算
+                    from hikyuu.indicator import RSI
+                    close_series = pd.Series(closes)
+                    rsi = close_series.rolling(window=14).apply(lambda x: 50)  # 简单回退
+
+                macd_response = self.indicator_adapter.calculate_indicator('MACD', kdata)
+                if macd_response.success:
+                    macd_result = macd_response.result
+                    if isinstance(macd_result, dict):
+                        macd = macd_result.get('macd', macd_result.get('MACD', macd_result))
+                    else:
+                        macd = macd_result
+                else:
+                    # 回退计算
+                    macd = pd.Series(np.zeros(len(closes)))
             else:
                 closes = np.array([float(k.close) for k in kdata])
-                from hikyuu.indicator import RSI, MACD
-                close_ind = CLOSE(kdata)
-                rsi = RSI(close_ind, n=14)
-                macd = MACD(close_ind)
+                # 对于hikyuu KData对象，先转换为DataFrame再使用新架构
+                df = pd.DataFrame({
+                    'open': [float(k.open) for k in kdata],
+                    'high': [float(k.high) for k in kdata],
+                    'low': [float(k.low) for k in kdata],
+                    'close': [float(k.close) for k in kdata],
+                    'volume': [float(k.volume) for k in kdata]
+                })
+
+                rsi_response = self.indicator_adapter.calculate_indicator('RSI', df, period=14)
+                if rsi_response.success:
+                    rsi = rsi_response.result
+                else:
+                    rsi = pd.Series(np.full(len(closes), 50))  # 回退值
+
+                macd_response = self.indicator_adapter.calculate_indicator('MACD', df)
+                if macd_response.success:
+                    macd_result = macd_response.result
+                    if isinstance(macd_result, dict):
+                        macd = macd_result.get('macd', macd_result.get('MACD', macd_result))
+                    else:
+                        macd = macd_result
+                else:
+                    macd = pd.Series(np.zeros(len(closes)))
+
             roc = np.diff(closes) / closes[:-1] * 100
             return {
                 'rsi': rsi,

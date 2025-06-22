@@ -3,7 +3,7 @@ import pandas as pd
 from hikyuu import *
 from hikyuu.trade_sys import SignalBase
 from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
-from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
 
 
 class EnhancedSignal(SignalBase):
@@ -14,6 +14,9 @@ class EnhancedSignal(SignalBase):
 
     def __init__(self, params=None):
         super(EnhancedSignal, self).__init__("EnhancedSignal")
+        # 获取统一指标管理器
+        self.indicator_adapter = IndicatorUIAdapter()
+
         # 默认参数
         self.params = {
             "n_fast": 12,              # 快速均线周期
@@ -110,77 +113,93 @@ class EnhancedSignal(SignalBase):
 
     def _calculate(self, k, record):
         try:
+            # 使用统一指标管理器计算所有指标
             indicators = {}
-            talib_list = get_talib_indicator_list()
-            category_map = get_all_indicators_by_category()
-            for name in talib_list:
-                try:
-                    val = calc_talib_indicator(name, k)
-                    if isinstance(val, pd.DataFrame):
-                        for col in val.columns:
-                            indicators[f"{name}_{col}".upper()] = val[col]
-                    else:
-                        indicators[name.upper()] = val
-                except Exception:
-                    continue
-            close_data = k['close']
+
+            # 获取K线数据
+            if hasattr(k, 'to_df'):
+                kdata = k.to_df()
+            else:
+                kdata = k
+
+            # 计算基础指标
             n_fast = self.get_param("n_fast")
             n_slow = self.get_param("n_slow")
-            if isinstance(close_data, pd.Series):
-                ma_fast = indicators.get('MA', calc_ma(close_data, n_fast))
-                ma_slow = indicators.get('EMA', calc_ma(close_data, n_slow))
-                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
-                if macd is None:
-                    from core.indicators_algo import calc_macd
-                    macd, _, _ = calc_macd(close_data)
-                rsi = indicators.get('RSI', None) or calc_rsi(close_data, self.get_param("rsi_window"))
-                volume_data = k['volume'] if 'volume' in k else None
-                if volume_data is not None and isinstance(volume_data, pd.Series):
-                    volume_ma = volume_data.rolling(window=self.get_param("volume_ma")).mean()
+
+            try:
+                # 移动平均线
+                ma_fast_resp = self.indicator_adapter.calculate_indicator('MA', kdata, period=n_fast)
+                ma_fast = ma_fast_resp.get('data') if ma_fast_resp and ma_fast_resp.get('success') else None
+
+                ma_slow_resp = self.indicator_adapter.calculate_indicator('MA', kdata, period=n_slow)
+                ma_slow = ma_slow_resp.get('data') if ma_slow_resp and ma_slow_resp.get('success') else None
+
+                # MACD
+                macd_resp = self.indicator_adapter.calculate_indicator('MACD', kdata,
+                                                                       fast_period=n_fast,
+                                                                       slow_period=n_slow,
+                                                                       signal_period=self.get_param("n_signal"))
+                macd_result = macd_resp.get('data') if macd_resp and macd_resp.get('success') else None
+                if isinstance(macd_result, dict):
+                    macd = macd_result.get('main', macd_result.get('macd'))
+                else:
+                    macd = macd_result
+
+                # RSI
+                rsi_resp = self.indicator_adapter.calculate_indicator('RSI', kdata, period=self.get_param("rsi_window"))
+                rsi = rsi_resp.get('data') if rsi_resp and rsi_resp.get('success') else None
+
+                # KDJ
+                kdj_resp = self.indicator_adapter.calculate_indicator('KDJ', kdata, k_period=self.get_param("kdj_n"))
+                kdj_result = kdj_resp.get('data') if kdj_resp and kdj_resp.get('success') else None
+
+                # 布林带
+                boll_resp = self.indicator_adapter.calculate_indicator('BOLL', kdata,
+                                                                       period=self.get_param("boll_n"),
+                                                                       std_dev=self.get_param("boll_width"))
+                boll_result = boll_resp.get('data') if boll_resp and boll_resp.get('success') else None
+
+                # ATR
+                atr_resp = self.indicator_adapter.calculate_indicator('ATR', kdata, period=self.get_param("atr_period"))
+                atr = atr_resp.get('data') if atr_resp and atr_resp.get('success') else None
+
+                # CCI
+                cci_resp = self.indicator_adapter.calculate_indicator('CCI', kdata, period=self.get_param("cci_period"))
+                cci = cci_resp.get('data') if cci_resp and cci_resp.get('success') else None
+
+                # OBV
+                obv_resp = self.indicator_adapter.calculate_indicator('OBV', kdata)
+                obv = obv_resp.get('data') if obv_resp and obv_resp.get('success') else None
+
+                # 成交量均线
+                if 'volume' in kdata.columns:
+                    volume_ma = kdata['volume'].rolling(window=self.get_param("volume_ma")).mean()
                 else:
                     volume_ma = None
-            else:
-                ma_fast = indicators.get('MA', MA(close_data, n=n_fast))
-                ma_slow = indicators.get('EMA', MA(close_data, n=n_slow))
-                from hikyuu.indicator import MACD, RSI, VOL, MA
-                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
-                if macd is None:
-                    macd = MACD(close_data, n1=n_fast, n2=n_slow, n3=9)
-                rsi = indicators.get('RSI', None) or RSI(close_data, n=self.get_param("rsi_window"))
+
+            except Exception as e:
+                # 回退到hikyuu指标
+                print(f"统一指标管理器计算失败，回退到hikyuu指标: {str(e)}")
+                close_ind = CLOSE(k)
+                ma_fast = MA(close_ind, n=n_fast)
+                ma_slow = MA(close_ind, n=n_slow)
+                macd = MACD(close_ind, n1=n_fast, n2=n_slow, n3=self.get_param("n_signal"))
+                rsi = RSI(close_ind, n=self.get_param("rsi_window"))
                 volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
-            kdj = calc_kdj(k, self.get_param("kdj_n"))
-            # --- 类型安全指标计算 ---
-            # BOLL
-            if isinstance(k['close'], pd.Series):
-                boll = calc_boll(k['close'], self.get_param("boll_n"), self.get_param("boll_width"))
-            else:
-                from hikyuu.indicator import BOLL
-                close_ind = CLOSE(k) if hasattr(k, 'to_df') else k['close']
-                boll = BOLL(close_ind, n=self.get_param("boll_n"), width=self.get_param("boll_width"))
-            # ATR
-            if hasattr(k, 'to_df'):
-                atr = calc_atr(k, self.get_param("atr_period"))
-            else:
-                from hikyuu.indicator import ATR
                 atr = ATR(k, n=self.get_param("atr_period"))
-            # CCI
-            if hasattr(k, 'to_df'):
-                cci = calc_cci(k, self.get_param("cci_period"))
-            else:
-                from hikyuu.indicator import CCI
                 cci = CCI(k, n=self.get_param("cci_period"))
-            # OBV
-            if hasattr(k, 'to_df'):
-                obv = calc_obv(k)
-            else:
-                from hikyuu.indicator import OBV
                 obv = OBV(k)
-            obv_ma = MA(obv, n=self.get_param("obv_ma"))
+
+            # DMI (继续使用hikyuu)
             dmi = DMI(k, n=self.get_param("dmi_period"))
-            self.market_regime = self._detect_market_regime(
-                k, ma_fast, ma_slow)
+
+            # 计算市场状态和波动率
+            self.market_regime = self._detect_market_regime(k, ma_fast, ma_slow)
             self.volatility = self._calculate_volatility(k, atr)
+
+            # 机器学习信号
             ml_signal = self._calculate_ml_signal(k)
+
             n = len(k)
             for i in range(2, n):
                 signal_strength = {
@@ -190,34 +209,53 @@ class EnhancedSignal(SignalBase):
                     "volatility": 0,
                     "ml": ml_signal
                 }
-                trend_up = ma_fast[i] > ma_slow[i] and ma_fast[i -
-                                                               1] <= ma_slow[i-1]
-                trend_down = ma_fast[i] < ma_slow[i] and ma_fast[i -
-                                                                 1] >= ma_slow[i-1]
+
+                # 趋势信号
+                if hasattr(ma_fast, '__getitem__') and hasattr(ma_slow, '__getitem__'):
+                    trend_up = ma_fast[i] > ma_slow[i] and ma_fast[i-1] <= ma_slow[i-1]
+                    trend_down = ma_fast[i] < ma_slow[i] and ma_fast[i-1] >= ma_slow[i-1]
+                elif hasattr(ma_fast, 'iloc') and hasattr(ma_slow, 'iloc'):
+                    trend_up = ma_fast.iloc[i] > ma_slow.iloc[i] and ma_fast.iloc[i-1] <= ma_slow.iloc[i-1]
+                    trend_down = ma_fast.iloc[i] < ma_slow.iloc[i] and ma_fast.iloc[i-1] >= ma_slow.iloc[i-1]
+                else:
+                    trend_up = False
+                    trend_down = False
+
                 if trend_up:
                     signal_strength["trend"] += 1
                 elif trend_down:
                     signal_strength["trend"] -= 1
+
+                # 动量信号
                 macd_up = macd[i] > 0 and macd[i-1] <= 0
                 macd_down = macd[i] < 0 and macd[i-1] >= 0
                 if macd_up:
                     signal_strength["momentum"] += 1
                 elif macd_down:
                     signal_strength["momentum"] -= 1
-                volume_confirm = VOL(k)[i] > volume_ma[i] * \
-                    self.get_param("volume_ratio")
+
+                # 成交量信号
+                volume_confirm = VOL(k)[i] > volume_ma[i] * self.get_param("volume_ratio")
                 if volume_confirm:
                     signal_strength["volume"] += 1
+
+                # 波动率信号
                 if self.volatility > self.get_param("volatility_threshold"):
                     signal_strength["volatility"] -= 1
+
+                # 机器学习信号
+                signal_strength["ml"] = ml_signal
+
                 total_strength = sum(
                     strength * self.get_param("signal_weights")[category]
                     for category, strength in signal_strength.items()
                 )
+
                 if self.market_regime == "bullish":
                     total_strength *= 1.2
                 elif self.market_regime == "bearish":
                     total_strength *= 0.8
+
                 if total_strength >= self.get_param("min_signal_strength"):
                     if self.last_signal <= 0:
                         record.add_buy_signal(k[i].datetime)
@@ -228,6 +266,7 @@ class EnhancedSignal(SignalBase):
                         record.add_sell_signal(k[i].datetime)
                         self.last_signal = -1
                         self.signal_history.append((k[i].datetime, -1))
+
                 if len(self.signal_history) > self.get_param("signal_confirm_window"):
                     self.signal_history.pop(0)
         except Exception as e:

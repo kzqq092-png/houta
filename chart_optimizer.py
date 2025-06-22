@@ -75,14 +75,45 @@ class ChartOptimizer:
             check: 复选框控件
         """
         lines = ax.get_lines()
-        labels = [line.get_label() for line in lines]
+        labels = []
+        for line in lines:
+            try:
+                label = line.get_label()
+                # 如果是Text对象，获取其文本内容
+                if hasattr(label, 'get_text'):
+                    label = str(label.get_text())
+                elif isinstance(label, str):
+                    label = label
+                else:
+                    label = str(label) if label is not None else ""
+                labels.append(label)
+            except Exception:
+                labels.append("")
 
         # 创建复选框
         rax = plt.axes([0.05, 0.4, 0.1, 0.15])
         check = CheckButtons(rax, labels)
 
         def func(label):
-            line = [l for l in lines if l.get_label() == label][0]
+            # 安全地查找匹配的线条
+            matching_lines = []
+            for l in lines:
+                try:
+                    l_label = l.get_label()
+                    if hasattr(l_label, 'get_text'):
+                        l_label = str(l_label.get_text())
+                    elif isinstance(l_label, str):
+                        l_label = l_label
+                    else:
+                        l_label = str(l_label) if l_label is not None else ""
+
+                    if l_label == label:
+                        matching_lines.append(l)
+                except Exception:
+                    continue
+
+            if matching_lines:
+                line = matching_lines[0]
             line.set_visible(not line.get_visible())
             ax.figure.canvas.draw_idle()
 

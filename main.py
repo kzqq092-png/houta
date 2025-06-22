@@ -50,7 +50,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 from PyQt5.QtCore import *
 from PyQt5.QtWebEngineWidgets import *
@@ -1146,12 +1146,12 @@ class TradingGUI(QMainWindow):
                 QTabWidget {
                     background-color: #ffffff;
                     border: 1px solid #e9ecef;
-                    border-radius: 5px;
-                    margin-top: 2px;  /* 增加顶部边距 */
+                    border-radius: 2px;
+                    margin-top: 1px;  /* 增加顶部边距 */
                 }
                 QTabWidget::pane {
                     border: 1px solid #dee2e6;
-                    border-radius: 5px;
+                    border-radius: 2px;
                     background-color: #ffffff;
                     margin-top: 0px;
                 }
@@ -1969,9 +1969,16 @@ class TradingGUI(QMainWindow):
             self.log_manager.error(f"处理图表更新失败: {str(e)}")
 
     def on_indicator_changed_from_panel(self, indicator_name: str, params: dict):
-        """处理从面板变化的指标 - 增强版本，支持多指标处理"""
+        """处理从面板变化的指标 - 修复版本，支持清除指标和多指标处理"""
         try:
-            if indicator_name == "multiple" and "indicators" in params:
+            if indicator_name == "clear_all":
+                # 清除所有指标
+                if hasattr(self, 'chart_widget'):
+                    self.chart_widget.clear_indicators()
+                    self.update_chart()
+                self.log_manager.info("已清除所有指标")
+
+            elif indicator_name == "multiple" and "indicators" in params:
                 # 处理多个指标选择
                 indicators = params["indicators"]
 
@@ -1982,24 +1989,40 @@ class TradingGUI(QMainWindow):
                 # 添加新选择的指标
                 for indicator_info in indicators:
                     if hasattr(self, 'chart_widget'):
-                        self.chart_widget.add_indicator(indicator_info)
+                        try:
+                            self.chart_widget.add_indicator(indicator_info)
+                        except Exception as e:
+                            indicator_name = getattr(indicator_info, 'name', indicator_info.get(
+                                'name', 'unknown') if isinstance(indicator_info, dict) else 'unknown')
+                            self.log_manager.error(f"添加指标 {indicator_name} 失败: {str(e)}")
 
                 # 更新图表显示
                 self.update_chart()
 
-                indicator_names = [ind.get('chinese_name', ind.get('name', '')) for ind in indicators]
+                indicator_names = []
+                for ind in indicators:
+                    if hasattr(ind, 'chinese_name'):
+                        indicator_names.append(ind.chinese_name)
+                    elif hasattr(ind, 'name'):
+                        indicator_names.append(ind.name)
+                    elif isinstance(ind, dict):
+                        indicator_names.append(ind.get('chinese_name', ind.get('name', '')))
+                    else:
+                        indicator_names.append(str(ind))
                 self.log_manager.info(f"已更新多个指标: {', '.join(indicator_names)}")
 
             else:
                 # 处理单个指标
                 if hasattr(self, 'chart_widget'):
-                    self.chart_widget.add_indicator({
-                        'name': indicator_name,
-                        'params': params
-                    })
-                    self.update_chart()
-
-                self.log_manager.info(f"已更新指标: {indicator_name}")
+                    try:
+                        self.chart_widget.add_indicator({
+                            'name': indicator_name,
+                            'params': params
+                        })
+                        self.update_chart()
+                        self.log_manager.info(f"已更新指标: {indicator_name}")
+                    except Exception as e:
+                        self.log_manager.error(f"添加单个指标 {indicator_name} 失败: {str(e)}")
 
         except Exception as e:
             self.log_manager.error(f"处理面板指标变化失败: {str(e)}")

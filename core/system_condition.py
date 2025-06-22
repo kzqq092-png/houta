@@ -2,7 +2,8 @@ from hikyuu import *
 from hikyuu.trade_sys import ConditionBase
 import numpy as np
 import pandas as pd
-from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
+from core.indicator_manager import get_indicator_manager  # 兼容层
 
 
 class EnhancedSystemCondition(ConditionBase):
@@ -98,26 +99,32 @@ class EnhancedSystemCondition(ConditionBase):
             return False
 
     def _calculate_indicators(self, k):
-        """计算技术指标，全部用ta-lib封装，自动适配参数，兼容Series/DataFrame，分类与主界面一致，修复无指标问题"""
+        """计算技术指标，使用新的指标服务架构"""
         try:
             indicators = {}
-            talib_list = get_talib_indicator_list()
-            category_map = get_all_indicators_by_category()
-            visible_count = {cat: len(names)
-                             for cat, names in category_map.items() if names}
-            for cat, count in visible_count.items():
-                print(f"系统条件-分类: {cat}，可见指标数: {count}")
-            if not talib_list or not category_map:
-                print("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
+            indicator_adapter = IndicatorUIAdapter()
+
+            # 获取可用指标列表
+            indicator_list = indicator_adapter.get_available_indicators()
+            if not indicator_list:
+                print("未检测到任何指标，请检查指标服务！")
                 return {}
-            for name in talib_list:
+
+            # 计算常用指标
+            common_indicators = ['MA', 'RSI', 'MACD', 'BOLL', 'KDJ', 'ATR', 'OBV']
+            for name in common_indicators:
                 try:
-                    val = calc_talib_indicator(name, k)
-                    if isinstance(val, pd.DataFrame):
-                        for col in val.columns:
-                            indicators[f"{name}_{col}".upper()] = val[col]
-                    else:
-                        indicators[name.upper()] = val
+                    result = indicator_adapter.calculate_indicator(name, k)
+                    if result and result.get('success'):
+                        val = result.get('data')
+                        if isinstance(val, pd.DataFrame):
+                            for col in val.columns:
+                                indicators[f"{name}_{col}".upper()] = val[col]
+                        elif isinstance(val, dict):
+                            for key, value in val.items():
+                                indicators[f"{name}_{key}".upper()] = value
+                        else:
+                            indicators[name.upper()] = val
                 except Exception:
                     continue
             return indicators
@@ -278,5 +285,5 @@ class EnhancedSystemCondition(ConditionBase):
 
 def get_indicator_categories():
     """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
-    from core.indicators_algo import get_all_indicators_by_category
-    return get_all_indicators_by_category()
+    from core.indicator_manager import get_indicator_manager
+    return get_indicator_manager().get_indicators_by_category()

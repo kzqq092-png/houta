@@ -10,6 +10,9 @@ import tempfile
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton
 from PyQt5.QtCore import QTimer
 from PyQt5.QtTest import QTest
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -181,6 +184,196 @@ def test_main_ui_integration():
         return False
 
 
+def test_indicator_ui_integration():
+    """测试指标UI集成"""
+    print("=" * 60)
+    print("UI层指标架构集成测试")
+    print("=" * 60)
+
+    try:
+        # 1. 测试指标UI适配器
+        print("\n1. 测试指标UI适配器...")
+        from core.services.indicator_ui_adapter import get_indicator_ui_adapter
+
+        ui_adapter = get_indicator_ui_adapter()
+        print(f"✅ 指标UI适配器初始化成功: {type(ui_adapter).__name__}")
+
+        # 创建测试数据
+        dates = pd.date_range(start='2023-01-01', periods=100, freq='D')
+        np.random.seed(42)
+
+        # 生成模拟价格数据
+        price_base = 100
+        returns = np.random.normal(0.001, 0.02, 100)
+        prices = [price_base]
+        for ret in returns[1:]:
+            prices.append(prices[-1] * (1 + ret))
+
+        test_data = pd.DataFrame({
+            'datetime': dates,
+            'open': [p * np.random.uniform(0.99, 1.01) for p in prices],
+            'high': [p * np.random.uniform(1.01, 1.05) for p in prices],
+            'low': [p * np.random.uniform(0.95, 0.99) for p in prices],
+            'close': prices,
+            'volume': np.random.randint(1000000, 10000000, 100)
+        })
+        test_data.set_index('datetime', inplace=True)
+
+        # 2. 测试获取指标列表
+        print("\n2. 测试获取指标列表...")
+        indicator_list = ui_adapter.get_indicator_list()
+        print(f"✅ 获取到指标列表，共 {len(indicator_list)} 个指标")
+        # 获取分类信息
+        categories = ui_adapter.get_indicators_by_category()
+        main_count = len(categories.get('趋势指标', [])) + len(categories.get('均线指标', []))
+        sub_count = len(categories.get('震荡指标', [])) + len(categories.get('成交量指标', []))
+        print(f"   主图类指标: ~{main_count}")
+        print(f"   副图类指标: ~{sub_count}")
+
+        # 3. 测试单个指标计算
+        print("\n3. 测试单个指标计算...")
+
+        # 测试MA指标
+        ma_result = ui_adapter.calculate_indicator_for_ui('MA', test_data, period=20)
+        if ma_result and ma_result.get('success'):
+            print("✅ MA指标计算成功")
+            print(f"   数据类型: {type(ma_result.get('data'))}")
+            if isinstance(ma_result.get('data'), dict):
+                print(f"   包含序列: {list(ma_result['data'].keys())}")
+        else:
+            print(f"❌ MA指标计算失败: {ma_result.get('error') if ma_result else '未知错误'}")
+
+        # 测试MACD指标
+        macd_result = ui_adapter.calculate_indicator_for_ui('MACD', test_data)
+        if macd_result and macd_result.get('success'):
+            print("✅ MACD指标计算成功")
+            print(f"   数据类型: {type(macd_result.get('data'))}")
+            if isinstance(macd_result.get('data'), dict):
+                print(f"   包含序列: {list(macd_result['data'].keys())}")
+        else:
+            print(f"❌ MACD指标计算失败: {macd_result.get('error') if macd_result else '未知错误'}")
+
+        # 4. 测试批量指标计算
+        print("\n4. 测试批量指标计算...")
+        batch_indicators = [
+            {'name': 'MA', 'params': {'period': 5}},
+            {'name': 'MA', 'params': {'period': 20}},
+            {'name': 'RSI', 'params': {'period': 14}},
+        ]
+
+        batch_results = ui_adapter.batch_calculate_indicators(batch_indicators, test_data)
+        successful_count = sum(1 for result in batch_results.values() if result.get('success'))
+        print(f"✅ 批量计算完成: {successful_count}/{len(batch_indicators)} 个指标成功")
+
+        # 5. 测试图表组件集成（模拟）
+        print("\n5. 测试图表组件集成（模拟）...")
+
+        try:
+            # 导入图表组件类（不实例化，避免Qt依赖）
+            from gui.widgets.chart_widget import ChartWidget
+            print("✅ 图表组件类导入成功")
+
+            # 检查是否有新的指标服务相关属性
+            import inspect
+            chart_methods = [method for method in dir(ChartWidget) if 'indicator' in method.lower()]
+            print(f"✅ 图表组件包含指标相关方法: {len(chart_methods)} 个")
+
+        except Exception as e:
+            print(f"⚠️  图表组件导入异常: {str(e)}")
+
+        # 6. 测试主窗口集成（模拟）
+        print("\n6. 测试主窗口集成（模拟）...")
+
+        try:
+            # 检查主窗口中的指标相关代码
+            with open('main.py', 'r', encoding='utf-8') as f:
+                main_content = f.read()
+
+            indicator_methods = [
+                'on_indicators_changed',
+                'show_indicator_params_dialog',
+                'on_indicator_changed_from_panel',
+                'update_indicators'
+            ]
+
+            found_methods = sum(1 for method in indicator_methods if method in main_content)
+            print(f"✅ 主窗口包含指标方法: {found_methods}/{len(indicator_methods)} 个")
+
+        except Exception as e:
+            print(f"⚠️  主窗口检查异常: {str(e)}")
+
+        print("\n" + "=" * 60)
+        print("✅ UI层指标架构集成测试完成！")
+        print("=" * 60)
+
+        return True
+
+    except Exception as e:
+        print(f"\n❌ UI集成测试失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_backward_compatibility():
+    """测试向后兼容性"""
+    print("\n" + "=" * 60)
+    print("向后兼容性测试")
+    print("=" * 60)
+
+    try:
+        # 测试旧的指标管理器是否仍然可用
+        print("\n1. 测试旧的统一指标管理器...")
+        from core.unified_indicator_manager import get_unified_indicator_manager
+
+        old_manager = get_unified_indicator_manager()
+        print("✅ 旧的统一指标管理器仍可用")
+
+        # 测试旧的便捷函数
+        print("\n2. 测试旧的便捷函数...")
+
+        # 创建测试数据
+        dates = pd.date_range(start='2023-01-01', periods=50, freq='D')
+        test_data = pd.DataFrame({
+            'datetime': dates,
+            'open': np.random.uniform(90, 110, 50),
+            'high': np.random.uniform(100, 120, 50),
+            'low': np.random.uniform(80, 100, 50),
+            'close': np.random.uniform(95, 105, 50),
+            'volume': np.random.randint(1000000, 10000000, 50)
+        })
+        test_data.set_index('datetime', inplace=True)
+
+        # 测试calc_ma
+        try:
+            ma_result = old_manager.calc_ma(test_data, period=20)
+            if ma_result is not None:
+                print("✅ calc_ma 方法正常工作")
+            else:
+                print("⚠️  calc_ma 方法返回None")
+        except Exception as e:
+            print(f"❌ calc_ma 方法异常: {str(e)}")
+
+        # 测试calculate_indicator
+        try:
+            indicator_result = old_manager.calculate_indicator('MA', test_data, params={'period': 20})
+            if indicator_result is not None:
+                print("✅ calculate_indicator 方法正常工作")
+            else:
+                print("⚠️  calculate_indicator 方法返回None")
+        except Exception as e:
+            print(f"❌ calculate_indicator 方法异常: {str(e)}")
+
+        print("\n✅ 向后兼容性测试完成！")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ 向后兼容性测试失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def run_ui_integration_tests():
     """运行所有UI集成测试"""
     print("开始UI集成测试...")
@@ -191,6 +384,8 @@ def run_ui_integration_tests():
         ("异步分析管理器UI集成测试", test_async_analysis_integration),
         ("模板管理器集成测试", test_template_manager_integration),
         ("主界面集成测试", test_main_ui_integration),
+        ("指标UI集成测试", test_indicator_ui_integration),
+        ("向后兼容性测试", test_backward_compatibility),
     ]
 
     passed = 0

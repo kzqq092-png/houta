@@ -11,6 +11,7 @@
 使用统一的策略管理系统框架
 """
 
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
 from core.strategy import register_strategy
 from core.strategy.base_strategy import BaseStrategy, StrategySignal, SignalType, StrategyType
 import pandas as pd
@@ -22,7 +23,7 @@ from enum import Enum
 import warnings
 warnings.filterwarnings('ignore')
 
-# 导入统一策略管理系统
+# 导入新的指标服务架构
 
 
 class TrendDirection(Enum):
@@ -245,6 +246,8 @@ class MomentumStrategy(BaseStrategy):
     def __init__(self, name: str = "Momentum"):
         super().__init__(name, StrategyType.MOMENTUM)
         self._init_default_parameters()
+        # 使用新的指标服务架构
+        self.indicator_adapter = IndicatorUIAdapter()
 
     def _init_default_parameters(self):
         """初始化默认参数"""
@@ -267,7 +270,14 @@ class MomentumStrategy(BaseStrategy):
         # 计算动量和RSI
         data = data.copy()
         data['momentum'] = data['close'].pct_change(momentum_period)
-        data['rsi'] = self._calculate_rsi(data['close'], rsi_period)
+
+        # 使用新的指标服务计算RSI
+        rsi_response = self.indicator_adapter.calculate_indicator('RSI', data, period=rsi_period)
+        if rsi_response.success:
+            data['rsi'] = rsi_response.result
+        else:
+            # 回退到简单计算
+            data['rsi'] = self._calculate_rsi_fallback(data['close'], rsi_period)
 
         for i in range(max(momentum_period, rsi_period), len(data)):
             current = data.iloc[i]
@@ -304,8 +314,8 @@ class MomentumStrategy(BaseStrategy):
 
         return signals
 
-    def _calculate_rsi(self, prices: pd.Series, period: int) -> pd.Series:
-        """计算RSI指标"""
+    def _calculate_rsi_fallback(self, prices: pd.Series, period: int) -> pd.Series:
+        """计算RSI指标（回退方法）"""
         delta = prices.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()

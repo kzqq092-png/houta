@@ -388,7 +388,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
                     stop:0 #28a745, stop:1 #1e7e34);
-                color: white; font-weight: bold; padding: 8px 16px;
+                color: white;  padding: 4px 10px;
                 border-radius: 4px; border: none;
             }
             QPushButton:hover { background: #218838; }
@@ -402,7 +402,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
                     stop:0 #6f42c1, stop:1 #5a32a3);
-                color: white; font-weight: bold; padding: 8px 16px;
+                color: white;  padding: 4px 10px;
                 border-radius: 4px; border: none;
             }
             QPushButton:hover { background: #5a32a3; }
@@ -415,7 +415,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
                     stop:0 #17a2b8, stop:1 #138496);
-                color: white; font-weight: bold; padding: 8px 16px;
+                color: white;  padding: 4px 10px;
                 border-radius: 4px; border: none;
             }
             QPushButton:hover { background: #138496; }

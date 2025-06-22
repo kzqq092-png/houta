@@ -17,3 +17,4 @@
 __pycache__
 reports/*
 logs/*
+.promptx/*

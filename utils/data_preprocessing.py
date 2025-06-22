@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Optional, Union, Any
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
 
 # 全局日志管理器
 _log_manager = None
@@ -259,7 +260,7 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
 
 def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
-    计算基础技术指标
+    计算基础技术指标，使用统一指标管理器
 
     Args:
         df: K线数据DataFrame
@@ -271,41 +272,174 @@ def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     df = df.copy()
+    log_manager = _get_log_manager()
 
     try:
-        # 移动平均线
+        # 获取指标UI适配器
+        indicator_adapter = IndicatorUIAdapter()
+
+        # 计算移动平均线
         for period in [5, 10, 20, 60]:
-            df[f'ma{period}'] = df['close'].rolling(window=period).mean()
+            try:
+                ma_result = indicator_adapter.calculate_indicator('MA', df, period=period)
+                if ma_result and ma_result.get('success'):
+                    values = ma_result.get('data')
+                    if values is not None:
+                        if hasattr(values, 'values'):
+                            df[f'ma{period}'] = values.values
+                        else:
+                            df[f'ma{period}'] = values
+                else:
+                    # 回退到手工计算
+                    df[f'ma{period}'] = df['close'].rolling(window=period).mean()
+            except Exception as e:
+                log_manager.warning(f"MA{period}计算失败，使用手工计算: {str(e)}")
+                df[f'ma{period}'] = df['close'].rolling(window=period).mean()
 
-        # RSI
-        delta = df['close'].diff()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
+        # 计算RSI
+        try:
+            rsi_result = indicator_adapter.calculate_indicator('RSI', df, period=14)
+            if rsi_result and rsi_result.get('success'):
+                values = rsi_result.get('data')
+                if values is not None:
+                    if hasattr(values, 'values'):
+                        df['rsi'] = values.values
+                    else:
+                        df['rsi'] = values
+            else:
+                # 回退到手工计算
+                delta = df['close'].diff()
+                gain = delta.where(delta > 0, 0)
+                loss = -delta.where(delta < 0, 0)
+                avg_gain = gain.rolling(window=14).mean()
+                avg_loss = loss.rolling(window=14).mean()
+                avg_loss = avg_loss.replace(0, 0.00001)
+                rs = avg_gain / avg_loss
+                df['rsi'] = 100 - (100 / (1 + rs))
+        except Exception as e:
+            log_manager.warning(f"RSI计算失败，使用手工计算: {str(e)}")
+            delta = df['close'].diff()
+            gain = delta.where(delta > 0, 0)
+            loss = -delta.where(delta < 0, 0)
+            avg_gain = gain.rolling(window=14).mean()
+            avg_loss = loss.rolling(window=14).mean()
+            avg_loss = avg_loss.replace(0, 0.00001)
+            rs = avg_gain / avg_loss
+            df['rsi'] = 100 - (100 / (1 + rs))
 
-        avg_gain = gain.rolling(window=14).mean()
-        avg_loss = loss.rolling(window=14).mean()
+        # 计算MACD
+        try:
+            macd_result = indicator_adapter.calculate_indicator('MACD', df, fast_period=12, slow_period=26, signal_period=9)
+            if macd_result and macd_result.get('success'):
+                macd_data = macd_result.get('data')
+                if macd_data and isinstance(macd_data, dict):
+                    if 'main' in macd_data:
+                        df['macd'] = macd_data['main']
+                    if 'signal' in macd_data:
+                        df['macd_signal'] = macd_data['signal']
+                    if 'histogram' in macd_data:
+                        df['macd_hist'] = macd_data['histogram']
+            else:
+                # 回退到手工计算
+                ema12 = df['close'].ewm(span=12).mean()
+                ema26 = df['close'].ewm(span=26).mean()
+                df['macd'] = ema12 - ema26
+                df['macd_signal'] = df['macd'].ewm(span=9).mean()
+                df['macd_hist'] = df['macd'] - df['macd_signal']
+        except Exception as e:
+            log_manager.warning(f"MACD计算失败，使用手工计算: {str(e)}")
+            ema12 = df['close'].ewm(span=12).mean()
+            ema26 = df['close'].ewm(span=26).mean()
+            df['macd'] = ema12 - ema26
+            df['macd_signal'] = df['macd'].ewm(span=9).mean()
+            df['macd_hist'] = df['macd'] - df['macd_signal']
 
-        # 避免除零
-        avg_loss = avg_loss.replace(0, 0.00001)
-        rs = avg_gain / avg_loss
-        df['rsi'] = 100 - (100 / (1 + rs))
+        # 计算布林带
+        try:
+            boll_result = indicator_adapter.calculate_indicator('BOLL', df, period=20, std_dev=2)
+            if boll_result and boll_result.get('success'):
+                boll_data = boll_result.get('data')
+                if boll_data and isinstance(boll_data, dict):
+                    if 'upper' in boll_data:
+                        df['boll_upper'] = boll_data['upper']
+                    if 'lower' in boll_data:
+                        df['boll_lower'] = boll_data['lower']
+                    if 'middle' in boll_data:
+                        df['boll_mid'] = boll_data['middle']
+            else:
+                # 回退到手工计算
+                ma20 = df['close'].rolling(window=20).mean()
+                std20 = df['close'].rolling(window=20).std()
+                df['boll_upper'] = ma20 + 2 * std20
+                df['boll_lower'] = ma20 - 2 * std20
+                df['boll_mid'] = ma20
+        except Exception as e:
+            log_manager.warning(f"BOLL计算失败，使用手工计算: {str(e)}")
+            ma20 = df['close'].rolling(window=20).mean()
+            std20 = df['close'].rolling(window=20).std()
+            df['boll_upper'] = ma20 + 2 * std20
+            df['boll_lower'] = ma20 - 2 * std20
+            df['boll_mid'] = ma20
 
-        # MACD
-        ema12 = df['close'].ewm(span=12).mean()
-        ema26 = df['close'].ewm(span=26).mean()
-        df['macd'] = ema12 - ema26
-        df['macd_signal'] = df['macd'].ewm(span=9).mean()
-        df['macd_hist'] = df['macd'] - df['macd_signal']
+        # 计算ATR
+        try:
+            atr_result = indicator_adapter.calculate_indicator('ATR', df, period=14)
+            if atr_result and atr_result.get('success'):
+                values = atr_result.get('data')
+                if values is not None:
+                    if hasattr(values, 'values'):
+                        df['atr'] = values.values
+                    else:
+                        df['atr'] = values
+            else:
+                # 回退到手工计算
+                high_low = df['high'] - df['low']
+                high_close = np.abs(df['high'] - df['close'].shift())
+                low_close = np.abs(df['low'] - df['close'].shift())
+                tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                df['atr'] = tr.rolling(window=14).mean()
+        except Exception as e:
+            log_manager.warning(f"ATR计算失败，使用手工计算: {str(e)}")
+            high_low = df['high'] - df['low']
+            high_close = np.abs(df['high'] - df['close'].shift())
+            low_close = np.abs(df['low'] - df['close'].shift())
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            df['atr'] = tr.rolling(window=14).mean()
 
-        # 布林带
-        ma20 = df['close'].rolling(window=20).mean()
-        std20 = df['close'].rolling(window=20).std()
-        df['boll_upper'] = ma20 + 2 * std20
-        df['boll_lower'] = ma20 - 2 * std20
-        df['boll_mid'] = ma20
+        # 计算OBV
+        try:
+            obv_result = indicator_adapter.calculate_indicator('OBV', df)
+            if obv_result and obv_result.get('success'):
+                values = obv_result.get('data')
+                if values is not None:
+                    if hasattr(values, 'values'):
+                        df['obv'] = values.values
+                    else:
+                        df['obv'] = values
+            else:
+                # 回退到手工计算
+                obv = [0]
+                for i in range(1, len(df)):
+                    if df['close'].iloc[i] > df['close'].iloc[i-1]:
+                        obv.append(obv[-1] + df['volume'].iloc[i])
+                    elif df['close'].iloc[i] < df['close'].iloc[i-1]:
+                        obv.append(obv[-1] - df['volume'].iloc[i])
+                    else:
+                        obv.append(obv[-1])
+                df['obv'] = obv
+        except Exception as e:
+            log_manager.warning(f"OBV计算失败，使用手工计算: {str(e)}")
+            obv = [0]
+            for i in range(1, len(df)):
+                if df['close'].iloc[i] > df['close'].iloc[i-1]:
+                    obv.append(obv[-1] + df['volume'].iloc[i])
+                elif df['close'].iloc[i] < df['close'].iloc[i-1]:
+                    obv.append(obv[-1] - df['volume'].iloc[i])
+                else:
+                    obv.append(obv[-1])
+            df['obv'] = obv
 
     except Exception as e:
-        log_manager = _get_log_manager()
         log_manager.error(f"计算基础指标失败: {str(e)}")
 
     return df

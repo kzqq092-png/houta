@@ -14,7 +14,9 @@ from core.data_manager import DataManager
 from core.logger import LogManager, LogLevel
 import os
 import json
-from core.indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+# 使用新的指标服务架构
+from core.services.indicator_ui_adapter import IndicatorUIAdapter
+from core.indicator_manager import get_indicator_manager  # 兼容层
 import ptvsd
 
 
@@ -30,6 +32,10 @@ class StockScreener:
         """
         self.data_manager = data_manager
         self.log_manager = log_manager
+
+        # 初始化指标服务架构
+        # 使用新的指标UI适配器
+        self.indicator_adapter = IndicatorUIAdapter()
 
     def screen_stocks(self,
                       strategy_type: str,
@@ -79,18 +85,15 @@ class StockScreener:
             return pd.DataFrame()
 
     def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
-        """技术指标筛选，全部用ta-lib封装，分类与主界面一致，修复可见指标数为0问题"""
+        """技术指标筛选，使用新的指标服务架构"""
         results = []
-        talib_list = get_talib_indicator_list()
-        category_map = get_all_indicators_by_category()
-        visible_count = {cat: len(names)
-                         for cat, names in category_map.items() if names}
-        for cat, count in visible_count.items():
-            self.log_manager.log(f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
-        if not talib_list or not category_map:
+
+        # 获取可用指标列表
+        indicator_list = self.indicator_adapter.get_available_indicators()
+        if not indicator_list:
             self.log_manager.log(
-                "未检测到任何ta-lib指标，请检查ta-lib安装（需C库和Python包都正确）！如需帮助请参考README或联系技术支持。", LogLevel.ERROR)
-            print("【错误】未检测到任何ta-lib指标，请检查ta-lib安装（需C库和Python包都正确）！如需帮助请参考README或联系技术支持。")
+                "未检测到任何指标，请检查指标服务！", LogLevel.ERROR)
+            print("【错误】未检测到任何指标，请检查指标服务！")
             return pd.DataFrame()
         for stock in stock_list:
             try:
@@ -99,17 +102,22 @@ class StockScreener:
                     self.log_manager.log(
                         f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
                     continue
-                # 动态遍历所有ta-lib指标
+                # 计算常用技术指标
                 indicator_values = {}
-                for name in talib_list:
+                common_indicators = ['MA', 'EMA', 'MACD', 'RSI', 'BOLL', 'KDJ', 'ATR', 'OBV']
+                for name in common_indicators:
                     try:
-                        val = calc_talib_indicator(name, kdata)
-                        if isinstance(val, pd.DataFrame):
-                            for col in val.columns:
-                                indicator_values[f"{name}_{col}".upper(
-                                )] = val[col]
-                        else:
-                            indicator_values[name.upper()] = val
+                        result = self.indicator_adapter.calculate_indicator(name, kdata)
+                        if result and result.get('success'):
+                            val = result.get('data')
+                            if isinstance(val, pd.DataFrame):
+                                for col in val.columns:
+                                    indicator_values[f"{name}_{col}".upper()] = val[col]
+                            elif isinstance(val, dict):
+                                for key, value in val.items():
+                                    indicator_values[f"{name}_{key}".upper()] = value
+                            else:
+                                indicator_values[name.upper()] = val
                     except Exception as e:
                         self.log_manager.log(
                             f"股票 {stock} 指标 {name} 计算失败: {str(e)}", LogLevel.WARNING)
@@ -539,6 +547,16 @@ class StockScreener:
             self.log_manager.log(f"删除策略模板失败: {str(e)}", LogLevel.ERROR)
 
     def get_indicator_categories(self):
-        """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
-        from core.indicators_algo import get_all_indicators_by_category
-        return get_all_indicators_by_category()
+        """获取所有指标分类及其指标列表"""
+        try:
+            return self.indicator_adapter.get_indicator_categories()
+        except Exception as e:
+            self.log_manager.log(f"获取指标分类失败: {str(e)}", LogLevel.ERROR)
+            # 最终备用方案
+            return {
+                "重叠研究": ["SMA", "EMA", "WMA", "BBANDS", "SAR"],
+                "动量指标": ["MACD", "RSI", "STOCH", "WILLR", "CCI"],
+                "成交量": ["OBV", "AD", "ADOSC"],
+                "波动率": ["ATR", "NATR"],
+                "其他": ["DMI", "BIAS", "PSY"]
+            }
