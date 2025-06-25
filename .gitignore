@@ -5,7 +5,7 @@
 *.pyw
 *.pyz
 *.pywz
-.cache/*
+cache/*
 .cache
 .env
 .idea

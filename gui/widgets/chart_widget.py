@@ -416,7 +416,21 @@ class ChartWidget(QWidget):
                     change = row.close - prev_close
                     change_pct = (change / prev_close) * 100
                     change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+
+                    # 根据涨跌状态设置文本颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    if change_color == "↑":
+                        text_color = colors.get('k_up', '#ff3b30')  # 红色（涨）
+                    elif change_color == "↓":
+                        text_color = colors.get('k_down', '#00e676')  # 绿色（跌）
+                    else:
+                        text_color = colors.get('text', '#757575')  # 灰色（平）
+
                     info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+                else:
+                    # 没有涨跌数据时使用默认颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    text_color = colors.get('text', '#757575')
 
                 # 计算振幅
                 amplitude = ((row.high - row.low) / row.close) * 100
@@ -445,6 +459,8 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_va(
                     'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
                 self._crosshair_text.set_text(info)
+                # 设置涨跌颜色
+                self._crosshair_text.set_color(text_color)
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
@@ -899,7 +915,21 @@ class ChartWidget(QWidget):
                     change = row.close - prev_close
                     change_pct = (change / prev_close) * 100
                     change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+
+                    # 根据涨跌状态设置文本颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    if change_color == "↑":
+                        text_color = colors.get('k_up', '#ff3b30')  # 红色（涨）
+                    elif change_color == "↓":
+                        text_color = colors.get('k_down', '#00e676')  # 绿色（跌）
+                    else:
+                        text_color = colors.get('text', '#757575')  # 灰色（平）
+
                     info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+                else:
+                    # 没有涨跌数据时使用默认颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    text_color = colors.get('text', '#757575')
 
                 # 计算振幅
                 amplitude = ((row.high - row.low) / row.close) * 100
@@ -928,6 +958,8 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_va(
                     'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
                 self._crosshair_text.set_text(info)
+                # 设置涨跌颜色
+                self._crosshair_text.set_color(text_color)
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
@@ -1251,7 +1283,21 @@ class ChartWidget(QWidget):
                     change = row.close - prev_close
                     change_pct = (change / prev_close) * 100
                     change_color = "↑" if change > 0 else "↓" if change < 0 else "→"
+
+                    # 根据涨跌状态设置文本颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    if change_color == "↑":
+                        text_color = colors.get('k_up', '#ff3b30')  # 红色（涨）
+                    elif change_color == "↓":
+                        text_color = colors.get('k_down', '#00e676')  # 绿色（跌）
+                    else:
+                        text_color = colors.get('text', '#757575')  # 灰色（平）
+
                     info += f"\n{change_color} 涨跌: {change:+.2f} ({change_pct:+.2f}%)"
+                else:
+                    # 没有涨跌数据时使用默认颜色
+                    colors = self.theme_manager.get_theme_colors() if hasattr(self, 'theme_manager') else {}
+                    text_color = colors.get('text', '#757575')
 
                 # 计算振幅
                 amplitude = ((row.high - row.low) / row.close) * 100
@@ -1280,6 +1326,8 @@ class ChartWidget(QWidget):
                 self._crosshair_text.set_va(
                     'bottom' if y_val < (ylim[0] + ylim[1]) / 2 else 'top')
                 self._crosshair_text.set_text(info)
+                # 设置涨跌颜色
+                self._crosshair_text.set_color(text_color)
                 self._crosshair_text.set_visible(True)
                 # --- X轴交点数字覆盖 ---
                 # 固定在X轴上方，不随窗口缩放
