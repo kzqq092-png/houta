@@ -1,6 +1,7 @@
 """
 交易系统主窗口模块
 """
+from utils.matplotlib_utils import configure_matplotlib_for_gui
 import random
 from utils.log_util import log_structured
 import time
@@ -52,7 +53,12 @@ import traceback
 import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
+# 抑制SIP相关的DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning,
+                        message=".*sipPyTypeDict.*")
 
+# 导入matplotlib工具，自动配置警告抑制
+configure_matplotlib_for_gui()
 # 在文件开头添加random模块导入
 
 
@@ -1728,7 +1734,9 @@ class TradingGUI(QMainWindow):
                 QMessageBox.warning(self, "提示", "当前没有可重置的图表！")
                 return
             if hasattr(self.chart_widget, 'canvas') and hasattr(self.chart_widget, 'figure'):
-                self.chart_widget.figure.tight_layout()
+                # 使用安全的布局调整方式
+                from utils.matplotlib_utils import safe_figure_layout
+                safe_figure_layout(self.chart_widget.figure)
                 self.chart_widget.canvas.draw()
             else:
                 QMessageBox.warning(self, "提示", "当前图表控件不支持重置！")
