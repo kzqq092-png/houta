@@ -6,6 +6,7 @@
 import sqlite3
 import os
 from typing import Dict, Any
+import pandas as pd
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'hikyuu_system.db')
 
@@ -528,92 +529,133 @@ for i in range(2, len(kdata)):
 
         'three_black_crows': {
             'code': '''
-# 三只乌鸦识别算法
-for i in range(2, len(kdata)):
-    k0 = kdata.iloc[i-2]  # 前日
-    k1 = kdata.iloc[i-1]  # 昨日
-    k2 = kdata.iloc[i]    # 今日
-    
-    # 三根都是阴线
-    is_bearish_0 = k0['close'] < k0['open']
-    is_bearish_1 = k1['close'] < k1['open']
-    is_bearish_2 = k2['close'] < k2['open']
-    
-    if not (is_bearish_0 and is_bearish_1 and is_bearish_2):
-        continue
-    
-    # 收盘价逐步下降
-    close_descending = k1['close'] < k0['close'] and k2['close'] < k1['close']
-    if not close_descending:
-        continue
-    
-    # 开盘价逐步下降
-    open_descending = k1['open'] < k0['open'] and k2['open'] < k1['open']
-    if not open_descending:
-        continue
-    
-    # 实体相对较大
-    body_0 = abs(k0['close'] - k0['open'])
-    body_1 = abs(k1['close'] - k1['open'])
-    body_2 = abs(k2['close'] - k2['open'])
-    
-    range_0 = k0['high'] - k0['low']
-    range_1 = k1['high'] - k1['low']
-    range_2 = k2['high'] - k2['low']
-    
-    body_ratio_0 = body_0 / range_0 if range_0 > 0 else 0
-    body_ratio_1 = body_1 / range_1 if range_1 > 0 else 0
-    body_ratio_2 = body_2 / range_2 if range_2 > 0 else 0
-    
-    min_body_ratio = 0.3
-    if not (body_ratio_0 > min_body_ratio and body_ratio_1 > min_body_ratio and body_ratio_2 > min_body_ratio):
-        continue
-    
-    # 下影线相对较短
-    lower_shadow_0 = k0['close'] - k0['low']
-    lower_shadow_1 = k1['close'] - k1['low']
-    lower_shadow_2 = k2['close'] - k2['low']
-    
-    lower_ratio_0 = lower_shadow_0 / range_0 if range_0 > 0 else 0
-    lower_ratio_1 = lower_shadow_1 / range_1 if range_1 > 0 else 0
-    lower_ratio_2 = lower_shadow_2 / range_2 if range_2 > 0 else 0
-    
-    max_lower_ratio = 0.4
-    if not (lower_ratio_0 < max_lower_ratio and lower_ratio_1 < max_lower_ratio and lower_ratio_2 < max_lower_ratio):
-        continue
-    
-    # 计算置信度
-    base_confidence = 0.6
-    avg_body_ratio = (body_ratio_0 + body_ratio_1 + body_ratio_2) / 3
-    body_score = min(0.2, (avg_body_ratio - 0.3) * 0.5)
-    avg_lower_ratio = (lower_ratio_0 + lower_ratio_1 + lower_ratio_2) / 3
-    lower_score = min(0.1, (0.4 - avg_lower_ratio) * 0.25)
-    total_loss = (k0['open'] - k2['close']) / k0['open']
-    loss_score = min(0.1, total_loss * 2)
-    
-    confidence = base_confidence + body_score + lower_score + loss_score
-    confidence = min(0.95, max(0.5, confidence))
-    
-    datetime_val = str(kdata.iloc[i]['datetime']) if 'datetime' in kdata.columns else None
-    
-    result = create_result(
-        pattern_type='three_black_crows',
-        signal_type=SignalType.SELL,
-        confidence=confidence,
-        index=i,
-        price=k2['close'],
-        datetime_val=datetime_val,
-        start_index=i-2,
-        end_index=i,
-        extra_data={
-            'start_price': k0['open'],
-            'end_price': k2['close'],
-            'total_loss': total_loss * 100,
-            'body_ratios': [body_ratio_0, body_ratio_1, body_ratio_2],
-            'lower_ratios': [lower_ratio_0, lower_ratio_1, lower_ratio_2]
-        }
-    )
-    results.append(result)
+# 三只乌鸦识别算法 - 安全增强版
+try:
+    # 数据有效性检查
+    if len(kdata) < 3:
+        pass  # 数据不足，跳过
+    else:
+        # 限制处理范围，防止过大数据集导致性能问题
+        max_process_length = min(len(kdata), 10000)
+        
+        for i in range(2, max_process_length):
+            try:
+                k0 = kdata.iloc[i-2]  # 前日
+                k1 = kdata.iloc[i-1]  # 昨日
+                k2 = kdata.iloc[i]    # 今日
+                
+                # 数据完整性检查
+                required_fields = ['open', 'high', 'low', 'close']
+                if not all(field in k0 and field in k1 and field in k2 for field in required_fields):
+                    continue
+                    
+                # 价格有效性检查
+                if any(pd.isna([k0['open'], k0['high'], k0['low'], k0['close'],
+                               k1['open'], k1['high'], k1['low'], k1['close'],
+                               k2['open'], k2['high'], k2['low'], k2['close']])):
+                    continue
+                
+                # 三根都是阴线
+                is_bearish_0 = k0['close'] < k0['open']
+                is_bearish_1 = k1['close'] < k1['open']
+                is_bearish_2 = k2['close'] < k2['open']
+                
+                if not (is_bearish_0 and is_bearish_1 and is_bearish_2):
+                    continue
+                
+                # 收盘价逐步下降
+                close_descending = k1['close'] < k0['close'] and k2['close'] < k1['close']
+                if not close_descending:
+                    continue
+                
+                # 开盘价逐步下降
+                open_descending = k1['open'] < k0['open'] and k2['open'] < k1['open']
+                if not open_descending:
+                    continue
+                
+                # 实体相对较大
+                body_0 = abs(k0['close'] - k0['open'])
+                body_1 = abs(k1['close'] - k1['open'])
+                body_2 = abs(k2['close'] - k2['open'])
+                
+                range_0 = k0['high'] - k0['low']
+                range_1 = k1['high'] - k1['low']
+                range_2 = k2['high'] - k2['low']
+                
+                # 防止除零错误
+                if range_0 <= 0 or range_1 <= 0 or range_2 <= 0:
+                    continue
+                
+                body_ratio_0 = body_0 / range_0
+                body_ratio_1 = body_1 / range_1
+                body_ratio_2 = body_2 / range_2
+                
+                min_body_ratio = 0.3
+                if not (body_ratio_0 > min_body_ratio and body_ratio_1 > min_body_ratio and body_ratio_2 > min_body_ratio):
+                    continue
+                
+                # 下影线相对较短
+                lower_shadow_0 = k0['close'] - k0['low']
+                lower_shadow_1 = k1['close'] - k1['low']
+                lower_shadow_2 = k2['close'] - k2['low']
+                
+                lower_ratio_0 = lower_shadow_0 / range_0
+                lower_ratio_1 = lower_shadow_1 / range_1
+                lower_ratio_2 = lower_shadow_2 / range_2
+                
+                max_lower_ratio = 0.4
+                if not (lower_ratio_0 < max_lower_ratio and lower_ratio_1 < max_lower_ratio and lower_ratio_2 < max_lower_ratio):
+                    continue
+                
+                # 计算置信度
+                base_confidence = 0.6
+                avg_body_ratio = (body_ratio_0 + body_ratio_1 + body_ratio_2) / 3
+                body_score = min(0.2, (avg_body_ratio - 0.3) * 0.5)
+                avg_lower_ratio = (lower_ratio_0 + lower_ratio_1 + lower_ratio_2) / 3
+                lower_score = min(0.1, (0.4 - avg_lower_ratio) * 0.25)
+                
+                # 防止除零错误
+                if k0['open'] <= 0:
+                    continue
+                    
+                total_loss = (k0['open'] - k2['close']) / k0['open']
+                loss_score = min(0.1, total_loss * 2)
+                
+                confidence = base_confidence + body_score + lower_score + loss_score
+                confidence = min(0.95, max(0.5, confidence))
+                
+                datetime_val = str(kdata.iloc[i]['datetime']) if 'datetime' in kdata.columns else None
+                
+                result = create_result(
+                    pattern_type='three_black_crows',
+                    signal_type=SignalType.SELL,
+                    confidence=confidence,
+                    index=i,
+                    price=k2['close'],
+                    datetime_val=datetime_val,
+                    start_index=i-2,
+                    end_index=i,
+                    extra_data={
+                        'start_price': k0['open'],
+                        'end_price': k2['close'],
+                        'total_loss': total_loss * 100,
+                        'body_ratios': [body_ratio_0, body_ratio_1, body_ratio_2],
+                        'lower_ratios': [lower_ratio_0, lower_ratio_1, lower_ratio_2]
+                    }
+                )
+                results.append(result)
+                
+                # 限制结果数量，防止内存问题
+                if len(results) > 1000:
+                    break
+                    
+            except Exception as inner_e:
+                # 单个K线处理失败不影响整体
+                continue
+                
+except Exception as e:
+    # 整个算法失败，返回空结果
+    pass
 ''',
             'parameters': '{"min_body_ratio": 0.3, "max_lower_ratio": 0.4}'
         },

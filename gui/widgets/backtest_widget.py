@@ -49,6 +49,14 @@ except ImportError:
         ADVANCED = "ADVANCED"
         REAL_TIME = "REAL_TIME"
 
+# 导入统一图表服务
+try:
+    from core.services.unified_chart_service import get_unified_chart_service
+    from gui.widgets.chart_widget import ChartWidget
+    UNIFIED_CHART_AVAILABLE = True
+except ImportError:
+    UNIFIED_CHART_AVAILABLE = False
+
 # 导入核心模块
 try:
     from core.logger import LogManager
@@ -102,62 +110,61 @@ except ImportError:
 
 
 class RealTimeChart(QWidget):
-    """实时图表组件"""
+    """实时图表组件 - 基于统一图表服务的高性能实现"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.figure = Figure(figsize=(12, 8), facecolor='#1e1e1e')
-        self.canvas = FigureCanvas(self.figure)
         self.data_queue = queue.Queue()
+        self.init_ui()
 
-        # 设置布局
+    def init_ui(self):
+        """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.addWidget(self.canvas)
 
-        # 初始化图表
-        self.init_charts()
+        if UNIFIED_CHART_AVAILABLE:
+            # 使用统一图表服务
+            self.chart_widget = ChartWidget(self)
+            layout.addWidget(self.chart_widget)
 
-        # 启动动画
-        self.animation = FuncAnimation(
-            self.figure, self.update_charts, interval=1000, blit=False
-        )
+            # 配置图表
+            self.setup_chart()
+        else:
+            # 降级到简单显示
+            self.fallback_widget = QLabel("图表服务不可用，请检查依赖")
+            self.fallback_widget.setAlignment(Qt.AlignCenter)
+            layout.addWidget(self.fallback_widget)
 
-    def init_charts(self):
-        """初始化图表"""
-        self.figure.clear()
+        # 启动定时器更新数据
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_charts)
+        self.timer.start(1000)  # 每秒更新一次
 
-        # 创建子图
-        gs = self.figure.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
+    def setup_chart(self):
+        """设置图表配置"""
+        if not UNIFIED_CHART_AVAILABLE:
+            return
 
-        # 累积收益图
-        self.ax1 = self.figure.add_subplot(gs[0, :])
-        self.ax1.set_title('累积收益率', color='white', fontsize=12)
-        self.ax1.set_facecolor('#2d2d2d')
-        self.ax1.tick_params(colors='white')
+        try:
+            # 获取统一图表服务
+            chart_service = get_unified_chart_service()
 
-        # 回撤图
-        self.ax2 = self.figure.add_subplot(gs[1, 0])
-        self.ax2.set_title('回撤分析', color='white', fontsize=10)
-        self.ax2.set_facecolor('#2d2d2d')
-        self.ax2.tick_params(colors='white')
+            # 配置图表主题
+            chart_service.apply_theme(self.chart_widget, 'dark')
 
-        # 风险指标图
-        self.ax3 = self.figure.add_subplot(gs[1, 1])
-        self.ax3.set_title('风险指标', color='white', fontsize=10)
-        self.ax3.set_facecolor('#2d2d2d')
-        self.ax3.tick_params(colors='white')
+            # 设置图表类型为多子图模式
+            self.chart_widget.set_chart_type('multi_panel')
 
-        # 设置样式
-        for ax in [self.ax1, self.ax2, self.ax3]:
-            ax.spines['bottom'].set_color('white')
-            ax.spines['top'].set_color('white')
-            ax.spines['right'].set_color('white')
-            ax.spines['left'].set_color('white')
+            # 启用实时更新
+            self.chart_widget.enable_real_time_update(True)
 
-        self.canvas.draw()
+        except Exception as e:
+            print(f"图表设置失败: {e}")
 
-    def update_charts(self, frame):
+    def update_charts(self):
         """更新图表"""
+        if not UNIFIED_CHART_AVAILABLE:
+            return
+
         try:
             # 获取最新数据
             if not self.data_queue.empty():
@@ -166,52 +173,37 @@ class RealTimeChart(QWidget):
                     data.append(self.data_queue.get())
 
                 if data:
+                    # 转换为DataFrame
                     df = pd.DataFrame(data)
 
-                    # 清除旧图
-                    self.ax1.clear()
-                    self.ax2.clear()
-                    self.ax3.clear()
-
-                    # 更新累积收益图
-                    if 'cumulative_return' in df.columns:
-                        self.ax1.plot(df.index, df['cumulative_return'] * 100,
-                                      color='#00ff88', linewidth=2, label='累积收益')
-                        self.ax1.set_title('累积收益率 (%)', color='white')
-                        self.ax1.grid(True, alpha=0.3)
-                        self.ax1.legend()
-
-                    # 更新回撤图
-                    if 'current_drawdown' in df.columns:
-                        self.ax2.fill_between(df.index, df['current_drawdown'] * 100, 0,
-                                              color='#ff4b4b', alpha=0.7, label='当前回撤')
-                        self.ax2.set_title('回撤分析 (%)', color='white')
-                        self.ax2.grid(True, alpha=0.3)
-                        self.ax2.legend()
-
-                    # 更新风险指标图
-                    if 'sharpe_ratio' in df.columns:
-                        self.ax3.plot(df.index, df['sharpe_ratio'],
-                                      color='#00d4ff', linewidth=2, label='Sharpe比率')
-                        self.ax3.set_title('Sharpe比率', color='white')
-                        self.ax3.grid(True, alpha=0.3)
-                        self.ax3.legend()
-
-                    # 设置样式
-                    for ax in [self.ax1, self.ax2, self.ax3]:
-                        ax.set_facecolor('#2d2d2d')
-                        ax.tick_params(colors='white')
-                        for spine in ax.spines.values():
-                            spine.set_color('white')
-
-                    self.canvas.draw()
+                    # 更新图表数据
+                    self.chart_widget.update_data(df)
 
         except Exception as e:
-            print(f"更新图表失败: {e}")
+            print(f"图表更新失败: {e}")
 
     def add_data(self, data: Dict):
         """添加数据到队列"""
         self.data_queue.put(data)
+
+    def clear_data(self):
+        """清空数据"""
+        while not self.data_queue.empty():
+            self.data_queue.get()
+
+        if UNIFIED_CHART_AVAILABLE and hasattr(self, 'chart_widget'):
+            self.chart_widget.clear_data()
+
+    def set_chart_type(self, chart_type: str):
+        """设置图表类型"""
+        if UNIFIED_CHART_AVAILABLE and hasattr(self, 'chart_widget'):
+            self.chart_widget.set_chart_type(chart_type)
+
+    def apply_theme(self, theme: str):
+        """应用主题"""
+        if UNIFIED_CHART_AVAILABLE and hasattr(self, 'chart_widget'):
+            chart_service = get_unified_chart_service()
+            chart_service.apply_theme(self.chart_widget, theme)
 
 
 class MetricsPanel(QWidget):
@@ -966,7 +958,7 @@ class ProfessionalBacktestWidget(QWidget):
         try:
             self.monitoring_data.clear()
             self.alerts_panel.clear_alerts()
-            self.chart_widget.init_charts()
+            self.chart_widget.clear_data()
 
             self.log_manager.log("数据已清除", LogLevel.INFO)
 

@@ -1,0 +1,43 @@
+default:
+  allowed_permissions:
+  - read_data
+  - ui_modification
+  denied_permissions:
+  - system_commands
+  - plugin_management
+  file_access_paths: []
+  max_cpu_usage: 0.5
+  max_memory_usage: 104857600
+  network_whitelist: []
+  sandbox_enabled: true
+  timeout_seconds: 30
+restricted:
+  allowed_permissions:
+  - read_data
+  denied_permissions:
+  - write_data
+  - network_access
+  - file_system_access
+  - system_commands
+  file_access_paths: []
+  max_cpu_usage: 0.5
+  max_memory_usage: 104857600
+  network_whitelist: []
+  sandbox_enabled: true
+  timeout_seconds: 30
+trusted:
+  allowed_permissions:
+  - read_data
+  - write_data
+  - network_access
+  - file_system_access
+  - system_commands
+  - ui_modification
+  - plugin_management
+  denied_permissions: []
+  file_access_paths: []
+  max_cpu_usage: 0.5
+  max_memory_usage: 104857600
+  network_whitelist: []
+  sandbox_enabled: true
+  timeout_seconds: 30

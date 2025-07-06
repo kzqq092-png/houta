@@ -1,124 +1,353 @@
 #!/usr/bin/env python3
 """
-HIkyuu系统优化器
+HIkyuu系统优化器服务
 
-自动分析和优化系统，清理冗余文件，提升性能
+基于新架构的系统优化器，提供自动分析和优化功能，清理冗余文件，提升性能
 """
 
 import os
 import sys
 import gc
-import logging
+import asyncio
 import shutil
 from pathlib import Path
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional, Callable
 import ast
 import importlib.util
-from datetime import datetime
+from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict
+from enum import Enum
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/system_optimizer.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# 核心模块导入
+from core.services.base_service import AsyncBaseService
+from core.performance_monitor import PerformanceMonitor, get_performance_monitor
+from core.config import ConfigManager
+from core.events import EventBus
+from core.logger import get_logger
+
+# 工具模块导入
+from utils.cache import Cache
+from utils.manager_factory import get_config_manager
 
 
-class SystemOptimizer:
-    """系统优化器"""
+logger = get_logger(__name__)
 
-    def __init__(self, project_root: str = "."):
+
+class OptimizationLevel(Enum):
+    """优化级别"""
+    LIGHT = "light"      # 轻度优化：只清理缓存
+    MEDIUM = "medium"    # 中度优化：清理缓存 + 临时文件
+    DEEP = "deep"        # 深度优化：全面优化
+    CUSTOM = "custom"    # 自定义优化
+
+
+@dataclass
+class OptimizationConfig:
+    """优化配置"""
+    level: OptimizationLevel = OptimizationLevel.MEDIUM
+    clean_cache: bool = True
+    clean_temp_files: bool = True
+    clean_logs: bool = True
+    optimize_imports: bool = True
+    optimize_memory: bool = True
+    analyze_dependencies: bool = True
+    backup_before_optimize: bool = True
+    log_retention_days: int = 30
+    max_file_size_mb: int = 100
+    exclude_patterns: List[str] = None
+    include_patterns: List[str] = None
+
+    def __post_init__(self):
+        if self.exclude_patterns is None:
+            self.exclude_patterns = [
+                '__pycache__',
+                '.git',
+                '.pytest_cache',
+                'node_modules',
+                '.vscode',
+                '.idea',
+                '*.pyc',
+                '*.pyo',
+                '*.pyd',
+                '.DS_Store',
+                'Thumbs.db'
+            ]
+        if self.include_patterns is None:
+            self.include_patterns = ['*.py', '*.json', '*.yaml', '*.yml']
+
+
+@dataclass
+class OptimizationResult:
+    """优化结果"""
+    start_time: datetime
+    end_time: datetime
+    level: OptimizationLevel
+    total_files_scanned: int = 0
+    files_cleaned: int = 0
+    files_optimized: int = 0
+    bytes_freed: int = 0
+    errors: List[str] = None
+    warnings: List[str] = None
+    performance_improvement: float = 0.0
+
+    def __post_init__(self):
+        if self.errors is None:
+            self.errors = []
+        if self.warnings is None:
+            self.warnings = []
+
+    @property
+    def duration(self) -> timedelta:
+        return self.end_time - self.start_time
+
+    @property
+    def success_rate(self) -> float:
+        if self.total_files_scanned == 0:
+            return 0.0
+        return (self.total_files_scanned - len(self.errors)) / self.total_files_scanned
+
+
+class SystemOptimizerService(AsyncBaseService):
+    """系统优化器服务"""
+
+    def __init__(self,
+                 config_manager: Optional[ConfigManager] = None,
+                 performance_monitor: Optional[PerformanceMonitor] = None,
+                 event_bus: Optional[EventBus] = None):
         """
-        初始化系统优化器
+        初始化系统优化器服务
 
         Args:
-            project_root: 项目根目录
+            config_manager: 配置管理器
+            performance_monitor: 性能监控器
+            event_bus: 事件总线
         """
-        self.project_root = Path(project_root)
-        self.optimization_report = {
-            'start_time': datetime.now(),
-            'cleaned_files': [],
-            'optimized_files': [],
-            'errors': [],
-            'warnings': [],
-            'statistics': {}
-        }
+        super().__init__(event_bus)
+        self._config_manager = config_manager
+        self._performance_monitor = performance_monitor
+        self._cache = Cache()
 
-        # 需要忽略的目录和文件
-        self.ignore_patterns = {
-            '__pycache__',
-            '.git',
-            '.pytest_cache',
-            'node_modules',
-            '.vscode',
-            '.idea',
-            '*.pyc',
-            '*.pyo',
-            '*.pyd',
-            '.DS_Store',
-            'Thumbs.db'
-        }
+        # 服务状态
+        self._project_root = Path(".")
+        self._optimization_config = OptimizationConfig()
+        self._current_result: Optional[OptimizationResult] = None
+        self._optimization_history: List[OptimizationResult] = []
 
-        logger.info(f"系统优化器初始化完成，项目根目录: {self.project_root}")
+        # 回调函数
+        self._progress_callback: Optional[Callable[[str, float], None]] = None
+        self._status_callback: Optional[Callable[[str], None]] = None
 
-    def analyze_system(self) -> Dict[str, Any]:
+    async def _do_initialize_async(self) -> None:
+        """异步初始化服务"""
+        try:
+            # 延迟初始化依赖项
+            if self._config_manager is None:
+                self._config_manager = get_config_manager()
+            if self._performance_monitor is None:
+                self._performance_monitor = get_performance_monitor()
+
+            # 加载配置
+            await self._load_configuration()
+
+            # 初始化项目根目录
+            self._project_root = Path(self._config_manager.get('project.root_path', '.'))
+
+            # 确保日志目录存在
+            logs_dir = self._project_root / 'logs'
+            logs_dir.mkdir(exist_ok=True)
+
+            # 注册事件监听器
+            self._register_event_listeners()
+
+            logger.info(f"系统优化器服务初始化完成，项目根目录: {self._project_root}")
+
+        except Exception as e:
+            logger.error(f"系统优化器服务初始化失败: {e}")
+            raise
+
+    async def _do_dispose_async(self) -> None:
+        """异步清理服务资源"""
+        try:
+            # 保存优化历史
+            await self._save_optimization_history()
+
+            # 清理缓存
+            self._cache.clear()
+
+            logger.info("系统优化器服务已清理")
+
+        except Exception as e:
+            logger.error(f"系统优化器服务清理失败: {e}")
+
+    async def _load_configuration(self) -> None:
+        """加载配置"""
+        try:
+            config_dict = self._config_manager.get('optimization', {})
+
+            # 更新优化配置
+            if config_dict:
+                for key, value in config_dict.items():
+                    if hasattr(self._optimization_config, key):
+                        setattr(self._optimization_config, key, value)
+
+            logger.info("优化配置加载完成")
+
+        except Exception as e:
+            logger.warning(f"加载优化配置失败，使用默认配置: {e}")
+
+    def _register_event_listeners(self) -> None:
+        """注册事件监听器"""
+        self.event_bus.subscribe('system.optimization.start', self._on_optimization_start)
+        self.event_bus.subscribe('system.optimization.complete', self._on_optimization_complete)
+        self.event_bus.subscribe('system.optimization.error', self._on_optimization_error)
+
+    def _on_optimization_start(self, event_data) -> None:
+        """优化开始事件处理"""
+        logger.info("系统优化开始")
+        if self._status_callback:
+            self._status_callback("优化开始")
+
+    def _on_optimization_complete(self, event_data) -> None:
+        """优化完成事件处理"""
+        result = getattr(event_data, 'result', None)
+        if result:
+            self._optimization_history.append(result)
+            logger.info(f"系统优化完成，耗时: {result.duration}")
+            if self._status_callback:
+                self._status_callback("优化完成")
+
+    def _on_optimization_error(self, event_data) -> None:
+        """优化错误事件处理"""
+        error = getattr(event_data, 'error', '未知错误')
+        logger.error(f"系统优化失败: {error}")
+        if self._status_callback:
+            self._status_callback(f"优化失败: {error}")
+
+    def set_progress_callback(self, callback: Callable[[str, float], None]) -> None:
+        """设置进度回调函数"""
+        self._progress_callback = callback
+
+    def set_status_callback(self, callback: Callable[[str], None]) -> None:
+        """设置状态回调函数"""
+        self._status_callback = callback
+
+    def update_optimization_config(self, config: OptimizationConfig) -> None:
+        """更新优化配置"""
+        self._optimization_config = config
+        logger.info(f"优化配置已更新: {config.level}")
+
+    @property
+    def optimization_config(self) -> OptimizationConfig:
+        """获取优化配置"""
+        return self._optimization_config
+
+    @property
+    def optimization_history(self) -> List[OptimizationResult]:
+        """获取优化历史"""
+        return self._optimization_history.copy()
+
+    @property
+    def current_result(self) -> Optional[OptimizationResult]:
+        """获取当前优化结果"""
+        return self._current_result
+
+    async def analyze_system(self) -> Dict[str, Any]:
         """分析系统状态"""
-        logger.info("开始分析系统状态...")
+        self._ensure_not_disposed()
 
-        analysis = {
-            'total_files': 0,
-            'python_files': 0,
-            'duplicate_imports': [],
-            'unused_imports': [],
-            'large_files': [],
-            'empty_files': [],
-            'cache_files': [],
-            'log_files': [],
-            'temp_files': []
-        }
+        with self._performance_monitor.measure_time("system_analysis"):
+            logger.info("开始系统状态分析...")
 
-        for file_path in self.project_root.rglob('*'):
-            if file_path.is_file() and not self._should_ignore(file_path):
-                analysis['total_files'] += 1
+            if self._progress_callback:
+                self._progress_callback("正在分析系统...", 0.0)
 
-                # 分析Python文件
-                if file_path.suffix == '.py':
-                    analysis['python_files'] += 1
-                    self._analyze_python_file(file_path, analysis)
+            analysis = {
+                'scan_time': datetime.now(),
+                'total_files': 0,
+                'python_files': 0,
+                'large_files': [],
+                'empty_files': [],
+                'cache_files': [],
+                'log_files': [],
+                'temp_files': [],
+                'duplicate_files': [],
+                'import_analysis': {
+                    'duplicate_imports': [],
+                    'unused_imports': [],
+                    'circular_imports': []
+                },
+                'dependency_analysis': {
+                    'missing_dependencies': [],
+                    'outdated_dependencies': [],
+                    'unused_dependencies': []
+                },
+                'performance_issues': [],
+                'security_issues': []
+            }
 
-                # 检查大文件
-                file_size = file_path.stat().st_size
-                if file_size > 10 * 1024 * 1024:  # 大于10MB
-                    analysis['large_files'].append({
-                        'path': str(file_path),
-                        'size_mb': file_size / (1024 * 1024)
-                    })
+            try:
+                total_files = list(self._project_root.rglob('*'))
+                analysis['total_files'] = len([f for f in total_files if f.is_file()])
 
-                # 检查空文件
-                if file_size == 0:
-                    analysis['empty_files'].append(str(file_path))
+                processed = 0
+                for file_path in total_files:
+                    if not file_path.is_file() or self._should_ignore(file_path):
+                        continue
 
-                # 检查缓存文件
-                if any(pattern in str(file_path) for pattern in ['__pycache__', '.cache', '.pytest_cache']):
-                    analysis['cache_files'].append(str(file_path))
+                    processed += 1
+                    if self._progress_callback and processed % 100 == 0:
+                        progress = processed / len(total_files)
+                        self._progress_callback(f"分析文件: {file_path.name}", progress)
 
-                # 检查日志文件
-                if file_path.suffix in ['.log', '.out'] or 'log' in file_path.name.lower():
-                    analysis['log_files'].append(str(file_path))
+                    await self._analyze_file(file_path, analysis)
 
-                # 检查临时文件
-                if file_path.suffix in ['.tmp', '.temp', '.bak'] or file_path.name.startswith('~'):
-                    analysis['temp_files'].append(str(file_path))
+                # 分析依赖关系
+                await self._analyze_dependencies(analysis)
 
-        self.optimization_report['statistics'] = analysis
-        logger.info(f"系统分析完成: {analysis['total_files']}个文件，{analysis['python_files']}个Python文件")
-        return analysis
+                # 分析性能问题
+                await self._analyze_performance_issues(analysis)
 
-    def _analyze_python_file(self, file_path: Path, analysis: Dict[str, Any]):
+                # 分析安全问题
+                await self._analyze_security_issues(analysis)
+
+                logger.info(f"系统分析完成: {analysis['total_files']}个文件")
+                return analysis
+
+            except Exception as e:
+                logger.error(f"系统分析失败: {e}")
+                raise
+
+    async def _analyze_file(self, file_path: Path, analysis: Dict[str, Any]) -> None:
+        """分析单个文件"""
+        try:
+            file_size = file_path.stat().st_size
+
+            # 检查大文件
+            if file_size > self._optimization_config.max_file_size_mb * 1024 * 1024:
+                analysis['large_files'].append({
+                    'path': str(file_path),
+                    'size_mb': file_size / (1024 * 1024)
+                })
+
+            # 检查空文件
+            if file_size == 0:
+                analysis['empty_files'].append(str(file_path))
+
+            # 分类文件
+            if file_path.suffix == '.py':
+                analysis['python_files'] += 1
+                await self._analyze_python_file(file_path, analysis)
+            elif any(pattern in str(file_path).lower() for pattern in ['cache', 'tmp', 'temp']):
+                analysis['cache_files'].append(str(file_path))
+            elif file_path.suffix in ['.log', '.out'] or 'log' in file_path.name.lower():
+                analysis['log_files'].append(str(file_path))
+            elif file_path.suffix in ['.tmp', '.temp', '.bak'] or file_path.name.startswith('~'):
+                analysis['temp_files'].append(str(file_path))
+
+        except Exception as e:
+            logger.warning(f"分析文件失败 {file_path}: {e}")
+
+    async def _analyze_python_file(self, file_path: Path, analysis: Dict[str, Any]) -> None:
         """分析Python文件"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -142,75 +371,375 @@ class SystemOptimizer:
             seen_imports = set()
             for imp in imports:
                 if imp in seen_imports:
-                    analysis['duplicate_imports'].append({
+                    analysis['import_analysis']['duplicate_imports'].append({
                         'file': str(file_path),
                         'import': imp
                     })
                 seen_imports.add(imp)
 
+            # 检查潜在的性能问题
+            await self._check_performance_issues(file_path, tree, analysis)
+
         except Exception as e:
             logger.warning(f"分析Python文件失败 {file_path}: {e}")
 
-    def clean_cache_files(self) -> int:
+    async def _analyze_dependencies(self, analysis: Dict[str, Any]) -> None:
+        """分析依赖关系"""
+        try:
+            # 检查requirements.txt
+            req_file = self._project_root / 'requirements.txt'
+            if req_file.exists():
+                with open(req_file, 'r', encoding='utf-8') as f:
+                    requirements = f.read().splitlines()
+
+                # 分析依赖
+                for req in requirements:
+                    if req.strip() and not req.startswith('#'):
+                        # 这里可以添加更复杂的依赖分析逻辑
+                        pass
+
+        except Exception as e:
+            logger.warning(f"依赖分析失败: {e}")
+
+    async def _analyze_performance_issues(self, analysis: Dict[str, Any]) -> None:
+        """分析性能问题"""
+        try:
+            # 检查大文件
+            for large_file in analysis['large_files']:
+                if large_file['size_mb'] > 50:  # 大于50MB
+                    analysis['performance_issues'].append({
+                        'type': 'large_file',
+                        'file': large_file['path'],
+                        'description': f"文件过大: {large_file['size_mb']:.2f}MB"
+                    })
+
+            # 检查重复导入
+            if analysis['import_analysis']['duplicate_imports']:
+                analysis['performance_issues'].append({
+                    'type': 'duplicate_imports',
+                    'count': len(analysis['import_analysis']['duplicate_imports']),
+                    'description': "存在重复导入，可能影响启动性能"
+                })
+
+        except Exception as e:
+            logger.warning(f"性能问题分析失败: {e}")
+
+    async def _analyze_security_issues(self, analysis: Dict[str, Any]) -> None:
+        """分析安全问题"""
+        try:
+            # 检查敏感文件
+            sensitive_patterns = ['.env', 'password', 'secret', 'key', 'token']
+
+            for file_path in self._project_root.rglob('*'):
+                if file_path.is_file():
+                    file_name_lower = file_path.name.lower()
+                    if any(pattern in file_name_lower for pattern in sensitive_patterns):
+                        analysis['security_issues'].append({
+                            'type': 'sensitive_file',
+                            'file': str(file_path),
+                            'description': "可能包含敏感信息的文件"
+                        })
+
+        except Exception as e:
+            logger.warning(f"安全问题分析失败: {e}")
+
+    async def _check_performance_issues(self, file_path: Path, tree: ast.AST, analysis: Dict[str, Any]) -> None:
+        """检查代码性能问题"""
+        try:
+            # 检查循环中的重复计算
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.For, ast.While)):
+                    # 这里可以添加更复杂的性能检查逻辑
+                    pass
+
+        except Exception as e:
+            logger.warning(f"性能问题检查失败 {file_path}: {e}")
+
+    async def optimize_system(self, level: OptimizationLevel = None) -> OptimizationResult:
+        """优化系统"""
+        self._ensure_not_disposed()
+
+        level = level or self._optimization_config.level
+        start_time = datetime.now()
+
+        # 创建优化结果
+        self._current_result = OptimizationResult(
+            start_time=start_time,
+            end_time=start_time,  # 临时设置
+            level=level
+        )
+
+        try:
+            # 发送优化开始事件
+            self.event_bus.publish('system.optimization.start',
+                                   level=level,
+                                   config=asdict(self._optimization_config)
+                                   )
+
+            logger.info(f"开始系统优化，级别: {level}")
+
+            with self._performance_monitor.measure_time("system_optimization"):
+                # 备份（如果需要）
+                if self._optimization_config.backup_before_optimize:
+                    await self._create_backup()
+
+                # 根据级别执行不同的优化
+                if level == OptimizationLevel.LIGHT:
+                    await self._light_optimization()
+                elif level == OptimizationLevel.MEDIUM:
+                    await self._medium_optimization()
+                elif level == OptimizationLevel.DEEP:
+                    await self._deep_optimization()
+                else:  # CUSTOM
+                    await self._custom_optimization()
+
+                # 内存优化
+                if self._optimization_config.optimize_memory:
+                    await self._optimize_memory()
+
+                # 更新结果
+                self._current_result.end_time = datetime.now()
+
+                # 发送优化完成事件
+                self.event_bus.publish('system.optimization.complete',
+                                       result=self._current_result
+                                       )
+
+                logger.info(f"系统优化完成，耗时: {self._current_result.duration}")
+                return self._current_result
+
+        except Exception as e:
+            # 发送优化错误事件
+            self.event_bus.publish('system.optimization.error',
+                                   error=str(e),
+                                   level=level
+                                   )
+
+            self._current_result.errors.append(str(e))
+            self._current_result.end_time = datetime.now()
+
+            logger.error(f"系统优化失败: {e}")
+            self._exception_handler.handle_exception(e, "system_optimization")
+            raise
+
+    async def _create_backup(self) -> None:
+        """创建备份"""
+        try:
+            backup_dir = self._project_root / 'backups' / f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            backup_dir.mkdir(parents=True, exist_ok=True)
+
+            # 备份重要文件
+            important_files = ['requirements.txt', 'setup.py', 'config.json', 'settings.json']
+            for file_name in important_files:
+                src_file = self._project_root / file_name
+                if src_file.exists():
+                    shutil.copy2(src_file, backup_dir / file_name)
+
+            logger.info(f"备份创建完成: {backup_dir}")
+
+        except Exception as e:
+            logger.warning(f"创建备份失败: {e}")
+
+    async def _light_optimization(self) -> None:
+        """轻度优化"""
+        if self._progress_callback:
+            self._progress_callback("执行轻度优化...", 0.0)
+
+        # 只清理缓存
+        await self._clean_cache_files()
+
+        if self._progress_callback:
+            self._progress_callback("轻度优化完成", 1.0)
+
+    async def _medium_optimization(self) -> None:
+        """中度优化"""
+        if self._progress_callback:
+            self._progress_callback("执行中度优化...", 0.0)
+
+        # 清理缓存和临时文件
+        await self._clean_cache_files()
+        if self._progress_callback:
+            self._progress_callback("缓存清理完成", 0.3)
+
+        await self._clean_temp_files()
+        if self._progress_callback:
+            self._progress_callback("临时文件清理完成", 0.6)
+
+        await self._clean_old_logs()
+        if self._progress_callback:
+            self._progress_callback("中度优化完成", 1.0)
+
+    async def _deep_optimization(self) -> None:
+        """深度优化"""
+        if self._progress_callback:
+            self._progress_callback("执行深度优化...", 0.0)
+
+        # 执行全面优化
+        await self._clean_cache_files()
+        if self._progress_callback:
+            self._progress_callback("缓存清理完成", 0.2)
+
+        await self._clean_temp_files()
+        if self._progress_callback:
+            self._progress_callback("临时文件清理完成", 0.4)
+
+        await self._clean_old_logs()
+        if self._progress_callback:
+            self._progress_callback("日志清理完成", 0.6)
+
+        await self._optimize_imports()
+        if self._progress_callback:
+            self._progress_callback("导入优化完成", 0.8)
+
+        await self._optimize_code_structure()
+        if self._progress_callback:
+            self._progress_callback("深度优化完成", 1.0)
+
+    async def _custom_optimization(self) -> None:
+        """自定义优化"""
+        if self._progress_callback:
+            self._progress_callback("执行自定义优化...", 0.0)
+
+        tasks = []
+        progress_step = 0.0
+        total_tasks = 0
+
+        # 根据配置决定执行哪些优化
+        if self._optimization_config.clean_cache:
+            tasks.append(self._clean_cache_files())
+            total_tasks += 1
+
+        if self._optimization_config.clean_temp_files:
+            tasks.append(self._clean_temp_files())
+            total_tasks += 1
+
+        if self._optimization_config.clean_logs:
+            tasks.append(self._clean_old_logs())
+            total_tasks += 1
+
+        if self._optimization_config.optimize_imports:
+            tasks.append(self._optimize_imports())
+            total_tasks += 1
+
+        # 执行任务
+        for i, task in enumerate(tasks):
+            await task
+            progress_step = (i + 1) / total_tasks
+            if self._progress_callback:
+                self._progress_callback(f"自定义优化进度", progress_step)
+
+        if self._progress_callback:
+            self._progress_callback("自定义优化完成", 1.0)
+
+    async def _clean_cache_files(self) -> int:
         """清理缓存文件"""
         logger.info("开始清理缓存文件...")
 
         cleaned_count = 0
-        cache_patterns = ['__pycache__', '.pytest_cache', '.cache']
+        bytes_freed = 0
+        cache_patterns = ['__pycache__', '.pytest_cache', '.cache', '.mypy_cache']
 
         for pattern in cache_patterns:
-            for cache_dir in self.project_root.rglob(pattern):
+            for cache_dir in self._project_root.rglob(pattern):
                 if cache_dir.is_dir():
                     try:
+                        # 计算目录大小
+                        dir_size = sum(f.stat().st_size for f in cache_dir.rglob('*') if f.is_file())
+
                         shutil.rmtree(cache_dir)
-                        self.optimization_report['cleaned_files'].append(str(cache_dir))
                         cleaned_count += 1
+                        bytes_freed += dir_size
+
                         logger.info(f"删除缓存目录: {cache_dir}")
+
                     except Exception as e:
                         logger.error(f"删除缓存目录失败 {cache_dir}: {e}")
-                        self.optimization_report['errors'].append(str(e))
+                        self._current_result.errors.append(f"删除缓存目录失败: {e}")
 
         # 清理.pyc文件
-        for pyc_file in self.project_root.rglob('*.pyc'):
+        for pyc_file in self._project_root.rglob('*.pyc'):
             try:
+                file_size = pyc_file.stat().st_size
                 pyc_file.unlink()
-                self.optimization_report['cleaned_files'].append(str(pyc_file))
                 cleaned_count += 1
+                bytes_freed += file_size
+
             except Exception as e:
                 logger.error(f"删除.pyc文件失败 {pyc_file}: {e}")
+                self._current_result.errors.append(f"删除.pyc文件失败: {e}")
 
-        logger.info(f"缓存文件清理完成，删除了 {cleaned_count} 个文件/目录")
+        self._current_result.files_cleaned += cleaned_count
+        self._current_result.bytes_freed += bytes_freed
+
+        logger.info(f"缓存文件清理完成，删除了 {cleaned_count} 个文件/目录，释放 {bytes_freed / 1024 / 1024:.2f} MB")
         return cleaned_count
 
-    def clean_temp_files(self) -> int:
+    async def _clean_temp_files(self) -> int:
         """清理临时文件"""
         logger.info("开始清理临时文件...")
 
         cleaned_count = 0
-        temp_patterns = ['*.tmp', '*.temp', '*.bak', '~*']
+        bytes_freed = 0
+        temp_patterns = ['*.tmp', '*.temp', '*.bak', '~*', '*.swp', '*.swo']
 
         for pattern in temp_patterns:
-            for temp_file in self.project_root.rglob(pattern):
+            for temp_file in self._project_root.rglob(pattern):
                 if temp_file.is_file():
                     try:
+                        file_size = temp_file.stat().st_size
                         temp_file.unlink()
-                        self.optimization_report['cleaned_files'].append(str(temp_file))
                         cleaned_count += 1
+                        bytes_freed += file_size
+
                         logger.info(f"删除临时文件: {temp_file}")
+
                     except Exception as e:
                         logger.error(f"删除临时文件失败 {temp_file}: {e}")
-                        self.optimization_report['errors'].append(str(e))
+                        self._current_result.errors.append(f"删除临时文件失败: {e}")
 
-        logger.info(f"临时文件清理完成，删除了 {cleaned_count} 个文件")
+        self._current_result.files_cleaned += cleaned_count
+        self._current_result.bytes_freed += bytes_freed
+
+        logger.info(f"临时文件清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
         return cleaned_count
 
-    def optimize_imports(self) -> int:
+    async def _clean_old_logs(self) -> int:
+        """清理旧日志文件"""
+        logger.info(f"开始清理 {self._optimization_config.log_retention_days} 天前的日志文件...")
+
+        cleaned_count = 0
+        bytes_freed = 0
+        cutoff_time = datetime.now().timestamp() - (self._optimization_config.log_retention_days * 24 * 60 * 60)
+
+        logs_dir = self._project_root / 'logs'
+        if logs_dir.exists():
+            for log_file in logs_dir.rglob('*.log'):
+                try:
+                    if log_file.stat().st_mtime < cutoff_time:
+                        file_size = log_file.stat().st_size
+                        log_file.unlink()
+                        cleaned_count += 1
+                        bytes_freed += file_size
+
+                        logger.info(f"删除旧日志文件: {log_file}")
+
+                except Exception as e:
+                    logger.error(f"删除日志文件失败 {log_file}: {e}")
+                    self._current_result.errors.append(f"删除日志文件失败: {e}")
+
+        self._current_result.files_cleaned += cleaned_count
+        self._current_result.bytes_freed += bytes_freed
+
+        logger.info(f"日志清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
+        return cleaned_count
+
+    async def _optimize_imports(self) -> int:
         """优化导入语句"""
         logger.info("开始优化导入语句...")
 
         optimized_count = 0
 
-        for py_file in self.project_root.rglob('*.py'):
+        for py_file in self._project_root.rglob('*.py'):
             if self._should_ignore(py_file):
                 continue
 
@@ -239,159 +768,263 @@ class SystemOptimizer:
                 if len(optimized_lines) < len(lines):
                     with open(py_file, 'w', encoding='utf-8') as f:
                         f.write('\n'.join(optimized_lines))
-                    self.optimization_report['optimized_files'].append(str(py_file))
+                    self._current_result.files_optimized += 1
 
             except Exception as e:
                 logger.error(f"优化导入失败 {py_file}: {e}")
-                self.optimization_report['errors'].append(str(e))
+                self._current_result.errors.append(f"优化导入失败: {e}")
 
         logger.info(f"导入优化完成，优化了 {optimized_count} 个重复导入")
         return optimized_count
 
-    def clean_old_logs(self, days: int = 30) -> int:
-        """清理旧日志文件"""
-        logger.info(f"开始清理 {days} 天前的日志文件...")
+    async def _optimize_code_structure(self) -> None:
+        """优化代码结构"""
+        logger.info("开始优化代码结构...")
 
-        cleaned_count = 0
-        cutoff_time = datetime.now().timestamp() - (days * 24 * 60 * 60)
+        try:
+            # 这里可以添加更复杂的代码结构优化逻辑
+            # 例如：重构长函数、优化类结构等
+            pass
 
-        logs_dir = self.project_root / 'logs'
-        if logs_dir.exists():
-            for log_file in logs_dir.rglob('*.log'):
-                try:
-                    if log_file.stat().st_mtime < cutoff_time:
-                        log_file.unlink()
-                        self.optimization_report['cleaned_files'].append(str(log_file))
-                        cleaned_count += 1
-                        logger.info(f"删除旧日志文件: {log_file}")
-                except Exception as e:
-                    logger.error(f"删除日志文件失败 {log_file}: {e}")
-                    self.optimization_report['errors'].append(str(e))
+        except Exception as e:
+            logger.error(f"代码结构优化失败: {e}")
+            self._current_result.errors.append(f"代码结构优化失败: {e}")
 
-        logger.info(f"日志清理完成，删除了 {cleaned_count} 个文件")
-        return cleaned_count
-
-    def optimize_memory(self):
+    async def _optimize_memory(self) -> None:
         """优化内存使用"""
         logger.info("开始内存优化...")
 
-        # 强制垃圾回收
-        collected = gc.collect()
-        logger.info(f"垃圾回收完成，回收了 {collected} 个对象")
+        try:
+            # 强制垃圾回收
+            collected = gc.collect()
+            logger.info(f"垃圾回收完成，回收了 {collected} 个对象")
 
-        # 清理导入缓存
-        if hasattr(sys, 'modules'):
-            modules_to_remove = []
-            for module_name in sys.modules:
-                if module_name.startswith('__pycache__'):
-                    modules_to_remove.append(module_name)
+            # 清理导入缓存
+            if hasattr(sys, 'modules'):
+                modules_to_remove = []
+                for module_name in sys.modules:
+                    if module_name.startswith('__pycache__'):
+                        modules_to_remove.append(module_name)
 
-            for module_name in modules_to_remove:
-                del sys.modules[module_name]
+                for module_name in modules_to_remove:
+                    del sys.modules[module_name]
 
-            logger.info(f"清理了 {len(modules_to_remove)} 个缓存模块")
+                logger.info(f"清理了 {len(modules_to_remove)} 个缓存模块")
+
+            # 清理服务缓存
+            self._cache.clear()
+
+        except Exception as e:
+            logger.error(f"内存优化失败: {e}")
+            self._current_result.errors.append(f"内存优化失败: {e}")
 
     def _should_ignore(self, path: Path) -> bool:
         """检查是否应该忽略该路径"""
         path_str = str(path)
-        return any(pattern in path_str for pattern in self.ignore_patterns)
 
-    def generate_report(self) -> str:
+        # 检查排除模式
+        for pattern in self._optimization_config.exclude_patterns:
+            if pattern in path_str:
+                return True
+
+        # 检查包含模式
+        if self._optimization_config.include_patterns:
+            for pattern in self._optimization_config.include_patterns:
+                if pattern.replace('*', '') in path_str:
+                    return False
+            return True
+
+        return False
+
+    async def generate_report(self) -> str:
         """生成优化报告"""
-        self.optimization_report['end_time'] = datetime.now()
-        duration = self.optimization_report['end_time'] - self.optimization_report['start_time']
+        if not self._current_result:
+            return "没有可用的优化结果"
+
+        result = self._current_result
 
         report = f"""
 HIkyuu系统优化报告
 ==================
 
-优化时间: {self.optimization_report['start_time'].strftime('%Y-%m-%d %H:%M:%S')} - {self.optimization_report['end_time'].strftime('%Y-%m-%d %H:%M:%S')}
-持续时间: {duration.total_seconds():.2f} 秒
+优化时间: {result.start_time.strftime('%Y-%m-%d %H:%M:%S')} - {result.end_time.strftime('%Y-%m-%d %H:%M:%S')}
+持续时间: {result.duration.total_seconds():.2f} 秒
+优化级别: {result.level.value}
+成功率: {result.success_rate:.2%}
 
-系统统计:
-- 总文件数: {self.optimization_report['statistics'].get('total_files', 0)}
-- Python文件数: {self.optimization_report['statistics'].get('python_files', 0)}
-- 大文件数: {len(self.optimization_report['statistics'].get('large_files', []))}
-- 空文件数: {len(self.optimization_report['statistics'].get('empty_files', []))}
+优化结果:
+- 扫描文件数: {result.total_files_scanned}
+- 清理文件数: {result.files_cleaned}
+- 优化文件数: {result.files_optimized}
+- 释放空间: {result.bytes_freed / 1024 / 1024:.2f} MB
+- 性能提升: {result.performance_improvement:.2%}
 
-清理结果:
-- 清理的文件数: {len(self.optimization_report['cleaned_files'])}
-- 优化的文件数: {len(self.optimization_report['optimized_files'])}
-- 错误数: {len(self.optimization_report['errors'])}
-- 警告数: {len(self.optimization_report['warnings'])}
-
-详细信息:
 """
 
-        if self.optimization_report['errors']:
-            report += "\n错误列表:\n"
-            for error in self.optimization_report['errors']:
+        if result.errors:
+            report += f"\n错误列表 ({len(result.errors)}个):\n"
+            for error in result.errors[:10]:  # 只显示前10个错误
                 report += f"- {error}\n"
+            if len(result.errors) > 10:
+                report += f"... 还有 {len(result.errors) - 10} 个错误\n"
 
-        if self.optimization_report['warnings']:
-            report += "\n警告列表:\n"
-            for warning in self.optimization_report['warnings']:
+        if result.warnings:
+            report += f"\n警告列表 ({len(result.warnings)}个):\n"
+            for warning in result.warnings[:10]:  # 只显示前10个警告
                 report += f"- {warning}\n"
+            if len(result.warnings) > 10:
+                report += f"... 还有 {len(result.warnings) - 10} 个警告\n"
+
+        # 性能统计
+        perf_stats = self._performance_monitor.get_stats()
+        if 'operations' in perf_stats:
+            report += "\n性能统计:\n"
+            for operation, stats in perf_stats['operations'].items():
+                if 'system' in operation:
+                    report += f"- {operation}: {stats['avg_time']:.3f}s (平均)\n"
 
         return report
 
-    def run_full_optimization(self) -> str:
-        """运行完整的系统优化"""
-        logger.info("开始完整系统优化...")
+    async def _save_optimization_history(self) -> None:
+        """保存优化历史"""
+        try:
+            history_file = self._project_root / 'logs' / 'optimization_history.json'
+            history_data = [asdict(result) for result in self._optimization_history]
+
+            import json
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(history_data, f, indent=2, ensure_ascii=False, default=str)
+
+            logger.info(f"优化历史已保存到: {history_file}")
+
+        except Exception as e:
+            logger.error(f"保存优化历史失败: {e}")
+
+    async def get_optimization_suggestions(self) -> List[str]:
+        """获取优化建议"""
+        suggestions = []
 
         try:
-            # 1. 分析系统
-            self.analyze_system()
+            # 分析系统状态
+            analysis = await self.analyze_system()
 
-            # 2. 清理缓存文件
-            self.clean_cache_files()
+            # 基于分析结果提供建议
+            if analysis['large_files']:
+                suggestions.append(f"发现 {len(analysis['large_files'])} 个大文件，建议检查是否可以压缩或删除")
 
-            # 3. 清理临时文件
-            self.clean_temp_files()
+            if analysis['import_analysis']['duplicate_imports']:
+                suggestions.append("发现重复导入，建议运行导入优化")
 
-            # 4. 优化导入
-            self.optimize_imports()
+            if analysis['cache_files']:
+                suggestions.append(f"发现 {len(analysis['cache_files'])} 个缓存文件，建议清理")
 
-            # 5. 清理旧日志
-            self.clean_old_logs()
+            if analysis['temp_files']:
+                suggestions.append(f"发现 {len(analysis['temp_files'])} 个临时文件，建议清理")
 
-            # 6. 内存优化
-            self.optimize_memory()
+            if analysis['performance_issues']:
+                suggestions.append(f"发现 {len(analysis['performance_issues'])} 个性能问题，建议深度优化")
 
-            # 7. 生成报告
-            report = self.generate_report()
+            if analysis['security_issues']:
+                suggestions.append(f"发现 {len(analysis['security_issues'])} 个安全问题，建议检查")
 
-            # 保存报告
-            report_file = self.project_root / 'logs' / f'optimization_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
-            report_file.parent.mkdir(exist_ok=True)
+            if not suggestions:
+                suggestions.append("系统状态良好，暂无优化建议")
+
+        except Exception as e:
+            logger.error(f"获取优化建议失败: {e}")
+            suggestions.append("无法获取优化建议，请检查系统状态")
+
+        return suggestions
+
+    async def run_full_optimization(self, level: OptimizationLevel = OptimizationLevel.MEDIUM) -> OptimizationResult:
+        """运行完整的系统优化"""
+        self._ensure_not_disposed()
+
+        logger.info(f"开始完整系统优化，级别: {level}")
+
+        try:
+            # 1. 系统分析
+            analysis = await self.analyze_system()
+
+            # 2. 执行优化
+            result = await self.optimize_system(level)
+            result.total_files_scanned = analysis['total_files']
+
+            # 3. 生成报告
+            report = await self.generate_report()
+
+            # 4. 保存报告
+            report_file = self._project_root / 'logs' / f'optimization_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
             with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
 
-            logger.info(f"系统优化完成，报告已保存到: {report_file}")
-            return report
+            logger.info(f"完整系统优化完成，报告已保存到: {report_file}")
+            return result
 
         except Exception as e:
-            logger.error(f"系统优化失败: {e}")
-            return f"系统优化失败: {e}"
+            logger.error(f"完整系统优化失败: {e}")
+            raise
 
 
-def main():
+# 全局实例
+_system_optimizer_service: Optional[SystemOptimizerService] = None
+
+
+def get_system_optimizer_service() -> SystemOptimizerService:
+    """获取系统优化器服务实例"""
+    global _system_optimizer_service
+    if _system_optimizer_service is None:
+        _system_optimizer_service = SystemOptimizerService()
+    return _system_optimizer_service
+
+
+def set_system_optimizer_service(service: SystemOptimizerService) -> None:
+    """设置系统优化器服务实例"""
+    global _system_optimizer_service
+    _system_optimizer_service = service
+
+
+async def main():
     """主函数"""
-    print("HIkyuu系统优化器")
-    print("================")
+    print("HIkyuu系统优化器服务")
+    print("====================")
 
-    # 确保日志目录存在
-    os.makedirs('logs', exist_ok=True)
+    # 创建并初始化优化器服务
+    optimizer_service = SystemOptimizerService()
 
-    # 创建优化器
-    optimizer = SystemOptimizer()
+    try:
+        await optimizer_service.initialize_async()
 
-    # 运行优化
-    report = optimizer.run_full_optimization()
+        # 设置进度回调
+        def progress_callback(message: str, progress: float):
+            print(f"进度: {progress:.1%} - {message}")
 
-    print("\n优化报告:")
-    print(report)
+        def status_callback(status: str):
+            print(f"状态: {status}")
+
+        optimizer_service.set_progress_callback(progress_callback)
+        optimizer_service.set_status_callback(status_callback)
+
+        # 获取优化建议
+        suggestions = await optimizer_service.get_optimization_suggestions()
+        print("\n优化建议:")
+        for suggestion in suggestions:
+            print(f"- {suggestion}")
+
+        # 运行完整优化
+        result = await optimizer_service.run_full_optimization()
+
+        # 生成报告
+        report = await optimizer_service.generate_report()
+        print("\n优化报告:")
+        print(report)
+
+    except Exception as e:
+        print(f"优化失败: {e}")
+
+    finally:
+        await optimizer_service.dispose_async()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

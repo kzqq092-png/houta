@@ -1,404 +1,894 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-股票详情对话框模块
+股票详情对话框
+
+显示股票的详细信息，包括基本信息、财务数据、技术指标等
 """
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
-import traceback
-from gui.widgets.log_widget import LogWidget
-import json
+
+import sys
 import os
+import traceback
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QTabWidget, QLabel, QLineEdit, QTextEdit, QTableWidget,
+    QTableWidgetItem, QPushButton, QComboBox, QDateEdit,
+    QFrame, QSplitter, QScrollArea, QGroupBox,
+    QProgressBar, QMessageBox, QHeaderView
+)
+from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QTimer
+from PyQt5.QtGui import QFont, QPixmap, QPalette
 
-SETTINGS_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'settings.json')
-
-
-class ColumnSelectorDialog(QDialog):
-    """表格样式动态勾选列对话框，支持字段筛选，5列紧凑排列，仿图片风格"""
-
-    def __init__(self, all_fields, selected_fields, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("选择要显示的财务字段")
-        self.selected_fields = set(selected_fields)
-        self.all_fields = all_fields
-        self.filtered_fields = all_fields.copy()
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["", "", "", "", ""])
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setSelectionMode(QAbstractItemView.NoSelection)
-        self.table.setFocusPolicy(Qt.NoFocus)
-        self.table.setShowGrid(False)
-        self.table.setAlternatingRowColors(False)
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("筛选字段名...")
-        self.search_edit.textChanged.connect(self.apply_filter)
-        btn_layout = QHBoxLayout()
-        self.select_all_btn = QPushButton("全选")
-        self.deselect_all_btn = QPushButton("全不选")
-        self.select_all_btn.clicked.connect(self.select_all)
-        self.deselect_all_btn.clicked.connect(self.deselect_all)
-        btn_layout.addWidget(self.select_all_btn)
-        btn_layout.addWidget(self.deselect_all_btn)
-        btn_layout.addStretch()
-        main_layout = QVBoxLayout(self)
-        main_layout.addWidget(self.search_edit)
-        main_layout.addWidget(self.table)
-        main_layout.addLayout(btn_layout)
-        ok_btn = QPushButton("确定")
-        ok_btn.clicked.connect(self.accept)
-        main_layout.addWidget(ok_btn, alignment=Qt.AlignRight)
-        self.refresh_table()
-
-    def refresh_table(self):
-        # 5列紧凑排列
-        fields = self.filtered_fields
-        n = len(fields)
-        cols = 5
-        rows = (n + cols - 1) // cols
-        self.table.setRowCount(rows)
-        self.table.setColumnCount(cols)
-        for i in range(rows * cols):
-            row, col = divmod(i, cols)
-            if i < n:
-                field = fields[i]
-                cb = QCheckBox()
-                cb.setChecked(field['key'] in self.selected_fields)
-                cb.field_key = field['key']
-                cb.stateChanged.connect(self.on_checkbox_changed)
-                w = QWidget()
-                layout = QHBoxLayout(w)
-                layout.setContentsMargins(0, 2, 0, 2)
-                layout.setSpacing(0)
-                layout.addWidget(cb)
-                label = QLabel(field['field'])
-                label.setFixedWidth(230)
-                label.setAlignment(Qt.AlignCenter)
-                layout.addWidget(label)
-                layout.addStretch()
-                w.setLayout(layout)
-                self.table.setCellWidget(row, col, w)
-                self.table.setRowHeight(row, 18)
-            else:
-                self.table.setCellWidget(row, col, QWidget())
-        self.table.resizeColumnsToContents()
-        self.table.resizeRowsToContents()
-
-    def on_checkbox_changed(self, state):
-        # 更新选中字段
-        self.selected_fields = set()
-        for row in range(self.table.rowCount()):
-            for col in range(self.table.columnCount()):
-                w = self.table.cellWidget(row, col)
-                if w:
-                    cb = w.findChild(QCheckBox)
-                    if cb and cb.isChecked():
-                        self.selected_fields.add(cb.field_key)
-
-    def get_selected_keys(self):
-        return list(self.selected_fields)
-
-    def select_all(self):
-        for row in range(self.table.rowCount()):
-            for col in range(self.table.columnCount()):
-                w = self.table.cellWidget(row, col)
-                if w:
-                    cb = w.findChild(QCheckBox)
-                    if cb:
-                        cb.setChecked(True)
-        self.on_checkbox_changed(None)
-
-    def deselect_all(self):
-        for row in range(self.table.rowCount()):
-            for col in range(self.table.columnCount()):
-                w = self.table.cellWidget(row, col)
-                if w:
-                    cb = w.findChild(QCheckBox)
-                    if cb:
-                        cb.setChecked(False)
-        self.on_checkbox_changed(None)
-
-    def apply_filter(self, text):
-        text = text.strip()
-        if not text:
-            self.filtered_fields = self.all_fields.copy()
-        else:
-            self.filtered_fields = [
-                f for f in self.all_fields if text in f['field'] or text in f['key']]
-        self.refresh_table()
-
-# 辅助函数：读写settings.json
+from core.logger import get_logger
 
 
-def load_selected_fields():
-    try:
-        with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
-        return settings.get('finance_selected_fields', None)
-    except Exception:
-        return None
+class StockDataWorker(QThread):
+    """股票数据获取工作线程"""
 
+    data_loaded = pyqtSignal(dict)  # 数据加载完成
+    error_occurred = pyqtSignal(str)  # 发生错误
+    progress_updated = pyqtSignal(int)  # 进度更新
 
-def save_selected_fields(selected_fields):
-    try:
-        if os.path.exists(SETTINGS_PATH):
-            with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-        else:
-            settings = {}
-        settings['finance_selected_fields'] = selected_fields
-        with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    def __init__(self, stock_code: str, data_manager=None):
+        super().__init__()
+        self.stock_code = stock_code
+        self.data_manager = data_manager
+        self.logger = get_logger(__name__)
+
+    def run(self):
+        """运行数据获取任务"""
+        try:
+            if not self.data_manager:
+                self.error_occurred.emit("数据管理器未设置")
+                return
+
+            result = {}
+            total_steps = 6
+            current_step = 0
+
+            # 1. 基本信息
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            basic_info = self.get_basic_info()
+            result['basic_info'] = basic_info
+            current_step += 1
+
+            # 2. K线数据
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            kdata = self.get_kdata()
+            result['kdata'] = kdata
+            current_step += 1
+
+            # 3. 财务数据
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            finance_data = self.get_finance_data()
+            result['finance_data'] = finance_data
+            current_step += 1
+
+            # 4. 技术指标
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            indicators = self.get_indicators()
+            result['indicators'] = indicators
+            current_step += 1
+
+            # 5. 历史统计
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            statistics = self.get_statistics()
+            result['statistics'] = statistics
+            current_step += 1
+
+            # 6. 相关股票
+            self.progress_updated.emit(int(current_step * 100 / total_steps))
+            related_stocks = self.get_related_stocks()
+            result['related_stocks'] = related_stocks
+            current_step += 1
+
+            self.progress_updated.emit(100)
+            self.data_loaded.emit(result)
+
+        except Exception as e:
+            self.logger.error(f"获取股票数据失败: {e}")
+            self.error_occurred.emit(str(e))
+
+    def get_basic_info(self) -> Dict[str, Any]:
+        """获取基本信息"""
+        try:
+            # 模拟获取基本信息
+            info = {
+                'code': self.stock_code,
+                'name': f"股票{self.stock_code}",
+                'market': '深圳' if self.stock_code.startswith('00') else '上海',
+                'industry': '银行业',
+                'concept': '银行,金融',
+                'listing_date': '2000-01-01',
+                'total_share': 1000000000,
+                'float_share': 800000000,
+                'market_cap': 50000000000,
+                'pe_ratio': 8.5,
+                'pb_ratio': 0.9,
+                'dividend_yield': 0.035,
+                'roe': 0.12,
+                'debt_ratio': 0.85
+            }
+
+            # 如果有数据管理器，尝试获取真实数据
+            if self.data_manager and hasattr(self.data_manager, 'get_stock_info'):
+                real_info = self.data_manager.get_stock_info(self.stock_code)
+                if real_info:
+                    info.update(real_info)
+
+            return info
+
+        except Exception as e:
+            self.logger.error(f"获取基本信息失败: {e}")
+            return {}
+
+    def get_kdata(self) -> Dict[str, Any]:
+        """获取K线数据"""
+        try:
+            result = {}
+
+            # 获取不同周期的K线数据
+            periods = ['1min', '5min', '15min', '30min', '60min', 'D', 'W', 'M']
+            for period in periods:
+                try:
+                    if self.data_manager and hasattr(self.data_manager, 'get_kdata'):
+                        kdata = self.data_manager.get_kdata(self.stock_code, period)
+                        if kdata is not None and not kdata.empty:
+                            result[period] = {
+                                'count': len(kdata),
+                                'start_date': str(kdata.index[0]) if len(kdata) > 0 else '',
+                                'end_date': str(kdata.index[-1]) if len(kdata) > 0 else '',
+                                'latest_price': float(kdata['close'].iloc[-1]) if len(kdata) > 0 else 0,
+                                'latest_volume': float(kdata['volume'].iloc[-1]) if len(kdata) > 0 else 0
+                            }
+                except Exception as e:
+                    self.logger.warning(f"获取{period}周期数据失败: {e}")
+                    continue
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"获取K线数据失败: {e}")
+            return {}
+
+    def get_finance_data(self) -> Dict[str, Any]:
+        """获取财务数据"""
+        try:
+            # 模拟财务数据
+            finance_data = {
+                'revenue': [100000, 110000, 120000, 130000],  # 营业收入
+                'profit': [20000, 22000, 24000, 26000],  # 净利润
+                'assets': [1000000, 1100000, 1200000, 1300000],  # 总资产
+                'liability': [800000, 850000, 900000, 950000],  # 总负债
+                'equity': [200000, 250000, 300000, 350000],  # 净资产
+                'cash_flow': [30000, 35000, 40000, 45000],  # 经营现金流
+                'years': ['2020', '2021', '2022', '2023']
+            }
+
+            # 如果有数据管理器，尝试获取真实数据
+            if self.data_manager and hasattr(self.data_manager, 'get_finance_data'):
+                real_data = self.data_manager.get_finance_data(self.stock_code)
+                if real_data:
+                    finance_data.update(real_data)
+
+            return finance_data
+
+        except Exception as e:
+            self.logger.error(f"获取财务数据失败: {e}")
+            return {}
+
+    def get_indicators(self) -> Dict[str, Any]:
+        """获取技术指标"""
+        try:
+            # 模拟技术指标数据
+            indicators = {
+                'ma5': 10.5,
+                'ma10': 10.3,
+                'ma20': 10.1,
+                'ma60': 9.8,
+                'rsi': 55.2,
+                'macd': 0.12,
+                'kdj_k': 45.6,
+                'kdj_d': 42.3,
+                'boll_upper': 11.2,
+                'boll_lower': 9.8,
+                'volume_ratio': 1.25,
+                'turnover_rate': 0.85
+            }
+
+            return indicators
+
+        except Exception as e:
+            self.logger.error(f"获取技术指标失败: {e}")
+            return {}
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取历史统计数据"""
+        try:
+            # 模拟统计数据
+            statistics = {
+                'max_price_52w': 12.5,
+                'min_price_52w': 8.2,
+                'avg_volume_20d': 50000000,
+                'price_change_1d': 0.02,
+                'price_change_5d': 0.05,
+                'price_change_20d': 0.08,
+                'price_change_60d': 0.12,
+                'price_change_ytd': 0.15,
+                'volatility_20d': 0.025,
+                'beta': 1.2,
+                'amplitude_20d': 0.08
+            }
+
+            return statistics
+
+        except Exception as e:
+            self.logger.error(f"获取统计数据失败: {e}")
+            return {}
+
+    def get_related_stocks(self) -> List[Dict[str, Any]]:
+        """获取相关股票"""
+        try:
+            # 模拟相关股票数据
+            related = [
+                {'code': '000002', 'name': '万科A', 'correlation': 0.75},
+                {'code': '600036', 'name': '招商银行', 'correlation': 0.82},
+                {'code': '600000', 'name': '浦发银行', 'correlation': 0.78},
+                {'code': '601318', 'name': '中国平安', 'correlation': 0.65},
+                {'code': '000858', 'name': '五粮液', 'correlation': 0.45}
+            ]
+
+            return related
+
+        except Exception as e:
+            self.logger.error(f"获取相关股票失败: {e}")
+            return []
 
 
 class StockDetailDialog(QDialog):
     """股票详情对话框"""
 
-    def __init__(self, stock_data: Dict[str, Any], parent=None):
-        """初始化股票详情对话框
+    # 信号定义
+    stock_selected = pyqtSignal(str)  # 股票选择
+    data_export_requested = pyqtSignal(str, dict)  # 数据导出请求
+
+    def __init__(self, stock_code: str, data_manager=None, parent=None):
+        """
+        初始化股票详情对话框
 
         Args:
-            stock_data: 股票数据字典
+            stock_code: 股票代码
+            data_manager: 数据管理器
             parent: 父窗口
         """
         super().__init__(parent)
-        self.setWindowTitle("股票详情")
-        self.setMinimumSize(700, 500)
-        self.stock_data = stock_data
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(4, 4, 4, 4)
-        main_layout.setSpacing(0)
-        # Tab按钮区
-        tab_btn_layout = QHBoxLayout()
-        tab_btn_layout.setContentsMargins(0, 0, 0, 0)
-        tab_btn_layout.setSpacing(0)
-        self.tab_buttons = []
-        tab_names = ["基本信息", "财务数据", "历史数据"]
-        for i, name in enumerate(tab_names):
-            btn = QPushButton(name)
-            btn.setCheckable(True)
-            btn.setAutoExclusive(False)
-            btn.setFixedHeight(32)
-            btn.setMinimumWidth(110)
-            btn.clicked.connect(lambda _, idx=i: self.switch_tab(idx))
-            self.tab_buttons.append(btn)
-            tab_btn_layout.addWidget(btn)
-        tab_btn_widget = QWidget()
-        tab_btn_widget.setLayout(tab_btn_layout)
-        main_layout.addWidget(tab_btn_widget)
-        # 内容区
-        self.stacked = QStackedWidget(self)
-        self.stacked.addWidget(self.create_basic_info_tab())
-        self.stacked.addWidget(self.create_financial_tab())
-        self.stacked.addWidget(self.create_history_tab())
-        main_layout.addWidget(self.stacked)
-        self.tab_buttons[0].setChecked(True)
-        self.stacked.setCurrentIndex(0)
-        # 按钮区
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        export_btn = QPushButton("导出数据")
-        export_btn.setFixedHeight(28)
-        export_btn.clicked.connect(self.export_data)
-        close_btn = QPushButton("关闭")
-        close_btn.setFixedHeight(28)
-        close_btn.clicked.connect(self.close)
-        btn_layout.addWidget(export_btn)
-        btn_layout.addWidget(close_btn)
-        main_layout.addLayout(btn_layout)
-        self.show()
-        LogWidget().center_dialog(self, parent)
+        self.stock_code = stock_code
+        self.data_manager = data_manager
+        self.logger = get_logger(__name__)
+        self.stock_data = {}
 
-    def switch_tab(self, idx: int):
-        self.stacked.setCurrentIndex(idx)
-        for i, btn in enumerate(self.tab_buttons):
-            btn.setChecked(i == idx)
+        # 工作线程
+        self.data_worker = None
 
-    def _set_table_readonly_style(self, table: QTableWidget):
-        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        table.setSelectionMode(QAbstractItemView.NoSelection)
-        for row in range(table.rowCount()):
-            for col in range(table.columnCount()):
-                item = table.item(row, col)
-                if item:
-                    item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        self.init_ui()
+        self.load_data()
 
-    def create_basic_info_tab(self) -> QWidget:
-        """创建基本信息标签页"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        table = QTableWidget()
-        table.setColumnCount(2)
-        table.setRowCount(8)
-        table.setHorizontalHeaderLabels(["项目", "值"])
-        table.horizontalHeader().setFixedHeight(36)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        table.setContentsMargins(0, 0, 0, 0)
-        basic_info = [
-            ("股票代码", self.stock_data['code']),
-            ("股票名称", self.stock_data['name']),
-            ("所属市场", self.stock_data['market']),
-            ("所属行业", self.stock_data.get('industry', '未知')),
-            ("上市日期", self.stock_data.get('list_date', '未知')),
-            ("总股本", f"{self.stock_data.get('total_shares', 0):,.0f}"),
-            ("流通股本", f"{self.stock_data.get('circulating_shares', 0):,.0f}"),
-            ("最新价格", f"{self.stock_data.get('price', 0):,.2f}")
-        ]
-        for row, (label, value) in enumerate(basic_info):
-            table.setItem(row, 0, QTableWidgetItem(label))
-            table.setItem(row, 1, QTableWidgetItem(str(value)))
-        self._set_table_readonly_style(table)
-        layout.addWidget(table)
-        return widget
+        self.logger.info(f"股票详情对话框初始化完成: {stock_code}")
 
-    def create_financial_tab(self) -> QWidget:
-        """创建财务数据标签页，支持多期历史财务数据和动态勾选列（表格筛选版）"""
+    def init_ui(self):
+        """初始化用户界面"""
         try:
-            widget = QWidget()
-            layout = QVBoxLayout(widget)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(0)
-            finance_history = self.stock_data.get('finance_history', [])
-            all_fields = self.stock_data.get('all_fields', [])
-            # 默认主流字段key
-            default_keys = [f['key'] for f in all_fields if f['key'] in (
-                'date', 'revenue', 'net_profit', 'roe', 'assets', 'liabilities', 'profit_margin', 'debt_to_equity', 'operating_cash_flow', 'equity')]
-            # 读取用户上次勾选
-            selected_keys = load_selected_fields() or default_keys
-            # 生成表头
-            headers = [f['field']
-                       for f in all_fields if f['key'] in selected_keys]
-            keys = [f['key'] for f in all_fields if f['key'] in selected_keys]
-            table = QTableWidget()
-            table.setColumnCount(len(keys))
-            table.setRowCount(len(finance_history))
-            table.setHorizontalHeaderLabels(headers)
-            table.horizontalHeader().setFixedHeight(28)
-            table.horizontalHeader().setStretchLastSection(True)
-            table.verticalHeader().setVisible(False)
-            table.setContentsMargins(0, 0, 0, 0)
-            for row, item in enumerate(finance_history):
-                for col, key in enumerate(keys):
-                    val = item.get(key, None)
-                    # None、空、nan等统一显示为'-'
-                    if val is None or val == '' or (isinstance(val, float) and (pd.isna(val) or str(val) == 'nan')):
-                        val_str = '-'
-                    elif isinstance(val, (int, float)):
-                        val_str = f"{val:.3f}"
-                    else:
-                        val_str = str(val)
-                    table.setItem(row, col, QTableWidgetItem(val_str))
-            self._set_table_readonly_style(table)
-            layout.addWidget(table)
-            # 增加"选择列"按钮
-            btn_layout = QHBoxLayout()
-            btn_layout.addStretch()
-            btn_select = QPushButton("选择列")
-            btn_select.setFixedHeight(24)
+            self.setWindowTitle(f"股票详情 - {self.stock_code}")
+            self.setMinimumSize(1000, 700)
+            self.resize(1200, 800)
 
-            def on_select_columns():
-                dialog = ColumnSelectorDialog(all_fields, selected_keys, self)
-                if dialog.exec_():
-                    new_keys = dialog.get_selected_keys()
-                    if new_keys:
-                        save_selected_fields(new_keys)
-                        # 刷新表格
-                        table.setColumnCount(len(new_keys))
-                        table.setHorizontalHeaderLabels(
-                            [f['field'] for f in all_fields if f['key'] in new_keys])
-                        for row, item in enumerate(finance_history):
-                            for col, key in enumerate(new_keys):
-                                val = item.get(key, None)
-                                if val is None or val == '' or (isinstance(val, float) and (pd.isna(val) or str(val) == 'nan')):
-                                    val_str = '-'
-                                elif isinstance(val, (int, float)):
-                                    val_str = f"{val:.3f}"
-                                else:
-                                    val_str = str(val)
-                                table.setItem(
-                                    row, col, QTableWidgetItem(val_str))
-            btn_select.clicked.connect(on_select_columns)
-            btn_layout.addWidget(btn_select)
-            layout.addLayout(btn_layout)
-            return widget
+            # 主布局
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(10, 10, 10, 10)
+
+            # 创建头部信息
+            self.create_header()
+            main_layout.addWidget(self.header_frame)
+
+            # 创建进度条
+            self.progress_bar = QProgressBar()
+            self.progress_bar.setVisible(False)
+            main_layout.addWidget(self.progress_bar)
+
+            # 创建标签页
+            self.create_tabs()
+            main_layout.addWidget(self.tab_widget)
+
+            # 创建底部按钮
+            self.create_buttons()
+            main_layout.addWidget(self.button_frame)
+
         except Exception as e:
-            print(f"创建财务数据标签页失败: {str(e)}")
-            print(traceback.format_exc())
-            raise
+            self.logger.error(f"初始化UI失败: {e}")
+            self.logger.error(traceback.format_exc())
 
-    def create_history_tab(self) -> QWidget:
-        """创建历史数据标签页"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        history = self.stock_data.get('history', [])
-        table = QTableWidget()
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(["日期", "开盘", "最高", "最低", "收盘", "成交量"])
-        table.setRowCount(len(history))
-        table.horizontalHeader().setFixedHeight(36)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.verticalHeader().setVisible(False)
-        table.setContentsMargins(0, 0, 0, 0)
-        for row, item in enumerate(history):
-            table.setItem(row, 0, QTableWidgetItem(item.get('date', '')))
-            # 数值字段保留2位小数
-            for col, key in enumerate(["open", "high", "low", "close", "volume"], start=1):
-                val = item.get(key, '')
-                if isinstance(val, (int, float)):
-                    val_str = f"{val:.3f}"
+    def create_header(self):
+        """创建头部信息"""
+        try:
+            self.header_frame = QFrame()
+            self.header_frame.setFrameStyle(QFrame.StyledPanel)
+            self.header_frame.setMaximumHeight(100)
+
+            layout = QHBoxLayout(self.header_frame)
+            layout.setContentsMargins(15, 10, 15, 10)
+
+            # 左侧基本信息
+            left_layout = QVBoxLayout()
+
+            # 股票代码和名称
+            title_layout = QHBoxLayout()
+            self.code_label = QLabel(self.stock_code)
+            self.code_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2E86AB;")
+            title_layout.addWidget(self.code_label)
+
+            self.name_label = QLabel("加载中...")
+            self.name_label.setStyleSheet("font-size: 16px; color: #333;")
+            title_layout.addWidget(self.name_label)
+            title_layout.addStretch()
+            left_layout.addLayout(title_layout)
+
+            # 基本信息
+            info_layout = QHBoxLayout()
+            self.market_label = QLabel("市场: --")
+            self.industry_label = QLabel("行业: --")
+            self.listing_label = QLabel("上市日期: --")
+
+            for label in [self.market_label, self.industry_label, self.listing_label]:
+                label.setStyleSheet("color: #666; margin-right: 20px;")
+                info_layout.addWidget(label)
+
+            info_layout.addStretch()
+            left_layout.addLayout(info_layout)
+
+            layout.addLayout(left_layout)
+
+            # 右侧价格信息
+            right_layout = QVBoxLayout()
+
+            price_layout = QHBoxLayout()
+            self.price_label = QLabel("--")
+            self.price_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #E74C3C;")
+            price_layout.addWidget(self.price_label)
+
+            self.change_label = QLabel("--")
+            self.change_label.setStyleSheet("font-size: 14px; color: #E74C3C;")
+            price_layout.addWidget(self.change_label)
+            price_layout.addStretch()
+            right_layout.addLayout(price_layout)
+
+            # 市值信息
+            cap_layout = QHBoxLayout()
+            self.market_cap_label = QLabel("市值: --")
+            self.pe_label = QLabel("PE: --")
+            self.pb_label = QLabel("PB: --")
+
+            for label in [self.market_cap_label, self.pe_label, self.pb_label]:
+                label.setStyleSheet("color: #666; margin-right: 15px;")
+                cap_layout.addWidget(label)
+
+            cap_layout.addStretch()
+            right_layout.addLayout(cap_layout)
+
+            layout.addLayout(right_layout)
+
+        except Exception as e:
+            self.logger.error(f"创建头部信息失败: {e}")
+
+    def create_tabs(self):
+        """创建标签页"""
+        try:
+            self.tab_widget = QTabWidget()
+
+            # 基本信息标签页
+            self.create_basic_tab()
+            self.tab_widget.addTab(self.basic_tab, "基本信息")
+
+            # 财务数据标签页
+            self.create_finance_tab()
+            self.tab_widget.addTab(self.finance_tab, "财务数据")
+
+            # 技术指标标签页
+            self.create_indicator_tab()
+            self.tab_widget.addTab(self.indicator_tab, "技术指标")
+
+            # 数据统计标签页
+            self.create_statistics_tab()
+            self.tab_widget.addTab(self.statistics_tab, "数据统计")
+
+            # 相关股票标签页
+            self.create_related_tab()
+            self.tab_widget.addTab(self.related_tab, "相关股票")
+
+        except Exception as e:
+            self.logger.error(f"创建标签页失败: {e}")
+
+    def create_basic_tab(self):
+        """创建基本信息标签页"""
+        try:
+            self.basic_tab = QWidget()
+            layout = QVBoxLayout(self.basic_tab)
+
+            # 创建滚动区域
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+
+            content_widget = QWidget()
+            content_layout = QGridLayout(content_widget)
+
+            # 基本信息组
+            basic_group = QGroupBox("基本信息")
+            basic_layout = QGridLayout(basic_group)
+
+            self.basic_info_labels = {}
+            basic_fields = [
+                ('股票代码', 'code'), ('股票名称', 'name'), ('所属市场', 'market'),
+                ('所属行业', 'industry'), ('概念板块', 'concept'), ('上市日期', 'listing_date')
+            ]
+
+            for i, (label_text, field) in enumerate(basic_fields):
+                label = QLabel(f"{label_text}:")
+                value_label = QLabel("--")
+                value_label.setStyleSheet("color: #333; font-weight: bold;")
+
+                basic_layout.addWidget(label, i // 2, (i % 2) * 2)
+                basic_layout.addWidget(value_label, i // 2, (i % 2) * 2 + 1)
+
+                self.basic_info_labels[field] = value_label
+
+            content_layout.addWidget(basic_group, 0, 0)
+
+            # 股本信息组
+            share_group = QGroupBox("股本信息")
+            share_layout = QGridLayout(share_group)
+
+            share_fields = [
+                ('总股本', 'total_share'), ('流通股本', 'float_share'), ('总市值', 'market_cap'),
+                ('市盈率', 'pe_ratio'), ('市净率', 'pb_ratio'), ('股息率', 'dividend_yield')
+            ]
+
+            for i, (label_text, field) in enumerate(share_fields):
+                label = QLabel(f"{label_text}:")
+                value_label = QLabel("--")
+                value_label.setStyleSheet("color: #333; font-weight: bold;")
+
+                share_layout.addWidget(label, i // 2, (i % 2) * 2)
+                share_layout.addWidget(value_label, i // 2, (i % 2) * 2 + 1)
+
+                self.basic_info_labels[field] = value_label
+
+            content_layout.addWidget(share_group, 0, 1)
+
+            # 财务指标组
+            financial_group = QGroupBox("关键财务指标")
+            financial_layout = QGridLayout(financial_group)
+
+            financial_fields = [
+                ('净资产收益率', 'roe'), ('资产负债率', 'debt_ratio')
+            ]
+
+            for i, (label_text, field) in enumerate(financial_fields):
+                label = QLabel(f"{label_text}:")
+                value_label = QLabel("--")
+                value_label.setStyleSheet("color: #333; font-weight: bold;")
+
+                financial_layout.addWidget(label, i, 0)
+                financial_layout.addWidget(value_label, i, 1)
+
+                self.basic_info_labels[field] = value_label
+
+            content_layout.addWidget(financial_group, 1, 0, 1, 2)
+
+            scroll.setWidget(content_widget)
+            layout.addWidget(scroll)
+
+        except Exception as e:
+            self.logger.error(f"创建基本信息标签页失败: {e}")
+
+    def create_finance_tab(self):
+        """创建财务数据标签页"""
+        try:
+            self.finance_tab = QWidget()
+            layout = QVBoxLayout(self.finance_tab)
+
+            # 财务数据表格
+            self.finance_table = QTableWidget()
+            self.finance_table.setColumnCount(5)
+            self.finance_table.setHorizontalHeaderLabels(['指标', '2023年', '2022年', '2021年', '2020年'])
+
+            # 设置表格样式
+            header = self.finance_table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Stretch)
+
+            layout.addWidget(self.finance_table)
+
+        except Exception as e:
+            self.logger.error(f"创建财务数据标签页失败: {e}")
+
+    def create_indicator_tab(self):
+        """创建技术指标标签页"""
+        try:
+            self.indicator_tab = QWidget()
+            layout = QVBoxLayout(self.indicator_tab)
+
+            # 技术指标表格
+            self.indicator_table = QTableWidget()
+            self.indicator_table.setColumnCount(2)
+            self.indicator_table.setHorizontalHeaderLabels(['指标名称', '当前值'])
+
+            # 设置表格样式
+            header = self.indicator_table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Stretch)
+
+            layout.addWidget(self.indicator_table)
+
+        except Exception as e:
+            self.logger.error(f"创建技术指标标签页失败: {e}")
+
+    def create_statistics_tab(self):
+        """创建数据统计标签页"""
+        try:
+            self.statistics_tab = QWidget()
+            layout = QVBoxLayout(self.statistics_tab)
+
+            # 统计数据表格
+            self.statistics_table = QTableWidget()
+            self.statistics_table.setColumnCount(2)
+            self.statistics_table.setHorizontalHeaderLabels(['统计项目', '数值'])
+
+            # 设置表格样式
+            header = self.statistics_table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Stretch)
+
+            layout.addWidget(self.statistics_table)
+
+        except Exception as e:
+            self.logger.error(f"创建数据统计标签页失败: {e}")
+
+    def create_related_tab(self):
+        """创建相关股票标签页"""
+        try:
+            self.related_tab = QWidget()
+            layout = QVBoxLayout(self.related_tab)
+
+            # 相关股票表格
+            self.related_table = QTableWidget()
+            self.related_table.setColumnCount(3)
+            self.related_table.setHorizontalHeaderLabels(['股票代码', '股票名称', '相关度'])
+
+            # 设置表格样式
+            header = self.related_table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Stretch)
+
+            # 双击事件
+            self.related_table.itemDoubleClicked.connect(self.on_related_stock_clicked)
+
+            layout.addWidget(self.related_table)
+
+        except Exception as e:
+            self.logger.error(f"创建相关股票标签页失败: {e}")
+
+    def create_buttons(self):
+        """创建底部按钮"""
+        try:
+            self.button_frame = QFrame()
+            layout = QHBoxLayout(self.button_frame)
+            layout.setContentsMargins(10, 5, 10, 5)
+
+            # 刷新按钮
+            self.refresh_btn = QPushButton("刷新数据")
+            self.refresh_btn.clicked.connect(self.load_data)
+            layout.addWidget(self.refresh_btn)
+
+            # 导出按钮
+            self.export_btn = QPushButton("导出数据")
+            self.export_btn.clicked.connect(self.export_data)
+            layout.addWidget(self.export_btn)
+
+            layout.addStretch()
+
+            # 关闭按钮
+            self.close_btn = QPushButton("关闭")
+            self.close_btn.clicked.connect(self.close)
+            layout.addWidget(self.close_btn)
+
+        except Exception as e:
+            self.logger.error(f"创建底部按钮失败: {e}")
+
+    def load_data(self):
+        """加载股票数据"""
+        try:
+            # 显示进度条
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setValue(0)
+            self.refresh_btn.setEnabled(False)
+
+            # 创建工作线程
+            self.data_worker = StockDataWorker(self.stock_code, self.data_manager)
+            self.data_worker.data_loaded.connect(self.on_data_loaded)
+            self.data_worker.error_occurred.connect(self.on_error_occurred)
+            self.data_worker.progress_updated.connect(self.progress_bar.setValue)
+            self.data_worker.finished.connect(self.on_loading_finished)
+
+            # 启动线程
+            self.data_worker.start()
+
+        except Exception as e:
+            self.logger.error(f"加载数据失败: {e}")
+            self.on_error_occurred(str(e))
+
+    def on_data_loaded(self, data: Dict[str, Any]):
+        """数据加载完成事件"""
+        try:
+            self.stock_data = data
+
+            # 更新头部信息
+            self.update_header(data.get('basic_info', {}))
+
+            # 更新各个标签页
+            self.update_basic_info(data.get('basic_info', {}))
+            self.update_finance_data(data.get('finance_data', {}))
+            self.update_indicators(data.get('indicators', {}))
+            self.update_statistics(data.get('statistics', {}))
+            self.update_related_stocks(data.get('related_stocks', []))
+
+            self.logger.info("股票数据更新完成")
+
+        except Exception as e:
+            self.logger.error(f"处理数据失败: {e}")
+
+    def on_error_occurred(self, error_msg: str):
+        """错误发生事件"""
+        QMessageBox.warning(self, "错误", f"加载数据失败: {error_msg}")
+        self.logger.error(f"数据加载错误: {error_msg}")
+
+    def on_loading_finished(self):
+        """加载完成事件"""
+        self.progress_bar.setVisible(False)
+        self.refresh_btn.setEnabled(True)
+        if self.data_worker:
+            self.data_worker.deleteLater()
+            self.data_worker = None
+
+    def update_header(self, basic_info: Dict[str, Any]):
+        """更新头部信息"""
+        try:
+            if basic_info:
+                self.name_label.setText(basic_info.get('name', '--'))
+                self.market_label.setText(f"市场: {basic_info.get('market', '--')}")
+                self.industry_label.setText(f"行业: {basic_info.get('industry', '--')}")
+                self.listing_label.setText(f"上市日期: {basic_info.get('listing_date', '--')}")
+
+                # 更新价格信息（从K线数据获取）
+                kdata = self.stock_data.get('kdata', {})
+                if 'D' in kdata:
+                    daily_data = kdata['D']
+                    price = daily_data.get('latest_price', 0)
+                    if price > 0:
+                        self.price_label.setText(f"{price:.2f}")
+
+                # 更新市值信息
+                market_cap = basic_info.get('market_cap', 0)
+                if market_cap > 0:
+                    cap_text = f"{market_cap / 100000000:.2f}亿" if market_cap > 100000000 else f"{market_cap / 10000:.2f}万"
+                    self.market_cap_label.setText(f"市值: {cap_text}")
+
+                pe_ratio = basic_info.get('pe_ratio', 0)
+                if pe_ratio > 0:
+                    self.pe_label.setText(f"PE: {pe_ratio:.2f}")
+
+                pb_ratio = basic_info.get('pb_ratio', 0)
+                if pb_ratio > 0:
+                    self.pb_label.setText(f"PB: {pb_ratio:.2f}")
+
+        except Exception as e:
+            self.logger.error(f"更新头部信息失败: {e}")
+
+    def update_basic_info(self, basic_info: Dict[str, Any]):
+        """更新基本信息"""
+        try:
+            for field, label in self.basic_info_labels.items():
+                value = basic_info.get(field, '--')
+
+                # 格式化显示
+                if field in ['total_share', 'float_share']:
+                    if isinstance(value, (int, float)) and value > 0:
+                        value = f"{value / 100000000:.2f}亿股"
+                elif field in ['market_cap']:
+                    if isinstance(value, (int, float)) and value > 0:
+                        value = f"{value / 100000000:.2f}亿元"
+                elif field in ['pe_ratio', 'pb_ratio', 'dividend_yield', 'roe', 'debt_ratio']:
+                    if isinstance(value, (int, float)):
+                        if field in ['dividend_yield', 'roe', 'debt_ratio']:
+                            value = f"{value * 100:.2f}%"
+                        else:
+                            value = f"{value:.2f}"
+
+                label.setText(str(value))
+
+        except Exception as e:
+            self.logger.error(f"更新基本信息失败: {e}")
+
+    def update_finance_data(self, finance_data: Dict[str, Any]):
+        """更新财务数据"""
+        try:
+            if not finance_data:
+                return
+
+            # 财务指标映射
+            finance_items = [
+                ('营业收入(万元)', 'revenue'),
+                ('净利润(万元)', 'profit'),
+                ('总资产(万元)', 'assets'),
+                ('总负债(万元)', 'liability'),
+                ('净资产(万元)', 'equity'),
+                ('经营现金流(万元)', 'cash_flow')
+            ]
+
+            self.finance_table.setRowCount(len(finance_items))
+
+            years = finance_data.get('years', ['2023', '2022', '2021', '2020'])
+
+            for i, (name, key) in enumerate(finance_items):
+                # 设置指标名称
+                self.finance_table.setItem(i, 0, QTableWidgetItem(name))
+
+                # 设置各年数据
+                values = finance_data.get(key, [])
+                for j, year in enumerate(years[:4]):  # 只显示4年
+                    if j < len(values):
+                        value = values[j]
+                        if isinstance(value, (int, float)):
+                            value_text = f"{value / 10000:.2f}" if value > 10000 else f"{value:.2f}"
+                        else:
+                            value_text = str(value)
+                    else:
+                        value_text = "--"
+
+                    self.finance_table.setItem(i, j + 1, QTableWidgetItem(value_text))
+
+        except Exception as e:
+            self.logger.error(f"更新财务数据失败: {e}")
+
+    def update_indicators(self, indicators: Dict[str, Any]):
+        """更新技术指标"""
+        try:
+            if not indicators:
+                return
+
+            # 技术指标映射
+            indicator_items = [
+                ('MA5', 'ma5'),
+                ('MA10', 'ma10'),
+                ('MA20', 'ma20'),
+                ('MA60', 'ma60'),
+                ('RSI', 'rsi'),
+                ('MACD', 'macd'),
+                ('KDJ-K', 'kdj_k'),
+                ('KDJ-D', 'kdj_d'),
+                ('布林上轨', 'boll_upper'),
+                ('布林下轨', 'boll_lower'),
+                ('量比', 'volume_ratio'),
+                ('换手率(%)', 'turnover_rate')
+            ]
+
+            self.indicator_table.setRowCount(len(indicator_items))
+
+            for i, (name, key) in enumerate(indicator_items):
+                self.indicator_table.setItem(i, 0, QTableWidgetItem(name))
+
+                value = indicators.get(key, '--')
+                if isinstance(value, (int, float)):
+                    if key == 'turnover_rate':
+                        value_text = f"{value:.2f}%"
+                    else:
+                        value_text = f"{value:.2f}"
                 else:
-                    val_str = str(val)
-                table.setItem(row, col, QTableWidgetItem(val_str))
-        self._set_table_readonly_style(table)
-        layout.addWidget(table)
-        return widget
+                    value_text = str(value)
+
+                self.indicator_table.setItem(i, 1, QTableWidgetItem(value_text))
+
+        except Exception as e:
+            self.logger.error(f"更新技术指标失败: {e}")
+
+    def update_statistics(self, statistics: Dict[str, Any]):
+        """更新统计数据"""
+        try:
+            if not statistics:
+                return
+
+            # 统计指标映射
+            stat_items = [
+                ('52周最高价', 'max_price_52w'),
+                ('52周最低价', 'min_price_52w'),
+                ('20日平均成交量', 'avg_volume_20d'),
+                ('1日涨跌幅(%)', 'price_change_1d'),
+                ('5日涨跌幅(%)', 'price_change_5d'),
+                ('20日涨跌幅(%)', 'price_change_20d'),
+                ('60日涨跌幅(%)', 'price_change_60d'),
+                ('年初至今涨跌幅(%)', 'price_change_ytd'),
+                ('20日波动率(%)', 'volatility_20d'),
+                ('Beta系数', 'beta'),
+                ('20日振幅(%)', 'amplitude_20d')
+            ]
+
+            self.statistics_table.setRowCount(len(stat_items))
+
+            for i, (name, key) in enumerate(stat_items):
+                self.statistics_table.setItem(i, 0, QTableWidgetItem(name))
+
+                value = statistics.get(key, '--')
+                if isinstance(value, (int, float)):
+                    if key in ['price_change_1d', 'price_change_5d', 'price_change_20d',
+                               'price_change_60d', 'price_change_ytd', 'volatility_20d', 'amplitude_20d']:
+                        value_text = f"{value * 100:.2f}%"
+                    elif key == 'avg_volume_20d':
+                        value_text = f"{value / 10000:.2f}万"
+                    else:
+                        value_text = f"{value:.2f}"
+                else:
+                    value_text = str(value)
+
+                self.statistics_table.setItem(i, 1, QTableWidgetItem(value_text))
+
+        except Exception as e:
+            self.logger.error(f"更新统计数据失败: {e}")
+
+    def update_related_stocks(self, related_stocks: List[Dict[str, Any]]):
+        """更新相关股票"""
+        try:
+            if not related_stocks:
+                return
+
+            self.related_table.setRowCount(len(related_stocks))
+
+            for i, stock in enumerate(related_stocks):
+                self.related_table.setItem(i, 0, QTableWidgetItem(stock.get('code', '')))
+                self.related_table.setItem(i, 1, QTableWidgetItem(stock.get('name', '')))
+
+                correlation = stock.get('correlation', 0)
+                correlation_text = f"{correlation:.2f}" if isinstance(correlation, (int, float)) else str(correlation)
+                self.related_table.setItem(i, 2, QTableWidgetItem(correlation_text))
+
+        except Exception as e:
+            self.logger.error(f"更新相关股票失败: {e}")
+
+    def on_related_stock_clicked(self, item):
+        """相关股票点击事件"""
+        try:
+            row = item.row()
+            code_item = self.related_table.item(row, 0)
+            if code_item:
+                stock_code = code_item.text()
+                self.stock_selected.emit(stock_code)
+
+        except Exception as e:
+            self.logger.error(f"处理相关股票点击失败: {e}")
 
     def export_data(self):
-        """导出股票数据"""
+        """导出数据"""
         try:
-            # 创建DataFrame
-            data = {
-                '基本信息': pd.DataFrame([
-                    {'项目': '股票代码', '值': self.stock_data['code']},
-                    {'项目': '股票名称', '值': self.stock_data['name']},
-                    {'项目': '所属市场', '值': self.stock_data['market']},
-                    {'项目': '所属行业', '值': self.stock_data.get('industry', '未知')},
-                    {'项目': '上市日期', '值': self.stock_data.get(
-                        'list_date', '未知')},
-                    {'项目': '总股本', '值': self.stock_data.get('total_shares', 0)},
-                    {'项目': '流通股本', '值': self.stock_data.get(
-                        'circulating_shares', 0)},
-                    {'项目': '最新价格', '值': self.stock_data.get('price', 0)}
-                ]),
-                '财务数据': pd.DataFrame([
-                    {'项目': '营业收入', '最新': self.stock_data.get('revenue', 0),
-                     '同比': self.stock_data.get('revenue_yoy', 0),
-                     '环比': self.stock_data.get('revenue_qoq', 0)},
-                    # ... 其他财务数据
-                ]),
-                '历史数据': pd.DataFrame(self.stock_data.get('history', []))
-            }
-
-            # 导出到Excel
-            filename = f"stock_{self.stock_data['code']}_{datetime.now().strftime('%Y%m%d')}.xlsx"
-            with pd.ExcelWriter(filename) as writer:
-                for sheet_name, df in data.items():
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-
-            print(f"数据已导出到: {filename}")
+            self.data_export_requested.emit(self.stock_code, self.stock_data)
 
         except Exception as e:
-            print(f"导出数据失败: {str(e)}")
-            print(traceback.format_exc())
+            self.logger.error(f"导出数据失败: {e}")
+            QMessageBox.warning(self, "错误", f"导出数据失败: {e}")
+
+
+if __name__ == "__main__":
+    from PyQt5.QtWidgets import QApplication
+    import sys
+
+    app = QApplication(sys.argv)
+
+    # 测试对话框
+    dialog = StockDetailDialog("000001")
+    dialog.show()
+
+    sys.exit(app.exec_())

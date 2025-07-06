@@ -1,45 +1,65 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-优化系统数据库表结构定义
-支持算法版本管理、性能指标存储和优化日志记录
+优化系统数据库架构
+管理算法版本、性能指标、优化日志等数据
 """
 
 import sqlite3
 import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+import threading
 
 
 class OptimizationDatabaseManager:
-    """优化系统数据库管理器"""
+    """优化系统数据库管理器 - 单例模式"""
+
+    _instance = None
+    _lock = threading.Lock()
+    _initialized = False
+
+    def __new__(cls, db_path: str = 'db/hikyuu_system.db'):
+        """单例模式实现"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self, db_path: str = 'db/hikyuu_system.db'):
+        # 避免重复初始化
+        if OptimizationDatabaseManager._initialized:
+            return
+
         self.db_path = db_path
         self.init_tables()
+        OptimizationDatabaseManager._initialized = True
 
     def init_tables(self):
-        """初始化优化系统相关表"""
+        """初始化数据库表"""
+        # 检查是否已经初始化过
+        if hasattr(self, '_tables_initialized'):
+            return
+
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)  # 添加超时
+            conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
             # 算法版本表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS algorithm_versions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    pattern_id INTEGER NOT NULL,
+                    pattern_id INTEGER,
                     pattern_name TEXT NOT NULL,
                     version_number INTEGER NOT NULL,
                     algorithm_code TEXT NOT NULL,
                     parameters TEXT,  -- JSON格式存储参数
                     created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    created_by TEXT DEFAULT 'auto_optimizer',
                     description TEXT,
                     is_active BOOLEAN DEFAULT 0,
                     parent_version_id INTEGER,
-                    optimization_method TEXT,
-                    FOREIGN KEY (pattern_id) REFERENCES pattern_types(id),
+                    optimization_method TEXT DEFAULT 'manual',  -- manual, genetic, grid_search, bayesian
                     FOREIGN KEY (parent_version_id) REFERENCES algorithm_versions(id)
                 )
             ''')
@@ -51,8 +71,7 @@ class OptimizationDatabaseManager:
                     version_id INTEGER NOT NULL,
                     pattern_name TEXT NOT NULL,
                     test_dataset_id TEXT,
-                    
-                    -- 准确性指标
+                    test_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     true_positives INTEGER DEFAULT 0,
                     false_positives INTEGER DEFAULT 0,
                     true_negatives INTEGER DEFAULT 0,
@@ -61,28 +80,17 @@ class OptimizationDatabaseManager:
                     recall REAL,
                     f1_score REAL,
                     accuracy REAL,
-                    
-                    -- 性能指标
-                    execution_time REAL,
-                    memory_usage REAL,
-                    cpu_usage REAL,
-                    
-                    -- 业务指标
-                    signal_quality REAL,
-                    confidence_avg REAL,
-                    confidence_std REAL,
-                    patterns_found INTEGER,
-                    
-                    -- 稳定性指标
-                    robustness_score REAL,
-                    parameter_sensitivity REAL,
-                    
-                    -- 综合评分
-                    overall_score REAL,
-                    
-                    test_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    test_conditions TEXT,  -- JSON格式存储测试条件
-                    
+                    execution_time REAL,  -- 秒
+                    memory_usage REAL,    -- MB
+                    cpu_usage REAL,       -- 百分比
+                    signal_quality REAL,  -- 信号质量评分 0-1
+                    confidence_avg REAL,  -- 平均置信度
+                    confidence_std REAL,  -- 置信度标准差
+                    patterns_found INTEGER DEFAULT 0,  -- 识别的形态数量
+                    robustness_score REAL,             -- 鲁棒性评分
+                    parameter_sensitivity REAL,        -- 参数敏感性
+                    overall_score REAL,                 -- 综合评分
+                    test_conditions TEXT,               -- JSON格式存储测试条件
                     FOREIGN KEY (version_id) REFERENCES algorithm_versions(id)
                 )
             ''')
@@ -92,45 +100,39 @@ class OptimizationDatabaseManager:
                 CREATE TABLE IF NOT EXISTS optimization_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     pattern_name TEXT NOT NULL,
-                    optimization_session_id TEXT NOT NULL,
+                    optimization_session_id TEXT UNIQUE NOT NULL,
                     optimization_method TEXT NOT NULL,
-                    
-                    start_time TIMESTAMP,
+                    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     end_time TIMESTAMP,
-                    status TEXT,  -- running, completed, failed, cancelled
-                    
+                    status TEXT DEFAULT 'running',  -- running, completed, failed, cancelled
                     initial_version_id INTEGER,
                     final_version_id INTEGER,
-                    
                     iterations INTEGER DEFAULT 0,
                     best_score REAL,
                     improvement_percentage REAL,
-                    
                     optimization_config TEXT,  -- JSON格式存储优化配置
                     optimization_log TEXT,     -- 详细日志
                     error_message TEXT,
-                    
-                    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
                     FOREIGN KEY (initial_version_id) REFERENCES algorithm_versions(id),
                     FOREIGN KEY (final_version_id) REFERENCES algorithm_versions(id)
                 )
             ''')
 
-            # 测试数据集表
+            # 形态信息表
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS test_datasets (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
+                CREATE TABLE IF NOT EXISTS pattern_info (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern_name TEXT UNIQUE NOT NULL,
+                    chinese_name TEXT,
                     description TEXT,
-                    data_source TEXT,
-                    data_period_start DATE,
-                    data_period_end DATE,
-                    total_records INTEGER,
-                    market_conditions TEXT,  -- JSON格式存储市场条件
+                    category TEXT,
+                    difficulty_level INTEGER DEFAULT 3,  -- 1-5
+                    is_active BOOLEAN DEFAULT 1,
                     created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    file_path TEXT,
-                    checksum TEXT
+                    last_optimized TIMESTAMP,
+                    optimization_count INTEGER DEFAULT 0,
+                    best_score REAL DEFAULT 0.0,
+                    avg_score REAL DEFAULT 0.0
                 )
             ''')
 
@@ -155,6 +157,9 @@ class OptimizationDatabaseManager:
 
             conn.commit()
             conn.close()
+
+            # 标记表已初始化
+            self._tables_initialized = True
             print("✅ 优化系统数据库表初始化完成")
 
         except sqlite3.OperationalError as e:

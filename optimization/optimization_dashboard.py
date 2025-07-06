@@ -12,6 +12,7 @@ from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner
 import sys
 import os
+import sqlite3
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import json
@@ -112,24 +113,180 @@ class SystemMonitor(QThread if GUI_AVAILABLE else object):
             }
 
 
-class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
-    """性能对比图表"""
+class PerformanceChart(QWidget):
+    """性能对比图表 - 基于统一图表服务的高性能实现"""
 
     def __init__(self, parent=None):
-        if not CHARTS_AVAILABLE:
-            super().__init__(parent)
+        super().__init__(parent)
+        self.parent = parent
+        self.init_ui()
+
+    def init_ui(self):
+        """初始化UI"""
+        layout = QVBoxLayout(self)
+
+        # 尝试使用统一图表服务
+        try:
+            from core.services.unified_chart_service import get_unified_chart_service
+            from gui.widgets.chart_widget import ChartWidget
+
+            # 创建图表控件
+            self.chart_widget = ChartWidget(self)
+            layout.addWidget(self.chart_widget)
+
+            # 配置图表
+            self.setup_chart()
+
+            self.unified_chart_available = True
+
+        except ImportError:
+            # 降级到matplotlib实现
+            if CHARTS_AVAILABLE:
+                self.figure = Figure(figsize=(10, 6))
+                self.canvas = FigureCanvas(self.figure)
+                layout.addWidget(self.canvas)
+                self.axes = self.figure.add_subplot(111)
+                self.figure.tight_layout()
+                self.unified_chart_available = False
+            else:
+                # 完全降级
+                self.fallback_label = QLabel("图表服务不可用")
+                self.fallback_label.setAlignment(Qt.AlignCenter)
+                layout.addWidget(self.fallback_label)
+                self.unified_chart_available = False
+
+    def setup_chart(self):
+        """设置图表配置"""
+        if not hasattr(self, 'chart_widget'):
             return
 
-        self.figure = Figure(figsize=(10, 6))
-        super().__init__(self.figure)
-        self.setParent(parent)
+        try:
+            # 获取统一图表服务
+            chart_service = get_unified_chart_service()
 
-        self.axes = self.figure.add_subplot(111)
-        self.figure.tight_layout()
+            # 配置图表类型
+            self.chart_widget.set_chart_type('line')
+
+            # 应用主题
+            chart_service.apply_theme(self.chart_widget, 'dark')
+
+            # 启用优化
+            self.chart_widget.enable_cache(True)
+            self.chart_widget.enable_async_rendering(True)
+
+        except Exception as e:
+            print(f"图表配置失败: {e}")
 
     def plot_performance_history(self, pattern_name: str, history_data: List[Dict]):
         """绘制性能历史图表"""
-        if not CHARTS_AVAILABLE:
+        if self.unified_chart_available and hasattr(self, 'chart_widget'):
+            # 使用统一图表服务
+            self._plot_with_unified_service(pattern_name, history_data, 'history')
+        elif hasattr(self, 'axes'):
+            # 使用matplotlib降级实现
+            self._plot_with_matplotlib(pattern_name, history_data, 'history')
+        else:
+            # 完全降级
+            print(f"无法绘制性能历史图表: {pattern_name}")
+
+    def _plot_with_unified_service(self, pattern_name: str, data: any, chart_type: str):
+        """使用统一图表服务绘制"""
+        try:
+            if chart_type == 'history':
+                self._plot_history_with_unified_service(pattern_name, data)
+            elif chart_type == 'comparison':
+                self._plot_comparison_with_unified_service(data)
+            else:
+                print(f"未知的图表类型: {chart_type}")
+
+        except Exception as e:
+            print(f"统一图表服务绘制失败: {e}")
+            # 降级到matplotlib
+            if hasattr(self, 'axes'):
+                if chart_type == 'history':
+                    self._plot_with_matplotlib(pattern_name, data, chart_type)
+                elif chart_type == 'comparison':
+                    self._plot_comparison_with_matplotlib(data)
+
+    def _plot_history_with_unified_service(self, pattern_name: str, history_data: List[Dict]):
+        """使用统一图表服务绘制历史数据"""
+        if not history_data:
+            # 显示无数据提示
+            self.chart_widget.show_message(f"暂无 {pattern_name} 的性能数据")
+            return
+
+        # 提取数据
+        timestamps = []
+        scores = []
+
+        for item in history_data:
+            if item.get('test_time'):
+                try:
+                    timestamp = datetime.fromisoformat(item['test_time'].replace('Z', '+00:00'))
+                    timestamps.append(timestamp)
+                    scores.append(item.get('overall_score', 0))
+                except Exception as e:
+                    print(f"解析时间戳失败: {e}")
+                    continue
+
+        if not timestamps or not scores:
+            self.chart_widget.show_message("数据格式错误")
+            return
+
+        # 创建DataFrame
+        import pandas as pd
+        df = pd.DataFrame({
+            'timestamp': timestamps,
+            'score': scores
+        })
+        df.set_index('timestamp', inplace=True)
+
+        # 更新图表数据
+        self.chart_widget.update_data(df)
+        self.chart_widget.set_title(f'{pattern_name} 性能历史')
+
+        # 添加标注
+        if timestamps and scores:
+            latest_score = scores[-1]
+            self.chart_widget.add_annotation(
+                timestamps[-1], latest_score,
+                f'最新: {latest_score:.3f}'
+            )
+
+    def _plot_comparison_with_unified_service(self, comparison_data: Dict[str, List[float]]):
+        """使用统一图表服务绘制对比数据"""
+        if not comparison_data:
+            self.chart_widget.show_message("暂无对比数据")
+            return
+
+        # 提取数据
+        patterns = list(comparison_data.keys())
+        scores = [comparison_data[pattern][-1] if comparison_data[pattern] else 0
+                  for pattern in patterns]
+
+        # 创建DataFrame
+        import pandas as pd
+        df = pd.DataFrame({
+            'pattern': patterns,
+            'score': scores
+        })
+
+        # 设置图表类型为柱状图
+        self.chart_widget.set_chart_type('bar')
+
+        # 更新图表数据
+        self.chart_widget.update_data(df)
+        self.chart_widget.set_title('形态性能对比')
+
+        # 添加数值标签
+        for pattern, score in zip(patterns, scores):
+            self.chart_widget.add_annotation(
+                pattern, score, f'{score:.3f}'
+            )
+
+    def _plot_with_matplotlib(self, pattern_name: str, history_data: List[Dict], chart_type: str):
+        """使用matplotlib降级实现"""
+        if not hasattr(self, 'axes'):
             return
 
         self.axes.clear()
@@ -137,7 +294,8 @@ class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
         if not history_data:
             self.axes.text(0.5, 0.5, f"暂无 {pattern_name} 的性能数据",
                            ha='center', va='center', transform=self.axes.transAxes)
-            self.draw()
+            if hasattr(self, 'canvas'):
+                self.canvas.draw()
             return
 
         # 提取数据
@@ -148,7 +306,8 @@ class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
         if not timestamps or not scores:
             self.axes.text(0.5, 0.5, "数据格式错误",
                            ha='center', va='center', transform=self.axes.transAxes)
-            self.draw()
+            if hasattr(self, 'canvas'):
+                self.canvas.draw()
             return
 
         # 绘制折线图
@@ -159,9 +318,10 @@ class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
         self.axes.grid(True, alpha=0.3)
 
         # 格式化x轴
-        self.axes.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
-        self.axes.xaxis.set_major_locator(mdates.HourLocator(interval=6))
-        self.figure.autofmt_xdate()
+        if CHARTS_AVAILABLE:
+            self.axes.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+            self.axes.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+            self.figure.autofmt_xdate()
 
         # 添加最新分数标注
         if timestamps and scores:
@@ -172,11 +332,24 @@ class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
                                bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
                                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
 
-        self.draw()
+        if hasattr(self, 'canvas'):
+            self.canvas.draw()
 
     def plot_comparison(self, comparison_data: Dict[str, List[float]]):
         """绘制多形态性能对比"""
-        if not CHARTS_AVAILABLE:
+        if self.unified_chart_available and hasattr(self, 'chart_widget'):
+            # 使用统一图表服务
+            self._plot_with_unified_service('comparison', comparison_data, 'comparison')
+        elif hasattr(self, 'axes'):
+            # 使用matplotlib降级实现
+            self._plot_comparison_with_matplotlib(comparison_data)
+        else:
+            # 完全降级
+            print("无法绘制性能对比图表")
+
+    def _plot_comparison_with_matplotlib(self, comparison_data: Dict[str, List[float]]):
+        """使用matplotlib绘制对比图表"""
+        if not hasattr(self, 'axes'):
             return
 
         self.axes.clear()
@@ -197,13 +370,13 @@ class PerformanceChart(FigureCanvas if CHARTS_AVAILABLE else QWidget):
         self.axes.set_title('形态性能对比', fontsize=14, fontweight='bold')
         self.axes.set_ylabel('综合评分')
         self.axes.set_ylim(0, 1.0)
-        self.axes.grid(True, alpha=0.3, axis='y')
+        self.axes.grid(True, alpha=0.3)
 
         # 旋转x轴标签
-        plt.setp(self.axes.get_xticklabels(), rotation=45, ha='right')
+        self.axes.tick_params(axis='x', rotation=45)
 
-        self.figure.tight_layout()
-        self.draw()
+        if hasattr(self, 'canvas'):
+            self.canvas.draw()
 
 
 class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
@@ -539,7 +712,6 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         try:
             # 获取所有优化日志
             conn = self.db_manager.db_path
-            import sqlite3
 
             db_conn = sqlite3.connect(conn)
             cursor = db_conn.cursor()

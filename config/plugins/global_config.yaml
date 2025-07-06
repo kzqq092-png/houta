@@ -1,0 +1,5 @@
+auto_load_plugins: true
+debug_mode: false
+max_plugins: 100
+plugin_directory: plugins
+sandbox_enabled: true

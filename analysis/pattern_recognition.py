@@ -3,6 +3,7 @@ Enhanced Pattern Recognition Module for Trading System
 完全重构的形态识别模块，与新统一框架完全兼容
 """
 
+from utils.data_preprocessing import validate_kdata
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional, Any
@@ -244,7 +245,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
     _algorithm_cache_size = 100  # 最大缓存算法数量
 
     def recognize(self, kdata: pd.DataFrame) -> List[PatternResult]:
-        """执行数据库算法识别 - 性能优化版"""
+        """执行数据库算法识别 - 安全增强版，防止系统崩溃"""
         if not self.validate_data(kdata):
             return []
 
@@ -254,32 +255,261 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             if not algorithm_code or not algorithm_code.strip():
                 return []
 
-            # 使用缓存的编译结果提升性能
-            cache_key = f"{self.config.english_name}_{hash(algorithm_code)}"
+            # 数据大小检查，防止处理过大数据集
+            if len(kdata) > 50000:  # 限制最大数据量
+                print(f"[DatabaseAlgorithmRecognizer] 数据量过大({len(kdata)})，跳过算法: {self.config.english_name}")
+                return []
 
             # 创建增强的安全执行环境
             safe_globals = self._create_enhanced_safe_globals()
             safe_locals = self._create_enhanced_safe_locals(kdata)
 
-            # 执行算法代码
-            exec(algorithm_code.strip(), safe_globals, safe_locals)
-
-            # 获取结果并转换格式
-            raw_results = safe_locals.get('results', [])
-            return self._convert_enhanced_results(raw_results)
+            # 使用超时和资源监控执行算法代码
+            return self._execute_algorithm_safely(algorithm_code, safe_globals, safe_locals)
 
         except Exception as e:
             print(f"[DatabaseAlgorithmRecognizer] 执行算法失败 {self.config.english_name}: {e}")
             return []
 
+    def _execute_algorithm_safely(self, algorithm_code: str, safe_globals: dict, safe_locals: dict) -> List[PatternResult]:
+        """安全执行算法代码，带超时和资源监控 - 跨平台版本"""
+        import threading
+        import time
+        import sys
+
+        # 尝试导入psutil，如果失败则跳过内存监控
+        try:
+            import psutil
+            import os
+            memory_monitoring = True
+        except ImportError:
+            memory_monitoring = False
+
+        class TimeoutException(Exception):
+            pass
+
+        def execute_with_timeout():
+            """在线程中执行算法代码"""
+            try:
+                exec(algorithm_code.strip(), safe_globals, safe_locals)
+            except Exception as e:
+                safe_locals['_execution_error'] = e
+
+        try:
+            # 记录开始时的内存使用
+            start_memory = 0
+            if memory_monitoring:
+                try:
+                    process = psutil.Process(os.getpid())
+                    start_memory = process.memory_info().rss / 1024 / 1024  # MB
+                except:
+                    memory_monitoring = False
+
+            # 创建执行线程
+            execution_thread = threading.Thread(target=execute_with_timeout)
+            execution_thread.daemon = True
+
+            # 开始执行
+            start_time = time.time()
+            execution_thread.start()
+
+            # 等待执行完成或超时
+            timeout_seconds = 30
+            execution_thread.join(timeout_seconds)
+
+            # 检查是否超时
+            if execution_thread.is_alive():
+                print(f"[DatabaseAlgorithmRecognizer] 算法执行超时 {self.config.english_name} (>{timeout_seconds}秒)")
+                return []
+
+            # 检查执行过程中是否有错误
+            if '_execution_error' in safe_locals:
+                error = safe_locals['_execution_error']
+                print(f"[DatabaseAlgorithmRecognizer] 算法执行错误 {self.config.english_name}: {error}")
+                return []
+
+            # 检查内存使用是否异常增长
+            if memory_monitoring:
+                try:
+                    end_memory = process.memory_info().rss / 1024 / 1024  # MB
+                    memory_increase = end_memory - start_memory
+
+                    if memory_increase > 500:  # 如果内存增长超过500MB
+                        print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 内存使用异常增长 {memory_increase:.1f}MB")
+                except:
+                    pass
+
+            # 获取结果并转换格式
+            raw_results = safe_locals.get('results', [])
+
+            # 限制结果数量，防止内存问题
+            if len(raw_results) > 10000:
+                print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 返回结果过多({len(raw_results)})，截取前10000个")
+                raw_results = raw_results[:10000]
+
+            execution_time = time.time() - start_time
+            if execution_time > 10:  # 如果执行时间超过10秒，给出警告
+                print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 执行时间较长 {execution_time:.1f}秒")
+
+            return self._convert_enhanced_results(raw_results)
+
+        except MemoryError as e:
+            print(f"[DatabaseAlgorithmRecognizer] 内存不足 {self.config.english_name}: {e}")
+            return []
+        except RecursionError as e:
+            print(f"[DatabaseAlgorithmRecognizer] 递归深度超限 {self.config.english_name}: {e}")
+            return []
+        except Exception as e:
+            print(f"[DatabaseAlgorithmRecognizer] 算法执行异常 {self.config.english_name}: {e}")
+            return []
+
     def _create_enhanced_safe_globals(self) -> Dict[str, Any]:
         """创建增强的安全执行环境 - 性能优化版"""
+
+        # 定义缺失的工具函数
+        def safe_find_local_extremes(data, window=5):
+            """安全的局部极值查找函数"""
+            if len(data) < window * 2 + 1:
+                return [], []
+
+            maxima = []
+            minima = []
+
+            for i in range(window, len(data) - window):
+                # 检查局部最大值
+                is_max = True
+                for j in range(i - window, i + window + 1):
+                    if j != i and data[j] >= data[i]:
+                        is_max = False
+                        break
+                if is_max:
+                    maxima.append(i)
+
+                # 检查局部最小值
+                is_min = True
+                for j in range(i - window, i + window + 1):
+                    if j != i and data[j] <= data[i]:
+                        is_min = False
+                        break
+                if is_min:
+                    minima.append(i)
+
+            return maxima, minima
+
+        def safe_calculate_trend_strength(prices, period=20):
+            """安全的趋势强度计算函数"""
+            if len(prices) < period:
+                return 0.0
+
+            recent_prices = prices[-period:]
+            if len(recent_prices) < 2:
+                return 0.0
+
+            # 计算线性回归斜率作为趋势强度
+            x = np.arange(len(recent_prices))
+            y = np.array(recent_prices)
+
+            try:
+                slope = np.polyfit(x, y, 1)[0]
+                return slope / np.mean(y) if np.mean(y) > 0 else 0.0
+            except:
+                return 0.0
+
+        def safe_calculate_volatility(prices, period=20):
+            """安全的波动率计算函数"""
+            if len(prices) < period:
+                return 0.0
+
+            recent_prices = prices[-period:]
+            if len(recent_prices) < 2:
+                return 0.0
+
+            try:
+                returns = np.diff(recent_prices) / recent_prices[:-1]
+                return np.std(returns) if len(returns) > 0 else 0.0
+            except:
+                return 0.0
+
+        def safe_calculate_momentum(prices, period=10):
+            """安全的动量计算函数"""
+            if len(prices) < period + 1:
+                return 0.0
+
+            try:
+                current_price = prices[-1]
+                past_price = prices[-period-1]
+                return (current_price - past_price) / past_price if past_price > 0 else 0.0
+            except:
+                return 0.0
+
+        def safe_calculate_rsi(prices, period=14):
+            """安全的RSI计算函数"""
+            if len(prices) < period + 1:
+                return 50.0
+
+            try:
+                deltas = np.diff(prices)
+                gains = np.where(deltas > 0, deltas, 0)
+                losses = np.where(deltas < 0, -deltas, 0)
+
+                avg_gain = np.mean(gains[-period:])
+                avg_loss = np.mean(losses[-period:])
+
+                if avg_loss == 0:
+                    return 100.0
+
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
+                return rsi
+            except:
+                return 50.0
+
+        def safe_calculate_body_ratio(open_price, high_price, low_price, close_price):
+            """安全的实体比例计算函数"""
+            try:
+                body_size = abs(close_price - open_price)
+                total_range = high_price - low_price
+                return body_size / total_range if total_range > 0 else 0.0
+            except:
+                return 0.0
+
+        def safe_calculate_shadow_ratios(open_price, high_price, low_price, close_price):
+            """安全的影线比例计算函数"""
+            try:
+                total_range = high_price - low_price
+                if total_range <= 0:
+                    return 0.0, 0.0
+
+                upper_shadow = high_price - max(open_price, close_price)
+                lower_shadow = min(open_price, close_price) - low_price
+
+                upper_ratio = upper_shadow / total_range
+                lower_ratio = lower_shadow / total_range
+
+                return upper_ratio, lower_ratio
+            except:
+                return 0.0, 0.0
+
+        def safe_is_bullish_candle(open_price, close_price):
+            """安全的阳线判断函数"""
+            try:
+                return close_price > open_price
+            except:
+                return False
+
+        def safe_is_bearish_candle(open_price, close_price):
+            """安全的阴线判断函数"""
+            try:
+                return close_price < open_price
+            except:
+                return False
+
         return {
             # 基础Python函数
             'len': len, 'abs': abs, 'max': max, 'min': min, 'sum': sum,
             'range': range, 'enumerate': enumerate, 'zip': zip,
             'str': str, 'float': float, 'int': int, 'bool': bool,
-            'round': round, 'pow': pow,
+            'round': round, 'pow': pow, 'any': any, 'all': all,
 
             # 数学和数据处理
             'np': np, 'pd': pd,
@@ -289,18 +519,16 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             'PatternResult': PatternResult,
             'PatternCategory': PatternCategory,
 
-            # 基础工具函数
-            'calculate_body_ratio': calculate_body_ratio,
-            'calculate_shadow_ratios': calculate_shadow_ratios,
-            'is_bullish_candle': is_bullish_candle,
-            'is_bearish_candle': is_bearish_candle,
-            'find_local_extremes': find_local_extremes,
-            'calculate_trend_strength': calculate_trend_strength,
-
-            # 新增性能优化函数
-            'calculate_volatility': calculate_volatility,
-            'calculate_momentum': calculate_momentum,
-            'calculate_rsi': calculate_rsi,
+            # 安全的工具函数
+            'calculate_body_ratio': safe_calculate_body_ratio,
+            'calculate_shadow_ratios': safe_calculate_shadow_ratios,
+            'is_bullish_candle': safe_is_bullish_candle,
+            'is_bearish_candle': safe_is_bearish_candle,
+            'find_local_extremes': safe_find_local_extremes,
+            'calculate_trend_strength': safe_calculate_trend_strength,
+            'calculate_volatility': safe_calculate_volatility,
+            'calculate_momentum': safe_calculate_momentum,
+            'calculate_rsi': safe_calculate_rsi,
         }
 
     def _create_enhanced_safe_locals(self, kdata: pd.DataFrame) -> Dict[str, Any]:
@@ -703,24 +931,7 @@ def create_pattern_recognizer(debug_mode: bool = False) -> EnhancedPatternRecogn
     return EnhancedPatternRecognizer(debug_mode=debug_mode)
 
 
-def validate_kdata(kdata) -> bool:
-    """
-    验证K线数据有效性
-
-    Args:
-        kdata: K线数据
-
-    Returns:
-        是否有效
-    """
-    if kdata is None:
-        return False
-
-    if not isinstance(kdata, pd.DataFrame):
-        return False
-
-    required_columns = ['open', 'high', 'low', 'close']
-    return all(col in kdata.columns for col in required_columns)
+# 使用utils.data_preprocessing中的validate_kdata函数
 
 
 def get_pattern_recognizer_info() -> Dict[str, Any]:

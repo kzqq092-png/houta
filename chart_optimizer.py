@@ -1,385 +1,399 @@
+"""
+图表优化器 - 统一图表服务的扩展工具
+提供高级图表优化功能，基于统一图表服务架构
+"""
+
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.widgets import CheckButtons
-from matplotlib.animation import FuncAnimation
-from typing import Dict, List, Optional
-import mplfinance as mpf
+import pandas as pd
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+
+# 导入统一图表服务
+try:
+    from core.services.unified_chart_service import get_unified_chart_service
+    from gui.widgets.chart_widget import ChartWidget
+    UNIFIED_CHART_AVAILABLE = True
+except ImportError:
+    UNIFIED_CHART_AVAILABLE = False
+    print("警告: 统一图表服务不可用，图表优化功能将受限")
+
+# 导入核心服务
+try:
+    from core.services.technical_analysis_service import get_technical_analysis_service
+    TECHNICAL_ANALYSIS_AVAILABLE = True
+except ImportError:
+    TECHNICAL_ANALYSIS_AVAILABLE = False
+
+# 导入日志管理器
+try:
+    from core.logger import LogManager
+    logger = LogManager()
+except ImportError:
+    class SimpleLogger:
+        def info(self, msg): print(f"[INFO] {msg}")
+        def warning(self, msg): print(f"[WARNING] {msg}")
+        def error(self, msg): print(f"[ERROR] {msg}")
+    logger = SimpleLogger()
 
 
-class ChartOptimizer:
-    """图表性能优化器"""
+class UnifiedChartOptimizer:
+    """统一图表优化器 - 基于统一图表服务的高级优化工具"""
 
-    @staticmethod
-    def optimize_figure(fig: Figure):
-        """优化图表配置
+    def __init__(self):
+        """初始化图表优化器"""
+        self.chart_service = None
+        self.technical_service = None
+
+        if UNIFIED_CHART_AVAILABLE:
+            try:
+                self.chart_service = get_unified_chart_service()
+                logger.info("统一图表服务已连接")
+            except Exception as e:
+                logger.error(f"无法连接统一图表服务: {e}")
+
+        if TECHNICAL_ANALYSIS_AVAILABLE:
+            try:
+                self.technical_service = get_technical_analysis_service()
+                logger.info("技术分析服务已连接")
+            except Exception as e:
+                logger.error(f"无法连接技术分析服务: {e}")
+
+    def optimize_chart_widget(self, chart_widget: 'ChartWidget', optimization_level: str = 'standard') -> bool:
+        """
+        优化图表控件性能
 
         Args:
-            fig: matplotlib图表对象
-        """
-        # 设置更高效的渲染后端
-        plt.style.use('fast')
-        fig.set_dpi(100)  # 适中的DPI值平衡清晰度和性能
+            chart_widget: 图表控件实例
+            optimization_level: 优化级别 ('basic', 'standard', 'advanced')
 
-        # 启用快速绘图模式
-        for ax in fig.axes:
-            ax.set_adjustable('datalim')
-            ax.set_animated(True)
+        Returns:
+            bool: 优化是否成功
+        """
+        if not UNIFIED_CHART_AVAILABLE or not self.chart_service:
+            logger.warning("统一图表服务不可用，无法进行优化")
+            return False
+
+        try:
+            # 根据优化级别应用不同的优化策略
+            if optimization_level == 'basic':
+                self._apply_basic_optimization(chart_widget)
+            elif optimization_level == 'standard':
+                self._apply_standard_optimization(chart_widget)
+            elif optimization_level == 'advanced':
+                self._apply_advanced_optimization(chart_widget)
+            else:
+                logger.warning(f"未知的优化级别: {optimization_level}")
+                return False
+
+            logger.info(f"图表优化完成 - 级别: {optimization_level}")
+            return True
+
+        except Exception as e:
+            logger.error(f"图表优化失败: {e}")
+            return False
+
+    def _apply_basic_optimization(self, chart_widget: 'ChartWidget'):
+        """应用基础优化"""
+        # 启用缓存
+        chart_widget.enable_cache(True)
+
+        # 设置合理的渲染参数
+        chart_widget.set_render_quality('medium')
+
+        # 启用数据压缩
+        chart_widget.enable_data_compression(True)
+
+    def _apply_standard_optimization(self, chart_widget: 'ChartWidget'):
+        """应用标准优化"""
+        # 应用基础优化
+        self._apply_basic_optimization(chart_widget)
+
+        # 启用异步渲染
+        chart_widget.enable_async_rendering(True)
+
+        # 设置智能重绘
+        chart_widget.enable_smart_redraw(True)
 
         # 优化内存使用
-        fig.set_tight_layout(True)
+        chart_widget.optimize_memory_usage()
 
-    @staticmethod
-    def create_blitting_canvas(canvas):
-        """创建用于blitting优化的背景
+    def _apply_advanced_optimization(self, chart_widget: 'ChartWidget'):
+        """应用高级优化"""
+        # 应用标准优化
+        self._apply_standard_optimization(chart_widget)
+
+        # 启用GPU加速（如果可用）
+        chart_widget.enable_gpu_acceleration(True)
+
+        # 设置高级缓存策略
+        chart_widget.set_cache_strategy('intelligent')
+
+        # 启用预测性加载
+        chart_widget.enable_predictive_loading(True)
+
+    def create_optimized_multi_chart(self, data_dict: Dict[str, pd.DataFrame],
+                                     chart_types: Dict[str, str] = None) -> Optional['ChartWidget']:
+        """
+        创建优化的多图表组合
 
         Args:
-            canvas: matplotlib画布对象
+            data_dict: 数据字典，键为图表名称，值为数据
+            chart_types: 图表类型字典，键为图表名称，值为图表类型
 
         Returns:
-            background: 背景图像
+            ChartWidget: 优化的图表控件或None
         """
-        canvas.draw()
-        return canvas.copy_from_bbox(canvas.figure.bbox)
+        if not UNIFIED_CHART_AVAILABLE or not self.chart_service:
+            logger.warning("统一图表服务不可用，无法创建多图表")
+            return None
 
-    @staticmethod
-    def apply_theme(fig: Figure, theme: str = 'light'):
-        """应用主题样式
+        try:
+            # 创建图表控件
+            chart_widget = ChartWidget()
+
+            # 设置多面板模式
+            chart_widget.set_chart_type('multi_panel')
+
+            # 配置子图表
+            for name, data in data_dict.items():
+                chart_type = chart_types.get(name, 'candlestick') if chart_types else 'candlestick'
+
+                # 添加子图表
+                chart_widget.add_sub_chart(name, data, chart_type)
+
+            # 应用高级优化
+            self.optimize_chart_widget(chart_widget, 'advanced')
+
+            logger.info(f"成功创建优化的多图表，包含 {len(data_dict)} 个子图表")
+            return chart_widget
+
+        except Exception as e:
+            logger.error(f"创建多图表失败: {e}")
+            return None
+
+    def add_technical_indicators(self, chart_widget: 'ChartWidget',
+                                 indicators: List[Dict[str, Any]]) -> bool:
+        """
+        添加技术指标到图表
 
         Args:
-            fig: matplotlib图表对象
-            theme: 主题名称，可选 'light' 或 'dark'
-        """
-        if theme == 'light':
-            plt.style.use('seaborn-v0_8-whitegrid')
-            fig.patch.set_facecolor('white')
-            for ax in fig.axes:
-                ax.set_facecolor('white')
-                ax.grid(True, alpha=0.2)
-        else:
-            plt.style.use('dark_background')
-            fig.patch.set_facecolor('#2E2E2E')
-            for ax in fig.axes:
-                ax.set_facecolor('#2E2E2E')
-                ax.grid(True, alpha=0.1)
-
-    @staticmethod
-    def create_interactive_legend(ax, alpha=0.5):
-        """创建交互式图例
-
-        Args:
-            ax: matplotlib轴对象
-            alpha: 透明度
+            chart_widget: 图表控件
+            indicators: 指标配置列表
 
         Returns:
-            check: 复选框控件
+            bool: 是否成功添加
         """
-        lines = ax.get_lines()
-        labels = [line.get_label() for line in lines]
+        if not UNIFIED_CHART_AVAILABLE or not self.technical_service:
+            logger.warning("服务不可用，无法添加技术指标")
+            return False
 
-        # 创建复选框
-        rax = plt.axes([0.05, 0.4, 0.1, 0.15])
-        check = CheckButtons(rax, labels)
+        try:
+            for indicator_config in indicators:
+                indicator_type = indicator_config.get('type')
+                params = indicator_config.get('params', {})
 
-        def func(label):
-            line = [l for l in lines if l.get_label() == label][0]
-            line.set_visible(not line.get_visible())
-            ax.figure.canvas.draw_idle()
+                # 计算指标
+                if self.technical_service:
+                    indicator_data = self.technical_service.calculate_indicator(
+                        indicator_type, chart_widget.get_data(), **params
+                    )
 
-        check.on_clicked(func)
-        return check
+                    # 添加到图表
+                    chart_widget.add_indicator(indicator_type, indicator_data, params)
 
-    @staticmethod
-    def setup_realtime_animation(fig, update_func, interval=1000):
-        """设置实时动画更新
+            logger.info(f"成功添加 {len(indicators)} 个技术指标")
+            return True
+
+        except Exception as e:
+            logger.error(f"添加技术指标失败: {e}")
+            return False
+
+    def create_performance_dashboard(self, performance_data: Dict[str, Any]) -> Optional['ChartWidget']:
+        """
+        创建性能仪表板
 
         Args:
-            fig: matplotlib图表对象
-            update_func: 更新函数
-            interval: 更新间隔(毫秒)
+            performance_data: 性能数据
 
         Returns:
-            anim: 动画对象
+            ChartWidget: 性能仪表板图表或None
         """
-        return FuncAnimation(fig, update_func, interval=interval)
+        if not UNIFIED_CHART_AVAILABLE:
+            logger.warning("统一图表服务不可用，无法创建性能仪表板")
+            return None
 
-    @staticmethod
-    def optimize_candlestick_chart(fig, data, style='yahoo'):
-        """优化K线图显示
+        try:
+            # 创建仪表板图表
+            dashboard = ChartWidget()
+            dashboard.set_chart_type('dashboard')
+
+            # 添加各种性能图表
+            if 'returns' in performance_data:
+                dashboard.add_returns_chart(performance_data['returns'])
+
+            if 'drawdown' in performance_data:
+                dashboard.add_drawdown_chart(performance_data['drawdown'])
+
+            if 'metrics' in performance_data:
+                dashboard.add_metrics_panel(performance_data['metrics'])
+
+            # 应用优化
+            self.optimize_chart_widget(dashboard, 'advanced')
+
+            logger.info("性能仪表板创建成功")
+            return dashboard
+
+        except Exception as e:
+            logger.error(f"创建性能仪表板失败: {e}")
+            return None
+
+    def apply_theme_optimization(self, chart_widget: 'ChartWidget',
+                                 theme: str = 'dark', custom_colors: Dict[str, str] = None) -> bool:
+        """
+        应用主题优化
 
         Args:
-            fig: matplotlib图表对象
-            data: K线数据
-            style: 样式名称
-        """
-        # 设置K线图样式
-        mc = mpf.make_marketcolors(
-            up='red', down='green',
-            edge='inherit',
-            wick='inherit',
-            volume='in',
-            ohlc='inherit'
-        )
-        s = mpf.make_mpf_style(
-            marketcolors=mc,
-            gridstyle='solid',
-            y_on_right=True
-        )
-
-        # 使用mplfinance绘制优化的K线图
-        mpf.plot(
-            data,
-            type='candle',
-            style=s,
-            volume=True,
-            panel_ratios=(3, 1),
-            figsize=(12, 8),
-            tight_layout=True,
-            figure=fig
-        )
-
-    @staticmethod
-    def create_multi_timeframe_chart(fig, data_dict):
-        """创建多时间周期图表
-
-        Args:
-            fig: matplotlib图表对象
-            data_dict: 不同时间周期的数据字典
-        """
-        n = len(data_dict)
-        for i, (period, data) in enumerate(data_dict.items()):
-            ax = fig.add_subplot(n, 1, i+1)
-            ChartOptimizer.optimize_candlestick_chart(ax, data)
-            ax.set_title(f'{period} Chart')
-
-    @staticmethod
-    def add_technical_overlay(ax, data, indicator_type, **params):
-        """添加技术指标叠加
-
-        Args:
-            ax: matplotlib轴对象
-            data: 数据
-            indicator_type: 指标类型
-            params: 指标参数
-        """
-        if indicator_type == 'MA':
-            periods = params.get('periods', [5, 10, 20, 60])
-            colors = params.get('colors', ['red', 'blue', 'green', 'purple'])
-            for period, color in zip(periods, colors):
-                ma = data.close.rolling(period).mean()
-                ax.plot(data.index, ma, color=color,
-                        label=f'MA{period}', linewidth=0.7)
-
-        elif indicator_type == 'BOLL':
-            period = params.get('period', 20)
-            std = params.get('std', 2)
-            middle = data.close.rolling(period).mean()
-            std_dev = data.close.rolling(period).std()
-            upper = middle + std * std_dev
-            lower = middle - std * std_dev
-
-            ax.plot(data.index, upper, 'r--', label='Upper Band')
-            ax.plot(data.index, middle, 'b-', label='Middle Band')
-            ax.plot(data.index, lower, 'g--', label='Lower Band')
-
-        # 添加更多指标...
-
-        ax.legend()
-
-    @staticmethod
-    def create_volume_profile(ax, data, bins=50):
-        """创建成交量分布图
-
-        Args:
-            ax: matplotlib轴对象
-            data: 数据
-            bins: 分箱数量
-        """
-        # 计算价格范围
-        price_range = np.linspace(data.low.min(), data.high.max(), bins)
-        volumes = np.zeros(bins-1)
-
-        # 统计每个价格区间的成交量
-        for i in range(len(data)):
-            idx = np.searchsorted(price_range, data.close.iloc[i]) - 1
-            if 0 <= idx < bins-1:
-                volumes[idx] += data.volume.iloc[i]
-
-        # 绘制水平直方图
-        ax.barh(price_range[:-1], volumes, height=price_range[1]-price_range[0],
-                alpha=0.3)
-
-    @staticmethod
-    def add_annotations(ax, points, texts):
-        """添加图表标注
-
-        Args:
-            ax: matplotlib轴对象
-            points: 标注点列表
-            texts: 标注文本列表
-        """
-        for point, text in zip(points, texts):
-            ax.annotate(text, xy=point, xytext=(10, 10),
-                        textcoords='offset points',
-                        bbox=dict(boxstyle='round,pad=0.5',
-                                  fc='yellow', alpha=0.5),
-                        arrowprops=dict(arrowstyle='->'))
-
-    @staticmethod
-    def create_correlation_matrix(fig, data_dict):
-        """创建相关性矩阵图
-
-        Args:
-            fig: matplotlib图表对象
-            data_dict: 数据字典
-        """
-        # 计算相关性矩阵
-        corr_matrix = pd.DataFrame(data_dict).corr()
-
-        # 创建热力图
-        ax = fig.add_subplot(111)
-        im = ax.imshow(corr_matrix, cmap='RdYlBu')
-
-        # 添加颜色条
-        fig.colorbar(im)
-
-        # 设置标签
-        ax.set_xticks(np.arange(len(corr_matrix.columns)))
-        ax.set_yticks(np.arange(len(corr_matrix.columns)))
-        ax.set_xticklabels(corr_matrix.columns)
-        ax.set_yticklabels(corr_matrix.columns)
-
-        # 旋转x轴标签
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-
-        # 添加数值标注
-        for i in range(len(corr_matrix.columns)):
-            for j in range(len(corr_matrix.columns)):
-                text = ax.text(j, i, f'{corr_matrix.iloc[i, j]:.3f}',
-                               ha='center', va='center')
-
-    @staticmethod
-    def create_indicator_dashboard(fig, data):
-        """创建指标仪表板
-
-        Args:
-            fig: matplotlib图表对象
-            data: 数据
-        """
-        # 创建网格布局
-        gs = fig.add_gridspec(3, 3)
-
-        # K线图
-        ax1 = fig.add_subplot(gs[0, :])
-        ChartOptimizer.optimize_candlestick_chart(ax1, data)
-
-        # RSI
-        ax2 = fig.add_subplot(gs[1, 0])
-        rsi = data.close.rolling(14).apply(lambda x: 100 - 100/(1 + x.mean()))
-        ax2.plot(data.index, rsi)
-        ax2.set_title('RSI')
-
-        # MACD
-        ax3 = fig.add_subplot(gs[1, 1])
-        exp1 = data.close.ewm(span=12).mean()
-        exp2 = data.close.ewm(span=26).mean()
-        macd = exp1 - exp2
-        signal = macd.ewm(span=9).mean()
-        ax3.plot(data.index, macd, label='MACD')
-        ax3.plot(data.index, signal, label='Signal')
-        ax3.set_title('MACD')
-
-        # 成交量
-        ax4 = fig.add_subplot(gs[1, 2])
-        ax4.bar(data.index, data.volume)
-        ax4.set_title('Volume')
-
-        # 布林带
-        ax5 = fig.add_subplot(gs[2, 0])
-        ChartOptimizer.add_technical_overlay(ax5, data, 'BOLL')
-        ax5.set_title('Bollinger Bands')
-
-        # 动量
-        ax6 = fig.add_subplot(gs[2, 1])
-        momentum = data.close - data.close.shift(10)
-        ax6.plot(data.index, momentum)
-        ax6.set_title('Momentum')
-
-        # 成交量分布
-        ax7 = fig.add_subplot(gs[2, 2])
-        ChartOptimizer.create_volume_profile(ax7, data)
-        ax7.set_title('Volume Profile')
-
-        fig.tight_layout()
-
-    @staticmethod
-    def optimize_performance(fig):
-        """优化图表性能
-
-        Args:
-            fig: matplotlib图表对象
-        """
-        # 减少绘制的数据点
-        for ax in fig.axes:
-            for line in ax.lines:
-                data = line.get_data()
-                if len(data[0]) > 1000:
-                    # 使用抽样减少数据点
-                    step = len(data[0]) // 1000
-                    line.set_data(data[0][::step], data[1][::step])
-
-        # 禁用不必要的交互功能
-        for ax in fig.axes:
-            ax.set_adjustable('datalim')
-
-        # 优化内存使用
-        fig.set_tight_layout(True)
-
-        # 使用快速样式
-        plt.style.use('fast')
-
-    @staticmethod
-    def create_chart_template(template_name: str) -> Dict:
-        """创建图表模板
-
-        Args:
-            template_name: 模板名称
+            chart_widget: 图表控件
+            theme: 主题名称
+            custom_colors: 自定义颜色配置
 
         Returns:
-            template: 模板配置字典
+            bool: 是否成功应用主题
         """
-        templates = {
-            'trading': {
-                'figsize': (12, 8),
-                'dpi': 100,
-                'style': 'seaborn-v0_8-whitegrid',
-                'layout': {
-                    'price': {'height_ratios': 3},
-                    'volume': {'height_ratios': 1},
-                    'indicator': {'height_ratios': 1}
-                }
-            },
-            'analysis': {
-                'figsize': (15, 10),
-                'dpi': 100,
-                'style': 'seaborn-v0_8-whitegrid',
-                'layout': {
-                    'main': {'height_ratios': 2},
-                    'sub1': {'height_ratios': 1},
-                    'sub2': {'height_ratios': 1},
-                    'sub3': {'height_ratios': 1}
-                }
-            },
-            'dashboard': {
-                'figsize': (16, 12),
-                'dpi': 100,
-                'style': 'seaborn-v0_8-whitegrid',
-                'layout': {
-                    'overview': {'grid': (2, 2)},
-                    'details': {'grid': (3, 3)},
-                    'summary': {'grid': (1, 3)}
-                }
+        if not UNIFIED_CHART_AVAILABLE or not self.chart_service:
+            logger.warning("图表服务不可用，无法应用主题")
+            return False
+
+        try:
+            # 应用基础主题
+            self.chart_service.apply_theme(chart_widget, theme)
+
+            # 应用自定义颜色
+            if custom_colors:
+                chart_widget.set_custom_colors(custom_colors)
+
+            # 优化主题性能
+            chart_widget.optimize_theme_rendering()
+
+            logger.info(f"主题 '{theme}' 应用成功")
+            return True
+
+        except Exception as e:
+            logger.error(f"应用主题失败: {e}")
+            return False
+
+    def create_realtime_monitor(self, data_source: Any, update_interval: int = 1000) -> Optional['ChartWidget']:
+        """
+        创建实时监控图表
+
+        Args:
+            data_source: 数据源
+            update_interval: 更新间隔（毫秒）
+
+        Returns:
+            ChartWidget: 实时监控图表或None
+        """
+        if not UNIFIED_CHART_AVAILABLE:
+            logger.warning("统一图表服务不可用，无法创建实时监控")
+            return None
+
+        try:
+            # 创建实时图表
+            monitor = ChartWidget()
+            monitor.set_chart_type('realtime')
+
+            # 设置数据源
+            monitor.set_data_source(data_source)
+
+            # 配置更新间隔
+            monitor.set_update_interval(update_interval)
+
+            # 启用实时优化
+            monitor.enable_realtime_optimization(True)
+
+            # 应用高级优化
+            self.optimize_chart_widget(monitor, 'advanced')
+
+            logger.info("实时监控图表创建成功")
+            return monitor
+
+        except Exception as e:
+            logger.error(f"创建实时监控失败: {e}")
+            return None
+
+    def get_optimization_report(self, chart_widget: 'ChartWidget') -> Dict[str, Any]:
+        """
+        获取优化报告
+
+        Args:
+            chart_widget: 图表控件
+
+        Returns:
+            Dict: 优化报告
+        """
+        try:
+            report = {
+                'optimization_level': chart_widget.get_optimization_level(),
+                'cache_enabled': chart_widget.is_cache_enabled(),
+                'memory_usage': chart_widget.get_memory_usage(),
+                'render_performance': chart_widget.get_render_performance(),
+                'data_compression': chart_widget.get_compression_ratio(),
+                'gpu_acceleration': chart_widget.is_gpu_acceleration_enabled(),
+                'timestamp': datetime.now().isoformat()
             }
-        }
 
-        return templates.get(template_name, templates['trading'])
+            return report
+
+        except Exception as e:
+            logger.error(f"获取优化报告失败: {e}")
+            return {}
+
+
+# 全局优化器实例
+_chart_optimizer = None
+
+
+def get_chart_optimizer() -> UnifiedChartOptimizer:
+    """获取全局图表优化器实例"""
+    global _chart_optimizer
+    if _chart_optimizer is None:
+        _chart_optimizer = UnifiedChartOptimizer()
+    return _chart_optimizer
+
+
+# 便捷函数
+def optimize_chart(chart_widget: 'ChartWidget', level: str = 'standard') -> bool:
+    """优化图表控件的便捷函数"""
+    optimizer = get_chart_optimizer()
+    return optimizer.optimize_chart_widget(chart_widget, level)
+
+
+def create_multi_chart(data_dict: Dict[str, pd.DataFrame],
+                       chart_types: Dict[str, str] = None) -> Optional['ChartWidget']:
+    """创建多图表的便捷函数"""
+    optimizer = get_chart_optimizer()
+    return optimizer.create_optimized_multi_chart(data_dict, chart_types)
+
+
+def add_indicators(chart_widget: 'ChartWidget', indicators: List[Dict[str, Any]]) -> bool:
+    """添加技术指标的便捷函数"""
+    optimizer = get_chart_optimizer()
+    return optimizer.add_technical_indicators(chart_widget, indicators)
+
+
+# 向后兼容的ChartOptimizer类（已废弃）
+class ChartOptimizer:
+    """
+    已废弃的ChartOptimizer类
+    请使用UnifiedChartOptimizer替代
+    """
+
+    def __init__(self):
+        logger.warning("ChartOptimizer已废弃，请使用UnifiedChartOptimizer")
+        self.unified_optimizer = get_chart_optimizer()
+
+    def __getattr__(self, name):
+        # 重定向到统一优化器
+        if hasattr(self.unified_optimizer, name):
+            return getattr(self.unified_optimizer, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")

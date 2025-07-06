@@ -1,0 +1,302 @@
+[
+  {
+    "stock_code": "000001",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "000001"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": false,
+        "error": "股票选择失败"
+      }
+    },
+    "success": false,
+    "error": null,
+    "success_rate": 66.66666666666666
+  },
+  {
+    "stock_code": "sz000001",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "sz000001"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": true,
+        "selected_stock": "sz000001",
+        "chart_created": true,
+        "data_count": 200
+      }
+    },
+    "success": true,
+    "error": null,
+    "success_rate": 83.33333333333334
+  },
+  {
+    "stock_code": "600000",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "600000"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": false,
+        "error": "股票选择失败"
+      }
+    },
+    "success": false,
+    "error": null,
+    "success_rate": 66.66666666666666
+  },
+  {
+    "stock_code": "sh600000",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "sh600000"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": true,
+        "selected_stock": "sh600000",
+        "chart_created": true,
+        "data_count": 200
+      }
+    },
+    "success": true,
+    "error": null,
+    "success_rate": 83.33333333333334
+  },
+  {
+    "stock_code": "000595",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "000595"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": false,
+        "error": "股票选择失败"
+      }
+    },
+    "success": false,
+    "error": null,
+    "success_rate": 66.66666666666666
+  },
+  {
+    "stock_code": "sz000595",
+    "steps": {
+      "stock_service_data": {
+        "success": true,
+        "data_count": 10,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount",
+          "code",
+          "prev_close",
+          "change",
+          "change_percent"
+        ]
+      },
+      "stock_selection_event": {
+        "success": true,
+        "event_type": "StockSelectedEvent"
+      },
+      "chart_service_response": {
+        "success": true,
+        "current_stock": "sz000595"
+      },
+      "chart_creation": {
+        "success": true,
+        "chart_type": "candlestick",
+        "data_count": 100,
+        "indicators": [
+          "MA5",
+          "MA10"
+        ]
+      },
+      "chart_data_retrieval": {
+        "success": false,
+        "error": "图表数据为空"
+      },
+      "complete_data_flow": {
+        "success": true,
+        "selected_stock": "sz000595",
+        "chart_created": true,
+        "data_count": 200
+      }
+    },
+    "success": true,
+    "error": null,
+    "success_rate": 83.33333333333334
+  }
+]

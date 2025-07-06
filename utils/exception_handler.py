@@ -1,94 +1,81 @@
 """
-异常处理模块
+异常处理器
 
-提供全局异常处理功能
+提供全局异常处理功能。
 """
 
-import os
 import sys
+import logging
 import traceback
-from datetime import datetime
-from typing import Optional, Dict, Any, Callable
-from PyQt5.QtCore import QObject, pyqtSignal
+from typing import Optional
+
+from PyQt5.QtWidgets import QApplication, QMessageBox
+
+logger = logging.getLogger(__name__)
 
 
-class ExceptionHandler(QObject):
-    """异常处理器"""
+class GlobalExceptionHandler:
+    """全局异常处理器"""
 
-    # 定义信号
-    exception_occurred = pyqtSignal(Exception, str, str)  # 异常对象, 错误类型, 错误消息
-
-    def __init__(self):
-        """初始化异常处理器"""
-        super().__init__()
-        self._logger = None
-        self._handlers = {}
-
-    def set_logger(self, logger):
-        """设置日志记录器
+    def __init__(self, app: Optional[QApplication] = None):
+        """
+        初始化异常处理器
 
         Args:
-            logger: 日志记录器对象
+            app: Qt应用程序实例
         """
-        self._logger = logger
-
-    def register_handler(self, error_type: type, handler: Callable):
-        """注册异常处理函数
-
-        Args:
-            error_type: 异常类型
-            handler: 处理函数
-        """
-        self._handlers[error_type] = handler
+        self.app = app
+        self.original_excepthook = sys.excepthook
 
     def handle_exception(self, exc_type, exc_value, exc_traceback):
-        """处理未捕获的异常
+        """
+        处理未捕获的异常
 
         Args:
             exc_type: 异常类型
             exc_value: 异常值
-            exc_traceback: 异常堆栈
+            exc_traceback: 异常追踪
         """
         try:
-            # 获取错误信息
-            error_msg = str(exc_value)
-            error_type = exc_type.__name__
-            trace_info = ''.join(traceback.format_tb(exc_traceback))
+            # 如果是KeyboardInterrupt，直接退出
+            if issubclass(exc_type, KeyboardInterrupt):
+                sys.exit(0)
 
-            # 记录错误日志
-            if self._logger:
-                self._logger.error(
-                    f"未捕获的异常: {error_type}: {error_msg}\n{trace_info}")
+            # 记录异常信息
+            error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            logger.error(f"Uncaught exception: {error_msg}")
 
-            # 发送异常信号
-            self.exception_occurred.emit(exc_value, error_type, error_msg)
+            # 显示错误对话框
+            if self.app:
+                try:
+                    QMessageBox.critical(
+                        None,
+                        "程序错误",
+                        f"程序遇到未处理的错误：\n\n{exc_value}\n\n详细信息请查看日志文件。"
+                    )
+                except:
+                    pass
 
-            # 调用对应的处理函数
-            if exc_type in self._handlers:
-                self._handlers[exc_type](exc_value)
+            # 调用原始的异常处理器
+            self.original_excepthook(exc_type, exc_value, exc_traceback)
 
         except Exception as e:
-            # 如果处理异常的过程中出现错误，至少打印到控制台
-            print(f"处理异常时出错: {str(e)}")
-            print(f"原始异常: {error_type}: {error_msg}")
-            print(trace_info)
+            # 异常处理器本身出错，直接调用原始处理器
+            logger.error(f"Exception handler failed: {e}")
+            self.original_excepthook(exc_type, exc_value, exc_traceback)
 
-    def log_exception(self, e: Exception, context: str = ""):
-        """记录异常
 
-        Args:
-            e: 异常对象
-            context: 上下文信息
-        """
-        try:
-            error_msg = f"{context}\n异常: {str(e)}\n堆栈跟踪:\n{traceback.format_exc()}"
-            if self._logger:
-                self._logger.error(error_msg)
-            self.exception_occurred.emit(e, e.__class__.__name__, str(e))
-        except Exception as ex:
-            print(f"记录异常失败: {str(ex)}")
-            print(f"原始异常: {str(e)}")
+def setup_exception_handler(app: Optional[QApplication] = None):
+    """
+    设置全局异常处理器
 
-    def install(self):
-        """安装全局异常处理器"""
-        sys.excepthook = self.handle_exception
+    Args:
+        app: Qt应用程序实例
+    """
+    try:
+        handler = GlobalExceptionHandler(app)
+        sys.excepthook = handler.handle_exception
+        logger.info("Global exception handler configured")
+
+    except Exception as e:
+        logger.error(f"Failed to setup exception handler: {e}")

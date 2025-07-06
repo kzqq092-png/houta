@@ -7,6 +7,7 @@
 - 形态识别性能评估
 - 系统运行性能评估
 - 风险调整后收益评估
+- 算法性能评估
 """
 
 import pandas as pd
@@ -15,8 +16,17 @@ from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import sqlite3
 import json
-from dataclasses import dataclass
+import time
+import tracemalloc
+from dataclasses import dataclass, asdict
 from enum import Enum
+
+# 尝试导入psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 
 class PerformanceMetricType(Enum):
@@ -25,6 +35,8 @@ class PerformanceMetricType(Enum):
     RISK = "risk"              # 风险指标
     EFFICIENCY = "efficiency"   # 效率指标
     STABILITY = "stability"     # 稳定性指标
+    ACCURACY = "accuracy"       # 准确性指标
+    BUSINESS = "business"       # 业务指标
 
 
 @dataclass
@@ -37,18 +49,60 @@ class PerformanceMetric:
     benchmark: Optional[float] = None
     score: Optional[float] = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return asdict(self)
+
+
+@dataclass
+class AlgorithmMetrics:
+    """算法性能指标数据类"""
+    # 准确性指标
+    true_positives: int = 0
+    false_positives: int = 0
+    true_negatives: int = 0
+    false_negatives: int = 0
+    precision: float = 0.0
+    recall: float = 0.0
+    f1_score: float = 0.0
+    accuracy: float = 0.0
+
+    # 性能指标
+    execution_time: float = 0.0
+    memory_usage: float = 0.0
+    cpu_usage: float = 0.0
+
+    # 业务指标
+    signal_quality: float = 0.0
+    confidence_avg: float = 0.0
+    confidence_std: float = 0.0
+    patterns_found: int = 0
+
+    # 稳定性指标
+    robustness_score: float = 0.0
+    parameter_sensitivity: float = 0.0
+
+    # 综合评分
+    overall_score: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return asdict(self)
+
 
 class PerformanceEvaluator:
     """系统性能评估器"""
 
-    def __init__(self, db_path: str = 'db/hikyuu_system.db'):
+    def __init__(self, db_path: str = 'db/hikyuu_system.db', debug_mode: bool = False):
         """
         初始化性能评估器
 
         Args:
             db_path: 数据库路径
+            debug_mode: 调试模式
         """
         self.db_path = db_path
+        self.debug_mode = debug_mode
         self.metrics_cache = {}
 
     def evaluate_strategy_performance(self,
@@ -267,9 +321,6 @@ class PerformanceEvaluator:
         metrics = {}
 
         try:
-            import psutil
-            import time
-
             # CPU使用率
             cpu_percent = psutil.cpu_percent(interval=1)
             metrics['cpu_usage'] = PerformanceMetric(
@@ -306,6 +357,213 @@ class PerformanceEvaluator:
             print(f"获取系统性能指标失败: {e}")
 
         return metrics
+
+    def evaluate_algorithm_performance(self,
+                                       pattern_name: str,
+                                       test_datasets: List[pd.DataFrame],
+                                       ground_truth: Optional[List[List[Dict]]] = None) -> AlgorithmMetrics:
+        """
+        评估算法性能（整合优化模块功能）
+
+        Args:
+            pattern_name: 形态名称
+            test_datasets: 测试数据集列表
+            ground_truth: 真实标签
+
+        Returns:
+            算法性能指标
+        """
+        if self.debug_mode:
+            print(f"🔍 开始评估算法: {pattern_name}")
+
+        try:
+            # 尝试导入模式管理器
+            from analysis.pattern_manager import PatternManager
+            from analysis.pattern_base import PatternAlgorithmFactory
+
+            manager = PatternManager()
+            config = manager.get_pattern_by_name(pattern_name)
+            if not config:
+                raise ValueError(f"未找到形态配置: {pattern_name}")
+
+            recognizer = PatternAlgorithmFactory.create(config)
+        except ImportError:
+            # 如果无法导入，返回默认指标
+            return AlgorithmMetrics()
+
+        metrics = AlgorithmMetrics()
+        all_results = []
+        execution_times = []
+        memory_usages = []
+        cpu_usages = []
+
+        # 性能测试
+        for i, dataset in enumerate(test_datasets):
+            if self.debug_mode:
+                print(f"  测试数据集 {i+1}/{len(test_datasets)}")
+
+            # 内存监控
+            tracemalloc.start()
+
+            # CPU监控
+            if PSUTIL_AVAILABLE:
+                cpu_before = psutil.cpu_percent()
+
+            # 执行时间监控
+            start_time = time.time()
+
+            try:
+                # 执行形态识别
+                results = recognizer.recognize(dataset)
+                all_results.extend(results)
+            except Exception as e:
+                if self.debug_mode:
+                    print(f"    识别失败: {e}")
+                continue
+
+            # 记录性能指标
+            execution_time = time.time() - start_time
+            execution_times.append(execution_time)
+
+            # 内存使用
+            current, peak = tracemalloc.get_traced_memory()
+            memory_usages.append(peak / 1024 / 1024)  # MB
+            tracemalloc.stop()
+
+            # CPU使用
+            if PSUTIL_AVAILABLE:
+                cpu_after = psutil.cpu_percent()
+                cpu_usages.append(cpu_after - cpu_before)
+
+        # 计算性能指标
+        if execution_times:
+            metrics.execution_time = np.mean(execution_times)
+        if memory_usages:
+            metrics.memory_usage = np.mean(memory_usages)
+        if cpu_usages:
+            metrics.cpu_usage = np.mean(cpu_usages)
+
+        # 计算业务指标
+        if all_results:
+            metrics.patterns_found = len(all_results)
+            confidences = [r.confidence for r in all_results if hasattr(r, 'confidence')]
+            if confidences:
+                metrics.confidence_avg = np.mean(confidences)
+                metrics.confidence_std = np.std(confidences)
+                metrics.signal_quality = self._calculate_signal_quality(all_results)
+
+        # 计算稳定性指标
+        if execution_times:
+            metrics.robustness_score = 1.0 - min(1.0, np.std(execution_times) / np.mean(execution_times))
+
+        # 计算综合评分
+        metrics.overall_score = self._calculate_algorithm_overall_score(metrics)
+
+        if self.debug_mode:
+            print(f"  ✓ 评估完成，综合评分: {metrics.overall_score:.3f}")
+
+        return metrics
+
+    def _calculate_signal_quality(self, results) -> float:
+        """计算信号质量"""
+        if not results:
+            return 0.0
+
+        # 基于置信度分布和信号一致性计算质量
+        confidences = [r.confidence for r in results if hasattr(r, 'confidence')]
+        if not confidences:
+            return 0.0
+
+        # 高置信度结果的比例
+        high_confidence_ratio = sum(1 for c in confidences if c > 0.7) / len(confidences)
+
+        # 置信度的稳定性（标准差越小越好）
+        confidence_stability = 1.0 - min(1.0, np.std(confidences))
+
+        # 信号强度（平均置信度）
+        signal_strength = np.mean(confidences)
+
+        # 综合质量评分
+        quality = (high_confidence_ratio * 0.4 +
+                   confidence_stability * 0.3 +
+                   signal_strength * 0.3)
+
+        return quality
+
+    def _calculate_algorithm_overall_score(self, metrics: AlgorithmMetrics) -> float:
+        """计算算法综合评分"""
+        scores = []
+        weights = []
+
+        # 业务指标权重最高
+        if metrics.signal_quality > 0:
+            scores.append(metrics.signal_quality)
+            weights.append(0.3)
+
+        if metrics.confidence_avg > 0:
+            scores.append(metrics.confidence_avg)
+            weights.append(0.2)
+
+        # 性能指标
+        if metrics.execution_time > 0:
+            # 执行时间越短越好，转换为评分
+            time_score = max(0, min(1.0, 1.0 - metrics.execution_time / 10.0))
+            scores.append(time_score)
+            weights.append(0.15)
+
+        # 稳定性指标
+        if metrics.robustness_score > 0:
+            scores.append(metrics.robustness_score)
+            weights.append(0.15)
+
+        if metrics.parameter_sensitivity > 0:
+            scores.append(metrics.parameter_sensitivity)
+            weights.append(0.1)
+
+        # 准确性指标（如果有）
+        if metrics.f1_score > 0:
+            scores.append(metrics.f1_score)
+            weights.append(0.1)
+
+        if not scores:
+            return 0.5  # 默认评分
+
+        # 加权平均
+        weighted_score = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
+        return max(0.0, min(1.0, weighted_score))
+
+    def create_test_datasets(self, pattern_name: str, count: int = 3) -> List[pd.DataFrame]:
+        """创建测试数据集"""
+        datasets = []
+
+        for i in range(count):
+            # 生成模拟K线数据
+            dates = pd.date_range(start='2023-01-01', periods=100, freq='D')
+
+            # 生成价格数据
+            np.random.seed(42 + i)  # 确保可重复性
+            returns = np.random.normal(0.001, 0.02, 100)
+            prices = 100 * np.cumprod(1 + returns)
+
+            # 生成OHLCV数据
+            opens = prices * (1 + np.random.normal(0, 0.005, 100))
+            closes = prices
+            highs = np.maximum(opens, closes) * (1 + np.random.uniform(0, 0.02, 100))
+            lows = np.minimum(opens, closes) * (1 - np.random.uniform(0, 0.02, 100))
+            volumes = np.random.lognormal(15, 1, 100)
+
+            dataset = pd.DataFrame({
+                'datetime': dates,
+                'open': opens,
+                'high': highs,
+                'low': lows,
+                'close': closes,
+                'volume': volumes
+            })
+
+            datasets.append(dataset)
+
+        return datasets
 
     def generate_performance_report(self,
                                     strategy_name: Optional[str] = None,
@@ -540,17 +798,18 @@ class PerformanceEvaluator:
         return max(score, 0.0)
 
 
-def create_performance_evaluator(db_path: str = 'db/hikyuu_system.db') -> PerformanceEvaluator:
+def create_performance_evaluator(db_path: str = 'db/hikyuu_system.db', debug_mode: bool = False) -> PerformanceEvaluator:
     """
     创建性能评估器实例
 
     Args:
         db_path: 数据库路径
+        debug_mode: 调试模式
 
     Returns:
         性能评估器实例
     """
-    return PerformanceEvaluator(db_path)
+    return PerformanceEvaluator(db_path, debug_mode)
 
 
 if __name__ == "__main__":

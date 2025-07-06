@@ -18,6 +18,12 @@ import threading
 import warnings
 from typing import Optional, Dict, Any
 from functools import lru_cache
+from core.industry_manager import IndustryManager
+from core.data_manager import DataManager
+from core.logger import LogManager
+from utils.theme import ThemeManager
+from utils.config_manager import ConfigManager
+
 
 # 全局锁，确保线程安全
 _factory_lock = threading.Lock()
@@ -162,23 +168,104 @@ class ManagerFactory:
         Returns:
             IndustryManager实例
         """
-        cache_key = f'industry_manager_{id(log_manager) if log_manager else "default"}'
+        # 统一缓存键策略 - 使用单一实例，避免因log_manager不同而创建多个实例
+        cache_key = 'industry_manager_singleton'
+
+        # 获取日志管理器用于记录操作日志
+        log_manager = log_manager or self.get_log_manager()
 
         with self._lock:
+            # 记录获取请求
+            try:
+                # 检查PyQt5环境
+                pyqt5_status = self._check_pyqt5_environment()
+                log_manager.info(f"开始获取行业管理器 - 缓存键: {cache_key}, 强制新建: {force_new}, PyQt5状态: {pyqt5_status}")
+            except Exception:
+                # 如果日志记录失败，不影响主要逻辑
+                log_manager.error("获取行业管理器失败")
+
             if force_new or cache_key not in self._instances:
                 try:
+                    # 记录开始创建实例
+                    log_manager.info(f"开始创建行业管理器实例 - 缓存键: {cache_key}")
+
                     from core.industry_manager import IndustryManager
+
+                    # 确保使用统一的日志管理器
                     if log_manager is None:
                         log_manager = self.get_log_manager()
-                    self._instances[cache_key] = IndustryManager(log_manager=log_manager)
+
+                    # 创建实例 - 添加额外的错误处理
+                    try:
+                        log_manager.info("开始创建行业管理器实例1111")
+                        self._instances[cache_key] = IndustryManager(log_manager=log_manager)
+
+                        # 记录创建成功
+                        log_manager.info(f"行业管理器创建成功 - 类型: {type(self._instances[cache_key]).__name__}")
+
+                    except Exception as creation_error:
+                        # 记录创建过程中的具体错误
+                        log_manager.error(f"创建行业管理器失败: {creation_error} (类型: {type(creation_error).__name__})")
+
+                        # 重新抛出原始错误
+                        raise creation_error
+
                 except ImportError as e:
-                    warnings.warn(f"无法导入IndustryManager: {e}")
-                    self._instances[cache_key] = self._create_simple_industry_manager()
-                except Exception as e:
-                    warnings.warn(f"创建IndustryManager失败: {e}")
+                    # 记录导入错误
+                    log_manager.error(f"导入行业管理器失败: {e}")
+
+                    # 创建简化版管理器
                     self._instances[cache_key] = self._create_simple_industry_manager()
 
+                    # 记录回退操作
+                    log_manager.warning(f"使用简化版行业管理器")
+
+                except Exception as e:
+                    # 记录创建错误
+                    log_manager.error(f"创建行业管理器失败: {e} (类型: {type(e).__name__})")
+
+                    # 创建简化版管理器
+                    self._instances[cache_key] = self._create_simple_industry_manager()
+
+                    # 记录回退操作
+                    log_manager.warning(f"使用简化版行业管理器，原因: {e}")
+            else:
+                # 记录缓存命中
+                log_manager.debug(f"缓存命中 - 缓存键: {cache_key}")
+
+            # 记录获取完成
+            log_manager.info(f"行业管理器获取完成 - 类型: {type(self._instances[cache_key]).__name__}")
+
             return self._instances[cache_key]
+
+    def _check_pyqt5_environment(self) -> dict:
+        """检查PyQt5环境状态"""
+        try:
+            status = {
+                "pyqt5_importable": False,
+                "qapplication_available": False,
+                "qapplication_instance": False
+            }
+
+            try:
+                from PyQt5.QtWidgets import QApplication
+                from PyQt5.QtCore import QObject
+                status["pyqt5_importable"] = True
+
+                try:
+                    app = QApplication.instance()
+                    status["qapplication_available"] = True
+                    status["qapplication_instance"] = app is not None
+                except Exception:
+                    pass
+
+            except ImportError:
+                pass
+
+            return status
+
+        except Exception:
+            return {"error": "failed_to_check"}
 
     def clear_cache(self, manager_type: Optional[str] = None):
         """
@@ -188,14 +275,76 @@ class ManagerFactory:
             manager_type: 要清除的管理器类型，None表示清除所有
         """
         with self._lock:
+            # 获取日志管理器
+            try:
+                log_manager = self.get_log_manager()
+                from utils.log_util import log_structured
+
+                # 记录清除操作开始
+                log_structured(log_manager, "clear_manager_cache",
+                               level="info", status="start",
+                               manager_type=manager_type,
+                               current_cache_size=len(self._instances))
+            except Exception:
+                log_manager.error("记录清除操作开始失败")
+
             if manager_type:
                 # 清除特定类型的管理器
                 keys_to_remove = [key for key in self._instances.keys() if key.startswith(manager_type)]
+                removed_count = 0
+
                 for key in keys_to_remove:
-                    del self._instances[key]
+                    try:
+                        # 记录即将删除的实例
+                        if log_manager:
+                            log_structured(log_manager, "remove_manager_instance",
+                                           level="debug", status="start",
+                                           cache_key=key,
+                                           instance_type=type(self._instances[key]).__name__)
+
+                        del self._instances[key]
+                        removed_count += 1
+
+                        # 记录删除成功
+                        if log_manager:
+                            log_structured(log_manager, "remove_manager_instance",
+                                           level="debug", status="success",
+                                           cache_key=key)
+                    except Exception as e:
+                        # 记录删除失败
+                        if log_manager:
+                            log_structured(log_manager, "remove_manager_instance",
+                                           level="error", status="fail",
+                                           cache_key=key, error=str(e))
+
+                # 记录清除结果
+                if log_manager:
+                    log_structured(log_manager, "clear_manager_cache",
+                                   level="info", status="success",
+                                   manager_type=manager_type,
+                                   removed_count=removed_count,
+                                   remaining_cache_size=len(self._instances))
             else:
                 # 清除所有管理器
+                original_size = len(self._instances)
+
+                # 记录所有即将清除的实例
+                if log_manager:
+                    for key, instance in self._instances.items():
+                        log_structured(log_manager, "remove_manager_instance",
+                                       level="debug", status="start",
+                                       cache_key=key,
+                                       instance_type=type(instance).__name__)
+
                 self._instances.clear()
+
+                # 记录清除结果
+                if log_manager:
+                    log_structured(log_manager, "clear_manager_cache",
+                                   level="info", status="success",
+                                   manager_type="all",
+                                   removed_count=original_size,
+                                   remaining_cache_size=0)
 
     def get_manager_info(self) -> Dict[str, Any]:
         """
@@ -316,17 +465,105 @@ class ManagerFactory:
 
     def _create_simple_industry_manager(self):
         """创建简化版行业管理器"""
-        class SimpleIndustryManager:
-            def __init__(self):
-                self.industries = {}
+        try:
+            # 获取日志管理器用于记录
+            log_manager = self.get_log_manager()
 
-            def get_industry(self, code: str):
-                return self.industries.get(code, '未知行业')
+            log_manager.info("开始创建简化版行业管理器")
 
-            def update_industry_data(self):
-                pass
+            class SimpleIndustryManager:
+                def __init__(self):
+                    self.industries = {
+                        # 提供基本的行业数据
+                        "BK0001": "银行",
+                        "BK0002": "保险",
+                        "BK0003": "证券",
+                        "BK0004": "房地产",
+                        "BK0005": "互联网",
+                        "BK0006": "软件开发",
+                        "BK0007": "电子信息",
+                        "BK0008": "生物医药",
+                        "BK0009": "新能源",
+                        "BK0010": "汽车制造"
+                    }
+                    self.log_manager = log_manager
 
-        return SimpleIndustryManager()
+                    # 记录简化版管理器初始化
+                    self.log_manager.info(f"简化版行业管理器初始化成功 - 行业数量: {len(self.industries)}")
+
+                def get_industry(self, code: str):
+                    """获取行业信息"""
+                    try:
+                        result = self.industries.get(code, '未知行业')
+                        self.log_manager.debug(f"获取行业信息 - 代码: {code}, 结果: {result}")
+                        return result
+                    except Exception as e:
+                        self.log_manager.error(f"获取行业信息失败 - 代码: {code}, 错误: {e}")
+                        return '未知行业'
+
+                def update_industry_data(self):
+                    """更新行业数据（简化版不执行实际更新）"""
+                    self.log_manager.info("简化版管理器跳过更新行业数据")
+                    return True
+
+                def get_industry_list(self, source: str = "default") -> list:
+                    """获取行业列表"""
+                    try:
+                        result = [{"code": k, "name": v, "source": source}
+                                  for k, v in self.industries.items()]
+                        self.log_manager.debug(f"获取行业列表成功 - 数量: {len(result)}")
+                        return result
+                    except Exception as e:
+                        self.log_manager.error(f"获取行业列表失败: {e}")
+                        return []
+
+                def get_industry_stocks(self, industry_code: str, source: str = "default") -> list:
+                    """获取行业股票（简化版返回示例数据）"""
+                    try:
+                        # 返回一些示例股票数据
+                        example_stocks = [
+                            {"code": "000001", "name": "平安银行", "industry": industry_code},
+                            {"code": "600036", "name": "招商银行", "industry": industry_code},
+                            {"code": "000002", "name": "万科A", "industry": industry_code}
+                        ]
+                        self.log_manager.debug(f"获取行业股票成功 - 行业: {industry_code}, 数量: {len(example_stocks)}")
+                        return example_stocks
+                    except Exception as e:
+                        self.log_manager.error(f"获取行业股票失败 - 行业: {industry_code}, 错误: {e}")
+                        return []
+
+            simple_manager = SimpleIndustryManager()
+
+            log_manager.info(f"简化版行业管理器创建成功 - 类型: SimpleIndustryManager")
+
+            return simple_manager
+
+        except Exception as e:
+            # 最后的保险措施
+            try:
+                log_manager = self.get_log_manager()
+                log_manager.error(f"创建简化版行业管理器失败: {e}")
+            except Exception:
+                print(f"创建简化版行业管理器失败: {e}")
+
+            # 返回最基本的管理器
+            class MinimalIndustryManager:
+                def __init__(self):
+                    self.industries = {}
+
+                def get_industry(self, code: str):
+                    return '未知行业'
+
+                def update_industry_data(self):
+                    return False
+
+                def get_industry_list(self, source: str = "default"):
+                    return []
+
+                def get_industry_stocks(self, industry_code: str, source: str = "default"):
+                    return []
+
+            return MinimalIndustryManager()
 
 
 # 全局管理器工厂实例

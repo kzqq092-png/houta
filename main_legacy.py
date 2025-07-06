@@ -1,6 +1,8 @@
 """
 交易系统主窗口模块
 """
+from utils.matplotlib_utils import configure_matplotlib_for_gui
+import random
 from utils.log_util import log_structured
 import time
 from core.plugin_manager import PluginManager
@@ -41,7 +43,7 @@ from PyQt5.QtWebEngineWidgets import *
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import ptvsd
-import subprocess
+from optimization.database_schema import *
 import numpy as np
 import pandas as pd
 import sys
@@ -51,6 +53,13 @@ import traceback
 import warnings
 warnings.filterwarnings(
     "ignore", category=FutureWarning, message=".*swapaxes*")
+# 抑制SIP相关的DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning,
+                        message=".*sipPyTypeDict.*")
+
+# 导入matplotlib工具，自动配置警告抑制
+configure_matplotlib_for_gui()
+# 在文件开头添加random模块导入
 
 
 class TradingGUI(QMainWindow):
@@ -1725,7 +1734,9 @@ class TradingGUI(QMainWindow):
                 QMessageBox.warning(self, "提示", "当前没有可重置的图表！")
                 return
             if hasattr(self.chart_widget, 'canvas') and hasattr(self.chart_widget, 'figure'):
-                self.chart_widget.figure.tight_layout()
+                # 使用安全的布局调整方式
+                from utils.matplotlib_utils import safe_figure_layout
+                safe_figure_layout(self.chart_widget.figure)
                 self.chart_widget.canvas.draw()
             else:
                 QMessageBox.warning(self, "提示", "当前图表控件不支持重置！")
@@ -3893,11 +3904,11 @@ class TradingGUI(QMainWindow):
             # 获取股票名称
             stock = self.sm[self.current_stock]
             title = f"{self.current_stock} {stock.name}"
-            # 获取当前选中指标
-            selected_items = self.indicator_list.selectedItems(
-            ) if hasattr(self, 'indicator_list') else []
-            indicators = [item.text()
-                          for item in selected_items] if selected_items else []
+            # 获取当前选中指标 - 修复selected_items变量问题
+            selected_items = []
+            if hasattr(self, 'indicator_list'):
+                selected_items = self.indicator_list.selectedItems()
+            indicators = [item.text() for item in selected_items] if selected_items else []
             data = {
                 'stock_code': self.current_stock,
                 'kdata': k_data,
@@ -4861,11 +4872,7 @@ class TradingGUI(QMainWindow):
             event.acceptProposedAction()
 
     def get_current_indicators(self):
-        """
-        获取当前激活的所有指标及其参数，兼容ta-lib、自有、自定义，修复无指标问题，支持中文名称
-        Returns:
-            List[dict]: [{"name": 指标名, "params": 参数字典, "type": 类型, "group": 分组}, ...]
-        """
+        """获取当前选中的指标列表，返回指标配置字典"""
         indicators = []
         from indicators_algo import get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, get_indicator_english_name
         talib_list = get_talib_indicator_list()
@@ -4874,7 +4881,8 @@ class TradingGUI(QMainWindow):
             import logging
             logging.error("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
             return []
-            selected_items = self.indicator_list.selectedItems()
+
+        selected_items = self.indicator_list.selectedItems()
         if not hasattr(self, 'param_controls') or self.param_controls is None:
             self.param_controls = {}
         for item in selected_items:
@@ -5009,9 +5017,13 @@ class TradingGUI(QMainWindow):
 
     def show_cloud_api_manager(self):
         """云端API管理入口，弹出API配置/节点注册/任务同步对话框"""
-        from gui.widgets.cloud_api_dialog import CloudAPIDialog
-        dlg = CloudAPIDialog(self)
-        dlg.exec_()
+        try:
+            from gui.dialogs.cloud_api_dialog import CloudApiDialog
+            dlg = CloudApiDialog(self)
+            dlg.exec_()
+        except Exception as e:
+            self.log_manager.error(f"打开云端API配置对话框失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"打开云端API配置对话框失败: {str(e)}")
 
     def show_indicator_market(self):
         """指标市场入口，弹出在线指标市场浏览/安装/上传/评价对话框"""
@@ -5796,6 +5808,27 @@ class TradingGUI(QMainWindow):
         except Exception as e:
             self.log_manager.error(f"策略优化失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"策略优化失败: {str(e)}")
+
+    def backtest(self):
+        """执行回测分析"""
+        try:
+            # 获取当前选中的股票
+            if not hasattr(self, 'current_stock') or not self.current_stock:
+                self.handle_error("请先选择股票")
+                return
+
+            # 调用现有的backtest_stock方法
+            selected_items = self.stock_list.selectedItems()
+            if selected_items:
+                self.backtest_stock(selected_items[0])
+            else:
+                self.handle_error("请先选择股票")
+
+        except Exception as e:
+            error_msg = f"回测执行失败: {str(e)}"
+            self.log_manager.error(error_msg)
+            self.log_manager.error(traceback.format_exc())
+            self.handle_error(error_msg)
 
 
 class StockListWidget(QListWidget):

@@ -748,15 +748,16 @@ class TradingWidget(QWidget):
             from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
 
             # 获取股票数据并生成信号
-            from main import TradingGUI
-            main_window = None
-            for w in QApplication.topLevelWidgets():
-                if isinstance(w, TradingGUI):
-                    main_window = w
-                    break
+            from core.containers import get_service_container
+            from core.services import StockService
 
-            if main_window and hasattr(main_window, 'get_kdata'):
-                kdata = main_window.get_kdata(self.current_stock.strip())
+            # 通过服务容器获取股票服务
+            service_container = get_service_container()
+            stock_service = service_container.get_service(StockService)
+            main_window = None  # 保持兼容性
+
+            if stock_service:
+                kdata = stock_service.get_kdata(self.current_stock.strip())
                 if kdata is None or kdata.empty:
                     raise ValueError("无法获取股票数据")
 
@@ -929,14 +930,14 @@ class TradingWidget(QWidget):
                 self._kdata_cache = {}
             data = self._kdata_cache.get(cache_key)
             if data is None or data.empty:
-                # 优先尝试主窗口的get_kdata
-                main_window = None
-                for w in QApplication.topLevelWidgets():
-                    if isinstance(w, TradingGUI):
-                        main_window = w
-                        break
-                if main_window and hasattr(main_window, 'get_kdata'):
-                    data = main_window.get_kdata(stock_code)
+                # 通过服务容器获取股票数据
+                from core.containers import get_service_container
+                from core.services import StockService
+
+                service_container = get_service_container()
+                stock_service = service_container.get_service(StockService)
+                if stock_service:
+                    data = stock_service.get_kdata(stock_code)
                 if data is not None and not data.empty:
                     self._kdata_cache[cache_key] = data
             if data is None or data.empty:

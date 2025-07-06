@@ -271,6 +271,30 @@ class MainMenuBar(QMenuBar):
             self.data_source_menu.addAction(self.data_source_eastmoney)
             self.data_source_menu.addAction(self.data_source_sina)
             self.data_source_menu.addAction(self.data_source_tonghuashun)
+
+            self.data_menu.addSeparator()
+
+            # 数据管理
+            self.import_data_action = QAction("导入数据", self)
+            self.import_data_action.setStatusTip("导入外部数据")
+            self.data_menu.addAction(self.import_data_action)
+
+            self.export_data_action = QAction("导出数据", self)
+            self.export_data_action.setStatusTip("导出数据到文件")
+            self.data_menu.addAction(self.export_data_action)
+
+            self.data_menu.addSeparator()
+
+            # 数据库管理
+            self.database_admin_action = QAction("数据库管理", self)
+            self.database_admin_action.setStatusTip("数据库管理和维护")
+            self.data_menu.addAction(self.database_admin_action)
+
+            # 数据质量检查
+            self.data_quality_action = QAction("数据质量检查", self)
+            self.data_quality_action.setStatusTip("检查数据质量")
+            self.data_menu.addAction(self.data_quality_action)
+
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化数据菜单失败: {str(e)}")
@@ -290,11 +314,25 @@ class MainMenuBar(QMenuBar):
 
             self.tools_menu.addSeparator()
 
+            # 系统优化器
+            self.system_optimizer_action = QAction("系统优化器", self)
+            self.system_optimizer_action.setStatusTip("打开系统优化器")
+            self.tools_menu.addAction(self.system_optimizer_action)
+
+            self.tools_menu.addSeparator()
+
             # 设置
             self.settings_action = QAction("设置", self)
             self.settings_action.setShortcut("Ctrl+,")
             self.settings_action.setStatusTip("打开设置")
             self.tools_menu.addAction(self.settings_action)
+
+            # 插件市场
+            self.plugin_market_action = QAction("插件市场", self)
+            self.plugin_market_action.setStatusTip("浏览和管理插件")
+            self.tools_menu.addAction(self.plugin_market_action)
+
+            self.tools_menu.addSeparator()
 
             # 分布式/云API/指标市场/批量分析
             self.node_manager_action = QAction("分布式节点管理", self)
@@ -362,6 +400,13 @@ class MainMenuBar(QMenuBar):
     def init_help_menu(self):
         """初始化帮助菜单"""
         try:
+            # 启动向导
+            self.startup_guides_action = QAction("启动向导", self)
+            self.startup_guides_action.setStatusTip("显示启动向导")
+            self.help_menu.addAction(self.startup_guides_action)
+
+            self.help_menu.addSeparator()
+
             # 帮助文档
             self.help_action = QAction("帮助文档", self)
             self.help_action.setStatusTip("打开帮助文档")
@@ -567,6 +612,16 @@ class MainMenuBar(QMenuBar):
         """Show unit converter"""
         # TODO: Implement unit converter
         pass
+
+    def show_system_optimizer(self):
+        """Show system optimizer"""
+        try:
+            from gui.dialogs import show_system_optimizer_dialog
+            show_system_optimizer_dialog(self.parent())
+        except Exception as e:
+            QMessageBox.critical(self.parent(), "错误", f"打开系统优化器失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"打开系统优化器失败: {str(e)}")
 
     def show_documentation(self):
         """Show documentation"""

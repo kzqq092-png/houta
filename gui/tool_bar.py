@@ -146,6 +146,12 @@ class MainToolBar(QToolBar):
         self.settings_action.setShortcut("Ctrl+,")
         self.addAction(self.settings_action)
 
+        # 系统优化器
+        self.system_optimizer_action = QAction(QIcon("icons/optimize.png"), "系统优化", self)
+        self.system_optimizer_action.setStatusTip("打开系统优化器")
+        self.system_optimizer_action.setShortcut("Ctrl+Shift+O")
+        self.addAction(self.system_optimizer_action)
+
         # 搜索框
         self.addSeparator()
         self.search_box = QLineEdit()

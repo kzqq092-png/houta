@@ -4,6 +4,7 @@
 提供日志记录和管理功能
 """
 
+import logging
 import logging.handlers
 import os
 from typing import Optional
@@ -199,3 +200,21 @@ class LogManager(BaseLogManager):
             lines = f.readlines()
         trace_logs = [line for line in lines if f"trace_id={trace_id}" in line]
         return ''.join(trace_logs[-20:]) if trace_logs else "未找到trace_id相关日志"
+
+
+def get_logger(name: str = None) -> logging.Logger:
+    """
+    获取日志记录器
+
+    Args:
+        name: 日志记录器名称，默认为调用模块名
+
+    Returns:
+        logging.Logger: 日志记录器实例
+    """
+    if name is None:
+        # 获取调用模块的名称
+        frame = inspect.currentframe().f_back
+        name = frame.f_globals.get('__name__', 'unknown')
+
+    return logging.getLogger(name)

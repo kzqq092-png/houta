@@ -1,0 +1,335 @@
+"""
+底部面板模块 - 日志显示和系统状态
+"""
+import logging
+from typing import Optional
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
+    QLineEdit, QPushButton, QComboBox, QLabel,
+    QSplitter, QFrame, QCheckBox, QSpinBox
+)
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QFont, QTextCursor
+
+from .base_panel import BasePanel
+
+
+class LogHandler(logging.Handler):
+    """自定义日志处理器，将日志输出到UI"""
+
+    def __init__(self, log_widget):
+        super().__init__()
+        self.log_widget = log_widget
+
+    def emit(self, record):
+        """发送日志记录到UI"""
+        try:
+            msg = self.format(record)
+            self.log_widget.append_log(msg, record.levelname)
+        except Exception:
+            self.handleError(record)
+
+
+class LogWidget(QTextEdit):
+    """日志显示组件"""
+
+    def __init__(self):
+        super().__init__()
+        self.setReadOnly(True)
+        # 使用document()来设置最大块数，兼容性更好
+        try:
+            self.document().setMaximumBlockCount(1000)  # 限制最大行数
+        except AttributeError:
+            # 如果方法不存在，使用替代方案
+            pass
+
+        # 设置字体
+        font = QFont("Consolas", 9)
+        font.setStyleHint(QFont.Monospace)
+        self.setFont(font)
+
+        # 日志级别颜色
+        self.level_colors = {
+            'DEBUG': '#888888',
+            'INFO': '#000000',
+            'WARNING': '#FF8C00',
+            'ERROR': '#FF0000',
+            'CRITICAL': '#8B0000'
+        }
+
+    def append_log(self, message: str, level: str = 'INFO'):
+        """添加日志消息"""
+        color = self.level_colors.get(level, '#000000')
+        formatted_msg = f'<span style="color: {color};">[{level}] {message}</span>'
+        self.append(formatted_msg)
+
+        # 自动滚动到底部
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.setTextCursor(cursor)
+
+
+class BottomPanel(BasePanel):
+    """底部面板 - 日志显示和系统状态"""
+
+    # 信号
+    log_level_changed = pyqtSignal(str)
+    log_cleared = pyqtSignal()
+
+    def __init__(self, parent, coordinator, **kwargs):
+        """
+        初始化底部面板
+
+        Args:
+            parent: 父窗口组件
+            coordinator: 主窗口协调器
+            **kwargs: 其他参数
+        """
+        self.log_handler: Optional[LogHandler] = None
+        self.auto_scroll = True
+        self.max_lines = 1000
+
+        super().__init__(parent, coordinator, **kwargs)
+
+        # 在父类初始化完成后设置日志系统
+        self._setup_logging()
+
+    def _create_widgets(self) -> None:
+        """创建UI组件（实现抽象方法）"""
+        # 创建主布局
+        layout = QVBoxLayout(self._root_frame)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
+
+        # 创建工具栏
+        toolbar = self._create_toolbar()
+        layout.addWidget(toolbar)
+
+        # 创建日志显示区域
+        self.log_widget = LogWidget()
+        layout.addWidget(self.log_widget)
+
+        # 设置初始大小
+        self._root_frame.setMinimumHeight(150)
+        self._root_frame.setMaximumHeight(400)
+
+        # 保存组件引用
+        self.add_widget('toolbar', toolbar)
+        self.add_widget('log_widget', self.log_widget)
+
+    def _create_toolbar(self) -> QWidget:
+        """创建工具栏"""
+        toolbar = QFrame()
+        toolbar.setFrameStyle(QFrame.StyledPanel)
+        toolbar.setMaximumHeight(35)
+
+        layout = QHBoxLayout(toolbar)
+        layout.setContentsMargins(5, 2, 5, 2)
+
+        # 日志级别选择
+        layout.addWidget(QLabel("日志级别:"))
+        self.level_combo = QComboBox()
+        self.level_combo.addItems(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+        self.level_combo.setCurrentText('INFO')
+        self.level_combo.currentTextChanged.connect(self._on_level_changed)
+        layout.addWidget(self.level_combo)
+
+        layout.addWidget(QFrame())  # 分隔符
+
+        # 搜索框
+        layout.addWidget(QLabel("搜索:"))
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("输入关键词搜索日志...")
+        self.search_edit.textChanged.connect(self._on_search_text_changed)
+        layout.addWidget(self.search_edit)
+
+        # 搜索按钮
+        search_btn = QPushButton("搜索")
+        search_btn.clicked.connect(self._search_logs)
+        layout.addWidget(search_btn)
+
+        layout.addWidget(QFrame())  # 分隔符
+
+        # 自动滚动复选框
+        self.auto_scroll_cb = QCheckBox("自动滚动")
+        self.auto_scroll_cb.setChecked(True)
+        self.auto_scroll_cb.toggled.connect(self._on_auto_scroll_toggled)
+        layout.addWidget(self.auto_scroll_cb)
+
+        # 最大行数设置
+        layout.addWidget(QLabel("最大行数:"))
+        self.max_lines_spin = QSpinBox()
+        self.max_lines_spin.setRange(100, 10000)
+        self.max_lines_spin.setValue(1000)
+        self.max_lines_spin.valueChanged.connect(self._on_max_lines_changed)
+        layout.addWidget(self.max_lines_spin)
+
+        layout.addWidget(QFrame())  # 分隔符
+
+        # 清空按钮
+        clear_btn = QPushButton("清空")
+        clear_btn.clicked.connect(self._clear_logs)
+        layout.addWidget(clear_btn)
+
+        # 导出按钮
+        export_btn = QPushButton("导出")
+        export_btn.clicked.connect(self._export_logs)
+        layout.addWidget(export_btn)
+
+        layout.addStretch()  # 添加弹性空间
+
+        return toolbar
+
+    def _setup_logging(self):
+        """设置日志系统"""
+        # 确保log_widget已经创建
+        if not hasattr(self, 'log_widget') or self.log_widget is None:
+            return
+
+        # 创建日志处理器
+        self.log_handler = LogHandler(self.log_widget)
+
+        # 设置日志格式
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        self.log_handler.setFormatter(formatter)
+
+        # 添加到根日志记录器
+        root_logger = logging.getLogger()
+        root_logger.addHandler(self.log_handler)
+        root_logger.setLevel(logging.INFO)
+
+        # 添加一些测试日志
+        self._add_welcome_logs()
+
+    def _add_welcome_logs(self):
+        """添加欢迎日志"""
+        logger = logging.getLogger(__name__)
+        logger.info("HIkyuu-UI 2.0 系统启动成功")
+        logger.info("日志系统已初始化")
+        logger.debug("调试模式已启用")
+
+    def _on_level_changed(self, level: str):
+        """日志级别改变"""
+        if self.log_handler:
+            level_value = getattr(logging, level)
+            self.log_handler.setLevel(level_value)
+            logging.getLogger().setLevel(level_value)
+
+        self.log_level_changed.emit(level)
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"日志级别已设置为: {level}")
+
+    def _on_search_text_changed(self, text: str):
+        """搜索文本改变"""
+        if not text:
+            # 清空搜索，恢复所有日志
+            self._restore_all_logs()
+
+    def _search_logs(self):
+        """搜索日志"""
+        search_text = self.search_edit.text().strip()
+        if not search_text:
+            return
+
+        # 简单的文本搜索实现
+        cursor = self.log_widget.textCursor()
+
+        # 移动到文档开始
+        cursor.movePosition(QTextCursor.Start)
+        self.log_widget.setTextCursor(cursor)
+
+        # 查找文本
+        found = self.log_widget.find(search_text)
+        if not found:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"未找到包含 '{search_text}' 的日志")
+
+    def _restore_all_logs(self):
+        """恢复所有日志显示"""
+        # 清除搜索高亮
+        cursor = self.log_widget.textCursor()
+        cursor.clearSelection()
+        self.log_widget.setTextCursor(cursor)
+
+    def _on_auto_scroll_toggled(self, checked: bool):
+        """自动滚动切换"""
+        self.auto_scroll = checked
+        logger = logging.getLogger(__name__)
+        logger.info(f"自动滚动已{'启用' if checked else '禁用'}")
+
+    def _on_max_lines_changed(self, value: int):
+        """最大行数改变"""
+        self.max_lines = value
+        try:
+            self.log_widget.document().setMaximumBlockCount(value)
+        except AttributeError:
+            # 如果方法不存在，忽略
+            pass
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"最大日志行数已设置为: {value}")
+
+    def _clear_logs(self):
+        """清空日志"""
+        self.log_widget.clear()
+        self.log_cleared.emit()
+
+        logger = logging.getLogger(__name__)
+        logger.info("日志已清空")
+
+    def _export_logs(self):
+        """导出日志"""
+        try:
+            from PyQt5.QtWidgets import QFileDialog
+            from datetime import datetime
+
+            # 获取保存路径
+            default_filename = f"hikyuu_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            filename, _ = QFileDialog.getSaveFileName(
+                self._root_frame,
+                "导出日志",
+                default_filename,
+                "文本文件 (*.txt);;所有文件 (*)"
+            )
+
+            if filename:
+                # 获取日志内容
+                log_content = self.log_widget.toPlainText()
+
+                # 写入文件
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(log_content)
+
+                logger = logging.getLogger(__name__)
+                logger.info(f"日志已导出到: {filename}")
+
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"导出日志失败: {e}")
+
+    def add_log(self, message: str, level: str = 'INFO'):
+        """添加日志（公共接口）"""
+        self.log_widget.append_log(message, level)
+
+    def set_log_level(self, level: str):
+        """设置日志级别（公共接口）"""
+        self.level_combo.setCurrentText(level)
+
+    def get_log_level(self) -> str:
+        """获取当前日志级别"""
+        return self.level_combo.currentText()
+
+    def clear_logs(self):
+        """清空日志（公共接口）"""
+        self._clear_logs()
+
+    def closeEvent(self, event):
+        """关闭事件处理"""
+        # 清理日志处理器
+        if self.log_handler:
+            logging.getLogger().removeHandler(self.log_handler)
+        event.accept()

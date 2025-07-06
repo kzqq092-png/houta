@@ -11,7 +11,8 @@ from .config_types import (
     DataConfig,
     LoggingConfig
 )
-from .exception_handler import ExceptionHandler
+from .exception_handler import GlobalExceptionHandler, setup_exception_handler
+from .warning_suppressor import suppress_warnings
 
 __all__ = [
     'Theme',
@@ -22,5 +23,7 @@ __all__ = [
     'TradingConfig',
     'DataConfig',
     'LoggingConfig',
-    'ExceptionHandler'
+    'GlobalExceptionHandler',
+    'setup_exception_handler',
+    'suppress_warnings'
 ]
