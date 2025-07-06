@@ -283,7 +283,7 @@ class CrosshairMixin:
                 price_str = f"{y_val:.3f}"
                 if self._crosshair_ytext is None:
                     self._crosshair_ytext = self.price_ax.text(
-                        +0.01, y_val, price_str,
+                        +0.03, y_val, price_str,
                         transform=self.price_ax.get_yaxis_transform(),
                         ha='right', va='center',
                         fontsize=8,
@@ -293,7 +293,7 @@ class CrosshairMixin:
                         zorder=200
                     )
                 else:
-                    self._crosshair_ytext.set_position((+0.01, y_val))
+                    self._crosshair_ytext.set_position((+0.03, y_val))
                     self._crosshair_ytext.set_text(price_str)
                     self._crosshair_ytext.set_color(primary_color)
                     self._crosshair_ytext.set_visible(True)

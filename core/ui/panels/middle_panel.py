@@ -458,7 +458,7 @@ class MiddlePanel(BasePanel):
         # 连接统一图表服务信号
         if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
             self.unified_chart_service.chart_updated.connect(self._on_unified_chart_updated)
-            self.unified_chart_service.error_occurred.connect(self._on_chart_load_error)
+            self.unified_chart_service.error_occurred.connect(self._on_chart_error)
             self.unified_chart_service.loading_progress.connect(self._on_loading_progress)
 
         # 状态栏
@@ -486,54 +486,83 @@ class MiddlePanel(BasePanel):
         self.add_widget('data_time_label', data_time_label)
 
     def _bind_events(self) -> None:
-        """绑定事件"""
-        # 周期选择变化
-        period_combo = self.get_widget('period_combo')
-        period_combo.currentTextChanged.connect(self._on_period_changed)
+        """绑定事件处理"""
+        try:
+            # 周期选择变化
+            period_combo = self.get_widget('period_combo')
+            period_combo.currentTextChanged.connect(self._on_period_changed)
 
-        # 时间范围选择变化
-        time_range_combo = self.get_widget('time_range_combo')
-        time_range_combo.currentTextChanged.connect(self._on_time_range_changed)
+            # 时间范围选择变化
+            time_range_combo = self.get_widget('time_range_combo')
+            time_range_combo.currentTextChanged.connect(self._on_time_range_changed)
 
-        # 回测区间选择变化
-        start_date_edit = self.get_widget('start_date_edit')
-        start_date_edit.dateChanged.connect(self._on_date_range_changed)
+            # 回测区间选择变化
+            start_date_edit = self.get_widget('start_date_edit')
+            start_date_edit.dateChanged.connect(self._on_date_range_changed)
 
-        end_date_edit = self.get_widget('end_date_edit')
-        end_date_edit.dateChanged.connect(self._on_date_range_changed)
+            end_date_edit = self.get_widget('end_date_edit')
+            end_date_edit.dateChanged.connect(self._on_date_range_changed)
 
-        # 图表类型选择变化
-        chart_type_combo = self.get_widget('chart_type_combo')
-        chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
+            # 图表类型选择变化
+            chart_type_combo = self.get_widget('chart_type_combo')
+            chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
 
-        # 工具栏按钮
-        refresh_action = self.get_widget('refresh_action')
-        refresh_action.triggered.connect(self._refresh_chart)
+            # 工具栏按钮
+            refresh_action = self.get_widget('refresh_action')
+            refresh_action.triggered.connect(self._refresh_chart)
 
-        fullscreen_action = self.get_widget('fullscreen_action')
-        fullscreen_action.triggered.connect(self._toggle_fullscreen)
+            fullscreen_action = self.get_widget('fullscreen_action')
+            fullscreen_action.triggered.connect(self._toggle_fullscreen)
 
-        multi_screen_action = self.get_widget('multi_screen_action')
-        multi_screen_action.triggered.connect(self._toggle_multi_screen)
+            multi_screen_action = self.get_widget('multi_screen_action')
+            multi_screen_action.triggered.connect(self._toggle_multi_screen)
 
-        # 订阅事件总线事件
-        if self.event_bus:
-            try:
-                from core.events import StockSelectedEvent, IndicatorChangedEvent
-                self.event_bus.subscribe(StockSelectedEvent, self.on_stock_selected)
-                self.event_bus.subscribe(IndicatorChangedEvent, self.on_indicator_changed)
-                logger.info("已订阅StockSelectedEvent和IndicatorChangedEvent事件")
-            except Exception as e:
-                logger.error(f"订阅事件失败: {e}")
+            # 导入安全连接工具
+            from utils.qt_helpers import safe_connect
 
-        # 连接统一图表服务信号
-        if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
-            try:
-                self.unified_chart_service.chart_updated.connect(self._on_unified_chart_updated)
-                self.unified_chart_service.loading_progress.connect(self._on_loading_progress)
-                logger.info("已连接统一图表服务信号")
-            except Exception as e:
-                logger.warning(f"连接统一图表服务信号失败: {e}")
+            # 订阅事件总线事件
+            if self.event_bus:
+                try:
+                    from core.events import StockSelectedEvent, IndicatorChangedEvent
+                    self.event_bus.subscribe(StockSelectedEvent, self.on_stock_selected)
+                    self.event_bus.subscribe(IndicatorChangedEvent, self.on_indicator_changed)
+                    logger.info("已订阅StockSelectedEvent和IndicatorChangedEvent事件")
+                except Exception as e:
+                    logger.error(f"订阅事件失败: {e}")
+
+            # 连接统一图表服务信号
+            if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
+                try:
+                    # 使用安全连接函数
+                    safe_connect(
+                        self.unified_chart_service,
+                        self.unified_chart_service.chart_updated,
+                        self._on_unified_chart_updated
+                    )
+
+                    # 连接错误和进度信号
+                    safe_connect(
+                        self.unified_chart_service,
+                        self.unified_chart_service.error_occurred,
+                        self._on_chart_error
+                    )
+
+                    safe_connect(
+                        self.unified_chart_service,
+                        self.unified_chart_service.loading_progress,
+                        self._on_loading_progress
+                    )
+
+                    logger.info("已连接统一图表服务信号")
+                except Exception as e:
+                    logger.warning(f"连接统一图表服务信号失败: {e}")
+                    import traceback
+                    logger.warning(traceback.format_exc())
+
+        except Exception as e:
+            logger.error(f"绑定事件失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _initialize_data(self) -> None:
         """初始化数据"""
@@ -640,7 +669,7 @@ class MiddlePanel(BasePanel):
                     self._current_indicators
                 )
                 self._loader_thread.data_loaded.connect(self._on_chart_data_loaded)
-                self._loader_thread.error_occurred.connect(self._on_chart_load_error)
+                self._loader_thread.error_occurred.connect(self._on_chart_error)
                 self._loader_thread.finished.connect(self._on_thread_finished)
                 self._loader_thread.start()
 
@@ -717,28 +746,39 @@ class MiddlePanel(BasePanel):
             logger.error(f"Failed to process chart data: {e}")
             self._update_status(f"处理数据失败: {e}")
 
-    def _on_chart_load_error(self, error_msg: str) -> None:
+    def _on_chart_error(self, error_message: str) -> None:
         """处理图表加载错误"""
         try:
+            logger.error(f"图表加载错误: {error_message}")
+
             # 隐藏进度条
             progress_bar = self.get_widget('progress_bar')
             if progress_bar:
                 progress_bar.setVisible(False)
 
-            self._update_status(f"加载失败: {error_msg}")
-            logger.error(f"Chart data load error: {error_msg}")
+            # 更新状态栏
+            self._update_status(f"加载失败: {error_message}")
 
             # 显示错误消息
+            status_bar = self.get_widget('status_bar')
+            if status_bar:
+                status_bar.showMessage(f"图表加载失败: {error_message}", 5000)
+
+            # 如果图表控件支持显示错误消息，则使用图表控件显示
             chart_canvas = self.get_widget('chart_canvas')
             if chart_canvas and hasattr(chart_canvas, '_show_error_message'):
-                chart_canvas._show_error_message(error_msg)
+                chart_canvas._show_error_message(error_message)
             else:
-                # 降级处理：在状态栏显示错误
-                self._update_status(f"图表加载错误: {error_msg}")
+                # 降级处理：尝试显示错误标签
+                error_label = self.get_widget('error_label')
+                if error_label:
+                    error_label.setText(f"图表加载错误: {error_message}")
+                    error_label.setVisible(True)
 
         except Exception as e:
-            logger.error(f"Failed to handle chart load error: {e}")
-            print(f"图表加载错误处理失败: {e}")
+            logger.error(f"处理图表错误时发生异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def _on_unified_chart_updated(self, stock_code: str, chart_data: Dict[str, Any]) -> None:
         """处理统一图表服务的图表更新"""
@@ -765,7 +805,14 @@ class MiddlePanel(BasePanel):
                 # 更新图表显示
                 chart_canvas = self.get_widget('chart_canvas')
                 if chart_canvas:
-                    chart_canvas.update_chart(chart_data)
+                    # 确保chart_data包含所有必要字段，包括indicators_data
+                    update_data = {
+                        'kdata': chart_data.get('kline_data'),
+                        'stock_code': stock_code,
+                        'indicators_data': indicators_data,  # 确保包含指标数据
+                        'title': chart_data.get('stock_name', stock_code)
+                    }
+                    chart_canvas.update_chart(update_data)
 
                 # 更新数据时间
                 if (hasattr(kline_data, '__len__') and len(kline_data) > 0) or (hasattr(kline_data, 'empty') and not kline_data.empty):

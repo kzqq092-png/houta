@@ -213,17 +213,61 @@ class ChartDataLoader(QThread):
                         logger.error(f"计算KDJ失败: {e}")
                     return {}
 
-                # 如果没有匹配的指标，返回空列表
+                elif indicator_name.upper() == 'ACOS':
+                    # 尝试计算ACOS指标，若不存在则返回空字典
+                    try:
+                        logger.debug(f"尝试计算 ACOS")
+                        # 检查是否存在calculate_acos方法
+                        if hasattr(analysis_service, 'calculate_acos'):
+                            acos_data = analysis_service.calculate_acos(kline_data)
+                            if acos_data is not None:
+                                if isinstance(acos_data, dict):
+                                    result = {}
+                                    for key, value in acos_data.items():
+                                        result[key] = value.tolist() if hasattr(value, 'tolist') else value
+                                else:
+                                    result = acos_data.tolist() if hasattr(acos_data, 'tolist') else acos_data
+                                logger.debug(f"ACOS 计算完成")
+                                return result
+                            else:
+                                logger.warning("ACOS 计算结果为空")
+                        else:
+                            logger.warning(f"分析服务中不存在calculate_acos方法，无法计算ACOS指标")
+                            # 添加系统内置指标支持信息
+                            logger.info("系统目前支持的内置指标: MA, MACD, BOLL, RSI, KDJ")
+                    except Exception as e:
+                        logger.error(f"计算ACOS失败: {e}")
+                    return {}
+
+                # 如果没有匹配的指标，尝试通用计算方法
+                try:
+                    # 检查是否有通用指标计算方法
+                    if hasattr(analysis_service, 'calculate_indicator'):
+                        logger.info(f"尝试使用通用方法计算指标: {indicator_name}")
+                        indicator_data = analysis_service.calculate_indicator(kline_data, indicator_name)
+                        if indicator_data is not None:
+                            if isinstance(indicator_data, dict):
+                                result = {}
+                                for key, value in indicator_data.items():
+                                    result[key] = value.tolist() if hasattr(value, 'tolist') else value
+                                return result
+                            else:
+                                return indicator_data.tolist() if hasattr(indicator_data, 'tolist') else indicator_data
+                except Exception as e:
+                    logger.error(f"通用计算指标 {indicator_name} 失败: {e}")
+
+                # 如果所有方法都失败，返回空字典并记录警告
                 logger.warning(f"未知指标: {indicator_name}")
-                return []
+                # 返回空字典而不是空列表，以保持返回类型一致性
+                return {}
 
             except ImportError as e:
                 logger.error(f"导入分析服务失败: {e}")
-                return []
+                return {}
 
         except Exception as e:
             logger.error(f"计算指标 {indicator_name} 失败: {e}")
-            return []
+            return {}
 
 
 class UnifiedChartService(QObject):
@@ -534,8 +578,16 @@ class UnifiedChartService(QObject):
                             logger.warning(f"图表数据缺少K线数据，无法更新图表 {chart_id}")
                             return
 
+                        # 为图表组件准备格式化的数据
+                        chart_data = {
+                            'kdata': data.get('kline_data'),
+                            'stock_code': stock_code,
+                            'indicators_data': indicators_data,  # 确保指标数据被传递
+                            'title': data.get('stock_name', stock_code)
+                        }
+
                         logger.debug(f"更新图表 {chart_id}，数据包含指标: {list(indicators_data.keys())}")
-                        chart_widget.update_chart(data)
+                        chart_widget.update_chart(chart_data)
                         logger.debug(f"已更新图表 {chart_id}")
                     else:
                         logger.warning(f"图表 {chart_id} 不存在")

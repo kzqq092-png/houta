@@ -15,9 +15,20 @@ class RenderingMixin:
     def update_chart(self, data: dict = None):
         """唯一K线渲染实现，X轴为等距序号，彻底消除节假日断层。"""
         try:
-            if not data or 'kdata' not in data:
+            if not data:
                 return
-            kdata = data['kdata']
+
+            # 处理不同的数据字段格式，兼容kdata和kline_data
+            kdata = None
+            if 'kdata' in data:
+                kdata = data['kdata']
+            elif 'kline_data' in data:
+                kdata = data['kline_data']
+            else:
+                # 没有找到有效的K线数据
+                self.show_no_data("无K线数据")
+                return
+
             kdata = self._downsample_kdata(kdata)
             kdata = kdata.dropna(how='any')
             kdata = kdata.loc[~kdata.index.duplicated(keep='first')]
@@ -34,6 +45,13 @@ class RenderingMixin:
             x = np.arange(len(kdata))  # 用等距序号做X轴
             self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
             self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
+
+            # 处理indicators_data（如果存在）
+            indicators_data = data.get('indicators_data', {})
+            if indicators_data:
+                # 将indicators_data传递给渲染函数
+                self._render_indicator_data(indicators_data, kdata, x)
+
             # 修复：自动同步主窗口指标
             if hasattr(self, 'parentWidget') and callable(getattr(self, 'parentWidget', None)):
                 main_window = self.parentWidget()
@@ -118,6 +136,111 @@ class RenderingMixin:
             if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.error(f"更新图表失败: {str(e)}")
             self.show_no_data("渲染失败")
+
+    def _render_indicator_data(self, indicators_data, kdata, x=None):
+        """渲染从indicators_data传递的指标数据"""
+        try:
+            if not indicators_data:
+                return
+
+            if x is None:
+                x = np.arange(len(kdata))
+
+            # 遍历所有指标
+            for i, (indicator_name, indicator_data) in enumerate(indicators_data.items()):
+                # 处理MA指标
+                if indicator_name == 'MA':
+                    for j, (period, values) in enumerate(indicator_data.items()):
+                        # 确保values是列表
+                        values_list = values
+                        if hasattr(values, 'tolist'):
+                            values_list = values.tolist()
+
+                        # 处理值为None的情况
+                        valid_values = []
+                        valid_x = []
+                        for idx, val in enumerate(values_list):
+                            if val is not None and not (isinstance(val, float) and np.isnan(val)):
+                                valid_values.append(val)
+                                valid_x.append(x[idx] if idx < len(x) else idx)
+
+                        if valid_values:
+                            style = self._get_indicator_style(f'MA{period}', j)
+                            self.price_ax.plot(
+                                valid_x,
+                                valid_values,
+                                color=style['color'],
+                                linewidth=style['linewidth'],
+                                alpha=style['alpha'],
+                                label=f'MA{period}'
+                            )
+
+                # 处理MACD指标
+                elif indicator_name == 'MACD':
+                    # MACD通常有DIF、DEA和MACD三个数据序列
+                    dif_values = indicator_data.get('DIF', [])
+                    dea_values = indicator_data.get('DEA', [])
+                    hist_values = indicator_data.get('MACD', [])
+
+                    # 确保是列表
+                    if hasattr(dif_values, 'tolist'):
+                        dif_values = dif_values.tolist()
+                    if hasattr(dea_values, 'tolist'):
+                        dea_values = dea_values.tolist()
+                    if hasattr(hist_values, 'tolist'):
+                        hist_values = hist_values.tolist()
+
+                    # 绘制DIF和DEA线
+                    valid_dif = [(idx, val) for idx, val in enumerate(dif_values)
+                                 if val is not None and not (isinstance(val, float) and np.isnan(val))]
+                    valid_dea = [(idx, val) for idx, val in enumerate(dea_values)
+                                 if val is not None and not (isinstance(val, float) and np.isnan(val))]
+
+                    if valid_dif:
+                        valid_x_dif, valid_y_dif = zip(*valid_dif)
+                        self.indicator_ax.plot(
+                            [x[i] for i in valid_x_dif if i < len(x)],
+                            valid_y_dif,
+                            color='#1976d2',  # 蓝色
+                            linewidth=0.7,
+                            alpha=0.85,
+                            label='DIF'
+                        )
+
+                    if valid_dea:
+                        valid_x_dea, valid_y_dea = zip(*valid_dea)
+                        self.indicator_ax.plot(
+                            [x[i] for i in valid_x_dea if i < len(x)],
+                            valid_y_dea,
+                            color='#ff9800',  # 橙色
+                            linewidth=0.7,
+                            alpha=0.85,
+                            label='DEA'
+                        )
+
+                    # 绘制MACD柱状图
+                    valid_hist = [(idx, val) for idx, val in enumerate(hist_values)
+                                  if val is not None and not (isinstance(val, float) and np.isnan(val))]
+
+                    if valid_hist:
+                        valid_x_hist, valid_y_hist = zip(*valid_hist)
+                        valid_x_hist = [x[i] for i in valid_x_hist if i < len(x)]
+                        colors = ['#e53935' if h >= 0 else '#43a047' for h in valid_y_hist]  # 红色和绿色
+                        self.indicator_ax.bar(
+                            valid_x_hist,
+                            valid_y_hist,
+                            color=colors,
+                            alpha=0.5,
+                            width=0.6
+                        )
+
+                # 其他指标类型...可以根据需要添加更多指标的处理逻辑
+
+        except Exception as e:
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(f"渲染指标数据失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"渲染指标数据失败: {str(e)}")
 
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
         """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""

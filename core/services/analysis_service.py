@@ -462,7 +462,7 @@ class AnalysisService(CacheableService, ConfigurableService):
         return rsi
 
     def _calculate_kdj(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """计算KDJ"""
+        """计算KDJ指标"""
         high = data['high']
         low = data['low']
         close = data['close']
@@ -836,3 +836,53 @@ class AnalysisService(CacheableService, ConfigurableService):
     def calculate_kdj(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
         """计算KDJ指标的公共接口"""
         return self._calculate_kdj(data)
+
+    def calculate_indicator(self, data: pd.DataFrame, indicator_name: str) -> Optional[Union[Dict[str, Any], pd.Series, List]]:
+        """
+        通用指标计算方法，根据指标名称动态调用相应的计算函数
+
+        Args:
+            data: 股票数据
+            indicator_name: 指标名称
+
+        Returns:
+            指标计算结果，可能是字典、Series或列表，如果指标不存在则返回None
+        """
+        try:
+            indicator_name = indicator_name.upper()
+
+            # 检查是否有直接匹配的计算方法
+            method_name = f"calculate_{indicator_name.lower()}"
+            if hasattr(self, method_name):
+                method = getattr(self, method_name)
+                return method(data)
+
+            # 检查是否为MA类型指标
+            if indicator_name.startswith('MA') and len(indicator_name) > 2:
+                try:
+                    period = int(indicator_name[2:])
+                    return self.calculate_ma(data, period)
+                except ValueError:
+                    logger.warning(f"无法从指标名称解析周期: {indicator_name}")
+
+            # 其他常见指标的映射
+            indicator_map = {
+                'BOLL': 'calculate_bollinger_bands',
+                'RSI': 'calculate_rsi',
+                'KDJ': 'calculate_kdj',
+                'MACD': 'calculate_macd'
+            }
+
+            if indicator_name in indicator_map and hasattr(self, indicator_map[indicator_name]):
+                method = getattr(self, indicator_map[indicator_name])
+                return method(data)
+
+            # 记录找不到的指标
+            logger.warning(f"找不到指标计算方法: {indicator_name}")
+            return None
+
+        except Exception as e:
+            logger.error(f"计算指标 {indicator_name} 时出错: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None

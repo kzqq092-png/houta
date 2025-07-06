@@ -142,23 +142,26 @@ class HIkyuuUIApplication:
     def _register_qt_meta_types(self) -> None:
         """注册Qt元类型"""
         try:
-            from PyQt5.QtCore import qRegisterMetaType
-            from PyQt5.QtGui import QTextCursor, QTextCharFormat, QTextDocument, QTextBlock
+            from PyQt5.QtCore import QMetaType
+            from utils.qt_helpers import register_meta_types
 
-            # 注册常用的Qt类型
-            qRegisterMetaType(QTextCursor, "QTextCursor")
-            qRegisterMetaType(QTextCharFormat, "QTextCharFormat")
-            qRegisterMetaType(QTextDocument, "QTextDocument")
-            qRegisterMetaType(QTextBlock, "QTextBlock")
+            # 注册常用的Qt类型 - 修复注册方式
+            # 在 PyQt5 中，没有直接的 qRegisterMetaType 函数
+            # 而是在 QObject.connect 时自动处理这些类型
+            # 使用 QtCore.Q_DECLARE_METATYPE 方式
+            logger.info("使用 QMetaType 注册元类型")
 
-            # 注册基本数据类型
-            qRegisterMetaType(list, "QVariantList")
-            qRegisterMetaType(dict, "QVariantMap")
+            # 使用工具类注册元类型
+            success = register_meta_types()
+            if success:
+                logger.info("使用辅助函数成功注册元类型")
 
+            # 注册完成消息
             logger.info("✓ Qt元类型注册完成")
 
         except Exception as e:
             logger.warning(f"Qt元类型注册失败: {e}")
+            logger.warning(traceback.format_exc())
 
     def _setup_global_styles(self) -> None:
         """设置全局样式"""
