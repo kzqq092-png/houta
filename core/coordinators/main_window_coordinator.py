@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QSplitter, QStatusBar, QMenuBar, QMessageBox
+    QSplitter, QStatusBar, QMenuBar, QMessageBox, QDockWidget, QLabel, QPushButton, QFrame
 )
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtGui import QIcon
@@ -25,6 +25,9 @@ from ..services import (
     StockService, ChartService, AnalysisService,
     ThemeService, ConfigService
 )
+from optimization.optimization_dashboard import create_optimization_dashboard
+from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
+from core.metrics.repository import MetricsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # UI面板
         self._panels: Dict[str, Any] = {}
+        self._optimization_dashboard = None
 
         # 窗口状态
         self._window_state = {
@@ -129,7 +133,35 @@ class MainWindowCoordinator(BaseCoordinator):
             # 设置状态栏
             self._status_bar = QStatusBar()
             self._main_window.setStatusBar(self._status_bar)
-            self._status_bar.showMessage("就绪")
+
+            # 添加状态信息标签
+            self._status_label = QLabel("就绪")
+            self._status_bar.addWidget(self._status_label)
+
+            # 添加永久小部件到右侧
+            self._status_bar.addPermanentWidget(QFrame())  # 弹性空间
+
+            # 创建日志显示/隐藏按钮
+            self._log_toggle_btn = QPushButton("隐藏日志")
+            self._log_toggle_btn.setToolTip("隐藏/显示日志面板")
+            self._log_toggle_btn.setFixedWidth(80)
+            self._log_toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    border: 1px solid #c0c0c0;
+                    border-radius: 2px;
+                    padding: 2px 8px;
+                    color: #505050;
+                }
+                QPushButton:hover {
+                    background-color: #e0e0e0;
+                }
+                QPushButton:pressed {
+                    background-color: #d0d0d0;
+                }
+            """)
+            self._log_toggle_btn.clicked.connect(self._toggle_log_panel)
+            self._status_bar.addPermanentWidget(self._log_toggle_btn)
 
             # 设置菜单栏
             self._menu_bar = QMenuBar()
@@ -173,6 +205,12 @@ class MainWindowCoordinator(BaseCoordinator):
             theme_menu.addAction('默认主题', lambda: self._on_theme_changed('default'))
             theme_menu.addAction('深色主题', lambda: self._on_theme_changed('dark'))
             theme_menu.addAction('浅色主题', lambda: self._on_theme_changed('light'))
+
+            # 新增：性能仪表板菜单项
+            self.performance_panel_action = view_menu.addAction("性能仪表板")
+            self.performance_panel_action.setCheckable(True)
+            self.performance_panel_action.setChecked(False)
+            self.performance_panel_action.triggered.connect(self._toggle_performance_panel)
 
             # 工具菜单
             tools_menu = menu_bar.addMenu('工具(&T)')
@@ -260,7 +298,7 @@ class MainWindowCoordinator(BaseCoordinator):
             raise
 
     def _create_panels(self) -> None:
-        """创建UI面板"""
+        """创建所有UI面板"""
         try:
             # 创建中央窗口部件
             central_widget = QWidget()
@@ -316,8 +354,8 @@ class MainWindowCoordinator(BaseCoordinator):
             # 设置分割器比例
             horizontal_splitter.setSizes([300, 700, 350])
 
-            # 创建底部面板（日志显示面板）
-            from core.ui.panels import BottomPanel
+            # 创建底部面板（日志面板）
+            from ..ui.panels import BottomPanel
             bottom_panel = BottomPanel(
                 parent=self._main_window,
                 coordinator=self
@@ -325,8 +363,24 @@ class MainWindowCoordinator(BaseCoordinator):
             vertical_splitter.addWidget(bottom_panel._root_frame)
             self._panels['bottom'] = bottom_panel
 
-            # 设置垂直分割器比例（主面板区域 80%, 底部面板 20%）
-            vertical_splitter.setSizes([600, 150])
+            # 设置分割器的初始大小
+            vertical_splitter.setSizes([700, 200])  # 主区域和底部面板的比例
+
+            # 创建性能仪表板
+            repository = self.service_container.resolve(MetricsRepository)
+            performance_panel = PerformanceDashboardPanel(self.event_bus, repository)
+
+            # 将其放入一个可停靠的窗口
+            self._performance_dock = QDockWidget("性能仪表板", self._main_window)
+            self._performance_dock.setWidget(performance_panel)
+            self._performance_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea)
+            self._main_window.addDockWidget(Qt.BottomDockWidgetArea, self._performance_dock)
+            # 默认隐藏性能仪表板
+            self._performance_dock.setVisible(False)
+
+            self._panels['performance_dashboard'] = performance_panel
+
+            logger.info("Performance dashboard panel created and docked")
 
             # 连接面板之间的信号
             self._connect_panel_signals()
@@ -344,11 +398,121 @@ class MainWindowCoordinator(BaseCoordinator):
             # 注意：现在通过事件总线通信，不需要直接信号连接
             # 事件订阅已在_register_event_handlers中完成，这里不需要重复订阅
 
+            # 连接底部面板的隐藏信号
+            bottom_panel = self._panels.get('bottom')
+            if bottom_panel and hasattr(bottom_panel, 'panel_hidden'):
+                bottom_panel.panel_hidden.connect(self._on_bottom_panel_hidden)
+
             logger.debug("Panel signals connected successfully")
 
         except Exception as e:
             logger.error(f"Failed to connect panel signals: {e}")
             raise
+
+    def _on_bottom_panel_hidden(self) -> None:
+        """处理底部面板隐藏事件"""
+        try:
+            # 获取垂直分割器
+            central_widget = self._main_window.centralWidget()
+            if not central_widget:
+                return
+
+            # 查找垂直分割器
+            vertical_splitter = None
+            for child in central_widget.children():
+                if isinstance(child, QSplitter) and child.orientation() == Qt.Vertical:
+                    vertical_splitter = child
+                    break
+
+            if vertical_splitter:
+                # 调整分割器大小，使主面板区域扩展
+                sizes = vertical_splitter.sizes()
+                if len(sizes) >= 2:
+                    # 保留底部面板的最小高度（用于显示切换按钮）
+                    bottom_panel = self._panels.get('bottom')
+                    bottom_height = 30 if bottom_panel else 0
+
+                    # 将底部面板的大部分大小添加到主面板区域，但保留切换按钮的空间
+                    new_sizes = [sizes[0] + sizes[1] - bottom_height, bottom_height]
+                    vertical_splitter.setSizes(new_sizes)
+                    logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
+
+            # 更新菜单项
+            self._update_bottom_panel_menu_item(False)
+
+        except Exception as e:
+            logger.error(f"处理底部面板隐藏事件失败: {e}")
+
+    def _update_bottom_panel_menu_item(self, is_visible: bool) -> None:
+        """更新底部面板菜单项"""
+        try:
+            # 查找视图菜单
+            menu_bar = self._main_window.menuBar()
+            view_menu = None
+            for action in menu_bar.actions():
+                if action.text() == '视图(&V)':
+                    view_menu = action.menu()
+                    break
+
+            if view_menu:
+                # 查找或创建底部面板菜单项
+                bottom_panel_action = None
+                for action in view_menu.actions():
+                    if action.text() == '显示日志面板':
+                        bottom_panel_action = action
+                        break
+
+                if not bottom_panel_action and not is_visible:
+                    # 如果面板隐藏且菜单项不存在，创建菜单项
+                    bottom_panel_action = view_menu.addAction('显示日志面板')
+                    bottom_panel_action.triggered.connect(self._show_bottom_panel)
+                elif bottom_panel_action and is_visible:
+                    # 如果面板可见且菜单项存在，移除菜单项
+                    view_menu.removeAction(bottom_panel_action)
+
+        except Exception as e:
+            logger.error(f"更新底部面板菜单项失败: {e}")
+
+    def _show_bottom_panel(self) -> None:
+        """显示底部面板"""
+        try:
+            # 获取底部面板
+            bottom_panel = self._panels.get('bottom')
+            if bottom_panel:
+                # 如果面板有_show_panel方法，调用它
+                if hasattr(bottom_panel, '_show_panel'):
+                    bottom_panel._show_panel()
+                # 否则使用旧方法
+                elif hasattr(bottom_panel, '_root_frame'):
+                    bottom_panel._root_frame.setVisible(True)
+
+            # 获取垂直分割器
+            central_widget = self._main_window.centralWidget()
+            if not central_widget:
+                return
+
+            # 查找垂直分割器
+            vertical_splitter = None
+            for child in central_widget.children():
+                if isinstance(child, QSplitter) and child.orientation() == Qt.Vertical:
+                    vertical_splitter = child
+                    break
+
+            if vertical_splitter:
+                # 调整分割器大小，恢复底部面板
+                sizes = vertical_splitter.sizes()
+                if len(sizes) >= 2:
+                    # 分配一部分空间给底部面板
+                    total_height = sum(sizes)
+                    new_sizes = [int(total_height * 0.8), int(total_height * 0.2)]
+                    vertical_splitter.setSizes(new_sizes)
+                    logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
+
+            # 更新菜单项
+            self._update_bottom_panel_menu_item(True)
+
+        except Exception as e:
+            logger.error(f"显示底部面板失败: {e}")
 
     def _setup_layout(self) -> None:
         """设置布局"""
@@ -485,7 +649,7 @@ class MainWindowCoordinator(BaseCoordinator):
             logger.info(f"Data update: {event.data_type}")
 
             # 更新状态栏
-            self._status_bar.showMessage(f"数据已更新: {event.data_type}")
+            self._status_label.setText(f"数据已更新: {event.data_type}")
 
         except Exception as e:
             logger.error(f"Failed to handle data update event: {e}")
@@ -504,7 +668,7 @@ class MainWindowCoordinator(BaseCoordinator):
                 QMessageBox.information(self._main_window, event.error_type, event.error_message)
 
             # 更新状态栏
-            self._status_bar.showMessage(f"错误: {event.error_message}")
+            self._status_label.setText(f"错误: {event.error_message}")
 
         except Exception as e:
             logger.error(f"Failed to handle error event: {e}")
@@ -518,7 +682,7 @@ class MainWindowCoordinator(BaseCoordinator):
             self._apply_theme()
 
             # 更新状态栏
-            self._status_bar.showMessage(f"主题已更改: {event.theme_name}")
+            self._status_label.setText(f"主题已更改: {event.theme_name}")
 
         except Exception as e:
             logger.error(f"Failed to handle theme changed event: {e}")
@@ -533,7 +697,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
     def show_message(self, message: str, level: str = 'info') -> None:
         """显示消息"""
-        self._status_bar.showMessage(message)
+        self._status_label.setText(message)
 
     def center_dialog(self, dialog, parent=None, offset_y=50):
         """居中显示对话框"""
@@ -574,6 +738,10 @@ class MainWindowCoordinator(BaseCoordinator):
     def _do_dispose(self) -> None:
         """清理资源"""
         try:
+            # 清理UI面板
+            if 'performance_dashboard' in self._panels:
+                self._panels['performance_dashboard'].dispose()
+
             # 保存窗口配置
             self._save_window_config()
 
@@ -912,19 +1080,17 @@ HIkyuu-UI 2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误", f"打开策略管理对话框失败: {str(e)}")
 
     def _on_optimization_dashboard(self) -> None:
-        """优化仪表板"""
+        """显示优化仪表板"""
         try:
-            from optimization.optimization_dashboard import OptimizationDashboard
+            if self._optimization_dashboard is None:
+                self._optimization_dashboard = create_optimization_dashboard(self.event_bus)
 
-            # 创建优化仪表板
-            dashboard = OptimizationDashboard()
-            dashboard.show()
-
-            logger.info("优化仪表板已打开")
-
+            self._optimization_dashboard.show()
+            self._optimization_dashboard.activateWindow()
+            self._optimization_dashboard.raise_()
         except Exception as e:
             logger.error(f"打开优化仪表板失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开优化仪表板失败: {str(e)}")
+            self.show_message(f"打开优化仪表板失败: {str(e)}", level='error')
 
     def _on_one_click_optimization(self) -> None:
         """一键优化"""
@@ -1380,3 +1546,67 @@ HIkyuu-UI 2.0 (重构版本)
         except Exception as e:
             logger.error(f"Failed to show data usage terms: {e}")
             QMessageBox.critical(self._main_window, "错误", f"无法显示数据使用条款: {str(e)}")
+
+    def _toggle_performance_panel(self, checked: bool):
+        """显示或隐藏性能仪表板"""
+        if self._performance_dock:
+            self._performance_dock.setVisible(checked)
+
+    def _toggle_log_panel(self):
+        """显示或隐藏日志面板"""
+        try:
+            # 获取底部面板
+            bottom_panel = self._panels.get('bottom')
+            if not bottom_panel:
+                return
+
+            # 获取当前可见状态
+            is_visible = bottom_panel._root_frame.isVisible() and bottom_panel._root_frame.height() > 10
+
+            # 切换状态
+            if is_visible:
+                # 隐藏面板
+                if hasattr(bottom_panel, '_hide_panel'):
+                    bottom_panel._hide_panel()
+                else:
+                    bottom_panel._root_frame.setVisible(False)
+
+                # 更新按钮文本
+                self._log_toggle_btn.setText("显示日志")
+                self._log_toggle_btn.setToolTip("显示日志面板")
+            else:
+                # 显示面板
+                bottom_panel._root_frame.setVisible(True)  # 确保面板可见
+
+                if hasattr(bottom_panel, '_show_panel'):
+                    bottom_panel._show_panel()
+
+                # 更新按钮文本
+                self._log_toggle_btn.setText("隐藏日志")
+                self._log_toggle_btn.setToolTip("隐藏日志面板")
+
+                # 获取垂直分割器
+                central_widget = self._main_window.centralWidget()
+                if central_widget:
+                    # 查找垂直分割器
+                    vertical_splitter = None
+                    for child in central_widget.children():
+                        if isinstance(child, QSplitter) and child.orientation() == Qt.Vertical:
+                            vertical_splitter = child
+                            break
+
+                    if vertical_splitter:
+                        # 调整分割器大小，恢复底部面板
+                        sizes = vertical_splitter.sizes()
+                        if len(sizes) >= 2:
+                            # 分配一部分空间给底部面板
+                            total_height = sum(sizes)
+                            new_sizes = [int(total_height * 0.8), int(total_height * 0.2)]
+                            vertical_splitter.setSizes(new_sizes)
+                            logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
+
+            # 更新菜单项
+            self._update_bottom_panel_menu_item(not is_visible)
+
+        except Exception as e:
+            logger.error(f"显示或隐藏日志面板失败: {e}")

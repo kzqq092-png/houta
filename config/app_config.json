@@ -53,25 +53,7 @@
     "enable_gpu": false
   },
   "_meta": {
-    "last_saved": "2025-07-08T00:49:05.818157",
+    "last_saved": "2025-07-07T21:20:49.133331",
     "version": "1.0"
-  },
-  "window": {
-    "geometry": [
-      0,
-      23,
-      2560,
-      1417
-    ],
-    "maximized": true
-  },
-  "appearance": {
-    "theme": "default",
-    "font_size": 12
-  },
-  "behavior": {
-    "language": "简体中文",
-    "auto_save": true,
-    "auto_load": false
   }
 }

@@ -6,32 +6,13 @@
 用于事件驱动架构的事件发布和订阅
 """
 
-from typing import Dict, List, Callable, Any, Optional
+from typing import Dict, List, Callable, Any, Optional, Type
 import threading
 import weakref
 from functools import wraps
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-class Event:
-    """事件基类"""
-
-    def __init__(self, event_type: str, data: Any = None, source: Any = None):
-        self.event_type = event_type
-        self.data = data
-        self.source = source
-        self.timestamp = None
-        self.cancelled = False
-
-    def cancel(self):
-        """取消事件"""
-        self.cancelled = True
-
-    def is_cancelled(self) -> bool:
-        """检查事件是否被取消"""
-        return self.cancelled
 
 
 class EventBus:
@@ -42,11 +23,12 @@ class EventBus:
         self._lock = threading.RLock()
         self._enabled = True
 
-    def subscribe(self, event_type: str, callback: Callable[[Event], None]):
+    def subscribe(self, event_class: Type, callback: Callable):
         """订阅事件"""
         with self._lock:
-            if event_type not in self._listeners:
-                self._listeners[event_type] = []
+            event_type_str = event_class.event_type
+            if event_type_str not in self._listeners:
+                self._listeners[event_type_str] = []
 
             # 使用弱引用避免内存泄漏
             if hasattr(callback, '__self__'):
@@ -54,14 +36,15 @@ class EventBus:
             else:
                 weak_callback = weakref.ref(callback)
 
-            self._listeners[event_type].append(weak_callback)
+            self._listeners[event_type_str].append(weak_callback)
 
-    def unsubscribe(self, event_type: str, callback: Callable[[Event], None]):
+    def unsubscribe(self, event_class: Type, callback: Callable):
         """取消订阅事件"""
         with self._lock:
-            if event_type in self._listeners:
+            event_type_str = event_class.event_type
+            if event_type_str in self._listeners:
                 # 查找并移除回调
-                listeners = self._listeners[event_type]
+                listeners = self._listeners[event_type_str]
                 for i, weak_callback in enumerate(listeners):
                     if weak_callback() == callback:
                         del listeners[i]
@@ -69,20 +52,20 @@ class EventBus:
 
                 # 如果没有监听器了，删除事件类型
                 if not listeners:
-                    del self._listeners[event_type]
+                    del self._listeners[event_type_str]
 
-    def publish(self, event: Event):
+    def publish(self, event: Any):
         """发布事件"""
         if not self._enabled:
             return
 
         with self._lock:
-            event_type = event.event_type
-            if event_type not in self._listeners:
+            event_type_str = type(event).event_type
+            if event_type_str not in self._listeners:
                 return
 
             # 复制监听器列表，避免在迭代时修改
-            listeners = self._listeners[event_type].copy()
+            listeners = self._listeners[event_type_str].copy()
 
         # 调用监听器
         dead_refs = []
@@ -94,18 +77,17 @@ class EventBus:
 
             try:
                 callback(event)
-                if event.is_cancelled():
-                    break
             except Exception as e:
                 logger.error(f"事件处理器异常: {e}", exc_info=True)
 
         # 清理死引用
         if dead_refs:
             with self._lock:
-                for dead_ref in dead_refs:
-                    if event_type in self._listeners:
+                event_type_str = type(event).event_type
+                if event_type_str in self._listeners:
+                    for dead_ref in dead_refs:
                         try:
-                            self._listeners[event_type].remove(dead_ref)
+                            self._listeners[event_type_str].remove(dead_ref)
                         except ValueError:
                             pass
 
@@ -147,20 +129,3 @@ class EventBus:
 
 # 全局事件总线实例
 global_event_bus = EventBus()
-
-
-def on_event(event_type: str):
-    """装饰器：订阅事件"""
-    def decorator(func):
-        global_event_bus.subscribe(event_type, func)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-def emit_event(event_type: str, data: Any = None, source: Any = None):
-    """发射事件到全局事件总线"""
-    return global_event_bus.emit(event_type, data, source)

@@ -9,6 +9,7 @@ import pandas as pd
 from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime
 import traceback
+import time
 
 # 导入新的统一框架
 from analysis.pattern_base import (
@@ -17,6 +18,9 @@ from analysis.pattern_base import (
     calculate_body_ratio, calculate_shadow_ratios,
     is_bullish_candle, is_bearish_candle
 )
+
+# 导入指标收集
+from core.metrics.app_metrics_service import measure
 
 
 class EnhancedPatternRecognizer:
@@ -53,6 +57,7 @@ class EnhancedPatternRecognizer:
                 print(f"构建形态名称映射失败: {e}")
             return {}
 
+    @measure("pattern.identify_patterns")
     def identify_patterns(self, kdata: pd.DataFrame,
                           confidence_threshold: float = 0.1,
                           pattern_types: Optional[List[str]] = None) -> List[Dict]:
@@ -244,6 +249,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
     _compiled_algorithms = {}
     _algorithm_cache_size = 100  # 最大缓存算法数量
 
+    @measure("pattern.database_recognize")
     def recognize(self, kdata: pd.DataFrame) -> List[PatternResult]:
         """执行数据库算法识别 - 安全增强版，防止系统崩溃"""
         if not self.validate_data(kdata):

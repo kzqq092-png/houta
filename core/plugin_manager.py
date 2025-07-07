@@ -16,16 +16,13 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 from PyQt5.QtCore import QObject, pyqtSignal
 
-logger = logging.getLogger(__name__)
+# 添加项目根目录到Python路径，确保可以导入plugins包
+current_dir = Path(__file__).parent
+project_root = current_dir.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-
-class PluginStatus(Enum):
-    """插件状态"""
-    UNLOADED = "unloaded"
-    LOADED = "loaded"
-    ENABLED = "enabled"
-    DISABLED = "disabled"
-    ERROR = "error"
+# 定义基础类型，以防导入失败
 
 
 class PluginType(Enum):
@@ -46,6 +43,61 @@ class PluginCategory(Enum):
     COMMUNITY = "community"
     COMMERCIAL = "commercial"
     EXPERIMENTAL = "experimental"
+
+
+# 尝试从plugins包导入接口定义
+try:
+    # 首先尝试直接导入
+    from plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
+    from plugins.plugin_market import PluginMarket
+    logger = logging.getLogger(__name__)
+    logger.info("成功导入插件接口和市场模块")
+except ImportError:
+    # 如果直接导入失败，尝试使用相对路径
+    try:
+        sys.path.append(str(project_root))
+        from hikyuu_ui.plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
+        from hikyuu_ui.plugins.plugin_market import PluginMarket
+        logger = logging.getLogger(__name__)
+        logger.info("使用hikyuu_ui前缀成功导入插件接口和市场模块")
+    except ImportError:
+        # 尝试使用绝对路径
+        try:
+            plugins_path = project_root / "plugins"
+            sys.path.append(str(plugins_path))
+            from plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
+            from plugin_market import PluginMarket
+            logger = logging.getLogger(__name__)
+            logger.info("使用绝对路径成功导入插件接口和市场模块")
+        except ImportError as e:
+            # 如果仍然失败，创建占位类
+            logger = logging.getLogger(__name__)
+            logger.error(f"导入插件模块失败: {e}")
+
+            class IPlugin:
+                """插件接口占位类"""
+                pass
+
+            class PluginMetadata:
+                """插件元数据占位类"""
+                pass
+
+            class PluginMarket:
+                """插件市场占位类"""
+                pass
+
+            logger.warning("使用占位类替代插件接口和市场模块")
+
+logger = logging.getLogger(__name__)
+
+
+class PluginStatus(Enum):
+    """插件状态"""
+    UNLOADED = "unloaded"
+    LOADED = "loaded"
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+    ERROR = "error"
 
 
 @dataclass
@@ -149,6 +201,16 @@ class PluginManager(QObject):
                 plugin_name = plugin_path.stem
                 self.load_plugin(plugin_name, plugin_path)
 
+            # 加载examples目录中的示例插件
+            examples_dir = self.plugin_dir / "examples"
+            if examples_dir.exists():
+                for plugin_path in examples_dir.glob("*.py"):
+                    if plugin_path.name.startswith("__"):
+                        continue
+
+                    plugin_name = f"examples.{plugin_path.stem}"
+                    self.load_plugin(plugin_name, plugin_path)
+
             logger.info(f"已加载 {len(self.loaded_plugins)} 个插件")
 
         except Exception as e:
@@ -178,6 +240,7 @@ class PluginManager(QObject):
                 return False
 
             module = importlib.util.module_from_spec(spec)
+            sys.modules[plugin_name] = module  # 将模块添加到sys.modules，确保可以被导入
             spec.loader.exec_module(module)
 
             # 查找插件类

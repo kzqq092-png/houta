@@ -75,6 +75,7 @@ class BottomPanel(BasePanel):
     # 信号
     log_level_changed = pyqtSignal(str)
     log_cleared = pyqtSignal()
+    panel_hidden = pyqtSignal()  # 新增：面板隐藏信号
 
     def __init__(self, parent, coordinator, **kwargs):
         """
@@ -97,17 +98,17 @@ class BottomPanel(BasePanel):
     def _create_widgets(self) -> None:
         """创建UI组件（实现抽象方法）"""
         # 创建主布局
-        layout = QVBoxLayout(self._root_frame)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(5)
+        main_layout = QVBoxLayout(self._root_frame)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(5)
 
         # 创建工具栏
         toolbar = self._create_toolbar()
-        layout.addWidget(toolbar)
+        main_layout.addWidget(toolbar)
 
         # 创建日志显示区域
         self.log_widget = LogWidget()
-        layout.addWidget(self.log_widget)
+        main_layout.addWidget(self.log_widget)
 
         # 设置初始大小
         self._root_frame.setMinimumHeight(150)
@@ -116,6 +117,9 @@ class BottomPanel(BasePanel):
         # 保存组件引用
         self.add_widget('toolbar', toolbar)
         self.add_widget('log_widget', self.log_widget)
+
+        # 面板状态
+        self.is_panel_visible = True
 
     def _create_toolbar(self) -> QWidget:
         """创建工具栏"""
@@ -333,3 +337,41 @@ class BottomPanel(BasePanel):
         if self.log_handler:
             logging.getLogger().removeHandler(self.log_handler)
         event.accept()
+
+    def _toggle_panel(self) -> None:
+        """切换面板显示/隐藏状态"""
+        if self.is_panel_visible:
+            self._hide_panel()
+        else:
+            self._show_panel()
+
+        self.is_panel_visible = not self.is_panel_visible
+
+    def _hide_panel(self) -> None:
+        """隐藏面板"""
+        if self._root_frame:
+            # 隐藏日志部分和工具栏
+            self.log_widget.setVisible(False)
+            self.get_widget('toolbar').setVisible(False)
+
+            # 调整面板大小为最小高度
+            self._root_frame.setFixedHeight(0)
+
+            # 发送隐藏信号
+            self.panel_hidden.emit()
+            logger = logging.getLogger(__name__)
+            logger.debug("日志面板已隐藏")
+
+    def _show_panel(self) -> None:
+        """显示面板"""
+        if self._root_frame:
+            # 显示日志部分和工具栏
+            self.log_widget.setVisible(True)
+            self.get_widget('toolbar').setVisible(True)
+
+            # 恢复面板大小
+            self._root_frame.setMinimumHeight(150)
+            self._root_frame.setMaximumHeight(800)
+
+            # 取消固定高度限制
+            self._root_frame.setFixedHeight(200)  # 设置一个合适的默认高度

@@ -84,6 +84,7 @@ class IndustryManager(QObject):
             cache_file: 缓存文件名
             log_manager: 日志管理器实例
         """
+        super().__init__()
         initialization_start_time = time.time()
 
         try:
@@ -94,14 +95,6 @@ class IndustryManager(QObject):
             else:
                 self.log_manager = LogManager()
                 self.log_manager.info(f"IndustryManager初始化开始 - 使用内部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
-
-            # 只有在PyQt5可用且有QApplication时才调用父类初始化
-            if PYQT5_AVAILABLE and has_qapp():
-                super().__init__()
-                self.log_manager.info("QObject初始化成功")
-            else:
-                # 如果PyQt5不可用或没有QApplication，跳过QObject初始化
-                self.log_manager.info("跳过QObject初始化 - PyQt5不可用或无QApplication")
 
             # 设置配置目录
             if config_dir:

@@ -20,16 +20,23 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+# 核心服务导入
+from core.metrics.aggregation_service import MetricsAggregationService
+from core.metrics.repository import MetricsRepository
+from core.containers import ServiceContainer
+
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
 class SystemHealthChecker:
-    """系统健康检查器 - 全面监控形态识别系统状态"""
+    """系统健康检查器 - 现在通过核心服务获取指标"""
 
-    def __init__(self):
+    def __init__(self, aggregation_service: MetricsAggregationService, repository: MetricsRepository):
         self.check_results = {}
         self.start_time = datetime.now()
+        self._aggregation_service = aggregation_service
+        self._repository = repository
 
     def run_comprehensive_check(self) -> Dict[str, Any]:
         """运行全面的系统健康检查"""
@@ -111,24 +118,42 @@ class SystemHealthChecker:
             }
 
     def _check_performance_metrics(self) -> Dict[str, Any]:
-        """检查性能监控系统"""
+        """从聚合服务和仓储检查性能指标"""
         try:
-            monitor = get_performance_monitor()
-            summary = monitor.get_performance_summary()
+            # 尝试从聚合服务获取实时（内存中）的指标
+            live_metrics = self._aggregation_service.get_latest_app_metrics()
+
+            total_calls = 0
+            total_errors = 0
+            total_duration = 0
+
+            for op_data in live_metrics.values():
+                calls = len(op_data.get('durations', []))
+                total_calls += calls
+                total_errors += op_data.get('error_count', 0)
+                total_duration += sum(op_data.get('durations', []))
+
+            # 从数据库获取历史趋势（例如过去1小时）
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=1)
+            historical_data = self._repository.query_historical_data(
+                start_time=start_time,
+                end_time=end_time,
+                table='app_metrics_summary'
+            )
 
             return {
                 'status': 'healthy',
-                'total_recognitions': summary.get('total_recognitions', 0),
-                'success_rate': summary.get('success_rate', 0),
-                'average_processing_time': summary.get('average_processing_time', 0),
-                'cache_hit_rate': summary.get('cache_hit_rate', 0),
-                'memory_usage_mb': summary.get('memory_usage_mb', 0),
-                'recent_performance': summary.get('recent_performance', {})
+                'live_monitored_operations': len(live_metrics),
+                'live_total_calls': total_calls,
+                'live_success_rate': (total_calls - total_errors) / total_calls if total_calls > 0 else 1.0,
+                'live_avg_duration': total_duration / total_calls if total_calls > 0 else 0,
+                'historical_records_count': len(historical_data),
             }
         except Exception as e:
             return {
                 'status': 'error',
-                'error': str(e),
+                'error': f"无法获取性能指标: {e}",
                 'details': traceback.format_exc()
             }
 
@@ -156,23 +181,35 @@ class SystemHealthChecker:
             }
 
     def _check_memory_usage(self) -> Dict[str, Any]:
-        """检查内存使用情况"""
+        """从资源服务检查内存使用情况（通过聚合器）"""
         try:
-            process = psutil.Process()
-            memory_info = process.memory_info()
+            # 这里的逻辑需要调整，因为我们现在依赖于事件驱动的聚合数据
+            # 我们从数据库查询最新的资源记录
+            end_time = datetime.now()
+            start_time = end_time - timedelta(minutes=5)  # 查询过去5分钟
 
+            recent_data = self._repository.query_historical_data(
+                start_time, end_time, 'resource_metrics_summary'
+            )
+
+            if not recent_data:
+                return {
+                    'status': 'warning',
+                    'message': '最近5分钟内没有可用的资源指标数据。监控服务可能尚未启动或写入数据库。'
+                }
+
+            latest_record = recent_data[-1]
             return {
                 'status': 'healthy',
-                'rss_mb': memory_info.rss / 1024 / 1024,
-                'vms_mb': memory_info.vms / 1024 / 1024,
-                'percent': process.memory_percent(),
-                'available_mb': psutil.virtual_memory().available / 1024 / 1024,
-                'total_mb': psutil.virtual_memory().total / 1024 / 1024
+                'cpu_percent': latest_record.get('cpu'),
+                'memory_percent': latest_record.get('mem'),
+                'disk_percent': latest_record.get('disk'),
+                'last_updated': latest_record.get('t_stamp')
             }
         except Exception as e:
             return {
                 'status': 'error',
-                'error': str(e),
+                'error': f"无法获取内存指标: {e}",
                 'details': traceback.format_exc()
             }
 
@@ -340,7 +377,7 @@ class SystemHealthChecker:
         if perf.get('success_rate', 1) < 0.9:
             recommendations.append("形态识别成功率较低，建议检查算法配置和数据质量")
 
-        if perf.get('average_processing_time', 0) > 1.0:
+        if perf.get('live_avg_duration', 0) > 1.0:
             recommendations.append("处理时间较长，建议优化算法或增加缓存")
 
         # 检查缓存系统
@@ -353,7 +390,10 @@ class SystemHealthChecker:
 
         # 检查内存使用
         memory = report.get('memory_usage', {})
-        if memory.get('percent', 0) > 80:
+        if memory.get('cpu_percent', 0) > 80:
+            recommendations.append("CPU使用率过高，建议优化CPU使用")
+
+        if memory.get('memory_percent', 0) > 80:
             recommendations.append("内存使用率过高，建议优化内存管理")
 
         # 检查依赖
@@ -386,17 +426,20 @@ class SystemHealthChecker:
         # 性能指标
         perf = report.get('performance_metrics', {})
         lines.append("⚡ 性能指标:")
-        lines.append(f"  总识别次数: {perf.get('total_recognitions', 0)}")
-        lines.append(f"  成功率: {perf.get('success_rate', 0):.2%}")
-        lines.append(f"  平均处理时间: {perf.get('average_processing_time', 0):.3f}秒")
-        lines.append(f"  缓存命中率: {perf.get('cache_hit_rate', 0):.2%}")
+        lines.append(f"  实时监控操作: {perf.get('live_monitored_operations', 0)}")
+        lines.append(f"  实时总调用次数: {perf.get('live_total_calls', 0)}")
+        lines.append(f"  实时成功率: {perf.get('live_success_rate', 0):.2%}")
+        lines.append(f"  实时平均处理时间: {perf.get('live_avg_duration', 0):.3f}秒")
+        lines.append(f"  历史记录总数: {perf.get('historical_records_count', 0)}")
         lines.append("")
 
         # 内存使用
         memory = report.get('memory_usage', {})
         lines.append("💾 内存使用:")
-        lines.append(f"  进程内存: {memory.get('rss_mb', 0):.1f}MB")
-        lines.append(f"  内存占用率: {memory.get('percent', 0):.1f}%")
+        lines.append(f"  CPU使用率: {memory.get('cpu_percent', 0):.1f}%")
+        lines.append(f"  内存使用率: {memory.get('memory_percent', 0):.1f}%")
+        lines.append(f"  磁盘使用率: {memory.get('disk_percent', 0):.1f}%")
+        lines.append(f"  最后更新时间: {memory.get('last_updated', '未知')}")
         lines.append("")
 
         # 建议
@@ -412,27 +455,31 @@ class SystemHealthChecker:
 
 
 def main():
-    """主函数 - 运行系统健康检查"""
-    checker = SystemHealthChecker()
+    """用于独立测试的入口点"""
+    print("运行系统健康检查器（独立测试模式）...")
+
+    # 在测试模式下，我们需要模拟服务容器和服务
+    from core.events import EventBus
+    from core.containers import ServiceContainer
+
+    # 1. 创建模拟组件
+    event_bus = EventBus()
+    container = ServiceContainer()
+
+    # 2. 创建并注册真实的服务
+    repo = MetricsRepository(db_path=':memory:')  # 使用内存数据库进行测试
+    agg_service = MetricsAggregationService(event_bus, repo)
+
+    # 3. 实例化检查器
+    checker = SystemHealthChecker(aggregation_service=agg_service, repository=repo)
+
+    # 4. 运行检查并打印报告
     report = checker.run_comprehensive_check()
-
-    # 打印报告
-    print("\n" + checker.generate_health_report(report))
-
-    # 保存报告到文件
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = f"logs/health_report_{timestamp}.json"
-
-    os.makedirs("logs", exist_ok=True)
-
-    import json
-    with open(report_file, 'w', encoding='utf-8') as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
-
-    print(f"\n📄 详细报告已保存到: {report_file}")
-
-    return report
+    report_str = checker.generate_health_report(report)
+    print("\n--- 健康检查报告 ---")
+    print(report_str)
+    print("---------------------\n")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

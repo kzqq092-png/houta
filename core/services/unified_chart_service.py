@@ -14,6 +14,7 @@ from gui.widgets.chart_widget import ChartWidget
 from utils.config_manager import ConfigManager
 from utils.theme import get_theme_manager
 from core.logger import LogManager
+from core.metrics.app_metrics_service import measure
 # Cache将在需要时动态导入
 
 logger = logging.getLogger(__name__)
@@ -395,7 +396,7 @@ class UnifiedChartService(QObject):
 
             if not indicators:
                 logger.warning(f"指标列表为空，将使用默认指标 ['MA']")
-                indicators = ['MA']
+                # indicators = ['MA']
 
             # 检查缓存
             cache_key = f"{stock_code}_{period}_{'-'.join(indicators or [])}"
