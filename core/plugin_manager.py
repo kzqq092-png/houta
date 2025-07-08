@@ -15,6 +15,7 @@ from pathlib import Path
 from enum import Enum
 from dataclasses import dataclass, asdict
 from PyQt5.QtCore import QObject, pyqtSignal
+import traceback
 
 # 添加项目根目录到Python路径，确保可以导入plugins包
 current_dir = Path(__file__).parent
@@ -23,6 +24,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # 定义基础类型，以防导入失败
+logger = logging.getLogger(__name__)
 
 
 class PluginType(Enum):
@@ -46,49 +48,86 @@ class PluginCategory(Enum):
 
 
 # 尝试从plugins包导入接口定义
+IPlugin = None
+PluginMetadata = None
+PluginMarket = None
+
+# 尝试多种导入方式，确保能够找到插件接口
 try:
     # 首先尝试直接导入
     from plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
     from plugins.plugin_market import PluginMarket
-    logger = logging.getLogger(__name__)
-    logger.info("成功导入插件接口和市场模块")
+    logger.info("成功直接导入插件接口和市场模块")
 except ImportError:
     # 如果直接导入失败，尝试使用相对路径
     try:
         sys.path.append(str(project_root))
         from hikyuu_ui.plugins.plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
         from hikyuu_ui.plugins.plugin_market import PluginMarket
-        logger = logging.getLogger(__name__)
         logger.info("使用hikyuu_ui前缀成功导入插件接口和市场模块")
     except ImportError:
         # 尝试使用绝对路径
         try:
             plugins_path = project_root / "plugins"
             sys.path.append(str(plugins_path))
-            from plugin_interface import IPlugin, PluginType, PluginCategory, PluginMetadata
-            from plugin_market import PluginMarket
-            logger = logging.getLogger(__name__)
-            logger.info("使用绝对路径成功导入插件接口和市场模块")
-        except ImportError as e:
-            # 如果仍然失败，创建占位类
-            logger = logging.getLogger(__name__)
-            logger.error(f"导入插件模块失败: {e}")
 
-            class IPlugin:
-                """插件接口占位类"""
-                pass
+            # 尝试直接从文件导入
+            spec_interface = importlib.util.spec_from_file_location(
+                "plugin_interface",
+                project_root / "plugins" / "plugin_interface.py"
+            )
+            if spec_interface and spec_interface.loader:
+                plugin_interface_module = importlib.util.module_from_spec(spec_interface)
+                sys.modules["plugin_interface"] = plugin_interface_module
+                spec_interface.loader.exec_module(plugin_interface_module)
+                IPlugin = plugin_interface_module.IPlugin
+                PluginType = plugin_interface_module.PluginType
+                PluginCategory = plugin_interface_module.PluginCategory
+                PluginMetadata = plugin_interface_module.PluginMetadata
+                logger.info("成功通过spec导入插件接口")
 
-            class PluginMetadata:
-                """插件元数据占位类"""
-                pass
+            spec_market = importlib.util.spec_from_file_location(
+                "plugin_market",
+                project_root / "plugins" / "plugin_market.py"
+            )
+            if spec_market and spec_market.loader:
+                plugin_market_module = importlib.util.module_from_spec(spec_market)
+                sys.modules["plugin_market"] = plugin_market_module
+                spec_market.loader.exec_module(plugin_market_module)
+                PluginMarket = plugin_market_module.PluginMarket
+                logger.info("成功通过spec导入插件市场")
 
-            class PluginMarket:
-                """插件市场占位类"""
-                pass
+        except Exception as e:
+            logger.error(f"通过spec导入插件模块失败: {e}")
 
-            logger.warning("使用占位类替代插件接口和市场模块")
+            # 如果仍然失败，尝试最后的方法
+            try:
+                # 直接导入
+                import plugin_interface
+                import plugin_market
+                IPlugin = plugin_interface.IPlugin
+                PluginType = plugin_interface.PluginType
+                PluginCategory = plugin_interface.PluginCategory
+                PluginMetadata = plugin_interface.PluginMetadata
+                PluginMarket = plugin_market.PluginMarket
+                logger.info("成功通过直接导入加载插件接口和市场模块")
+            except ImportError as e:
+                logger.error(f"导入插件模块失败: {e}")
 
-logger = logging.getLogger(__name__)
+                # 如果仍然失败，创建占位类
+                class IPlugin:
+                    """插件接口占位类"""
+                    pass
+
+                class PluginMetadata:
+                    """插件元数据占位类"""
+                    pass
+
+                class PluginMarket:
+                    """插件市场占位类"""
+                    pass
+
+                logger.warning("使用占位类替代插件接口和市场模块")
 
 
 class PluginStatus(Enum):
@@ -193,28 +232,51 @@ class PluginManager(QObject):
                 logger.warning(f"插件目录不存在: {self.plugin_dir}")
                 return
 
+            # 需要排除的文件和模块
+            excluded_files = ["plugin_interface.py", "plugin_market.py", "__init__.py"]
+            excluded_modules = ["plugin_interface", "plugin_market"]
+
+            # 加载插件目录中的插件
+            loaded_count = 0
+
             # 扫描插件目录
             for plugin_path in self.plugin_dir.glob("*.py"):
-                if plugin_path.name.startswith("__"):
+                if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                    logger.info(f"跳过非插件文件: {plugin_path.name}")
                     continue
 
                 plugin_name = plugin_path.stem
-                self.load_plugin(plugin_name, plugin_path)
+                if plugin_name in excluded_modules:
+                    logger.info(f"跳过非插件模块: {plugin_name}")
+                    continue
+
+                if self.load_plugin(plugin_name, plugin_path):
+                    loaded_count += 1
 
             # 加载examples目录中的示例插件
             examples_dir = self.plugin_dir / "examples"
             if examples_dir.exists():
+                # 确保examples目录是一个包
+                init_file = examples_dir / "__init__.py"
+                if not init_file.exists():
+                    with open(init_file, 'w') as f:
+                        f.write('"""插件示例包"""')
+                    logger.info(f"创建examples包的__init__.py文件")
+
                 for plugin_path in examples_dir.glob("*.py"):
-                    if plugin_path.name.startswith("__"):
+                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                        logger.info(f"跳过非插件文件: {plugin_path.name}")
                         continue
 
                     plugin_name = f"examples.{plugin_path.stem}"
-                    self.load_plugin(plugin_name, plugin_path)
+                    if self.load_plugin(plugin_name, plugin_path):
+                        loaded_count += 1
 
-            logger.info(f"已加载 {len(self.loaded_plugins)} 个插件")
+            logger.info(f"已加载 {loaded_count} 个插件 [core.plugin_manager::load_all_plugins]")
 
         except Exception as e:
             logger.error(f"加载插件失败: {e}")
+            logger.error(traceback.format_exc())
 
     def load_plugin(self, plugin_name: str, plugin_path: Path) -> bool:
         """
@@ -240,7 +302,29 @@ class PluginManager(QObject):
                 return False
 
             module = importlib.util.module_from_spec(spec)
+
+            # 处理相对导入问题
+            if "." in plugin_name:  # 如果是子包中的模块
+                parent_name = plugin_name.rsplit(".", 1)[0]
+                if parent_name not in sys.modules:
+                    # 确保父包已经在sys.modules中
+                    parent_path = plugin_path.parent
+                    parent_init = parent_path / "__init__.py"
+                    if parent_init.exists():
+                        parent_spec = importlib.util.spec_from_file_location(parent_name, parent_init)
+                        if parent_spec and parent_spec.loader:
+                            parent_module = importlib.util.module_from_spec(parent_spec)
+                            sys.modules[parent_name] = parent_module
+                            parent_spec.loader.exec_module(parent_module)
+
             sys.modules[plugin_name] = module  # 将模块添加到sys.modules，确保可以被导入
+
+            # 执行模块前修正相对导入问题
+            # 为模块设置__package__属性
+            if "." in plugin_name:
+                module.__package__ = plugin_name.rsplit(".", 1)[0]
+
+            # 执行模块
             spec.loader.exec_module(module)
 
             # 查找插件类
@@ -253,7 +337,16 @@ class PluginManager(QObject):
             metadata = self._get_plugin_metadata(plugin_class)
 
             # 创建插件实例
-            plugin_instance = plugin_class()
+            try:
+                plugin_instance = plugin_class()
+            except Exception as e:
+                # 如果是抽象类或接口，跳过
+                if "Can't instantiate abstract class" in str(e):
+                    logger.warning(f"跳过抽象类或接口: {plugin_name}")
+                    return False
+                else:
+                    logger.error(f"创建插件实例失败 {plugin_name}: {e}")
+                    return False
 
             # 保存插件信息
             self.loaded_plugins[plugin_name] = module
@@ -262,7 +355,28 @@ class PluginManager(QObject):
 
             # 初始化插件
             if hasattr(plugin_instance, 'initialize'):
-                plugin_instance.initialize()
+                try:
+                    # 创建插件上下文
+                    from plugins.plugin_interface import PluginContext
+                    context = PluginContext(
+                        main_window=self.main_window,
+                        data_manager=self.data_manager,
+                        config_manager=self.config_manager,
+                        log_manager=self.log_manager
+                    )
+
+                    # 调用初始化方法
+                    plugin_instance.initialize(context)
+                except TypeError as e:
+                    if "missing 1 required positional argument: 'context'" in str(e):
+                        # 如果插件需要上下文但我们无法提供，记录警告但仍然加载插件
+                        logger.warning(f"插件需要上下文但无法提供: {plugin_name}")
+                    else:
+                        logger.error(f"插件初始化失败 {plugin_name}: {e}")
+                        return False
+                except Exception as e:
+                    logger.error(f"插件初始化失败 {plugin_name}: {e}")
+                    return False
 
             logger.info(f"插件加载成功: {plugin_name}")
             return True
@@ -382,26 +496,53 @@ class PluginManager(QObject):
             插件类或None
         """
         try:
-            # 查找继承自BasePlugin的类
+            # 需要排除的类型名称
+            excluded_class_names = ["IPlugin", "PluginType", "PluginCategory", "PluginMetadata", "PluginContext"]
+
+            # 首先检查是否有使用装饰器标记的插件类
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (isinstance(attr, type) and
+                    hasattr(attr, '_plugin_metadata') and
+                        attr.__name__ not in excluded_class_names):
+                    logger.info(f"找到带有_plugin_metadata属性的插件类: {attr.__name__}")
+                    return attr
+
+            # 查找继承自IPlugin的类
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
                 if (isinstance(attr, type) and
                     hasattr(attr, '__bases__') and
-                        any(base.__name__ == 'BasePlugin' for base in attr.__bases__)):
-                    return attr
+                        attr.__name__ not in excluded_class_names):
+                    # 检查基类名称
+                    for base in attr.__bases__:
+                        if base.__name__ == 'IPlugin' or 'Plugin' in base.__name__:
+                            # 检查是否是抽象类
+                            if hasattr(attr, '__abstractmethods__') and attr.__abstractmethods__:
+                                logger.info(f"跳过抽象类: {attr.__name__}, 抽象方法: {attr.__abstractmethods__}")
+                                continue
 
-            # 如果没有找到BasePlugin子类，查找包含特定方法的类
+                            logger.info(f"找到继承自插件基类的类: {attr.__name__}, 基类: {[b.__name__ for b in attr.__bases__]}")
+                            return attr
+
+            # 查找名称符合插件特征的类
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
                 if (isinstance(attr, type) and
-                    hasattr(attr, 'initialize') and
-                        hasattr(attr, 'get_name')):
+                    'Plugin' in attr.__name__ and
+                        attr.__name__ not in excluded_class_names):
+                    # 检查是否是枚举类型
+                    if hasattr(attr, '__members__'):
+                        logger.info(f"跳过枚举类型: {attr.__name__}")
+                        continue
+
+                    logger.info(f"找到名称符合插件特征的类: {attr.__name__}")
                     return attr
 
             return None
 
         except Exception as e:
-            logger.error(f"查找插件类失败: {e}")
+            logger.error(f"查找插件类时出错: {e}")
             return None
 
     def _get_plugin_metadata(self, plugin_class: Type) -> Dict[str, Any]:
