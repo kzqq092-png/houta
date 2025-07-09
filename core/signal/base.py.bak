@@ -7,9 +7,6 @@ from typing import Dict, Any, Optional
 from core.data_manager import data_manager
 
 
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
-from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
-
 class BaseSignal(SignalBase):
     """信号系统基类"""
 
@@ -49,7 +46,7 @@ class BaseSignal(SignalBase):
         if hasattr(k, 'to_df'):
             df = k.to_df()
             if isinstance(df['close'], pd.Series):
-                # 已替换为新的导入
+                from indicators_algo import calc_ma, calc_macd, calc_rsi
                 indicators['ma_fast'] = calc_ma(df['close'], self.get_param("n_fast", 12))
                 indicators['ma_slow'] = calc_ma(df['close'], self.get_param("n_slow", 26))
                 macd, _, _ = calc_macd(df['close'], self.get_param("n_fast", 12), self.get_param("n_slow", 26), self.get_param("n_signal", 9))

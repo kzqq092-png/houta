@@ -19,7 +19,7 @@ from core.data_validator import ProfessionalDataValidator, ValidationLevel
 from core.performance_optimizer import optimize_stock_analysis, performance_monitor
 from analysis.pattern_recognition import EnhancedPatternRecognizer
 from analysis.technical_analysis import TechnicalAnalyzer
-# 已替换为新的导入
+from features.advanced_indicators import calculate_advanced_indicators
 
 
 class AnalysisDepth(Enum):
@@ -266,8 +266,7 @@ class ProfessionalStockAnalyzer:
                 data = data.sort_index()
 
             # 计算基础技术指标
-            data = # TODO: 需要更新为新指标系统的调用
-calculate_advanced_indicators(data)
+            data = calculate_advanced_indicators(data)
 
             # 计算收益率
             data['returns'] = data['close'].pct_change()

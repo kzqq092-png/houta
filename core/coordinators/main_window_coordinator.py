@@ -328,7 +328,7 @@ class MainWindowCoordinator(BaseCoordinator):
                 width=self._layout_config['left_panel_width']
             )
             left_panel._root_frame.setMinimumWidth(self._layout_config['left_panel_width'])
-            left_panel._root_frame.setMaximumWidth(400)
+            left_panel._root_frame.setMaximumWidth(300)
             horizontal_splitter.addWidget(left_panel._root_frame)
             self._panels['left'] = left_panel
 
@@ -347,7 +347,7 @@ class MainWindowCoordinator(BaseCoordinator):
                 width=self._layout_config['right_panel_width']
             )
             right_panel._root_frame.setMinimumWidth(self._layout_config['right_panel_width'])
-            right_panel._root_frame.setMaximumWidth(450)
+            right_panel._root_frame.setMaximumWidth(850)
             horizontal_splitter.addWidget(right_panel._root_frame)
             self._panels['right'] = right_panel
 

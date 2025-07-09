@@ -4,9 +4,6 @@ import numpy as np
 import pandas as pd
 
 
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
-from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
-
 class MarketEnvironment(EnvironmentBase):
     """
     市场环境判断模块
@@ -80,7 +77,7 @@ class MarketEnvironment(EnvironmentBase):
             df = k.to_df()
             # 计算移动平均线
             if isinstance(df['close'], pd.Series):
-                # 已替换为新的导入
+                from indicators_algo import calc_ma, calc_macd, calc_rsi
                 ma_short = calc_ma(df['close'], self.get_param("ma_short"))
                 ma_mid = calc_ma(df['close'], self.get_param("ma_mid"))
                 ma_long = calc_ma(df['close'], self.get_param("ma_long"))
@@ -109,7 +106,7 @@ class MarketEnvironment(EnvironmentBase):
                 volume = VOL(k)
             # --- 类型安全指标计算 ---
             if isinstance(df['close'], pd.Series):
-                # 已替换为新的导入
+                from indicators_algo import calc_boll, calc_atr, calc_obv, calc_cci
                 boll = calc_boll(df['close'], self.get_param("boll_period"), self.get_param("boll_width"))
                 atr = calc_atr(df, self.get_param("atr_period"))
                 obv = calc_obv(df)

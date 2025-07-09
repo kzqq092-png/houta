@@ -378,6 +378,38 @@ class PluginManager(QObject):
                     logger.error(f"插件初始化失败 {plugin_name}: {e}")
                     return False
 
+            # 检查是否有plugin_info模块
+            try:
+                plugin_info = None
+                if hasattr(module, 'plugin_info'):
+                    plugin_info = module.plugin_info
+
+                    # 检查是否有register_indicators函数，如果有则调用它注册指标
+                    if hasattr(plugin_info, 'register_indicators'):
+                        try:
+                            from core.indicator_service import IndicatorService
+                            indicator_service = IndicatorService()
+
+                            # 调用register_indicators获取指标列表
+                            indicators_list = plugin_info.register_indicators()
+
+                            # 注册指标
+                            if indicators_list:
+                                if hasattr(indicator_service, 'register_indicators'):
+                                    indicator_ids = indicator_service.register_indicators(indicators_list, plugin_name)
+                                    logger.info(f"插件 {plugin_name} 成功注册了 {len(indicator_ids)} 个指标")
+                                else:
+                                    logger.warning(f"IndicatorService缺少register_indicators方法，无法注册插件 {plugin_name} 的指标")
+                        except ImportError:
+                            logger.warning(f"无法导入IndicatorService，跳过插件 {plugin_name} 的指标注册")
+                        except Exception as e:
+                            logger.error(f"注册插件 {plugin_name} 的指标时发生错误: {e}")
+                            logger.error(traceback.format_exc())
+            except ImportError:
+                logger.info(f"插件 {plugin_name} 没有plugin_info模块")
+            except Exception as e:
+                logger.warning(f"加载插件 {plugin_name} 的plugin_info模块时发生错误: {e}")
+
             logger.info(f"插件加载成功: {plugin_name}")
             return True
 

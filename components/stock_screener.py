@@ -18,7 +18,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import json
 import traceback
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category
+from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
+from core.indicator_service import get_indicator_categories, get_all_indicators_metadata, get_indicator_metadata
 from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1554,16 +1555,27 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.log_manager.log(f"设置弹窗位置失败: {str(e)}", LogLevel.ERROR)
 
     def get_available_indicators(self):
-        """获取所有可用指标分类及其指标列表，确保与后端ta-lib分类一致"""
-        from indicators_algo import get_all_indicators_by_category
-        categories = get_all_indicators_by_category()
-        # 强制所有分类名和指标名为str类型，防止类型对比异常
-        categories = {str(cat): [str(ind) for ind in inds]
-                      for cat, inds in categories.items()}
-        for cat, inds in categories.items():
-            self.log_manager.log(
-                f"筛选分类: {cat}，可见指标数: {len(inds)}", LogLevel.INFO)
-        return categories
+        """获取可用的技术指标列表"""
+        try:
+            # 使用新的指标系统获取指标列表
+            indicators = get_all_indicators_metadata()
+            # 将指标按分类组织
+            categories = {}
+            for indicator in indicators:
+                category = indicator.get('category', '其他')
+                if category not in categories:
+                    categories[category] = []
+                categories[category].append(indicator['name'])
+            return categories
+        except Exception as e:
+            self.log_manager.error(f"获取指标列表失败: {str(e)}")
+            # 返回默认分类
+            return {
+                "趋势指标": ["MA", "EMA", "MACD"],
+                "震荡指标": ["RSI", "KDJ", "CCI"],
+                "成交量指标": ["OBV", "VOLUME"],
+                "波动率指标": ["ATR", "BOLL"]
+            }
 
     def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
         """技术指标筛选，全部用ta-lib封装，分类、筛选用统一接口"""

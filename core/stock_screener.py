@@ -14,7 +14,9 @@ from core.data_manager import DataManager
 from core.logger import LogManager, LogLevel
 import os
 import json
-from indicators_algo import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_talib_indicator_list, get_talib_category, get_all_indicators_by_category, calc_talib_indicator
+# 替换旧的指标系统导入
+from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
+from core.indicator_service import calculate_indicator, get_indicator_categories, get_all_indicators_metadata
 import ptvsd
 
 
@@ -79,52 +81,67 @@ class StockScreener:
             return pd.DataFrame()
 
     def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
-        """技术指标筛选，全部用ta-lib封装，分类与主界面一致，修复可见指标数为0问题"""
+        """技术指标筛选，使用新的指标系统"""
         results = []
-        talib_list = get_talib_indicator_list()
-        category_map = get_all_indicators_by_category()
-        visible_count = {cat: len(names)
-                         for cat, names in category_map.items() if names}
-        for cat, count in visible_count.items():
-            self.log_manager.log(f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
-        if not talib_list or not category_map:
-            self.log_manager.log(
-                "未检测到任何ta-lib指标，请检查ta-lib安装（需C库和Python包都正确）！如需帮助请参考README或联系技术支持。", LogLevel.ERROR)
-            print("【错误】未检测到任何ta-lib指标，请检查ta-lib安装（需C库和Python包都正确）！如需帮助请参考README或联系技术支持。")
+
+        # 获取所有可用指标
+        try:
+            indicators = get_all_indicators_metadata()
+            category_map = {}
+            for ind in indicators:
+                cat = ind.get('category', '其他')
+                if cat not in category_map:
+                    category_map[cat] = []
+                category_map[cat].append(ind['name'])
+
+            visible_count = {cat: len(names) for cat, names in category_map.items() if names}
+            for cat, count in visible_count.items():
+                self.log_manager.log(f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
+
+            if not indicators:
+                self.log_manager.log("未检测到任何指标，请检查指标系统是否正确初始化！", LogLevel.ERROR)
+                print("【错误】未检测到任何指标，请检查指标系统是否正确初始化！")
+                return pd.DataFrame()
+        except Exception as e:
+            self.log_manager.log(f"获取指标元数据失败: {str(e)}", LogLevel.ERROR)
             return pd.DataFrame()
+
         for stock in stock_list:
             try:
                 kdata = self.data_manager.get_kdata(stock)
                 if kdata.empty or len(kdata) < 30:
-                    self.log_manager.log(
-                        f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
+                    self.log_manager.log(f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
                     continue
-                # 动态遍历所有ta-lib指标
+
+                # 计算常用指标
                 indicator_values = {}
-                for name in talib_list:
-                    try:
-                        val = calc_talib_indicator(name, kdata)
-                        if isinstance(val, pd.DataFrame):
-                            for col in val.columns:
-                                indicator_values[f"{name}_{col}".upper(
-                                )] = val[col]
-                        else:
-                            indicator_values[name.upper()] = val
-                    except Exception as e:
-                        self.log_manager.log(
-                            f"股票 {stock} 指标 {name} 计算失败: {str(e)}", LogLevel.WARNING)
-                        continue
-                # 兼容常见指标名称
-                ma_short = indicator_values.get('MA', None) or indicator_values.get(
-                    'MA5', None) or indicator_values.get('MA_5', None)
-                ma_long = indicator_values.get('EMA', None) or indicator_values.get(
-                    'EMA12', None) or indicator_values.get('EMA_12', None)
-                # MACD 兼容多种命名
-                macd = (indicator_values.get('MACD_1', None) or indicator_values.get('MACD', None) or
-                        indicator_values.get('MACD_DIF', None) or indicator_values.get('MACD_DEA', None))
-                # RSI 兼容
-                rsi = indicator_values.get('RSI', None) or indicator_values.get(
-                    'RSI6', None) or indicator_values.get('RSI_6', None)
+                try:
+                    # 计算MA
+                    ma_result = calculate_indicator("MA", kdata, {"timeperiod": 5})
+                    indicator_values['MA'] = ma_result['MA']
+
+                    # 计算EMA
+                    ema_result = calculate_indicator("EMA", kdata, {"timeperiod": 12})
+                    indicator_values['EMA'] = ema_result['EMA']
+
+                    # 计算MACD
+                    macd_result = calculate_indicator("MACD", kdata, {})
+                    indicator_values['MACD'] = macd_result['MACD']
+                    indicator_values['MACD_SIGNAL'] = macd_result['MACD_SIGNAL']
+                    indicator_values['MACD_HIST'] = macd_result['MACD_HIST']
+
+                    # 计算RSI
+                    rsi_result = calculate_indicator("RSI", kdata, {"timeperiod": 14})
+                    indicator_values['RSI'] = rsi_result['RSI']
+                except Exception as e:
+                    self.log_manager.log(f"股票 {stock} 指标计算失败: {str(e)}", LogLevel.WARNING)
+                    continue
+
+                # 提取指标值
+                ma_short = indicator_values.get('MA')
+                ma_long = indicator_values.get('EMA')
+                macd = indicator_values.get('MACD')
+                rsi = indicator_values.get('RSI')
 
                 def last_val(x):
                     if x is None:
@@ -155,8 +172,7 @@ class StockScreener:
                         macd_val = last_val(macd)
                         rsi_val = last_val(rsi)
                         if ma_short_val is None or ma_long_val is None or macd_val is None or rsi_val is None:
-                            self.log_manager.log(
-                                f"股票 {stock} 指标有空值，跳过。", LogLevel.WARNING)
+                            self.log_manager.log(f"股票 {stock} 指标有空值，跳过。", LogLevel.WARNING)
                             continue
                         if ma_short_val > ma_long_val and macd_val > 0 and rsi_val > params.get('rsi_value', 50):
                             info = self.data_manager.get_stock_info(stock)
@@ -173,15 +189,12 @@ class StockScreener:
                                 'north_money': self.get_north_money(stock)
                             })
                     except Exception as e:
-                        self.log_manager.log(
-                            f"股票 {stock} 指标筛选判断异常: {str(e)}", LogLevel.WARNING)
+                        self.log_manager.log(f"股票 {stock} 指标筛选判断异常: {str(e)}", LogLevel.WARNING)
                         continue
                 else:
-                    self.log_manager.log(
-                        f"股票 {stock} 指标缺失，未参与筛选。", LogLevel.WARNING)
+                    self.log_manager.log(f"股票 {stock} 指标缺失，未参与筛选。", LogLevel.WARNING)
             except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                self.log_manager.log(f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
                 continue
         return pd.DataFrame(results)
 
@@ -539,6 +552,14 @@ class StockScreener:
             self.log_manager.log(f"删除策略模板失败: {str(e)}", LogLevel.ERROR)
 
     def get_indicator_categories(self):
-        """获取所有指标分类及其指标列表，确保与ta-lib分类一致"""
-        from indicators_algo import get_all_indicators_by_category
-        return get_all_indicators_by_category()
+        """获取指标分类"""
+        try:
+            return get_indicator_categories()
+        except Exception as e:
+            self.log_manager.log(f"获取指标分类失败: {str(e)}", LogLevel.ERROR)
+            return {
+                "趋势指标": ["MA", "EMA", "MACD"],
+                "震荡指标": ["RSI", "KDJ", "CCI"],
+                "成交量指标": ["OBV", "VOLUME"],
+                "波动率指标": ["ATR", "BOLL"]
+            }
