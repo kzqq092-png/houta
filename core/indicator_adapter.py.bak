@@ -32,6 +32,36 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 
+def get_indicator_english_name(name: str) -> str:
+    """
+    获取指标英文名称
+
+    参数:
+        name: 指标名称（可能是中文或英文）
+
+    返回:
+        str: 指标英文名称
+    """
+    # 获取指标元数据
+    metadata = get_indicator_metadata(name)
+
+    # 如果指标不存在，尝试查找中文名匹配的指标
+    if not metadata:
+        # 获取所有指标元数据
+        all_metadata = get_all_indicators_metadata()
+
+        # 查找display_name匹配的指标
+        for indicator_name, indicator_metadata in all_metadata.items():
+            if indicator_metadata.get('display_name') == name:
+                return indicator_name
+
+        # 如果没有找到匹配的指标，返回原名称
+        return name
+
+    # 返回指标英文名称（即指标ID）
+    return metadata.get('name', name)
+
+
 def calc_talib_indicator(name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
     计算指标的适配函数，兼容旧的 calc_talib_indicator 接口
@@ -339,3 +369,151 @@ def get_talib_chinese_name(name: str) -> str:
         return name
 
     return metadata.get('display_name', name)
+
+
+def get_indicator_params_config(indicator_name: str) -> dict:
+    """
+    获取指标参数配置
+
+    参数:
+        indicator_name: 指标名称
+
+    返回:
+        dict: 参数配置字典
+    """
+    # 获取指标元数据
+    metadata = get_indicator_metadata(indicator_name)
+
+    # 如果指标不存在，返回空配置
+    if not metadata:
+        return {"parameters": {}, "inputs": ["close"]}
+
+    # 从元数据中提取参数配置
+    params_config = {}
+    params = metadata.get('parameters', {})
+
+    # 转换为旧格式
+    for param_name, param_info in params.items():
+        params_config[param_name] = {
+            "default": param_info.get('default'),
+            "min": param_info.get('min'),
+            "max": param_info.get('max'),
+            "step": param_info.get('step', 1),
+            "type": param_info.get('type', 'int')
+        }
+
+    # 获取输入列
+    inputs = metadata.get('inputs', ["close"])
+
+    return {
+        "parameters": params_config,
+        "inputs": inputs
+    }
+
+
+def get_indicator_default_params(indicator_name: str) -> dict:
+    """
+    获取指标默认参数
+
+    参数:
+        indicator_name: 指标名称
+
+    返回:
+        dict: 默认参数字典
+    """
+    # 获取参数配置
+    config = get_indicator_params_config(indicator_name)
+
+    # 提取默认值
+    default_params = {}
+    for param_name, param_info in config.get("parameters", {}).items():
+        default_params[param_name] = param_info.get("default")
+
+    return default_params
+
+
+def get_indicator_inputs(indicator_name: str) -> list:
+    """
+    获取指标所需的输入列
+
+    参数:
+        indicator_name: 指标名称
+
+    返回:
+        list: 输入列名列表
+    """
+    indicator_name = indicator_name.upper()
+
+    # 处理指标别名
+    if 'INDICATOR_ALIASES' in globals() and indicator_name in INDICATOR_ALIASES:
+        indicator_name = INDICATOR_ALIASES[indicator_name]
+    else:
+        # 导入INDICATOR_ALIASES
+        try:
+            from core.indicator_service import INDICATOR_ALIASES
+            if indicator_name in INDICATOR_ALIASES:
+                indicator_name = INDICATOR_ALIASES[indicator_name]
+        except ImportError:
+            pass
+
+    # 预定义的输入映射
+    input_mapping = {
+        'MA': ['close'],
+        'SMA': ['close'],
+        'EMA': ['close'],
+        'MACD': ['close'],
+        'RSI': ['close'],
+        'BBANDS': ['close'],
+        'BOLL': ['close'],
+        'KDJ': ['high', 'low', 'close'],
+        'STOCH': ['high', 'low', 'close'],
+        'ADX': ['high', 'low', 'close'],
+        'CCI': ['high', 'low', 'close'],
+        'OBV': ['close', 'volume'],
+        'ROC': ['close'],
+        'ATR': ['high', 'low', 'close'],
+        'SAR': ['high', 'low'],
+        'WILLR': ['high', 'low', 'close'],
+        'MOM': ['close'],
+        'TRIX': ['close'],
+        'CMF': ['high', 'low', 'close', 'volume'],
+        'MFI': ['high', 'low', 'close', 'volume']
+    }
+
+    if indicator_name in input_mapping:
+        return input_mapping[indicator_name]
+
+    # 尝试从数据库获取指标定义
+    try:
+        from db.models.indicator_models import IndicatorDatabase
+        import os
+
+        db_path = os.path.join(os.path.dirname(__file__), '..', 'db', 'indicators.db')
+        if os.path.exists(db_path):
+            db = IndicatorDatabase(db_path)
+            indicator = db.get_indicator_by_name(indicator_name)
+            db.close()
+
+            if indicator:
+                # 根据指标实现判断输入
+                for impl in indicator.implementations:
+                    if impl.engine == 'talib':
+                        # 大多数TA-Lib函数使用close
+                        return ['close']
+                    elif 'trends.calculate_' in impl.function_name:
+                        if 'adx' in impl.function_name:
+                            return ['high', 'low', 'close']
+                        else:
+                            return ['close']
+                    elif 'oscillators.calculate_' in impl.function_name:
+                        if 'kdj' in impl.function_name or 'stoch' in impl.function_name:
+                            return ['high', 'low', 'close']
+                        else:
+                            return ['close']
+                    elif 'volumes.calculate_' in impl.function_name:
+                        return ['close', 'volume']
+    except Exception as e:
+        logger.warning(f"获取指标输入列失败: {str(e)}")
+
+    # 默认返回close
+    return ['close']

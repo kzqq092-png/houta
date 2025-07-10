@@ -15,7 +15,6 @@ from core.logger import LogManager, LogLevel
 import os
 import json
 # 替换旧的指标系统导入
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_categories, get_all_indicators_metadata
 import ptvsd
 

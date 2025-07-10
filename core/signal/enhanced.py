@@ -6,8 +6,8 @@ from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
 # 已替换为新的导入
 
 
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+
 
 class EnhancedSignal(SignalBase):
     """
@@ -130,13 +130,12 @@ class EnhancedSignal(SignalBase):
             n_fast = self.get_param("n_fast")
             n_slow = self.get_param("n_slow")
             if isinstance(close_data, pd.Series):
-                ma_fast = indicators.get('MA', calc_ma(close_data, n_fast))
-                ma_slow = indicators.get('EMA', calc_ma(close_data, n_slow))
+                ma_fast = indicators.get('MA', calculate_indicator('MA', k, {'timeperiod': n_fast}))
+                ma_slow = indicators.get('EMA', calculate_indicator('EMA', k, {'timeperiod': n_slow}))
                 macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
                 if macd is None:
-                    # 已替换为新的导入
-                    macd, _, _ = calc_macd(close_data, fast=, slow=, signal=)
-                rsi = indicators.get('RSI', None) or calc_rsi(close_data, self.get_param("rsi_window"))
+                    macd = calculate_indicator('MACD', k, {'fast': n_fast, 'slow': n_slow, 'signal': self.get_param('n_signal')})
+                rsi = indicators.get('RSI', None) or calculate_indicator('RSI', k, {'timeperiod': self.get_param("rsi_window")})
                 volume_data = k['volume'] if 'volume' in k else None
                 if volume_data is not None and isinstance(volume_data, pd.Series):
                     volume_ma = volume_data.rolling(window=self.get_param("volume_ma")).mean()
@@ -151,30 +150,30 @@ class EnhancedSignal(SignalBase):
                     macd = MACD(close_data, n1=n_fast, n2=n_slow, n3=9)
                 rsi = indicators.get('RSI', None) or RSI(close_data, n=self.get_param("rsi_window"))
                 volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
-            kdj = calc_kdj(k, self.get_param("kdj_n"))
+            kdj = calculate_indicator('KDJ', k, {'n': self.get_param("kdj_n")})
             # --- 类型安全指标计算 ---
             # BOLL
             if isinstance(k['close'], pd.Series):
-                boll = calc_boll(k['close'], self.get_param("boll_n"), self.get_param("boll_width"))
+                boll = calculate_indicator('BOLL', k, {'timeperiod': self.get_param("boll_n"), 'width': self.get_param("boll_width")})
             else:
                 from hikyuu.indicator import BOLL
                 close_ind = CLOSE(k) if hasattr(k, 'to_df') else k['close']
                 boll = BOLL(close_ind, n=self.get_param("boll_n"), width=self.get_param("boll_width"))
             # ATR
             if hasattr(k, 'to_df'):
-                atr = calc_atr(k, self.get_param("atr_period"))
+                atr = calculate_indicator('ATR', k, {'timeperiod': self.get_param("atr_period")})
             else:
                 from hikyuu.indicator import ATR
                 atr = ATR(k, n=self.get_param("atr_period"))
             # CCI
             if hasattr(k, 'to_df'):
-                cci = calc_cci(k, self.get_param("cci_period"))
+                cci = calculate_indicator('CCI', k, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import CCI
                 cci = CCI(k, n=self.get_param("cci_period"))
             # OBV
             if hasattr(k, 'to_df'):
-                obv = calc_obv(k)
+                obv = calculate_indicator('OBV', k, {})
             else:
                 from hikyuu.indicator import OBV
                 obv = OBV(k)

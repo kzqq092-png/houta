@@ -143,11 +143,11 @@ class TechnicalAnalyzer:
         try:
             if isinstance(kdata, pd.DataFrame):
                 closes = kdata['close'].values
-                from indicators_algo import calc_rsi, calc_macd
-                rsi = calc_rsi(kdata['close'], 14)
+                # 已替换为新的导入
+                rsi = calc_rsi(kdata['close'], n=14)
                 macd, _, _ = calc_macd(kdata['close'])
             else:
-                closes = np.array([float(k.close) for k in kdata])
+                closes = np.array([float(k.close, fast=, slow=, signal=) for k in kdata], fast=, slow=, signal=)
                 from hikyuu.indicator import RSI, MACD
                 close_ind = CLOSE(kdata)
                 rsi = RSI(close_ind, n=14)

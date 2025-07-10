@@ -145,9 +145,9 @@ class TechnicalAnalyzer:
                 closes = kdata['close'].values
                 # 已替换为新的导入
                 rsi = calc_rsi(kdata['close'], n=14)
-                macd, _, _ = calc_macd(kdata['close'])
+                macd, _, _ = calc_macd(kdata['close'], fast=, slow=, signal=)
             else:
-                closes = np.array([float(k.close) for k in kdata], fast=, slow=, signal=)
+                closes = np.array([float(k.close, fast=, slow=, signal=) for k in kdata], fast=, slow=, signal=)
                 from hikyuu.indicator import RSI, MACD
                 close_ind = CLOSE(kdata)
                 rsi = RSI(close_ind, n=14)

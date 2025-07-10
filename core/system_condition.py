@@ -5,8 +5,8 @@ import pandas as pd
 # 已替换为新的导入
 
 
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+
 
 class EnhancedSystemCondition(ConditionBase):
     """

@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 
 
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+
 
 class MarketEnvironment(EnvironmentBase):
     """
@@ -81,17 +81,16 @@ class MarketEnvironment(EnvironmentBase):
             # 计算移动平均线
             if isinstance(df['close'], pd.Series):
                 # 已替换为新的导入
-                ma_short = calc_ma(df['close'], self.get_param("ma_short"))
-                ma_mid = calc_ma(df['close'], self.get_param("ma_mid"))
-                ma_long = calc_ma(df['close'], self.get_param("ma_long"))
-                macd, _, _ = calc_macd(df['close'], self.get_param("macd_fast"), self.get_param("macd_slow"), self.get_param("macd_signal"))
-                rsi = calc_rsi(df['close'], self.get_param("rsi_period"))
-                # 布林带、波动率等同理
-                returns = df['close'].pct_change()
-                volatility = returns.rolling(window=self.get_param("volatility_window")).std()
-                volume_ma = df['volume'].rolling(window=self.get_param("volume_ma")).mean()
-                close = df['close']
-                volume = df['volume']
+                ma_short = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_short")})
+                ma_mid = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_mid")})
+                ma_long = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_long")})
+                macd = calculate_indicator('MACD', df, {'fast': self.get_param("macd_fast"),
+                                           'slow': self.get_param("macd_slow"), 'signal': self.get_param("macd_signal")})
+                rsi = calculate_indicator('RSI', df, {'timeperiod': self.get_param("rsi_period")})
+                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param("boll_period"), 'width': self.get_param("boll_width")})
+                atr = calculate_indicator('ATR', df, {'timeperiod': self.get_param("atr_period")})
+                obv = calculate_indicator('OBV', df, {})
+                cci = calculate_indicator('CCI', df, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import MA, MACD, RSI, BOLL, VOL
                 close_ind = CLOSE(k)
@@ -110,10 +109,10 @@ class MarketEnvironment(EnvironmentBase):
             # --- 类型安全指标计算 ---
             if isinstance(df['close'], pd.Series):
                 # 已替换为新的导入
-                boll = calc_boll(df['close'], self.get_param("boll_period"), self.get_param("boll_width"))
-                atr = calc_atr(df, self.get_param("atr_period"))
-                obv = calc_obv(df)
-                cci = calc_cci(df, self.get_param("cci_period"))
+                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param("boll_period"), 'width': self.get_param("boll_width")})
+                atr = calculate_indicator('ATR', df, {'timeperiod': self.get_param("atr_period")})
+                obv = calculate_indicator('OBV', df, {})
+                cci = calculate_indicator('CCI', df, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import BOLL, ATR, OBV, CCI, CLOSE
                 close_ind = CLOSE(k)
