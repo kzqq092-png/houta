@@ -343,6 +343,76 @@ class AnalysisService(CacheableService, ConfigurableService):
 
             self._current_stock_code = stock_code
 
+            # 使用统一数据管理器请求分析数据，避免重复加载
+            try:
+                from .unified_data_manager import UnifiedDataManager
+                from ..containers import get_service_container
+
+                container = get_service_container()
+                data_manager = container.try_resolve(UnifiedDataManager)
+
+                if data_manager:
+                    # 检查事件循环，兜底处理
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if not loop.is_running():
+                            loop.run_until_complete(asyncio.sleep(0))  # 激活事件循环
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(asyncio.sleep(0))
+                    # 异步请求分析数据，优先级设为中等
+                    data_manager.request_data(
+                        stock_code=stock_code,
+                        data_type='analysis',
+                        period='D',
+                        time_range=60,  # 减少数据量
+                        parameters={'analysis_type': 'comprehensive'},
+                        priority=1,  # 中优先级
+                        callback=self._on_analysis_data_received
+                    )
+
+                    logger.info(f"Starting comprehensive analysis for {stock_code}")
+                else:
+                    # 降级到原有逻辑
+                    logger.warning("Unified data manager not available, falling back to direct analysis")
+                    self._fallback_analysis(stock_code)
+
+            except Exception as e:
+                logger.warning(f"Failed to use unified data manager: {e}")
+                self._fallback_analysis(stock_code)
+
+        except Exception as e:
+            logger.error(f"Failed to handle stock selected event: {e}")
+
+    def _on_analysis_data_received(self, data, error=None):
+        """处理接收到的分析数据"""
+        try:
+            if error:
+                logger.error(f"Analysis data request failed: {error}")
+                return
+
+            if data is not None:
+                # 发布分析完成事件
+                from ..events import AnalysisCompleteEvent
+                event = AnalysisCompleteEvent(
+                    stock_code=self._current_stock_code,
+                    analysis_type='comprehensive'
+                )
+                event.data.update(data)
+                self.event_bus.publish(event)
+
+                logger.debug(f"Analysis data received and published for {self._current_stock_code}")
+            else:
+                logger.warning(f"No analysis data received for {self._current_stock_code}")
+
+        except Exception as e:
+            logger.error(f"Error processing analysis data: {e}")
+
+    def _fallback_analysis(self, stock_code: str):
+        """降级分析逻辑"""
+        try:
             # 获取股票服务
             stock_service = self._get_stock_service()
             if not stock_service:
@@ -350,20 +420,16 @@ class AnalysisService(CacheableService, ConfigurableService):
                 return
 
             # 快速检查股票是否有数据
-            try:
-                test_data = stock_service.get_stock_data(stock_code, period='D', count=1)
-                if test_data is None or test_data.empty:
-                    logger.warning(f"No data available for {stock_code}")
-                    return
-            except Exception as e:
-                logger.warning(f"Failed to check data for {stock_code}: {e}")
+            test_data = stock_service.get_stock_data(stock_code, period='D', count=1)
+            if test_data is None or test_data.empty:
+                logger.warning(f"No data available for {stock_code}")
                 return
 
             # 异步运行自动分析，避免阻塞
             self._run_auto_analysis_async(stock_code)
 
         except Exception as e:
-            logger.error(f"Failed to handle stock selected event: {e}")
+            logger.error(f"Fallback analysis failed: {e}")
 
     def _run_auto_analysis_async(self, stock_code: str) -> None:
         """异步运行自动分析"""

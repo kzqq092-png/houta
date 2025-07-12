@@ -12,7 +12,7 @@ from PyQt5.QtGui import *
 
 from .base_panel import BasePanel
 from gui.widgets.log_widget import LogWidget
-from core.event_bus import EventBus
+from core.events.event_bus import EventBus
 
 
 class LogPanel(BasePanel):

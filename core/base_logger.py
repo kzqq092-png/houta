@@ -87,7 +87,7 @@ class BaseLogManager(QObject):
                         open(handler.baseFilename, 'w').close()
             self.log_cleared.emit()
         except Exception as e:
-            self.logger(f"清除日志失败: {str(e)}")
+            self.logger.error(f"清除日志失败: {str(e)}")
 
     def handle_exception(self, e: Exception):
         """处理异常"""
@@ -96,7 +96,7 @@ class BaseLogManager(QObject):
             self.error(error_msg)
             self.exception_occurred.emit(e)
         except Exception as ex:
-            self.logger(f"处理异常失败: {str(ex)}")
+            self.logger.error(f"处理异常失败: {str(ex)}")
 
     def performance(self, message: str):
         """记录性能日志"""

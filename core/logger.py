@@ -12,6 +12,7 @@ from PyQt5.QtCore import pyqtSignal
 from utils.config_types import LoggingConfig
 from .base_logger import BaseLogManager, LogLevel
 import inspect
+from utils.trace_context import TraceIdFilter
 
 
 class LogManager(BaseLogManager):
@@ -100,6 +101,12 @@ class LogManager(BaseLogManager):
             ))
             self.logger.addHandler(console_handler)
 
+        # 日志格式增加trace_id
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(trace_id)s] %(name)s: %(message)s')
+        for handler in self.logger.handlers:
+            handler.setFormatter(formatter)
+            handler.addFilter(TraceIdFilter())
+
     def _async_log(self, message: str, level: LogLevel):
         """异步记录日志
 
@@ -156,7 +163,9 @@ class LogManager(BaseLogManager):
         # 拼接trace_id/request_id
         if trace_id or request_id:
             message = f"[trace_id={trace_id or ''}][request_id={request_id or ''}] {message}"
-        if self.config.async_logging:
+
+        # 检查配置是否存在且有效
+        if self.config and hasattr(self.config, 'async_logging') and self.config.async_logging:
             self._async_log(message, level)
         else:
             self._write_log(message, level)

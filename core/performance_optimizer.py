@@ -21,6 +21,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from core.logger import LogManager, LogLevel
+from utils.performance_monitor import measure_performance
 
 
 class OptimizationLevel(Enum):
@@ -230,6 +231,7 @@ class ParallelProcessor:
         self.thread_pool = None
         self.process_pool = None
 
+    @measure_performance("ParallelProcessor.process_parallel_threads")
     def process_parallel_threads(self, func: Callable, data_list: List[Any],
                                  **kwargs) -> List[Any]:
         """使用多线程并行处理"""
@@ -253,6 +255,7 @@ class ParallelProcessor:
 
         return results
 
+    @measure_performance("ParallelProcessor.process_parallel_processes")
     def process_parallel_processes(self, func: Callable, data_list: List[Any],
                                    **kwargs) -> List[Any]:
         """使用多进程并行处理"""

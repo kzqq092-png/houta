@@ -6,12 +6,104 @@
 
 import logging
 import pandas as pd
+import uuid
+import asyncio
 from typing import Dict, List, Optional, Any, Tuple
 from .base_service import CacheableService, ConfigurableService
 from ..events import ChartUpdateEvent, StockSelectedEvent
 
 
 logger = logging.getLogger(__name__)
+
+
+# 错误类型枚举
+class ErrorType:
+    DATA_LOAD_ERROR = "data_load_error"
+    RENDER_ERROR = "render_error"
+    UNKNOWN_ERROR = "unknown_error"
+
+
+# 错误处理器
+class ErrorHandler:
+    """错误处理器"""
+
+    def __init__(self):
+        self.error_callbacks = {}
+        self.error_history = []
+        self.max_history = 100
+
+    def handle_error(self, error_type: str, error_msg: str, callback=None, context=None):
+        """处理错误"""
+        error_info = {
+            'type': error_type,
+            'message': error_msg,
+            'timestamp': asyncio.get_event_loop().time(),
+            'context': context or {}
+        }
+
+        # 记录错误
+        self.error_history.append(error_info)
+        if len(self.error_history) > self.max_history:
+            self.error_history.pop(0)
+
+        # 调用错误回调
+        if callback:
+            try:
+                callback(error_info)
+            except Exception as e:
+                logger.error(f"Error in error callback: {e}")
+
+        # 调用注册的错误处理器
+        if error_type in self.error_callbacks:
+            for cb in self.error_callbacks[error_type]:
+                try:
+                    cb(error_info)
+                except Exception as e:
+                    logger.error(f"Error in registered error handler: {e}")
+
+    def register_error_handler(self, error_type: str, callback):
+        """注册错误处理器"""
+        if error_type not in self.error_callbacks:
+            self.error_callbacks[error_type] = []
+        self.error_callbacks[error_type].append(callback)
+
+    def get_error_history(self):
+        """获取错误历史"""
+        return self.error_history
+
+
+# 重试管理器
+class RetryManager:
+    """重试管理器"""
+
+    def __init__(self, max_retries=3, retry_delay=1.0):
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+
+    async def execute_with_retry(self, func, *args, **kwargs):
+        """执行带重试的函数"""
+        retries = 0
+        last_error = None
+
+        while retries < self.max_retries:
+            try:
+                return await func(*args, **kwargs)
+            except asyncio.CancelledError:
+                # 不重试取消的请求
+                raise
+            except Exception as e:
+                last_error = e
+                retries += 1
+                if retries < self.max_retries:
+                    logger.warning(f"Retry {retries}/{self.max_retries} after error: {e}")
+                    await asyncio.sleep(self.retry_delay * retries)
+                else:
+                    logger.error(f"Failed after {retries} retries: {e}")
+
+        # 所有重试都失败
+        if last_error:
+            raise last_error
+        return None
 
 
 class ChartService(CacheableService, ConfigurableService):
@@ -38,6 +130,14 @@ class ChartService(CacheableService, ConfigurableService):
         self._current_indicators = []
         self._current_stock_code = None
         self._chart_themes = {}
+
+        # 错误处理和重试
+        self.error_handler = ErrorHandler()
+        self.retry_manager = RetryManager(max_retries=3)
+
+        # 请求管理
+        self.active_requests = {}
+        self.request_lock = asyncio.Lock()
 
     def _do_initialize(self) -> None:
         """初始化图表服务"""
@@ -506,45 +606,148 @@ class ChartService(CacheableService, ConfigurableService):
             logger.error(f"Failed to export chart: {e}")
             return None
 
-    def _on_stock_selected(self, event: StockSelectedEvent) -> None:
-        """处理股票选择事件"""
+    async def _on_stock_selected(self, event: StockSelectedEvent) -> None:
+        """
+        处理股票选择事件
+
+        Args:
+            event: 股票选择事件
+        """
+        stock_code = event.stock_code
+        freq = event.period or self._current_period
+
+        request_id = str(uuid.uuid4())
+
+        # 取消之前的请求
+        await self._cancel_previous_requests()
+
         try:
-            stock_code = event.stock_code
+            # 发出图表加载开始信号
+            self.chart_loading_started.emit(stock_code)
 
-            # 避免重复处理相同股票
-            if self._current_stock_code == stock_code:
-                logger.debug(f"Chart service already handling {stock_code}, skipping")
+            # 使用重试管理器包装数据请求
+            data_manager = self._get_data_manager()
+            if not data_manager:
+                self.error_handler.handle_error(
+                    ErrorType.DATA_LOAD_ERROR,
+                    "Data manager not available",
+                    self._on_data_load_error,
+                    {'code': stock_code}
+                )
                 return
 
-            self._current_stock_code = stock_code
-
-            # 获取股票服务
-            stock_service = self._get_stock_service()
-            if not stock_service:
-                logger.warning("Stock service not available for chart update")
-                return
-
-            # 快速检查股票是否有数据（只检查1条数据）
-            try:
-                test_data = stock_service.get_stock_data(stock_code, period='D', count=1)
-                if test_data is None or test_data.empty:
-                    logger.warning(f"No data available for {stock_code}")
-                    return
-            except Exception as e:
-                logger.warning(f"Failed to check data for {stock_code}: {e}")
-                return
-
-            # 创建图表（使用较少的数据量进行初始化）
-            self.create_chart(
-                stock_code=stock_code,
-                chart_type=self._current_chart_type,
-                period=self._current_period,
-                indicators=self._current_indicators,
-                time_range=100  # 减少初始数据量
+            data = await self.retry_manager.execute_with_retry(
+                lambda: data_manager.get_stock_data(stock_code, freq, request_id=request_id)
             )
 
+            if data is None:
+                # 数据加载失败处理
+                self.error_handler.handle_error(
+                    ErrorType.DATA_LOAD_ERROR,
+                    f"Failed to load data for {stock_code}",
+                    self._on_data_load_error,
+                    {'code': stock_code}
+                )
+                return
+
+            # 数据加载成功，更新图表
+            self.chart_data_loaded.emit(stock_code, data)
+
+            # 预加载相关股票数据
+            self._preload_related_stocks(stock_code, freq)
+
+        except asyncio.CancelledError:
+            # 请求被取消
+            logger.info(f"Request for {stock_code} was cancelled")
+            self.chart_loading_cancelled.emit(stock_code)
         except Exception as e:
-            logger.error(f"Failed to handle stock selected event: {e}")
+            # 其他错误处理
+            logger.error(f"Error loading chart for {stock_code}: {e}")
+            self.error_handler.handle_error(
+                ErrorType.UNKNOWN_ERROR,
+                f"Error: {str(e)}",
+                self._on_unknown_error,
+                {'code': stock_code}
+            )
+
+    async def _cancel_previous_requests(self):
+        """取消之前的请求"""
+        async with self.request_lock:
+            for request_id, request_info in list(self.active_requests.items()):
+                data_manager = self._get_data_manager()
+                if data_manager and hasattr(data_manager, 'cancel_request'):
+                    data_manager.cancel_request(request_id)
+                    logger.debug(f"Cancelled previous request {request_id}")
+
+            # 清空请求列表
+            self.active_requests.clear()
+
+    def _on_data_load_error(self, error_info):
+        """处理数据加载错误"""
+        code = error_info.get('context', {}).get('code')
+        self.chart_loading_failed.emit(code, "Failed to load data")
+
+        # 显示用户友好的错误信息
+        self.show_error_message.emit(
+            "数据加载失败",
+            f"无法加载股票数据，请检查网络连接或稍后再试。\n详情: {error_info.get('message')}"
+        )
+
+    def _on_unknown_error(self, error_info):
+        """处理未知错误"""
+        code = error_info.get('context', {}).get('code')
+        self.chart_loading_failed.emit(code, f"Error: {error_info.get('message')}")
+
+        # 显示用户友好的错误信息
+        self.show_error_message.emit(
+            "发生错误",
+            f"处理请求时发生错误。\n详情: {error_info.get('message')}"
+        )
+
+    def _preload_related_stocks(self, code: str, freq: str):
+        """预加载相关股票数据"""
+        # 获取同行业股票
+        try:
+            industry_service = self._get_industry_service()
+            if not industry_service:
+                logger.warning("Industry service not available for preloading")
+                return
+
+            industry = industry_service.get_stock_industry(code)
+            if industry:
+                related_stocks = industry_service.get_stocks_by_industry(industry)
+                # 限制预加载数量
+                related_stocks = related_stocks[:5]  # 最多预加载5只
+
+                # 获取数据管理器
+                data_manager = self._get_data_manager()
+                if not data_manager or not hasattr(data_manager, 'preload_data'):
+                    return
+
+                # 低优先级预加载
+                for related_code in related_stocks:
+                    if related_code != code:  # 跳过当前股票
+                        data_manager.preload_data(related_code, freq, priority='low')
+
+                logger.debug(f"Preloaded {len(related_stocks)} related stocks for {code}")
+        except Exception as e:
+            logger.warning(f"Failed to preload related stocks: {e}")
+
+    def _get_data_manager(self):
+        """获取数据管理器"""
+        try:
+            return self.service_container.resolve('unified_data_manager')
+        except Exception as e:
+            logger.error(f"Failed to resolve data manager: {e}")
+            return None
+
+    def _get_industry_service(self):
+        """获取行业服务"""
+        try:
+            return self.service_container.resolve('industry_service')
+        except Exception as e:
+            logger.error(f"Failed to resolve industry service: {e}")
+            return None
 
     def _get_stock_service(self):
         """获取股票服务"""

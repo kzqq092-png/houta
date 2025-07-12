@@ -196,7 +196,7 @@ class TradingSystem:
             LogManager.log(f"计算交易信号失败: {str(e)}", LogLevel.ERROR)
             return []
 
-    @monitor_performance(name="run_backtest", threshold_ms=5000)
+    @monitor_performance(name="run_backtest")
     def run_backtest(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """运行回测
 

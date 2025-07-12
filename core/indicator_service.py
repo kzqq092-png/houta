@@ -775,3 +775,151 @@ INDICATOR_ALIASES = {
     'MACD指标': 'MACD',
     '布林带': 'BBANDS'
 }
+
+
+def get_indicator_categories() -> List[str]:
+    """
+    获取所有指标分类
+
+    返回:
+        List[str]: 分类名称列表
+    """
+    service = IndicatorService()
+    try:
+        categories = service.db.get_all_categories()
+        return [category.name for category in categories]
+    except Exception as e:
+        logger.error(f"获取指标分类失败: {e}")
+        return ['趋势指标', '震荡指标', '成交量指标', '动量指标', '波动率指标', '自定义指标']
+    finally:
+        service.close()
+
+
+def get_indicators_by_categories() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    获取按分类组织的所有指标
+
+    返回:
+        Dict[str, List[Dict]]: 分类名称到指标列表的映射
+    """
+    service = IndicatorService()
+    try:
+        categories = service.db.get_all_categories()
+        result = {}
+
+        for category in categories:
+            indicators = service.get_indicators_by_category(category.name)
+            result[category.name] = [
+                {
+                    'name': indicator.name,
+                    'display_name': indicator.display_name,
+                    'description': indicator.description,
+                    'formula': indicator.formula,
+                    'params': [param.to_dict() for param in indicator.parameters],
+                    'output_names': indicator.output_names
+                }
+                for indicator in indicators
+            ]
+
+        return result
+    except Exception as e:
+        logger.error(f"获取分类指标失败: {e}")
+        # 返回默认分类结构
+        return {
+            '趋势指标': [
+                {'name': 'MA', 'display_name': '移动平均线', 'description': '简单移动平均线'},
+                {'name': 'EMA', 'display_name': '指数移动平均线', 'description': '指数移动平均线'},
+                {'name': 'BBANDS', 'display_name': '布林带', 'description': '布林带指标'}
+            ],
+            '震荡指标': [
+                {'name': 'RSI', 'display_name': '相对强弱指标', 'description': '相对强弱指标'},
+                {'name': 'MACD', 'display_name': 'MACD', 'description': 'MACD指标'},
+                {'name': 'KDJ', 'display_name': 'KDJ', 'description': 'KDJ随机指标'}
+            ],
+            '成交量指标': [
+                {'name': 'OBV', 'display_name': '能量潮', 'description': '能量潮指标'}
+            ],
+            '动量指标': [
+                {'name': 'ROC', 'display_name': '变动率', 'description': '价格变动率指标'}
+            ]
+        }
+    finally:
+        service.close()
+
+
+def get_talib_category() -> Dict[str, List[str]]:
+    """
+    获取TA-Lib指标分类
+
+    返回:
+        Dict[str, List[str]]: TA-Lib指标分类
+    """
+    if not TALIB_AVAILABLE:
+        return {}
+
+    try:
+        # TA-Lib指标分类
+        talib_categories = {
+            '重叠研究': [
+                'BBANDS', 'DEMA', 'EMA', 'HT_TRENDLINE', 'KAMA', 'MA', 'MAMA',
+                'MAVP', 'MIDPOINT', 'MIDPRICE', 'SAR', 'SAREXT', 'SMA', 'T3',
+                'TEMA', 'TRIMA', 'WMA'
+            ],
+            '动量指标': [
+                'ADX', 'ADXR', 'APO', 'AROON', 'AROONOSC', 'BOP', 'CCI', 'CMO',
+                'DX', 'MACD', 'MACDEXT', 'MACDFIX', 'MFI', 'MINUS_DI', 'MINUS_DM',
+                'MOM', 'PLUS_DI', 'PLUS_DM', 'PPO', 'ROC', 'ROCP', 'ROCR',
+                'ROCR100', 'RSI', 'STOCH', 'STOCHF', 'STOCHRSI', 'TRIX',
+                'ULTOSC', 'WILLR'
+            ],
+            '成交量指标': [
+                'AD', 'ADOSC', 'OBV'
+            ],
+            '波动率指标': [
+                'ATR', 'NATR', 'TRANGE'
+            ],
+            '价格变换': [
+                'AVGPRICE', 'MEDPRICE', 'TYPPRICE', 'WCLPRICE'
+            ],
+            '周期指标': [
+                'HT_DCPERIOD', 'HT_DCPHASE', 'HT_PHASOR', 'HT_SINE', 'HT_TRENDMODE'
+            ],
+            '模式识别': [
+                'CDL2CROWS', 'CDL3BLACKCROWS', 'CDL3INSIDE', 'CDL3LINESTRIKE',
+                'CDL3OUTSIDE', 'CDL3STARSINSOUTH', 'CDL3WHITESOLDIERS',
+                'CDLABANDONEDBABY', 'CDLADVANCEBLOCK', 'CDLBELTHOLD',
+                'CDLBREAKAWAY', 'CDLCLOSINGMARUBOZU', 'CDLCONCEALBABYSWALL',
+                'CDLCOUNTERATTACK', 'CDLDARKCLOUDCOVER', 'CDLDOJI',
+                'CDLDOJISTAR', 'CDLDRAGONFLYDOJI', 'CDLENGULFING',
+                'CDLEVENINGDOJISTAR', 'CDLEVENINGSTAR', 'CDLGAPSIDESIDEWHITE',
+                'CDLGRAVESTONEDOJI', 'CDLHAMMER', 'CDLHANGINGMAN',
+                'CDLHARAMI', 'CDLHARAMICROSS', 'CDLHIGHWAVE', 'CDLHIKKAKE',
+                'CDLHIKKAKEMOD', 'CDLHOMINGPIGEON', 'CDLIDENTICAL3CROWS',
+                'CDLINNECK', 'CDLINVERTEDHAMMER', 'CDLKICKING',
+                'CDLKICKINGBYLENGTH', 'CDLLADDERBOTTOM', 'CDLLONGLEGGEDDOJI',
+                'CDLLONGLINE', 'CDLMARUBOZU', 'CDLMATCHINGLOW',
+                'CDLMATHOLD', 'CDLMORNINGDOJISTAR', 'CDLMORNINGSTAR',
+                'CDLONNECK', 'CDLPIERCING', 'CDLRICKSHAWMAN', 'CDLRISEFALL3METHODS',
+                'CDLSEPARATINGLINES', 'CDLSHOOTINGSTAR', 'CDLSHORTLINE',
+                'CDLSPINNINGTOP', 'CDLSTALLEDPATTERN', 'CDLSTICKSANDWICH',
+                'CDLTAKURI', 'CDLTASUKIGAP', 'CDLTHRUSTING', 'CDLTRISTAR',
+                'CDLUNIQUE3RIVER', 'CDLUPSIDEGAP2CROWS', 'CDLXSIDEGAP3METHODS'
+            ],
+            '统计函数': [
+                'BETA', 'CORREL', 'LINEARREG', 'LINEARREG_ANGLE', 'LINEARREG_INTERCEPT',
+                'LINEARREG_SLOPE', 'STDDEV', 'TSF', 'VAR'
+            ],
+            '数学变换': [
+                'ACOS', 'ASIN', 'ATAN', 'CEIL', 'COS', 'COSH', 'EXP', 'FLOOR',
+                'LN', 'LOG10', 'SIN', 'SINH', 'SQRT', 'TAN', 'TANH'
+            ],
+            '数学运算': [
+                'ADD', 'DIV', 'MAX', 'MAXINDEX', 'MIN', 'MININDEX', 'MINMAX',
+                'MINMAXINDEX', 'MULT', 'SUB', 'SUM'
+            ]
+        }
+
+        return talib_categories
+    except Exception as e:
+        logger.error(f"获取TA-Lib分类失败: {e}")
+        return {}

@@ -9,6 +9,7 @@ import logging
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 import numpy as np
 from datetime import datetime, timedelta
+import time  # Added for loading time tracking
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -21,18 +22,20 @@ from PyQt5.QtGui import QFont, QIcon
 from .base_panel import BasePanel
 from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent
 from core.services.unified_chart_service import get_unified_chart_service, create_chart_widget, ChartDataLoader, ChartWidget
+from optimization.progressive_loading_manager import get_progressive_loader, LoadingStage
+from optimization.update_throttler import get_update_throttler
 
 logger = logging.getLogger(__name__)
 
 # 导入性能监控
 try:
-    from monitor_chart_performance import chart_monitor, monitor_chart_load
+    from utils.performance_monitor import monitor_performance, get_performance_monitor
     PERFORMANCE_MONITORING = True
     logger.info("图表性能监控已启用")
 except ImportError:
     PERFORMANCE_MONITORING = False
 
-    def monitor_chart_load(func):
+    def monitor_performance(func):
         return func  # 无监控装饰器
 
 if TYPE_CHECKING:
@@ -47,6 +50,9 @@ class ChartCanvas(QWidget):
 
     # 定义信号
     request_stat_dialog = pyqtSignal(tuple)  # (start_idx, end_idx)
+    loading_state_changed = pyqtSignal(bool, str)  # (is_loading, message)
+    loading_error = pyqtSignal(str)  # (error_message)
+    loading_progress = pyqtSignal(int, str)  # (progress_percent, stage_name)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -74,6 +80,10 @@ class ChartCanvas(QWidget):
             # 连接信号
             self.chart_widget.request_stat_dialog.connect(self.request_stat_dialog.emit)
             self.chart_widget.error_occurred.connect(self._on_chart_error)
+
+            # 添加进度信号连接
+            if hasattr(self.chart_widget, 'loading_progress'):
+                self.chart_widget.loading_progress.connect(self.loading_progress.emit)
         else:
             # 创建错误占位符
             placeholder = QLabel("图表控件创建失败")
@@ -91,12 +101,145 @@ class ChartCanvas(QWidget):
         self.selection_end = None
         self.selecting = False
 
+        # 加载状态
+        self.is_loading = False
+        self.loading_stage = 0
+        self.loading_start_time = 0
+
+        # 创建加载骨架屏
+        self._create_loading_skeleton()
+
+        # 获取渐进式加载管理器
+        try:
+            self.progressive_loader = get_progressive_loader()
+        except:
+            logger.warning("渐进式加载管理器不可用")
+            self.progressive_loader = None
+
+        # 获取更新节流器
+        try:
+            self.update_throttler = get_update_throttler()
+        except:
+            logger.warning("更新节流器不可用")
+            self.update_throttler = None
+
+        # 获取性能监控器
+        if PERFORMANCE_MONITORING:
+            try:
+                self.performance_monitor = get_performance_monitor()
+            except:
+                logger.warning("性能监控器不可用")
+                self.performance_monitor = None
+        else:
+            self.performance_monitor = None
+
+    def _create_loading_skeleton(self):
+        """创建加载骨架屏"""
+        # 骨架屏容器
+        self.skeleton_frame = QFrame(self)
+        self.skeleton_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(245, 245, 245, 0.8);
+                border-radius: 5px;
+            }
+            QLabel {
+                color: #666;
+                font-size: 14px;
+            }
+            QProgressBar {
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                background-color: #f5f5f5;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #007bff;
+                width: 10px;
+                margin: 0.5px;
+            }
+        """)
+        self.skeleton_frame.setVisible(False)
+
+        # 骨架屏布局
+        skeleton_layout = QVBoxLayout(self.skeleton_frame)
+        skeleton_layout.setAlignment(Qt.AlignCenter)
+
+        # 标题
+        self.loading_title = QLabel("正在加载图表...", self.skeleton_frame)
+        self.loading_title.setAlignment(Qt.AlignCenter)
+        self.loading_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #333;")
+        skeleton_layout.addWidget(self.loading_title)
+
+        # 加载指示器
+        self.loading_indicator = QLabel("正在加载基础数据...", self.skeleton_frame)
+        self.loading_indicator.setAlignment(Qt.AlignCenter)
+        skeleton_layout.addWidget(self.loading_indicator)
+
+        # 进度条
+        self.loading_progress_bar = QProgressBar(self.skeleton_frame)
+        self.loading_progress_bar.setRange(0, 100)
+        self.loading_progress_bar.setValue(0)
+        self.loading_progress_bar.setTextVisible(True)
+        self.loading_progress_bar.setMinimumWidth(300)
+        self.loading_progress_bar.setMaximumHeight(15)
+        skeleton_layout.addWidget(self.loading_progress_bar)
+
+        # 阶段指示器
+        self.stage_indicators = []
+        stages_layout = QHBoxLayout()
+        stages_layout.setAlignment(Qt.AlignCenter)
+        stages_layout.setSpacing(10)
+
+        stage_names = ["基础K线", "成交量", "基础指标", "高级指标", "装饰元素"]
+        for i, name in enumerate(stage_names):
+            indicator = QLabel(name)
+            indicator.setStyleSheet("color: #999; font-size: 12px;")
+            indicator.setAlignment(Qt.AlignCenter)
+            indicator.setMinimumWidth(60)
+            stages_layout.addWidget(indicator)
+            self.stage_indicators.append(indicator)
+
+        skeleton_layout.addLayout(stages_layout)
+
+        # 错误消息
+        self.error_label = QLabel("", self.skeleton_frame)
+        self.error_label.setStyleSheet("color: #dc3545;")
+        self.error_label.setAlignment(Qt.AlignCenter)
+        self.error_label.setVisible(False)
+        skeleton_layout.addWidget(self.error_label)
+
+        # 取消按钮
+        self.cancel_button = QPushButton("取消加载", self.skeleton_frame)
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                padding: 5px 10px;
+                color: #666;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        self.cancel_button.setMaximumWidth(100)
+        self.cancel_button.clicked.connect(self._cancel_loading)
+        skeleton_layout.addWidget(self.cancel_button, 0, Qt.AlignCenter)
+
+        # 添加到主布局
+        self.layout().addWidget(self.skeleton_frame)
+
+        # 创建加载计时器
+        self.loading_timer = QTimer(self)
+        self.loading_timer.timeout.connect(self._update_loading_time)
+        self.loading_time = 0
+
     def _setup_chart(self):
         """设置图表布局 - 使用统一图表服务"""
         # 图表布局由ChartWidget自动管理
         pass
 
-    @monitor_chart_load
+    @monitor_performance("chart_update")
     def update_chart(self, stock_data: Dict[str, Any]):
         """更新图表数据 - 使用统一图表服务"""
         try:
@@ -131,8 +274,29 @@ class ChartCanvas(QWidget):
                 self._show_no_data_message()
                 return
 
-            # 使用统一图表服务更新图表
-            if self.chart_widget:
+            # 使用渐进式加载管理器更新图表
+            if self.progressive_loader and self.chart_widget:
+                # 转换数据格式为ChartWidget期望的格式
+                chart_data = {
+                    'kdata': self.current_kdata,
+                    'stock_code': self.current_stock,
+                    'indicators': stock_data.get('indicators_data', stock_data.get('indicators', {})),
+                    'title': stock_data.get('stock_name', self.current_stock)
+                }
+
+                # 启动加载计时器
+                self.loading_time = 0
+                self.loading_timer.start(100)  # 100ms更新一次
+                self.loading_start_time = time.time()
+
+                # 使用渐进式加载
+                self.progressive_loader.load_chart_progressive(self.chart_widget, chart_data['kdata'], chart_data['indicators'])
+
+                # 注册加载进度回调
+                if hasattr(self.chart_widget, 'set_loading_callback'):
+                    self.chart_widget.set_loading_callback(self._on_loading_progress)
+            # 回退到普通更新
+            elif self.chart_widget:
                 # 转换数据格式为ChartWidget期望的格式
                 chart_data = {
                     'kdata': self.current_kdata,
@@ -148,90 +312,236 @@ class ChartCanvas(QWidget):
             logger.error(f"Failed to update chart: {e}")
             self._show_error_message(str(e))
 
-    # 移除旧的matplotlib绘制方法，使用统一图表服务
+    def _update_loading_time(self):
+        """更新加载时间"""
+        self.loading_time += 0.1
+        if self.loading_time > 10:  # 超过10秒，停止计时
+            self.loading_timer.stop()
+
+    def show_loading_skeleton(self):
+        """显示加载骨架屏"""
+        if hasattr(self, 'skeleton_frame'):
+            self.is_loading = True
+            self.loading_stage = 0
+            self.loading_progress_bar.setValue(0)
+            self.loading_indicator.setText("正在加载数据...")
+            self.error_label.setVisible(False)
+            self.skeleton_frame.setVisible(True)
+
+            # 重置阶段指示器
+            for indicator in self.stage_indicators:
+                indicator.setStyleSheet("color: #999; font-size: 12px;")
+
+            # 启动加载计时器
+            self.loading_time = 0
+            self.loading_timer.start(100)  # 100ms更新一次
+            self.loading_start_time = time.time()
+
+            self.loading_state_changed.emit(True, "正在加载数据...")
+
+    def hide_loading_skeleton(self):
+        """隐藏加载骨架屏"""
+        if hasattr(self, 'skeleton_frame'):
+            self.is_loading = False
+            self.skeleton_frame.setVisible(False)
+            self.loading_timer.stop()
+
+            # 记录加载时间
+            if PERFORMANCE_MONITORING and self.performance_monitor:
+                total_time = time.time() - self.loading_start_time
+                self.performance_monitor.record_time("chart_loading_total", total_time)
+
+            self.loading_state_changed.emit(False, "")
+
+    def update_loading_progress(self, progress: int, message: str = None):
+        """更新加载进度"""
+        if hasattr(self, 'loading_progress_bar'):
+            self.loading_progress_bar.setValue(progress)
+            if message:
+                self.loading_indicator.setText(message)
+
+            # 发送进度信号
+            self.loading_progress.emit(progress, message or "")
+
+            # 更新阶段指示器
+            stage = min(len(self.stage_indicators) - 1, progress // 20)
+            if stage >= 0:
+                # 将当前阶段设为高亮
+                for i, indicator in enumerate(self.stage_indicators):
+                    if i < stage:
+                        indicator.setStyleSheet("color: #28a745; font-size: 12px; font-weight: bold;")
+                    elif i == stage:
+                        indicator.setStyleSheet("color: #007bff; font-size: 12px; font-weight: bold;")
+                    else:
+                        indicator.setStyleSheet("color: #999; font-size: 12px;")
+
+                self.loading_stage = stage
+
+    def update_chart_frame(self):
+        """更新图表框架（在数据加载前）"""
+        if self.chart_widget and hasattr(self.chart_widget, 'update_chart_frame'):
+            self.chart_widget.update_chart_frame()
+        else:
+            # 显示骨架屏作为替代
+            self.show_loading_skeleton()
+
+    def update_basic_kdata(self, kdata):
+        """更新基础K线数据（第一阶段）"""
+        if self.chart_widget and hasattr(self.chart_widget, 'update_basic_kdata'):
+            self.chart_widget.update_basic_kdata(kdata)
+            self.update_loading_progress(20, "正在加载K线数据...")
+
+            # 记录性能指标
+            if PERFORMANCE_MONITORING and self.performance_monitor:
+                self.performance_monitor.record_time("chart_loading_basic_kdata",
+                                                     time.time() - self.loading_start_time)
+        else:
+            # 使用普通更新
+            self.update_chart({'kdata': kdata})
+
+    def update_volume(self, kdata):
+        """更新成交量数据（第二阶段）"""
+        if self.chart_widget and hasattr(self.chart_widget, 'update_volume'):
+            self.chart_widget.update_volume(kdata)
+            self.update_loading_progress(40, "正在加载成交量数据...")
+
+            # 记录性能指标
+            if PERFORMANCE_MONITORING and self.performance_monitor:
+                self.performance_monitor.record_time("chart_loading_volume",
+                                                     time.time() - self.loading_start_time)
+        else:
+            # 使用普通更新
+            self.update_chart({'kdata': kdata})
+
+    def update_indicators(self, kdata, indicators):
+        """更新指标数据（第三阶段）"""
+        if self.chart_widget and hasattr(self.chart_widget, 'update_indicators'):
+            self.chart_widget.update_indicators(kdata, indicators)
+            self.update_loading_progress(80, "正在加载指标数据...")
+
+            # 记录性能指标
+            if PERFORMANCE_MONITORING and self.performance_monitor:
+                self.performance_monitor.record_time("chart_loading_indicators",
+                                                     time.time() - self.loading_start_time)
+        else:
+            # 使用普通更新
+            chart_data = {'kdata': kdata, 'indicators': indicators}
+            self.update_chart(chart_data)
+
+    def _on_loading_progress(self, progress, stage_name):
+        """处理加载进度更新"""
+        self.update_loading_progress(progress, stage_name)
+
+        # 完成后隐藏骨架屏
+        if progress >= 100:
+            QTimer.singleShot(500, self.hide_loading_skeleton)
+
+    def _cancel_loading(self):
+        """取消加载"""
+        if self.chart_widget and hasattr(self.chart_widget, 'cancel_loading'):
+            self.chart_widget.cancel_loading()
+
+        self.hide_loading_skeleton()
+        self._show_error_message("加载已取消")
+
+    def show_loading_error(self, error_msg: str):
+        """显示加载错误"""
+        if hasattr(self, 'error_label'):
+            self.error_label.setText(error_msg)
+            self.error_label.setVisible(True)
+            self.loading_indicator.setText("加载失败")
+            self.loading_progress_bar.setStyleSheet("""
+                QProgressBar::chunk {
+                    background-color: #dc3545;
+                }
+            """)
+
+            # 发送错误信号
+            self.loading_error.emit(error_msg)
 
     def _show_no_data_message(self):
         """显示无数据消息"""
-        if self.chart_widget:
-            # 通过图表控件显示无数据消息
-            self.chart_widget.show_message("暂无数据", "info")
+        if hasattr(self, 'chart_widget') and self.chart_widget:
+            # 清空图表
+            if hasattr(self.chart_widget, 'clear_chart'):
+                self.chart_widget.clear_chart()
+
+            # 显示无数据消息
+            if hasattr(self.chart_widget, 'show_message'):
+                self.chart_widget.show_message("没有可用数据")
         else:
-            logger.warning("无数据显示")
+            # 显示错误消息
+            self.show_loading_error("没有可用数据")
 
     def _show_error_message(self, error_msg: str):
         """显示错误消息"""
-        try:
-            if hasattr(self.chart_widget, 'show_message'):
-                self.chart_widget.show_message(f"错误: {error_msg}", "error")
-            elif hasattr(self.chart_widget, 'set_title'):
-                # 降级：使用标题显示错误
-                self.chart_widget.set_title(f"错误: {error_msg}")
-            else:
-                # 最后降级：在控制台输出
-                print(f"图表错误: {error_msg}")
+        logger.error(f"图表错误: {error_msg}")
 
-        except Exception as e:
-            print(f"显示错误消息失败: {e}")
-            print(f"原始错误: {error_msg}")
+        if hasattr(self, 'chart_widget') and self.chart_widget:
+            # 显示错误消息
+            if hasattr(self.chart_widget, 'show_error'):
+                self.chart_widget.show_error(error_msg)
+            elif hasattr(self.chart_widget, 'show_message'):
+                self.chart_widget.show_message(f"错误: {error_msg}")
+
+        # 更新骨架屏
+        self.show_loading_error(error_msg)
 
     def _show_loading_message(self):
         """显示加载消息"""
-        try:
-            if hasattr(self.chart_widget, 'show_message'):
-                self.chart_widget.show_message("正在加载数据...", "info")
-            elif hasattr(self.chart_widget, 'set_title'):
-                # 降级：使用标题显示加载状态
-                self.chart_widget.set_title("正在加载数据...")
-            else:
-                # 最后降级：在控制台输出
-                print("正在加载图表数据...")
+        if hasattr(self, 'chart_widget') and self.chart_widget:
+            # 显示加载消息
+            if hasattr(self.chart_widget, 'show_loading'):
+                self.chart_widget.show_loading()
+            elif hasattr(self.chart_widget, 'show_message'):
+                self.chart_widget.show_message("正在加载...")
 
-        except Exception as e:
-            print(f"显示加载消息失败: {e}")
+        # 显示骨架屏
+        self.show_loading_skeleton()
 
     def _clear_error_message(self):
         """清除错误消息"""
-        try:
-            if hasattr(self.chart_widget, 'clear_message'):
-                self.chart_widget.clear_message()
-            elif hasattr(self.chart_widget, 'set_title'):
-                # 降级：恢复默认标题
-                self.chart_widget.set_title("")
+        if hasattr(self, 'error_label'):
+            self.error_label.setText("")
+            self.error_label.setVisible(False)
 
-        except Exception as e:
-            print(f"清除错误消息失败: {e}")
+        if hasattr(self, 'loading_progress_bar'):
+            self.loading_progress_bar.setStyleSheet("""
+                QProgressBar::chunk {
+                    background-color: #007bff;
+                }
+            """)
 
     def _on_chart_error(self, error_msg: str):
         """处理图表错误"""
-        logger.error(f"图表错误: {error_msg}")
         self._show_error_message(error_msg)
 
     def mousePressEvent(self, event):
-        """鼠标按下事件 - 委托给图表控件"""
-        if self.chart_widget:
+        """鼠标按下事件"""
+        super().mousePressEvent(event)
+        # 将事件传递给图表控件
+        if hasattr(self, 'chart_widget') and self.chart_widget:
             self.chart_widget.mousePressEvent(event)
-        else:
-            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        """鼠标移动事件 - 委托给图表控件"""
-        if self.chart_widget:
+        """鼠标移动事件"""
+        super().mouseMoveEvent(event)
+        # 将事件传递给图表控件
+        if hasattr(self, 'chart_widget') and self.chart_widget:
             self.chart_widget.mouseMoveEvent(event)
-        else:
-            super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """鼠标释放事件 - 委托给图表控件"""
-        if self.chart_widget:
+        """鼠标释放事件"""
+        super().mouseReleaseEvent(event)
+        # 将事件传递给图表控件
+        if hasattr(self, 'chart_widget') and self.chart_widget:
             self.chart_widget.mouseReleaseEvent(event)
-        else:
-            super().mouseReleaseEvent(event)
 
     def _get_selection_indices(self):
-        """获取选择区间的数据索引 - 委托给图表控件"""
-        if self.chart_widget and hasattr(self.chart_widget, '_get_selection_indices'):
-            return self.chart_widget._get_selection_indices()
-        return None, None
+        """获取选择区间的索引"""
+        if hasattr(self, 'chart_widget') and self.chart_widget:
+            return self.chart_widget.get_selection_indices()
+        return None
 
 
 class MiddlePanel(BasePanel):

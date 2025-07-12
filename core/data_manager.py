@@ -21,7 +21,11 @@ import sqlite3
 import os
 from core.industry_manager import IndustryManager
 from utils.log_util import log_structured
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
 # import ptvsd
+from utils.performance_monitor import measure_performance
 
 DB_PATH = os.path.join(os.path.dirname(
     os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
@@ -39,6 +43,11 @@ class DataManager:
         self._data_sources = {}  # 兼容多数据源逻辑
         self.industry_manager = IndustryManager(
             log_manager=self.log_manager)  # 行业管理器
+
+        # 添加异步处理支持
+        self._async_executor = ThreadPoolExecutor(max_workers=4)
+        self._data_loading_queue = asyncio.Queue() if hasattr(asyncio, 'Queue') else None
+
         # 自动加载和更新行业数据
         try:
             log_structured(self.log_manager, "load_industry_cache", level="info", status="start")
@@ -51,6 +60,198 @@ class DataManager:
         except Exception as e:
             if self.log_manager:
                 log_structured(self.log_manager, "industry_init", level="warning", status="fail", error=str(e))
+
+    async def get_k_data_async(self, code: str, freq: str = 'D',
+                               start_date: Optional[str] = None,
+                               end_date: Optional[str] = None,
+                               query: Optional[Any] = None,
+                               **kwargs) -> pd.DataFrame:
+        """异步获取K线数据，避免阻塞UI线程
+
+        Args:
+            code: 股票代码
+            freq: 频率
+            start_date: 开始日期
+            end_date: 结束日期
+            query: 查询对象
+            **kwargs: 其他参数
+
+        Returns:
+            pd.DataFrame: K线数据
+        """
+        try:
+            # 首先检查缓存
+            cache_key = f"kdata_{code}_{freq}_{start_date}_{end_date}_{str(query)}"
+            cached_data = self.cache_manager.get(cache_key)
+            if cached_data is not None and not cached_data.empty:
+                if 'code' not in cached_data.columns:
+                    cached_data = cached_data.copy()
+                    cached_data['code'] = code
+                return cached_data
+
+            # 使用线程池执行同步的数据获取操作
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._async_executor,
+                self.get_k_data,
+                code, freq, start_date, end_date, query
+            )
+
+            return result
+
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"异步获取K线数据失败: {str(e)}")
+            return pd.DataFrame()
+
+    async def get_stock_list_async(self, market: str = 'all') -> pd.DataFrame:
+        """异步获取股票列表
+
+        Args:
+            market: 市场类型
+
+        Returns:
+            pd.DataFrame: 股票列表
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._async_executor,
+                self.get_stock_list,
+                market
+            )
+            return result
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"异步获取股票列表失败: {str(e)}")
+            return pd.DataFrame()
+
+    async def get_realtime_quotes_async(self, codes: List[str]) -> pd.DataFrame:
+        """异步获取实时行情
+
+        Args:
+            codes: 股票代码列表
+
+        Returns:
+            pd.DataFrame: 实时行情数据
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._async_executor,
+                self.get_realtime_quotes,
+                codes
+            )
+            return result
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"异步获取实时行情失败: {str(e)}")
+            return pd.DataFrame()
+
+    def preload_data(self, codes: List[str], freq: str = 'D', priority: int = 1):
+        """预加载数据到缓存
+
+        Args:
+            codes: 股票代码列表
+            freq: 频率
+            priority: 优先级 (1=高, 2=中, 3=低)
+        """
+        try:
+            # 创建预加载任务
+            for code in codes:
+                cache_key = f"kdata_{code}_{freq}_None_None_None"
+                if not self.cache_manager.get(cache_key):
+                    # 只预加载缓存中没有的数据
+                    self._async_executor.submit(
+                        self._preload_single_stock,
+                        code, freq, priority
+                    )
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.warning(f"预加载数据失败: {str(e)}")
+
+    def _preload_single_stock(self, code: str, freq: str, priority: int):
+        """预加载单个股票数据"""
+        try:
+            # 根据优先级调整处理
+            if priority > 2:
+                time.sleep(0.1)  # 低优先级任务稍作延迟
+
+            data = self.get_k_data(code, freq)
+            if not data.empty:
+                if self.log_manager:
+                    self.log_manager.debug(f"预加载完成: {code}")
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.warning(f"预加载股票 {code} 失败: {str(e)}")
+
+
+class AsyncDataManagerWrapper(QObject):
+    """异步数据管理器包装器，提供Qt信号支持"""
+
+    data_loaded = pyqtSignal(str, object)  # code, data
+    error_occurred = pyqtSignal(str, str)  # code, error_message
+    progress_updated = pyqtSignal(int, str)  # progress, message
+
+    def __init__(self, data_manager: DataManager):
+        super().__init__()
+        self.data_manager = data_manager
+        self._load_tasks = {}  # 跟踪加载任务
+
+    def load_data_async(self, code: str, freq: str = 'D',
+                        start_date: Optional[str] = None,
+                        end_date: Optional[str] = None):
+        """异步加载数据并发出信号"""
+
+        class LoadWorker(QThread):
+            finished = pyqtSignal(str, object)
+            error = pyqtSignal(str, str)
+            progress = pyqtSignal(int, str)
+
+            def __init__(self, data_manager, code, freq, start_date, end_date):
+                super().__init__()
+                self.data_manager = data_manager
+                self.code = code
+                self.freq = freq
+                self.start_date = start_date
+                self.end_date = end_date
+
+            @measure_performance("LoadWorker.run")
+            def run(self):
+                try:
+                    self.progress.emit(10, f"开始加载 {self.code} 数据...")
+
+                    data = self.data_manager.get_k_data(
+                        self.code, self.freq, self.start_date, self.end_date
+                    )
+
+                    self.progress.emit(100, f"加载 {self.code} 完成")
+                    self.finished.emit(self.code, data)
+
+                except Exception as e:
+                    self.error.emit(self.code, str(e))
+
+        # 创建并启动工作线程
+        worker = LoadWorker(self.data_manager, code, freq, start_date, end_date)
+        worker.finished.connect(self.data_loaded.emit)
+        worker.error.connect(self.error_occurred.emit)
+        worker.progress.connect(self.progress_updated.emit)
+
+        # 保存任务引用，防止被垃圾回收
+        self._load_tasks[code] = worker
+        worker.finished.connect(lambda: self._load_tasks.pop(code, None))
+        worker.error.connect(lambda: self._load_tasks.pop(code, None))
+
+        worker.start()
+
+    def cancel_loading(self, code: str):
+        """取消加载任务"""
+        if code in self._load_tasks:
+            worker = self._load_tasks[code]
+            if worker.isRunning():
+                worker.terminate()
+                worker.wait()
+            self._load_tasks.pop(code, None)
 
     def get_config(self, key: str, default=None):
         cursor = self.conn.cursor()

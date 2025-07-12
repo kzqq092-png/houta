@@ -4,9 +4,9 @@ import time
 import psutil
 from typing import Optional
 
-from ..event_bus import EventBus
-from .events import SystemResourceUpdated
-from ..config import config_manager
+from core.metrics import SystemResourceUpdated
+from core.events.event_bus import EventBus
+from core.config import config_manager
 
 
 class SystemResourceService:

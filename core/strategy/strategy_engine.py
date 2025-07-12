@@ -19,6 +19,7 @@ from core.adapters import get_logger, get_config, get_performance_monitor
 from .base_strategy import BaseStrategy, StrategySignal
 from .strategy_registry import get_strategy_registry
 from .strategy_database import get_strategy_database_manager
+from utils.performance_monitor import measure_performance
 
 
 class StrategyCache:
@@ -333,6 +334,7 @@ class StrategyEngine:
         self.logger.info(f"批量执行策略完成: {len(results)}个结果")
         return results
 
+    @measure_performance("StrategyEngine.execute_strategies_parallel")
     def execute_strategies_parallel(self, strategies_data: List[Tuple[str, pd.DataFrame]],
                                     use_cache: bool = True, save_to_db: bool = True) -> Dict[str, Tuple[List[StrategySignal], Dict[str, Any]]]:
         """

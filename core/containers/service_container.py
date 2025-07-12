@@ -241,6 +241,116 @@ class ServiceContainer:
         """
         return self._registry.get_all_services()
 
+    def auto_wire(self, cls: Type[T], *args, **kwargs) -> T:
+        """
+        自动装配类实例
+
+        根据类的构造函数参数，自动从容器中注入依赖。
+        这个功能来自于原始的core/service_container.py实现。
+
+        Args:
+            cls: 要实例化的类
+            *args: 位置参数
+            **kwargs: 关键字参数
+
+        Returns:
+            实例化的对象
+        """
+        import inspect
+
+        # 获取构造函数的参数
+        sig = inspect.signature(cls.__init__)
+        params = list(sig.parameters.values())[1:]  # 跳过self参数
+
+        # 尝试从容器中获取依赖
+        injected_kwargs = {}
+        for param in params:
+            if param.name not in kwargs:
+                # 尝试按类型解析
+                if param.annotation != inspect.Parameter.empty:
+                    try:
+                        dependency = self.resolve(param.annotation)
+                        injected_kwargs[param.name] = dependency
+                    except:
+                        # 如果按类型解析失败，尝试按名称解析
+                        if self._registry.get_service_info_by_name(param.name):
+                            injected_kwargs[param.name] = self.resolve_by_name(param.name)
+
+        # 合并参数
+        final_kwargs = {**injected_kwargs, **kwargs}
+
+        return cls(*args, **final_kwargs)
+
+    # 兼容旧的API
+    def has(self, name: str) -> bool:
+        """
+        检查是否有服务（兼容旧API）
+
+        Args:
+            name: 服务名称
+
+        Returns:
+            是否存在服务
+        """
+        service_info = self._registry.get_service_info_by_name(name)
+        return service_info is not None
+
+    def get(self, name: str) -> Any:
+        """
+        根据名称获取服务（兼容旧API）
+
+        Args:
+            name: 服务名称
+
+        Returns:
+            服务实例
+        """
+        return self.resolve_by_name(name)
+
+    def remove(self, name: str) -> bool:
+        """
+        移除服务（兼容旧API）
+
+        Args:
+            name: 服务名称
+
+        Returns:
+            是否成功移除
+        """
+        # 这个功能需要在ServiceRegistry中实现
+        # 暂时返回False
+        logger.warning(f"Remove service '{name}' is not implemented in new architecture")
+        return False
+
+    def clear(self) -> None:
+        """
+        清空所有服务（兼容旧API）
+        """
+        self.dispose()
+
+    def get_service_names(self) -> List[str]:
+        """
+        获取所有已注册的服务名称（兼容旧API）
+
+        Returns:
+            服务名称列表
+        """
+        services = self._registry.get_all_services()
+        return [s.name for s in services if s.name]
+
+    def initialize_all(self) -> None:
+        """
+        初始化所有已注册的服务（兼容旧API）
+        """
+        for service_info in self._registry.get_all_services():
+            try:
+                service = self.resolve(service_info.service_type)
+                if service and hasattr(service, 'initialize'):
+                    service.initialize()
+                    logger.debug(f"Service initialized: {service_info.name or service_info.service_type.__name__}")
+            except Exception as e:
+                logger.error(f"Failed to initialize service {service_info.name or service_info.service_type.__name__}: {e}")
+
     def _get_singleton(self, service_info: ServiceInfo) -> Any:
         """获取单例实例"""
         if service_info.service_type in self._instances:

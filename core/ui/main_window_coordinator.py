@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from core.services.service_container import ServiceContainer
+from core.containers.service_container import ServiceContainer
 from core.logger import get_logger
 
 

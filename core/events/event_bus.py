@@ -8,6 +8,7 @@ import asyncio
 import logging
 import threading
 import weakref
+import time
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 from .events import BaseEvent
@@ -36,15 +37,17 @@ class EventBus:
     2. 异步事件处理
     3. 错误处理和恢复
     4. 性能监控和统计
+    5. 事件去重机制
     """
 
-    def __init__(self, async_execution: bool = False, max_workers: int = 4):
+    def __init__(self, async_execution: bool = False, max_workers: int = 4, deduplication_window: float = 0.5):
         """
         初始化事件总线
 
         Args:
             async_execution: 是否异步执行事件处理器
             max_workers: 异步执行时的最大工作线程数
+            deduplication_window: 事件去重时间窗口（秒）
         """
         self._handlers: Dict[str, List[SimpleEventHandler]] = {}
         self._global_handlers: List[SimpleEventHandler] = []
@@ -55,15 +58,91 @@ class EventBus:
         self._executor = ThreadPoolExecutor(max_workers=max_workers) if async_execution else None
         self._active_futures = set()
 
+        # 事件去重机制
+        self._deduplication_window = deduplication_window
+        self._recent_events: Dict[str, float] = {}  # 事件键 -> 时间戳
+        self._dedup_lock = Lock()
+
         # 性能统计
         self._stats = {
             'events_published': 0,
             'events_handled': 0,
+            'events_deduplicated': 0,
             'handlers_registered': 0,
             'errors': 0
         }
 
-        logger.info(f"Event bus initialized (async={async_execution})")
+        logger.info(f"Event bus initialized (async={async_execution}, dedup_window={deduplication_window}s)")
+
+    def _get_event_key(self, event: Union[BaseEvent, str], **kwargs) -> str:
+        """
+        生成事件的唯一键，用于去重
+
+        Args:
+            event: 事件实例或事件名称
+            **kwargs: 事件参数
+
+        Returns:
+            事件的唯一键
+        """
+        if isinstance(event, str):
+            event_name = event
+            # 对于字符串事件，使用事件名称和主要参数生成键
+            key_parts = [event_name]
+            if 'stock_code' in kwargs:
+                key_parts.append(f"stock:{kwargs['stock_code']}")
+            if 'chart_type' in kwargs:
+                key_parts.append(f"chart:{kwargs['chart_type']}")
+            return "_".join(key_parts)
+        else:
+            event_name = event.__class__.__name__
+            key_parts = [event_name]
+
+            # 根据事件类型添加关键属性
+            if hasattr(event, 'stock_code'):
+                key_parts.append(f"stock:{event.stock_code}")
+            if hasattr(event, 'chart_type'):
+                key_parts.append(f"chart:{event.chart_type}")
+            if hasattr(event, 'period'):
+                key_parts.append(f"period:{event.period}")
+            if hasattr(event, 'analysis_type'):
+                key_parts.append(f"analysis:{event.analysis_type}")
+
+            return "_".join(key_parts)
+
+    def _should_deduplicate(self, event_key: str) -> bool:
+        """
+        检查事件是否应该被去重
+
+        Args:
+            event_key: 事件键
+
+        Returns:
+            是否应该去重
+        """
+        with self._dedup_lock:
+            current_time = time.time()
+
+            # 清理过期的事件记录
+            expired_keys = []
+            for key, timestamp in self._recent_events.items():
+                if current_time - timestamp > self._deduplication_window:
+                    expired_keys.append(key)
+
+            for key in expired_keys:
+                del self._recent_events[key]
+
+            # 检查当前事件是否在去重窗口内
+            if event_key in self._recent_events:
+                time_diff = current_time - self._recent_events[event_key]
+                if time_diff < self._deduplication_window:
+                    logger.debug(f"Event {event_key} deduplicated (time_diff: {time_diff:.3f}s)")
+                    self._stats['events_deduplicated'] += 1
+                    return True
+
+            # 记录当前事件
+            self._recent_events[event_key] = current_time
+            return False
 
     def subscribe(self, event_type: Union[Type[BaseEvent], str], handler: Callable[[BaseEvent], None]) -> None:
         """
@@ -87,6 +166,7 @@ class EventBus:
             handler_wrapper = SimpleEventHandler(handler, getattr(handler, '__name__', str(handler)))
             self._handlers[event_name].append(handler_wrapper)
 
+            self._stats['handlers_registered'] += 1
             logger.debug(f"Subscribed {handler_wrapper.name} to {event_name}")
 
     def subscribe_global(self,
@@ -160,6 +240,11 @@ class EventBus:
             event: 事件实例或事件名称字符串
             **kwargs: 事件参数（当event为字符串时使用）
         """
+        # 生成事件键并检查是否需要去重
+        event_key = self._get_event_key(event, **kwargs)
+        if self._should_deduplicate(event_key):
+            return
+
         # 在锁内准备事件和处理器列表
         handlers_to_execute = []
         event_obj = None
@@ -183,6 +268,7 @@ class EventBus:
             # 获取处理器列表的副本，避免在迭代时修改
             handlers_to_execute = self._handlers[event_name].copy()
 
+            self._stats['events_published'] += 1
             logger.debug(f"Publishing {event_name} to {len(handlers_to_execute)} handlers")
 
         # 在锁外执行所有处理器，避免死锁
@@ -198,8 +284,11 @@ class EventBus:
                     # 同步执行（在锁外）
                     handler_wrapper.handler(event_obj)
 
+                self._stats['events_handled'] += 1
+
             except Exception as e:
                 logger.error(f"Error in event handler {handler_wrapper.name}: {e}")
+                self._stats['errors'] += 1
 
                 # 发布错误事件
                 if event_name != 'error':  # 避免无限递归

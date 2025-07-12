@@ -28,6 +28,7 @@ from ..services import (
 from optimization.optimization_dashboard import create_optimization_dashboard
 from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
 from core.metrics.repository import MetricsRepository
+from utils.performance_monitor import measure_performance
 
 logger = logging.getLogger(__name__)
 
@@ -1199,6 +1200,7 @@ HIkyuu-UI 2.0 (重构版本)
                     self.performance_threshold = perf_threshold
                     self.improvement_target = improve_target
 
+                @measure_performance("SmartOptimizationThread.run")
                 def run(self):
                     try:
                         # 模拟智能优化过程

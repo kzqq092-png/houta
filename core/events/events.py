@@ -101,12 +101,14 @@ class DataUpdateEvent(BaseEvent):
     当数据发生更新时触发。
     """
     data_type: str = ""
+    stock_code: str = ""
     update_info: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         super().__post_init__()
         self.data.update({
             'data_type': self.data_type,
+            'stock_code': self.stock_code,
             'update_info': self.update_info
         })
 

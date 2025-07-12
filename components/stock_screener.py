@@ -1233,21 +1233,21 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 if ind == 'MACD':
                     close_data = stock_data['close']
                     if isinstance(close_data, pd.Series):
-                        macd, _, _ = calc_macd(close_data, fast=, slow=, signal=)
+                        macd, _, _ = calc_macd(close_data, fast=12, slow=26, signal=9)
                         return macd.iloc[-1]
                     else:
                         from hikyuu.indicator import MACD
                         macd = MACD(close_data, n1=12, n2=26, n3=9)
                         return macd.dif[-1] if hasattr(macd, 'dif') else macd[-1]
                 if ind == 'RSI':
-                    return calc_rsi(stock_data['close'], n=).iloc[-1]
+                    return calc_rsi(stock_data['close'], n=6).iloc[-1]
                 if ind == 'KDJ':
-                    k, d, j = calc_kdj(stock_data, n=, m1=, m2=)
+                    k, d, j = calc_kdj(stock_data, n=9, m1=3, m2=3)
                     return j.iloc[-1]
                 if ind == 'BOLL':
                     close_data = stock_data['close']
                     if isinstance(close_data, pd.Series):
-                        _, upper, lower = calc_boll(close_data, n=, p=)
+                        _, upper, lower = calc_boll(close_data, n=20, p=2)
                         return upper.iloc[-1]
                     else:
                         from hikyuu.indicator import BOLL
@@ -1255,7 +1255,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                         return boll.upper[-1] if hasattr(boll, 'upper') else boll[-1]
                 if ind == 'ATR':
                     if isinstance(stock_data['close'], pd.Series):
-                        return calc_atr(stock_data, n=).iloc[-1]
+                        return calc_atr(stock_data, n=14).iloc[-1]
                     else:
                         from hikyuu.indicator import ATR
                         return ATR(stock_data, n=14)[-1]
@@ -1267,7 +1267,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                         return OBV(stock_data)[-1]
                 if ind == 'CCI':
                     if isinstance(stock_data['close'], pd.Series):
-                        return calc_cci(stock_data, n=).iloc[-1]
+                        return calc_cci(stock_data, n=14).iloc[-1]
                     else:
                         from hikyuu.indicator import CCI
                         return CCI(stock_data, n=14)[-1]
@@ -1596,9 +1596,9 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 # ...原有条件判断和结果收集逻辑...
                 ma_short = calc_ma(kdata['close'], params.get('ma_short', 5))
                 ma_long = calc_ma(kdata['close'], params.get('ma_long', 20))
-                macd, _, _ = calc_macd(kdata['close'], fast=, slow=, signal=)
-                rsi = calc_rsi(kdata['close'], n=)
-                if ma_short.iloc[-1] > ma_long.iloc[-1] and macd.iloc[-1] > 0 and rsi.iloc[-1] > params.get('rsi_value', fast=50, slow=, signal=):
+                macd, _, _ = calc_macd(kdata['close'], fast=12, slow=26, signal=9)
+                rsi = calc_rsi(kdata['close'], n=6)
+                if ma_short.iloc[-1] > ma_long.iloc[-1] and macd.iloc[-1] > 0 and rsi.iloc[-1] > params.get('rsi_value', 50):
                     info = self.data_manager.get_stock_info(stock)
                     results.append({
                         'code': stock,

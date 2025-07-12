@@ -20,6 +20,7 @@ from PyQt5.QtGui import QIcon, QFont
 
 from .base_panel import BasePanel
 from core.events.events import StockSelectedEvent
+from utils.performance_monitor import measure_performance
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class StockDataLoader(QThread):
         self.market_filter = market_filter
         self.search_text = search_text
 
+    @measure_performance("StockDataLoader.run")
     def run(self):
         """运行数据加载"""
         try:

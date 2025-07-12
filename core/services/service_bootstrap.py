@@ -20,6 +20,7 @@ from core.services.stock_service import StockService
 from core.services.chart_service import ChartService
 from core.services.analysis_service import AnalysisService
 from core.services.industry_service import IndustryService
+from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
 
 # 最后导入监控服务
@@ -94,6 +95,24 @@ class ServiceBootstrap:
         """注册业务服务"""
         logger.info("注册业务服务...")
 
+        # 添加依赖检查
+        self._check_dependencies()
+
+        # 先注册UnifiedDataManager
+        self.service_container.register_factory(
+            UnifiedDataManager,
+            lambda: UnifiedDataManager(self.service_container, self.event_bus)
+        )
+
+        # 确保初始化成功后再继续
+        try:
+            data_manager = self.service_container.resolve(UnifiedDataManager)
+            logger.info("✓ 统一数据管理器注册完成")
+        except Exception as e:
+            logger.error(f"Failed to initialize UnifiedDataManager: {e}")
+            # 提供回退机制
+            self._initialize_fallback_data_manager()
+
         # 主题服务
         self.service_container.register(ThemeService, scope=ServiceScope.SINGLETON)
         theme_service = self.service_container.resolve(ThemeService)
@@ -127,6 +146,35 @@ class ServiceBootstrap:
         except Exception as e:
             logger.error(f"❌ 行业服务注册失败: {e}")
             logger.error(traceback.format_exc())
+
+    def _check_dependencies(self):
+        """检查UnifiedDataManager的依赖项"""
+        dependencies = ['config_service']
+        for dep in dependencies:
+            try:
+                # 尝试解析依赖服务
+                self.service_container.resolve(dep)
+            except Exception as e:
+                logger.warning(f"Dependency {dep} not available for UnifiedDataManager: {e}")
+
+    def _initialize_fallback_data_manager(self):
+        """初始化失败时的回退策略"""
+        logger.info("Initializing fallback data manager")
+        try:
+            # 尝试使用简化版数据管理器
+            from core.data_manager import DataManager
+            self.service_container.register_instance('unified_data_manager', DataManager())
+            logger.info("✓ 回退数据管理器注册完成")
+        except Exception as e:
+            logger.error(f"Failed to initialize fallback data manager: {e}")
+            # 创建最小可用的数据管理器
+
+            class MinimalDataManager:
+                def request_data(self, *args, **kwargs):
+                    logger.warning("Using minimal data manager - limited functionality")
+                    return "request_id"
+            self.service_container.register_instance('unified_data_manager', MinimalDataManager())
+            logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
 
     def _register_monitoring_services(self) -> None:
         """注册监控服务"""

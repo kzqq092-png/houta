@@ -2,283 +2,358 @@
 """
 性能监控模块
 
-提供统一的性能监控和度量功能
+监控系统性能，包括事件处理时间、数据加载性能等。
 """
 
+import logging
 import time
 import threading
-import psutil
-import gc
-from typing import Dict, Any, Optional, Callable, ContextManager
-from contextlib import contextmanager
-from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Callable
 from collections import defaultdict, deque
-import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+import statistics
 
 logger = logging.getLogger(__name__)
 
 
-class PerformanceMetrics:
-    """性能指标数据类"""
+@dataclass
+class PerformanceMetric:
+    """性能指标"""
+    name: str
+    start_time: float
+    end_time: float = 0
+    duration: float = 0
+    metadata: Dict[str, Any] = None
 
-    def __init__(self):
-        self.execution_times: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
-        self.memory_usage: deque = deque(maxlen=1000)
-        self.cpu_usage: deque = deque(maxlen=1000)
-        self.error_counts: Dict[str, int] = defaultdict(int)
-        self.call_counts: Dict[str, int] = defaultdict(int)
-        self.start_time = datetime.now()
-        self._lock = threading.RLock()
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
 
-    def add_execution_time(self, operation: str, duration: float):
-        """添加执行时间记录"""
-        with self._lock:
-            self.execution_times[operation].append(duration)
-            self.call_counts[operation] += 1
-
-    def add_memory_usage(self, usage: float):
-        """添加内存使用记录"""
-        with self._lock:
-            self.memory_usage.append(usage)
-
-    def add_cpu_usage(self, usage: float):
-        """添加CPU使用记录"""
-        with self._lock:
-            self.cpu_usage.append(usage)
-
-    def increment_error(self, error_type: str):
-        """增加错误计数"""
-        with self._lock:
-            self.error_counts[error_type] += 1
-
-    def get_stats(self) -> Dict[str, Any]:
-        """获取统计信息"""
-        with self._lock:
-            stats = {
-                'uptime_seconds': (datetime.now() - self.start_time).total_seconds(),
-                'total_operations': sum(self.call_counts.values()),
-                'total_errors': sum(self.error_counts.values()),
-                'operations': {}
-            }
-
-            # 操作统计
-            for operation, times in self.execution_times.items():
-                if times:
-                    stats['operations'][operation] = {
-                        'count': self.call_counts[operation],
-                        'avg_time': sum(times) / len(times),
-                        'min_time': min(times),
-                        'max_time': max(times),
-                        'total_time': sum(times)
-                    }
-
-            # 系统资源统计
-            if self.memory_usage:
-                stats['memory'] = {
-                    'current': self.memory_usage[-1],
-                    'avg': sum(self.memory_usage) / len(self.memory_usage),
-                    'max': max(self.memory_usage)
-                }
-
-            if self.cpu_usage:
-                stats['cpu'] = {
-                    'current': self.cpu_usage[-1],
-                    'avg': sum(self.cpu_usage) / len(self.cpu_usage),
-                    'max': max(self.cpu_usage)
-                }
-
-            # 错误统计
-            stats['errors'] = dict(self.error_counts)
-
-            return stats
+    def finish(self):
+        """完成性能测量"""
+        self.end_time = time.time()
+        self.duration = self.end_time - self.start_time
+        return self.duration
 
 
 class PerformanceMonitor:
-    """性能监控器"""
+    """
+    性能监控器
 
-    def __init__(self, enable_system_monitoring: bool = True,
-                 monitoring_interval: float = 5.0):
+    功能：
+    1. 监控事件处理性能
+    2. 监控数据加载性能
+    3. 收集性能统计信息
+    4. 提供性能报告
+    """
+
+    def __init__(self, max_metrics: int = 1000):
         """
         初始化性能监控器
 
         Args:
-            enable_system_monitoring: 是否启用系统监控
-            monitoring_interval: 系统监控间隔（秒）
+            max_metrics: 最大保存的指标数量
         """
-        self.metrics = PerformanceMetrics()
-        self.enable_system_monitoring = enable_system_monitoring
-        self.monitoring_interval = monitoring_interval
-        self._monitoring_thread = None
-        self._stop_monitoring = threading.Event()
+        self.max_metrics = max_metrics
 
-        if enable_system_monitoring:
-            self._start_system_monitoring()
+        # 性能指标存储
+        self._metrics: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_metrics))
+        self._active_metrics: Dict[str, PerformanceMetric] = {}
+        self._lock = threading.Lock()
 
-        logger.info("性能监控器初始化完成")
+        # 统计信息
+        self._stats = {
+            'total_events': 0,
+            'total_data_loads': 0,
+            'avg_event_time': 0,
+            'avg_data_load_time': 0,
+            'slow_operations': 0,
+            'fast_operations': 0
+        }
 
-    def _start_system_monitoring(self):
-        """启动系统监控线程"""
-        self._monitoring_thread = threading.Thread(
-            target=self._monitor_system_resources,
-            daemon=True
-        )
-        self._monitoring_thread.start()
+        # 阈值设置
+        self.slow_threshold = 1.0  # 1秒
+        self.fast_threshold = 0.1  # 0.1秒
 
-    def _monitor_system_resources(self):
-        """监控系统资源使用情况"""
-        process = psutil.Process()
+        logger.info("Performance monitor initialized")
 
-        while not self._stop_monitoring.wait(self.monitoring_interval):
-            try:
-                # 监控内存使用
-                memory_info = process.memory_info()
-                memory_mb = memory_info.rss / 1024 / 1024
-                self.metrics.add_memory_usage(memory_mb)
-
-                # 监控CPU使用
-                cpu_percent = process.cpu_percent()
-                self.metrics.add_cpu_usage(cpu_percent)
-
-            except Exception as e:
-                logger.warning(f"系统资源监控失败: {e}")
-
-    @contextmanager
-    def measure_time(self, operation: str) -> ContextManager[None]:
+    def start_metric(self, name: str, metadata: Dict[str, Any] = None) -> str:
         """
-        测量操作执行时间的上下文管理器
+        开始性能测量
 
         Args:
-            operation: 操作名称
-        """
-        start_time = time.time()
-        try:
-            yield
-        except Exception as e:
-            self.metrics.increment_error(type(e).__name__)
-            raise
-        finally:
-            duration = time.time() - start_time
-            self.metrics.add_execution_time(operation, duration)
+            name: 指标名称
+            metadata: 元数据
 
-    def time_function(self, operation: str = None) -> Callable:
+        Returns:
+            指标ID
         """
-        装饰器：测量函数执行时间
+        metric_id = f"{name}_{int(time.time() * 1000000)}"
+
+        with self._lock:
+            metric = PerformanceMetric(
+                name=name,
+                start_time=time.time(),
+                metadata=metadata or {}
+            )
+            self._active_metrics[metric_id] = metric
+
+        logger.debug(f"Started metric: {name} ({metric_id})")
+        return metric_id
+
+    def end_metric(self, metric_id: str) -> Optional[float]:
+        """
+        结束性能测量
 
         Args:
-            operation: 操作名称，如果为None则使用函数名
-        """
-        def decorator(func: Callable) -> Callable:
-            op_name = operation or f"{func.__module__}.{func.__name__}"
+            metric_id: 指标ID
 
+        Returns:
+            持续时间（秒）
+        """
+        with self._lock:
+            if metric_id not in self._active_metrics:
+                logger.warning(f"Metric {metric_id} not found in active metrics")
+                return None
+
+            metric = self._active_metrics[metric_id]
+            duration = metric.finish()
+
+            # 移动到历史记录
+            self._metrics[metric.name].append(metric)
+            del self._active_metrics[metric_id]
+
+            # 更新统计信息
+            self._update_stats(metric)
+
+        logger.debug(f"Ended metric: {metric.name} ({metric_id}) - {duration:.3f}s")
+        return duration
+
+    def measure_event(self, event_name: str, stock_code: str = None):
+        """
+        事件性能测量装饰器
+
+        Args:
+            event_name: 事件名称
+            stock_code: 股票代码
+        """
+        def decorator(func):
             def wrapper(*args, **kwargs):
-                with self.measure_time(op_name):
-                    return func(*args, **kwargs)
+                metadata = {'event_name': event_name}
+                if stock_code:
+                    metadata['stock_code'] = stock_code
 
+                metric_id = self.start_metric(f"event_{event_name}", metadata)
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    self.end_metric(metric_id)
             return wrapper
         return decorator
 
-    def record_error(self, error: Exception, context: str = None):
+    def measure_data_load(self, data_type: str, stock_code: str = None):
         """
-        记录错误
+        数据加载性能测量装饰器
 
         Args:
-            error: 异常对象
-            context: 错误上下文
+            data_type: 数据类型
+            stock_code: 股票代码
         """
-        error_type = type(error).__name__
-        if context:
-            error_type = f"{context}.{error_type}"
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                metadata = {'data_type': data_type}
+                if stock_code:
+                    metadata['stock_code'] = stock_code
 
-        self.metrics.increment_error(error_type)
-        logger.error(f"性能监控记录错误: {error_type} - {str(error)}")
+                metric_id = self.start_metric(f"data_load_{data_type}", metadata)
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    self.end_metric(metric_id)
+            return wrapper
+        return decorator
 
     def get_stats(self) -> Dict[str, Any]:
         """获取性能统计信息"""
-        return self.metrics.get_stats()
+        with self._lock:
+            stats = self._stats.copy()
 
-    def reset_metrics(self):
-        """重置性能指标"""
-        self.metrics = PerformanceMetrics()
-        logger.info("性能指标已重置")
+            # 添加详细统计
+            detailed_stats = {}
+            for metric_name, metrics in self._metrics.items():
+                if metrics:
+                    durations = [m.duration for m in metrics]
+                    detailed_stats[metric_name] = {
+                        'count': len(durations),
+                        'avg': statistics.mean(durations),
+                        'min': min(durations),
+                        'max': max(durations),
+                        'median': statistics.median(durations)
+                    }
 
-    def shutdown(self):
-        """关闭性能监控器"""
-        if self._monitoring_thread and self._monitoring_thread.is_alive():
-            self._stop_monitoring.set()
-            self._monitoring_thread.join(timeout=5.0)
+            stats['detailed'] = detailed_stats
+            stats['active_metrics'] = len(self._active_metrics)
 
-        logger.info("性能监控器已关闭")
+            return stats
 
-    def __del__(self):
-        """析构函数"""
-        try:
-            self.shutdown()
-        except:
-            pass
+    def get_slow_operations(self, threshold: float = None) -> List[PerformanceMetric]:
+        """
+        获取慢操作列表
+
+        Args:
+            threshold: 时间阈值（秒）
+
+        Returns:
+            慢操作列表
+        """
+        threshold = threshold or self.slow_threshold
+        slow_ops = []
+
+        with self._lock:
+            for metrics in self._metrics.values():
+                for metric in metrics:
+                    if metric.duration > threshold:
+                        slow_ops.append(metric)
+
+        # 按持续时间排序
+        slow_ops.sort(key=lambda x: x.duration, reverse=True)
+        return slow_ops
+
+    def get_performance_report(self) -> str:
+        """生成性能报告"""
+        stats = self.get_stats()
+        slow_ops = self.get_slow_operations()
+
+        report = []
+        report.append("=" * 60)
+        report.append("性能监控报告")
+        report.append("=" * 60)
+
+        # 总体统计
+        report.append(f"总事件数: {stats['total_events']}")
+        report.append(f"总数据加载数: {stats['total_data_loads']}")
+        report.append(f"平均事件处理时间: {stats['avg_event_time']:.3f}s")
+        report.append(f"平均数据加载时间: {stats['avg_data_load_time']:.3f}s")
+        report.append(f"慢操作数: {stats['slow_operations']}")
+        report.append(f"快操作数: {stats['fast_operations']}")
+        report.append(f"活跃指标数: {stats['active_metrics']}")
+
+        # 详细统计
+        if 'detailed' in stats:
+            report.append("\n详细统计:")
+            for metric_name, metric_stats in stats['detailed'].items():
+                report.append(f"  {metric_name}:")
+                report.append(f"    数量: {metric_stats['count']}")
+                report.append(f"    平均: {metric_stats['avg']:.3f}s")
+                report.append(f"    最小: {metric_stats['min']:.3f}s")
+                report.append(f"    最大: {metric_stats['max']:.3f}s")
+                report.append(f"    中位数: {metric_stats['median']:.3f}s")
+
+        # 慢操作
+        if slow_ops:
+            report.append(f"\n最慢的{min(10, len(slow_ops))}个操作:")
+            for i, op in enumerate(slow_ops[:10]):
+                report.append(f"  {i+1}. {op.name}: {op.duration:.3f}s")
+                if op.metadata:
+                    for key, value in op.metadata.items():
+                        report.append(f"     {key}: {value}")
+
+        report.append("=" * 60)
+        return "\n".join(report)
+
+    def clear_metrics(self):
+        """清理性能指标"""
+        with self._lock:
+            self._metrics.clear()
+            self._active_metrics.clear()
+            self._stats = {
+                'total_events': 0,
+                'total_data_loads': 0,
+                'avg_event_time': 0,
+                'avg_data_load_time': 0,
+                'slow_operations': 0,
+                'fast_operations': 0
+            }
+
+        logger.info("Performance metrics cleared")
+
+    def _update_stats(self, metric: PerformanceMetric):
+        """更新统计信息"""
+        # 更新计数
+        if metric.name.startswith('event_'):
+            self._stats['total_events'] += 1
+            # 更新平均事件时间
+            total = self._stats['total_events']
+            current_avg = self._stats['avg_event_time']
+            self._stats['avg_event_time'] = (current_avg * (total - 1) + metric.duration) / total
+
+        elif metric.name.startswith('data_load_'):
+            self._stats['total_data_loads'] += 1
+            # 更新平均数据加载时间
+            total = self._stats['total_data_loads']
+            current_avg = self._stats['avg_data_load_time']
+            self._stats['avg_data_load_time'] = (current_avg * (total - 1) + metric.duration) / total
+
+        # 更新快慢操作计数
+        if metric.duration > self.slow_threshold:
+            self._stats['slow_operations'] += 1
+        elif metric.duration < self.fast_threshold:
+            self._stats['fast_operations'] += 1
 
 
-# 全局单例实例
+# 全局性能监控器实例
 _performance_monitor = None
-_monitor_lock = threading.Lock()
 
 
 def get_performance_monitor() -> PerformanceMonitor:
-    """获取性能监控器单例"""
+    """获取全局性能监控器"""
     global _performance_monitor
-
     if _performance_monitor is None:
-        with _monitor_lock:
-            if _performance_monitor is None:
-                _performance_monitor = PerformanceMonitor()
-
+        _performance_monitor = PerformanceMonitor()
     return _performance_monitor
 
 
-def initialize_performance_monitor(enable_system_monitoring: bool = True,
-                                   monitoring_interval: float = 5.0) -> PerformanceMonitor:
+def measure_performance(name: str, metadata: Dict[str, Any] = None):
     """
-    初始化性能监控器
+    性能测量装饰器
 
     Args:
-        enable_system_monitoring: 是否启用系统监控
-        monitoring_interval: 系统监控间隔（秒）
-
-    Returns:
-        性能监控器实例
+        name: 指标名称
+        metadata: 元数据
     """
-    global _performance_monitor
-
-    with _monitor_lock:
-        if _performance_monitor is not None:
-            _performance_monitor.shutdown()
-
-        _performance_monitor = PerformanceMonitor(
-            enable_system_monitoring, monitoring_interval
-        )
-
-    return _performance_monitor
-
-
-# 便捷函数
-def measure_time(operation: str):
-    """测量时间的装饰器"""
-    monitor = get_performance_monitor()
-    return monitor.time_function(operation)
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            monitor = get_performance_monitor()
+            metric_id = monitor.start_metric(name, metadata)
+            try:
+                result = func(*args, **kwargs)
+                return result
+            finally:
+                monitor.end_metric(metric_id)
+        return wrapper
+    return decorator
 
 
-def record_performance(operation: str, duration: float):
-    """记录性能数据"""
-    monitor = get_performance_monitor()
-    monitor.metrics.add_execution_time(operation, duration)
+def measure_event_performance(event_name: str, stock_code: str = None):
+    """
+    事件性能测量装饰器
+
+    Args:
+        event_name: 事件名称
+        stock_code: 股票代码
+    """
+    return get_performance_monitor().measure_event(event_name, stock_code)
 
 
-def record_error(error: Exception, context: str = None):
-    """记录错误"""
-    monitor = get_performance_monitor()
-    monitor.record_error(error, context)
+def measure_data_load_performance(data_type: str, stock_code: str = None):
+    """
+    数据加载性能测量装饰器
 
-
-def get_performance_stats() -> Dict[str, Any]:
-    """获取性能统计"""
-    monitor = get_performance_monitor()
-    return monitor.get_stats()
+    Args:
+        data_type: 数据类型
+        stock_code: 股票代码
+    """
+    return get_performance_monitor().measure_data_load(data_type, stock_code)

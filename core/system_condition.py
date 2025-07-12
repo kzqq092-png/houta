@@ -2,6 +2,7 @@ from hikyuu import *
 from hikyuu.trade_sys import ConditionBase
 import numpy as np
 import pandas as pd
+from core.indicator_adapter import get_talib_indicator_list, calc_talib_indicator
 # 已替换为新的导入
 
 

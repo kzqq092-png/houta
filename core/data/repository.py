@@ -16,6 +16,102 @@ from .models import StockInfo, KlineData, MarketData, QueryParams
 logger = logging.getLogger(__name__)
 
 
+class FallbackDataManager:
+    """
+    统一的备用数据管理器
+
+    当主数据管理器不可用时，提供模拟数据以确保系统正常运行。
+    """
+
+    def __init__(self):
+        self.logger = logging.getLogger("FallbackDataManager")
+        self.mock_stocks = [
+            {'code': '000001', 'name': '平安银行', 'market': 'sz', 'industry': '银行'},
+            {'code': '000002', 'name': '万科A', 'market': 'sz', 'industry': '房地产'},
+            {'code': '600000', 'name': '浦发银行', 'market': 'sh', 'industry': '银行'},
+            {'code': '600036', 'name': '招商银行', 'market': 'sh', 'industry': '银行'},
+            {'code': '600519', 'name': '贵州茅台', 'market': 'sh', 'industry': '食品饮料'},
+            {'code': '000858', 'name': '五粮液', 'market': 'sz', 'industry': '食品饮料'},
+            {'code': '300750', 'name': '宁德时代', 'market': 'sz', 'industry': '电池'},
+            {'code': '002415', 'name': '海康威视', 'market': 'sz', 'industry': '电子'},
+            {'code': '000725', 'name': '京东方A', 'market': 'sz', 'industry': '电子'},
+            {'code': '600276', 'name': '恒瑞医药', 'market': 'sh', 'industry': '医药生物'},
+        ]
+
+    def get_stock_list(self, market=None):
+        """返回模拟股票列表"""
+        if market:
+            return [s for s in self.mock_stocks if s['market'] == market]
+        return self.mock_stocks
+
+    def get_stock_info(self, stock_code):
+        """返回模拟股票信息"""
+        for stock in self.mock_stocks:
+            if stock['code'] == stock_code:
+                return stock
+        return None
+
+    def search_stocks(self, keyword):
+        """搜索股票"""
+        keyword_lower = keyword.lower()
+        results = []
+        for stock in self.mock_stocks:
+            if (keyword_lower in stock['code'].lower() or
+                    keyword_lower in stock['name'].lower()):
+                results.append(stock)
+        return results
+
+    def get_kdata(self, stock_code, period='D', count=365):
+        """返回空DataFrame"""
+        import pandas as pd
+        return pd.DataFrame()
+
+    def get_latest_price(self, stock_code):
+        """返回模拟价格"""
+        return 10.0  # 模拟价格
+
+    def get_market_data(self, index_code, date=None):
+        """返回模拟市场数据"""
+        return {
+            'date': date or datetime.now(),
+            'index_code': index_code,
+            'index_name': '模拟指数',
+            'open': 3000.0,
+            'high': 3100.0,
+            'low': 2900.0,
+            'close': 3050.0,
+            'volume': 1000000.0,
+            'amount': 3000000000.0,
+            'change': 50.0,
+            'change_pct': 1.67
+        }
+
+    def get_market_indices(self):
+        """返回模拟指数列表"""
+        return ['000001', '000300', '399001', '399006']
+
+
+class MinimalDataManager:
+    """
+    最小化的数据管理器
+
+    当FallbackDataManager也无法创建时的最后备用方案。
+    """
+
+    def get_stock_list(self, market=None):
+        return []
+
+    def get_stock_info(self, stock_code):
+        return None
+
+    def search_stocks(self, keyword):
+        return []
+
+    def get_kdata(self, stock_code, period='D', count=365):
+        import pandas as pd
+        return pd.DataFrame()
+
+
 class BaseRepository(ABC):
     """数据仓库基类"""
 
@@ -71,74 +167,11 @@ class StockRepository(BaseRepository):
     def _create_fallback_data_manager(self) -> None:
         """创建备用数据管理器"""
         try:
-            class FallbackDataManager:
-                def __init__(self):
-                    self.logger = logging.getLogger("FallbackDataManager")
-
-                def get_stock_list(self, market=None):
-                    """返回模拟股票列表"""
-                    mock_stocks = [
-                        {'code': '000001', 'name': '平安银行', 'market': 'sz', 'industry': '银行'},
-                        {'code': '000002', 'name': '万科A', 'market': 'sz', 'industry': '房地产'},
-                        {'code': '600000', 'name': '浦发银行', 'market': 'sh', 'industry': '银行'},
-                        {'code': '600036', 'name': '招商银行', 'market': 'sh', 'industry': '银行'},
-                        {'code': '600519', 'name': '贵州茅台', 'market': 'sh', 'industry': '食品饮料'},
-                        {'code': '000858', 'name': '五粮液', 'market': 'sz', 'industry': '食品饮料'},
-                        {'code': '300750', 'name': '宁德时代', 'market': 'sz', 'industry': '电池'},
-                        {'code': '002415', 'name': '海康威视', 'market': 'sz', 'industry': '电子'},
-                        {'code': '000725', 'name': '京东方A', 'market': 'sz', 'industry': '电子'},
-                        {'code': '600276', 'name': '恒瑞医药', 'market': 'sh', 'industry': '医药生物'},
-                    ]
-
-                    if market:
-                        return [s for s in mock_stocks if s['market'] == market]
-                    return mock_stocks
-
-                def get_stock_info(self, stock_code):
-                    """返回模拟股票信息"""
-                    stock_list = self.get_stock_list()
-                    for stock in stock_list:
-                        if stock['code'] == stock_code:
-                            return stock
-                    return None
-
-                def search_stocks(self, keyword):
-                    """搜索股票"""
-                    stock_list = self.get_stock_list()
-                    keyword_lower = keyword.lower()
-                    results = []
-                    for stock in stock_list:
-                        if (keyword_lower in stock['code'].lower() or
-                                keyword_lower in stock['name'].lower()):
-                            results.append(stock)
-                    return results
-
-                def get_kdata(self, stock_code, period='D', count=365):
-                    """返回空DataFrame"""
-                    import pandas as pd
-                    return pd.DataFrame()
-
             self.data_manager = FallbackDataManager()
             self.logger.info("Created fallback data manager")
-
         except Exception as e:
             self.logger.error(f"Failed to create fallback data manager: {e}")
             # 最后的备用方案
-
-            class MinimalDataManager:
-                def get_stock_list(self, market=None):
-                    return []
-
-                def get_stock_info(self, stock_code):
-                    return None
-
-                def search_stocks(self, keyword):
-                    return []
-
-                def get_kdata(self, stock_code, period='D', count=365):
-                    import pandas as pd
-                    return pd.DataFrame()
-
             self.data_manager = MinimalDataManager()
 
     def get_stock_info(self, stock_code: str) -> Optional[StockInfo]:
@@ -356,21 +389,11 @@ class KlineRepository(BaseRepository):
     def _create_fallback_data_manager(self) -> None:
         """创建备用数据管理器"""
         try:
-            class FallbackDataManager:
-                def get_kdata(self, stock_code, period='D', count=365):
-                    """返回空DataFrame"""
-                    import pandas as pd
-                    return pd.DataFrame()
-
-                def get_latest_price(self, stock_code):
-                    """返回模拟价格"""
-                    return 10.0  # 模拟价格
-
             self.data_manager = FallbackDataManager()
             self.logger.info("Created fallback data manager for kline repository")
-
         except Exception as e:
             self.logger.error(f"Failed to create fallback data manager: {e}")
+            self.data_manager = MinimalDataManager()
 
     def get_kline_data(self, params: QueryParams) -> Optional[KlineData]:
         """获取K线数据"""
@@ -471,32 +494,11 @@ class MarketRepository(BaseRepository):
     def _create_fallback_data_manager(self) -> None:
         """创建备用数据管理器"""
         try:
-            class FallbackDataManager:
-                def get_market_data(self, index_code, date=None):
-                    """返回模拟市场数据"""
-                    return {
-                        'date': date or datetime.now(),
-                        'index_code': index_code,
-                        'index_name': '模拟指数',
-                        'open': 3000.0,
-                        'high': 3100.0,
-                        'low': 2900.0,
-                        'close': 3050.0,
-                        'volume': 1000000.0,
-                        'amount': 3000000000.0,
-                        'change': 50.0,
-                        'change_pct': 1.67
-                    }
-
-                def get_market_indices(self):
-                    """返回模拟指数列表"""
-                    return ['000001', '000300', '399001', '399006']
-
             self.data_manager = FallbackDataManager()
             self.logger.info("Created fallback data manager for market repository")
-
         except Exception as e:
             self.logger.error(f"Failed to create fallback data manager: {e}")
+            self.data_manager = MinimalDataManager()
 
     def get_market_data(self, index_code: str, date: Optional[datetime] = None) -> Optional[MarketData]:
         """获取市场数据"""
