@@ -40,7 +40,8 @@ class AIAlert:
                     triggered = False  # 检测逻辑
                     if triggered:
                         send_notification(push_type, f"预警触发: {user_input}")
-                        self.alert_history.append({"condition": user_input, "push_type": push_type, "time": time.strftime('%Y-%m-%d %H:%M:%S')})
+                        self.alert_history.append(
+                            {"condition": user_input, "push_type": push_type, "time": time.strftime('%Y-%m-%d %H:%M:%S')})
                 except Exception as e:
                     self.log_manager.error(f"预警检测异常: {e}")
                 time.sleep(60)

@@ -39,7 +39,8 @@ class ThemeService(ConfigurableService):
         """初始化主题服务"""
         try:
             # 设置主题文件路径
-            self._theme_files_path = Path(self.get_config_value('theme_files_path', 'themes'))
+            self._theme_files_path = Path(
+                self.get_config_value('theme_files_path', 'themes'))
 
             # 加载内置主题
             self._load_builtin_themes()
@@ -48,13 +49,16 @@ class ThemeService(ConfigurableService):
             self._load_external_themes()
 
             # 设置当前主题
-            self._current_theme = self.get_config_value('current_theme', 'default')
+            self._current_theme = self.get_config_value(
+                'current_theme', 'default')
 
             if self._current_theme not in self._themes:
-                logger.warning(f"Theme '{self._current_theme}' not found, using default")
+                logger.warning(
+                    f"Theme '{self._current_theme}' not found, using default")
                 self._current_theme = 'default'
 
-            logger.info(f"Theme service initialized with theme: {self._current_theme}")
+            logger.info(
+                f"Theme service initialized with theme: {self._current_theme}")
 
         except Exception as e:
             logger.error(f"Failed to initialize theme service: {e}")
@@ -210,7 +214,8 @@ class ThemeService(ConfigurableService):
             # 保存到文件
             self._save_custom_theme(theme_name, base_config)
 
-            logger.info(f"Created custom theme '{theme_name}' based on '{base_theme}'")
+            logger.info(
+                f"Created custom theme '{theme_name}' based on '{base_theme}'")
             return True
 
         except Exception as e:
@@ -312,7 +317,8 @@ class ThemeService(ConfigurableService):
 
             # 验证主题配置
             if not self._validate_theme_config(theme_config):
-                logger.warning(f"Invalid theme configuration in '{import_path}'")
+                logger.warning(
+                    f"Invalid theme configuration in '{import_path}'")
                 return None
 
             # 获取主题名称
@@ -488,7 +494,8 @@ class ThemeService(ConfigurableService):
                     self._themes[theme_name] = theme_config
                     logger.debug(f"Loaded external theme: {theme_name}")
                 else:
-                    logger.warning(f"Invalid theme configuration in {theme_file}")
+                    logger.warning(
+                        f"Invalid theme configuration in {theme_file}")
 
             except Exception as e:
                 logger.error(f"Failed to load theme from {theme_file}: {e}")

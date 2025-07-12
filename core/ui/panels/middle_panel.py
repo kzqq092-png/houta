@@ -20,7 +20,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot
 from PyQt5.QtGui import QFont, QIcon
 
 from .base_panel import BasePanel
-from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent
+from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent, UIDataReadyEvent
 from core.services.unified_chart_service import get_unified_chart_service, create_chart_widget, ChartDataLoader, ChartWidget
 from optimization.progressive_loading_manager import get_progressive_loader, LoadingStage
 from optimization.update_throttler import get_update_throttler
@@ -70,7 +70,8 @@ class ChartCanvas(QWidget):
 
         # 创建图表控件
         try:
-            self.chart_widget = create_chart_widget(parent=self, chart_id="middle_panel_chart")
+            self.chart_widget = create_chart_widget(
+                parent=self, chart_id="middle_panel_chart")
         except:
             logger.warning("无法创建图表控件")
             self.chart_widget = None
@@ -78,12 +79,14 @@ class ChartCanvas(QWidget):
             layout.addWidget(self.chart_widget)
 
             # 连接信号
-            self.chart_widget.request_stat_dialog.connect(self.request_stat_dialog.emit)
+            self.chart_widget.request_stat_dialog.connect(
+                self.request_stat_dialog.emit)
             self.chart_widget.error_occurred.connect(self._on_chart_error)
 
             # 添加进度信号连接
             if hasattr(self.chart_widget, 'loading_progress'):
-                self.chart_widget.loading_progress.connect(self.loading_progress.emit)
+                self.chart_widget.loading_progress.connect(
+                    self.loading_progress.emit)
         else:
             # 创建错误占位符
             placeholder = QLabel("图表控件创建失败")
@@ -167,7 +170,8 @@ class ChartCanvas(QWidget):
         # 标题
         self.loading_title = QLabel("正在加载图表...", self.skeleton_frame)
         self.loading_title.setAlignment(Qt.AlignCenter)
-        self.loading_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #333;")
+        self.loading_title.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #333;")
         skeleton_layout.addWidget(self.loading_title)
 
         # 加载指示器
@@ -247,7 +251,8 @@ class ChartCanvas(QWidget):
             self.current_stock = stock_data.get('stock_code', '')
 
             # 获取OHLCV数据 - 支持多种数据格式
-            kline_data = stock_data.get('kline_data', stock_data.get('kdata', []))
+            kline_data = stock_data.get(
+                'kline_data', stock_data.get('kdata', []))
 
             # 检查数据是否为空
             import pandas as pd
@@ -270,7 +275,8 @@ class ChartCanvas(QWidget):
                 if not self.current_kdata.empty and 'date' in self.current_kdata.columns:
                     self.current_kdata.set_index('date', inplace=True)
             else:
-                logger.warning(f"Unsupported kline_data type: {type(kline_data)}")
+                logger.warning(
+                    f"Unsupported kline_data type: {type(kline_data)}")
                 self._show_no_data_message()
                 return
 
@@ -290,11 +296,13 @@ class ChartCanvas(QWidget):
                 self.loading_start_time = time.time()
 
                 # 使用渐进式加载
-                self.progressive_loader.load_chart_progressive(self.chart_widget, chart_data['kdata'], chart_data['indicators'])
+                self.progressive_loader.load_chart_progressive(
+                    self.chart_widget, chart_data['kdata'], chart_data['indicators'])
 
                 # 注册加载进度回调
                 if hasattr(self.chart_widget, 'set_loading_callback'):
-                    self.chart_widget.set_loading_callback(self._on_loading_progress)
+                    self.chart_widget.set_loading_callback(
+                        self._on_loading_progress)
             # 回退到普通更新
             elif self.chart_widget:
                 # 转换数据格式为ChartWidget期望的格式
@@ -349,7 +357,8 @@ class ChartCanvas(QWidget):
             # 记录加载时间
             if PERFORMANCE_MONITORING and self.performance_monitor:
                 total_time = time.time() - self.loading_start_time
-                self.performance_monitor.record_time("chart_loading_total", total_time)
+                self.performance_monitor.record_time(
+                    "chart_loading_total", total_time)
 
             self.loading_state_changed.emit(False, "")
 
@@ -369,11 +378,14 @@ class ChartCanvas(QWidget):
                 # 将当前阶段设为高亮
                 for i, indicator in enumerate(self.stage_indicators):
                     if i < stage:
-                        indicator.setStyleSheet("color: #28a745; font-size: 12px; font-weight: bold;")
+                        indicator.setStyleSheet(
+                            "color: #28a745; font-size: 12px; font-weight: bold;")
                     elif i == stage:
-                        indicator.setStyleSheet("color: #007bff; font-size: 12px; font-weight: bold;")
+                        indicator.setStyleSheet(
+                            "color: #007bff; font-size: 12px; font-weight: bold;")
                     else:
-                        indicator.setStyleSheet("color: #999; font-size: 12px;")
+                        indicator.setStyleSheet(
+                            "color: #999; font-size: 12px;")
 
                 self.loading_stage = stage
 
@@ -575,7 +587,8 @@ class MiddlePanel(BasePanel):
         if coordinator and hasattr(coordinator, 'service_container') and coordinator.service_container:
             try:
                 from core.services import ChartService
-                self.chart_service = coordinator.service_container.get_service(ChartService)
+                self.chart_service = coordinator.service_container.get_service(
+                    ChartService)
             except Exception as e:
                 logger.warning(f"无法获取图表服务: {e}")
                 self.chart_service = None
@@ -599,7 +612,8 @@ class MiddlePanel(BasePanel):
         # 获取统一图表服务
         try:
             from core.services.unified_chart_service import get_unified_chart_service
-            self.unified_chart_service = get_unified_chart_service(data_source=self.chart_service)
+            self.unified_chart_service = get_unified_chart_service(
+                data_source=self.chart_service)
         except ImportError:
             logger.warning("统一图表服务不可用，使用原有图表实现")
             self.unified_chart_service = None
@@ -655,8 +669,17 @@ class MiddlePanel(BasePanel):
 
         # 创建主布局
         main_layout = QVBoxLayout(self._root_frame)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 创建分裂器
+        splitter = QSplitter(Qt.Vertical)
+        main_layout.addWidget(splitter)
+
+        # 创建图表画布
+        self.chart_canvas = ChartCanvas(self._root_frame)
+        self.add_widget('chart_canvas', self.chart_canvas)
+        splitter.addWidget(self.chart_canvas)
 
         # 创建工具栏
         toolbar = QToolBar()
@@ -666,7 +689,8 @@ class MiddlePanel(BasePanel):
 
         # 股票信息标签
         stock_info_label = QLabel("请选择股票")
-        stock_info_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #495057;")
+        stock_info_label.setStyleSheet(
+            "font-size: 12px; font-weight: bold; color: #495057;")
         toolbar.addWidget(stock_info_label)
         self.add_widget('stock_info_label', stock_info_label)
 
@@ -675,7 +699,8 @@ class MiddlePanel(BasePanel):
         # 周期选择
         toolbar.addWidget(QLabel("周期:"))
         period_combo = QComboBox()
-        period_combo.addItems(["分时", "5分钟", "15分钟", "30分钟", "60分钟", "日线", "周线", "月线"])
+        period_combo.addItems(
+            ["分时", "5分钟", "15分钟", "30分钟", "60分钟", "日线", "周线", "月线"])
         period_combo.setCurrentText("日线")
         toolbar.addWidget(period_combo)
         self.add_widget('period_combo', period_combo)
@@ -743,38 +768,16 @@ class MiddlePanel(BasePanel):
         main_layout.addWidget(progress_bar)
         self.add_widget('progress_bar', progress_bar)
 
-        # 创建图表区域
-        chart_splitter = QSplitter(Qt.Vertical)
-        main_layout.addWidget(chart_splitter)
-        self.add_widget('chart_splitter', chart_splitter)
+        # 连接图表画布的信号
+        self.chart_canvas.loading_state_changed.connect(
+            self._on_loading_state_changed)
+        self.chart_canvas.loading_error.connect(self._on_chart_error)
+        self.chart_canvas.loading_progress.connect(self._on_loading_progress)
+        self.chart_canvas.request_stat_dialog.connect(self._show_stat_dialog)
 
-        # 主图表
-        main_chart_frame = QFrame()
-        main_chart_frame.setFrameStyle(QFrame.StyledPanel)
-        chart_splitter.addWidget(main_chart_frame)
-        self.add_widget('main_chart_frame', main_chart_frame)
-
-        # 创建图表画布
-        main_chart_layout = QVBoxLayout(main_chart_frame)
-        main_chart_layout.setContentsMargins(0, 0, 0, 0)
-
-        chart_canvas = ChartCanvas(main_chart_frame)
-        main_chart_layout.addWidget(chart_canvas)
-        self.add_widget('chart_canvas', chart_canvas)
-
-        # 连接区间统计信号
-        chart_canvas.request_stat_dialog.connect(self._show_stat_dialog)
-
-        # 连接统一图表服务信号
-        if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
-            self.unified_chart_service.chart_updated.connect(self._on_unified_chart_updated)
-            self.unified_chart_service.error_occurred.connect(self._on_chart_error)
-            self.unified_chart_service.loading_progress.connect(self._on_loading_progress)
-
-        # 状态栏
+        # 创建状态栏
         status_frame = QFrame()
-        status_frame.setMaximumHeight(30)
-        status_frame.setStyleSheet("background-color: #f8f9fa; border-top: 1px solid #dee2e6;")
+        status_frame.setFrameStyle(QFrame.StyledPanel)
         main_layout.addWidget(status_frame)
         self.add_widget('status_frame', status_frame)
 
@@ -790,10 +793,13 @@ class MiddlePanel(BasePanel):
         status_layout.addStretch()
 
         # 数据时间标签
-        data_time_label = QLabel("")
-        data_time_label.setStyleSheet("color: #6c757d; font-size: 12px;")
+        data_time_label = QLabel("数据时间:")
         status_layout.addWidget(data_time_label)
         self.add_widget('data_time_label', data_time_label)
+
+    def _create_chart_controls(self, parent: QWidget) -> None:
+        """创建图表控制栏"""
+        pass
 
     def _bind_events(self) -> None:
         """绑定事件处理"""
@@ -804,7 +810,8 @@ class MiddlePanel(BasePanel):
 
             # 时间范围选择变化
             time_range_combo = self.get_widget('time_range_combo')
-            time_range_combo.currentTextChanged.connect(self._on_time_range_changed)
+            time_range_combo.currentTextChanged.connect(
+                self._on_time_range_changed)
 
             # 回测区间选择变化
             start_date_edit = self.get_widget('start_date_edit')
@@ -815,7 +822,8 @@ class MiddlePanel(BasePanel):
 
             # 图表类型选择变化
             chart_type_combo = self.get_widget('chart_type_combo')
-            chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
+            chart_type_combo.currentTextChanged.connect(
+                self._on_chart_type_changed)
 
             # 工具栏按钮
             refresh_action = self.get_widget('refresh_action')
@@ -834,40 +842,16 @@ class MiddlePanel(BasePanel):
             if self.event_bus:
                 try:
                     from core.events import StockSelectedEvent, IndicatorChangedEvent
-                    self.event_bus.subscribe(StockSelectedEvent, self.on_stock_selected)
-                    self.event_bus.subscribe(IndicatorChangedEvent, self.on_indicator_changed)
-                    logger.info("已订阅StockSelectedEvent和IndicatorChangedEvent事件")
+                    self.event_bus.subscribe(
+                        StockSelectedEvent, self.on_stock_selected)
+                    self.event_bus.subscribe(
+                        IndicatorChangedEvent, self.on_indicator_changed)
+                    self.event_bus.subscribe(
+                        UIDataReadyEvent, self._on_ui_data_ready)
+                    logger.info(
+                        "已订阅StockSelectedEvent, IndicatorChangedEvent, UIDataReadyEvent事件")
                 except Exception as e:
                     logger.error(f"订阅事件失败: {e}")
-
-            # 连接统一图表服务信号
-            if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
-                try:
-                    # 使用安全连接函数
-                    safe_connect(
-                        self.unified_chart_service,
-                        self.unified_chart_service.chart_updated,
-                        self._on_unified_chart_updated
-                    )
-
-                    # 连接错误和进度信号
-                    safe_connect(
-                        self.unified_chart_service,
-                        self.unified_chart_service.error_occurred,
-                        self._on_chart_error
-                    )
-
-                    safe_connect(
-                        self.unified_chart_service,
-                        self.unified_chart_service.loading_progress,
-                        self._on_loading_progress
-                    )
-
-                    logger.info("已连接统一图表服务信号")
-                except Exception as e:
-                    logger.warning(f"连接统一图表服务信号失败: {e}")
-                    import traceback
-                    logger.warning(traceback.format_exc())
 
         except Exception as e:
             logger.error(f"绑定事件失败: {e}")
@@ -876,322 +860,72 @@ class MiddlePanel(BasePanel):
 
     def _initialize_data(self) -> None:
         """初始化数据"""
-        self._update_status("就绪")
+        self._update_status("请先从左侧选择股票")
 
-    def load_stock_chart(self, stock_code: str, stock_name: str = '') -> None:
-        """加载股票图表"""
-        try:
-            self._current_stock_code = stock_code
-            self._current_stock_name = stock_name or stock_code
+    def _on_loading_state_changed(self, is_loading: bool, message: str):
+        pass
 
-            # 更新股票信息显示
-            stock_info_label = self.get_widget('stock_info_label')
-            stock_info_label.setText(f"{self._current_stock_code} - {self._current_stock_name}")
+    def _on_chart_error(self, error_message: str):
+        pass
 
-            # 加载图表数据
-            self._load_chart_data()
+    def _on_loading_progress(self, progress: int, message: str):
+        pass
 
-        except Exception as e:
-            logger.error(f"Failed to load stock chart: {e}")
-            self._update_status(f"加载失败: {e}")
+    @pyqtSlot(UIDataReadyEvent)
+    def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
+        """处理数据准备就绪事件，更新图表"""
+        data = event.data
+        if not data or data.get('kline') is None:
+            self._update_status("K线数据为空，无法渲染图表")
+            # 可以在这里显示一个空状态或错误信息
+            return
 
-    def _load_chart_data(self, skip_indicators_update: bool = False) -> None:
-        """加载图表数据"""
-        try:
-            if not self._current_stock_code:
-                return
+        self._current_stock_code = data.get('stock_code')
+        self._current_stock_name = data.get('stock_name')
 
-            # 停止之前的加载线程
-            if hasattr(self, '_loader_thread') and self._loader_thread and self._loader_thread.isRunning():
-                self._loader_thread.quit()
-                self._loader_thread.wait(3000)  # 等待最多3秒
-                if self._loader_thread.isRunning():
-                    self._loader_thread.terminate()
-                    self._loader_thread.wait()
+        self._update_status(f"正在渲染 {self._current_stock_name} 的图表...")
 
-            # 显示进度条
-            progress_bar = self.get_widget('progress_bar')
-            progress_bar.setVisible(True)
-            progress_bar.setRange(0, 0)  # 无限进度条
+        # 准备图表所需的数据包
+        chart_data_package = self._prepare_chart_data(data)
 
-            # 更新状态
-            self._update_status("正在加载图表数据...")
+        self.chart_canvas.update_chart(chart_data_package)
+        self._update_status(f"{self._current_stock_name} 图表渲染完成")
 
-            # 获取当前选择的指标
-            if not skip_indicators_update:
-                self._update_current_indicators()
-            else:
-                logger.debug(f"跳过指标更新，使用当前指标: {self._current_indicators}")
+    def _prepare_chart_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将从协调器接收到的统一数据模型转换为图表控件所需的数据格式。
+        """
+        # technical_analysis 的原始格式: {'MA': {'5': [...], '10': [...]}, 'MACD': {'DIF': [...], ...}}
+        raw_indicators = data.get('analysis', {}).get('technical_analysis', {})
 
-            # 记录当前指标列表
-            logger.info(f"加载图表数据，股票代码: {self._current_stock_code}, 周期: {self._current_period}, 指标: {self._current_indicators}")
+        # 转换指标数据格式以匹配图表控件的期望
+        # 例如，图表控件可能需要一个更扁平的结构
+        formatted_indicators = {}
+        if 'MA' in raw_indicators:
+            formatted_indicators['MA'] = raw_indicators['MA']
+        if 'MACD' in raw_indicators:
+            formatted_indicators['MACD'] = raw_indicators['MACD']
+        # 可以为其他指标添加更多转换逻辑...
 
-            # 使用统一图表服务加载数据
-            if hasattr(self, 'unified_chart_service') and self.unified_chart_service:
-                # 转换周期格式
-                period_map = {
-                    '分时': '1',
-                    '5分钟': '5',
-                    '15分钟': '15',
-                    '30分钟': '30',
-                    '60分钟': '60',
-                    '日线': 'D',
-                    '周线': 'W',
-                    '月线': 'M'
-                }
-                period = period_map.get(self._current_period, 'D')
-
-                self.unified_chart_service.load_chart_data(
-                    stock_code=self._current_stock_code,
-                    period=period,
-                    indicators=self._current_indicators,
-                    chart_id="middle_panel_chart"
-                )
-            else:
-                # 回退到原有的加载方式
-                # 验证ChartService是否可用
-                if not self.chart_service:
-                    logger.error("ChartService not available")
-                    self._update_status("图表服务不可用")
-                    return
-
-                # 验证get_kdata方法是否存在
-                if not hasattr(self.chart_service, 'get_kdata'):
-                    logger.error(f"ChartService {type(self.chart_service)} has no get_kdata method")
-                    self._update_status("图表服务缺少get_kdata方法")
-                    return
-
-                # 尝试初始化ChartService
-                try:
-                    if hasattr(self.chart_service, '_ensure_initialized'):
-                        self.chart_service._ensure_initialized()
-                    logger.info(f"ChartService type: {type(self.chart_service)}")
-                    logger.info(f"ChartService has get_kdata: {hasattr(self.chart_service, 'get_kdata')}")
-                except Exception as e:
-                    logger.error(f"Failed to initialize ChartService: {e}")
-                    self._update_status(f"图表服务初始化失败: {e}")
-                    return
-
-                self._loader_thread = ChartDataLoader(
-                    self.chart_service,
-                    self._current_stock_code,
-                    self._current_period,
-                    self._current_indicators
-                )
-                self._loader_thread.data_loaded.connect(self._on_chart_data_loaded)
-                self._loader_thread.error_occurred.connect(self._on_chart_error)
-                self._loader_thread.finished.connect(self._on_thread_finished)
-                self._loader_thread.start()
-
-        except Exception as e:
-            logger.error(f"Failed to load chart data: {e}")
-            self._update_status(f"加载失败: {e}")
-
-    def _update_current_indicators(self) -> None:
-        """更新当前选择的指标"""
-        # 尝试从左侧面板获取选中的指标
-        try:
-            if hasattr(self, 'coordinator') and self.coordinator:
-                # 尝试从左侧面板获取指标选择
-                left_panel = getattr(self.coordinator, 'left_panel', None)
-                if left_panel and hasattr(left_panel, 'get_selected_indicators'):
-                    selected_indicators = left_panel.get_selected_indicators()
-                    if selected_indicators:
-                        self._current_indicators = selected_indicators
-                        logger.debug(f"Updated indicators from left panel: {selected_indicators}")
-                        return
-
-                # 尝试从配置管理器获取指标设置
-                config_manager = getattr(self.coordinator, 'config_manager', None)
-                if config_manager:
-                    indicators_config = config_manager.get('chart.indicators', ['MA', 'MACD'])
-                    self._current_indicators = indicators_config
-                    logger.debug(f"Updated indicators from config: {indicators_config}")
-                    return
-        except Exception as e:
-            logger.warning(f"Failed to get indicators from left panel or config: {e}")
-
-        # 使用默认指标配置作为后备
-        if not hasattr(self, '_current_indicators') or not self._current_indicators:
-            self._current_indicators = ['MA', 'MACD']  # 默认启用MA和MACD指标
-            logger.debug(f"Using default indicators: {self._current_indicators}")
-
-    def _on_chart_data_loaded(self, chart_data: Dict[str, Any]) -> None:
-        """处理图表数据加载完成"""
-        try:
-            self._chart_data = chart_data
-
-            # 隐藏进度条
-            progress_bar = self.get_widget('progress_bar')
-            progress_bar.setVisible(False)
-
-            # 更新图表
-            chart_canvas = self.get_widget('chart_canvas')
-            chart_canvas.update_chart(chart_data)
-
-            # 更新状态
-            data_count = len(chart_data.get('kline_data', []))
-            self._update_status(f"数据加载完成，共 {data_count} 条记录")
-
-            # 更新数据时间
-            if chart_data.get('kline_data'):
-                last_date = chart_data['kline_data'][-1].get('date', '')
-                data_time_label = self.get_widget('data_time_label')
-                data_time_label.setText(f"数据更新时间: {last_date}")
-
-            # 发出图表更新信号
-            self.chart_updated.emit(self._current_stock_code, self._current_period)
-
-            # 发布事件
-            if self.coordinator and self.coordinator.event_bus:
-                event = ChartUpdateEvent(
-                    stock_code=self._current_stock_code,
-                    chart_type='candlestick',
-                    period=self._current_period,
-                    indicators=self._current_indicators
-                )
-                self.coordinator.event_bus.publish(event)
-
-        except Exception as e:
-            logger.error(f"Failed to process chart data: {e}")
-            self._update_status(f"处理数据失败: {e}")
-
-    def _on_chart_error(self, error_message: str) -> None:
-        """处理图表加载错误"""
-        try:
-            logger.error(f"图表加载错误: {error_message}")
-
-            # 隐藏进度条
-            progress_bar = self.get_widget('progress_bar')
-            if progress_bar:
-                progress_bar.setVisible(False)
-
-            # 更新状态栏
-            self._update_status(f"加载失败: {error_message}")
-
-            # 显示错误消息
-            status_bar = self.get_widget('status_bar')
-            if status_bar:
-                status_bar.showMessage(f"图表加载失败: {error_message}", 5000)
-
-            # 如果图表控件支持显示错误消息，则使用图表控件显示
-            chart_canvas = self.get_widget('chart_canvas')
-            if chart_canvas and hasattr(chart_canvas, '_show_error_message'):
-                chart_canvas._show_error_message(error_message)
-            else:
-                # 降级处理：尝试显示错误标签
-                error_label = self.get_widget('error_label')
-                if error_label:
-                    error_label.setText(f"图表加载错误: {error_message}")
-                    error_label.setVisible(True)
-
-        except Exception as e:
-            logger.error(f"处理图表错误时发生异常: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-
-    def _on_unified_chart_updated(self, stock_code: str, chart_data: Dict[str, Any]) -> None:
-        """处理统一图表服务的图表更新"""
-        try:
-            if stock_code == self._current_stock_code:
-                self._chart_data = chart_data
-
-                # 记录图表更新信息
-                indicators_data = chart_data.get('indicators_data', {})
-                logger.info(f"图表更新，股票代码: {stock_code}, 指标数据: {list(indicators_data.keys())}")
-
-                # 隐藏进度条
-                progress_bar = self.get_widget('progress_bar')
-                progress_bar.setVisible(False)
-
-                # 更新状态
-                kline_data = chart_data.get('kline_data', [])
-                if hasattr(kline_data, '__len__'):
-                    data_count = len(kline_data)
-                else:
-                    data_count = 0
-                self._update_status(f"数据加载完成，共 {data_count} 条记录")
-
-                # 更新图表显示
-                chart_canvas = self.get_widget('chart_canvas')
-                if chart_canvas:
-                    # 确保chart_data包含所有必要字段，包括indicators_data
-                    update_data = {
-                        'kdata': chart_data.get('kline_data'),
-                        'stock_code': stock_code,
-                        'indicators_data': indicators_data,  # 确保包含指标数据
-                        'title': chart_data.get('stock_name', stock_code)
-                    }
-                    chart_canvas.update_chart(update_data)
-
-                # 更新数据时间
-                if (hasattr(kline_data, '__len__') and len(kline_data) > 0) or (hasattr(kline_data, 'empty') and not kline_data.empty):
-                    try:
-                        last_item = kline_data.iloc[-1] if hasattr(kline_data, 'iloc') else kline_data[-1]
-                        if hasattr(last_item, 'name'):
-                            last_date = str(last_item.name)
-                        elif isinstance(last_item, dict):
-                            last_date = last_item.get('date', '')
-                        else:
-                            last_date = str(last_item)
-
-                        data_time_label = self.get_widget('data_time_label')
-                        data_time_label.setText(f"数据更新时间: {last_date}")
-                    except Exception as e:
-                        logger.warning(f"Failed to update data time: {e}")
-
-                # 发出图表更新信号
-                self.chart_updated.emit(self._current_stock_code, self._current_period)
-
-                # 发布事件
-                if self.coordinator and self.coordinator.event_bus:
-                    event = ChartUpdateEvent(
-                        stock_code=self._current_stock_code,
-                        chart_type='candlestick',
-                        period=self._current_period,
-                        indicators=self._current_indicators
-                    )
-                    self.coordinator.event_bus.publish(event)
-
-        except Exception as e:
-            logger.error(f"Failed to handle unified chart update: {e}")
-
-    def _on_loading_progress(self, progress: int, message: str) -> None:
-        """处理加载进度更新"""
-        try:
-            progress_bar = self.get_widget('progress_bar')
-            if progress_bar:
-                if progress_bar.maximum() == 0:  # 无限进度条
-                    progress_bar.setRange(0, 100)
-                progress_bar.setValue(progress)
-
-            self._update_status(message)
-
-        except Exception as e:
-            logger.error(f"Failed to handle loading progress: {e}")
-
-    def _on_thread_finished(self) -> None:
-        """线程完成处理"""
-        try:
-            # 清理线程引用
-            if hasattr(self, '_loader_thread') and self._loader_thread is not None:
-                self._loader_thread.deleteLater()
-                self._loader_thread = None
-        except Exception as e:
-            logger.error(f"Failed to handle thread finished: {e}")
+        return {
+            'stock_code': data.get('stock_code'),
+            'kline_data': data.get('kline'),
+            'indicators_data': formatted_indicators
+        }
 
     def _refresh_chart(self) -> None:
         """刷新图表"""
-        try:
-            if self._current_stock_code:
-                self._update_status("正在刷新...")
-                self._load_chart_data()
-            else:
-                QMessageBox.information(self._root_frame, "提示", "请先选择股票")
-
-        except Exception as e:
-            logger.error(f"Failed to refresh chart: {e}")
-            self._update_status(f"刷新失败: {e}")
+        if self._current_stock_code:
+            # 触发协调器重新加载数据
+            self._update_status("正在刷新数据...")
+            self.event_bus.publish(
+                StockSelectedEvent(
+                    stock_code=self._current_stock_code,
+                    stock_name=self._current_stock_name
+                )
+            )
+        else:
+            self._update_status("请先选择股票")
 
     def _toggle_fullscreen(self) -> None:
         """切换全屏显示"""
@@ -1342,34 +1076,14 @@ class MiddlePanel(BasePanel):
 
     @pyqtSlot(object)
     def on_indicator_changed(self, event: IndicatorChangedEvent) -> None:
-        """处理指标变化事件"""
-        try:
-            # 记录接收到的指标变化事件
-            if hasattr(event, 'selected_indicators') and event.selected_indicators:
-                logger.info(f"Middle panel received indicator change: {event.selected_indicators}")
-                # 更新当前指标列表
-                self._current_indicators = event.selected_indicators
-                # 加载图表数据，跳过指标更新
-                self._load_chart_data(skip_indicators_update=True)
-            elif hasattr(event, 'data') and 'selected_indicators' in event.data and event.data['selected_indicators']:
-                # 从event.data中获取指标列表
-                logger.info(f"Middle panel received indicator change from data: {event.data['selected_indicators']}")
-                self._current_indicators = event.data['selected_indicators']
-                # 加载图表数据，跳过指标更新
-                self._load_chart_data(skip_indicators_update=True)
-            else:
-                logger.warning("收到的指标变化事件没有指标数据或为空")
-        except Exception as e:
-            logger.error(f"处理指标变化事件失败: {e}", exc_info=True)
+        """响应指标变化事件"""
+        # 刷新图表以应用新的指标
+        self._refresh_chart()
 
     def on_stock_selected(self, event: StockSelectedEvent) -> None:
         """处理股票选择事件"""
-        try:
-            logger.info(f"Middle panel received stock selection: {event.stock_code}")
-            self.load_stock_chart(event.stock_code, event.stock_name)
-
-        except Exception as e:
-            logger.error(f"Failed to handle stock selection in middle panel: {e}")
+        # 此方法已废弃，逻辑移至 _on_ui_data_ready
+        pass
 
     def get_current_stock(self) -> str:
         """获取当前股票代码"""
@@ -1409,7 +1123,8 @@ class MiddlePanel(BasePanel):
             low = sub['low'].min()
             mean = sub['close'].mean()
             ret = (close_ - open_) / open_ * 100
-            max_drawdown = ((sub['close'].cummax() - sub['close']) / sub['close'].cummax()).max() * 100
+            max_drawdown = (
+                (sub['close'].cummax() - sub['close']) / sub['close'].cummax()).max() * 100
             up_days = (sub['close'] > sub['open']).sum()
             down_days = (sub['close'] < sub['open']).sum()
             amplitude = ((sub['high'] - sub['low']) / sub['close'] * 100)
@@ -1506,7 +1221,8 @@ class MiddlePanel(BasePanel):
 
                 # 等待线程正常退出
                 if not self._loader_thread.wait(5000):  # 等待5秒
-                    logger.warning("Thread did not quit gracefully, terminating...")
+                    logger.warning(
+                        "Thread did not quit gracefully, terminating...")
                     self._loader_thread.terminate()
                     self._loader_thread.wait()
 

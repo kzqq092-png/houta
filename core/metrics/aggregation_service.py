@@ -56,8 +56,10 @@ class MetricsAggregationService:
 
         # 注册事件处理器
         if self.event_bus:
-            self.event_bus.subscribe(SystemResourceUpdated, self._handle_resource_update)
-            self.event_bus.subscribe(ApplicationMetricRecorded, self._handle_app_metric)
+            self.event_bus.subscribe(
+                SystemResourceUpdated, self._handle_resource_update)
+            self.event_bus.subscribe(
+                ApplicationMetricRecorded, self._handle_app_metric)
 
     def start(self) -> None:
         """启动聚合服务"""
@@ -284,13 +286,16 @@ class MetricsAggregationService:
         alerts = []
 
         if event.cpu_percent > self.alert_thresholds["cpu"]:
-            alerts.append(f"CPU使用率 ({event.cpu_percent:.1f}%) 超过阈值 ({self.alert_thresholds['cpu']}%)")
+            alerts.append(
+                f"CPU使用率 ({event.cpu_percent:.1f}%) 超过阈值 ({self.alert_thresholds['cpu']}%)")
 
         if event.memory_percent > self.alert_thresholds["memory"]:
-            alerts.append(f"内存使用率 ({event.memory_percent:.1f}%) 超过阈值 ({self.alert_thresholds['memory']}%)")
+            alerts.append(
+                f"内存使用率 ({event.memory_percent:.1f}%) 超过阈值 ({self.alert_thresholds['memory']}%)")
 
         if event.disk_percent > self.alert_thresholds["disk"]:
-            alerts.append(f"磁盘使用率 ({event.disk_percent:.1f}%) 超过阈值 ({self.alert_thresholds['disk']}%)")
+            alerts.append(
+                f"磁盘使用率 ({event.disk_percent:.1f}%) 超过阈值 ({self.alert_thresholds['disk']}%)")
 
         if alerts and self.event_bus:
             try:
@@ -311,18 +316,21 @@ class MetricsAggregationService:
         alerts = []
 
         if event.duration > self.alert_thresholds["operation_time"]:
-            alerts.append(f"操作 '{event.operation_name}' 响应时间 ({event.duration:.2f}秒) 超过阈值 ({self.alert_thresholds['operation_time']}秒)")
+            alerts.append(
+                f"操作 '{event.operation_name}' 响应时间 ({event.duration:.2f}秒) 超过阈值 ({self.alert_thresholds['operation_time']}秒)")
 
         if not event.was_successful:
             # 计算错误率
             with self._lock:
                 if event.operation_name in self.app_metrics and self.app_metrics[event.operation_name]:
                     metrics = self.app_metrics[event.operation_name]
-                    error_count = sum(1 for m in metrics if not m.get("success", True))
+                    error_count = sum(
+                        1 for m in metrics if not m.get("success", True))
                     error_rate = error_count / len(metrics)
 
                     if error_rate > self.alert_thresholds["error_rate"]:
-                        alerts.append(f"操作 '{event.operation_name}' 错误率 ({error_rate:.1%}) 超过阈值 ({self.alert_thresholds['error_rate']:.1%})")
+                        alerts.append(
+                            f"操作 '{event.operation_name}' 错误率 ({error_rate:.1%}) 超过阈值 ({self.alert_thresholds['error_rate']:.1%})")
 
         if alerts and self.event_bus:
             try:
@@ -399,7 +407,9 @@ class MetricsAggregationService:
         # 取消事件订阅
         if self.event_bus:
             try:
-                self.event_bus.unsubscribe(SystemResourceUpdated, self._handle_resource_update)
-                self.event_bus.unsubscribe(ApplicationMetricRecorded, self._handle_app_metric)
+                self.event_bus.unsubscribe(
+                    SystemResourceUpdated, self._handle_resource_update)
+                self.event_bus.unsubscribe(
+                    ApplicationMetricRecorded, self._handle_app_metric)
             except Exception as e:
                 logger.error(f"取消事件订阅失败: {e}")

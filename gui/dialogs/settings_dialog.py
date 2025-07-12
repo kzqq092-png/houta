@@ -26,7 +26,7 @@ class SettingsDialog(QDialog):
     theme_changed = pyqtSignal(str)
     settings_applied = pyqtSignal(dict)
 
-    def __init__(self, parent: Optional[QWidget] = None, 
+    def __init__(self, parent: Optional[QWidget] = None,
                  theme_service=None, config_service=None):
         """
         初始化设置对话框
@@ -39,7 +39,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.theme_service = theme_service
         self.config_service = config_service
-        
+
         self.setWindowTitle("设置")
         self.setMinimumSize(800, 600)
         self.setModal(True)
@@ -227,20 +227,20 @@ class SettingsDialog(QDialog):
 
         # 主题操作按钮
         btn_layout = QHBoxLayout()
-        
+
         self.preview_btn = QPushButton("预览主题")
         self.import_btn = QPushButton("导入主题")
         self.export_btn = QPushButton("导出主题")
         self.delete_btn = QPushButton("删除主题")
         self.rename_btn = QPushButton("重命名主题")
-        
+
         btn_layout.addWidget(self.preview_btn)
         btn_layout.addWidget(self.import_btn)
         btn_layout.addWidget(self.export_btn)
         btn_layout.addWidget(self.delete_btn)
         btn_layout.addWidget(self.rename_btn)
         btn_layout.addStretch()
-        
+
         theme_layout.addLayout(btn_layout)
 
         # 主题内容预览
@@ -261,17 +261,17 @@ class SettingsDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply
         )
-        
+
         self.ok_btn = button_box.button(QDialogButtonBox.Ok)
         self.cancel_btn = button_box.button(QDialogButtonBox.Cancel)
         self.apply_btn = button_box.button(QDialogButtonBox.Apply)
-        
+
         self.ok_btn.setText("确定")
         self.cancel_btn.setText("取消")
         self.apply_btn.setText("应用")
-        
+
         layout.addWidget(button_box)
-        
+
         # 连接按钮信号
         button_box.accepted.connect(self._on_ok_clicked)
         button_box.rejected.connect(self.reject)
@@ -281,16 +281,17 @@ class SettingsDialog(QDialog):
         """连接信号"""
         # 主题列表选择
         self.theme_list.currentItemChanged.connect(self._on_theme_selected)
-        
+
         # 主题操作按钮
         self.preview_btn.clicked.connect(self._on_preview_theme)
         self.import_btn.clicked.connect(self._on_import_theme)
         self.export_btn.clicked.connect(self._on_export_theme)
         self.delete_btn.clicked.connect(self._on_delete_theme)
         self.rename_btn.clicked.connect(self._on_rename_theme)
-        
+
         # 主题下拉框变化
-        self.theme_combo.currentTextChanged.connect(self._on_theme_combo_changed)
+        self.theme_combo.currentTextChanged.connect(
+            self._on_theme_combo_changed)
 
     def _load_current_settings(self) -> None:
         """加载当前设置"""
@@ -298,26 +299,32 @@ class SettingsDialog(QDialog):
             if self.config_service:
                 # 加载基本设置
                 config = self.config_service.get_all_config()
-                
+
                 # 设置当前主题
                 if self.theme_service:
                     current_theme = self.theme_service.get_current_theme()
                     if current_theme in [self.theme_combo.itemText(i) for i in range(self.theme_combo.count())]:
                         self.theme_combo.setCurrentText(current_theme)
-                
+
                 # 设置其他配置项
                 appearance_config = config.get('appearance', {})
-                self.font_size_spin.setValue(appearance_config.get('font_size', 12))
-                
+                self.font_size_spin.setValue(
+                    appearance_config.get('font_size', 12))
+
                 behavior_config = config.get('behavior', {})
-                self.language_combo.setCurrentText(behavior_config.get('language', '简体中文'))
-                self.auto_save_checkbox.setChecked(behavior_config.get('auto_save', True))
-                self.auto_load_checkbox.setChecked(behavior_config.get('auto_load', False))
-                
+                self.language_combo.setCurrentText(
+                    behavior_config.get('language', '简体中文'))
+                self.auto_save_checkbox.setChecked(
+                    behavior_config.get('auto_save', True))
+                self.auto_load_checkbox.setChecked(
+                    behavior_config.get('auto_load', False))
+
                 data_config = config.get('data', {})
-                self.update_interval_spin.setValue(data_config.get('update_interval', 5))
-                self.cache_size_spin.setValue(data_config.get('cache_size', 1000))
-                
+                self.update_interval_spin.setValue(
+                    data_config.get('update_interval', 5))
+                self.cache_size_spin.setValue(
+                    data_config.get('cache_size', 1000))
+
         except Exception as e:
             logger.error(f"Failed to load current settings: {e}")
 
@@ -327,7 +334,7 @@ class SettingsDialog(QDialog):
         if not current_item:
             self.theme_content_edit.clear()
             return
-            
+
         theme_name = current_item.text()
         if self.theme_service:
             try:
@@ -335,7 +342,8 @@ class SettingsDialog(QDialog):
                 if theme_config:
                     # 显示主题配置内容
                     import json
-                    content = json.dumps(theme_config, indent=2, ensure_ascii=False)
+                    content = json.dumps(
+                        theme_config, indent=2, ensure_ascii=False)
                     self.theme_content_edit.setPlainText(content)
                 else:
                     self.theme_content_edit.setPlainText("主题配置不可用")
@@ -356,40 +364,40 @@ class SettingsDialog(QDialog):
         if not current_item:
             QMessageBox.warning(self, "警告", "请先选择一个主题")
             return
-            
+
         theme_name = current_item.text()
         if self.theme_service:
             try:
                 self.theme_service.set_theme(theme_name)
                 self.theme_changed.emit(theme_name)
                 QMessageBox.information(self, "预览", f"已预览主题: {theme_name}")
-                
+
                 # 同步更新下拉框
                 self.theme_combo.setCurrentText(theme_name)
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"预览主题失败: {e}")
 
     def _on_import_theme(self) -> None:
         """导入主题"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "导入主题", "", 
+            self, "导入主题", "",
             "主题文件 (*.json *.qss);;所有文件 (*)"
         )
-        
+
         if not file_path:
             return
-            
+
         try:
             theme_name = os.path.splitext(os.path.basename(file_path))[0]
-            
+
             # 读取文件内容
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
+
             # 这里需要根据实际的主题服务API来实现
             QMessageBox.information(self, "导入", f"主题导入功能待实现\n文件: {file_path}")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "错误", f"导入主题失败: {e}")
 
@@ -399,21 +407,21 @@ class SettingsDialog(QDialog):
         if not current_item:
             QMessageBox.warning(self, "警告", "请先选择一个主题")
             return
-            
+
         theme_name = current_item.text()
-        
+
         file_path, _ = QFileDialog.getSaveFileName(
             self, "导出主题", f"{theme_name}.json",
             "JSON文件 (*.json);;所有文件 (*)"
         )
-        
+
         if not file_path:
             return
-            
+
         try:
             # 这里需要根据实际的主题服务API来实现
             QMessageBox.information(self, "导出", f"主题导出功能待实现\n文件: {file_path}")
-            
+
         except Exception as e:
             QMessageBox.critical(self, "错误", f"导出主题失败: {e}")
 
@@ -423,20 +431,20 @@ class SettingsDialog(QDialog):
         if not current_item:
             QMessageBox.warning(self, "警告", "请先选择一个主题")
             return
-            
+
         theme_name = current_item.text()
-        
+
         reply = QMessageBox.question(
-            self, "确认删除", 
+            self, "确认删除",
             f"确定要删除主题 '{theme_name}' 吗？",
             QMessageBox.Yes | QMessageBox.No
         )
-        
+
         if reply == QMessageBox.Yes:
             try:
                 # 这里需要根据实际的主题服务API来实现
                 QMessageBox.information(self, "删除", f"主题删除功能待实现")
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"删除主题失败: {e}")
 
@@ -446,19 +454,19 @@ class SettingsDialog(QDialog):
         if not current_item:
             QMessageBox.warning(self, "警告", "请先选择一个主题")
             return
-            
+
         old_name = current_item.text()
-        
+
         new_name, ok = QInputDialog.getText(
             self, "重命名主题", "请输入新的主题名称:",
             QLineEdit.Normal, old_name
         )
-        
+
         if ok and new_name and new_name != old_name:
             try:
                 # 这里需要根据实际的主题服务API来实现
                 QMessageBox.information(self, "重命名", f"主题重命名功能待实现")
-                
+
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"重命名主题失败: {e}")
 
@@ -482,7 +490,7 @@ class SettingsDialog(QDialog):
         """应用设置"""
         if not self.config_service:
             return
-            
+
         # 收集设置
         settings = {
             'appearance': {
@@ -499,26 +507,26 @@ class SettingsDialog(QDialog):
                 'cache_size': self.cache_size_spin.value()
             }
         }
-        
+
         # 保存设置
         for category, config in settings.items():
             for key, value in config.items():
                 self.config_service.set(f'{category}.{key}', value)
-        
+
         # 应用主题
         if self.theme_service:
             theme_name = self.theme_combo.currentText()
             self.theme_service.set_theme(theme_name)
             self.theme_changed.emit(theme_name)
-        
+
         # 发送设置应用信号
         self.settings_applied.emit(settings)
-        
+
         logger.info("Settings applied successfully")
 
 
-def show_settings_dialog(parent: Optional[QWidget] = None, 
-                        theme_service=None, config_service=None) -> None:
+def show_settings_dialog(parent: Optional[QWidget] = None,
+                         theme_service=None, config_service=None) -> None:
     """显示设置对话框"""
     dialog = SettingsDialog(parent, theme_service, config_service)
     dialog.exec_()

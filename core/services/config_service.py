@@ -50,7 +50,8 @@ class ConfigService(BaseService):
             config_path = Path(self._config_file)
             config_path.parent.mkdir(parents=True, exist_ok=True)
 
-            logger.info(f"Config service initialized with file: {self._config_file}")
+            logger.info(
+                f"Config service initialized with file: {self._config_file}")
 
         except Exception as e:
             logger.error(f"Failed to initialize config service: {e}")
@@ -416,7 +417,8 @@ class ConfigService(BaseService):
                 if not self._config_watchers[key]:
                     del self._config_watchers[key]
 
-                logger.debug(f"Removed config watcher for '{key}': {watcher_id}")
+                logger.debug(
+                    f"Removed config watcher for '{key}': {watcher_id}")
                 return True
 
             return False
@@ -520,7 +522,8 @@ class ConfigService(BaseService):
                 # 使用默认配置
                 self._config_data = self._deep_copy(self._default_config)
                 self._save_config()
-                logger.info(f"Created default config file: {self._config_file}")
+                logger.info(
+                    f"Created default config file: {self._config_file}")
 
         except Exception as e:
             logger.error(f"Failed to load config file: {e}")

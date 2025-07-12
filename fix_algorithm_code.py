@@ -14,7 +14,8 @@ def fix_algorithm_codes():
 
     try:
         # 获取所有包含算法代码的形态
-        cursor.execute('SELECT id, english_name, algorithm_code FROM pattern_types WHERE algorithm_code IS NOT NULL AND algorithm_code != ""')
+        cursor.execute(
+            'SELECT id, english_name, algorithm_code FROM pattern_types WHERE algorithm_code IS NOT NULL AND algorithm_code != ""')
         patterns = cursor.fetchall()
 
         print(f"找到 {len(patterns)} 个包含算法代码的形态")
@@ -87,7 +88,8 @@ def test_cleaned_code():
     cursor = conn.cursor()
 
     try:
-        cursor.execute('SELECT english_name, algorithm_code FROM pattern_types WHERE english_name = "hammer"')
+        cursor.execute(
+            'SELECT english_name, algorithm_code FROM pattern_types WHERE english_name = "hammer"')
         result = cursor.fetchone()
 
         if result:

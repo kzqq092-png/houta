@@ -8,6 +8,9 @@ from typing import Dict, Any
 from PyQt5.QtCore import Qt
 import matplotlib.pyplot as plt
 
+# 替换旧的指标系统导入
+from core.indicator_adapter import get_indicator_english_name
+
 
 class RenderingMixin:
     """图表渲染功能Mixin"""
@@ -73,16 +76,19 @@ class RenderingMixin:
                 # 设置X轴刻度和标签（间隔显示，防止过密）
                 step = max(1, len(kdata)//8)
                 xticks = np.arange(0, len(kdata), step)
-                xticklabels = [self._safe_format_date(kdata.iloc[i], i, kdata) for i in xticks]
+                xticklabels = [self._safe_format_date(
+                    kdata.iloc[i], i, kdata) for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
                 # 修复：确保tick数量和label数量一致
                 if len(xticks) == len(xticklabels):
-                    self.indicator_ax.set_xticklabels(xticklabels, rotation=30, fontsize=8)
+                    self.indicator_ax.set_xticklabels(
+                        xticklabels, rotation=30, fontsize=8)
                 else:
                     # 自动补齐或截断
                     min_len = min(len(xticks), len(xticklabels))
                     self.indicator_ax.set_xticks(xticks[:min_len])
-                    self.indicator_ax.set_xticklabels(xticklabels[:min_len], rotation=30, fontsize=8)
+                    self.indicator_ax.set_xticklabels(
+                        xticklabels[:min_len], rotation=30, fontsize=8)
             self.close_loading_dialog()
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.yaxis.set_tick_params(direction='in', pad=0)
@@ -224,8 +230,10 @@ class RenderingMixin:
 
                     if valid_hist:
                         valid_x_hist, valid_y_hist = zip(*valid_hist)
-                        valid_x_hist = [x[i] for i in valid_x_hist if i < len(x)]
-                        colors = ['#e53935' if h >= 0 else '#43a047' for h in valid_y_hist]  # 红色和绿色
+                        valid_x_hist = [x[i]
+                                        for i in valid_x_hist if i < len(x)]
+                        colors = ['#e53935' if h >=
+                                  0 else '#43a047' for h in valid_y_hist]  # 红色和绿色
                         self.indicator_ax.bar(
                             valid_x_hist,
                             valid_y_hist,
@@ -297,7 +305,6 @@ class RenderingMixin:
                     try:
                         import talib
                         # 如果name是中文名称，需要转换为英文名称
-                        from indicators_algo import get_indicator_english_name
                         english_name = get_indicator_english_name(name)
 
                         func = getattr(talib, english_name)
@@ -612,3 +619,67 @@ class RenderingMixin:
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.error(f"处理指标变更失败: {str(e)}")
+
+    def _optimize_display(self):
+        """优化显示效果，所有坐标轴字体统一为8号，始终显示网格和XY轴刻度（任何操作都不隐藏）"""
+        try:
+            # 确保所有子图都有网格和刻度
+            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
+                if not ax:
+                    continue
+
+                # 获取主题颜色
+                colors = self.theme_manager.get_theme_colors()
+                grid_color = colors.get('chart_grid', '#e0e0e0')
+                text_color = colors.get('chart_text', '#222b45')
+
+                # 设置网格
+                ax.grid(True, linestyle='--', alpha=0.3, color=grid_color)
+
+                # 设置刻度样式
+                ax.tick_params(axis='both', which='major',
+                               labelsize=8, colors=text_color)
+                ax.tick_params(axis='y', which='major', labelleft=True)
+
+                # 设置所有文本字体大小
+                for label in (ax.get_yticklabels()):
+                    label.set_fontsize(8)
+                    label.set_color(text_color)
+
+                # 设置标题和标签字体
+                if ax.get_title():
+                    ax.title.set_fontsize(8)
+                    ax.title.set_color(text_color)
+                ax.xaxis.label.set_fontsize(8)
+                ax.xaxis.label.set_color(text_color)
+                ax.yaxis.label.set_fontsize(8)
+                ax.yaxis.label.set_color(text_color)
+
+            # 只设置indicator_ax的X轴刻度样式，其他子图隐藏X轴
+            if self.price_ax:
+                self.price_ax.set_xticklabels([])
+                self.price_ax.tick_params(
+                    axis='x', which='both', bottom=False, top=False, labelbottom=False)
+
+            if self.volume_ax and self.volume_ax != self.indicator_ax:
+                self.volume_ax.set_xticklabels([])
+                self.volume_ax.tick_params(
+                    axis='x', which='both', bottom=False, top=False, labelbottom=False)
+
+            if self.indicator_ax:
+                self.indicator_ax.tick_params(
+                    axis='x', which='major', labelsize=8, labelbottom=True, colors=text_color)
+                for label in self.indicator_ax.get_xticklabels():
+                    label.set_fontsize(8)
+                    label.set_color(text_color)
+                    label.set_rotation(30)
+
+            # 保存当前状态
+            if hasattr(self, 'canvas') and self.canvas:
+                self.canvas.draw_idle()
+
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"优化显示失败: {str(e)}")
+            else:
+                print(f"RenderingMixin _optimize_display错误: {str(e)}")

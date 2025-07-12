@@ -105,7 +105,8 @@ class StrategyMetrics:
     cvar_95: float = 0.0
 
     # 时间指标
-    evaluation_period: timedelta = field(default_factory=lambda: timedelta(days=0))
+    evaluation_period: timedelta = field(
+        default_factory=lambda: timedelta(days=0))
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
@@ -175,7 +176,8 @@ class StrategyPerformanceEvaluator:
         # 检查缓存
         cache_key = None
         if use_cache:
-            cache_key = self._generate_cache_key(signals, price_data, initial_capital, commission_rate)
+            cache_key = self._generate_cache_key(
+                signals, price_data, initial_capital, commission_rate)
             with self._cache_lock:
                 if cache_key in self._evaluation_cache:
                     self._evaluation_stats['cache_hits'] += 1
@@ -185,22 +187,26 @@ class StrategyPerformanceEvaluator:
 
         try:
             # 生成交易记录
-            trades = self._generate_trades(signals, price_data, commission_rate)
+            trades = self._generate_trades(
+                signals, price_data, commission_rate)
 
             # 计算收益序列
-            returns_series = self._calculate_returns_series(trades, price_data, initial_capital)
+            returns_series = self._calculate_returns_series(
+                trades, price_data, initial_capital)
 
             # 计算基础指标
             metrics = self._calculate_basic_metrics(returns_series, trades)
 
             # 计算风险指标
-            self._calculate_risk_metrics(metrics, returns_series, benchmark_data)
+            self._calculate_risk_metrics(
+                metrics, returns_series, benchmark_data)
 
             # 计算交易指标
             self._calculate_trade_metrics(metrics, trades)
 
             # 计算自定义指标
-            self._calculate_custom_metrics(metrics, signals, price_data, trades)
+            self._calculate_custom_metrics(
+                metrics, signals, price_data, trades)
 
             # 设置时间信息
             if not price_data.empty:
@@ -247,7 +253,8 @@ class StrategyPerformanceEvaluator:
                     entry_signal = open_positions[position_key]
 
                     # 计算手续费
-                    commission = (entry_signal.price + signal_price) * commission_rate
+                    commission = (entry_signal.price +
+                                  signal_price) * commission_rate
 
                     # 创建交易记录
                     trade = TradeResult(
@@ -268,7 +275,8 @@ class StrategyPerformanceEvaluator:
             last_time = price_data.index[-1]
 
             for position_key, entry_signal in open_positions.items():
-                commission = (entry_signal.price + last_price) * commission_rate
+                commission = (entry_signal.price + last_price) * \
+                    commission_rate
 
                 trade = TradeResult(
                     entry_time=entry_signal.timestamp,
@@ -300,7 +308,8 @@ class StrategyPerformanceEvaluator:
 
             # 找到最接近的交易日期
             try:
-                trade_date = returns.index[returns.index.get_indexer([trade.exit_time], method='nearest')[0]]
+                trade_date = returns.index[returns.index.get_indexer(
+                    [trade.exit_time], method='nearest')[0]]
                 returns.loc[trade_date] += trade_return
             except (IndexError, KeyError):
                 continue
@@ -326,7 +335,8 @@ class StrategyPerformanceEvaluator:
             trading_days = len(returns_series)
             years = trading_days / 252  # 假设一年252个交易日
             if years > 0:
-                metrics.annual_return = (1 + metrics.total_return) ** (1 / years) - 1
+                metrics.annual_return = (
+                    1 + metrics.total_return) ** (1 / years) - 1
 
         # 波动率（年化）
         if len(returns_series) > 1:
@@ -384,13 +394,15 @@ class StrategyPerformanceEvaluator:
                     benchmark_returns = aligned_data.iloc[:, 1]
 
                     # 贝塔系数
-                    covariance = np.cov(strategy_returns, benchmark_returns)[0, 1]
+                    covariance = np.cov(
+                        strategy_returns, benchmark_returns)[0, 1]
                     benchmark_variance = np.var(benchmark_returns)
                     if benchmark_variance > 0:
                         metrics.beta = covariance / benchmark_variance
 
                     # 阿尔法系数
-                    benchmark_annual_return = (1 + benchmark_returns.mean()) ** 252 - 1
+                    benchmark_annual_return = (
+                        1 + benchmark_returns.mean()) ** 252 - 1
                     metrics.alpha = metrics.annual_return - (self.risk_free_rate +
                                                              metrics.beta * (benchmark_annual_return - self.risk_free_rate))
 
@@ -403,10 +415,12 @@ class StrategyPerformanceEvaluator:
                     active_returns = strategy_returns - benchmark_returns
                     tracking_error = active_returns.std() * np.sqrt(252)
                     if tracking_error > 0:
-                        metrics.information_ratio = (metrics.annual_return - benchmark_annual_return) / tracking_error
+                        metrics.information_ratio = (
+                            metrics.annual_return - benchmark_annual_return) / tracking_error
 
             except Exception as e:
-                warnings.warn(f"Failed to calculate benchmark-related metrics: {e}")
+                warnings.warn(
+                    f"Failed to calculate benchmark-related metrics: {e}")
 
     def _calculate_trade_metrics(self, metrics: StrategyMetrics, trades: List[TradeResult]):
         """计算交易指标"""
@@ -447,7 +461,8 @@ class StrategyPerformanceEvaluator:
                 value = metric_func(signals, price_data, trades)
                 metrics.custom_metrics[metric_name] = float(value)
             except Exception as e:
-                warnings.warn(f"Failed to calculate custom metric '{metric_name}': {e}")
+                warnings.warn(
+                    f"Failed to calculate custom metric '{metric_name}': {e}")
 
     def register_custom_metric(self, name: str, metric_function: callable):
         """注册自定义指标
@@ -472,7 +487,8 @@ class StrategyPerformanceEvaluator:
         df = pd.DataFrame(comparison_data).T
 
         # 添加排名
-        ranking_columns = ['total_return', 'annual_return', 'sharpe_ratio', 'win_rate']
+        ranking_columns = ['total_return',
+                           'annual_return', 'sharpe_ratio', 'win_rate']
         for col in ranking_columns:
             if col in df.columns:
                 df[f'{col}_rank'] = df[col].rank(ascending=False)

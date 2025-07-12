@@ -30,9 +30,12 @@ class RiskAnalysis:
             # 计算风险指标
             daily_returns = pd.Series(returns)
             cumulative_returns = (1 + daily_returns).cumprod() - 1
-            rolling_volatility = daily_returns.rolling(window=20).std() * np.sqrt(252)
-            rolling_sharpe = daily_returns.rolling(window=20).mean() / daily_returns.rolling(window=20).std() * np.sqrt(252)
-            drawdown = (cumulative_returns - cumulative_returns.cummax()) / cumulative_returns.cummax()
+            rolling_volatility = daily_returns.rolling(
+                window=20).std() * np.sqrt(252)
+            rolling_sharpe = daily_returns.rolling(window=20).mean(
+            ) / daily_returns.rolling(window=20).std() * np.sqrt(252)
+            drawdown = (cumulative_returns - cumulative_returns.cummax()
+                        ) / cumulative_returns.cummax()
 
             # 绘制累计收益率
             axes[0].plot(cumulative_returns.index, cumulative_returns.values)
@@ -50,7 +53,8 @@ class RiskAnalysis:
             axes[2].grid(True)
 
             # 绘制回撤
-            axes[3].fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.3)
+            axes[3].fill_between(
+                drawdown.index, drawdown.values, 0, color='red', alpha=0.3)
             axes[3].set_title('回撤')
             axes[3].grid(True)
 
@@ -144,7 +148,8 @@ class RiskAnalysis:
         """
         try:
             # 计算风险贡献
-            portfolio_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+            portfolio_vol = np.sqrt(
+                np.dot(weights.T, np.dot(cov_matrix, weights)))
             marginal_contrib = np.dot(cov_matrix, weights) / portfolio_vol
             risk_contrib = weights * marginal_contrib
 
@@ -188,7 +193,8 @@ class RiskAnalysis:
 
             # 绘制Beta
             plt.plot(beta.index, beta.values, color='blue')
-            plt.axhline(y=1, color='red', linestyle='--', label='Market Beta = 1')
+            plt.axhline(y=1, color='red', linestyle='--',
+                        label='Market Beta = 1')
 
             plt.title('Rolling Beta Analysis')
             plt.xlabel('Date')
@@ -217,24 +223,31 @@ class RiskAnalysis:
         min_vals = df.min(numeric_only=True)
         col_count = df.shape[1]
         for j in range(col_count):
-            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
             item.setBackground(QColor("#fffde7"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df), j, item)
         for j in range(col_count):
-            item = QTableWidgetItem(f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffe082"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df)+1, j, item)
         for j in range(col_count):
-            item = QTableWidgetItem(f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffccbc"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.risk_table.setItem(len(df)+2, j, item)
         for j in range(col_count):
-            max_idx = df.iloc[:, j].idxmax() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
-            min_idx = df.iloc[:, j].idxmin() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
+            max_idx = df.iloc[:, j].idxmax() if pd.api.types.is_numeric_dtype(
+                df.iloc[:, j]) else None
+            min_idx = df.iloc[:, j].idxmin() if pd.api.types.is_numeric_dtype(
+                df.iloc[:, j]) else None
             if max_idx is not None:
-                self.risk_table.item(max_idx, j).setBackground(QColor("#b2ff59"))
+                self.risk_table.item(max_idx, j).setBackground(
+                    QColor("#b2ff59"))
             if min_idx is not None:
-                self.risk_table.item(min_idx, j).setBackground(QColor("#ffcdd2"))
+                self.risk_table.item(min_idx, j).setBackground(
+                    QColor("#ffcdd2"))

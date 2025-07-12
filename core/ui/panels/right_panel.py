@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime, timedelta
 import json
+import asyncio
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -20,7 +21,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot
 from PyQt5.QtGui import QFont, QIcon, QColor, QPalette
 
 from .base_panel import BasePanel
-from core.events import StockSelectedEvent, AnalysisCompleteEvent, ChartUpdateEvent
+from core.events import StockSelectedEvent, AnalysisCompleteEvent, ChartUpdateEvent, UIDataReadyEvent
 
 if TYPE_CHECKING:
     from core.services import AnalysisService
@@ -43,14 +44,16 @@ class AnalysisDataLoader(QThread):
     def run(self):
         """加载分析数据"""
         try:
-            analysis_data = self.analysis_service.analyze_stock(
+            # 使用asyncio.run()来执行异步函数
+            analysis_data = asyncio.run(self.analysis_service.analyze_stock(
                 self.stock_code,
                 self.analysis_type
-            )
+            ))
             if analysis_data:
                 self.data_loaded.emit(analysis_data)
             else:
-                self.error_occurred.emit(f"No analysis data returned for {self.stock_code}")
+                self.error_occurred.emit(
+                    f"No analysis data returned for {self.stock_code}")
         except Exception as e:
             self.error_occurred.emit(str(e))
 
@@ -88,7 +91,8 @@ class RightPanel(BasePanel):
         self.analysis_service = None
         if coordinator and hasattr(coordinator, 'service_container'):
             from core.services import AnalysisService
-            self.analysis_service = coordinator.service_container.get_service(AnalysisService)
+            self.analysis_service = coordinator.service_container.get_service(
+                AnalysisService)
         self.width = width
 
         # 当前状态
@@ -185,14 +189,16 @@ class RightPanel(BasePanel):
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("color: #495057; font-size: 14px; font-weight: bold;")
+        title_label.setStyleSheet(
+            "color: #495057; font-size: 14px; font-weight: bold;")
         main_layout.addWidget(title_label)
         self.add_widget('title', title_label)
 
         # 股票信息框
         stock_info_frame = QFrame()
         stock_info_frame.setFrameStyle(QFrame.StyledPanel)
-        stock_info_frame.setStyleSheet("background-color: white; border: 1px solid #dee2e6; border-radius: 4px;")
+        stock_info_frame.setStyleSheet(
+            "background-color: white; border: 1px solid #dee2e6; border-radius: 4px;")
         main_layout.addWidget(stock_info_frame)
         self.add_widget('stock_info_frame', stock_info_frame)
 
@@ -201,7 +207,8 @@ class RightPanel(BasePanel):
 
         # 股票代码和名称
         stock_label = QLabel("请选择股票")
-        stock_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #495057;")
+        stock_label.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #495057;")
         stock_label.setAlignment(Qt.AlignCenter)
         stock_info_layout.addWidget(stock_label)
         self.add_widget('stock_label', stock_label)
@@ -345,7 +352,8 @@ class RightPanel(BasePanel):
 
         # 主要信号显示
         main_signal_label = QLabel("暂无信号")
-        main_signal_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #495057; padding: 10px;")
+        main_signal_label.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #495057; padding: 10px;")
         main_signal_label.setAlignment(Qt.AlignCenter)
         current_signal_layout.addWidget(main_signal_label)
         self.add_widget('main_signal_label', main_signal_label)
@@ -409,7 +417,8 @@ class RightPanel(BasePanel):
 
         # 风险等级显示
         risk_level_label = QLabel("未评估")
-        risk_level_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #495057; padding: 15px;")
+        risk_level_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #495057; padding: 15px;")
         risk_level_label.setAlignment(Qt.AlignCenter)
         risk_level_layout.addWidget(risk_level_label)
         self.add_widget('risk_level_label', risk_level_label)
@@ -553,7 +562,8 @@ class RightPanel(BasePanel):
 
         # 执行按钮
         ai_run_btn = QPushButton("一键AI选股")
-        ai_run_btn.setStyleSheet("background-color: #28a745; font-size: 14px; padding: 8px;")
+        ai_run_btn.setStyleSheet(
+            "background-color: #28a745; font-size: 14px; padding: 8px;")
         condition_layout.addWidget(ai_run_btn)
         self.add_widget('ai_run_btn', ai_run_btn)
 
@@ -566,7 +576,8 @@ class RightPanel(BasePanel):
 
         # 结果表格
         result_table = QTableWidget(0, 6)
-        result_table.setHorizontalHeaderLabels(['股票代码', '股票名称', '推荐理由', '评分', '风险等级', '建议仓位'])
+        result_table.setHorizontalHeaderLabels(
+            ['股票代码', '股票名称', '推荐理由', '评分', '风险等级', '建议仓位'])
         result_table.horizontalHeader().setStretchLastSection(True)
         result_table.setAlternatingRowColors(True)
         result_layout.addWidget(result_table)
@@ -612,7 +623,8 @@ class RightPanel(BasePanel):
 
         # 表现表格
         performance_table = QTableWidget(0, 4)
-        performance_table.setHorizontalHeaderLabels(['板块', '涨跌幅', '成交额', '领涨股'])
+        performance_table.setHorizontalHeaderLabels(
+            ['板块', '涨跌幅', '成交额', '领涨股'])
         performance_table.horizontalHeader().setStretchLastSection(True)
         performance_table.setAlternatingRowColors(True)
         performance_layout.addWidget(performance_table)
@@ -641,145 +653,83 @@ class RightPanel(BasePanel):
 
     def _bind_events(self) -> None:
         """绑定事件"""
-        # 刷新按钮
-        refresh_btn = self.get_widget('refresh_btn')
-        refresh_btn.clicked.connect(self._refresh_analysis)
+        self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
 
-        # 导出按钮
-        export_btn = self.get_widget('export_btn')
-        export_btn.clicked.connect(self._export_report)
+        # 绑定按钮点击事件
+        self.get_widget('refresh_btn').clicked.connect(self._refresh_analysis)
+        self.get_widget('export_btn').clicked.connect(self._export_report)
+        self.get_widget('run_backtest_btn').clicked.connect(self._run_backtest)
+        self.get_widget('ai_run_btn').clicked.connect(
+            self._run_ai_stock_selection)
+        self.get_widget('export_ai_btn').clicked.connect(
+            self._export_ai_results)
+        self.get_widget('refresh_industry_btn').clicked.connect(
+            self._refresh_industry_data)
 
-        # 运行回测按钮
-        run_backtest_btn = self.get_widget('run_backtest_btn')
-        run_backtest_btn.clicked.connect(self._run_backtest)
-
-        # 回测天数变化
-        backtest_days_spin = self.get_widget('backtest_days_spin')
-        backtest_days_spin.valueChanged.connect(self._on_backtest_params_changed)
-
-        # AI选股按钮
-        ai_run_btn = self.get_widget('ai_run_btn')
-        ai_run_btn.clicked.connect(self._run_ai_stock_selection)
-
-        # 导出AI选股结果
-        export_ai_btn = self.get_widget('export_ai_btn')
-        export_ai_btn.clicked.connect(self._export_ai_results)
-
-        # 刷新行业数据
-        refresh_industry_btn = self.get_widget('refresh_industry_btn')
-        refresh_industry_btn.clicked.connect(self._refresh_industry_data)
-
-        # 订阅事件总线事件
-        if self.event_bus:
-            self.event_bus.subscribe(StockSelectedEvent, self.on_stock_selected)
+        # 绑定回测参数变化事件
+        self.get_widget('backtest_days_spin').valueChanged.connect(
+            self._on_backtest_params_changed)
 
     def _initialize_data(self) -> None:
         """初始化数据"""
-        self._update_status("就绪")
+        # 初始状态下禁用部分按钮
+        self.get_widget('export_btn').setEnabled(False)
+        self.get_widget('run_backtest_btn').setEnabled(False)
 
-    def load_stock_analysis(self, stock_code: str, stock_name: str = '') -> None:
-        """加载股票分析"""
-        try:
-            self._current_stock_code = stock_code
-            self._current_stock_name = stock_name or stock_code
+    @pyqtSlot(UIDataReadyEvent)
+    def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
+        """处理数据准备就绪事件"""
+        data = event.data
+        if not data or not data.get('analysis'):
+            self._on_analysis_load_error("分析数据为空")
+            return
 
-            # 更新股票信息显示
-            stock_label = self.get_widget('stock_label')
-            stock_label.setText(f"{self._current_stock_code} - {self._current_stock_name}")
+        self._current_stock_code = data.get('stock_code')
+        self._current_stock_name = data.get('stock_name')
 
-            # 加载分析数据
-            self._load_analysis_data()
+        # 更新UI
+        stock_label = self.get_widget('stock_label')
+        stock_label.setText(
+            f"{self._current_stock_name} ({self._current_stock_code})")
 
-        except Exception as e:
-            logger.error(f"Failed to load stock analysis: {e}")
-            self._update_status(f"加载失败: {e}")
+        analysis_time_label = self.get_widget('analysis_time_label')
+        analysis_time_label.setText(
+            f"分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    def _load_analysis_data(self) -> None:
-        """加载分析数据"""
-        try:
-            if not self._current_stock_code:
-                return
-
-            # 停止之前的加载线程
-            if hasattr(self, '_loader_thread') and self._loader_thread and self._loader_thread.isRunning():
-                self._loader_thread.quit()
-                self._loader_thread.wait(3000)  # 等待最多3秒
-                if self._loader_thread.isRunning():
-                    self._loader_thread.terminate()
-                    self._loader_thread.wait()
-
-            # 显示进度条
-            progress_bar = self.get_widget('progress_bar')
-            progress_bar.setVisible(True)
-            progress_bar.setRange(0, 0)  # 无限进度条
-
-            # 更新状态
-            self._update_status("正在分析...")
-
-            # 创建加载线程
-            self._loader_thread = AnalysisDataLoader(
-                self.analysis_service,
-                self._current_stock_code,
-                self._analysis_type
-            )
-            self._loader_thread.data_loaded.connect(self._on_analysis_data_loaded)
-            self._loader_thread.error_occurred.connect(self._on_analysis_load_error)
-            self._loader_thread.finished.connect(self._on_analysis_thread_finished)
-            self._loader_thread.start()
-
-        except Exception as e:
-            logger.error(f"Failed to load analysis data: {e}")
-            self._update_status(f"加载失败: {e}")
+        self._on_analysis_data_loaded(data['analysis'])
 
     def _on_analysis_data_loaded(self, analysis_data: Dict[str, Any]) -> None:
-        """处理分析数据加载完成"""
-        try:
-            # 检查数据是否为None
-            if analysis_data is None:
-                self._on_analysis_load_error("分析数据为空")
-                return
+        """
+        处理加载完成的分析数据
 
-            self._analysis_data = analysis_data
+        Args:
+            analysis_data: 分析数据
+        """
+        if not analysis_data:
+            self._update_status("分析数据为空")
+            self.get_widget('export_btn').setEnabled(False)
+            self.get_widget('run_backtest_btn').setEnabled(False)
+            return
 
-            # 隐藏进度条
-            progress_bar = self.get_widget('progress_bar')
-            if progress_bar:
-                progress_bar.setVisible(False)
+        self._analysis_data = analysis_data
 
-            # 更新各个标签页
-            self._update_technical_analysis(analysis_data.get('technical_indicators', {}))
-            self._update_signal_analysis(analysis_data.get('signal', {}))
-            self._update_risk_analysis(analysis_data.get('risk', {}))
-            self._update_backtest_results(analysis_data.get('backtest', {}))
+        # 更新各个标签页
+        self._update_technical_analysis(
+            analysis_data.get('technical_analysis', {}))
+        self._update_signal_analysis(analysis_data.get('signal_analysis', {}))
+        self._update_risk_analysis(analysis_data.get('risk_analysis', {}))
+        self._update_backtest_results(
+            analysis_data.get('backtest_results', {}))
 
-            # 更新分析时间
-            analysis_time_label = self.get_widget('analysis_time_label')
-            if analysis_time_label:
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                analysis_time_label.setText(f"分析时间: {current_time}")
-
-            # 更新状态
-            self._update_status("分析完成")
-
-            # 发出分析完成信号
-            if self._current_stock_code and analysis_data:
-                self.analysis_completed.emit(self._current_stock_code, analysis_data)
-
-            # 发布事件
-            if self.coordinator and self.coordinator.event_bus:
-                event = AnalysisCompleteEvent(
-                    stock_code=self._current_stock_code,
-                    analysis_type='comprehensive',
-                    results=analysis_data
-                )
-                self.coordinator.event_bus.publish(event)
-
-        except Exception as e:
-            logger.error(f"Failed to process analysis data: {e}")
-            self._update_status(f"处理数据失败: {e}")
+        # 更新状态
+        self._update_status("分析完成")
+        self.get_widget('export_btn').setEnabled(True)
+        self.get_widget('run_backtest_btn').setEnabled(True)
 
     def _on_analysis_load_error(self, error_msg: str) -> None:
-        """处理分析加载错误"""
+        """
+        处理分析数据加载错误
+        """
         # 隐藏进度条
         progress_bar = self.get_widget('progress_bar')
         progress_bar.setVisible(False)
@@ -788,14 +738,11 @@ class RightPanel(BasePanel):
         logger.error(f"Analysis data load error: {error_msg}")
 
     def _on_analysis_thread_finished(self) -> None:
-        """分析线程完成处理"""
-        try:
-            # 清理线程引用
-            if hasattr(self, '_loader_thread') and self._loader_thread is not None:
-                self._loader_thread.deleteLater()
-                self._loader_thread = None
-        except Exception as e:
-            logger.error(f"Failed to handle analysis thread finished: {e}")
+        """分析线程完成后的处理"""
+        self.get_widget('progress_bar').setVisible(False)
+        if self._loader_thread:
+            self._loader_thread.deleteLater()
+            self._loader_thread = None
 
     def _update_technical_analysis(self, technical_data: Dict[str, Any]) -> None:
         """更新技术指标分析"""
@@ -809,7 +756,8 @@ class RightPanel(BasePanel):
                 row = trend_table.rowCount()
                 trend_table.insertRow(row)
                 trend_table.setItem(row, 0, QTableWidgetItem(indicator))
-                trend_table.setItem(row, 1, QTableWidgetItem(str(data.get('value', ''))))
+                trend_table.setItem(row, 1, QTableWidgetItem(
+                    str(data.get('value', ''))))
 
                 signal = data.get('signal', 'neutral')
                 signal_item = QTableWidgetItem(signal)
@@ -828,7 +776,8 @@ class RightPanel(BasePanel):
                 row = momentum_table.rowCount()
                 momentum_table.insertRow(row)
                 momentum_table.setItem(row, 0, QTableWidgetItem(indicator))
-                momentum_table.setItem(row, 1, QTableWidgetItem(str(data.get('value', ''))))
+                momentum_table.setItem(
+                    row, 1, QTableWidgetItem(str(data.get('value', ''))))
 
                 signal = data.get('signal', 'neutral')
                 signal_item = QTableWidgetItem(signal)
@@ -861,11 +810,14 @@ class RightPanel(BasePanel):
 
             # 设置信号颜色
             if signal_type == 'buy':
-                main_signal_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #28a745; padding: 10px;")
+                main_signal_label.setStyleSheet(
+                    "font-size: 16px; font-weight: bold; color: #28a745; padding: 10px;")
             elif signal_type == 'sell':
-                main_signal_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #dc3545; padding: 10px;")
+                main_signal_label.setStyleSheet(
+                    "font-size: 16px; font-weight: bold; color: #dc3545; padding: 10px;")
             else:
-                main_signal_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c757d; padding: 10px;")
+                main_signal_label.setStyleSheet(
+                    "font-size: 16px; font-weight: bold; color: #6c757d; padding: 10px;")
 
             # 更新信号强度
             signal_strength_bar = self.get_widget('signal_strength_bar')
@@ -880,10 +832,14 @@ class RightPanel(BasePanel):
             for signal in history_signals[-10:]:  # 只显示最近10个信号
                 row = signal_table.rowCount()
                 signal_table.insertRow(row)
-                signal_table.setItem(row, 0, QTableWidgetItem(signal.get('date', '')))
-                signal_table.setItem(row, 1, QTableWidgetItem(signal.get('type', '')))
-                signal_table.setItem(row, 2, QTableWidgetItem(str(signal.get('price', ''))))
-                signal_table.setItem(row, 3, QTableWidgetItem(f"{signal.get('return', 0):.2f}%"))
+                signal_table.setItem(
+                    row, 0, QTableWidgetItem(signal.get('date', '')))
+                signal_table.setItem(
+                    row, 1, QTableWidgetItem(signal.get('type', '')))
+                signal_table.setItem(row, 2, QTableWidgetItem(
+                    str(signal.get('price', ''))))
+                signal_table.setItem(row, 3, QTableWidgetItem(
+                    f"{signal.get('return', 0):.2f}%"))
 
             # 更新信号统计
             signal_stats_text = self.get_widget('signal_stats_text')
@@ -908,17 +864,22 @@ class RightPanel(BasePanel):
             risk_level = risk_data.get('level', 'unknown')
             risk_score = risk_data.get('score', 0)
 
-            risk_level_label.setText(f"{risk_level.upper()}\n风险评分: {risk_score}")
+            risk_level_label.setText(
+                f"{risk_level.upper()}\n风险评分: {risk_score}")
 
             # 设置风险等级颜色
             if risk_level == 'low':
-                risk_level_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #28a745; padding: 15px;")
+                risk_level_label.setStyleSheet(
+                    "font-size: 18px; font-weight: bold; color: #28a745; padding: 15px;")
             elif risk_level == 'medium':
-                risk_level_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffc107; padding: 15px;")
+                risk_level_label.setStyleSheet(
+                    "font-size: 18px; font-weight: bold; color: #ffc107; padding: 15px;")
             elif risk_level == 'high':
-                risk_level_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #dc3545; padding: 15px;")
+                risk_level_label.setStyleSheet(
+                    "font-size: 18px; font-weight: bold; color: #dc3545; padding: 15px;")
             else:
-                risk_level_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #6c757d; padding: 15px;")
+                risk_level_label.setStyleSheet(
+                    "font-size: 18px; font-weight: bold; color: #6c757d; padding: 15px;")
 
             # 更新风险指标表格
             risk_table = self.get_widget('risk_table')
@@ -951,7 +912,8 @@ class RightPanel(BasePanel):
                 row = backtest_table.rowCount()
                 backtest_table.insertRow(row)
                 backtest_table.setItem(row, 0, QTableWidgetItem(metric_name))
-                backtest_table.setItem(row, 1, QTableWidgetItem(str(metric_value)))
+                backtest_table.setItem(
+                    row, 1, QTableWidgetItem(str(metric_value)))
 
             # 更新交易记录表格
             trade_table = self.get_widget('trade_table')
@@ -961,10 +923,14 @@ class RightPanel(BasePanel):
             for trade in trades[-20:]:  # 只显示最近20笔交易
                 row = trade_table.rowCount()
                 trade_table.insertRow(row)
-                trade_table.setItem(row, 0, QTableWidgetItem(trade.get('date', '')))
-                trade_table.setItem(row, 1, QTableWidgetItem(trade.get('action', '')))
-                trade_table.setItem(row, 2, QTableWidgetItem(str(trade.get('price', ''))))
-                trade_table.setItem(row, 3, QTableWidgetItem(str(trade.get('quantity', ''))))
+                trade_table.setItem(
+                    row, 0, QTableWidgetItem(trade.get('date', '')))
+                trade_table.setItem(
+                    row, 1, QTableWidgetItem(trade.get('action', '')))
+                trade_table.setItem(row, 2, QTableWidgetItem(
+                    str(trade.get('price', ''))))
+                trade_table.setItem(row, 3, QTableWidgetItem(
+                    str(trade.get('quantity', ''))))
 
                 profit = trade.get('profit', 0)
                 profit_item = QTableWidgetItem(f"{profit:.2f}")
@@ -982,7 +948,8 @@ class RightPanel(BasePanel):
         try:
             if self._current_stock_code:
                 self._update_status("正在刷新...")
-                self._load_analysis_data()
+                # 这里可以触发协调器重新加载数据
+                # self.coordinator.load_stock_analysis(self._current_stock_code, self._current_stock_name)
             else:
                 QMessageBox.information(self._root_frame, "提示", "请先选择股票")
 
@@ -1018,7 +985,8 @@ class RightPanel(BasePanel):
 
             # 这里可以实现回测功能
             # 暂时显示提示信息
-            QMessageBox.information(self._root_frame, "提示", f"正在运行{days}天回测...")
+            QMessageBox.information(
+                self._root_frame, "提示", f"正在运行{days}天回测...")
 
         except Exception as e:
             logger.error(f"Failed to run backtest: {e}")
@@ -1083,12 +1051,15 @@ class RightPanel(BasePanel):
                 result_table.setItem(i, 0, QTableWidgetItem(result["code"]))
                 result_table.setItem(i, 1, QTableWidgetItem(result["name"]))
                 result_table.setItem(i, 2, QTableWidgetItem(result["reason"]))
-                result_table.setItem(i, 3, QTableWidgetItem(str(result["score"])))
+                result_table.setItem(
+                    i, 3, QTableWidgetItem(str(result["score"])))
                 result_table.setItem(i, 4, QTableWidgetItem(result["risk"]))
-                result_table.setItem(i, 5, QTableWidgetItem(result["position"]))
+                result_table.setItem(
+                    i, 5, QTableWidgetItem(result["position"]))
 
             self._update_status("AI选股完成")
-            QMessageBox.information(self._root_frame, "AI选股", f"选股完成，共筛选出 {len(ai_results)} 只股票")
+            QMessageBox.information(
+                self._root_frame, "AI选股", f"选股完成，共筛选出 {len(ai_results)} 只股票")
 
         except Exception as e:
             logger.error(f"AI选股失败: {e}")
@@ -1184,21 +1155,15 @@ class RightPanel(BasePanel):
 
     def on_stock_selected(self, event: StockSelectedEvent) -> None:
         """处理股票选择事件"""
-        try:
-            logger.info(f"Right panel received stock selection: {event.stock_code}")
-            self.load_stock_analysis(event.stock_code, event.stock_name)
-
-        except Exception as e:
-            logger.error(f"Failed to handle stock selection in right panel: {e}")
+        # 这个方法现在可以被废弃，因为协调器会处理数据加载
+        # self.load_stock_analysis(event.stock_code, event.stock_name)
+        pass
 
     def on_analysis_complete(self, event: AnalysisCompleteEvent) -> None:
         """处理分析完成事件"""
-        try:
-            logger.info(f"Right panel received analysis complete: {event.stock_code}")
+        if event.stock_code == self.get_current_stock():
             # 可以在这里进行额外的处理
-
-        except Exception as e:
-            logger.error(f"Failed to handle analysis complete event: {e}")
+            pass
 
     def get_current_stock(self) -> str:
         """获取当前股票代码"""
@@ -1218,7 +1183,8 @@ class RightPanel(BasePanel):
 
                 # 等待线程正常退出
                 if not self._loader_thread.wait(5000):  # 等待5秒
-                    logger.warning("Analysis thread did not quit gracefully, terminating...")
+                    logger.warning(
+                        "Analysis thread did not quit gracefully, terminating...")
                     self._loader_thread.terminate()
                     self._loader_thread.wait()
 

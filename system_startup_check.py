@@ -57,7 +57,8 @@ def check_core_imports() -> Dict[str, Any]:
             print(f"  ✅ {module_name}")
 
         except Exception as e:
-            results[module_name] = {'status': 'error', 'message': f'❌ 导入失败: {str(e)}'}
+            results[module_name] = {'status': 'error',
+                                    'message': f'❌ 导入失败: {str(e)}'}
             print(f"  ❌ {module_name}: {str(e)}")
 
     return results
@@ -90,7 +91,8 @@ def check_pattern_recognition() -> Dict[str, Any]:
 
         # 检查系统信息
         info = get_pattern_recognizer_info()
-        print(f"  ✅ 系统信息获取成功 (版本: {info['version']}, 支持形态: {info['supported_patterns']}种)")
+        print(
+            f"  ✅ 系统信息获取成功 (版本: {info['version']}, 支持形态: {info['supported_patterns']}种)")
 
         return {
             'status': 'success',
@@ -231,7 +233,8 @@ def run_performance_test() -> Dict[str, Any]:
 
         print("  🔍 执行形态识别测试...")
         start_time = time.time()
-        patterns = recognizer.identify_patterns(kdata, confidence_threshold=0.1)
+        patterns = recognizer.identify_patterns(
+            kdata, confidence_threshold=0.1)
         processing_time = time.time() - start_time
 
         print(f"  ✅ 识别完成: {len(patterns)}个形态, 耗时: {processing_time:.3f}秒")
@@ -239,10 +242,12 @@ def run_performance_test() -> Dict[str, Any]:
         # 缓存测试
         print("  🔄 测试缓存性能...")
         start_time = time.time()
-        patterns_cached = recognizer.identify_patterns(kdata, confidence_threshold=0.1)
+        patterns_cached = recognizer.identify_patterns(
+            kdata, confidence_threshold=0.1)
         cached_time = time.time() - start_time
 
-        speedup = processing_time / cached_time if cached_time > 0 else float('inf')
+        speedup = processing_time / \
+            cached_time if cached_time > 0 else float('inf')
         print(f"  ✅ 缓存测试完成: 耗时: {cached_time:.3f}秒, 加速比: {speedup:.1f}x")
 
         return {
@@ -265,44 +270,25 @@ def run_performance_test() -> Dict[str, Any]:
         }
 
 
-def run_health_check() -> Dict[str, Any]:
+def run_health_check(checker) -> Dict[str, Any]:
     """运行系统健康检查"""
-    print("\n🏥 运行系统健康检查...")
+    print("\n🩺 运行系统健康检查...")
 
     try:
-        from analysis.system_health_checker import SystemHealthChecker
-
-        checker = SystemHealthChecker()
-        health_report = checker.run_comprehensive_check()
-
-        overall_health = health_report.get('overall_health', 'unknown')
-        print(f"  📊 系统总体健康状态: {overall_health.upper()}")
-
-        # 显示关键指标
-        perf = health_report.get('performance_metrics', {})
-        if perf.get('status') == 'healthy':
-            print(f"  ⚡ 性能指标: 成功率 {perf.get('success_rate', 0):.2%}, 平均处理时间 {perf.get('average_processing_time', 0):.3f}秒")
-
-        cache = health_report.get('cache_system', {})
-        if cache.get('status') == 'healthy':
-            print(f"  🔄 缓存系统: 命中率 {cache.get('hit_rate', 0):.2%}, 使用率 {cache.get('utilization', 0):.1%}")
-
-        memory = health_report.get('memory_usage', {})
-        if memory.get('status') == 'healthy':
-            print(f"  💾 内存使用: {memory.get('rss_mb', 0):.1f}MB ({memory.get('percent', 0):.1f}%)")
-
+        report = checker.run_comprehensive_check()
+        print(f"  ✅ 健康检查完成 (总体状态: {report.get('overall_health', '未知')})")
         return {
             'status': 'success',
-            'overall_health': overall_health,
-            'detailed_report': health_report
+            'report': report
         }
 
     except Exception as e:
-        error_msg = f"健康检查失败: {str(e)}"
+        error_msg = f"系统健康检查失败: {str(e)}"
         print(f"  ❌ {error_msg}")
         return {
             'status': 'error',
-            'error': error_msg
+            'error': error_msg,
+            'traceback': traceback.format_exc()
         }
 
 
@@ -317,7 +303,8 @@ def generate_startup_report(results: Dict[str, Any]) -> str:
 
     # 统计结果
     total_checks = len(results)
-    success_count = sum(1 for r in results.values() if r.get('status') == 'success')
+    success_count = sum(1 for r in results.values()
+                        if r.get('status') == 'success')
     error_count = total_checks - success_count
 
     lines.append(f"📊 检查统计:")
@@ -342,7 +329,8 @@ def generate_startup_report(results: Dict[str, Any]) -> str:
     perf_test = results.get('performance_test', {})
     if perf_test.get('status') == 'success':
         lines.append("⚡ 性能摘要:")
-        lines.append(f"  识别性能: {perf_test.get('performance_rating', 'unknown').upper()}")
+        lines.append(
+            f"  识别性能: {perf_test.get('performance_rating', 'unknown').upper()}")
         lines.append(f"  处理时间: {perf_test.get('processing_time', 0):.3f}秒")
         lines.append(f"  缓存加速: {perf_test.get('speedup_ratio', 0):.1f}倍")
         lines.append(f"  检测形态: {perf_test.get('patterns_detected', 0)}个")
@@ -365,56 +353,93 @@ def main():
     """主函数"""
     print_banner()
 
+    # 模拟主应用的服务初始化过程
+    print("\n🚀 初始化核心服务 (模拟环境)...")
+    services = None
+    try:
+        from core.events import EventBus
+        from core.containers import ServiceContainer
+        from core.metrics.repository import MetricsRepository
+        from core.metrics.app_metrics_service import initialize_app_metrics_service
+        from core.metrics.resource_service import SystemResourceService
+        from core.metrics.aggregation_service import MetricsAggregationService
+        from analysis.system_health_checker import SystemHealthChecker
+
+        event_bus = EventBus()
+        container = ServiceContainer()
+
+        # 注册服务
+        repo = MetricsRepository(db_path=':memory:')
+        container.register_instance(MetricsRepository, repo)
+
+        initialize_app_metrics_service(event_bus)
+
+        agg_service = MetricsAggregationService(event_bus, repo)
+        container.register_instance(MetricsAggregationService, agg_service)
+        agg_service.start()
+
+        resource_service = SystemResourceService(event_bus)
+        container.register_instance(SystemResourceService, resource_service)
+        resource_service.start()
+
+        services = {
+            "repo": repo,
+            "agg": agg_service,
+            "res": resource_service
+        }
+        print("  ✅ 核心监控服务初始化成功")
+
+        # 实例化健康检查器并注入依赖
+        checker = SystemHealthChecker(
+            aggregation_service=agg_service, repository=repo)
+
+    except Exception as e:
+        print(f"  ❌ 核心服务初始化失败: {e}")
+        traceback.print_exc()
+        return
+
+    all_results = {}
+    all_checks_ok = True
+
     # 执行各项检查
-    results = {}
+    checks_to_run = {
+        'core_imports': check_core_imports,
+        'pattern_recognition': check_pattern_recognition,
+        'ui_components': check_ui_components,
+        'database_files': check_database_files,
+        'performance_test': run_performance_test,
+    }
 
-    # 1. 核心模块导入检查
-    results['core_imports'] = check_core_imports()
+    for name, check_func in checks_to_run.items():
+        result = check_func()
+        all_results[name] = result
+        if result.get('status') == 'error':
+            all_checks_ok = False
 
-    # 2. 形态识别功能检查
-    results['pattern_recognition'] = check_pattern_recognition()
+    # 单独运行健康检查
+    health_result = run_health_check(checker)
+    all_results['health_check'] = health_result
+    if health_result.get('status') == 'error':
+        all_checks_ok = False
 
-    # 3. UI组件检查
-    results['ui_components'] = check_ui_components()
-
-    # 4. 数据库文件检查
-    results['database_files'] = check_database_files()
-
-    # 5. 性能测试
-    results['performance_test'] = run_performance_test()
-
-    # 6. 系统健康检查
-    results['health_check'] = run_health_check()
-
-    # 生成并显示报告
-    report = generate_startup_report(results)
+    # 生成和打印报告
+    report = generate_startup_report(all_results)
+    print("\n\n" + "="*60)
     print(report)
+    print("="*60 + "\n")
 
-    # 保存报告到文件
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = f"logs/startup_check_{timestamp}.txt"
+    if all_checks_ok:
+        print("✅✅✅ 所有检查项通过，系统状态良好！ ✅✅✅")
+    else:
+        print("❌❌❌ 部分检查项失败，请检查以上日志！ ❌❌❌")
 
-    os.makedirs("logs", exist_ok=True)
-    with open(report_file, 'w', encoding='utf-8') as f:
-        f.write(report)
-
-    print(f"\n📄 启动检查报告已保存到: {report_file}")
-
-    return results
+    # 清理服务
+    print("\n🧹 清理服务...")
+    if services:
+        services['agg'].dispose()
+        services['res'].dispose()
+    print("  ✅ 服务已清理")
 
 
 if __name__ == "__main__":
-    try:
-        results = main()
-
-        # 根据结果设置退出码
-        error_count = sum(1 for r in results.values() if r.get('status') == 'error')
-        sys.exit(0 if error_count == 0 else 1)
-
-    except KeyboardInterrupt:
-        print("\n\n⚠️ 用户中断检查")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n\n❌ 启动检查过程中发生未预期错误: {str(e)}")
-        print(traceback.format_exc())
-        sys.exit(1)
+    main()

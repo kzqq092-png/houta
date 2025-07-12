@@ -33,7 +33,8 @@ class RealDataProvider:
         # 缓存管理
         self._cache = {}
         self._cache_lock = threading.RLock()
-        self._cache_ttl = self.config.get('real_data', {}).get('cache_ttl', 300)  # 5分钟缓存
+        self._cache_ttl = self.config.get(
+            'real_data', {}).get('cache_ttl', 300)  # 5分钟缓存
 
         # 默认股票池
         self._default_stocks = [
@@ -184,7 +185,8 @@ class RealDataProvider:
                     continue
 
             if len(available_stocks) < count:
-                self.logger.warning(f"只找到 {len(available_stocks)} 只有效股票，少于请求的 {count} 只")
+                self.logger.warning(
+                    f"只找到 {len(available_stocks)} 只有效股票，少于请求的 {count} 只")
 
             self.logger.info(f"获取默认测试股票: {available_stocks}")
             return available_stocks[:count]
@@ -302,7 +304,8 @@ class RealDataProvider:
 
             # 确保必要的列存在
             required_columns = ['open', 'high', 'low', 'close', 'volume']
-            missing_columns = [col for col in required_columns if col not in kdata.columns]
+            missing_columns = [
+                col for col in required_columns if col not in kdata.columns]
 
             if missing_columns:
                 self.logger.warning(f"股票 {code} 缺少列: {missing_columns}")
@@ -322,7 +325,8 @@ class RealDataProvider:
 
             if invalid_mask.any():
                 invalid_count = invalid_mask.sum()
-                self.logger.warning(f"股票 {code} 有 {invalid_count} 条无效价格关系数据，已移除")
+                self.logger.warning(
+                    f"股票 {code} 有 {invalid_count} 条无效价格关系数据，已移除")
                 kdata = kdata[~invalid_mask]
 
             # 确保成交量为正数

@@ -15,14 +15,16 @@ from .events import (
     UIUpdateEvent,
     ThemeChangedEvent,
     PerformanceUpdateEvent,
-    IndicatorChangedEvent
+    IndicatorChangedEvent,
+    UIDataReadyEvent,
 )
 from .event_handler import EventHandler, AsyncEventHandler
 
 __all__ = [
-    'EventBus',
-    'get_event_bus',
     'BaseEvent',
+    'EventBus',
+    'EventHandler',
+    'AsyncEventHandler',
     'StockSelectedEvent',
     'ChartUpdateEvent',
     'AnalysisCompleteEvent',
@@ -32,6 +34,5 @@ __all__ = [
     'ThemeChangedEvent',
     'PerformanceUpdateEvent',
     'IndicatorChangedEvent',
-    'EventHandler',
-    'AsyncEventHandler'
+    'UIDataReadyEvent',
 ]

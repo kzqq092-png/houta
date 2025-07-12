@@ -112,7 +112,8 @@ def calculate_candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
             if hasattr(talib, pattern_name):
                 pattern_func = getattr(talib, pattern_name)
                 result[pattern_name] = pd.Series(
-                    pattern_func(open_price.values, high.values, low.values, close.values),
+                    pattern_func(open_price.values, high.values,
+                                 low.values, close.values),
                     index=close.index
                 )
 
@@ -145,14 +146,18 @@ def calculate_pattern_recognition_features(df: pd.DataFrame) -> pd.DataFrame:
         )
 
         # 计算K线实体占比
-        result['body_percent'] = result['body_length'] / (result['high'] - result['low']).replace(0, 1e-10)
+        result['body_percent'] = result['body_length'] / \
+            (result['high'] - result['low']).replace(0, 1e-10)
 
         # 计算上下影线占比
-        result['upper_shadow_percent'] = result['upper_shadow'] / (result['high'] - result['low']).replace(0, 1e-10)
-        result['lower_shadow_percent'] = result['lower_shadow'] / (result['high'] - result['low']).replace(0, 1e-10)
+        result['upper_shadow_percent'] = result['upper_shadow'] / \
+            (result['high'] - result['low']).replace(0, 1e-10)
+        result['lower_shadow_percent'] = result['lower_shadow'] / \
+            (result['high'] - result['low']).replace(0, 1e-10)
 
         # 计算K线方向
-        result['candle_direction'] = np.where(result['close'] >= result['open'], 1, -1)
+        result['candle_direction'] = np.where(
+            result['close'] >= result['open'], 1, -1)
 
         # 识别锤子线
         result['is_hammer'] = ((result['lower_shadow'] > 2 * result['body_length']) &
@@ -176,7 +181,8 @@ def calculate_pattern_recognition_features(df: pd.DataFrame) -> pd.DataFrame:
                                           (result['close'] < result['open'].shift(1)))
 
         # 识别十字星
-        result['is_doji'] = (result['body_length'] < 0.1 * (result['high'] - result['low']))
+        result['is_doji'] = (result['body_length'] < 0.1 *
+                             (result['high'] - result['low']))
 
         # 识别启明星
         result['is_morning_star'] = ((result['candle_direction'].shift(2) == -1) &

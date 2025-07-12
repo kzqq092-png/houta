@@ -18,17 +18,22 @@ from utils.imports import get_sklearn
 _sklearn_modules = get_sklearn()
 
 # 获取ensemble模块
-sklearn_ensemble = _sklearn_modules.get('ensemble') if _sklearn_modules else None
+sklearn_ensemble = _sklearn_modules.get(
+    'ensemble') if _sklearn_modules else None
 if sklearn_ensemble:
-    RandomForestClassifier = getattr(sklearn_ensemble, 'RandomForestClassifier', None)
-    GradientBoostingClassifier = getattr(sklearn_ensemble, 'GradientBoostingClassifier', None)
+    RandomForestClassifier = getattr(
+        sklearn_ensemble, 'RandomForestClassifier', None)
+    GradientBoostingClassifier = getattr(
+        sklearn_ensemble, 'GradientBoostingClassifier', None)
     StackingClassifier = getattr(sklearn_ensemble, 'StackingClassifier', None)
     VotingClassifier = getattr(sklearn_ensemble, 'VotingClassifier', None)
 
 # 获取linear_model模块
-sklearn_linear_model = _sklearn_modules.get('linear_model') if _sklearn_modules else None
+sklearn_linear_model = _sklearn_modules.get(
+    'linear_model') if _sklearn_modules else None
 if sklearn_linear_model:
-    LogisticRegression = getattr(sklearn_linear_model, 'LogisticRegression', None)
+    LogisticRegression = getattr(
+        sklearn_linear_model, 'LogisticRegression', None)
 
 # 获取svm模块
 sklearn_svm = _sklearn_modules.get('svm') if _sklearn_modules else None
@@ -149,7 +154,8 @@ def train_enhanced_model(X_train, y_train):
     if len(base_models) >= 3:
         print("创建集成模型...")
         # 定义元模型
-        meta_model = LogisticRegression(max_iter=1000, class_weight='balanced', random_state=42)
+        meta_model = LogisticRegression(
+            max_iter=1000, class_weight='balanced', random_state=42)
 
         # 创建堆叠集成
         stacking_model = StackingClassifier(
@@ -194,12 +200,14 @@ def train_enhanced_model(X_train, y_train):
     except Exception as e:
         print(f"模型训练出错: {e}")
         print("回退到随机森林模型...")
-        final_model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+        final_model = RandomForestClassifier(
+            n_estimators=100, random_state=42, class_weight='balanced')
         final_model.fit(X_train, y_train)
 
     # 计算模型评估指标
     try:
-        cv_scores = cross_val_score(final_model, X_train, y_train, cv=5, scoring='accuracy')
+        cv_scores = cross_val_score(
+            final_model, X_train, y_train, cv=5, scoring='accuracy')
         print(f"交叉验证平均准确率: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
     except Exception as e:
         print(f"交叉验证出错: {e}")
@@ -243,7 +251,8 @@ def prevent_overfitting(X_train, y_train, X_test, y_test):
     )
 
     # 初始化基础模型
-    base_model = RandomForestClassifier(random_state=42, class_weight='balanced')
+    base_model = RandomForestClassifier(
+        random_state=42, class_weight='balanced')
 
     # 设置参数网格
     param_grid = {
@@ -299,11 +308,14 @@ def prevent_overfitting(X_train, y_train, X_test, y_test):
 
         # 如果max_depth不是None，减少它
         if regularized_params.get('max_depth') is not None:
-            regularized_params['max_depth'] = max(5, regularized_params['max_depth'] // 2)
+            regularized_params['max_depth'] = max(
+                5, regularized_params['max_depth'] // 2)
 
         # 增加min_samples_split和min_samples_leaf以减少复杂度
-        regularized_params['min_samples_split'] = min(20, regularized_params.get('min_samples_split', 2) * 2)
-        regularized_params['min_samples_leaf'] = min(10, regularized_params.get('min_samples_leaf', 1) * 2)
+        regularized_params['min_samples_split'] = min(
+            20, regularized_params.get('min_samples_split', 2) * 2)
+        regularized_params['min_samples_leaf'] = min(
+            10, regularized_params.get('min_samples_leaf', 1) * 2)
 
         # 使用正则化参数创建新模型
         regularized_model = RandomForestClassifier(

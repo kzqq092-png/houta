@@ -10,7 +10,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QFormLayout, QPushButton, QTextEdit
 
-from ..plugin_interface import (
+# 修改导入方式，使用绝对导入
+from plugins.plugin_interface import (
     IDataSourcePlugin, PluginMetadata, PluginType, PluginCategory,
     plugin_metadata, register_plugin, PluginContext
 )
@@ -52,7 +53,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         """获取插件元数据"""
         return self._plugin_metadata
 
-    def initialize(self, context: PluginContext) -> bool:
+    def initialize(self, context: PluginContext = None) -> bool:
         """
         初始化插件
 
@@ -65,20 +66,28 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         try:
             self._context = context
 
-            # 加载配置
-            config = context.get_plugin_config(self.metadata.name)
-            if config:
-                self._config.update(config)
+            # 如果上下文不为空，加载配置和注册事件
+            if context:
+                # 加载配置
+                config = context.get_plugin_config(self.metadata.name)
+                if config:
+                    self._config.update(config)
 
-            # 注册事件处理器
-            context.register_event_handler("market_close", self._on_market_close)
+                # 注册事件处理器
+                context.register_event_handler(
+                    "market_close", self._on_market_close)
 
-            context.log_manager.info(f"Yahoo Finance数据源插件初始化成功")
+                context.log_manager.info(f"Yahoo Finance数据源插件初始化成功")
+            else:
+                print("Yahoo Finance数据源插件初始化成功（无上下文）")
+
             return True
 
         except Exception as e:
             if context:
                 context.log_manager.error(f"Yahoo Finance数据源插件初始化失败: {e}")
+            else:
+                print(f"Yahoo Finance数据源插件初始化失败: {e}")
             return False
 
     def cleanup(self) -> None:
@@ -138,13 +147,15 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                 self._cache[cache_key] = (datetime.now(), data)
 
             if self._context:
-                self._context.log_manager.info(f"成功获取数据: {symbol} ({data_type})")
+                self._context.log_manager.info(
+                    f"成功获取数据: {symbol} ({data_type})")
 
             return data
 
         except Exception as e:
             if self._context:
-                self._context.log_manager.error(f"获取数据失败: {symbol} ({data_type}) - {e}")
+                self._context.log_manager.error(
+                    f"获取数据失败: {symbol} ({data_type}) - {e}")
             raise
 
     def _fetch_daily_data(self, symbol: str, **params) -> pd.DataFrame:
@@ -194,15 +205,18 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             date = datetime.strptime(date, '%Y-%m-%d').date()
 
         # 生成分钟级数据
-        start_time = datetime.combine(date, datetime.min.time().replace(hour=9, minute=30))
-        end_time = datetime.combine(date, datetime.min.time().replace(hour=16, minute=0))
+        start_time = datetime.combine(
+            date, datetime.min.time().replace(hour=9, minute=30))
+        end_time = datetime.combine(
+            date, datetime.min.time().replace(hour=16, minute=0))
 
         # 根据间隔生成时间序列
         interval_minutes = {
             '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60
         }.get(interval, 1)
 
-        times = pd.date_range(start_time, end_time, freq=f'{interval_minutes}min')
+        times = pd.date_range(start_time, end_time,
+                              freq=f'{interval_minutes}min')
 
         np.random.seed(hash(f"{symbol}_{date}") % 2**32)
 
@@ -213,8 +227,10 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
 
         # 生成OHLC数据
         opens = prices * (1 + np.random.normal(0, 0.001, len(times)))
-        highs = np.maximum(opens, prices) * (1 + np.abs(np.random.normal(0, 0.002, len(times))))
-        lows = np.minimum(opens, prices) * (1 - np.abs(np.random.normal(0, 0.002, len(times))))
+        highs = np.maximum(opens, prices) * \
+            (1 + np.abs(np.random.normal(0, 0.002, len(times))))
+        lows = np.minimum(opens, prices) * \
+            (1 - np.abs(np.random.normal(0, 0.002, len(times))))
         closes = prices
         volumes = np.random.randint(1000, 10000, len(times))
 
@@ -444,7 +460,8 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                 self._config['retry_count'] = int(retry_edit.text())
 
                 if self._context:
-                    self._context.save_plugin_config(self.metadata.name, self._config)
+                    self._context.save_plugin_config(
+                        self.metadata.name, self._config)
 
             except ValueError:
                 result_text.setPlainText("✗ 配置格式错误")

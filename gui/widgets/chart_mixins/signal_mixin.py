@@ -49,15 +49,18 @@ class SignalMixin:
             max_signals_per_screen = 20  # 每屏最多显示信号数
             if len(visible_signals) > max_signals_per_screen:
                 # 聚合展示：仅显示重要信号，其余用统计标记
-                important_signals = self._select_important_signals(visible_signals, max_signals_per_screen)
-                aggregated_count = len(visible_signals) - len(important_signals)
+                important_signals = self._select_important_signals(
+                    visible_signals, max_signals_per_screen)
+                aggregated_count = len(visible_signals) - \
+                    len(important_signals)
                 visible_signals = important_signals
 
                 # 在角落显示聚合信息
                 if aggregated_count > 0:
                     agg_text = self.main_ax.text(0.02, 0.98, f"+ {aggregated_count} 个信号",
                                                  transform=self.main_ax.transAxes,
-                                                 bbox=dict(boxstyle="round,pad=0.3", facecolor="orange", alpha=0.7),
+                                                 bbox=dict(
+                                                     boxstyle="round,pad=0.3", facecolor="orange", alpha=0.7),
                                                  fontsize=9, verticalalignment='top')
                     self._signal_artists.append(agg_text)
 
@@ -77,7 +80,8 @@ class SignalMixin:
     def _select_important_signals(self, signals, max_count):
         """选择重要信号，基于置信度、类型优先级等"""
         # 按置信度排序，优先显示高置信度信号
-        sorted_signals = sorted(signals, key=lambda x: x.get('confidence', 0), reverse=True)
+        sorted_signals = sorted(signals, key=lambda x: x.get(
+            'confidence', 0), reverse=True)
         return sorted_signals[:max_count]
 
     def _plot_single_signal(self, signal):
@@ -213,7 +217,8 @@ class SignalMixin:
                 current_xlim = self.main_ax.get_xlim()
                 window_size = current_xlim[1] - current_xlim[0]
                 new_center = idx
-                self.main_ax.set_xlim(new_center - window_size/2, new_center + window_size/2)
+                self.main_ax.set_xlim(
+                    new_center - window_size/2, new_center + window_size/2)
 
             self.canvas.draw()
 
@@ -291,7 +296,8 @@ class SignalMixin:
             # 修复：严格的索引边界检查
             if not isinstance(idx, (int, float)) or idx < 0 or idx >= len(kdata):
                 if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.warning(f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
+                    self.log_manager.warning(
+                        f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
                 invalid_patterns += 1
                 continue
 
@@ -299,7 +305,8 @@ class SignalMixin:
             idx = int(idx)
             valid_patterns += 1
 
-            pattern_name = pat.get('pattern_name', pat.get('pattern', 'Unknown'))
+            pattern_name = pat.get(
+                'pattern_name', pat.get('pattern', 'Unknown'))
             signal = pat.get('signal', 'neutral')
             confidence = pat.get('confidence', 0)
             price = kdata.iloc[idx]['high'] if signal == 'buy' else kdata.iloc[idx]['low']
@@ -311,12 +318,14 @@ class SignalMixin:
             # 绘制专业箭头标记
             if signal == 'buy':
                 # 买入信号：空心向上三角，位于K线下方
-                arrow_y = kdata.iloc[idx]['low'] - (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                arrow_y = kdata.iloc[idx]['low'] - \
+                    (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
                 ax.scatter(idx, arrow_y, marker='^', s=80, facecolors='none',
                            edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
             elif signal == 'sell':
                 # 卖出信号：空心向下三角，位于K线上方
-                arrow_y = kdata.iloc[idx]['high'] + (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                arrow_y = kdata.iloc[idx]['high'] + \
+                    (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
                 ax.scatter(idx, arrow_y, marker='v', s=80, facecolors='none',
                            edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
             else:
@@ -336,7 +345,8 @@ class SignalMixin:
 
         # 记录绘制结果
         if hasattr(self, 'log_manager') and self.log_manager:
-            self.log_manager.info(f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
+            self.log_manager.info(
+                f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
 
         # 高亮特定形态（如果指定）
         if highlight_index is not None and highlight_index in self._pattern_info:
@@ -351,7 +361,8 @@ class SignalMixin:
     def highlight_pattern(self, idx: int):
         """外部调用高亮指定K线索引的形态"""
         if hasattr(self, '_current_pattern_signals'):
-            self.plot_patterns(self._current_pattern_signals, highlight_index=idx)
+            self.plot_patterns(self._current_pattern_signals,
+                               highlight_index=idx)
 
     def mark_highlight_candle(self, event):
         # 标记鼠标所在K线为高亮

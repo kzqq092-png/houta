@@ -82,7 +82,8 @@ def example_gui_maintenance():
         print("\n要使用GUI界面，请运行以下代码：")
         print("```python")
         print("from PyQt5.QtWidgets import QApplication")
-        print("from gui.dialogs.system_optimizer_dialog import show_system_optimizer_dialog")
+        print(
+            "from gui.dialogs.system_optimizer_dialog import show_system_optimizer_dialog")
         print("app = QApplication([])")
         print("show_system_optimizer_dialog()")
         print("app.exec_()")

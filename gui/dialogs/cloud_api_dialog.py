@@ -202,7 +202,8 @@ class CloudApiDialog(QDialog):
         status_layout = QVBoxLayout(status_group)
 
         self.registration_status_label = QLabel("未注册")
-        self.registration_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.registration_status_label.setStyleSheet(
+            "color: red; font-weight: bold;")
         status_layout.addWidget(self.registration_status_label)
 
         self.last_heartbeat_label = QLabel("从未")
@@ -489,7 +490,8 @@ class CloudApiDialog(QDialog):
                 self.sync_progress.setValue(progress)
 
                 # 添加到任务表格
-                self.add_sync_task(f"sync_{int(time.time())}", data_type, "进行中", progress)
+                self.add_sync_task(
+                    f"sync_{int(time.time())}", data_type, "进行中", progress)
 
                 # 模拟网络延迟
                 time.sleep(0.1)
@@ -515,7 +517,8 @@ class CloudApiDialog(QDialog):
         self.sync_tasks_table.setItem(row, 1, QTableWidgetItem(data_type))
         self.sync_tasks_table.setItem(row, 2, QTableWidgetItem(status))
         self.sync_tasks_table.setItem(row, 3, QTableWidgetItem(f"{progress}%"))
-        self.sync_tasks_table.setItem(row, 4, QTableWidgetItem(time.strftime("%H:%M:%S")))
+        self.sync_tasks_table.setItem(
+            row, 4, QTableWidgetItem(time.strftime("%H:%M:%S")))
 
     def register_node(self):
         """注册节点"""
@@ -529,7 +532,8 @@ class CloudApiDialog(QDialog):
 
             # 模拟注册过程
             self.registration_status_label.setText("已注册")
-            self.registration_status_label.setStyleSheet("color: green; font-weight: bold;")
+            self.registration_status_label.setStyleSheet(
+                "color: green; font-weight: bold;")
 
             # 发送心跳
             self.send_heartbeat()
@@ -544,7 +548,8 @@ class CloudApiDialog(QDialog):
         """注销节点"""
         try:
             self.registration_status_label.setText("未注册")
-            self.registration_status_label.setStyleSheet("color: red; font-weight: bold;")
+            self.registration_status_label.setStyleSheet(
+                "color: red; font-weight: bold;")
 
             QMessageBox.information(self, "成功", "节点注销成功！")
             self.add_monitor_log("节点注销成功")

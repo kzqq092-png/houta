@@ -88,7 +88,8 @@ def reduce_noise_with_filtering(df, columns=None, window=5, method='ewm'):
     # 应用相应的滤波方法
     for col in columns:
         if method == 'sma':  # 简单移动平均
-            df_filtered[col] = df[col].rolling(window=window, center=False).mean()
+            df_filtered[col] = df[col].rolling(
+                window=window, center=False).mean()
         elif method == 'ewm':  # 指数加权移动平均
             df_filtered[col] = df[col].ewm(span=window, adjust=False).mean()
         elif method == 'kalman':  # 简化的卡尔曼滤波
@@ -170,7 +171,8 @@ def prepare_features_and_labels(df, future_period=5, threshold=0.015):
 
     # 对最新数据，我们将NaN标签设为0（持有信号）
     if len(latest_dates) > 0:
-        df.loc[latest_dates, 'target'] = df.loc[latest_dates, 'target'].fillna(0)
+        df.loc[latest_dates, 'target'] = df.loc[latest_dates,
+                                                'target'].fillna(0)
 
     # 对于预测特征中的NaN值，使用前向填充处理
     df = df.fillna(method='ffill')
@@ -179,7 +181,8 @@ def prepare_features_and_labels(df, future_period=5, threshold=0.015):
     df = df.fillna(df.mean())
 
     # 选择特征列，排除标签和原始价格数据
-    feature_columns = [col for col in df.columns if col not in ['target', 'future_return', 'date', 'open', 'high', 'low', 'close', 'volume']]
+    feature_columns = [col for col in df.columns if col not in [
+        'target', 'future_return', 'date', 'open', 'high', 'low', 'close', 'volume']]
 
     # 增加一个标记，指示哪些行是最新的数据点（可能没有实际标签）
     df['is_latest'] = False
@@ -247,7 +250,8 @@ def preprocess_data(df):
         if 'open' in result.columns and 'high' in result.columns and 'low' in result.columns and 'close' in result.columns:
             # 确保high >= low
             if row['high'] < row['low']:
-                result.loc[i, 'high'], result.loc[i, 'low'] = row['low'], row['high']
+                result.loc[i, 'high'], result.loc[i,
+                                                  'low'] = row['low'], row['high']
 
             # 确保high >= open, close
             result.loc[i, 'high'] = max(row['high'], row['open'], row['close'])
@@ -265,7 +269,8 @@ def preprocess_data(df):
         result['returns'] = result['close'].pct_change()
 
         # 计算对数收益率
-        result['log_returns'] = np.log(result['close'] / result['close'].shift(1))
+        result['log_returns'] = np.log(
+            result['close'] / result['close'].shift(1))
 
     if 'volume' in result.columns and 'close' in result.columns:
         # 计算成交额
@@ -325,14 +330,17 @@ def create_features_targets(df, target_type='regression', lookahead_periods=5, t
     features = df.copy()
 
     # 从features中排除不应该用作特征的列
-    cols_to_exclude = ['returns', 'log_returns', 'target', 'signal', 'position']
-    feature_cols = [col for col in features.columns if col not in cols_to_exclude]
+    cols_to_exclude = ['returns', 'log_returns',
+                       'target', 'signal', 'position']
+    feature_cols = [
+        col for col in features.columns if col not in cols_to_exclude]
     features = features[feature_cols]
 
     # 创建目标变量
     if 'close' in df.columns:
         # 未来收益率
-        future_returns = df['close'].pct_change(lookahead_periods).shift(-lookahead_periods)
+        future_returns = df['close'].pct_change(
+            lookahead_periods).shift(-lookahead_periods)
 
         if target_type == 'regression':
             # 回归目标 - 直接使用未来收益率
@@ -429,10 +437,12 @@ def balance_samples(X, y):
 
                     # 如果样本数量少于需要的数量，则重复采样
                     if len(indices) < window_min:
-                        indices = np.random.choice(indices, window_min, replace=True)
+                        indices = np.random.choice(
+                            indices, window_min, replace=True)
                     # 如果样本数量多于需要的数量，则随机选择
                     elif len(indices) > window_min:
-                        indices = np.random.choice(indices, window_min, replace=False)
+                        indices = np.random.choice(
+                            indices, window_min, replace=False)
 
                     # 收集样本
                     X_samples.append(X_window[indices])
@@ -471,16 +481,21 @@ def balance_samples(X, y):
 
         # 计算采样质量指标
         original_dist = np.array([count for count in class_counts.values()])
-        resampled_dist = np.array([count for count in resampled_counts.values()])
+        resampled_dist = np.array(
+            [count for count in resampled_counts.values()])
 
         # 分布均衡度
-        original_entropy = -np.sum((original_dist/sum(original_dist)) * np.log2(original_dist/sum(original_dist)))
-        resampled_entropy = -np.sum((resampled_dist/sum(resampled_dist)) * np.log2(resampled_dist/sum(resampled_dist)))
+        original_entropy = - \
+            np.sum((original_dist/sum(original_dist)) *
+                   np.log2(original_dist/sum(original_dist)))
+        resampled_entropy = -np.sum((resampled_dist/sum(resampled_dist))
+                                    * np.log2(resampled_dist/sum(resampled_dist)))
 
         print("\n采样质量评估:")
         print(f"原始分布熵: {original_entropy:.4f}")
         print(f"重采样分布熵: {resampled_entropy:.4f}")
-        print(f"分布改善: {((resampled_entropy - original_entropy) / original_entropy) * 100:.3f}%")
+        print(
+            f"分布改善: {((resampled_entropy - original_entropy) / original_entropy) * 100:.3f}%")
 
         return X_resampled, y_resampled
 

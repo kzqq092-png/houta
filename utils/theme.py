@@ -25,7 +25,8 @@ from PyQt5.QtGui import *
 # Global theme manager instance
 _theme_manager_instance: Optional['ThemeManager'] = None
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
+DB_PATH = os.path.join(os.path.dirname(
+    os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
 
 
 def safe_read_file(filepath):
@@ -109,7 +110,8 @@ class ThemeManager(QObject):
     def _import_themes_to_db(self):
         # 导入QSS主题
         for qss_file in glob.glob(os.path.join(self.qss_theme_dir, '*.qss')):
-            name = self._extract_qss_theme_name(qss_file) or os.path.splitext(os.path.basename(qss_file))[0]
+            name = self._extract_qss_theme_name(
+                qss_file) or os.path.splitext(os.path.basename(qss_file))[0]
             content = safe_read_file(qss_file)
             # 跳过已存在的主题
             cur = self.conn.cursor()

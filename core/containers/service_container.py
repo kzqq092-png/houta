@@ -124,11 +124,13 @@ class ServiceContainer:
         with self._lock:
             # 检查循环依赖
             if service_type in self._resolving:
-                raise ValueError(f"Circular dependency detected for {service_type.__name__}")
+                raise ValueError(
+                    f"Circular dependency detected for {service_type.__name__}")
 
             service_info = self._registry.get_service_info(service_type)
             if service_info is None:
-                raise ValueError(f"Service {service_type.__name__} is not registered")
+                raise ValueError(
+                    f"Service {service_type.__name__} is not registered")
 
             # 根据作用域获取或创建实例
             if service_info.scope == ServiceScope.SINGLETON:
@@ -170,7 +172,8 @@ class ServiceContainer:
         try:
             return self.resolve(service_type)
         except Exception as e:
-            logger.debug(f"Failed to resolve service {service_type.__name__}: {e}")
+            logger.debug(
+                f"Failed to resolve service {service_type.__name__}: {e}")
             return None
 
     def get_service(self, service_name_or_type: Union[str, Type[T]]) -> Optional[T]:
@@ -274,7 +277,8 @@ class ServiceContainer:
                     except:
                         # 如果按类型解析失败，尝试按名称解析
                         if self._registry.get_service_info_by_name(param.name):
-                            injected_kwargs[param.name] = self.resolve_by_name(param.name)
+                            injected_kwargs[param.name] = self.resolve_by_name(
+                                param.name)
 
         # 合并参数
         final_kwargs = {**injected_kwargs, **kwargs}
@@ -319,7 +323,8 @@ class ServiceContainer:
         """
         # 这个功能需要在ServiceRegistry中实现
         # 暂时返回False
-        logger.warning(f"Remove service '{name}' is not implemented in new architecture")
+        logger.warning(
+            f"Remove service '{name}' is not implemented in new architecture")
         return False
 
     def clear(self) -> None:
@@ -347,9 +352,11 @@ class ServiceContainer:
                 service = self.resolve(service_info.service_type)
                 if service and hasattr(service, 'initialize'):
                     service.initialize()
-                    logger.debug(f"Service initialized: {service_info.name or service_info.service_type.__name__}")
+                    logger.debug(
+                        f"Service initialized: {service_info.name or service_info.service_type.__name__}")
             except Exception as e:
-                logger.error(f"Failed to initialize service {service_info.name or service_info.service_type.__name__}: {e}")
+                logger.error(
+                    f"Failed to initialize service {service_info.name or service_info.service_type.__name__}: {e}")
 
     def _get_singleton(self, service_info: ServiceInfo) -> Any:
         """获取单例实例"""
@@ -370,7 +377,8 @@ class ServiceContainer:
             # 如果没有当前作用域，当作单例处理
             return self._get_singleton(service_info)
 
-        scope_instances = self._scoped_instances.setdefault(self._current_scope, {})
+        scope_instances = self._scoped_instances.setdefault(
+            self._current_scope, {})
 
         if service_info.service_type in scope_instances:
             return scope_instances[service_info.service_type]
@@ -389,12 +397,14 @@ class ServiceContainer:
                 instance = self._call_factory(service_info.factory)
             elif callable(service_info.implementation):
                 # 使用构造函数
-                instance = self._call_constructor(service_info.implementation, service_info.dependencies)
+                instance = self._call_constructor(
+                    service_info.implementation, service_info.dependencies)
             else:
                 # 直接返回实例
                 instance = service_info.implementation
 
-            logger.debug(f"Created instance of {service_info.service_type.__name__}")
+            logger.debug(
+                f"Created instance of {service_info.service_type.__name__}")
             return instance
 
         finally:

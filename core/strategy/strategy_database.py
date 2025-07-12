@@ -36,7 +36,8 @@ class StrategyDatabaseManager:
 
         # 从配置获取数据库路径，避免硬编码
         if db_path is None:
-            db_path = self.config.get('strategy_database', {}).get('path', 'data/strategies.db')
+            db_path = self.config.get('strategy_database', {}).get(
+                'path', 'data/strategies.db')
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,12 +124,18 @@ class StrategyDatabaseManager:
             ''')
 
             # 创建索引提高查询性能
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategies_name ON strategies (name)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategies_type ON strategies (strategy_type)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategies_category ON strategies (category)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_executions_strategy ON strategy_executions (strategy_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_execution ON strategy_signals (execution_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON strategy_signals (timestamp)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_strategies_name ON strategies (name)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_strategies_type ON strategies (strategy_type)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_strategies_category ON strategies (category)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_executions_strategy ON strategy_executions (strategy_id)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_signals_execution ON strategy_signals (execution_id)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON strategy_signals (timestamp)')
 
             conn.commit()
 
@@ -167,7 +174,8 @@ class StrategyDatabaseManager:
                 cursor = conn.cursor()
 
                 # 检查策略是否已存在
-                cursor.execute('SELECT id FROM strategies WHERE name = ?', (strategy_name,))
+                cursor.execute(
+                    'SELECT id FROM strategies WHERE name = ?', (strategy_name,))
                 existing = cursor.fetchone()
 
                 if existing:
@@ -188,7 +196,8 @@ class StrategyDatabaseManager:
                         class_path,
                         strategy_id
                     ))
-                    self.logger.info(f"更新策略: {strategy_name} (ID: {strategy_id})")
+                    self.logger.info(
+                        f"更新策略: {strategy_name} (ID: {strategy_id})")
                 else:
                     # 插入新策略
                     cursor.execute('''
@@ -205,7 +214,8 @@ class StrategyDatabaseManager:
                         class_path
                     ))
                     strategy_id = cursor.lastrowid
-                    self.logger.info(f"注册新策略: {strategy_name} (ID: {strategy_id})")
+                    self.logger.info(
+                        f"注册新策略: {strategy_name} (ID: {strategy_id})")
 
                 conn.commit()
                 return strategy_id
@@ -227,12 +237,14 @@ class StrategyDatabaseManager:
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute('SELECT * FROM strategies WHERE name = ? AND is_active = 1', (strategy_name,))
+                cursor.execute(
+                    'SELECT * FROM strategies WHERE name = ? AND is_active = 1', (strategy_name,))
                 row = cursor.fetchone()
 
                 if row:
                     strategy_info = dict(row)
-                    strategy_info['metadata'] = json.loads(strategy_info['metadata'])
+                    strategy_info['metadata'] = json.loads(
+                        strategy_info['metadata'])
 
                     # 获取参数信息
                     cursor.execute('''
@@ -294,7 +306,8 @@ class StrategyDatabaseManager:
 
                 for row in cursor.fetchall():
                     strategy_info = dict(row)
-                    strategy_info['metadata'] = json.loads(strategy_info['metadata'])
+                    strategy_info['metadata'] = json.loads(
+                        strategy_info['metadata'])
                     strategies.append(strategy_info)
 
                 return strategies
@@ -316,7 +329,8 @@ class StrategyDatabaseManager:
                 cursor = conn.cursor()
 
                 # 获取策略ID
-                cursor.execute('SELECT id FROM strategies WHERE name = ?', (strategy_name,))
+                cursor.execute(
+                    'SELECT id FROM strategies WHERE name = ?', (strategy_name,))
                 row = cursor.fetchone()
                 if not row:
                     raise ValueError(f"策略不存在: {strategy_name}")
@@ -324,7 +338,8 @@ class StrategyDatabaseManager:
                 strategy_id = row['id']
 
                 # 删除现有参数
-                cursor.execute('DELETE FROM strategy_parameters WHERE strategy_id = ?', (strategy_id,))
+                cursor.execute(
+                    'DELETE FROM strategy_parameters WHERE strategy_id = ?', (strategy_id,))
 
                 # 插入新参数
                 for param_name, param in parameters.items():
@@ -338,12 +353,15 @@ class StrategyDatabaseManager:
                         self._serialize_value(param.value),
                         param.param_type.__name__,
                         param.description,
-                        self._serialize_value(param.min_value) if param.min_value is not None else None,
-                        self._serialize_value(param.max_value) if param.max_value is not None else None
+                        self._serialize_value(
+                            param.min_value) if param.min_value is not None else None,
+                        self._serialize_value(
+                            param.max_value) if param.max_value is not None else None
                     ))
 
                 conn.commit()
-                self.logger.info(f"保存策略参数: {strategy_name} ({len(parameters)}个参数)")
+                self.logger.info(
+                    f"保存策略参数: {strategy_name} ({len(parameters)}个参数)")
 
         except Exception as e:
             self.logger.error(f"保存策略参数失败 {strategy_name}: {e}")
@@ -372,7 +390,8 @@ class StrategyDatabaseManager:
                 cursor = conn.cursor()
 
                 # 获取策略ID
-                cursor.execute('SELECT id FROM strategies WHERE name = ?', (strategy_name,))
+                cursor.execute(
+                    'SELECT id FROM strategies WHERE name = ?', (strategy_name,))
                 row = cursor.fetchone()
                 if not row:
                     raise ValueError(f"策略不存在: {strategy_name}")
@@ -409,7 +428,8 @@ class StrategyDatabaseManager:
                             signal.reason,
                             signal.stop_loss,
                             signal.take_profit,
-                            json.dumps(signal.metadata if hasattr(signal, 'metadata') else {})
+                            json.dumps(signal.metadata if hasattr(
+                                signal, 'metadata') else {})
                         ))
 
                     cursor.executemany('''
@@ -419,7 +439,8 @@ class StrategyDatabaseManager:
                     ''', signal_data)
 
                 conn.commit()
-                self.logger.info(f"保存执行结果: {strategy_name} (执行ID: {execution_id}, 信号数: {len(signals)})")
+                self.logger.info(
+                    f"保存执行结果: {strategy_name} (执行ID: {execution_id}, 信号数: {len(signals)})")
                 return execution_id
 
         except Exception as e:
@@ -440,7 +461,8 @@ class StrategyDatabaseManager:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('UPDATE strategies SET is_active = 0 WHERE name = ?', (strategy_name,))
+                cursor.execute(
+                    'UPDATE strategies SET is_active = 0 WHERE name = ?', (strategy_name,))
 
                 if cursor.rowcount > 0:
                     conn.commit()
@@ -471,7 +493,8 @@ class StrategyDatabaseManager:
             try:
                 # 验证数据格式
                 if not self.validator.validate_strategy_data(strategy_data):
-                    self.logger.warning(f"策略数据格式无效: {strategy_data.get('name', 'Unknown')}")
+                    self.logger.warning(
+                        f"策略数据格式无效: {strategy_data.get('name', 'Unknown')}")
                     failure_count += 1
                     continue
 
@@ -498,7 +521,8 @@ class StrategyDatabaseManager:
                     success_count += 1
 
             except Exception as e:
-                self.logger.error(f"导入策略失败 {strategy_data.get('name', 'Unknown')}: {e}")
+                self.logger.error(
+                    f"导入策略失败 {strategy_data.get('name', 'Unknown')}: {e}")
                 failure_count += 1
 
         self.logger.info(f"策略导入完成: 成功 {success_count}, 失败 {failure_count}")
@@ -526,7 +550,8 @@ class StrategyDatabaseManager:
                     ''', strategy_names)
                 else:
                     # 导出所有策略
-                    cursor.execute('SELECT * FROM strategies WHERE is_active = 1')
+                    cursor.execute(
+                        'SELECT * FROM strategies WHERE is_active = 1')
 
                 strategies = cursor.fetchall()
                 exported_data = []
@@ -554,7 +579,8 @@ class StrategyDatabaseManager:
 
                     # 解析元数据
                     try:
-                        strategy_data['metadata'] = json.loads(strategy_data['metadata'])
+                        strategy_data['metadata'] = json.loads(
+                            strategy_data['metadata'])
                     except (json.JSONDecodeError, TypeError):
                         strategy_data['metadata'] = {}
 
@@ -593,7 +619,8 @@ class StrategyDatabaseManager:
                 output_file.parent.mkdir(parents=True, exist_ok=True)
 
                 with open(output_file, 'w', encoding='utf-8') as f:
-                    json.dump(strategy_info, f, ensure_ascii=False, indent=2, default=str)
+                    json.dump(strategy_info, f, ensure_ascii=False,
+                              indent=2, default=str)
 
                 self.logger.info(f"策略已导出到文件: {output_path}")
 
@@ -630,7 +657,8 @@ class StrategyDatabaseManager:
                 executions = []
                 for row in cursor.fetchall():
                     execution = dict(row)
-                    execution['performance_metrics'] = json.loads(execution['performance_metrics'])
+                    execution['performance_metrics'] = json.loads(
+                        execution['performance_metrics'])
                     executions.append(execution)
 
                 return executions
@@ -702,25 +730,31 @@ class StrategyDatabaseManager:
                 stats = {}
 
                 # 策略统计
-                cursor.execute('SELECT COUNT(*) as count FROM strategies WHERE is_active = 1')
+                cursor.execute(
+                    'SELECT COUNT(*) as count FROM strategies WHERE is_active = 1')
                 stats['active_strategies'] = cursor.fetchone()['count']
 
-                cursor.execute('SELECT COUNT(*) as count FROM strategies WHERE is_active = 0')
+                cursor.execute(
+                    'SELECT COUNT(*) as count FROM strategies WHERE is_active = 0')
                 stats['deleted_strategies'] = cursor.fetchone()['count']
 
                 # 执行统计
-                cursor.execute('SELECT COUNT(*) as count FROM strategy_executions')
+                cursor.execute(
+                    'SELECT COUNT(*) as count FROM strategy_executions')
                 stats['total_executions'] = cursor.fetchone()['count']
 
-                cursor.execute('SELECT COUNT(*) as count FROM strategy_executions WHERE success = 1')
+                cursor.execute(
+                    'SELECT COUNT(*) as count FROM strategy_executions WHERE success = 1')
                 stats['successful_executions'] = cursor.fetchone()['count']
 
                 # 信号统计
-                cursor.execute('SELECT COUNT(*) as count FROM strategy_signals')
+                cursor.execute(
+                    'SELECT COUNT(*) as count FROM strategy_signals')
                 stats['total_signals'] = cursor.fetchone()['count']
 
                 # 数据库大小
-                cursor.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
+                cursor.execute(
+                    "SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
                 stats['database_size_bytes'] = cursor.fetchone()['size']
 
                 return stats

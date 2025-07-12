@@ -42,7 +42,8 @@ class GlobalExceptionHandler:
                 sys.exit(0)
 
             # 记录异常信息
-            error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            error_msg = ''.join(traceback.format_exception(
+                exc_type, exc_value, exc_traceback))
             logger.error(f"Uncaught exception: {error_msg}")
 
             # 显示错误对话框

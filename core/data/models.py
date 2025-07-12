@@ -54,9 +54,11 @@ class KlineData:
         if self.data is not None and not self.data.empty:
             # 确保必要的列存在
             required_columns = ['open', 'high', 'low', 'close', 'volume']
-            missing_columns = [col for col in required_columns if col not in self.data.columns]
+            missing_columns = [
+                col for col in required_columns if col not in self.data.columns]
             if missing_columns:
-                raise ValueError(f"Missing required columns: {missing_columns}")
+                raise ValueError(
+                    f"Missing required columns: {missing_columns}")
 
             # 自动设置开始和结束日期
             if self.start_date is None and 'datetime' in self.data.columns:

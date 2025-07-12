@@ -48,7 +48,8 @@ class IndustryService(CacheableService, ConfigurableService):
             if self._industry_manager:
                 logger.info("Industry service initialized successfully")
             else:
-                logger.warning("Failed to get industry manager, using fallback mode")
+                logger.warning(
+                    "Failed to get industry manager, using fallback mode")
                 self._create_fallback_manager()
 
         except Exception as e:
@@ -82,14 +83,18 @@ class IndustryService(CacheableService, ConfigurableService):
                     """获取行业股票"""
                     # 返回一些示例股票
                     return [
-                        {"code": "000001", "name": "平安银行", "industry": industry_code},
-                        {"code": "600036", "name": "招商银行", "industry": industry_code},
-                        {"code": "000002", "name": "万科A", "industry": industry_code},
+                        {"code": "000001", "name": "平安银行",
+                            "industry": industry_code},
+                        {"code": "600036", "name": "招商银行",
+                            "industry": industry_code},
+                        {"code": "000002", "name": "万科A",
+                            "industry": industry_code},
                     ]
 
                 def update_industry_data(self, source="eastmoney"):
                     """更新行业数据"""
-                    logger.info(f"Updating industry data from {source} (fallback mode)")
+                    logger.info(
+                        f"Updating industry data from {source} (fallback mode)")
                     return True
 
                 def get_supported_sources(self):
@@ -165,7 +170,8 @@ class IndustryService(CacheableService, ConfigurableService):
 
         try:
             if self._industry_manager:
-                stocks = self._industry_manager.get_industry_stocks(industry_code, source)
+                stocks = self._industry_manager.get_industry_stocks(
+                    industry_code, source)
 
                 # 缓存结果
                 self.put_to_cache(cache_key, stocks)
@@ -176,7 +182,8 @@ class IndustryService(CacheableService, ConfigurableService):
                 return []
 
         except Exception as e:
-            logger.error(f"Failed to get industry stocks for {industry_code} from {source}: {e}")
+            logger.error(
+                f"Failed to get industry stocks for {industry_code} from {source}: {e}")
             return []
 
     def update_industry_data(self, source: str = "eastmoney") -> bool:
@@ -209,7 +216,8 @@ class IndustryService(CacheableService, ConfigurableService):
                     )
                     self.event_bus.publish(event)
 
-                    logger.info(f"Industry data updated successfully from {source}")
+                    logger.info(
+                        f"Industry data updated successfully from {source}")
 
                 return success
             else:
@@ -267,7 +275,8 @@ class IndustryService(CacheableService, ConfigurableService):
             return matched_industries
 
         except Exception as e:
-            logger.error(f"Failed to search industries with keyword '{keyword}': {e}")
+            logger.error(
+                f"Failed to search industries with keyword '{keyword}': {e}")
             return []
 
     def get_industry_info(self, industry_code: str, source: str = "eastmoney") -> Optional[Dict[str, Any]]:
@@ -293,7 +302,8 @@ class IndustryService(CacheableService, ConfigurableService):
             return None
 
         except Exception as e:
-            logger.error(f"Failed to get industry info for {industry_code}: {e}")
+            logger.error(
+                f"Failed to get industry info for {industry_code}: {e}")
             return None
 
     def refresh_data(self) -> bool:

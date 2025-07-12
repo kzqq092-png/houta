@@ -20,7 +20,8 @@ def _get_buy_num(self, signal: Signal) -> int:
         return 0
 
     # 计算每手交易成本
-    cost_per_lot = signal.buy_price * self.lot_size * (1 + self.commission_rate)
+    cost_per_lot = signal.buy_price * \
+        self.lot_size * (1 + self.commission_rate)
 
     # 计算最大可买入手数
     max_lots = int(available_cash / cost_per_lot)

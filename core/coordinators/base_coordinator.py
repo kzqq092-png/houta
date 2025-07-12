@@ -249,7 +249,8 @@ class UICoordinator(BaseCoordinator):
             component: UI组件
         """
         self._ui_components[name] = component
-        logger.debug(f"Registered UI component {name} in coordinator {self._name}")
+        logger.debug(
+            f"Registered UI component {name} in coordinator {self._name}")
 
     def unregister_ui_component(self, name: str) -> None:
         """
@@ -260,7 +261,8 @@ class UICoordinator(BaseCoordinator):
         """
         if name in self._ui_components:
             del self._ui_components[name]
-            logger.debug(f"Unregistered UI component {name} from coordinator {self._name}")
+            logger.debug(
+                f"Unregistered UI component {name} from coordinator {self._name}")
 
     def _do_dispose(self) -> None:
         """清理UI组件"""
@@ -287,9 +289,11 @@ class AsyncCoordinator(BaseCoordinator):
             self._register_event_handlers()
             await self._do_initialize_async()
             self._initialized = True
-            logger.info(f"Coordinator {self._name} initialized successfully (async)")
+            logger.info(
+                f"Coordinator {self._name} initialized successfully (async)")
         except Exception as e:
-            logger.error(f"Failed to initialize coordinator {self._name} (async): {e}")
+            logger.error(
+                f"Failed to initialize coordinator {self._name} (async): {e}")
             raise
 
     async def dispose_async(self) -> None:
@@ -305,9 +309,11 @@ class AsyncCoordinator(BaseCoordinator):
             await self._do_dispose_async()
             self._disposed = True
             self._initialized = False
-            logger.info(f"Coordinator {self._name} disposed successfully (async)")
+            logger.info(
+                f"Coordinator {self._name} disposed successfully (async)")
         except Exception as e:
-            logger.error(f"Failed to dispose coordinator {self._name} (async): {e}")
+            logger.error(
+                f"Failed to dispose coordinator {self._name} (async): {e}")
             raise
 
     async def _do_initialize_async(self) -> None:

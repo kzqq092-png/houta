@@ -91,10 +91,12 @@ class IndustryManager(QObject):
             # 确保日志管理器优先使用传入的实例
             if log_manager is not None:
                 self.log_manager = log_manager
-                self.log_manager.info(f"IndustryManager初始化开始 - 使用外部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
+                self.log_manager.info(
+                    f"IndustryManager初始化开始 - 使用外部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
             else:
                 self.log_manager = LogManager()
-                self.log_manager.info(f"IndustryManager初始化开始 - 使用内部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
+                self.log_manager.info(
+                    f"IndustryManager初始化开始 - 使用内部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
 
             # 设置配置目录
             if config_dir:
@@ -141,8 +143,10 @@ class IndustryManager(QObject):
                 self._load_default_industry_data()
 
             # 记录初始化完成
-            initialization_time = int((time.time() - initialization_start_time) * 1000)
-            self.log_manager.info(f"IndustryManager初始化完成 - 耗时: {initialization_time}ms, 行业数据: {len(self.industry_data)}个")
+            initialization_time = int(
+                (time.time() - initialization_start_time) * 1000)
+            self.log_manager.info(
+                f"IndustryManager初始化完成 - 耗时: {initialization_time}ms, 行业数据: {len(self.industry_data)}个")
 
         except Exception as e:
             # 确保即使在严重错误时也能记录日志
@@ -246,7 +250,8 @@ class IndustryManager(QObject):
                 "BK0019": {"code": "BK0019", "name": "纺织服装", "type": "theme", "market": "THEME"},
                 "BK0020": {"code": "BK0020", "name": "医疗器械", "type": "theme", "market": "THEME"},
             }
-            self.log_manager.info(f"加载默认行业数据成功 - 数据数量: {len(self.industry_data)}")
+            self.log_manager.info(
+                f"加载默认行业数据成功 - 数据数量: {len(self.industry_data)}")
         except Exception as e:
             self.log_manager.error(f"加载默认行业数据失败: {e}")
             self.industry_data = {}
@@ -270,7 +275,8 @@ class IndustryManager(QObject):
                     self.log_manager.error(f"后台更新任务失败: {e}")
 
             # 创建后台线程
-            update_thread = threading.Thread(target=background_update, daemon=True)
+            update_thread = threading.Thread(
+                target=background_update, daemon=True)
             update_thread.start()
 
             self.log_manager.info("后台更新任务安排成功")
@@ -669,16 +675,26 @@ class IndustryManager(QObject):
             # 如果没有数据，返回默认行业列表
             if not industries:
                 industries = [
-                    {"code": "BK0001", "name": "银行", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0002", "name": "保险", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0003", "name": "证券", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0004", "name": "房地产", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0005", "name": "互联网", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0006", "name": "软件开发", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0007", "name": "电子信息", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0008", "name": "生物医药", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0009", "name": "新能源", "type": "theme", "market": "THEME", "source": source},
-                    {"code": "BK0010", "name": "汽车制造", "type": "theme", "market": "THEME", "source": source},
+                    {"code": "BK0001", "name": "银行", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0002", "name": "保险", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0003", "name": "证券", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0004", "name": "房地产", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0005", "name": "互联网", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0006", "name": "软件开发", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0007", "name": "电子信息", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0008", "name": "生物医药", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0009", "name": "新能源", "type": "theme",
+                        "market": "THEME", "source": source},
+                    {"code": "BK0010", "name": "汽车制造", "type": "theme",
+                        "market": "THEME", "source": source},
                 ]
 
             return industries
@@ -719,9 +735,12 @@ class IndustryManager(QObject):
             # 如果没有找到股票，返回一些示例数据
             if not stocks:
                 stocks = [
-                    {"code": "000001", "name": "平安银行", "industry": industry_code, "market": "SZ", "source": source},
-                    {"code": "600036", "name": "招商银行", "industry": industry_code, "market": "SH", "source": source},
-                    {"code": "000002", "name": "万科A", "industry": industry_code, "market": "SZ", "source": source},
+                    {"code": "000001", "name": "平安银行", "industry": industry_code,
+                        "market": "SZ", "source": source},
+                    {"code": "600036", "name": "招商银行", "industry": industry_code,
+                        "market": "SH", "source": source},
+                    {"code": "000002", "name": "万科A", "industry": industry_code,
+                        "market": "SZ", "source": source},
                 ]
 
             return stocks
@@ -906,7 +925,8 @@ class IndustryManager(QObject):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
 
-            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=headers, params=params, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('rc') == 0 and 'data' in data and 'diff' in data['data']:
@@ -977,14 +997,17 @@ class IndustryManager(QObject):
 
                 if len(periods_data) >= 2:
                     # 趋势强度：各周期涨跌幅的平均值
-                    trend_strength = sum(periods_data.values()) / len(periods_data)
+                    trend_strength = sum(
+                        periods_data.values()) / len(periods_data)
 
                     # 一致性：各周期方向的一致性
-                    positive_periods = sum(1 for v in periods_data.values() if v > 0)
+                    positive_periods = sum(
+                        1 for v in periods_data.values() if v > 0)
                     consistency = positive_periods / len(periods_data)
 
                     # 动量：短期相对长期的表现
-                    momentum = periods_data.get('1d', 0) - periods_data.get('1m', 0)
+                    momentum = periods_data.get(
+                        '1d', 0) - periods_data.get('1m', 0)
 
                     analysis['trend_strength'] = trend_strength
                     analysis['consistency'] = consistency
@@ -1035,7 +1058,8 @@ class IndustryManager(QObject):
 
             # 分析轮动信号
             for industry_code, analysis in trend_analysis.get('trending_up', []):
-                signal_strength = analysis['trend_strength'] * analysis['consistency']
+                signal_strength = analysis['trend_strength'] * \
+                    analysis['consistency']
 
                 if signal_strength > 0.03:  # 强信号阈值
                     rotation_signals['signals'].append({
@@ -1050,7 +1074,8 @@ class IndustryManager(QObject):
                     })
 
             for industry_code, analysis in trend_analysis.get('trending_down', []):
-                signal_strength = abs(analysis['trend_strength']) * analysis['consistency']
+                signal_strength = abs(
+                    analysis['trend_strength']) * analysis['consistency']
 
                 if signal_strength > 0.03:  # 强信号阈值
                     rotation_signals['signals'].append({
@@ -1065,7 +1090,8 @@ class IndustryManager(QObject):
                     })
 
             # 按信号强度排序
-            rotation_signals['signals'].sort(key=lambda x: x['signal_strength'], reverse=True)
+            rotation_signals['signals'].sort(
+                key=lambda x: x['signal_strength'], reverse=True)
 
             print(f"行业轮动信号获取成功 - 信号数量: {len(rotation_signals['signals'])}")
 
@@ -1201,7 +1227,8 @@ class IndustryManager(QObject):
                 filtered_industries.append(industry_result)
 
             # 按涨跌幅排序
-            filtered_industries.sort(key=lambda x: x['change_percent'], reverse=True)
+            filtered_industries.sort(
+                key=lambda x: x['change_percent'], reverse=True)
 
             print(f"行业筛选完成 - 符合条件的行业数量: {len(filtered_industries)}")
 

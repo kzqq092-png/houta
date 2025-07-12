@@ -179,7 +179,9 @@ def _build_returns_from_trades(trades):
     returns = []
     for trade in trades:
         # 假设每笔交易的收益率
-        trade_return = trade.profit / trade.entry_price if hasattr(trade, 'entry_price') and trade.entry_price > 0 else 0
+        trade_return = trade.profit / \
+            trade.entry_price if hasattr(
+                trade, 'entry_price') and trade.entry_price > 0 else 0
         returns.append(trade_return)
 
     return pd.DataFrame({'daily_return': returns})
@@ -227,7 +229,8 @@ def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
         # 计算盈亏比
         profits = [trade.profit for trade in trades if trade.profit > 0]
         losses = [abs(trade.profit) for trade in trades if trade.profit < 0]
-        profit_factor = sum(profits) / sum(losses) if sum(losses) > 0 else float('inf')
+        profit_factor = sum(profits) / \
+            sum(losses) if sum(losses) > 0 else float('inf')
 
         # 添加交易统计
         metrics.update({
@@ -316,7 +319,8 @@ def _kdata_preprocess(df, context="分析"):
 
     # 检查必需的列
     required_columns = ['open', 'high', 'low', 'close', 'volume']
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    missing_columns = [
+        col for col in required_columns if col not in df.columns]
 
     if missing_columns:
         log_manager.warning(f"{context}缺少必需的列: {missing_columns}")

@@ -21,7 +21,8 @@ for row in theme_rows:
 try:
     c1.execute('SELECT key, value FROM config')
     for row in c1.fetchall():
-        c2.execute('INSERT OR REPLACE INTO theme_config (key, value) VALUES (?, ?)', row)
+        c2.execute(
+            'INSERT OR REPLACE INTO theme_config (key, value) VALUES (?, ?)', row)
 except Exception as e:
     print('config表迁移异常:', e)
 

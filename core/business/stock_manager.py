@@ -42,7 +42,8 @@ class StockManager:
                 stock_info.is_favorite = stock_code in self._favorites
             return stock_info
         except Exception as e:
-            self.logger.error(f"Failed to get stock info for {stock_code}: {e}")
+            self.logger.error(
+                f"Failed to get stock info for {stock_code}: {e}")
             return None
 
     def get_stock_list(self, market: Optional[str] = None,
@@ -97,7 +98,8 @@ class StockManager:
 
             return stock_list
         except Exception as e:
-            self.logger.error(f"Failed to search stocks with keyword '{keyword}': {e}")
+            self.logger.error(
+                f"Failed to search stocks with keyword '{keyword}': {e}")
             return []
 
     def add_to_favorites(self, stock_code: str) -> bool:
@@ -114,7 +116,8 @@ class StockManager:
             # 验证股票是否存在
             stock_info = self.data_access.get_stock_info(stock_code)
             if not stock_info:
-                self.logger.warning(f"Stock {stock_code} not found, cannot add to favorites")
+                self.logger.warning(
+                    f"Stock {stock_code} not found, cannot add to favorites")
                 return False
 
             self._favorites.add(stock_code)
@@ -143,7 +146,8 @@ class StockManager:
                 self.logger.warning(f"Stock {stock_code} not in favorites")
                 return False
         except Exception as e:
-            self.logger.error(f"Failed to remove {stock_code} from favorites: {e}")
+            self.logger.error(
+                f"Failed to remove {stock_code} from favorites: {e}")
             return False
 
     def get_favorites(self) -> List[StockInfo]:
@@ -226,7 +230,8 @@ class StockManager:
             stock_info = self.data_access.get_stock_info(stock_code)
             return stock_info is not None
         except Exception as e:
-            self.logger.error(f"Failed to validate stock code {stock_code}: {e}")
+            self.logger.error(
+                f"Failed to validate stock code {stock_code}: {e}")
             return False
 
     def get_stock_statistics(self) -> Dict[str, Any]:

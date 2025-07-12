@@ -200,7 +200,8 @@ class BatchAnalysisDialog(QDialog):
         self.stock_selection_combo.addItems([
             "全部股票", "指定股票列表", "按市值筛选", "按行业筛选", "自定义条件"
         ])
-        self.stock_selection_combo.currentTextChanged.connect(self.on_stock_selection_changed)
+        self.stock_selection_combo.currentTextChanged.connect(
+            self.on_stock_selection_changed)
         stock_selection_layout.addWidget(QLabel("选择方式:"))
         stock_selection_layout.addWidget(self.stock_selection_combo)
         stock_selection_layout.addStretch()
@@ -411,8 +412,10 @@ class BatchAnalysisDialog(QDialog):
         sort_by_sharpe_btn = QPushButton("按夏普比排序")
         filter_profitable_btn = QPushButton("筛选盈利组合")
 
-        sort_by_return_btn.clicked.connect(lambda: self.sort_results("return_rate"))
-        sort_by_sharpe_btn.clicked.connect(lambda: self.sort_results("sharpe_ratio"))
+        sort_by_return_btn.clicked.connect(
+            lambda: self.sort_results("return_rate"))
+        sort_by_sharpe_btn.clicked.connect(
+            lambda: self.sort_results("sharpe_ratio"))
         filter_profitable_btn.clicked.connect(self.filter_profitable_results)
 
         results_button_layout.addWidget(sort_by_return_btn)
@@ -536,7 +539,8 @@ class BatchAnalysisDialog(QDialog):
         )
         if file_path:
             # 这里实现导入逻辑
-            QMessageBox.information(self, "提示", f"股票列表导入功能开发中...\n文件: {file_path}")
+            QMessageBox.information(
+                self, "提示", f"股票列表导入功能开发中...\n文件: {file_path}")
 
     def start_analysis(self):
         """开始批量分析"""
@@ -594,7 +598,8 @@ class BatchAnalysisDialog(QDialog):
             self.worker_thread = BatchAnalysisWorker(self.analysis_config)
             self.worker_thread.progress_updated.connect(self.update_progress)
             self.worker_thread.task_completed.connect(self.on_task_completed)
-            self.worker_thread.analysis_finished.connect(self.on_analysis_finished)
+            self.worker_thread.analysis_finished.connect(
+                self.on_analysis_finished)
             self.worker_thread.error_occurred.connect(self.on_analysis_error)
             self.worker_thread.start()
 
@@ -639,12 +644,15 @@ class BatchAnalysisDialog(QDialog):
         row = self.tasks_table.rowCount()
         self.tasks_table.insertRow(row)
 
-        self.tasks_table.setItem(row, 0, QTableWidgetItem(result['stock_code']))
-        self.tasks_table.setItem(row, 1, QTableWidgetItem(result['stock_name']))
+        self.tasks_table.setItem(
+            row, 0, QTableWidgetItem(result['stock_code']))
+        self.tasks_table.setItem(
+            row, 1, QTableWidgetItem(result['stock_name']))
         self.tasks_table.setItem(row, 2, QTableWidgetItem(result['strategy']))
         self.tasks_table.setItem(row, 3, QTableWidgetItem("完成"))
         self.tasks_table.setItem(row, 4, QTableWidgetItem("100%"))
-        self.tasks_table.setItem(row, 5, QTableWidgetItem(result['analysis_time']))
+        self.tasks_table.setItem(
+            row, 5, QTableWidgetItem(result['analysis_time']))
 
         # 添加到结果表格
         self.add_result_to_table(result)
@@ -657,7 +665,8 @@ class BatchAnalysisDialog(QDialog):
         self.update_results_statistics()
         self.add_log(f"批量分析完成，共处理 {len(results)} 个任务")
 
-        QMessageBox.information(self, "分析完成", f"批量分析已完成！\n共处理 {len(results)} 个任务")
+        QMessageBox.information(
+            self, "分析完成", f"批量分析已完成！\n共处理 {len(results)} 个任务")
         self.analysis_finished.emit(results)
 
     def on_analysis_error(self, error_msg):
@@ -671,14 +680,22 @@ class BatchAnalysisDialog(QDialog):
         row = self.results_table.rowCount()
         self.results_table.insertRow(row)
 
-        self.results_table.setItem(row, 0, QTableWidgetItem(result['stock_code']))
-        self.results_table.setItem(row, 1, QTableWidgetItem(result['stock_name']))
-        self.results_table.setItem(row, 2, QTableWidgetItem(result['strategy']))
-        self.results_table.setItem(row, 3, QTableWidgetItem(f"{result['return_rate']:.2%}"))
-        self.results_table.setItem(row, 4, QTableWidgetItem(str(result['sharpe_ratio'])))
-        self.results_table.setItem(row, 5, QTableWidgetItem(f"{result['max_drawdown']:.2%}"))
-        self.results_table.setItem(row, 6, QTableWidgetItem(f"{result['win_rate']:.1%}"))
-        self.results_table.setItem(row, 7, QTableWidgetItem(str(result['total_trades'])))
+        self.results_table.setItem(
+            row, 0, QTableWidgetItem(result['stock_code']))
+        self.results_table.setItem(
+            row, 1, QTableWidgetItem(result['stock_name']))
+        self.results_table.setItem(
+            row, 2, QTableWidgetItem(result['strategy']))
+        self.results_table.setItem(
+            row, 3, QTableWidgetItem(f"{result['return_rate']:.2%}"))
+        self.results_table.setItem(
+            row, 4, QTableWidgetItem(str(result['sharpe_ratio'])))
+        self.results_table.setItem(
+            row, 5, QTableWidgetItem(f"{result['max_drawdown']:.2%}"))
+        self.results_table.setItem(
+            row, 6, QTableWidgetItem(f"{result['win_rate']:.1%}"))
+        self.results_table.setItem(
+            row, 7, QTableWidgetItem(str(result['total_trades'])))
 
     def update_results_statistics(self):
         """更新结果统计"""
@@ -686,7 +703,8 @@ class BatchAnalysisDialog(QDialog):
             return
 
         total_combinations = len(self.analysis_results)
-        profitable_combinations = len([r for r in self.analysis_results if r['return_rate'] > 0])
+        profitable_combinations = len(
+            [r for r in self.analysis_results if r['return_rate'] > 0])
 
         returns = [r['return_rate'] for r in self.analysis_results]
         sharpe_ratios = [r['sharpe_ratio'] for r in self.analysis_results]
@@ -697,7 +715,8 @@ class BatchAnalysisDialog(QDialog):
         best_sharpe = max(sharpe_ratios)
 
         self.total_combinations_label.setText(str(total_combinations))
-        self.profitable_combinations_label.setText(str(profitable_combinations))
+        self.profitable_combinations_label.setText(
+            str(profitable_combinations))
         self.best_return_label.setText(f"{best_return:.2%}")
         self.worst_return_label.setText(f"{worst_return:.2%}")
         self.avg_return_label.setText(f"{avg_return:.2%}")
@@ -721,7 +740,8 @@ class BatchAnalysisDialog(QDialog):
         if not self.analysis_results:
             return
 
-        profitable_results = [r for r in self.analysis_results if r['return_rate'] > 0]
+        profitable_results = [
+            r for r in self.analysis_results if r['return_rate'] > 0]
 
         # 重新填充表格
         self.results_table.setRowCount(0)

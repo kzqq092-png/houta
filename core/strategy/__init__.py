@@ -356,7 +356,8 @@ def evaluate_strategy_performance(strategy_name: str, signals: List[StrategySign
     """
     try:
         evaluator = get_performance_evaluator()
-        metrics = evaluator.evaluate_strategy_performance(signals, data, **kwargs)
+        metrics = evaluator.evaluate_strategy_performance(
+            signals, data, **kwargs)
         result = metrics.to_dict()
         result['strategy_name'] = strategy_name
         result['success'] = True

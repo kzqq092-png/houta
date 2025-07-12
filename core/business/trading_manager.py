@@ -138,7 +138,8 @@ class TradingManager:
             # 模拟订单执行（在实际系统中这里会发送到交易所）
             self._simulate_order_execution(order)
 
-            self.logger.info(f"Order placed: {order_id} - {side} {quantity} {stock_code}")
+            self.logger.info(
+                f"Order placed: {order_id} - {side} {quantity} {stock_code}")
             return order_id
 
         except Exception as e:
@@ -163,7 +164,8 @@ class TradingManager:
             order = self._orders[order_id]
 
             if order.status != OrderStatus.PENDING:
-                self.logger.error(f"Order {order_id} cannot be cancelled, status: {order.status}")
+                self.logger.error(
+                    f"Order {order_id} cannot be cancelled, status: {order.status}")
                 return False
 
             order.status = OrderStatus.CANCELLED
@@ -223,7 +225,8 @@ class TradingManager:
             from datetime import timedelta
             cutoff_date = datetime.now() - timedelta(days=days)
 
-            records = [r for r in self._trade_records if r.trade_time >= cutoff_date]
+            records = [
+                r for r in self._trade_records if r.trade_time >= cutoff_date]
 
             if stock_code:
                 records = [r for r in records if r.stock_code == stock_code]
@@ -268,9 +271,11 @@ class TradingManager:
             # 统计最常交易的股票
             stock_counts = {}
             for record in records:
-                stock_counts[record.stock_code] = stock_counts.get(record.stock_code, 0) + 1
+                stock_counts[record.stock_code] = stock_counts.get(
+                    record.stock_code, 0) + 1
 
-            most_traded_stock = max(stock_counts.items(), key=lambda x: x[1])[0] if stock_counts else None
+            most_traded_stock = max(stock_counts.items(), key=lambda x: x[1])[
+                0] if stock_counts else None
 
             return {
                 'total_trades': total_trades,
@@ -293,21 +298,26 @@ class TradingManager:
             # 检查股票是否存在
             stock_info = self.data_access.get_stock_info(order.stock_code)
             if not stock_info:
-                self.logger.warning(f"Risk check failed: stock {order.stock_code} not found")
+                self.logger.warning(
+                    f"Risk check failed: stock {order.stock_code} not found")
                 return False
 
             # 检查数量是否合理（至少100股，且为100的倍数）
             if order.quantity < 100 or order.quantity % 100 != 0:
-                self.logger.warning(f"Risk check failed: invalid quantity {order.quantity}")
+                self.logger.warning(
+                    f"Risk check failed: invalid quantity {order.quantity}")
                 return False
 
             # 检查价格是否合理（限价单）
             if order.order_type == OrderType.LIMIT and order.price:
-                current_price = self.data_access.get_latest_price(order.stock_code)
+                current_price = self.data_access.get_latest_price(
+                    order.stock_code)
                 if current_price:
-                    price_diff_ratio = abs(float(order.price) - current_price) / current_price
+                    price_diff_ratio = abs(
+                        float(order.price) - current_price) / current_price
                     if price_diff_ratio > 0.2:  # 价格偏差超过20%
-                        self.logger.warning(f"Risk check failed: price deviation too large")
+                        self.logger.warning(
+                            f"Risk check failed: price deviation too large")
                         return False
 
             return True
@@ -341,7 +351,8 @@ class TradingManager:
 
             # 计算手续费
             amount = filled_price * order.quantity
-            commission = max(amount * self._commission_rate, self._min_commission)
+            commission = max(amount * self._commission_rate,
+                             self._min_commission)
 
             # 更新订单状态
             order.status = OrderStatus.FILLED
@@ -368,7 +379,8 @@ class TradingManager:
             )
 
             self._trade_records.append(trade_record)
-            self.logger.info(f"Order executed: {order.order_id} - {trade_record.trade_id}")
+            self.logger.info(
+                f"Order executed: {order.order_id} - {trade_record.trade_id}")
 
         except Exception as e:
             self.logger.error(f"Order execution simulation failed: {e}")
@@ -388,7 +400,8 @@ class TradingManager:
     def clear_history(self) -> None:
         """清除历史记录"""
         # 只保留未完成的订单
-        pending_orders = {k: v for k, v in self._orders.items() if v.status == OrderStatus.PENDING}
+        pending_orders = {k: v for k, v in self._orders.items(
+        ) if v.status == OrderStatus.PENDING}
         self._orders = pending_orders
 
         # 清除交易记录

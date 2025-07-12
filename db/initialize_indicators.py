@@ -20,7 +20,8 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 # 添加项目根目录到Python路径
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
 
 
 # 指标数据库文件路径
@@ -28,12 +29,18 @@ INDICATOR_DB_PATH = os.path.join(os.path.dirname(__file__), 'indicators.db')
 
 # 内置指标分类
 DEFAULT_CATEGORIES = [
-    IndicatorCategory(id=1, name='trend', display_name='趋势类', description='用于判断市场趋势的指标'),
-    IndicatorCategory(id=2, name='oscillator', display_name='震荡类', description='用于判断市场超买超卖的指标'),
-    IndicatorCategory(id=3, name='volume', display_name='成交量类', description='基于成交量的指标'),
-    IndicatorCategory(id=4, name='volatility', display_name='波动性类', description='用于衡量市场波动性的指标'),
-    IndicatorCategory(id=5, name='pattern', display_name='形态类', description='K线形态识别指标'),
-    IndicatorCategory(id=6, name='other', display_name='其他', description='其他类型的指标')
+    IndicatorCategory(id=1, name='trend', display_name='趋势类',
+                      description='用于判断市场趋势的指标'),
+    IndicatorCategory(id=2, name='oscillator',
+                      display_name='震荡类', description='用于判断市场超买超卖的指标'),
+    IndicatorCategory(id=3, name='volume',
+                      display_name='成交量类', description='基于成交量的指标'),
+    IndicatorCategory(id=4, name='volatility',
+                      display_name='波动性类', description='用于衡量市场波动性的指标'),
+    IndicatorCategory(id=5, name='pattern',
+                      display_name='形态类', description='K线形态识别指标'),
+    IndicatorCategory(id=6, name='other', display_name='其他',
+                      description='其他类型的指标')
 ]
 
 

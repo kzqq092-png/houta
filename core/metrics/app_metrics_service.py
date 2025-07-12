@@ -130,7 +130,8 @@ class ApplicationMetricsService:
         with self._metrics_lock:
             # 获取或创建操作指标
             if operation_name not in self.metrics:
-                self.metrics[operation_name] = OperationMetrics(name=operation_name)
+                self.metrics[operation_name] = OperationMetrics(
+                    name=operation_name)
 
             metrics = self.metrics[operation_name]
 
@@ -223,7 +224,8 @@ class ApplicationMetricsService:
         with self._metrics_lock:
             if operation_name:
                 if operation_name in self.metrics:
-                    self.metrics[operation_name] = OperationMetrics(name=operation_name)
+                    self.metrics[operation_name] = OperationMetrics(
+                        name=operation_name)
             else:
                 self.metrics.clear()
 

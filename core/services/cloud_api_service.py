@@ -107,13 +107,17 @@ class CloudAPIClient:
         for attempt in range(self.config.retry_count):
             try:
                 if method.upper() == 'GET':
-                    response = self.session.get(url, headers=headers, timeout=self.config.timeout)
+                    response = self.session.get(
+                        url, headers=headers, timeout=self.config.timeout)
                 elif method.upper() == 'POST':
-                    response = self.session.post(url, headers=headers, json=data, timeout=self.config.timeout)
+                    response = self.session.post(
+                        url, headers=headers, json=data, timeout=self.config.timeout)
                 elif method.upper() == 'PUT':
-                    response = self.session.put(url, headers=headers, json=data, timeout=self.config.timeout)
+                    response = self.session.put(
+                        url, headers=headers, json=data, timeout=self.config.timeout)
                 elif method.upper() == 'DELETE':
-                    response = self.session.delete(url, headers=headers, timeout=self.config.timeout)
+                    response = self.session.delete(
+                        url, headers=headers, timeout=self.config.timeout)
                 else:
                     raise ValueError(f"不支持的HTTP方法: {method}")
 
@@ -121,7 +125,8 @@ class CloudAPIClient:
                 return response.json()
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"API请求失败 (尝试 {attempt + 1}/{self.config.retry_count}): {e}")
+                logger.warning(
+                    f"API请求失败 (尝试 {attempt + 1}/{self.config.retry_count}): {e}")
                 if attempt == self.config.retry_count - 1:
                     raise
                 time.sleep(2 ** attempt)  # 指数退避
@@ -129,7 +134,8 @@ class CloudAPIClient:
     def upload_config(self, config_data: Dict[str, Any]) -> bool:
         """上传配置"""
         try:
-            response = self._make_request('POST', '/api/v1/config', config_data)
+            response = self._make_request(
+                'POST', '/api/v1/config', config_data)
             return response.get('success', False)
         except Exception as e:
             logger.error(f"上传配置失败: {e}")
@@ -147,7 +153,8 @@ class CloudAPIClient:
     def upload_strategy(self, strategy_data: Dict[str, Any]) -> bool:
         """上传策略"""
         try:
-            response = self._make_request('POST', '/api/v1/strategies', strategy_data)
+            response = self._make_request(
+                'POST', '/api/v1/strategies', strategy_data)
             return response.get('success', False)
         except Exception as e:
             logger.error(f"上传策略失败: {e}")
@@ -165,7 +172,8 @@ class CloudAPIClient:
     def upload_indicator(self, indicator_data: Dict[str, Any]) -> bool:
         """上传指标"""
         try:
-            response = self._make_request('POST', '/api/v1/indicators', indicator_data)
+            response = self._make_request(
+                'POST', '/api/v1/indicators', indicator_data)
             return response.get('success', False)
         except Exception as e:
             logger.error(f"上传指标失败: {e}")
@@ -233,7 +241,8 @@ class CloudSyncManager:
             return
 
         self.running = True
-        self.sync_thread = threading.Thread(target=self._sync_loop, daemon=True)
+        self.sync_thread = threading.Thread(
+            target=self._sync_loop, daemon=True)
         self.sync_thread.start()
         logger.info("云端同步服务已启动")
 
@@ -346,7 +355,8 @@ class CloudSyncManager:
 
     def _execute_sync_tasks(self):
         """执行同步任务"""
-        pending_tasks = [task for task in self.sync_tasks if task.status == "pending"]
+        pending_tasks = [
+            task for task in self.sync_tasks if task.status == "pending"]
 
         for task in pending_tasks:
             try:

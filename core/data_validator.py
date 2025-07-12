@@ -114,23 +114,28 @@ class ProfessionalDataValidator:
 
         try:
             # 1. 结构验证
-            structure_score = self._validate_structure(data, "kline_data", errors, warnings)
+            structure_score = self._validate_structure(
+                data, "kline_data", errors, warnings)
             metrics["structure_score"] = structure_score
 
             # 2. 完整性验证
-            completeness_score = self._validate_completeness(data, errors, warnings)
+            completeness_score = self._validate_completeness(
+                data, errors, warnings)
             metrics["completeness_score"] = completeness_score
 
             # 3. 一致性验证
-            consistency_score = self._validate_consistency(data, errors, warnings)
+            consistency_score = self._validate_consistency(
+                data, errors, warnings)
             metrics["consistency_score"] = consistency_score
 
             # 4. 合理性验证
-            reasonableness_score = self._validate_reasonableness(data, stock_code, errors, warnings)
+            reasonableness_score = self._validate_reasonableness(
+                data, stock_code, errors, warnings)
             metrics["reasonableness_score"] = reasonableness_score
 
             # 5. 时间序列验证
-            timeseries_score = self._validate_timeseries(data, errors, warnings)
+            timeseries_score = self._validate_timeseries(
+                data, errors, warnings)
             metrics["timeseries_score"] = timeseries_score
 
             # 计算总体质量分数
@@ -187,7 +192,8 @@ class ProfessionalDataValidator:
         required_columns = rules.get("required_columns", [])
 
         # 检查必需列
-        missing_columns = [col for col in required_columns if col not in data.columns]
+        missing_columns = [
+            col for col in required_columns if col not in data.columns]
         if missing_columns:
             errors.append(f"缺少必需列: {missing_columns}")
             return 0.0
@@ -229,13 +235,15 @@ class ProfessionalDataValidator:
         # 检查OHLC关系
         if all(col in data.columns for col in ["open", "high", "low", "close"]):
             # High应该是最高价
-            invalid_high = (data["high"] < data[["open", "close"]].max(axis=1)).sum()
+            invalid_high = (
+                data["high"] < data[["open", "close"]].max(axis=1)).sum()
             if invalid_high > 0:
                 errors.append(f"发现 {invalid_high} 条记录的最高价不正确")
                 score -= 20
 
             # Low应该是最低价
-            invalid_low = (data["low"] > data[["open", "close"]].min(axis=1)).sum()
+            invalid_low = (
+                data["low"] > data[["open", "close"]].min(axis=1)).sum()
             if invalid_low > 0:
                 errors.append(f"发现 {invalid_low} 条记录的最低价不正确")
                 score -= 20
@@ -263,7 +271,8 @@ class ProfessionalDataValidator:
             extreme_changes = (abs(returns) > max_change).sum()
 
             if extreme_changes > 0:
-                warnings.append(f"发现 {extreme_changes} 个异常涨跌幅 (>{max_change:.1%})")
+                warnings.append(
+                    f"发现 {extreme_changes} 个异常涨跌幅 (>{max_change:.1%})")
                 score -= min(30, extreme_changes * 5)
 
             # 检查价格连续性
@@ -375,7 +384,8 @@ class ProfessionalDataValidator:
                 result = self.validate_kline_data(data, stock_code)
                 results[stock_code] = result
             except Exception as e:
-                self.log_manager.log(f"验证股票 {stock_code} 数据失败: {str(e)}", LogLevel.ERROR)
+                self.log_manager.log(
+                    f"验证股票 {stock_code} 数据失败: {str(e)}", LogLevel.ERROR)
                 results[stock_code] = ValidationResult(
                     is_valid=False,
                     quality_score=0.0,
@@ -400,7 +410,8 @@ class ProfessionalDataValidator:
 
         quality_distribution = {}
         for level in DataQuality:
-            count = sum(1 for r in results.values() if r.quality_level == level)
+            count = sum(1 for r in results.values()
+                        if r.quality_level == level)
             quality_distribution[level.value] = count
 
         self.log_manager.log(

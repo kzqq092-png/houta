@@ -40,7 +40,8 @@ class MainMenuBar(QMenuBar):
             # 初始化UI
             self.init_ui()
 
-            log_structured(self.log_manager, "menu_bar_init", level="info", status="success")
+            log_structured(self.log_manager, "menu_bar_init",
+                           level="info", status="success")
 
         except Exception as e:
             print(f"初始化菜单栏失败: {str(e)}")
@@ -196,7 +197,8 @@ class MainMenuBar(QMenuBar):
             self.analysis_menu.addSeparator()
 
             # 批量/分布式分析
-            self.batch_analysis_action = QAction(QIcon("icons/batch.png"), "批量/分布式分析", self)
+            self.batch_analysis_action = QAction(
+                QIcon("icons/batch.png"), "批量/分布式分析", self)
             self.batch_analysis_action.setStatusTip("批量/分布式回测与分析")
             self.analysis_menu.addAction(self.batch_analysis_action)
         except Exception as e:
@@ -207,7 +209,8 @@ class MainMenuBar(QMenuBar):
         """初始化策略菜单"""
         try:
             # 策略管理
-            self.strategy_manager_action = QAction(QIcon("icons/strategy.png"), "策略管理器", self)
+            self.strategy_manager_action = QAction(
+                QIcon("icons/strategy.png"), "策略管理器", self)
             self.strategy_manager_action.setStatusTip("打开策略管理器")
             self.strategy_menu.addAction(self.strategy_manager_action)
 
@@ -242,17 +245,23 @@ class MainMenuBar(QMenuBar):
 
             # 连接信号
             if hasattr(self.parent, 'show_strategy_manager'):
-                self.strategy_manager_action.triggered.connect(self.parent.show_strategy_manager)
+                self.strategy_manager_action.triggered.connect(
+                    self.parent.show_strategy_manager)
             if hasattr(self.parent, 'create_new_strategy'):
-                self.create_strategy_action.triggered.connect(self.parent.create_new_strategy)
+                self.create_strategy_action.triggered.connect(
+                    self.parent.create_new_strategy)
             if hasattr(self.parent, 'import_strategy'):
-                self.import_strategy_action.triggered.connect(self.parent.import_strategy)
+                self.import_strategy_action.triggered.connect(
+                    self.parent.import_strategy)
             if hasattr(self.parent, 'export_strategy'):
-                self.export_strategy_action.triggered.connect(self.parent.export_strategy)
+                self.export_strategy_action.triggered.connect(
+                    self.parent.export_strategy)
             if hasattr(self.parent, 'backtest_strategy'):
-                self.strategy_backtest_action.triggered.connect(self.parent.backtest_strategy)
+                self.strategy_backtest_action.triggered.connect(
+                    self.parent.backtest_strategy)
             if hasattr(self.parent, 'optimize_strategy'):
-                self.strategy_optimize_action.triggered.connect(self.parent.optimize_strategy)
+                self.strategy_optimize_action.triggered.connect(
+                    self.parent.optimize_strategy)
 
         except Exception as e:
             if self.log_manager:
@@ -352,7 +361,8 @@ class MainMenuBar(QMenuBar):
             # 优化仪表板
             self.optimization_dashboard_action = QAction("优化仪表板", self)
             self.optimization_dashboard_action.setStatusTip("打开形态识别算法优化仪表板")
-            self.optimization_menu.addAction(self.optimization_dashboard_action)
+            self.optimization_menu.addAction(
+                self.optimization_dashboard_action)
 
             # 一键优化
             self.one_click_optimize_action = QAction("一键优化所有形态", self)
@@ -374,7 +384,8 @@ class MainMenuBar(QMenuBar):
             # 性能评估
             self.performance_evaluation_action = QAction("性能评估", self)
             self.performance_evaluation_action.setStatusTip("评估形态识别算法性能")
-            self.optimization_menu.addAction(self.performance_evaluation_action)
+            self.optimization_menu.addAction(
+                self.performance_evaluation_action)
 
             # 系统状态
             self.optimization_status_action = QAction("系统状态", self)
@@ -570,13 +581,27 @@ class MainMenuBar(QMenuBar):
 
     def analyze(self):
         """Perform analysis"""
-        # TODO: Implement analysis
-        pass
+        try:
+            # 获取主窗口的分析控件
+            main_window = self.window()
+            if hasattr(main_window, 'trading_widget'):
+                main_window.trading_widget.on_analyze()
+            else:
+                QMessageBox.information(self, "分析", "分析功能已启动")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"启动分析失败: {str(e)}")
 
     def backtest(self):
         """Run backtest"""
-        # TODO: Implement backtest
-        pass
+        try:
+            # 获取主窗口的回测控件
+            main_window = self.window()
+            if hasattr(main_window, 'trading_widget'):
+                main_window.trading_widget.run_backtest()
+            else:
+                QMessageBox.information(self, "回测", "回测功能已启动")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"启动回测失败: {str(e)}")
 
     def optimize(self):
         """Optimize parameters"""

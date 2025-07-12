@@ -88,7 +88,8 @@ def calculate_ad(df: pd.DataFrame) -> pd.DataFrame:
             )
         else:
             # 使用pandas实现
-            clv = ((close - low) - (high - close)) / (high - low).replace(0, 1e-10)
+            clv = ((close - low) - (high - close)) / \
+                (high - low).replace(0, 1e-10)
             ad = (clv * volume).cumsum()
 
             result['AD'] = ad
@@ -125,7 +126,8 @@ def calculate_cmf(df: pd.DataFrame, timeperiod: int = 20) -> pd.DataFrame:
         mfv = mfm * volume
 
         # 计算Chaikin Money Flow
-        cmf = mfv.rolling(window=timeperiod).sum() / volume.rolling(window=timeperiod).sum().replace(0, 1e-10)
+        cmf = mfv.rolling(window=timeperiod).sum(
+        ) / volume.rolling(window=timeperiod).sum().replace(0, 1e-10)
 
         result['CMF'] = cmf
 

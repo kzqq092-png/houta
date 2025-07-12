@@ -49,33 +49,33 @@ class IntervalStatDialog(QDialog):
         super().__init__(parent)
         self.kdata = kdata
         self.stat_data = stat_data
-        
+
         self.setWindowTitle("区间统计分析")
         self.setMinimumSize(800, 600)
         self.resize(1000, 700)
-        
+
         self._init_ui()
 
     def _init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        # layout.setSpacing(5)
 
         # 标题
-        title_label = QLabel("区间统计分析报告")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 18px;
-                font-weight: bold;
-                color: #2c3e50;
-                padding: 10px;
-                background-color: #ecf0f1;
-                border-radius: 5px;
-            }
-        """)
-        layout.addWidget(title_label)
+        # title_label = QLabel("区间统计分析报告")
+        # title_label.setAlignment(Qt.AlignCenter)
+        # title_label.setStyleSheet("""
+        #     QLabel {
+        #         font-size: 15px;
+        #         font-weight: bold;
+        #         color: #2c3e50;
+        #         padding: 10px;
+        #         background-color: #ecf0f1;
+        #         border-radius: 5px;
+        #     }
+        # """)
+        # layout.addWidget(title_label)
 
         # 创建标签页
         tab_widget = QTabWidget()
@@ -117,7 +117,7 @@ class IntervalStatDialog(QDialog):
         table = QTableWidget()
         table.setColumnCount(2)
         table.setHorizontalHeaderLabels(["指标", "数值"])
-        
+
         # 设置表格样式
         table.setAlternatingRowColors(True)
         table.setStyleSheet("""
@@ -153,7 +153,7 @@ class IntervalStatDialog(QDialog):
         table.setRowCount(len(basic_stats))
         for i, (name, value) in enumerate(basic_stats):
             table.setItem(i, 0, QTableWidgetItem(name))
-            
+
             # 格式化数值
             if isinstance(value, (int, float)):
                 if abs(value) >= 1:
@@ -162,16 +162,16 @@ class IntervalStatDialog(QDialog):
                     formatted_value = f"{value:.4f}"
             else:
                 formatted_value = str(value)
-                
+
             item = QTableWidgetItem(formatted_value)
-            
+
             # 根据数值设置颜色
             if "涨跌幅" in name and isinstance(value, (int, float)):
                 if value > 0:
                     item.setForeground(QColor("#e74c3c"))  # 红色
                 elif value < 0:
                     item.setForeground(QColor("#27ae60"))  # 绿色
-            
+
             table.setItem(i, 1, item)
 
         # 调整列宽
@@ -198,7 +198,8 @@ class IntervalStatDialog(QDialog):
 
         trade_title = QLabel("交易统计")
         trade_title.setAlignment(Qt.AlignCenter)
-        trade_title.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
+        trade_title.setStyleSheet(
+            "font-weight: bold; font-size: 14px; padding: 5px;")
         trade_layout.addWidget(trade_title)
 
         trade_table = QTableWidget()
@@ -236,7 +237,8 @@ class IntervalStatDialog(QDialog):
 
         volume_title = QLabel("成交量统计")
         volume_title.setAlignment(Qt.AlignCenter)
-        volume_title.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
+        volume_title.setStyleSheet(
+            "font-weight: bold; font-size: 14px; padding: 5px;")
         volume_layout.addWidget(volume_title)
 
         volume_table = QTableWidget()
@@ -257,7 +259,7 @@ class IntervalStatDialog(QDialog):
         volume_table.setRowCount(len(volume_stats))
         for i, (name, value) in enumerate(volume_stats):
             volume_table.setItem(i, 0, QTableWidgetItem(name))
-            
+
             # 格式化大数值
             if isinstance(value, (int, float)):
                 if value >= 10000:
@@ -266,7 +268,7 @@ class IntervalStatDialog(QDialog):
                     formatted_value = f"{value:.2f}"
             else:
                 formatted_value = str(value)
-                
+
             volume_table.setItem(i, 1, QTableWidgetItem(formatted_value))
 
         volume_table.setAlternatingRowColors(True)
@@ -307,7 +309,7 @@ class IntervalStatDialog(QDialog):
             # 绘制价格走势图
             dates = pd.to_datetime(self.kdata.index)
             closes = self.kdata['close'].values
-            
+
             ax1.plot(dates, closes, linewidth=2, color='#3498db')
             ax1.set_title('价格走势', fontsize=12, fontweight='bold')
             ax1.set_ylabel('价格')
@@ -315,9 +317,9 @@ class IntervalStatDialog(QDialog):
 
             # 绘制成交量柱状图
             volumes = self.kdata['volume'].values
-            colors = ['red' if self.kdata['close'].iloc[i] >= self.kdata['open'].iloc[i] 
-                     else 'green' for i in range(len(self.kdata))]
-            
+            colors = ['red' if self.kdata['close'].iloc[i] >= self.kdata['open'].iloc[i]
+                      else 'green' for i in range(len(self.kdata))]
+
             ax2.bar(dates, volumes, color=colors, alpha=0.7)
             ax2.set_title('成交量分布', fontsize=12, fontweight='bold')
             ax2.set_ylabel('成交量')
@@ -325,15 +327,18 @@ class IntervalStatDialog(QDialog):
 
             # 绘制收益率分布直方图
             returns = self.kdata['close'].pct_change().dropna()
-            ax3.hist(returns, bins=30, alpha=0.7, color='#9b59b6', edgecolor='black')
+            ax3.hist(returns, bins=30, alpha=0.7,
+                     color='#9b59b6', edgecolor='black')
             ax3.set_title('收益率分布', fontsize=12, fontweight='bold')
             ax3.set_xlabel('收益率')
             ax3.set_ylabel('频次')
             ax3.grid(True, alpha=0.3)
 
             # 绘制振幅分布
-            amplitude = ((self.kdata['high'] - self.kdata['low']) / self.kdata['close'] * 100)
-            ax4.hist(amplitude, bins=20, alpha=0.7, color='#e67e22', edgecolor='black')
+            amplitude = (
+                (self.kdata['high'] - self.kdata['low']) / self.kdata['close'] * 100)
+            ax4.hist(amplitude, bins=20, alpha=0.7,
+                     color='#e67e22', edgecolor='black')
             ax4.set_title('振幅分布', fontsize=12, fontweight='bold')
             ax4.set_xlabel('振幅(%)')
             ax4.set_ylabel('频次')
@@ -352,28 +357,29 @@ class IntervalStatDialog(QDialog):
         """导出报告"""
         try:
             from PyQt5.QtWidgets import QFileDialog, QMessageBox
-            
+
             filename, _ = QFileDialog.getSaveFileName(
                 self,
                 "导出统计报告",
                 f"区间统计报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 "文本文件 (*.txt);;所有文件 (*)"
             )
-            
+
             if filename:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write("区间统计分析报告\n")
                     f.write("=" * 50 + "\n\n")
-                    
+
                     f.write("基础统计:\n")
                     f.write("-" * 20 + "\n")
                     for key, value in self.stat_data.items():
                         f.write(f"{key}: {value}\n")
-                    
-                    f.write(f"\n生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                
+
+                    f.write(
+                        f"\n生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
                 QMessageBox.information(self, "导出成功", f"报告已导出到: {filename}")
-                
+
         except Exception as e:
             logger.error(f"Failed to export report: {e}")
             from PyQt5.QtWidgets import QMessageBox

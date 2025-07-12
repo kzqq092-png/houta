@@ -111,7 +111,8 @@ class OptimizationSystemTester:
                 "confidence_avg": 0.75,
                 "execution_time": 0.01
             }
-            metric_id = db_manager.save_performance_metrics(version_id, "test_pattern", metrics)
+            metric_id = db_manager.save_performance_metrics(
+                version_id, "test_pattern", metrics)
             print(f"  ✓ 性能指标保存成功，ID: {metric_id}")
 
             # 测试统计信息获取
@@ -211,7 +212,8 @@ class OptimizationSystemTester:
             print(f"    迭代次数: {result.get('iterations', 0)}")
 
             # 验证结果完整性
-            required_keys = ['baseline_score', 'best_score', 'improvement_percentage', 'iterations']
+            required_keys = ['baseline_score', 'best_score',
+                             'improvement_percentage', 'iterations']
             for key in required_keys:
                 if key not in result:
                     raise ValueError(f"缺少结果字段: {key}")
@@ -324,7 +326,8 @@ class OptimizationSystemTester:
 
                 # 创建评估器并评估
                 evaluator = PerformanceEvaluator(debug_mode=True)
-                datasets = evaluator.create_test_datasets(test_pattern, count=1)
+                datasets = evaluator.create_test_datasets(
+                    test_pattern, count=1)
                 metrics = evaluator.evaluate_algorithm(test_pattern, datasets)
 
                 # 保存性能指标
@@ -362,9 +365,12 @@ class OptimizationSystemTester:
 
         # 统计结果
         total_tests = len(self.test_results)
-        passed_tests = sum(1 for r in self.test_results.values() if r["status"] == "PASS")
-        failed_tests = sum(1 for r in self.test_results.values() if r["status"] == "FAIL")
-        error_tests = sum(1 for r in self.test_results.values() if r["status"] == "ERROR")
+        passed_tests = sum(
+            1 for r in self.test_results.values() if r["status"] == "PASS")
+        failed_tests = sum(
+            1 for r in self.test_results.values() if r["status"] == "FAIL")
+        error_tests = sum(1 for r in self.test_results.values()
+                          if r["status"] == "ERROR")
 
         print(f"总测试数: {total_tests}")
         print(f"通过测试: {passed_tests} ✅")
@@ -377,9 +383,11 @@ class OptimizationSystemTester:
         print("详细结果:")
         print("-" * 40)
         for test_name, result in self.test_results.items():
-            status_icon = {"PASS": "✅", "FAIL": "❌", "ERROR": "💥"}[result["status"]]
+            status_icon = {"PASS": "✅", "FAIL": "❌",
+                           "ERROR": "💥"}[result["status"]]
             duration = result.get("duration", 0)
-            print(f"{status_icon} {test_name:<25} {result['status']:<6} ({duration:.3f}s)")
+            print(
+                f"{status_icon} {test_name:<25} {result['status']:<6} ({duration:.3f}s)")
 
             if "error" in result:
                 print(f"    错误: {result['error']}")

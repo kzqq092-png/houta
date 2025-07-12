@@ -10,6 +10,7 @@ from core.data_manager import data_manager
 from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 
+
 class BaseSignal(SignalBase):
     """信号系统基类"""
 
@@ -50,20 +51,27 @@ class BaseSignal(SignalBase):
             df = k.to_df()
             if isinstance(df['close'], pd.Series):
                 # 已替换为新的导入
-                indicators['ma_fast'] = calc_ma(df['close'], self.get_param("n_fast", 12))
-                indicators['ma_slow'] = calc_ma(df['close'], self.get_param("n_slow", 26))
-                macd, _, _ = calc_macd(df['close'], self.get_param("n_fast", 12), self.get_param("n_slow", 26), self.get_param("n_signal", 9))
+                indicators['ma_fast'] = calc_ma(
+                    df['close'], self.get_param("n_fast", 12))
+                indicators['ma_slow'] = calc_ma(
+                    df['close'], self.get_param("n_slow", 26))
+                macd, _, _ = calc_macd(df['close'], self.get_param(
+                    "n_fast", 12), self.get_param("n_slow", 26), self.get_param("n_signal", 9))
                 indicators['macd'] = macd
-                indicators['rsi'] = calc_rsi(df['close'], self.get_param("rsi_window", 14))
+                indicators['rsi'] = calc_rsi(
+                    df['close'], self.get_param("rsi_window", 14))
                 # KDJ等同理
             else:
                 from hikyuu.indicator import MA, MACD, RSI, KDJ
                 close_ind = CLOSE(k)
-                indicators['ma_fast'] = MA(close_ind, n=self.get_param("n_fast", 12))
-                indicators['ma_slow'] = MA(close_ind, n=self.get_param("n_slow", 26))
+                indicators['ma_fast'] = MA(
+                    close_ind, n=self.get_param("n_fast", 12))
+                indicators['ma_slow'] = MA(
+                    close_ind, n=self.get_param("n_slow", 26))
                 indicators['macd'] = MACD(close_ind, n1=self.get_param("n_fast", 12),
                                           n2=self.get_param("n_slow", 26), n3=self.get_param("n_signal", 9))
-                indicators['rsi'] = RSI(close_ind, n=self.get_param("rsi_window", 14))
+                indicators['rsi'] = RSI(
+                    close_ind, n=self.get_param("rsi_window", 14))
                 indicators['kdj'] = KDJ(k, n=self.get_param("kdj_n", 9))
         else:
             # 兼容性兜底

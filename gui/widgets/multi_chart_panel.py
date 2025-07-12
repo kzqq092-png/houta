@@ -98,8 +98,10 @@ class MultiChartPanel(QWidget):
             # 网格大小选择
             layout.addWidget(QLabel("网格大小:"))
             self.grid_combo = QComboBox()
-            self.grid_combo.addItems(["2x2", "2x3", "3x2", "3x3", "4x2", "2x4"])
-            self.grid_combo.currentTextChanged.connect(self.on_grid_size_changed)
+            self.grid_combo.addItems(
+                ["2x2", "2x3", "3x2", "3x3", "4x2", "2x4"])
+            self.grid_combo.currentTextChanged.connect(
+                self.on_grid_size_changed)
             layout.addWidget(self.grid_combo)
 
             # 自动填充按钮
@@ -156,7 +158,8 @@ class MultiChartPanel(QWidget):
         try:
             if self.single_chart is None:
                 self.single_chart = ChartCanvas(self)
-                self.single_chart.stock_selected.connect(self.stock_selected.emit)
+                self.single_chart.stock_selected.connect(
+                    self.stock_selected.emit)
 
             # 清空单屏容器并添加图表
             layout = self.single_container.layout()
@@ -203,14 +206,16 @@ class MultiChartPanel(QWidget):
                     title_layout.setContentsMargins(5, 2, 5, 2)
 
                     title_label = QLabel(f"图表 {row+1}-{col+1}")
-                    title_label.setStyleSheet("font-weight: bold; color: #333;")
+                    title_label.setStyleSheet(
+                        "font-weight: bold; color: #333;")
                     title_layout.addWidget(title_label)
 
                     # 股票选择下拉框
                     stock_combo = QComboBox()
                     stock_combo.setMaximumWidth(120)
                     stock_combo.currentTextChanged.connect(
-                        lambda code, r=row, c=col: self.on_chart_stock_changed(r, c, code)
+                        lambda code, r=row, c=col: self.on_chart_stock_changed(
+                            r, c, code)
                     )
                     title_layout.addWidget(stock_combo)
 
@@ -254,7 +259,8 @@ class MultiChartPanel(QWidget):
                 self.multi_container.setVisible(True)
                 self.mode_btn.setText("切换到单屏模式")
                 self.status_label.setText("多屏模式")
-                self.status_label.setStyleSheet("color: green; font-weight: bold;")
+                self.status_label.setStyleSheet(
+                    "color: green; font-weight: bold;")
                 self.auto_fill_btn.setEnabled(True)
                 self.clear_btn.setEnabled(True)
             else:
@@ -263,7 +269,8 @@ class MultiChartPanel(QWidget):
                 self.multi_container.setVisible(False)
                 self.mode_btn.setText("切换到多屏模式")
                 self.status_label.setText("单屏模式")
-                self.status_label.setStyleSheet("color: blue; font-weight: bold;")
+                self.status_label.setStyleSheet(
+                    "color: blue; font-weight: bold;")
                 self.auto_fill_btn.setEnabled(False)
                 self.clear_btn.setEnabled(False)
 
@@ -398,7 +405,8 @@ class MultiChartPanel(QWidget):
                     for col in range(len(self.chart_widgets[row])):
                         chart_info = self.chart_widgets[row][col]
                         if chart_info['stock_code']:
-                            self.update_chart_data(row, col, chart_info['stock_code'])
+                            self.update_chart_data(
+                                row, col, chart_info['stock_code'])
             else:
                 if self.single_chart and hasattr(self.single_chart, 'update_indicators'):
                     self.single_chart.update_indicators(indicators)
@@ -510,7 +518,8 @@ class MultiChartPanel(QWidget):
                 elif self.single_chart and hasattr(self.single_chart, 'update_chart_data'):
                     self.single_chart.update_chart_data(chart_data)
                 else:
-                    self.logger.warning("单屏图表没有update_chart或update_chart_data方法")
+                    self.logger.warning(
+                        "单屏图表没有update_chart或update_chart_data方法")
             else:
                 # 多屏模式，加载到第一个图表
                 if self.chart_widgets and len(self.chart_widgets) > 0 and len(self.chart_widgets[0]) > 0:

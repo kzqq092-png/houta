@@ -9,7 +9,8 @@ import pandas as pd
 from typing import Dict, Any, Optional
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QFormLayout
 
-from ..plugin_interface import (
+# 修改导入方式，使用绝对导入
+from plugins.plugin_interface import (
     IIndicatorPlugin, PluginMetadata, PluginType, PluginCategory,
     plugin_metadata, register_plugin, PluginContext
 )
@@ -49,7 +50,7 @@ class MACDIndicatorPlugin(IIndicatorPlugin):
         """获取插件元数据"""
         return self._plugin_metadata
 
-    def initialize(self, context: PluginContext) -> bool:
+    def initialize(self, context: PluginContext = None) -> bool:
         """
         初始化插件
 
@@ -62,20 +63,28 @@ class MACDIndicatorPlugin(IIndicatorPlugin):
         try:
             self._context = context
 
-            # 加载配置
-            config = context.get_plugin_config(self.metadata.name)
-            if config:
-                self._config.update(config)
+            # 如果上下文不为空，加载配置和注册事件
+            if context:
+                # 加载配置
+                config = context.get_plugin_config(self.metadata.name)
+                if config:
+                    self._config.update(config)
 
-            # 注册事件处理器
-            context.register_event_handler("data_updated", self._on_data_updated)
+                # 注册事件处理器
+                context.register_event_handler(
+                    "data_updated", self._on_data_updated)
 
-            context.log_manager.info(f"MACD指标插件初始化成功")
+                context.log_manager.info(f"MACD指标插件初始化成功")
+            else:
+                print("MACD指标插件初始化成功（无上下文）")
+
             return True
 
         except Exception as e:
             if context:
                 context.log_manager.error(f"MACD指标插件初始化失败: {e}")
+            else:
+                print(f"MACD指标插件初始化失败: {e}")
             return False
 
     def cleanup(self) -> None:
@@ -127,7 +136,8 @@ class MACDIndicatorPlugin(IIndicatorPlugin):
         # 获取参数
         fast_period = params.get('fast_period', self._config['fast_period'])
         slow_period = params.get('slow_period', self._config['slow_period'])
-        signal_period = params.get('signal_period', self._config['signal_period'])
+        signal_period = params.get(
+            'signal_period', self._config['signal_period'])
 
         # 验证参数
         if fast_period >= slow_period:
@@ -387,8 +397,10 @@ class MACDIndicatorPlugin(IIndicatorPlugin):
             if self.validate_config(new_config):
                 self._config.update(new_config)
                 if self._context:
-                    self._context.save_plugin_config(self.metadata.name, new_config)
-                    self._context.emit_event("config_changed", self.metadata.name, new_config)
+                    self._context.save_plugin_config(
+                        self.metadata.name, new_config)
+                    self._context.emit_event(
+                        "config_changed", self.metadata.name, new_config)
 
         fast_spin.valueChanged.connect(on_config_changed)
         slow_spin.valueChanged.connect(on_config_changed)

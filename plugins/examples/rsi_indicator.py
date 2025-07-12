@@ -9,7 +9,8 @@ import pandas as pd
 from typing import Dict, Any, Optional
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QFormLayout
 
-from ..plugin_interface import (
+# 修改导入方式，使用绝对导入
+from plugins.plugin_interface import (
     IIndicatorPlugin, PluginMetadata, PluginType, PluginCategory,
     plugin_metadata, register_plugin, PluginContext
 )
@@ -49,7 +50,7 @@ class RSIIndicatorPlugin(IIndicatorPlugin):
         """获取插件元数据"""
         return self._plugin_metadata
 
-    def initialize(self, context: PluginContext) -> bool:
+    def initialize(self, context: PluginContext = None) -> bool:
         """
         初始化插件
 
@@ -62,20 +63,28 @@ class RSIIndicatorPlugin(IIndicatorPlugin):
         try:
             self._context = context
 
-            # 加载配置
-            config = context.get_plugin_config(self.metadata.name)
-            if config:
-                self._config.update(config)
+            # 如果上下文不为空，加载配置和注册事件
+            if context:
+                # 加载配置
+                config = context.get_plugin_config(self.metadata.name)
+                if config:
+                    self._config.update(config)
 
-            # 注册事件处理器
-            context.register_event_handler("data_updated", self._on_data_updated)
+                # 注册事件处理器
+                context.register_event_handler(
+                    "data_updated", self._on_data_updated)
 
-            context.log_manager.info(f"RSI指标插件初始化成功")
+                context.log_manager.info(f"RSI指标插件初始化成功")
+            else:
+                print("RSI指标插件初始化成功（无上下文）")
+
             return True
 
         except Exception as e:
             if context:
                 context.log_manager.error(f"RSI指标插件初始化失败: {e}")
+            else:
+                print(f"RSI指标插件初始化失败: {e}")
             return False
 
     def cleanup(self) -> None:
@@ -308,7 +317,8 @@ class RSIIndicatorPlugin(IIndicatorPlugin):
         rsi_result = self.calculate(data, **params)
         rsi = rsi_result['rsi']
 
-        overbought = params.get('overbought_level', self._config['overbought_level'])
+        overbought = params.get(
+            'overbought_level', self._config['overbought_level'])
         oversold = params.get('oversold_level', self._config['oversold_level'])
 
         # 生成信号
@@ -360,7 +370,8 @@ class RSIIndicatorPlugin(IIndicatorPlugin):
             self._config['oversold_level'] = oversold_spinbox.value()
 
             if self._context:
-                self._context.save_plugin_config(self.metadata.name, self._config)
+                self._context.save_plugin_config(
+                    self.metadata.name, self._config)
 
         # 连接信号
         period_spinbox.valueChanged.connect(on_config_changed)

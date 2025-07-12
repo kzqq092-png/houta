@@ -123,7 +123,8 @@ class MovingAverageTrendStrategy(BaseStrategy):
             return 0.5
 
         # 基于价格趋势强度计算置信度
-        price_change = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
+        price_change = (recent_data['close'].iloc[-1] -
+                        recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
         volatility = recent_data['close'].std() / recent_data['close'].mean()
 
         # 趋势强度
@@ -154,7 +155,8 @@ class BreakoutStrategy(BaseStrategy):
         """初始化默认参数"""
         self.add_parameter("lookback_period", 20, int, "回看周期", 10, 50)
         self.add_parameter("volume_threshold", 1.5, float, "成交量阈值倍数", 1.0, 3.0)
-        self.add_parameter("min_breakout_pct", 0.02, float, "最小突破幅度", 0.01, 0.1)
+        self.add_parameter("min_breakout_pct", 0.02,
+                           float, "最小突破幅度", 0.01, 0.1)
 
     def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
         """生成突破信号"""
@@ -170,7 +172,8 @@ class BreakoutStrategy(BaseStrategy):
         data = data.copy()
         data['resistance'] = data['high'].rolling(window=lookback_period).max()
         data['support'] = data['low'].rolling(window=lookback_period).min()
-        data['avg_volume'] = data['volume'].rolling(window=lookback_period).mean()
+        data['avg_volume'] = data['volume'].rolling(
+            window=lookback_period).mean()
 
         for i in range(lookback_period, len(data)):
             current = data.iloc[i]
@@ -222,8 +225,10 @@ class BreakoutStrategy(BaseStrategy):
             return 0.5
 
         # 基于成交量和价格变化计算置信度
-        volume_ratio = recent_data['volume'].iloc[-1] / recent_data['volume'].mean()
-        price_change = abs(recent_data['close'].iloc[-1] - recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
+        volume_ratio = recent_data['volume'].iloc[-1] / \
+            recent_data['volume'].mean()
+        price_change = abs(recent_data['close'].iloc[-1] -
+                           recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
 
         confidence = min(0.9, max(0.1, (volume_ratio * price_change) / 3))
         return confidence
@@ -251,7 +256,8 @@ class MomentumStrategy(BaseStrategy):
         self.add_parameter("momentum_period", 14, int, "动量周期", 5, 30)
         self.add_parameter("rsi_period", 14, int, "RSI周期", 5, 30)
         self.add_parameter("rsi_oversold", 30.0, float, "RSI超卖阈值", 20.0, 40.0)
-        self.add_parameter("rsi_overbought", 70.0, float, "RSI超买阈值", 60.0, 80.0)
+        self.add_parameter("rsi_overbought", 70.0,
+                           float, "RSI超买阈值", 60.0, 80.0)
 
     def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
         """生成动量信号"""
@@ -321,7 +327,8 @@ class MomentumStrategy(BaseStrategy):
 
         # 基于动量强度和RSI极值计算置信度
         momentum_strength = abs(recent_data['momentum'].iloc[-1])
-        rsi_extreme = min(recent_data['rsi'].iloc[-1], 100 - recent_data['rsi'].iloc[-1]) / 50
+        rsi_extreme = min(recent_data['rsi'].iloc[-1],
+                          100 - recent_data['rsi'].iloc[-1]) / 50
 
         confidence = min(0.9, max(0.1, (momentum_strength + rsi_extreme) / 2))
         return confidence
@@ -360,7 +367,8 @@ class AdaptiveTrendStrategy(BaseStrategy):
 
         # 计算自适应指标
         data = data.copy()
-        data['volatility'] = data['close'].rolling(window=volatility_period).std()
+        data['volatility'] = data['close'].rolling(
+            window=volatility_period).std()
         data['trend_strength'] = self._calculate_trend_strength(data)
         data['adaptive_ma'] = self._calculate_adaptive_ma(data)
 
@@ -419,8 +427,10 @@ class AdaptiveTrendStrategy(BaseStrategy):
         """计算自适应移动平均"""
         # 基于波动率调整移动平均周期
         base_period = 20
-        volatility_factor = data['volatility'] / data['volatility'].rolling(window=50).mean()
-        adaptive_period = (base_period / volatility_factor).fillna(base_period).clip(5, 50)
+        volatility_factor = data['volatility'] / \
+            data['volatility'].rolling(window=50).mean()
+        adaptive_period = (
+            base_period / volatility_factor).fillna(base_period).clip(5, 50)
 
         # 计算自适应移动平均
         adaptive_ma = pd.Series(index=data.index, dtype=float)
@@ -437,7 +447,8 @@ class AdaptiveTrendStrategy(BaseStrategy):
             return TrendDirection.SIDEWAYS
 
         # 计算价格变化趋势
-        price_trend = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
+        price_trend = (recent_data['close'].iloc[-1] -
+                       recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
 
         if price_trend > 0.02:
             return TrendDirection.UP
@@ -457,7 +468,8 @@ class AdaptiveTrendStrategy(BaseStrategy):
         trend_strength = abs(recent_data['trend_strength'].iloc[-1])
         trend_consistency = self._calculate_trend_consistency(recent_data)
 
-        confidence = min(0.9, max(0.1, (trend_strength + trend_consistency) / 2))
+        confidence = min(
+            0.9, max(0.1, (trend_strength + trend_consistency) / 2))
         return confidence
 
     def _calculate_trend_consistency(self, data: pd.DataFrame) -> float:
@@ -537,7 +549,8 @@ class TrendFollowingManager:
             if len(signals) >= min_agreement:
                 # 使用第一个信号作为代表，平均置信度
                 representative_signal = signals[0]
-                avg_confidence = sum(s.confidence for s in signals) / len(signals)
+                avg_confidence = sum(
+                    s.confidence for s in signals) / len(signals)
                 representative_signal.confidence = avg_confidence
                 representative_signal.reason = f"多策略一致性信号({len(signals)}个策略)"
                 consensus_signals.append(representative_signal)
@@ -594,4 +607,5 @@ if __name__ == "__main__":
 
         print("\n一致性信号详情:")
         for signal in consensus_signals[:5]:  # 显示前5个信号
-            print(f"  {signal.timestamp.date()}: {signal.signal_type.value} @ {signal.price:.3f} (置信度: {signal.confidence:.3f})")
+            print(
+                f"  {signal.timestamp.date()}: {signal.signal_type.value} @ {signal.price:.3f} (置信度: {signal.confidence:.3f})")

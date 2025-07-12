@@ -11,6 +11,6 @@ from . import panels
 
 __all__ = [
     'dialogs',
-    'widgets', 
+    'widgets',
     'panels'
 ]

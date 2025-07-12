@@ -118,9 +118,12 @@ class AnalysisThread(QThread):
 
             if patterns and len(self.kdata) > 0:
                 # 基于形态数量和置信度进行预测
-                avg_confidence = np.mean([p.get('confidence', 0.5) for p in patterns])
-                buy_signals = len([p for p in patterns if p.get('signal', '') == 'buy'])
-                sell_signals = len([p for p in patterns if p.get('signal', '') == 'sell'])
+                avg_confidence = np.mean(
+                    [p.get('confidence', 0.5) for p in patterns])
+                buy_signals = len(
+                    [p for p in patterns if p.get('signal', '') == 'buy'])
+                sell_signals = len(
+                    [p for p in patterns if p.get('signal', '') == 'sell'])
 
                 # 计算当前价格和目标价格
                 current_price = float(self.kdata['close'].iloc[-1])
@@ -128,12 +131,14 @@ class AnalysisThread(QThread):
                 if buy_signals > sell_signals:
                     predictions['trend_prediction'] = '上升'
                     predictions['confidence'] = min(0.9, avg_confidence + 0.2)
-                    predictions['target_price'] = current_price * (1 + avg_confidence * 0.1)
+                    predictions['target_price'] = current_price * \
+                        (1 + avg_confidence * 0.1)
                     predictions['risk_level'] = '低' if avg_confidence > 0.7 else '中等'
                 elif sell_signals > buy_signals:
                     predictions['trend_prediction'] = '下降'
                     predictions['confidence'] = min(0.9, avg_confidence + 0.2)
-                    predictions['target_price'] = current_price * (1 - avg_confidence * 0.1)
+                    predictions['target_price'] = current_price * \
+                        (1 - avg_confidence * 0.1)
                     predictions['risk_level'] = '高' if avg_confidence > 0.7 else '中等'
                 else:
                     predictions['trend_prediction'] = '震荡'
@@ -165,8 +170,10 @@ class AnalysisThread(QThread):
 
             # 基础统计
             total_patterns = len(patterns)
-            buy_patterns = len([p for p in patterns if p.get('signal', '') == 'buy'])
-            sell_patterns = len([p for p in patterns if p.get('signal', '') == 'sell'])
+            buy_patterns = len(
+                [p for p in patterns if p.get('signal', '') == 'buy'])
+            sell_patterns = len(
+                [p for p in patterns if p.get('signal', '') == 'sell'])
             neutral_patterns = total_patterns - buy_patterns - sell_patterns
 
             # 置信度统计
@@ -182,9 +189,12 @@ class AnalysisThread(QThread):
                 pattern_types[ptype] = pattern_types.get(ptype, 0) + 1
 
             # 信号强度分析
-            high_confidence_patterns = len([p for p in patterns if p.get('confidence', 0) >= 0.8])
-            medium_confidence_patterns = len([p for p in patterns if 0.5 <= p.get('confidence', 0) < 0.8])
-            low_confidence_patterns = len([p for p in patterns if p.get('confidence', 0) < 0.5])
+            high_confidence_patterns = len(
+                [p for p in patterns if p.get('confidence', 0) >= 0.8])
+            medium_confidence_patterns = len(
+                [p for p in patterns if 0.5 <= p.get('confidence', 0) < 0.8])
+            low_confidence_patterns = len(
+                [p for p in patterns if p.get('confidence', 0) < 0.5])
 
             statistics = {
                 'total_patterns': total_patterns,
@@ -442,7 +452,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         # 时间周期
         advanced_layout.addWidget(QLabel("周期:"))
         self.timeframe_combo = QComboBox()
-        self.timeframe_combo.addItems(["日线", "周线", "月线", "60分钟", "30分钟", "15分钟"])
+        self.timeframe_combo.addItems(
+            ["日线", "周线", "月线", "60分钟", "30分钟", "15分钟"])
         advanced_layout.addWidget(self.timeframe_combo)
 
         # 实时监控开关
@@ -579,7 +590,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         self.patterns_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.patterns_table.setSortingEnabled(True)
         self.patterns_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.patterns_table.customContextMenuRequested.connect(self.show_pattern_context_menu)
+        self.patterns_table.customContextMenuRequested.connect(
+            self.show_pattern_context_menu)
 
         # 设置列宽
         header = self.patterns_table.horizontalHeader()
@@ -705,11 +717,13 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _populate_pattern_tree(self):
         """填充形态树"""
         for category, patterns in self.professional_patterns.items():
-            category_item = QTreeWidgetItem([self._get_category_name(category)])
+            category_item = QTreeWidgetItem(
+                [self._get_category_name(category)])
             category_item.setData(0, Qt.UserRole, category)
 
             for pattern_name, info in patterns.items():
-                pattern_item = QTreeWidgetItem([f"{pattern_name} ({info['success_rate']:.1%})"])
+                pattern_item = QTreeWidgetItem(
+                    [f"{pattern_name} ({info['success_rate']:.1%})"])
                 pattern_item.setData(0, Qt.UserRole, pattern_name)
                 category_item.addChild(pattern_item)
 
@@ -757,7 +771,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 连接信号
             self.analysis_thread.progress_updated.connect(self.update_progress)
-            self.analysis_thread.analysis_completed.connect(self.on_analysis_completed)
+            self.analysis_thread.analysis_completed.connect(
+                self.on_analysis_completed)
             self.analysis_thread.error_occurred.connect(self.on_analysis_error)
 
             # 开始分析
@@ -837,7 +852,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         for category, pattern_dict in self.professional_patterns.items():
             for pattern_name, info in pattern_dict.items():
                 # 模拟形态检测
-                confidence = self._calculate_pattern_confidence(pattern_name, info, sensitivity)
+                confidence = self._calculate_pattern_confidence(
+                    pattern_name, info, sensitivity)
 
                 if confidence >= self.min_confidence.value():
                     pattern = {
@@ -901,12 +917,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         # 风险分布
         for pattern in patterns:
             risk = pattern['risk_level']
-            stats['risk_distribution'][risk] = stats['risk_distribution'].get(risk, 0) + 1
+            stats['risk_distribution'][risk] = stats['risk_distribution'].get(
+                risk, 0) + 1
 
         # 类型分布
         for pattern in patterns:
             category = pattern['category']
-            stats['category_distribution'][category] = stats['category_distribution'].get(category, 0) + 1
+            stats['category_distribution'][category] = stats['category_distribution'].get(
+                category, 0) + 1
 
         return stats
 
@@ -1051,12 +1069,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         processed_patterns = []
         for pattern in patterns:
             processed_pattern = pattern.copy()
-            processed_pattern['category'] = self._get_category_name(pattern['category'])
+            processed_pattern['category'] = self._get_category_name(
+                pattern['category'])
             processed_pattern['confidence'] = f"{pattern['confidence']:.2%}"
             processed_pattern['success_rate'] = f"{pattern['success_rate']:.2%}"
             processed_patterns.append(processed_pattern)
 
-        self.update_table_data(self.patterns_table, processed_patterns, column_keys)
+        self.update_table_data(self.patterns_table,
+                               processed_patterns, column_keys)
 
         # 设置行颜色
         for row, pattern in enumerate(patterns):

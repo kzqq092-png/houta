@@ -46,8 +46,10 @@ def create_hammer_test_data():
             base_price = 100.0 + np.random.uniform(-2, 2)
             open_price = base_price
             close_price = base_price + np.random.uniform(-1, 1)
-            high_price = max(open_price, close_price) + np.random.uniform(0, 0.5)
-            low_price = min(open_price, close_price) - np.random.uniform(0, 0.5)
+            high_price = max(open_price, close_price) + \
+                np.random.uniform(0, 0.5)
+            low_price = min(open_price, close_price) - \
+                np.random.uniform(0, 0.5)
 
             data.append({
                 'datetime': date,
@@ -64,11 +66,13 @@ def create_hammer_test_data():
 
     # 显示锤头线数据
     hammer_data = df.iloc[25]
-    print(f"🔨 锤头线数据: O={hammer_data['open']:.3f} H={hammer_data['high']:.3f} L={hammer_data['low']:.3f} C={hammer_data['close']:.3f}")
+    print(
+        f"🔨 锤头线数据: O={hammer_data['open']:.3f} H={hammer_data['high']:.3f} L={hammer_data['low']:.3f} C={hammer_data['close']:.3f}")
 
     body_size = abs(hammer_data['close'] - hammer_data['open'])
     total_range = hammer_data['high'] - hammer_data['low']
-    lower_shadow = min(hammer_data['open'], hammer_data['close']) - hammer_data['low']
+    lower_shadow = min(hammer_data['open'],
+                       hammer_data['close']) - hammer_data['low']
 
     print(f"实体大小: {body_size:.3f}")
     print(f"总区间: {total_range:.3f}")
@@ -135,7 +139,8 @@ def test_hammer_pattern():
                     k_data = test_data.iloc[pattern.index]
                     date_str = k_data['datetime'].strftime('%Y-%m-%d')
                     print(f"     日期: {date_str}")
-                    print(f"     K线: O={k_data['open']:.3f} H={k_data['high']:.3f} L={k_data['low']:.3f} C={k_data['close']:.3f}")
+                    print(
+                        f"     K线: O={k_data['open']:.3f} H={k_data['high']:.3f} L={k_data['low']:.3f} C={k_data['close']:.3f}")
                 print()
         else:
             print("⚠️  未识别到锤头线形态")

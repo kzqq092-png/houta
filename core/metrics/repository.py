@@ -74,9 +74,12 @@ class MetricsRepository:
             ''')
 
             # 创建索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_name ON metrics (metric_name)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics (timestamp)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_category ON metrics (category)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_metrics_name ON metrics (metric_name)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics (timestamp)')
+            cursor.execute(
+                'CREATE INDEX IF NOT EXISTS idx_metrics_category ON metrics (category)')
 
             # 创建聚合指标表
             cursor.execute('''
@@ -378,7 +381,8 @@ class MetricsRepository:
                 (metric_name, min_value, max_value, avg_value, count, period, start_time, end_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (metric_name, row[0], row[1], row[2], row[3], period, start_time, end_time)
+                (metric_name, row[0], row[1], row[2],
+                 row[3], period, start_time, end_time)
             )
 
             conn.commit()
@@ -420,7 +424,8 @@ class MetricsRepository:
             cursor = conn.cursor()
 
             # 删除旧数据
-            cursor.execute("DELETE FROM metrics WHERE timestamp < ?", (cutoff_time,))
+            cursor.execute(
+                "DELETE FROM metrics WHERE timestamp < ?", (cutoff_time,))
             deleted_count = cursor.rowcount
 
             conn.commit()
@@ -471,9 +476,12 @@ class MetricsRepository:
                 end_timestamp = int(end_time.timestamp())
 
                 # 从新表中查询数据
-                cpu_data = self.query_metrics("cpu_usage", start_timestamp, end_timestamp, "system")
-                memory_data = self.query_metrics("memory_usage", start_timestamp, end_timestamp, "system")
-                disk_data = self.query_metrics("disk_usage", start_timestamp, end_timestamp, "system")
+                cpu_data = self.query_metrics(
+                    "cpu_usage", start_timestamp, end_timestamp, "system")
+                memory_data = self.query_metrics(
+                    "memory_usage", start_timestamp, end_timestamp, "system")
+                disk_data = self.query_metrics(
+                    "disk_usage", start_timestamp, end_timestamp, "system")
 
                 # 如果没有任何数据，返回空列表
                 if not cpu_data and not memory_data and not disk_data:
@@ -490,9 +498,12 @@ class MetricsRepository:
 
                 # 按时间戳组织数据
                 for ts in sorted(timestamps):
-                    cpu_value = next((float(item["value"]) for item in cpu_data if item["timestamp"] == ts), 0)
-                    memory_value = next((float(item["value"]) for item in memory_data if item["timestamp"] == ts), 0)
-                    disk_value = next((float(item["value"]) for item in disk_data if item["timestamp"] == ts), 0)
+                    cpu_value = next(
+                        (float(item["value"]) for item in cpu_data if item["timestamp"] == ts), 0)
+                    memory_value = next(
+                        (float(item["value"]) for item in memory_data if item["timestamp"] == ts), 0)
+                    disk_value = next(
+                        (float(item["value"]) for item in disk_data if item["timestamp"] == ts), 0)
 
                     result.append({
                         "id": len(result) + 1,
@@ -557,7 +568,8 @@ class MetricsRepository:
                     if row["tags"]:
                         try:
                             tags = json.loads(row["tags"])
-                            success = tags.get("success", "true").lower() == "true"
+                            success = tags.get(
+                                "success", "true").lower() == "true"
                         except json.JSONDecodeError:
                             pass
 

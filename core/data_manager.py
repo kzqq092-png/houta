@@ -50,16 +50,22 @@ class DataManager:
 
         # 自动加载和更新行业数据
         try:
-            log_structured(self.log_manager, "load_industry_cache", level="info", status="start")
+            log_structured(self.log_manager, "load_industry_cache",
+                           level="info", status="start")
             self.industry_manager.load_cache()
-            log_structured(self.log_manager, "load_industry_cache", level="info", status="end")
-            log_structured(self.log_manager, "update_industry_data", level="info", status="start")
+            log_structured(self.log_manager, "load_industry_cache",
+                           level="info", status="end")
+            log_structured(self.log_manager, "update_industry_data",
+                           level="info", status="start")
             self.industry_manager.update_industry_data()
-            log_structured(self.log_manager, "update_industry_data", level="info", status="end")
-            log_structured(self.log_manager, "industry_init", level="info", status="success")
+            log_structured(self.log_manager, "update_industry_data",
+                           level="info", status="end")
+            log_structured(self.log_manager, "industry_init",
+                           level="info", status="success")
         except Exception as e:
             if self.log_manager:
-                log_structured(self.log_manager, "industry_init", level="warning", status="fail", error=str(e))
+                log_structured(self.log_manager, "industry_init",
+                               level="warning", status="fail", error=str(e))
 
     async def get_k_data_async(self, code: str, freq: str = 'D',
                                start_date: Optional[str] = None,
@@ -232,7 +238,8 @@ class AsyncDataManagerWrapper(QObject):
                     self.error.emit(self.code, str(e))
 
         # 创建并启动工作线程
-        worker = LoadWorker(self.data_manager, code, freq, start_date, end_date)
+        worker = LoadWorker(self.data_manager, code,
+                            freq, start_date, end_date)
         worker.finished.connect(self.data_loaded.emit)
         worker.error.connect(self.error_occurred.emit)
         worker.progress.connect(self.progress_updated.emit)
@@ -418,11 +425,13 @@ class AsyncDataManagerWrapper(QObject):
                                                 industry_stocks[level].add(
                                                     code)
                     except Exception as e:
-                        log_structured(self.log_manager, "get_industry_info", level="warning", status="fail", error=str(e))
+                        log_structured(self.log_manager, "get_industry_info",
+                                       level="warning", status="fail", error=str(e))
                         continue
 
                 except Exception as e:
-                    log_structured(self.log_manager, "process_stock_data", level="warning", status="fail", error=f"{code} - {str(e)}")
+                    log_structured(self.log_manager, "process_stock_data",
+                                   level="warning", status="fail", error=f"{code} - {str(e)}")
                     continue
 
             # 缓存市场和行业数据
@@ -434,8 +443,10 @@ class AsyncDataManagerWrapper(QObject):
                            count=len(market_data), industry_count=len(industry_data))
 
         except Exception as e:
-            log_structured(self.log_manager, "market_industry_init", level="error", status="fail", error=str(e))
-            log_structured(self.log_manager, "traceback", level="error", error=traceback.format_exc())
+            log_structured(self.log_manager, "market_industry_init",
+                           level="error", status="fail", error=str(e))
+            log_structured(self.log_manager, "traceback",
+                           level="error", error=traceback.format_exc())
 
     def get_markets(self) -> Dict[str, Dict]:
         """获取所有市场数据
@@ -510,7 +521,8 @@ class AsyncDataManagerWrapper(QObject):
                 return dt.strftime('%Y-%m-%d')
             return str(dt)
         except Exception as e:
-            log_structured(self.log_manager, "convert_date", level="warning", error=str(e))
+            log_structured(self.log_manager, "convert_date",
+                           level="warning", error=str(e))
             return None
 
     def _standardize_kdata_format(self, df: pd.DataFrame, code: str) -> pd.DataFrame:
@@ -553,7 +565,8 @@ class AsyncDataManagerWrapper(QObject):
             except:
                 # 如果无法转换，添加默认datetime列
                 self.log_manager.warning(f"股票 {code} 无法推断datetime字段，使用默认日期")
-                df_copy['datetime'] = pd.date_range(start='2020-01-01', periods=len(df_copy), freq='D')
+                df_copy['datetime'] = pd.date_range(
+                    start='2020-01-01', periods=len(df_copy), freq='D')
                 datetime_col_name = 'datetime'
 
         # 标准化列名映射
@@ -577,7 +590,8 @@ class AsyncDataManagerWrapper(QObject):
         # 确保datetime作为索引
         if datetime_col_name and not datetime_in_index:
             # datetime在列中，需要设置为索引
-            df_copy[datetime_col_name] = pd.to_datetime(df_copy[datetime_col_name])
+            df_copy[datetime_col_name] = pd.to_datetime(
+                df_copy[datetime_col_name])
             df_copy = df_copy.set_index(datetime_col_name)
         elif not datetime_in_index:
             # 既不在列中也不在索引中，这种情况已经在上面处理了
@@ -600,7 +614,8 @@ class AsyncDataManagerWrapper(QObject):
                     if col == 'volume':
                         df_copy[col] = 0
                     elif col == 'amount':
-                        df_copy[col] = df_copy.get('close', 0) * df_copy.get('volume', 0)
+                        df_copy[col] = df_copy.get(
+                            'close', 0) * df_copy.get('volume', 0)
                     else:
                         df_copy[col] = df_copy.get('close', 0)  # 用收盘价填充其他价格字段
 
@@ -747,7 +762,8 @@ class AsyncDataManagerWrapper(QObject):
 
                 elif self._current_source == 'tonghuashun':
                     if 'tonghuashun' not in self._data_sources or not hasattr(self._data_sources['tonghuashun'], 'get_kdata'):
-                        self.log_manager.error("tonghuashun数据源未初始化或无get_kdata方法")
+                        self.log_manager.error(
+                            "tonghuashun数据源未初始化或无get_kdata方法")
                         return pd.DataFrame()
                     df = self._data_sources['tonghuashun'].get_kdata(
                         code, freq, start_date, end_date)
@@ -780,7 +796,8 @@ class AsyncDataManagerWrapper(QObject):
                     return pd.DataFrame()
 
                 # 检查其他必要列
-                missing_columns = [col for col in required_columns if col not in df.columns]
+                missing_columns = [
+                    col for col in required_columns if col not in df.columns]
                 if missing_columns:
                     self.log_manager.warning(
                         f"股票 {code} 的K线数据缺少必要列: {missing_columns}")
@@ -822,7 +839,8 @@ class AsyncDataManagerWrapper(QObject):
                                 return df
                             self._current_source = old_source
                         except Exception as e:
-                            self.log_manager.error(f"备用数据源 {source} 获取K线数据失败: {str(e)}")
+                            self.log_manager.error(
+                                f"备用数据源 {source} 获取K线数据失败: {str(e)}")
                             continue
                 return pd.DataFrame()
         except Exception as e:
@@ -1588,7 +1606,8 @@ class AsyncDataManagerWrapper(QObject):
             if not code:
                 code = '000001'  # 使用默认代码
                 if hasattr(self, 'log_manager') and log:
-                    self.log_manager.warning("df_to_kdata无法推断股票代码，使用默认代码000001")
+                    self.log_manager.warning(
+                        "df_to_kdata无法推断股票代码，使用默认代码000001")
 
             # 自动补全 datetime 字段
             df_copy = df.copy()
@@ -1597,15 +1616,18 @@ class AsyncDataManagerWrapper(QObject):
                     df_copy['datetime'] = df_copy.index
                 else:
                     if hasattr(self, 'log_manager') and log:
-                        self.log_manager.error("df_to_kdata无法推断datetime字段，请确保DataFrame包含'datetime'列或索引")
+                        self.log_manager.error(
+                            "df_to_kdata无法推断datetime字段，请确保DataFrame包含'datetime'列或索引")
                     return KData()
 
             # 检查必要字段
             required_columns = ['open', 'high', 'low', 'close', 'volume']
-            missing_columns = [col for col in required_columns if col not in df_copy.columns]
+            missing_columns = [
+                col for col in required_columns if col not in df_copy.columns]
             if missing_columns:
                 if hasattr(self, 'log_manager') and log:
-                    self.log_manager.error(f"df_to_kdata缺少必要列: {missing_columns}")
+                    self.log_manager.error(
+                        f"df_to_kdata缺少必要列: {missing_columns}")
                 return KData()
 
             # 直接从DataFrame数据创建KData
@@ -1624,7 +1646,8 @@ class AsyncDataManagerWrapper(QObject):
                 for _, row in df_copy.iterrows():
                     try:
                         # 创建Datetime对象
-                        dt = Datetime(row['datetime'].strftime('%Y-%m-%d %H:%M:%S'))
+                        dt = Datetime(row['datetime'].strftime(
+                            '%Y-%m-%d %H:%M:%S'))
 
                         # 创建KRecord
                         record = KRecord()
@@ -1634,7 +1657,8 @@ class AsyncDataManagerWrapper(QObject):
                         record.low = float(row['low'])
                         record.close = float(row['close'])
                         record.volume = float(row['volume'])
-                        record.amount = float(row.get('amount', row['volume'] * row['close']))
+                        record.amount = float(
+                            row.get('amount', row['volume'] * row['close']))
 
                         # 添加到KData
                         kdata.append(record)
@@ -1647,14 +1671,16 @@ class AsyncDataManagerWrapper(QObject):
                 if hasattr(self, 'log_manager') and log:
                     start_date = df_copy['datetime'].min().strftime('%Y-%m-%d')
                     end_date = df_copy['datetime'].max().strftime('%Y-%m-%d')
-                    self.log_manager.info(f"df_to_kdata转换成功: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
+                    self.log_manager.info(
+                        f"df_to_kdata转换成功: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
 
                 return kdata
 
             except Exception as e:
                 # 如果直接创建失败，尝试从hikyuu数据库获取（兼容性方案）
                 if hasattr(self, 'log_manager') and log:
-                    self.log_manager.warning(f"直接创建KData失败，尝试从hikyuu数据库获取: {e}")
+                    self.log_manager.warning(
+                        f"直接创建KData失败，尝试从hikyuu数据库获取: {e}")
 
                 # 自动推断起止日期
                 start_date = str(df_copy['datetime'].min())[:10]
@@ -1672,7 +1698,8 @@ class AsyncDataManagerWrapper(QObject):
                     kdata = stock.get_kdata(query)
 
                     if hasattr(self, 'log_manager') and log:
-                        self.log_manager.info(f"df_to_kdata从hikyuu获取: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
+                        self.log_manager.info(
+                            f"df_to_kdata从hikyuu获取: code={code}, start={start_date}, end={end_date}, KData长度={len(kdata)}")
 
                     return kdata
 

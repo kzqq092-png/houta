@@ -93,16 +93,21 @@ class MAStrategy(BaseStrategy):
         recent_data = data.iloc[signal_index-10:signal_index+1]
 
         # 价格变化幅度
-        price_change = abs(recent_data['close'].iloc[-1] - recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
+        price_change = abs(recent_data['close'].iloc[-1] -
+                           recent_data['close'].iloc[0]) / recent_data['close'].iloc[0]
 
         # 成交量变化
-        volume_ratio = recent_data['volume'].iloc[-1] / recent_data['volume'].mean() if recent_data['volume'].mean() > 0 else 1
+        volume_ratio = recent_data['volume'].iloc[-1] / \
+            recent_data['volume'].mean(
+        ) if recent_data['volume'].mean() > 0 else 1
 
         # 均线分离度
-        ma_separation = abs(recent_data['ma_short'].iloc[-1] - recent_data['ma_long'].iloc[-1]) / recent_data['ma_long'].iloc[-1]
+        ma_separation = abs(recent_data['ma_short'].iloc[-1] -
+                            recent_data['ma_long'].iloc[-1]) / recent_data['ma_long'].iloc[-1]
 
         # 综合置信度
-        confidence = min(0.9, max(0.1, (price_change * 2 + volume_ratio * 0.3 + ma_separation * 5) / 3))
+        confidence = min(
+            0.9, max(0.1, (price_change * 2 + volume_ratio * 0.3 + ma_separation * 5) / 3))
 
         return confidence
 
@@ -191,16 +196,20 @@ class MACDStrategy(BaseStrategy):
         recent_data = data.iloc[signal_index-10:signal_index+1]
 
         # MACD强度
-        macd_strength = abs(recent_data['macd'].iloc[-1]) / recent_data['close'].iloc[-1]
+        macd_strength = abs(
+            recent_data['macd'].iloc[-1]) / recent_data['close'].iloc[-1]
 
         # 柱状图趋势
-        histogram_trend = recent_data['histogram'].iloc[-1] - recent_data['histogram'].iloc[-5]
+        histogram_trend = recent_data['histogram'].iloc[-1] - \
+            recent_data['histogram'].iloc[-5]
 
         # 价格确认
-        price_trend = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[-5]) / recent_data['close'].iloc[-5]
+        price_trend = (recent_data['close'].iloc[-1] -
+                       recent_data['close'].iloc[-5]) / recent_data['close'].iloc[-5]
 
         # 综合置信度
-        confidence = min(0.9, max(0.1, (macd_strength * 100 + abs(histogram_trend) * 10 + abs(price_trend) * 2) / 3))
+        confidence = min(0.9, max(0.1, (macd_strength * 100 +
+                         abs(histogram_trend) * 10 + abs(price_trend) * 2) / 3))
 
         return confidence
 
@@ -290,13 +299,17 @@ class RSIStrategy(BaseStrategy):
         rsi_extreme = min(current_rsi, 100 - current_rsi) / 50  # 越接近极值置信度越高
 
         # 价格确认
-        price_change = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[-3]) / recent_data['close'].iloc[-3]
+        price_change = (recent_data['close'].iloc[-1] -
+                        recent_data['close'].iloc[-3]) / recent_data['close'].iloc[-3]
 
         # 成交量确认
-        volume_ratio = recent_data['volume'].iloc[-1] / recent_data['volume'].mean() if recent_data['volume'].mean() > 0 else 1
+        volume_ratio = recent_data['volume'].iloc[-1] / \
+            recent_data['volume'].mean(
+        ) if recent_data['volume'].mean() > 0 else 1
 
         # 综合置信度
-        confidence = min(0.9, max(0.1, (rsi_extreme + abs(price_change) * 2 + volume_ratio * 0.2) / 3))
+        confidence = min(
+            0.9, max(0.1, (rsi_extreme + abs(price_change) * 2 + volume_ratio * 0.2) / 3))
 
         return confidence
 
@@ -390,16 +403,20 @@ class KDJStrategy(BaseStrategy):
         recent_data = data.iloc[signal_index-10:signal_index+1]
 
         # KD值分离度
-        kd_separation = abs(recent_data['k'].iloc[-1] - recent_data['d'].iloc[-1]) / 100
+        kd_separation = abs(
+            recent_data['k'].iloc[-1] - recent_data['d'].iloc[-1]) / 100
 
         # J值极值程度
-        j_extreme = min(abs(recent_data['j'].iloc[-1]), abs(100 - recent_data['j'].iloc[-1])) / 50
+        j_extreme = min(
+            abs(recent_data['j'].iloc[-1]), abs(100 - recent_data['j'].iloc[-1])) / 50
 
         # 价格确认
-        price_trend = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[-5]) / recent_data['close'].iloc[-5]
+        price_trend = (recent_data['close'].iloc[-1] -
+                       recent_data['close'].iloc[-5]) / recent_data['close'].iloc[-5]
 
         # 综合置信度
-        confidence = min(0.9, max(0.1, (kd_separation * 2 + j_extreme + abs(price_trend) * 2) / 3))
+        confidence = min(
+            0.9, max(0.1, (kd_separation * 2 + j_extreme + abs(price_trend) * 2) / 3))
 
         return confidence
 
@@ -486,16 +503,21 @@ class BollingerBandsStrategy(BaseStrategy):
         recent_data = data.iloc[signal_index-10:signal_index+1]
 
         # 布林带宽度（波动率）
-        bb_width = (recent_data['bb_upper'].iloc[-1] - recent_data['bb_lower'].iloc[-1]) / recent_data['bb_middle'].iloc[-1]
+        bb_width = (recent_data['bb_upper'].iloc[-1] -
+                    recent_data['bb_lower'].iloc[-1]) / recent_data['bb_middle'].iloc[-1]
 
         # 价格位置
         price_position = (recent_data['close'].iloc[-1] - recent_data['bb_lower'].iloc[-1]) / \
-            (recent_data['bb_upper'].iloc[-1] - recent_data['bb_lower'].iloc[-1])
+            (recent_data['bb_upper'].iloc[-1] -
+             recent_data['bb_lower'].iloc[-1])
 
         # 成交量确认
-        volume_ratio = recent_data['volume'].iloc[-1] / recent_data['volume'].mean() if recent_data['volume'].mean() > 0 else 1
+        volume_ratio = recent_data['volume'].iloc[-1] / \
+            recent_data['volume'].mean(
+        ) if recent_data['volume'].mean() > 0 else 1
 
         # 综合置信度
-        confidence = min(0.9, max(0.1, (bb_width * 5 + abs(0.5 - price_position) * 2 + volume_ratio * 0.3) / 3))
+        confidence = min(0.9, max(
+            0.1, (bb_width * 5 + abs(0.5 - price_position) * 2 + volume_ratio * 0.3) / 3))
 
         return confidence

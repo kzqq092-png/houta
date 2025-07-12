@@ -55,7 +55,8 @@ class EventBus:
 
         # 异步执行配置
         self._async_execution = async_execution
-        self._executor = ThreadPoolExecutor(max_workers=max_workers) if async_execution else None
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers) if async_execution else None
         self._active_futures = set()
 
         # 事件去重机制
@@ -72,7 +73,8 @@ class EventBus:
             'errors': 0
         }
 
-        logger.info(f"Event bus initialized (async={async_execution}, dedup_window={deduplication_window}s)")
+        logger.info(
+            f"Event bus initialized (async={async_execution}, dedup_window={deduplication_window}s)")
 
     def _get_event_key(self, event: Union[BaseEvent, str], **kwargs) -> str:
         """
@@ -136,7 +138,8 @@ class EventBus:
             if event_key in self._recent_events:
                 time_diff = current_time - self._recent_events[event_key]
                 if time_diff < self._deduplication_window:
-                    logger.debug(f"Event {event_key} deduplicated (time_diff: {time_diff:.3f}s)")
+                    logger.debug(
+                        f"Event {event_key} deduplicated (time_diff: {time_diff:.3f}s)")
                     self._stats['events_deduplicated'] += 1
                     return True
 
@@ -163,7 +166,8 @@ class EventBus:
                 self._handlers[event_name] = []
 
             # 创建处理器包装
-            handler_wrapper = SimpleEventHandler(handler, getattr(handler, '__name__', str(handler)))
+            handler_wrapper = SimpleEventHandler(
+                handler, getattr(handler, '__name__', str(handler)))
             self._handlers[event_name].append(handler_wrapper)
 
             self._stats['handlers_registered'] += 1
@@ -180,7 +184,8 @@ class EventBus:
             priority: 优先级
         """
         with self._lock:
-            handler_wrapper = SimpleEventHandler(handler, getattr(handler, '__name__', str(handler)))
+            handler_wrapper = SimpleEventHandler(
+                handler, getattr(handler, '__name__', str(handler)))
             self._global_handlers.append(handler_wrapper)
 
             logger.debug(f"Subscribed {handler_wrapper.name} to all events")
@@ -262,32 +267,31 @@ class EventBus:
                 event_obj = event
 
             if event_name not in self._handlers:
-                logger.debug(f"No handlers for event: {event_name}")
+                # logger.debug(f"No handlers for event: {event_name}") # 注释掉，避免过多日志
                 return
 
             # 获取处理器列表的副本，避免在迭代时修改
             handlers_to_execute = self._handlers[event_name].copy()
 
             self._stats['events_published'] += 1
-            logger.debug(f"Publishing {event_name} to {len(handlers_to_execute)} handlers")
+            # logger.debug(f"Publishing {event_name} to {len(handlers_to_execute)} handlers")
 
         # 在锁外执行所有处理器，避免死锁
         for handler_wrapper in handlers_to_execute:
             try:
-                if self._async_execution:
-                    # 异步执行
-                    future = self._executor.submit(handler_wrapper.handler, event_obj)
-                    with self._lock:
-                        self._active_futures.add(future)
-                    future.add_done_callback(lambda f: self._active_futures.discard(f) if hasattr(self, '_active_futures') else None)
+                # 检查处理器是否是异步函数
+                if asyncio.iscoroutinefunction(handler_wrapper.handler):
+                    # 如果是协程，使用asyncio.create_task在事件循环中调度
+                    asyncio.create_task(handler_wrapper.handler(event_obj))
                 else:
-                    # 同步执行（在锁外）
+                    # 否则，同步执行
                     handler_wrapper.handler(event_obj)
 
                 self._stats['events_handled'] += 1
 
             except Exception as e:
-                logger.error(f"Error in event handler {handler_wrapper.name}: {e}")
+                logger.error(
+                    f"Error in event handler {handler_wrapper.name}: {e}")
                 self._stats['errors'] += 1
 
                 # 发布错误事件

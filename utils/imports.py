@@ -56,7 +56,8 @@ class ImportManager:
         # 检查是否已知导入失败
         if cache_key in self._errors:
             if required and cache_key not in self._warnings_shown:
-                self.logger.warning(f"Required module '{module_name}' is not available: {self._errors[cache_key]}")
+                self.logger.warning(
+                    f"Required module '{module_name}' is not available: {self._errors[cache_key]}")
                 self._warnings_shown.add(cache_key)
             return None
 
@@ -75,7 +76,8 @@ class ImportManager:
             self._errors[cache_key] = error_msg
 
             if required and cache_key not in self._warnings_shown:
-                self.logger.warning(f"Required module '{module_name}' is not available: {error_msg}")
+                self.logger.warning(
+                    f"Required module '{module_name}' is not available: {error_msg}")
                 self._warnings_shown.add(cache_key)
 
             return None
@@ -158,7 +160,8 @@ def get_matplotlib_dates():
 @lru_cache(maxsize=1)
 def get_matplotlib_backends():
     """获取matplotlib后端"""
-    backend = _import_manager._safe_import('matplotlib.backends.backend_qt5agg', required=False)
+    backend = _import_manager._safe_import(
+        'matplotlib.backends.backend_qt5agg', required=False)
     if backend:
         return {
             'FigureCanvas': getattr(backend, 'FigureCanvasQTAgg', None),
@@ -185,11 +188,16 @@ def get_plotly():
     plotly_modules = {}
 
     # 主要plotly模块
-    plotly_modules['graph_objects'] = _import_manager._safe_import('plotly.graph_objects', required=False)
-    plotly_modules['express'] = _import_manager._safe_import('plotly.express', required=False)
-    plotly_modules['subplots'] = _import_manager._safe_import('plotly.subplots', required=False)
-    plotly_modules['figure_factory'] = _import_manager._safe_import('plotly.figure_factory', required=False)
-    plotly_modules['io'] = _import_manager._safe_import('plotly.io', required=False)
+    plotly_modules['graph_objects'] = _import_manager._safe_import(
+        'plotly.graph_objects', required=False)
+    plotly_modules['express'] = _import_manager._safe_import(
+        'plotly.express', required=False)
+    plotly_modules['subplots'] = _import_manager._safe_import(
+        'plotly.subplots', required=False)
+    plotly_modules['figure_factory'] = _import_manager._safe_import(
+        'plotly.figure_factory', required=False)
+    plotly_modules['io'] = _import_manager._safe_import(
+        'plotly.io', required=False)
 
     return plotly_modules
 
@@ -207,7 +215,8 @@ px = _plotly_modules.get('express') if _plotly_modules else None
 # Matplotlib后端
 _mpl_backends = get_matplotlib_backends()
 FigureCanvas = _mpl_backends.get('FigureCanvas') if _mpl_backends else None
-NavigationToolbar = _mpl_backends.get('NavigationToolbar') if _mpl_backends else None
+NavigationToolbar = _mpl_backends.get(
+    'NavigationToolbar') if _mpl_backends else None
 
 # Matplotlib Figure
 _mpl_figure = get_matplotlib_figure()
@@ -224,8 +233,10 @@ def get_scipy():
     scipy_modules = {}
 
     # 主要scipy模块
-    scipy_modules['stats'] = _import_manager._safe_import('scipy.stats', required=False)
-    scipy_modules['optimize'] = _import_manager._safe_import('scipy.optimize', required=False)
+    scipy_modules['stats'] = _import_manager._safe_import(
+        'scipy.stats', required=False)
+    scipy_modules['optimize'] = _import_manager._safe_import(
+        'scipy.optimize', required=False)
 
     return scipy_modules
 
@@ -246,16 +257,24 @@ def get_sklearn():
     sklearn_modules = {}
 
     # 主要sklearn模块
-    sklearn_modules['metrics'] = _import_manager._safe_import('sklearn.metrics', required=False)
-    sklearn_modules['model_selection'] = _import_manager._safe_import('sklearn.model_selection', required=False)
-    sklearn_modules['preprocessing'] = _import_manager._safe_import('sklearn.preprocessing', required=False)
-    sklearn_modules['feature_selection'] = _import_manager._safe_import('sklearn.feature_selection', required=False)
-    sklearn_modules['decomposition'] = _import_manager._safe_import('sklearn.decomposition', required=False)
+    sklearn_modules['metrics'] = _import_manager._safe_import(
+        'sklearn.metrics', required=False)
+    sklearn_modules['model_selection'] = _import_manager._safe_import(
+        'sklearn.model_selection', required=False)
+    sklearn_modules['preprocessing'] = _import_manager._safe_import(
+        'sklearn.preprocessing', required=False)
+    sklearn_modules['feature_selection'] = _import_manager._safe_import(
+        'sklearn.feature_selection', required=False)
+    sklearn_modules['decomposition'] = _import_manager._safe_import(
+        'sklearn.decomposition', required=False)
 
     # 机器学习算法
-    sklearn_modules['ensemble'] = _import_manager._safe_import('sklearn.ensemble', required=False)
-    sklearn_modules['linear_model'] = _import_manager._safe_import('sklearn.linear_model', required=False)
-    sklearn_modules['svm'] = _import_manager._safe_import('sklearn.svm', required=False)
+    sklearn_modules['ensemble'] = _import_manager._safe_import(
+        'sklearn.ensemble', required=False)
+    sklearn_modules['linear_model'] = _import_manager._safe_import(
+        'sklearn.linear_model', required=False)
+    sklearn_modules['svm'] = _import_manager._safe_import(
+        'sklearn.svm', required=False)
 
     return sklearn_modules
 
@@ -263,8 +282,10 @@ def get_sklearn():
 # Sklearn别名
 _sklearn_modules = get_sklearn()
 sklearn_metrics = _sklearn_modules.get('metrics') if _sklearn_modules else None
-sklearn_model_selection = _sklearn_modules.get('model_selection') if _sklearn_modules else None
-sklearn_preprocessing = _sklearn_modules.get('preprocessing') if _sklearn_modules else None
+sklearn_model_selection = _sklearn_modules.get(
+    'model_selection') if _sklearn_modules else None
+sklearn_preprocessing = _sklearn_modules.get(
+    'preprocessing') if _sklearn_modules else None
 
 # =============================================================================
 # 技术分析库
@@ -330,10 +351,12 @@ def get_import_summary() -> str:
 def ensure_required_libraries():
     """确保必需库可用，如果不可用则抛出异常"""
     required_status = check_required_libraries()
-    missing_libs = [name for name, available in required_status.items() if not available]
+    missing_libs = [name for name,
+                    available in required_status.items() if not available]
 
     if missing_libs:
-        raise ImportError(f"Missing required libraries: {', '.join(missing_libs)}")
+        raise ImportError(
+            f"Missing required libraries: {', '.join(missing_libs)}")
 
 
 def safe_import(module_name: str, required: bool = True) -> Optional[Any]:
@@ -361,8 +384,10 @@ scipy_optimize = _scipy_modules.get('optimize') if _scipy_modules else None
 # Sklearn别名
 _sklearn_modules = get_sklearn()
 sklearn_metrics = _sklearn_modules.get('metrics') if _sklearn_modules else None
-sklearn_model_selection = _sklearn_modules.get('model_selection') if _sklearn_modules else None
-sklearn_preprocessing = _sklearn_modules.get('preprocessing') if _sklearn_modules else None
+sklearn_model_selection = _sklearn_modules.get(
+    'model_selection') if _sklearn_modules else None
+sklearn_preprocessing = _sklearn_modules.get(
+    'preprocessing') if _sklearn_modules else None
 
 # Talib别名
 talib = get_talib()

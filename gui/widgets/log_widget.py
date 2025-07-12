@@ -187,14 +187,17 @@ class LogWidget(QWidget):
             self.log_text.setReadOnly(True)
             self.log_text.setLineWrapMode(QTextEdit.WidgetWidth)
             self.log_text.setContextMenuPolicy(Qt.CustomContextMenu)
-            self.log_text.customContextMenuRequested.connect(self.show_log_context_menu)
-            self.log_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            self.log_text.customContextMenuRequested.connect(
+                self.show_log_context_menu)
+            self.log_text.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.log_text.setStyleSheet(
                 "margin-top: 0px; margin-bottom: 0px; font-size: 12px; line-height: 1.4; padding: 5px 16px; font-family: 'Consolas', 'Microsoft YaHei', monospace;")
             layout.addWidget(self.log_text, 1)
-            self.log_text.verticalScrollBar().valueChanged.connect(self._on_scrollbar_value_changed)
+            self.log_text.verticalScrollBar().valueChanged.connect(
+                self._on_scrollbar_value_changed)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.update()
             self.adjustSize()
@@ -204,8 +207,10 @@ class LogWidget(QWidget):
             if self.log_text is None:
                 self.log_text = QTextEdit()
                 self.log_text.setReadOnly(True)
-                self.log_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-                self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                self.log_text.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.log_text.setHorizontalScrollBarPolicy(
+                    Qt.ScrollBarAlwaysOff)
                 self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
                 self.layout().addWidget(self.log_text, 1)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -256,14 +261,17 @@ class LogWidget(QWidget):
             self.setVisible(True)
             self.update()
             if self.log_text is not None:
-                QTimer.singleShot(0, lambda: self.log_text.moveCursor(QTextCursor.End))
+                QTimer.singleShot(
+                    0, lambda: self.log_text.moveCursor(QTextCursor.End))
         except Exception as e:
             error_msg = f"添加日志失败: {str(e)}"
             if self.log_text is None:
                 self.log_text = QTextEdit()
                 self.log_text.setReadOnly(True)
-                self.log_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-                self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                self.log_text.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.log_text.setHorizontalScrollBarPolicy(
+                    Qt.ScrollBarAlwaysOff)
                 self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
                 self.layout().addWidget(self.log_text, 1)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -351,7 +359,8 @@ class LogWidget(QWidget):
                 logs = [l for l in self._all_logs if isinstance(l[0], dict)]
                 if not logs:
                     return
-                df = pd.DataFrame([dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
+                df = pd.DataFrame(
+                    [dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
                 if fmt == "csv":
                     df.to_csv(file_path, index=False)
                 else:
@@ -751,7 +760,8 @@ class LogWidget(QWidget):
                 html_logs.append(
                     f'<div style="text-align:left;color:{color};word-break:break-all;white-space:pre-wrap;width:100%;">[{ts}] [{lvl}] {msg}</div>')
         if not html_logs:
-            html_logs = ['<div style="color:#888;text-align:center;margin-top:40px;">暂无日志内容</div>']
+            html_logs = [
+                '<div style="color:#888;text-align:center;margin-top:40px;">暂无日志内容</div>']
         scrollbar = self.log_text.verticalScrollBar()
         old_value = scrollbar.value()
         old_max = scrollbar.maximum()
@@ -759,7 +769,8 @@ class LogWidget(QWidget):
         if self.log_text is not None:
             self.log_text.setHtml("".join(html_logs))
             if scroll_to_end or not self.pause_scroll:
-                QTimer.singleShot(0, lambda: self.log_text.moveCursor(QTextCursor.End))
+                QTimer.singleShot(
+                    0, lambda: self.log_text.moveCursor(QTextCursor.End))
 
     def refresh(self) -> None:
         """
@@ -787,7 +798,8 @@ class LogWidget(QWidget):
         logs = [l for l in self._all_logs if isinstance(l[0], dict)]
         if not logs:
             return
-        df = pd.DataFrame([dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
+        df = pd.DataFrame(
+            [dict(**d[0], level=d[1], timestamp=d[2]) for d in logs])
         dialog = QDialog(self)
         dialog.setWindowTitle("日志统计可视化")
         layout = QVBoxLayout(dialog)
@@ -804,17 +816,20 @@ class LogWidget(QWidget):
             df["event"].value_counts().plot(kind="bar", ax=ax1, title="事件分布")
         # 级别分布
         if "level" in df:
-            df["level"].value_counts().plot(kind="pie", ax=ax2, autopct="%1.1f%%", title="日志级别分布")
+            df["level"].value_counts().plot(
+                kind="pie", ax=ax2, autopct="%1.1f%%", title="日志级别分布")
         # 时间趋势
         if "timestamp" in df:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
-            df.set_index("timestamp").resample("min").size().plot(ax=ax3, title="日志时间趋势")
+            df.set_index("timestamp").resample(
+                "min").size().plot(ax=ax3, title="日志时间趋势")
         fig.tight_layout()
         # 支持导出图片
         btn_export = QPushButton("导出统计图")
 
         def do_export():
-            file_path, _ = QFileDialog.getSaveFileName(dialog, "导出统计图", "", "PNG Files (*.png)")
+            file_path, _ = QFileDialog.getSaveFileName(
+                dialog, "导出统计图", "", "PNG Files (*.png)")
             if file_path:
                 fig.savefig(file_path)
         btn_export.clicked.connect(do_export)

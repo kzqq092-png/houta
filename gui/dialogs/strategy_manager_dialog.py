@@ -72,25 +72,25 @@ class StrategyManagerDialog(QDialog):
 
         # 按钮区域
         button_layout = QHBoxLayout()
-        
+
         refresh_button = QPushButton("刷新")
         refresh_button.clicked.connect(self._load_strategies)
-        
+
         import_button = QPushButton("导入策略")
         import_button.clicked.connect(self._import_strategy)
-        
+
         export_button = QPushButton("导出策略")
         export_button.clicked.connect(self._export_strategy)
-        
+
         close_button = QPushButton("关闭")
         close_button.clicked.connect(self.accept)
-        
+
         button_layout.addWidget(refresh_button)
         button_layout.addWidget(import_button)
         button_layout.addWidget(export_button)
         button_layout.addStretch()
         button_layout.addWidget(close_button)
-        
+
         layout.addLayout(button_layout)
 
     def _create_strategy_list_tab(self) -> None:
@@ -101,7 +101,8 @@ class StrategyManagerDialog(QDialog):
         # 策略列表
         self.strategy_list = QListWidget()
         self.strategy_list.itemClicked.connect(self._on_strategy_selected)
-        self.strategy_list.itemDoubleClicked.connect(self._on_strategy_double_clicked)
+        self.strategy_list.itemDoubleClicked.connect(
+            self._on_strategy_double_clicked)
         layout.addWidget(self.strategy_list)
 
         # 策略详情
@@ -116,21 +117,21 @@ class StrategyManagerDialog(QDialog):
 
         # 操作按钮
         action_layout = QHBoxLayout()
-        
+
         edit_button = QPushButton("编辑策略")
         edit_button.clicked.connect(self._edit_strategy)
-        
+
         delete_button = QPushButton("删除策略")
         delete_button.clicked.connect(self._delete_strategy)
-        
+
         clone_button = QPushButton("克隆策略")
         clone_button.clicked.connect(self._clone_strategy)
-        
+
         action_layout.addWidget(edit_button)
         action_layout.addWidget(delete_button)
         action_layout.addWidget(clone_button)
         action_layout.addStretch()
-        
+
         layout.addLayout(action_layout)
 
         self.tab_widget.addTab(tab, "策略列表")
@@ -161,7 +162,7 @@ class StrategyManagerDialog(QDialog):
 
         self.strategy_type_combo = QComboBox()
         self.strategy_type_combo.addItems([
-            "趋势跟踪", "均值回归", "动量策略", "套利策略", 
+            "趋势跟踪", "均值回归", "动量策略", "套利策略",
             "网格策略", "定投策略", "自定义策略"
         ])
         basic_layout.addRow("策略类型:", self.strategy_type_combo)
@@ -174,7 +175,8 @@ class StrategyManagerDialog(QDialog):
 
         # 时间周期
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["1分钟", "5分钟", "15分钟", "30分钟", "1小时", "日线", "周线", "月线"])
+        self.period_combo.addItems(
+            ["1分钟", "5分钟", "15分钟", "30分钟", "1小时", "日线", "周线", "月线"])
         params_layout.addRow("时间周期:", self.period_combo)
 
         # 止损比例
@@ -205,14 +207,14 @@ class StrategyManagerDialog(QDialog):
 
         self.indicators_list = QListWidget()
         self.indicators_list.setSelectionMode(QListWidget.MultiSelection)
-        
+
         # 添加常用技术指标
         indicators = [
             "MA - 移动平均线", "EMA - 指数移动平均线", "MACD - 指数平滑移动平均线",
             "RSI - 相对强弱指标", "KDJ - 随机指标", "BOLL - 布林线",
             "CCI - 商品通道指数", "WR - 威廉指标", "ATR - 平均真实波幅"
         ]
-        
+
         for indicator in indicators:
             item = QListWidgetItem(indicator)
             self.indicators_list.addItem(item)
@@ -227,7 +229,7 @@ class StrategyManagerDialog(QDialog):
         self.strategy_code_edit = QTextEdit()
         self.strategy_code_edit.setPlaceholderText("输入策略代码（Python）")
         self.strategy_code_edit.setFont(QFont("Consolas", 10))
-        
+
         # 默认策略模板
         default_code = '''
 def strategy_logic(data, params):
@@ -271,7 +273,7 @@ def strategy_logic(data, params):
     
     return signals
         '''.strip()
-        
+
         self.strategy_code_edit.setPlainText(default_code)
         code_layout.addWidget(self.strategy_code_edit)
 
@@ -438,7 +440,8 @@ def strategy_logic(data, params):
 
             for strategy in self.strategies:
                 # 策略列表
-                item = QListWidgetItem(f"{strategy['name']} ({strategy['type']})")
+                item = QListWidgetItem(
+                    f"{strategy['name']} ({strategy['type']})")
                 item.setData(Qt.UserRole, strategy)
                 self.strategy_list.addItem(item)
 
@@ -466,7 +469,7 @@ def strategy_logic(data, params):
 策略描述:
 {strategy['description']}
                 """.strip()
-                
+
                 self.strategy_details.setPlainText(details)
 
         except Exception as e:
@@ -518,10 +521,10 @@ def strategy_logic(data, params):
             self.strategy_created.emit(strategy_data)
 
             QMessageBox.information(self, "成功", f"策略 '{name}' 创建成功")
-            
+
             # 刷新策略列表
             self._load_strategies()
-            
+
             # 清空表单
             self._clear_create_form()
 
@@ -551,7 +554,8 @@ def strategy_logic(data, params):
                 return
 
             strategy = current_item.data(Qt.UserRole)
-            QMessageBox.information(self, "编辑策略", f"编辑策略功能开发中...\n策略: {strategy['name']}")
+            QMessageBox.information(
+                self, "编辑策略", f"编辑策略功能开发中...\n策略: {strategy['name']}")
 
         except Exception as e:
             logger.error(f"编辑策略失败: {e}")
@@ -565,9 +569,9 @@ def strategy_logic(data, params):
                 return
 
             strategy = current_item.data(Qt.UserRole)
-            
+
             reply = QMessageBox.question(
-                self, "确认删除", 
+                self, "确认删除",
                 f"确定要删除策略 '{strategy['name']}' 吗？\n此操作不可撤销。",
                 QMessageBox.Yes | QMessageBox.No
             )
@@ -575,8 +579,9 @@ def strategy_logic(data, params):
             if reply == QMessageBox.Yes:
                 # 这里应该调用策略服务删除策略
                 # self.strategy_service.delete_strategy(strategy['name'])
-                
-                QMessageBox.information(self, "成功", f"策略 '{strategy['name']}' 已删除")
+
+                QMessageBox.information(
+                    self, "成功", f"策略 '{strategy['name']}' 已删除")
                 self._load_strategies()
 
         except Exception as e:
@@ -591,16 +596,17 @@ def strategy_logic(data, params):
                 return
 
             strategy = current_item.data(Qt.UserRole)
-            
+
             new_name, ok = QInputDialog.getText(
-                self, "克隆策略", 
-                "请输入新策略名称:", 
+                self, "克隆策略",
+                "请输入新策略名称:",
                 text=f"{strategy['name']}_副本"
             )
 
             if ok and new_name.strip():
                 # 这里应该调用策略服务克隆策略
-                QMessageBox.information(self, "成功", f"策略已克隆为 '{new_name.strip()}'")
+                QMessageBox.information(
+                    self, "成功", f"策略已克隆为 '{new_name.strip()}'")
                 self._load_strategies()
 
         except Exception as e:
@@ -636,9 +642,9 @@ def strategy_logic(data, params):
                 return
 
             strategy = current_item.data(Qt.UserRole)
-            
+
             file_path, _ = QFileDialog.getSaveFileName(
-                self, "导出策略", f"{strategy['name']}.json", 
+                self, "导出策略", f"{strategy['name']}.json",
                 "JSON文件 (*.json);;所有文件 (*)"
             )
 

@@ -86,10 +86,12 @@ class AnalysisManager:
                 result = self._fundamental_analysis(stock_code, stock_info)
             elif analysis_type == 'combined':
                 tech_result = self._technical_analysis(stock_code, stock_info)
-                fund_result = self._fundamental_analysis(stock_code, stock_info)
+                fund_result = self._fundamental_analysis(
+                    stock_code, stock_info)
                 result = self._combine_analysis(tech_result, fund_result)
             else:
-                self.logger.error(f"Unsupported analysis type: {analysis_type}")
+                self.logger.error(
+                    f"Unsupported analysis type: {analysis_type}")
                 return None
 
             # 缓存结果
@@ -136,10 +138,12 @@ class AnalysisManager:
 
             # 计算目标价和止损价
             current_price = df['close'].iloc[-1] if not df.empty else None
-            target_price, stop_loss = self._calculate_price_targets(df, recommendation)
+            target_price, stop_loss = self._calculate_price_targets(
+                df, recommendation)
 
             # 生成分析摘要
-            summary = self._generate_technical_summary(signals, recommendation, confidence)
+            summary = self._generate_technical_summary(
+                signals, recommendation, confidence)
 
             return AnalysisResult(
                 stock_code=stock_code,
@@ -154,7 +158,8 @@ class AnalysisManager:
             )
 
         except Exception as e:
-            self.logger.error(f"Technical analysis failed for {stock_code}: {e}")
+            self.logger.error(
+                f"Technical analysis failed for {stock_code}: {e}")
             return None
 
     def _fundamental_analysis(self, stock_code: str, stock_info: StockInfo) -> Optional[AnalysisResult]:
@@ -213,7 +218,8 @@ class AnalysisManager:
 
             # 生成推荐
             recommendation, confidence = self._generate_recommendation(signals)
-            summary = self._generate_fundamental_summary(signals, stock_info, recommendation)
+            summary = self._generate_fundamental_summary(
+                signals, stock_info, recommendation)
 
             return AnalysisResult(
                 stock_code=stock_code,
@@ -226,7 +232,8 @@ class AnalysisManager:
             )
 
         except Exception as e:
-            self.logger.error(f"Fundamental analysis failed for {stock_code}: {e}")
+            self.logger.error(
+                f"Fundamental analysis failed for {stock_code}: {e}")
             return None
 
     def _calculate_ma_signals(self, df: pd.DataFrame, stock_code: str) -> List[TechnicalSignal]:
@@ -404,9 +411,11 @@ class AnalysisManager:
 
         # 计算买入和卖出信号的权重
         buy_weight = sum(s.strength for s in signals if s.signal_type == 'buy')
-        sell_weight = sum(s.strength for s in signals if s.signal_type == 'sell')
+        sell_weight = sum(
+            s.strength for s in signals if s.signal_type == 'sell')
 
-        total_signals = len([s for s in signals if s.signal_type in ['buy', 'sell']])
+        total_signals = len(
+            [s for s in signals if s.signal_type in ['buy', 'sell']])
         if total_signals == 0:
             return 'hold', 0.5
 
@@ -464,7 +473,8 @@ class AnalysisManager:
         # 添加主要信号描述
         strong_signals = [s for s in signals if s.strength > 0.7]
         if strong_signals:
-            summary += "主要信号：" + "；".join([s.description for s in strong_signals[:3]])
+            summary += "主要信号：" + \
+                "；".join([s.description for s in strong_signals[:3]])
 
         return summary
 
@@ -494,7 +504,8 @@ class AnalysisManager:
         combined_signals = tech_result.signals + fund_result.signals
 
         # 重新生成推荐
-        recommendation, confidence = self._generate_recommendation(combined_signals)
+        recommendation, confidence = self._generate_recommendation(
+            combined_signals)
 
         # 合并摘要
         summary = f"综合分析：{tech_result.summary} {fund_result.summary}"

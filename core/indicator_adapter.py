@@ -20,7 +20,8 @@ import pandas as pd
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # 添加项目根目录到Python路径
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
 
 
 # 设置日志
@@ -28,7 +29,8 @@ logger = logging.getLogger('indicator_adapter')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
 
 
@@ -124,7 +126,8 @@ def calc_macd(close: pd.Series, fast=12, slow=26, signal=9) -> Tuple[pd.Series, 
 
     # 直接使用新的指标算法库
     from core.indicators.library.oscillators import calculate_macd
-    result = calculate_macd(df, fastperiod=fast, slowperiod=slow, signalperiod=signal)
+    result = calculate_macd(df, fastperiod=fast,
+                            slowperiod=slow, signalperiod=signal)
 
     # 返回MACD序列
     if 'MACD' in result.columns and 'MACDSignal' in result.columns and 'MACDHist' in result.columns:
@@ -136,9 +139,12 @@ def calc_macd(close: pd.Series, fast=12, slow=26, signal=9) -> Tuple[pd.Series, 
     else:
         # 返回全NaN序列
         return (
-            pd.Series([float('nan')] * len(close), index=close.index, name="MACD"),
-            pd.Series([float('nan')] * len(close), index=close.index, name="MACD_signal"),
-            pd.Series([float('nan')] * len(close), index=close.index, name="MACD_hist")
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="MACD"),
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="MACD_signal"),
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="MACD_hist")
         )
 
 
@@ -236,9 +242,12 @@ def calc_boll(close: pd.Series, n=20, p=2) -> Tuple[pd.Series, pd.Series, pd.Ser
     else:
         # 返回全NaN序列
         return (
-            pd.Series([float('nan')] * len(close), index=close.index, name="BOLL_mid"),
-            pd.Series([float('nan')] * len(close), index=close.index, name="BOLL_upper"),
-            pd.Series([float('nan')] * len(close), index=close.index, name="BOLL_lower")
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="BOLL_mid"),
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="BOLL_upper"),
+            pd.Series([float('nan')] * len(close),
+                      index=close.index, name="BOLL_lower")
         )
 
 
@@ -488,7 +497,8 @@ def get_indicator_inputs(indicator_name: str) -> list:
         from db.models.indicator_models import IndicatorDatabase
         import os
 
-        db_path = os.path.join(os.path.dirname(__file__), '..', 'db', 'indicators.db')
+        db_path = os.path.join(os.path.dirname(
+            __file__), '..', 'db', 'indicators.db')
         if os.path.exists(db_path):
             db = IndicatorDatabase(db_path)
             indicator = db.get_indicator_by_name(indicator_name)

@@ -81,8 +81,10 @@ class PatternTestSuite:
 
             open_price = base_price
             close_price = base_price + np.random.uniform(-1, 1)
-            high_price = max(open_price, close_price) + np.random.uniform(0, 0.5)
-            low_price = min(open_price, close_price) - np.random.uniform(0, 0.5)
+            high_price = max(open_price, close_price) + \
+                np.random.uniform(0, 0.5)
+            low_price = min(open_price, close_price) - \
+                np.random.uniform(0, 0.5)
 
             data.append({
                 'datetime': date,
@@ -396,7 +398,8 @@ class PatternTestSuite:
         if idx < len(data):
             k = data.iloc[idx]
             print(f"注入的形态数据 (第{idx+1}根K线):")
-            print(f"  开盘: {k['open']}, 最高: {k['high']}, 最低: {k['low']}, 收盘: {k['close']}")
+            print(
+                f"  开盘: {k['open']}, 最高: {k['high']}, 最低: {k['low']}, 收盘: {k['close']}")
 
             body_size = abs(k['close'] - k['open'])
             upper_shadow = k['high'] - max(k['open'], k['close'])
@@ -414,7 +417,8 @@ class PatternTestSuite:
             print(f"注入的形态数据 (第{idx1+1}-{idx2+1}根K线):")
             for i, idx in enumerate([idx1, idx2], 1):
                 k = data.iloc[idx]
-                print(f"  第{i}根: 开盘{k['open']}, 最高{k['high']}, 最低{k['low']}, 收盘{k['close']}")
+                print(
+                    f"  第{i}根: 开盘{k['open']}, 最高{k['high']}, 最低{k['low']}, 收盘{k['close']}")
 
     def _show_triple_candle_pattern(self, data: pd.DataFrame, idx1: int, idx2: int, idx3: int):
         """显示三根K线形态的数据"""
@@ -422,7 +426,8 @@ class PatternTestSuite:
             print(f"注入的形态数据 (第{idx1+1}-{idx3+1}根K线):")
             for i, idx in enumerate([idx1, idx2, idx3], 1):
                 k = data.iloc[idx]
-                print(f"  第{i}根: 开盘{k['open']}, 最高{k['high']}, 最低{k['low']}, 收盘{k['close']}")
+                print(
+                    f"  第{i}根: 开盘{k['open']}, 最高{k['high']}, 最低{k['low']}, 收盘{k['close']}")
 
     def test_all_patterns(self) -> Dict:
         """测试所有形态算法"""
@@ -434,7 +439,8 @@ class PatternTestSuite:
         print(f"找到 {len(all_configs)} 个形态配置")
 
         # 过滤出有算法代码的形态
-        configs_with_code = [c for c in all_configs if c.algorithm_code and c.algorithm_code.strip()]
+        configs_with_code = [
+            c for c in all_configs if c.algorithm_code and c.algorithm_code.strip()]
         print(f"📝 其中 {len(configs_with_code)} 个包含算法代码")
 
         total_tests = len(configs_with_code)
@@ -489,20 +495,24 @@ class PatternTestSuite:
         print(f"  成功率: {summary['success_rate']:.1f}%")
 
         # 成功的测试
-        successful_patterns = [name for name, result in summary['test_results'].items() if result['success']]
+        successful_patterns = [
+            name for name, result in summary['test_results'].items() if result['success']]
         if successful_patterns:
             print(f"\n✅ 成功的形态 ({len(successful_patterns)}个):")
             for pattern in successful_patterns:
                 result = summary['test_results'][pattern]
-                print(f"  - {result['pattern_name']} ({pattern}): {result['patterns_found']}个形态, {result['execution_time']:.3f}秒")
+                print(
+                    f"  - {result['pattern_name']} ({pattern}): {result['patterns_found']}个形态, {result['execution_time']:.3f}秒")
 
         # 失败的测试
-        failed_patterns = [name for name, result in summary['test_results'].items() if not result['success']]
+        failed_patterns = [
+            name for name, result in summary['test_results'].items() if not result['success']]
         if failed_patterns:
             print(f"\n❌ 失败的形态 ({len(failed_patterns)}个):")
             for pattern in failed_patterns:
                 result = summary['test_results'][pattern]
-                print(f"  - {result['pattern_name']} ({pattern}): {result['error_type']} - {result['error']}")
+                print(
+                    f"  - {result['pattern_name']} ({pattern}): {result['error_type']} - {result['error']}")
 
         # 错误分类统计
         if summary['error_summary']:
@@ -510,12 +520,14 @@ class PatternTestSuite:
             for error_type, errors in summary['error_summary'].items():
                 print(f"  {error_type}: {len(errors)}个")
                 for error in errors[:3]:  # 只显示前3个
-                    print(f"    - {error['pattern']}: {error['error'][:100]}...")
+                    print(
+                        f"    - {error['pattern']}: {error['error'][:100]}...")
                 if len(errors) > 3:
                     print(f"    ... 还有 {len(errors)-3} 个类似错误")
 
         # 性能统计
-        execution_times = [result['execution_time'] for result in summary['test_results'].values() if result['success']]
+        execution_times = [result['execution_time']
+                           for result in summary['test_results'].values() if result['success']]
         if execution_times:
             avg_time = sum(execution_times) / len(execution_times)
             max_time = max(execution_times)
@@ -526,7 +538,8 @@ class PatternTestSuite:
             print(f"  最短执行时间: {min_time:.3f}秒")
 
         # 形态识别统计
-        total_patterns_found = sum(result['patterns_found'] for result in summary['test_results'].values() if result['success'])
+        total_patterns_found = sum(
+            result['patterns_found'] for result in summary['test_results'].values() if result['success'])
         print(f"\n形态识别统计:")
         print(f"  总共识别出: {total_patterns_found}个形态")
 

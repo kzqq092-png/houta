@@ -115,7 +115,8 @@ class ProfessionalBacktestValidator:
 
         try:
             # 1. 数据结构验证
-            structure_score = self._validate_data_structure(data, errors, warnings)
+            structure_score = self._validate_data_structure(
+                data, errors, warnings)
             metrics["structure_score"] = structure_score
 
             # 2. 数据质量验证
@@ -123,15 +124,18 @@ class ProfessionalBacktestValidator:
             metrics["quality_score"] = quality_score
 
             # 3. 信号验证
-            signal_score = self._validate_signals(data, signal_col, errors, warnings)
+            signal_score = self._validate_signals(
+                data, signal_col, errors, warnings)
             metrics["signal_score"] = signal_score
 
             # 4. 时间序列验证
-            timeseries_score = self._validate_timeseries(data, errors, warnings)
+            timeseries_score = self._validate_timeseries(
+                data, errors, warnings)
             metrics["timeseries_score"] = timeseries_score
 
             # 5. 市场数据合理性验证
-            market_score = self._validate_market_data(data, stock_code, errors, warnings)
+            market_score = self._validate_market_data(
+                data, stock_code, errors, warnings)
             metrics["market_score"] = market_score
 
             # 计算总体质量分数
@@ -203,10 +207,12 @@ class ProfessionalBacktestValidator:
 
                     # 检查范围
                     if "min" in param_rules and param_value < param_rules["min"]:
-                        errors.append(f"参数 {param_name} 值 {param_value} 小于最小值 {param_rules['min']}")
+                        errors.append(
+                            f"参数 {param_name} 值 {param_value} 小于最小值 {param_rules['min']}")
 
                     if "max" in param_rules and param_value > param_rules["max"]:
-                        errors.append(f"参数 {param_name} 值 {param_value} 大于最大值 {param_rules['max']}")
+                        errors.append(
+                            f"参数 {param_name} 值 {param_value} 大于最大值 {param_rules['max']}")
 
             # 参数组合合理性检查
             if "stop_loss_pct" in params and "take_profit_pct" in params:
@@ -259,7 +265,8 @@ class ProfessionalBacktestValidator:
         required_columns = rules["required_columns"]
 
         # 检查必需列
-        missing_columns = [col for col in required_columns if col not in data.columns]
+        missing_columns = [
+            col for col in required_columns if col not in data.columns]
         if missing_columns:
             errors.append(f"缺少必需列: {missing_columns}")
             return 0.0
@@ -315,7 +322,8 @@ class ProfessionalBacktestValidator:
                     returns = data[col].pct_change().dropna()
                     extreme_returns = (abs(returns) > 0.5).sum()  # 50%以上变动
                     if extreme_returns > 0:
-                        warnings.append(f"发现 {extreme_returns} 个异常价格波动在列 {col}")
+                        warnings.append(
+                            f"发现 {extreme_returns} 个异常价格波动在列 {col}")
                         score -= 5
 
         return max(0, score)
@@ -413,13 +421,15 @@ class ProfessionalBacktestValidator:
         # OHLC关系验证
         if all(col in data.columns for col in ["open", "high", "low", "close"]):
             # High应该是最高价
-            invalid_high = (data["high"] < data[["open", "close"]].max(axis=1)).sum()
+            invalid_high = (
+                data["high"] < data[["open", "close"]].max(axis=1)).sum()
             if invalid_high > 0:
                 errors.append(f"发现 {invalid_high} 条记录的最高价不正确")
                 score -= 20
 
             # Low应该是最低价
-            invalid_low = (data["low"] > data[["open", "close"]].min(axis=1)).sum()
+            invalid_low = (
+                data["low"] > data[["open", "close"]].min(axis=1)).sum()
             if invalid_low > 0:
                 errors.append(f"发现 {invalid_low} 条记录的最低价不正确")
                 score -= 20
@@ -507,7 +517,8 @@ class ProfessionalBacktestValidator:
             # 验证交易次数
             trade_count = len(trades)
             if trade_count < rules["min_trades"]:
-                warnings.append(f"交易次数过少: {trade_count}, 建议至少 {rules['min_trades']} 次")
+                warnings.append(
+                    f"交易次数过少: {trade_count}, 建议至少 {rules['min_trades']} 次")
 
             # 验证回测结果的合理性
             if 'equity' in results.columns:
@@ -542,7 +553,8 @@ class ProfessionalBacktestValidator:
                 errors=errors,
                 warnings=warnings,
                 suggestions=suggestions,
-                metrics={"result_score": result_score, "trade_count": trade_count},
+                metrics={"result_score": result_score,
+                         "trade_count": trade_count},
                 validation_time=start_time
             )
 

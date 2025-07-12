@@ -29,7 +29,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"显示设置对话框失败: {e}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"无法打开设置对话框: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"无法打开设置对话框: {str(e)}")
 
     def show_node_manager_dialog(self):
         """显示节点管理对话框"""
@@ -40,7 +41,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"显示节点管理对话框失败: {e}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"无法打开节点管理对话框: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"无法打开节点管理对话框: {str(e)}")
 
     def show_cloud_api_dialog(self):
         """显示云端API管理对话框"""
@@ -51,7 +53,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"显示云端API管理对话框失败: {e}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"无法打开云端API管理对话框: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"无法打开云端API管理对话框: {str(e)}")
 
     def show_indicator_market_dialog(self):
         """显示指标市场对话框"""
@@ -62,7 +65,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"显示指标市场对话框失败: {e}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"无法打开指标市场对话框: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"无法打开指标市场对话框: {str(e)}")
 
     def show_batch_analysis_dialog(self):
         """显示批量分析对话框"""
@@ -73,7 +77,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"显示批量分析对话框失败: {e}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"无法打开批量分析对话框: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"无法打开批量分析对话框: {str(e)}")
 
     def show_optimization_dashboard(self):
         """显示优化仪表板"""
@@ -90,7 +95,8 @@ class MainWindowCoordinator(QObject):
                 GUI_AVAILABLE = False
 
             if not GUI_AVAILABLE:
-                QMessageBox.warning(self.main_window, "提示", "优化仪表板需要matplotlib支持，请安装：pip install matplotlib")
+                QMessageBox.warning(
+                    self.main_window, "提示", "优化仪表板需要matplotlib支持，请安装：pip install matplotlib")
                 return
 
             # 创建并显示优化仪表板
@@ -102,7 +108,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"打开优化仪表板失败: {str(e)}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"打开优化仪表板失败: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"打开优化仪表板失败: {str(e)}")
 
     def _on_data_export(self):
         """数据导出处理"""
@@ -137,7 +144,8 @@ class MainWindowCoordinator(QObject):
                 return
 
             # 创建进度对话框
-            progress = QProgressDialog("正在优化形态识别算法...", "取消", 0, 100, self.main_window)
+            progress = QProgressDialog(
+                "正在优化形态识别算法...", "取消", 0, 100, self.main_window)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
 
@@ -175,13 +183,16 @@ class MainWindowCoordinator(QObject):
 
             def on_optimization_error(error):
                 progress.close()
-                QMessageBox.critical(self.main_window, "优化失败", f"一键优化失败: {error}")
+                QMessageBox.critical(
+                    self.main_window, "优化失败", f"一键优化失败: {error}")
                 self.logger.error(f"一键优化失败: {error}")
 
             # 启动优化线程
             self.optimization_thread = OptimizationThread()
-            self.optimization_thread.finished_signal.connect(on_optimization_finished)
-            self.optimization_thread.error_signal.connect(on_optimization_error)
+            self.optimization_thread.finished_signal.connect(
+                on_optimization_finished)
+            self.optimization_thread.error_signal.connect(
+                on_optimization_error)
             self.optimization_thread.start()
 
             self.logger.info("已启动一键优化")
@@ -220,7 +231,8 @@ class MainWindowCoordinator(QObject):
                 return
 
             # 创建进度对话框
-            progress = QProgressDialog("正在进行智能优化...", "取消", 0, 100, self.main_window)
+            progress = QProgressDialog(
+                "正在进行智能优化...", "取消", 0, 100, self.main_window)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
 
@@ -253,13 +265,15 @@ class MainWindowCoordinator(QObject):
 达成目标数: {smart_analysis.get('targets_achieved', 0)}
 目标达成率: {smart_analysis.get('target_achievement_rate', 0):.1f}%
                         """.strip()
-                        QMessageBox.information(self.main_window, "智能优化完成", message)
+                        QMessageBox.information(
+                            self.main_window, "智能优化完成", message)
 
                     self.logger.info("智能优化完成")
 
                 except Exception as e:
                     progress.close()
-                    QMessageBox.critical(self.main_window, "优化失败", f"智能优化失败: {str(e)}")
+                    QMessageBox.critical(
+                        self.main_window, "优化失败", f"智能优化失败: {str(e)}")
                     self.logger.error(f"智能优化失败: {str(e)}")
 
             # 启动后台线程
@@ -305,7 +319,8 @@ class MainWindowCoordinator(QObject):
 
             # 显示版本管理对话框
             version_manager = VersionManager()
-            dialog = VersionManagerDialog(pattern_name, version_manager, self.main_window)
+            dialog = VersionManagerDialog(
+                pattern_name, version_manager, self.main_window)
             dialog.exec_()
 
             self.logger.info(f"已打开 {pattern_name} 的版本管理器")
@@ -313,7 +328,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"打开版本管理器失败: {str(e)}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"打开版本管理器失败: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"打开版本管理器失败: {str(e)}")
 
     def show_performance_evaluation(self):
         """显示性能评估"""
@@ -348,7 +364,8 @@ class MainWindowCoordinator(QObject):
                 return
 
             # 创建进度对话框
-            progress = QProgressDialog("正在评估性能...", "取消", 0, 100, self.main_window)
+            progress = QProgressDialog(
+                "正在评估性能...", "取消", 0, 100, self.main_window)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
 
@@ -358,10 +375,12 @@ class MainWindowCoordinator(QObject):
                     evaluator = PerformanceEvaluator(debug_mode=True)
 
                     # 创建测试数据集
-                    test_datasets = evaluator.create_test_datasets(pattern_name, count=5)
+                    test_datasets = evaluator.create_test_datasets(
+                        pattern_name, count=5)
 
                     # 评估性能
-                    metrics = evaluator.evaluate_algorithm(pattern_name, test_datasets)
+                    metrics = evaluator.evaluate_algorithm(
+                        pattern_name, test_datasets)
 
                     progress.close()
 
@@ -379,12 +398,14 @@ class MainWindowCoordinator(QObject):
 测试股票数: {len(test_datasets)}
                     """.strip()
 
-                    QMessageBox.information(self.main_window, f"性能评估 - {pattern_name}", result_text)
+                    QMessageBox.information(
+                        self.main_window, f"性能评估 - {pattern_name}", result_text)
                     self.logger.info(f"已完成 {pattern_name} 的性能评估（使用真实数据）")
 
                 except Exception as e:
                     progress.close()
-                    QMessageBox.critical(self.main_window, "评估失败", f"性能评估失败: {str(e)}")
+                    QMessageBox.critical(
+                        self.main_window, "评估失败", f"性能评估失败: {str(e)}")
                     self.logger.error(f"性能评估失败: {str(e)}")
 
             # 启动后台线程
@@ -432,7 +453,8 @@ class MainWindowCoordinator(QObject):
         except Exception as e:
             self.logger.error(f"获取优化系统状态失败: {str(e)}")
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self.main_window, "错误", f"获取优化系统状态失败: {str(e)}")
+            QMessageBox.critical(self.main_window, "错误",
+                                 f"获取优化系统状态失败: {str(e)}")
 
     def check_single_stock_quality(self):
         """检查单个股票数据质量"""
@@ -453,7 +475,8 @@ class MainWindowCoordinator(QObject):
                 return
 
             # 创建进度对话框
-            progress = QProgressDialog(f"正在检查 {stock_code} 的数据质量...", "取消", 0, 100, self.main_window)
+            progress = QProgressDialog(
+                f"正在检查 {stock_code} 的数据质量...", "取消", 0, 100, self.main_window)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
 
@@ -461,28 +484,33 @@ class MainWindowCoordinator(QObject):
                 try:
                     # 获取K线数据
                     from core.services.data_service import DataService
-                    data_service = self.service_container.get_service('data_service')
+                    data_service = self.service_container.get_service(
+                        'data_service')
                     kdata = data_service.get_kdata(stock_code)
 
                     if kdata is None or kdata.empty:
                         progress.close()
-                        QMessageBox.warning(self.main_window, "警告", f"无法获取 {stock_code} 的数据")
+                        QMessageBox.warning(
+                            self.main_window, "警告", f"无法获取 {stock_code} 的数据")
                         return
 
                     # 生成质量报告
-                    report = self.generate_quality_report(kdata, context=f"单股检查-{stock_code}")
+                    report = self.generate_quality_report(
+                        kdata, context=f"单股检查-{stock_code}")
 
                     progress.close()
 
                     # 显示报告对话框
                     from gui.dialogs.quality_report_dialog import show_quality_report_dialog
-                    show_quality_report_dialog([{**report, "code": stock_code}], self.main_window)
+                    show_quality_report_dialog(
+                        [{**report, "code": stock_code}], self.main_window)
 
                     self.logger.info(f"已完成 {stock_code} 的数据质量检查")
 
                 except Exception as e:
                     progress.close()
-                    QMessageBox.critical(self.main_window, "错误", f"数据质量检查失败: {str(e)}")
+                    QMessageBox.critical(
+                        self.main_window, "错误", f"数据质量检查失败: {str(e)}")
                     self.logger.error(f"单股数据质量检查失败: {e}")
 
             # 启动后台线程
@@ -519,14 +547,16 @@ class MainWindowCoordinator(QObject):
             total_stocks = len(stock_list)
 
             # 创建进度对话框
-            progress = QProgressDialog(f"正在检查 {total_stocks} 只股票的数据质量...", "取消", 0, total_stocks, self.main_window)
+            progress = QProgressDialog(
+                f"正在检查 {total_stocks} 只股票的数据质量...", "取消", 0, total_stocks, self.main_window)
             progress.setWindowModality(Qt.WindowModal)
             progress.show()
 
             def run_batch_quality_check():
                 try:
                     from core.services.data_service import DataService
-                    data_service = self.service_container.get_service('data_service')
+                    data_service = self.service_container.get_service(
+                        'data_service')
 
                     reports = []
                     processed = 0
@@ -545,7 +575,8 @@ class MainWindowCoordinator(QObject):
 
                             if kdata is not None and not kdata.empty:
                                 # 生成质量报告
-                                report = self.generate_quality_report(kdata, context=f"批量检查-{stock_code}")
+                                report = self.generate_quality_report(
+                                    kdata, context=f"批量检查-{stock_code}")
                                 report.update({
                                     "code": stock_code,
                                     "market": stock.get('market', '未知'),
@@ -568,15 +599,18 @@ class MainWindowCoordinator(QObject):
 
                         self.logger.info(f"已完成 {len(reports)} 只股票的数据质量检查")
                     else:
-                        QMessageBox.information(self.main_window, "提示", "没有生成有效的质量报告")
+                        QMessageBox.information(
+                            self.main_window, "提示", "没有生成有效的质量报告")
 
                 except Exception as e:
                     progress.close()
-                    QMessageBox.critical(self.main_window, "错误", f"批量数据质量检查失败: {str(e)}")
+                    QMessageBox.critical(
+                        self.main_window, "错误", f"批量数据质量检查失败: {str(e)}")
                     self.logger.error(f"批量数据质量检查失败: {e}")
 
             # 启动后台线程
-            threading.Thread(target=run_batch_quality_check, daemon=True).start()
+            threading.Thread(target=run_batch_quality_check,
+                             daemon=True).start()
 
         except Exception as e:
             self.logger.error(f"启动批量数据质量检查失败: {e}")
@@ -591,7 +625,8 @@ class MainWindowCoordinator(QObject):
             # 基础统计
             total_rows = len(kdata)
             missing_data = kdata.isnull().sum().sum()
-            missing_ratio = missing_data / (total_rows * len(kdata.columns)) if total_rows > 0 else 0
+            missing_ratio = missing_data / \
+                (total_rows * len(kdata.columns)) if total_rows > 0 else 0
 
             # 价格关系检查
             price_errors = 0
@@ -599,8 +634,10 @@ class MainWindowCoordinator(QObject):
                 # 检查高价 >= 低价
                 invalid_high_low = (kdata['high'] < kdata['low']).sum()
                 # 检查开盘价和收盘价在高低价范围内
-                invalid_open = ((kdata['open'] > kdata['high']) | (kdata['open'] < kdata['low'])).sum()
-                invalid_close = ((kdata['close'] > kdata['high']) | (kdata['close'] < kdata['low'])).sum()
+                invalid_open = ((kdata['open'] > kdata['high']) | (
+                    kdata['open'] < kdata['low'])).sum()
+                invalid_close = ((kdata['close'] > kdata['high']) | (
+                    kdata['close'] < kdata['low'])).sum()
                 price_errors = invalid_high_low + invalid_open + invalid_close
 
             # 异常值检测
@@ -613,7 +650,8 @@ class MainWindowCoordinator(QObject):
                     IQR = Q3 - Q1
                     lower_bound = Q1 - 1.5 * IQR
                     upper_bound = Q3 + 1.5 * IQR
-                    outliers = ((kdata[col] < lower_bound) | (kdata[col] > upper_bound)).sum()
+                    outliers = ((kdata[col] < lower_bound) |
+                                (kdata[col] > upper_bound)).sum()
                     if outliers > 0:
                         anomaly_stats[col] = outliers
 
@@ -627,9 +665,11 @@ class MainWindowCoordinator(QObject):
             # 计算质量评分
             quality_score = 100
             quality_score -= missing_ratio * 30  # 缺失数据扣分
-            quality_score -= min(price_errors / total_rows * 50, 20) if total_rows > 0 else 0  # 价格错误扣分
+            quality_score -= min(price_errors / total_rows *
+                                 50, 20) if total_rows > 0 else 0  # 价格错误扣分
             quality_score -= min(len(anomaly_stats) * 5, 20)  # 异常值扣分
-            quality_score -= min(logic_errors / total_rows * 30, 15) if total_rows > 0 else 0  # 逻辑错误扣分
+            quality_score -= min(logic_errors / total_rows *
+                                 30, 15) if total_rows > 0 else 0  # 逻辑错误扣分
             quality_score = max(0, quality_score)
 
             # 生成错误和警告
@@ -683,9 +723,11 @@ class MainWindowCoordinator(QObject):
 
             # 如果没有，返回默认测试数据
             return [
-                {"code": "000001", "name": "平安银行", "market": "深圳", "industry": "银行"},
+                {"code": "000001", "name": "平安银行",
+                    "market": "深圳", "industry": "银行"},
                 {"code": "000002", "name": "万科A", "market": "深圳", "industry": "地产"},
-                {"code": "600000", "name": "浦发银行", "market": "上海", "industry": "银行"},
+                {"code": "600000", "name": "浦发银行",
+                    "market": "上海", "industry": "银行"},
             ]
 
         except Exception as e:
@@ -700,10 +742,12 @@ class MainWindowCoordinator(QObject):
 
             if not hasattr(self, 'auto_quality_timer'):
                 self.auto_quality_timer = QTimer()
-                self.auto_quality_timer.timeout.connect(self._auto_quality_check)
+                self.auto_quality_timer.timeout.connect(
+                    self._auto_quality_check)
 
             # 启动定时器
-            self.auto_quality_timer.start(interval_minutes * 60 * 1000)  # 转换为毫秒
+            self.auto_quality_timer.start(
+                interval_minutes * 60 * 1000)  # 转换为毫秒
 
             QMessageBox.information(
                 self.main_window, "自动检查启动",

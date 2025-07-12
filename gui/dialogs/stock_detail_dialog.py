@@ -130,11 +130,13 @@ class StockDataWorker(QThread):
             result = {}
 
             # 获取不同周期的K线数据
-            periods = ['1min', '5min', '15min', '30min', '60min', 'D', 'W', 'M']
+            periods = ['1min', '5min', '15min',
+                       '30min', '60min', 'D', 'W', 'M']
             for period in periods:
                 try:
                     if self.data_manager and hasattr(self.data_manager, 'get_kdata'):
-                        kdata = self.data_manager.get_kdata(self.stock_code, period)
+                        kdata = self.data_manager.get_kdata(
+                            self.stock_code, period)
                         if kdata is not None and not kdata.empty:
                             result[period] = {
                                 'count': len(kdata),
@@ -325,7 +327,8 @@ class StockDetailDialog(QDialog):
             # 股票代码和名称
             title_layout = QHBoxLayout()
             self.code_label = QLabel(self.stock_code)
-            self.code_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2E86AB;")
+            self.code_label.setStyleSheet(
+                "font-size: 18px; font-weight: bold; color: #2E86AB;")
             title_layout.addWidget(self.code_label)
 
             self.name_label = QLabel("加载中...")
@@ -354,7 +357,8 @@ class StockDetailDialog(QDialog):
 
             price_layout = QHBoxLayout()
             self.price_label = QLabel("--")
-            self.price_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #E74C3C;")
+            self.price_label.setStyleSheet(
+                "font-size: 24px; font-weight: bold; color: #E74C3C;")
             price_layout.addWidget(self.price_label)
 
             self.change_label = QLabel("--")
@@ -449,7 +453,8 @@ class StockDetailDialog(QDialog):
             share_layout = QGridLayout(share_group)
 
             share_fields = [
-                ('总股本', 'total_share'), ('流通股本', 'float_share'), ('总市值', 'market_cap'),
+                ('总股本', 'total_share'), ('流通股本',
+                                         'float_share'), ('总市值', 'market_cap'),
                 ('市盈率', 'pe_ratio'), ('市净率', 'pb_ratio'), ('股息率', 'dividend_yield')
             ]
 
@@ -500,7 +505,8 @@ class StockDetailDialog(QDialog):
             # 财务数据表格
             self.finance_table = QTableWidget()
             self.finance_table.setColumnCount(5)
-            self.finance_table.setHorizontalHeaderLabels(['指标', '2023年', '2022年', '2021年', '2020年'])
+            self.finance_table.setHorizontalHeaderLabels(
+                ['指标', '2023年', '2022年', '2021年', '2020年'])
 
             # 设置表格样式
             header = self.finance_table.horizontalHeader()
@@ -560,14 +566,16 @@ class StockDetailDialog(QDialog):
             # 相关股票表格
             self.related_table = QTableWidget()
             self.related_table.setColumnCount(3)
-            self.related_table.setHorizontalHeaderLabels(['股票代码', '股票名称', '相关度'])
+            self.related_table.setHorizontalHeaderLabels(
+                ['股票代码', '股票名称', '相关度'])
 
             # 设置表格样式
             header = self.related_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Stretch)
 
             # 双击事件
-            self.related_table.itemDoubleClicked.connect(self.on_related_stock_clicked)
+            self.related_table.itemDoubleClicked.connect(
+                self.on_related_stock_clicked)
 
             layout.addWidget(self.related_table)
 
@@ -610,10 +618,12 @@ class StockDetailDialog(QDialog):
             self.refresh_btn.setEnabled(False)
 
             # 创建工作线程
-            self.data_worker = StockDataWorker(self.stock_code, self.data_manager)
+            self.data_worker = StockDataWorker(
+                self.stock_code, self.data_manager)
             self.data_worker.data_loaded.connect(self.on_data_loaded)
             self.data_worker.error_occurred.connect(self.on_error_occurred)
-            self.data_worker.progress_updated.connect(self.progress_bar.setValue)
+            self.data_worker.progress_updated.connect(
+                self.progress_bar.setValue)
             self.data_worker.finished.connect(self.on_loading_finished)
 
             # 启动线程
@@ -661,9 +671,12 @@ class StockDetailDialog(QDialog):
         try:
             if basic_info:
                 self.name_label.setText(basic_info.get('name', '--'))
-                self.market_label.setText(f"市场: {basic_info.get('market', '--')}")
-                self.industry_label.setText(f"行业: {basic_info.get('industry', '--')}")
-                self.listing_label.setText(f"上市日期: {basic_info.get('listing_date', '--')}")
+                self.market_label.setText(
+                    f"市场: {basic_info.get('market', '--')}")
+                self.industry_label.setText(
+                    f"行业: {basic_info.get('industry', '--')}")
+                self.listing_label.setText(
+                    f"上市日期: {basic_info.get('listing_date', '--')}")
 
                 # 更新价格信息（从K线数据获取）
                 kdata = self.stock_data.get('kdata', {})
@@ -751,7 +764,8 @@ class StockDetailDialog(QDialog):
                     else:
                         value_text = "--"
 
-                    self.finance_table.setItem(i, j + 1, QTableWidgetItem(value_text))
+                    self.finance_table.setItem(
+                        i, j + 1, QTableWidgetItem(value_text))
 
         except Exception as e:
             self.logger.error(f"更新财务数据失败: {e}")
@@ -792,7 +806,8 @@ class StockDetailDialog(QDialog):
                 else:
                     value_text = str(value)
 
-                self.indicator_table.setItem(i, 1, QTableWidgetItem(value_text))
+                self.indicator_table.setItem(
+                    i, 1, QTableWidgetItem(value_text))
 
         except Exception as e:
             self.logger.error(f"更新技术指标失败: {e}")
@@ -835,7 +850,8 @@ class StockDetailDialog(QDialog):
                 else:
                     value_text = str(value)
 
-                self.statistics_table.setItem(i, 1, QTableWidgetItem(value_text))
+                self.statistics_table.setItem(
+                    i, 1, QTableWidgetItem(value_text))
 
         except Exception as e:
             self.logger.error(f"更新统计数据失败: {e}")
@@ -849,12 +865,16 @@ class StockDetailDialog(QDialog):
             self.related_table.setRowCount(len(related_stocks))
 
             for i, stock in enumerate(related_stocks):
-                self.related_table.setItem(i, 0, QTableWidgetItem(stock.get('code', '')))
-                self.related_table.setItem(i, 1, QTableWidgetItem(stock.get('name', '')))
+                self.related_table.setItem(
+                    i, 0, QTableWidgetItem(stock.get('code', '')))
+                self.related_table.setItem(
+                    i, 1, QTableWidgetItem(stock.get('name', '')))
 
                 correlation = stock.get('correlation', 0)
-                correlation_text = f"{correlation:.2f}" if isinstance(correlation, (int, float)) else str(correlation)
-                self.related_table.setItem(i, 2, QTableWidgetItem(correlation_text))
+                correlation_text = f"{correlation:.2f}" if isinstance(
+                    correlation, (int, float)) else str(correlation)
+                self.related_table.setItem(
+                    i, 2, QTableWidgetItem(correlation_text))
 
         except Exception as e:
             self.logger.error(f"更新相关股票失败: {e}")

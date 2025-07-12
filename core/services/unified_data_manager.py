@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 import pandas as pd
 import asyncio
+from asyncio import Future as AsyncioFuture
 
 from ..events import EventBus, DataUpdateEvent
 from ..containers import ServiceContainer
@@ -40,16 +41,34 @@ class DataRequest:
     time_range: int = 365
     parameters: Dict[str, Any] = None
     priority: int = 0  # 0=高优先级, 1=中优先级, 2=低优先级
-    callback: Optional[Callable] = None
+    future: Optional[AsyncioFuture] = None  # 用于async/await
     timestamp: float = 0
     status: DataRequestStatus = DataRequestStatus.PENDING
-    future: Optional[Future] = None
 
     def __post_init__(self):
         if self.timestamp == 0:
             self.timestamp = time.time()
         if self.parameters is None:
             self.parameters = {}
+
+    def __eq__(self, other):
+        if not isinstance(other, DataRequest):
+            return NotImplemented
+        return (self.stock_code == other.stock_code and
+                self.data_type == other.data_type and
+                self.period == other.period and
+                self.time_range == other.time_range and
+                self.parameters == other.parameters)
+
+    def __hash__(self):
+        # The hash should be based on the immutable fields that define the request's identity
+        # Note: self.parameters is mutable, so we convert it to a string representation of its items
+        param_tuple = tuple(sorted((self.parameters or {}).items()))
+        return hash((self.stock_code,
+                     self.data_type,
+                     self.period,
+                     self.time_range,
+                     param_tuple))
 
 
 class UnifiedDataManager:
@@ -75,9 +94,11 @@ class UnifiedDataManager:
         """
         self.service_container = service_container
         self.event_bus = event_bus
+        self.loop = None  # 延迟初始化，在异步方法中获取
 
         # 线程池
-        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="DataManager")
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="DataManager")
 
         # 请求管理
         self._pending_requests: Dict[str, DataRequest] = {}
@@ -92,7 +113,7 @@ class UnifiedDataManager:
         self._cache_ttl = 300  # 5分钟缓存TTL
 
         # 去重机制
-        self._request_dedup: Dict[str, Set[str]] = {}  # 请求键 -> 请求ID集合
+        self._request_dedup: Dict[str, Set[DataRequest]] = {}  # 请求键 -> 请求ID集合
         self._dedup_lock = threading.Lock()
 
         # 请求跟踪器 - 用于取消请求
@@ -153,44 +174,43 @@ class UnifiedDataManager:
 
         return end_date >= today
 
-    def request_data(self, stock_code: str, data_type: str, period: str = 'D',
-                     time_range: int = 365, parameters: Dict[str, Any] = None,
-                     priority: int = 1, callback: Optional[Callable] = None) -> str:
+    async def request_data(self, stock_code: str, data_type: str, period: str = 'D',
+                           time_range: int = 365, parameters: Dict[str, Any] = None,
+                           priority: int = 1) -> Any:
         """
-        请求数据
+        异步请求数据，返回一个可以等待的Future
 
         Args:
             stock_code: 股票代码
-            data_type: 数据类型 ('kdata', 'indicators', 'analysis')
+            data_type: 数据类型 ('kdata', 'indicators', 'analysis', 'chart')
             period: 周期
             time_range: 时间范围
             parameters: 额外参数
             priority: 优先级 (0=高, 1=中, 2=低)
-            callback: 回调函数
 
         Returns:
-            请求ID
+            一个包含请求结果的Future
         """
+        # 在异步上下文中安全地获取事件循环
+        if self.loop is None:
+            self.loop = asyncio.get_running_loop()
+
         # 生成请求ID
         request_id = f"{data_type}_{stock_code}_{period}_{time_range}_{hash(str(parameters or {}))}"
 
         # 检查缓存
-        cache_key = self._get_cache_key(stock_code, data_type, period, time_range, parameters)
+        cache_key = self._get_cache_key(
+            stock_code, data_type, period, time_range, parameters)
         cached_data = self._get_from_cache(cache_key)
         if cached_data is not None:
             self._stats['cache_hits'] += 1
             logger.debug(f"Cache hit for {cache_key}")
-
-            # 立即回调
-            if callback:
-                try:
-                    callback(cached_data)
-                except Exception as e:
-                    logger.error(f"Error in callback for cached data: {e}")
-
-            return request_id
+            return cached_data
 
         self._stats['cache_misses'] += 1
+
+        # 为这个请求创建一个新的Future
+        future = self.loop.create_future()
 
         # 创建数据请求
         request = DataRequest(
@@ -201,30 +221,30 @@ class UnifiedDataManager:
             time_range=time_range,
             parameters=parameters or {},
             priority=priority,
-            callback=callback
+            future=future
         )
 
-        # 注册请求到跟踪器
-        self._register_request(request_id)
-
         # 检查是否有重复请求
-        request_key = self._get_request_key(stock_code, data_type, period, time_range, parameters)
+        request_key = self._get_request_key(
+            stock_code, data_type, period, time_range, parameters)
 
         with self._dedup_lock:
             if request_key in self._request_dedup:
                 # 有重复请求，添加到现有请求组
-                self._request_dedup[request_key].add(request_id)
+                self._request_dedup[request_key].add(request)
                 self._stats['requests_deduplicated'] += 1
-                logger.debug(f"Deduplicated request {request_id} with key {request_key}")
+                logger.debug(
+                    f"Deduplicated request {request_id} with key {request_key}")
             else:
                 # 新请求
-                self._request_dedup[request_key] = {request_id}
-
-                # 提交请求
-                self._submit_request(request)
+                self._request_dedup[request_key] = {request}
+                # 提交请求到线程池
+                self._executor.submit(self._process_request, request)
 
         self._stats['requests_total'] += 1
-        return request_id
+
+        # 等待并返回Future的结果
+        return await future
 
     def cancel_request(self, request_id: str) -> bool:
         """
@@ -276,7 +296,8 @@ class UnifiedDataManager:
         """注册请求到跟踪器"""
         with self.request_tracker_lock:
             try:
-                task = asyncio.current_task() if asyncio.iscoroutinefunction(self.get_stock_data) else None
+                task = asyncio.current_task() if asyncio.iscoroutinefunction(
+                    self.get_stock_data) else None
             except RuntimeError:
                 # 没有运行的事件循环
                 task = None
@@ -408,95 +429,65 @@ class UnifiedDataManager:
         future = self._executor.submit(self._process_request, request)
         request.future = future
 
-        logger.debug(f"Submitted request {request.request_id} for {request.stock_code}")
+        logger.debug(
+            f"Submitted request {request.request_id} for {request.stock_code}")
 
     def _process_request(self, request: DataRequest) -> None:
-        """处理数据请求"""
+        """
+        处理数据请求
+        """
         try:
-            # 移动到活动请求
-            with self._request_lock:
-                if request.request_id in self._pending_requests:
-                    del self._pending_requests[request.request_id]
-                    self._active_requests[request.request_id] = request
-                    request.status = DataRequestStatus.LOADING
-
-            logger.debug(f"Processing request {request.request_id}")
-
-            # 根据数据类型加载数据
+            data = None
             if request.data_type == 'kdata':
                 data = self._load_kdata(request)
             elif request.data_type == 'indicators':
                 data = self._load_indicators(request)
             elif request.data_type == 'analysis':
                 data = self._load_analysis(request)
+            elif request.data_type == 'chart':
+                kline_data = self._load_kdata(request)
+                indicators_data = self._load_indicators(request)
+                data = {
+                    'kline_data': kline_data,
+                    'indicators_data': indicators_data
+                }
             else:
-                raise ValueError(f"Unknown data type: {request.data_type}")
+                raise ValueError(f"Unsupported data type: {request.data_type}")
 
-            # 缓存数据
-            cache_key = self._get_cache_key(
-                request.stock_code, request.data_type, request.period,
-                request.time_range, request.parameters
-            )
-            self._put_to_cache(cache_key, data)
-
-            # 处理完成
-            request.status = DataRequestStatus.COMPLETED
             self._complete_request(request, data)
 
-            logger.debug(f"Completed request {request.request_id}")
-
         except Exception as e:
-            logger.error(f"Failed to process request {request.request_id}: {e}")
-            request.status = DataRequestStatus.FAILED
+            logger.error(
+                f"Failed to process request {request.request_id}: {e}")
             self._complete_request(request, None, str(e))
 
     def _complete_request(self, request: DataRequest, data: Any, error: str = None) -> None:
-        """完成请求处理"""
-        # 移动到完成请求
-        with self._request_lock:
-            if request.request_id in self._active_requests:
-                del self._active_requests[request.request_id]
-                self._completed_requests[request.request_id] = request
-
-        # 更新统计
-        if request.status == DataRequestStatus.COMPLETED:
-            self._stats['requests_completed'] += 1
-        elif request.status == DataRequestStatus.FAILED:
-            self._stats['requests_failed'] += 1
-
-        # 处理重复请求
+        """
+        完成请求并通过Future返回结果
+        """
         request_key = self._get_request_key(
-            request.stock_code, request.data_type, request.period,
-            request.time_range, request.parameters
-        )
+            request.stock_code, request.data_type, request.period, request.time_range, request.parameters)
 
         with self._dedup_lock:
-            if request_key in self._request_dedup:
-                request_ids = self._request_dedup[request_key]
+            request_group = self._request_dedup.pop(request_key, set())
 
-                # 通知所有相关请求
-                for req_id in request_ids:
-                    if req_id in self._completed_requests:
-                        req = self._completed_requests[req_id]
-                        if req.callback:
-                            try:
-                                if error:
-                                    req.callback(None, error)
-                                else:
-                                    req.callback(data)
-                            except Exception as e:
-                                logger.error(f"Error in callback for request {req_id}: {e}")
+        for req in request_group:
+            if req.future and not req.future.done():
+                if error:
+                    exception = Exception(error)
+                    self.loop.call_soon_threadsafe(
+                        req.future.set_exception, exception)
+                else:
+                    self.loop.call_soon_threadsafe(req.future.set_result, data)
 
-                # 清理去重记录
-                del self._request_dedup[request_key]
+            with self._request_lock:
+                self._completed_requests[req.request_id] = req
+                req.status = DataRequestStatus.COMPLETED if not error else DataRequestStatus.FAILED
 
-        # 发布数据更新事件
-        if data is not None:
-            self.event_bus.publish(DataUpdateEvent(
-                data_type=f"{request.data_type}_{request.stock_code}",
-                stock_code=request.stock_code,
-                update_info=data
-            ))
+        if not error:
+            self._stats['requests_completed'] += len(request_group)
+        else:
+            self._stats['requests_failed'] += len(request_group)
 
     def _load_kdata(self, request: DataRequest) -> pd.DataFrame:
         """加载K线数据"""
@@ -530,7 +521,8 @@ class UnifiedDataManager:
             from .analysis_service import AnalysisService
             analysis_service = self.service_container.resolve(AnalysisService)
 
-            analysis_type = request.parameters.get('analysis_type', 'comprehensive')
+            analysis_type = request.parameters.get(
+                'analysis_type', 'comprehensive')
             return analysis_service.analyze_stock(request.stock_code, analysis_type)
         except Exception as e:
             logger.error(f"Failed to load analysis: {e}")
@@ -539,7 +531,8 @@ class UnifiedDataManager:
     def _get_cache_key(self, stock_code: str, data_type: str, period: str,
                        time_range: int, parameters: Dict[str, Any]) -> str:
         """生成缓存键"""
-        param_hash = hash(str(sorted(parameters.items())) if parameters else "")
+        param_hash = hash(str(sorted(parameters.items()))
+                          if parameters else "")
         return f"{data_type}_{stock_code}_{period}_{time_range}_{param_hash}"
 
     def _get_request_key(self, stock_code: str, data_type: str, period: str,
@@ -596,7 +589,8 @@ class HistoryDataStrategy:
 
     async def get_data(self, code: str, freq: str, start_date=None, end_date=None):
         """获取历史数据"""
-        logger.debug(f"Loading historical data for {code} from {start_date} to {end_date}")
+        logger.debug(
+            f"Loading historical data for {code} from {start_date} to {end_date}")
         # 实际实现应该调用相应的历史数据服务
         # 这里为示例实现
         try:

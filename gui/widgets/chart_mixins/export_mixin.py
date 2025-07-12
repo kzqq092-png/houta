@@ -76,10 +76,10 @@ class ExportMixin:
 
     def export_chart_data(self, format_type: str = "csv") -> bool:
         """导出图表数据
-        
+
         Args:
             format_type: 导出格式，支持 "csv", "json", "excel"
-            
+
         Returns:
             bool: 导出是否成功
         """
@@ -90,13 +90,14 @@ class ExportMixin:
 
             # 准备导出数据
             export_data = self.current_kdata.copy()
-            
+
             # 添加指标数据（如果有）
             if hasattr(self, 'active_indicators') and self.active_indicators:
                 for indicator in self.active_indicators:
                     name = indicator.get('name', '')
                     if name and hasattr(self, f'_indicator_{name.lower()}_data'):
-                        indicator_data = getattr(self, f'_indicator_{name.lower()}_data')
+                        indicator_data = getattr(
+                            self, f'_indicator_{name.lower()}_data')
                         if isinstance(indicator_data, dict):
                             for key, series in indicator_data.items():
                                 export_data[f"{name}_{key}"] = series
@@ -108,12 +109,14 @@ class ExportMixin:
                 file_path, _ = QFileDialog.getSaveFileName(
                     self, "导出CSV数据", "", "CSV Files (*.csv)")
                 if file_path:
-                    export_data.to_csv(file_path, index=True, encoding='utf-8-sig')
+                    export_data.to_csv(file_path, index=True,
+                                       encoding='utf-8-sig')
             elif format_type == "json":
                 file_path, _ = QFileDialog.getSaveFileName(
                     self, "导出JSON数据", "", "JSON Files (*.json)")
                 if file_path:
-                    export_data.to_json(file_path, orient='index', date_format='iso')
+                    export_data.to_json(
+                        file_path, orient='index', date_format='iso')
             elif format_type == "excel":
                 file_path, _ = QFileDialog.getSaveFileName(
                     self, "导出Excel数据", "", "Excel Files (*.xlsx)")
@@ -137,7 +140,7 @@ class ExportMixin:
 
     def export_signals_data(self) -> bool:
         """导出信号数据
-        
+
         Returns:
             bool: 导出是否成功
         """
@@ -148,17 +151,18 @@ class ExportMixin:
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出信号数据", "", "CSV Files (*.csv);;JSON Files (*.json)")
-            
+
             if not file_path:
                 return False
 
             signals_df = pd.DataFrame(self.current_signals)
-            
+
             if file_path.endswith('.csv'):
                 signals_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             elif file_path.endswith('.json'):
-                signals_df.to_json(file_path, orient='records', date_format='iso')
-            
+                signals_df.to_json(
+                    file_path, orient='records', date_format='iso')
+
             if self.log_manager:
                 self.log_manager.info(f"信号数据已导出到: {file_path}")
             return True
@@ -171,7 +175,7 @@ class ExportMixin:
 
     def export_pattern_data(self) -> bool:
         """导出形态数据
-        
+
         Returns:
             bool: 导出是否成功
         """
@@ -182,7 +186,7 @@ class ExportMixin:
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出形态数据", "", "CSV Files (*.csv);;JSON Files (*.json)")
-            
+
             if not file_path:
                 return False
 
@@ -198,14 +202,16 @@ class ExportMixin:
                     'price': info.get('price', 0),
                     'datetime': info.get('datetime', '')
                 })
-            
+
             patterns_df = pd.DataFrame(pattern_data)
-            
+
             if file_path.endswith('.csv'):
-                patterns_df.to_csv(file_path, index=False, encoding='utf-8-sig')
+                patterns_df.to_csv(file_path, index=False,
+                                   encoding='utf-8-sig')
             elif file_path.endswith('.json'):
-                patterns_df.to_json(file_path, orient='records', date_format='iso')
-            
+                patterns_df.to_json(
+                    file_path, orient='records', date_format='iso')
+
             if self.log_manager:
                 self.log_manager.info(f"形态数据已导出到: {file_path}")
             return True
@@ -218,14 +224,14 @@ class ExportMixin:
 
     def save_chart_as_template(self) -> bool:
         """保存图表为模板
-        
+
         Returns:
             bool: 保存是否成功
         """
         try:
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "保存图表模板", "", "Template Files (*.json)")
-            
+
             if not file_path:
                 return False
 
@@ -255,14 +261,14 @@ class ExportMixin:
 
     def load_chart_template(self) -> bool:
         """加载图表模板
-        
+
         Returns:
             bool: 加载是否成功
         """
         try:
             file_path, _ = QFileDialog.getOpenFileName(
                 self, "加载图表模板", "", "Template Files (*.json)")
-            
+
             if not file_path:
                 return False
 
@@ -272,16 +278,16 @@ class ExportMixin:
             # 应用模板配置
             if 'period' in template_data:
                 self.current_period = template_data['period']
-                
+
             if 'indicators' in template_data:
                 self.active_indicators = template_data['indicators']
-                
+
             if 'theme' in template_data and hasattr(self, 'theme_manager'):
                 self.theme_manager.set_theme(template_data['theme'])
-                
+
             if 'zoom_level' in template_data:
                 self._zoom_level = template_data['zoom_level']
-                
+
             if 'crosshair_enabled' in template_data:
                 self.crosshair_enabled = template_data['crosshair_enabled']
 
@@ -301,7 +307,7 @@ class ExportMixin:
 
     def export_chart_report(self) -> bool:
         """导出图表分析报告
-        
+
         Returns:
             bool: 导出是否成功
         """
@@ -312,13 +318,13 @@ class ExportMixin:
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出分析报告", "", "HTML Files (*.html);;PDF Files (*.pdf)")
-            
+
             if not file_path:
                 return False
 
             # 生成报告数据
             report_data = self._generate_chart_report_data()
-            
+
             if file_path.endswith('.html'):
                 self._export_html_report(file_path, report_data)
             elif file_path.endswith('.pdf'):
@@ -430,7 +436,7 @@ class ExportMixin:
         </body>
         </html>
         """
-        
+
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
@@ -440,8 +446,8 @@ class ExportMixin:
         # 为简化，先转换为HTML再保存
         html_path = file_path.replace('.pdf', '_temp.html')
         self._export_html_report(html_path, report_data)
-        
+
         # 提示用户使用浏览器打印为PDF
-        QMessageBox.information(self, "提示", 
-                               f"已生成HTML报告: {html_path}\n"
-                               "请使用浏览器打开并打印为PDF格式。")
+        QMessageBox.information(self, "提示",
+                                f"已生成HTML报告: {html_path}\n"
+                                "请使用浏览器打开并打印为PDF格式。")

@@ -94,7 +94,8 @@ class VersionManager:
 
     def get_versions(self, pattern_name: str, limit: int = 10) -> List[AlgorithmVersion]:
         """获取算法版本列表"""
-        versions_data = self.db_manager.get_algorithm_versions(pattern_name, limit)
+        versions_data = self.db_manager.get_algorithm_versions(
+            pattern_name, limit)
         versions = []
 
         for data in versions_data:
@@ -286,10 +287,12 @@ class VersionManager:
 
         try:
             # 删除性能指标
-            cursor.execute('DELETE FROM performance_metrics WHERE version_id = ?', (version_id,))
+            cursor.execute(
+                'DELETE FROM performance_metrics WHERE version_id = ?', (version_id,))
 
             # 删除版本记录
-            cursor.execute('DELETE FROM algorithm_versions WHERE id = ?', (version_id,))
+            cursor.execute(
+                'DELETE FROM algorithm_versions WHERE id = ?', (version_id,))
 
             conn.commit()
             print(f"✅ 版本 {version.version_number} 已删除")
@@ -389,7 +392,8 @@ class VersionManager:
 
     def _cleanup_old_versions(self, pattern_name: str):
         """清理旧版本"""
-        self.db_manager.cleanup_old_versions(pattern_name, self.max_versions_per_pattern)
+        self.db_manager.cleanup_old_versions(
+            pattern_name, self.max_versions_per_pattern)
 
     def _compare_code(self, code1: str, code2: str) -> Dict[str, Any]:
         """比较代码差异"""

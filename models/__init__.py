@@ -4,4 +4,4 @@
 
 from .model_training import *
 from .model_evaluation import *
-from .deep_learning import * 
+from .deep_learning import *

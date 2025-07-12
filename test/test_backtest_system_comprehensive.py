@@ -165,7 +165,8 @@ class TestDataGenerator:
     @staticmethod
     def generate_signal_data(kline_data: pd.DataFrame) -> pd.DataFrame:
         """生成交易信号数据"""
-        signals = np.random.choice([-1, 0, 1], len(kline_data), p=[0.1, 0.8, 0.1])
+        signals = np.random.choice(
+            [-1, 0, 1], len(kline_data), p=[0.1, 0.8, 0.1])
         signal_data = kline_data.copy()
         signal_data['signal'] = signals
         return signal_data
@@ -280,7 +281,8 @@ class BacktestEngineTest(unittest.TestCase):
 
         for metric in required_metrics:
             with self.subTest(metric=metric):
-                self.assertTrue(hasattr(risk_metrics, metric), f"缺少风险指标: {metric}")
+                self.assertTrue(hasattr(risk_metrics, metric),
+                                f"缺少风险指标: {metric}")
                 value = getattr(risk_metrics, metric)
                 self.assertIsInstance(value, (int, float), f"{metric} 应为数值类型")
                 print(f"  ✅ {metric}: {value:.4f}")
@@ -529,7 +531,8 @@ class IntegrationTest(unittest.TestCase):
             backtest_level=BacktestLevel.INVESTMENT_BANK,
             log_manager=self.log_manager
         )
-        backtest_result = engine.run_backtest(signal_data, initial_capital=1000000)
+        backtest_result = engine.run_backtest(
+            signal_data, initial_capital=1000000)
         self.assertIsNotNone(backtest_result)
         print("  ✅ 步骤3: 回测执行完成")
 
@@ -615,11 +618,13 @@ class StressTest(unittest.TestCase):
         print(f"  ✅ 大数据集回测完成")
         print(f"     执行时间: {metrics['execution_time']:.3f}秒")
         print(f"     内存使用: {metrics['memory_usage']:.2f}MB")
-        print(f"     处理速度: {len(large_dataset)/metrics['execution_time']:.0f} 条/秒")
+        print(
+            f"     处理速度: {len(large_dataset)/metrics['execution_time']:.0f} 条/秒")
 
         # 性能要求
         self.assertLess(metrics['execution_time'], 60.0, "大数据集回测应在60秒内完成")
-        self.assertGreater(len(large_dataset)/metrics['execution_time'], 20, "处理速度应大于20条/秒")
+        self.assertGreater(len(large_dataset) /
+                           metrics['execution_time'], 20, "处理速度应大于20条/秒")
 
     def test_concurrent_backtests(self):
         """测试并发回测"""
@@ -639,7 +644,8 @@ class StressTest(unittest.TestCase):
                     log_manager=self.log_manager
                 )
 
-                result = engine.run_backtest(signal_data, initial_capital=1000000)
+                result = engine.run_backtest(
+                    signal_data, initial_capital=1000000)
                 return test_id, True, result
 
             except Exception as e:
@@ -706,9 +712,11 @@ class TestReportGenerator:
     def generate_report(self, duration: timedelta):
         """生成测试报告"""
         total_tests = len(self.test_results)
-        successful_tests = sum(1 for result in self.test_results if result['success'])
+        successful_tests = sum(
+            1 for result in self.test_results if result['success'])
         failed_tests = total_tests - successful_tests
-        success_rate = (successful_tests / total_tests * 100) if total_tests > 0 else 0
+        success_rate = (successful_tests / total_tests *
+                        100) if total_tests > 0 else 0
 
         print(f"\n📈 测试统计:")
         print(f"   总测试数: {total_tests}")
@@ -731,7 +739,8 @@ class TestReportGenerator:
         print(f"   Python版本: {sys.version.split()[0]}")
         print(f"   操作系统: {os.name}")
         print(f"   CPU核心数: {multiprocessing.cpu_count()}")
-        print(f"   内存总量: {psutil.virtual_memory().total / 1024 / 1024 / 1024:.1f}GB")
+        print(
+            f"   内存总量: {psutil.virtual_memory().total / 1024 / 1024 / 1024:.1f}GB")
 
         # 模块可用性
         print(f"\n📦 模块可用性:")
@@ -740,7 +749,8 @@ class TestReportGenerator:
         print(f"   核心模块: {'✅ 可用' if CORE_MODULES_AVAILABLE else '❌ 不可用'}")
 
         # 性能评级
-        performance_grade = self.calculate_performance_grade(duration.total_seconds(), success_rate)
+        performance_grade = self.calculate_performance_grade(
+            duration.total_seconds(), success_rate)
         print(f"\n🏆 性能评级: {performance_grade}")
 
         # 保存报告到文件
@@ -788,7 +798,8 @@ class TestReportGenerator:
 
             report_file = f"backtest_test_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(report_file, 'w', encoding='utf-8') as f:
-                json.dump(report_data, f, indent=2, ensure_ascii=False, default=str)
+                json.dump(report_data, f, indent=2,
+                          ensure_ascii=False, default=str)
 
             print(f"\n💾 测试报告已保存到: {report_file}")
 
@@ -826,10 +837,12 @@ def run_comprehensive_tests():
     # 记录测试结果
     for test, error in result.failures + result.errors:
         test_name = f"{test.__class__.__name__}.{test._testMethodName}"
-        report_generator.add_test_result(test_name, False, {'error': str(error)})
+        report_generator.add_test_result(
+            test_name, False, {'error': str(error)})
 
     # 记录成功的测试
-    successful_count = result.testsRun - len(result.failures) - len(result.errors)
+    successful_count = result.testsRun - \
+        len(result.failures) - len(result.errors)
     for i in range(successful_count):
         report_generator.add_test_result(f"Test_{i+1}", True)
 

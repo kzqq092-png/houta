@@ -88,7 +88,8 @@ class BasePanel(QObject, ABC, metaclass=QObjectMeta):
             logger.info(f"{self.__class__.__name__} initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize {self.__class__.__name__}: {e}")
+            logger.error(
+                f"Failed to initialize {self.__class__.__name__}: {e}")
             raise
 
     def _create_root_frame(self) -> None:
@@ -118,7 +119,8 @@ class BasePanel(QObject, ABC, metaclass=QObjectMeta):
             logger.debug(f"Applied theme to {self.__class__.__name__}")
 
         except Exception as e:
-            logger.error(f"Failed to apply theme to {self.__class__.__name__}: {e}")
+            logger.error(
+                f"Failed to apply theme to {self.__class__.__name__}: {e}")
 
     def _apply_theme_to_widgets(self, theme: Dict[str, Any]) -> None:
         """应用主题到组件（子类可重写）"""

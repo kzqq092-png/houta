@@ -598,7 +598,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 min_val = min(values)
                 mean_val = sum(values) / len(values)
                 # 通过QChart的title增强显示
-                self.sentiment_chart.setTitle(f"市场情绪（最大: {max_val:.3f}  最小: {min_val:.3f}  均值: {mean_val:.3f}）")
+                self.sentiment_chart.setTitle(
+                    f"市场情绪（最大: {max_val:.3f}  最小: {min_val:.3f}  均值: {mean_val:.3f}）")
             # 更新图表
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
@@ -767,7 +768,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     self.set_status_message("未获取到市场情绪数据", error=True)
                     self.log_manager.warning("分析未获取到数据")
             else:
-                self.set_status_message("数据管理器未实现get_market_sentiment", error=True)
+                self.set_status_message(
+                    "数据管理器未实现get_market_sentiment", error=True)
         except Exception as e:
             self.set_status_message(f"分析失败: {str(e)}", error=True)
             self.log_manager.error(f"分析失败: {str(e)}")
@@ -788,7 +790,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
 
         # 创建按钮布局
         button_layout = self.create_button_layout([
-            ("应用模板", lambda: self._apply_template(template_list, dialog), '#4CAF50'),
+            ("应用模板", lambda: self._apply_template(
+                template_list, dialog), '#4CAF50'),
             ("删除模板", lambda: self._delete_template(template_list), '#F44336'),
             ("新建模板", self._create_new_template, '#2196F3')
         ])
@@ -824,7 +827,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 self.show_warning_message("删除失败", "默认模板不能删除")
                 return
 
-            result = self.show_question_message("确认删除", f"确定要删除模板 '{template_name}' 吗？")
+            result = self.show_question_message(
+                "确认删除", f"确定要删除模板 '{template_name}' 吗？")
             if result == QMessageBox.Yes:
                 row = list_widget.row(current_item)
                 list_widget.takeItem(row)
@@ -900,7 +904,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
 
         try:
             button.clicked.disconnect()
@@ -928,7 +933,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
@@ -966,27 +972,34 @@ class MarketSentimentWidget(BaseAnalysisTab):
         col_count = df.shape[1]
         # 均值行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{mean_vals.iloc[j]:.3f}" if pd.api.types.is_number(mean_vals.iloc[j]) else "")
             item.setBackground(QColor("#fffde7"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df), j, item)
         # 最大行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{max_vals.iloc[j]:.3f}" if pd.api.types.is_number(max_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffe082"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df)+1, j, item)
         # 最小行
         for j in range(col_count):
-            item = QTableWidgetItem(f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
+            item = QTableWidgetItem(
+                f"{min_vals.iloc[j]:.3f}" if pd.api.types.is_number(min_vals.iloc[j]) else "")
             item.setBackground(QColor("#ffccbc"))
             item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.sentiment_table.setItem(len(df)+2, j, item)
         # 极值高亮
         for j in range(col_count):
-            max_idx = df.iloc[:, j].idxmax() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
-            min_idx = df.iloc[:, j].idxmin() if pd.api.types.is_numeric_dtype(df.iloc[:, j]) else None
+            max_idx = df.iloc[:, j].idxmax() if pd.api.types.is_numeric_dtype(
+                df.iloc[:, j]) else None
+            min_idx = df.iloc[:, j].idxmin() if pd.api.types.is_numeric_dtype(
+                df.iloc[:, j]) else None
             if max_idx is not None:
-                self.sentiment_table.item(max_idx, j).setBackground(QColor("#b2ff59"))
+                self.sentiment_table.item(
+                    max_idx, j).setBackground(QColor("#b2ff59"))
             if min_idx is not None:
-                self.sentiment_table.item(min_idx, j).setBackground(QColor("#ffcdd2"))
+                self.sentiment_table.item(
+                    min_idx, j).setBackground(QColor("#ffcdd2"))

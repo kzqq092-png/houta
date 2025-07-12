@@ -61,7 +61,8 @@ class StrategyInstance:
     configuration: Dict[str, Any] = field(default_factory=dict)
     performance_metrics: Optional[StrategyMetrics] = None
     execution_history: List[Dict[str, Any]] = field(default_factory=list)
-    lifecycle_events: List[StrategyLifecycleEvent] = field(default_factory=list)
+    lifecycle_events: List[StrategyLifecycleEvent] = field(
+        default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def add_event(self, stage: LifecycleStage, event_type: str,
@@ -193,7 +194,8 @@ class StrategyLifecycleManager:
                     details or {}
                 )
 
-                self.logger.debug(f"策略 {strategy_name} 阶段更新: {instance.current_stage.value} -> {stage.value}")
+                self.logger.debug(
+                    f"策略 {strategy_name} 阶段更新: {instance.current_stage.value} -> {stage.value}")
                 return True
 
         except Exception as e:

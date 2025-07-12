@@ -228,7 +228,8 @@ class Converter(QDialog):
                 self.output_value.setText(f"{result:.6e}")
             else:
                 # 使用普通格式，最多6位小数
-                self.output_value.setText(f"{result:.6f}".rstrip('0').rstrip('.'))
+                self.output_value.setText(
+                    f"{result:.6f}".rstrip('0').rstrip('.'))
 
         except Exception as e:
             logger.error(f"单位转换失败: {e}")

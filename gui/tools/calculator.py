@@ -138,7 +138,8 @@ class Calculator(QDialog):
         for text, row, col, rowspan, colspan, obj_name in button_configs:
             button = QPushButton(text)
             button.setObjectName(obj_name)
-            button.clicked.connect(lambda checked, t=text: self._on_button_clicked(t))
+            button.clicked.connect(
+                lambda checked, t=text: self._on_button_clicked(t))
             grid_layout.addWidget(button, row, col, rowspan, colspan)
             self.buttons[text] = button
 

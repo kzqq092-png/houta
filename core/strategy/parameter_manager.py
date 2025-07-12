@@ -151,7 +151,8 @@ class ParameterValidator:
 
         for param_name, param in parameters.items():
             if param_name in values:
-                valid, error = self.validate_parameter(param, values[param_name])
+                valid, error = self.validate_parameter(
+                    param, values[param_name])
                 if not valid:
                     errors[param_name] = error
             elif param.required:
@@ -324,7 +325,8 @@ class StrategyParameterManager:
                 )
 
             # 记录优化时间
-            result.optimization_time = (datetime.now() - start_time).total_seconds()
+            result.optimization_time = (
+                datetime.now() - start_time).total_seconds()
 
             # 保存优化历史
             with self._lock:
@@ -347,7 +349,8 @@ class StrategyParameterManager:
                                   max_evaluations: int, parallel: bool) -> ParameterOptimizationResult:
         """网格搜索优化"""
         # 生成参数组合
-        param_combinations = self._generate_parameter_combinations(parameter_ranges, max_evaluations)
+        param_combinations = self._generate_parameter_combinations(
+            parameter_ranges, max_evaluations)
 
         best_score = float('-inf')
         best_params = {}
@@ -365,7 +368,8 @@ class StrategyParameterManager:
             for future, params in futures:
                 try:
                     score = future.result(timeout=30)  # 30秒超时
-                    evaluation_history.append({'parameters': params, 'score': score})
+                    evaluation_history.append(
+                        {'parameters': params, 'score': score})
 
                     if score > best_score:
                         best_score = score
@@ -376,8 +380,10 @@ class StrategyParameterManager:
             # 串行评估
             for params in param_combinations:
                 try:
-                    score = self._evaluate_parameters(strategy, data, params, objective_function)
-                    evaluation_history.append({'parameters': params, 'score': score})
+                    score = self._evaluate_parameters(
+                        strategy, data, params, objective_function)
+                    evaluation_history.append(
+                        {'parameters': params, 'score': score})
 
                     if score > best_score:
                         best_score = score
@@ -423,12 +429,14 @@ class StrategyParameterManager:
             return [{}]
 
         # 计算每个参数的值数量
-        values_per_param = max(1, int(max_combinations ** (1.0 / len(param_names))))
+        values_per_param = max(
+            1, int(max_combinations ** (1.0 / len(param_names))))
 
         # 生成每个参数的值列表
         param_values = {}
         for param_name, param_range in parameter_ranges.items():
-            param_values[param_name] = param_range.generate_values(values_per_param)
+            param_values[param_name] = param_range.generate_values(
+                values_per_param)
 
         # 生成组合（简化版，避免笛卡尔积过大）
         import itertools
@@ -482,7 +490,8 @@ class StrategyParameterManager:
         """导出参数到文件"""
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(parameters, f, indent=2, ensure_ascii=False, default=str)
+                json.dump(parameters, f, indent=2,
+                          ensure_ascii=False, default=str)
             return True
         except Exception as e:
             warnings.warn(f"Failed to export parameters: {e}")
@@ -503,7 +512,8 @@ class StrategyParameterManager:
         stats.update(self.validator.get_validation_stats())
 
         with self._lock:
-            stats['optimization_history_size'] = len(self._optimization_history)
+            stats['optimization_history_size'] = len(
+                self._optimization_history)
             stats['parameter_templates'] = len(self._parameter_templates)
             stats['parameter_presets'] = len(self._parameter_presets)
 

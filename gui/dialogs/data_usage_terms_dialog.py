@@ -137,7 +137,8 @@ class DataUsageTermsDialog(QDialog):
         """加载使用条款内容"""
         try:
             # 查找条款文件
-            terms_file = Path(__file__).parent.parent.parent / "DATA_USAGE_TERMS.md"
+            terms_file = Path(__file__).parent.parent.parent / \
+                "DATA_USAGE_TERMS.md"
 
             if terms_file.exists():
                 with open(terms_file, 'r', encoding='utf-8') as f:
@@ -171,7 +172,8 @@ class DataUsageTermsDialog(QDialog):
         # 转换代码块
         html = re.sub(r'```python\n(.*?)\n```',
                       r'<pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px;"><code>\1</code></pre>', html, flags=re.DOTALL)
-        html = re.sub(r'```\n(.*?)\n```', r'<pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px;"><code>\1</code></pre>', html, flags=re.DOTALL)
+        html = re.sub(r'```\n(.*?)\n```',
+                      r'<pre style="background-color: #f8f9fa; padding: 10px; border-radius: 5px;"><code>\1</code></pre>', html, flags=re.DOTALL)
 
         # 转换列表
         html = re.sub(r'^- (.*?)$', r'<li>\1</li>', html, flags=re.MULTILINE)
@@ -297,7 +299,8 @@ class DataUsageManager:
     def set_terms_agreed(self, agreed: bool):
         """设置用户同意条款状态"""
         self.settings.setValue("terms_agreed", agreed)
-        self.settings.setValue("terms_agreed_time", QDateTime.currentDateTime())
+        self.settings.setValue("terms_agreed_time",
+                               QDateTime.currentDateTime())
 
     def get_agreement_time(self) -> QDateTime:
         """获取用户同意条款的时间"""

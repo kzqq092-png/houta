@@ -185,13 +185,15 @@ def calculate_cci(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
         close = df['close']
 
         if TALIB_AVAILABLE:
-            cci = talib.CCI(high.values, low.values, close.values, timeperiod=timeperiod)
+            cci = talib.CCI(high.values, low.values,
+                            close.values, timeperiod=timeperiod)
             result['CCI'] = pd.Series(cci, index=close.index)
         else:
             # 使用pandas实现
             tp = (high + low + close) / 3
             ma = tp.rolling(window=timeperiod).mean()
-            md = tp.rolling(window=timeperiod).apply(lambda x: abs(x - x.mean()).mean())
+            md = tp.rolling(window=timeperiod).apply(
+                lambda x: abs(x - x.mean()).mean())
             cci = (tp - ma) / (0.015 * md)
             result['CCI'] = cci
 

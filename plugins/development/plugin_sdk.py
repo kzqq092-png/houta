@@ -527,7 +527,8 @@ class PluginSDK:
                     plugin_config = json.load(f)
 
                 # 检查必要字段
-                required_fields = ['name', 'version', 'main_module', 'main_class']
+                required_fields = ['name', 'version',
+                                   'main_module', 'main_class']
                 for field in required_fields:
                     if field not in plugin_config:
                         result['valid'] = False
@@ -611,7 +612,8 @@ class PluginSDK:
             zip_name = f"{plugin_name.replace(' ', '_')}-{plugin_version}.zip"
             zip_path = output_dir / zip_name
 
-            shutil.make_archive(str(zip_path).replace('.zip', ''), 'zip', temp_dir)
+            shutil.make_archive(str(zip_path).replace(
+                '.zip', ''), 'zip', temp_dir)
 
         return str(zip_path)
 

@@ -22,6 +22,7 @@ from core.services.analysis_service import AnalysisService
 from core.services.industry_service import IndustryService
 from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
+from core.logger import LogManager
 
 # 最后导入监控服务
 from core.metrics.repository import MetricsRepository
@@ -82,7 +83,8 @@ class ServiceBootstrap:
         # 注册事件总线 (EventBus)
         self.service_container.register_instance(EventBus, self.event_bus)
         # 确保也注册具体类型，以便能够通过类型注入
-        self.service_container.register_instance(type(self.event_bus), self.event_bus)
+        self.service_container.register_instance(
+            type(self.event_bus), self.event_bus)
         logger.info("✓ 事件总线注册完成")
 
         # 注册配置服务
@@ -90,6 +92,11 @@ class ServiceBootstrap:
         config_service.initialize()
         self.service_container.register_instance(ConfigService, config_service)
         logger.info("✓ 配置服务注册完成")
+
+        # 注册日志服务
+        log_manager = LogManager()
+        self.service_container.register_instance(LogManager, log_manager)
+        logger.info("✓ 日志服务注册完成")
 
     def _register_business_services(self) -> None:
         """注册业务服务"""
@@ -114,32 +121,37 @@ class ServiceBootstrap:
             self._initialize_fallback_data_manager()
 
         # 主题服务
-        self.service_container.register(ThemeService, scope=ServiceScope.SINGLETON)
+        self.service_container.register(
+            ThemeService, scope=ServiceScope.SINGLETON)
         theme_service = self.service_container.resolve(ThemeService)
         theme_service.initialize()
         logger.info("✓ 主题服务注册完成")
 
         # 股票服务
-        self.service_container.register(StockService, scope=ServiceScope.SINGLETON)
+        self.service_container.register(
+            StockService, scope=ServiceScope.SINGLETON)
         stock_service = self.service_container.resolve(StockService)
         stock_service.initialize()
         logger.info("✓ 股票服务注册完成")
 
         # 图表服务
-        self.service_container.register(ChartService, scope=ServiceScope.SINGLETON)
+        self.service_container.register(
+            ChartService, scope=ServiceScope.SINGLETON)
         chart_service = self.service_container.resolve(ChartService)
         chart_service.initialize()
         logger.info("✓ 图表服务注册完成")
 
         # 分析服务
-        self.service_container.register(AnalysisService, scope=ServiceScope.SINGLETON)
+        self.service_container.register(
+            AnalysisService, scope=ServiceScope.SINGLETON)
         analysis_service = self.service_container.resolve(AnalysisService)
         analysis_service.initialize()
         logger.info("✓ 分析服务注册完成")
 
         # 行业服务
         try:
-            self.service_container.register(IndustryService, scope=ServiceScope.SINGLETON)
+            self.service_container.register(
+                IndustryService, scope=ServiceScope.SINGLETON)
             industry_service = self.service_container.resolve(IndustryService)
             industry_service.initialize()
             logger.info("✓ 行业服务注册完成")
@@ -155,7 +167,8 @@ class ServiceBootstrap:
                 # 尝试解析依赖服务
                 self.service_container.resolve(dep)
             except Exception as e:
-                logger.warning(f"Dependency {dep} not available for UnifiedDataManager: {e}")
+                logger.warning(
+                    f"Dependency {dep} not available for UnifiedDataManager: {e}")
 
     def _initialize_fallback_data_manager(self):
         """初始化失败时的回退策略"""
@@ -163,7 +176,8 @@ class ServiceBootstrap:
         try:
             # 尝试使用简化版数据管理器
             from core.data_manager import DataManager
-            self.service_container.register_instance('unified_data_manager', DataManager())
+            self.service_container.register_instance(
+                'unified_data_manager', DataManager())
             logger.info("✓ 回退数据管理器注册完成")
         except Exception as e:
             logger.error(f"Failed to initialize fallback data manager: {e}")
@@ -171,9 +185,11 @@ class ServiceBootstrap:
 
             class MinimalDataManager:
                 def request_data(self, *args, **kwargs):
-                    logger.warning("Using minimal data manager - limited functionality")
+                    logger.warning(
+                        "Using minimal data manager - limited functionality")
                     return "request_id"
-            self.service_container.register_instance('unified_data_manager', MinimalDataManager())
+            self.service_container.register_instance(
+                'unified_data_manager', MinimalDataManager())
             logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
 
     def _register_monitoring_services(self) -> None:
@@ -182,12 +198,15 @@ class ServiceBootstrap:
 
         try:
             # 1. 注册数据库仓储
-            self.service_container.register(MetricsRepository, scope=ServiceScope.SINGLETON)
+            self.service_container.register(
+                MetricsRepository, scope=ServiceScope.SINGLETON)
             logger.info("✓ 指标数据库仓储(MetricsRepository)注册完成")
 
             # 2. 初始化并注册应用性能度量服务
-            app_metrics_service = initialize_app_metrics_service(self.event_bus)
-            self.service_container.register_instance(ApplicationMetricsService, app_metrics_service)
+            app_metrics_service = initialize_app_metrics_service(
+                self.event_bus)
+            self.service_container.register_instance(
+                ApplicationMetricsService, app_metrics_service)
             logger.info("✓ 应用性能度量服务(ApplicationMetricsService)初始化完成")
 
             # 3. 注册系统资源服务
@@ -196,7 +215,8 @@ class ServiceBootstrap:
                 SystemResourceService,
                 lambda: SystemResourceService(self.event_bus)
             )
-            resource_service = self.service_container.resolve(SystemResourceService)
+            resource_service = self.service_container.resolve(
+                SystemResourceService)
             resource_service.start()
             logger.info("✓ 系统资源服务(SystemResourceService)启动完成")
 
@@ -204,9 +224,11 @@ class ServiceBootstrap:
             # 同样使用工厂函数直接传递事件总线
             self.service_container.register_factory(
                 MetricsAggregationService,
-                lambda: MetricsAggregationService(self.event_bus, self.service_container.resolve(MetricsRepository))
+                lambda: MetricsAggregationService(
+                    self.event_bus, self.service_container.resolve(MetricsRepository))
             )
-            aggregation_service = self.service_container.resolve(MetricsAggregationService)
+            aggregation_service = self.service_container.resolve(
+                MetricsAggregationService)
             aggregation_service.start()
             logger.info("✓ 指标聚合服务(MetricsAggregationService)启动完成")
 
@@ -219,7 +241,8 @@ class ServiceBootstrap:
         logger.info("注册插件服务...")
 
         try:
-            self.service_container.register(PluginManager, scope=ServiceScope.SINGLETON)
+            self.service_container.register(
+                PluginManager, scope=ServiceScope.SINGLETON)
             plugin_manager = self.service_container.resolve(PluginManager)
             plugin_manager.initialize()
             logger.info("✓ 插件管理器服务注册完成")

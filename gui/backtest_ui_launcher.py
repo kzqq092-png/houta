@@ -358,7 +358,8 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
         # 配置说明
         config_label = QLabel("⚙️ 系统配置")
-        config_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff88;")
+        config_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #00ff88;")
         layout.addWidget(config_label)
 
         # 端口配置
@@ -398,7 +399,8 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
         # 日志标题
         log_label = QLabel("📋 系统日志")
-        log_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #f59e0b;")
+        log_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #f59e0b;")
         layout.addWidget(log_label)
 
         # 日志显示区域
@@ -434,7 +436,8 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             self.ui_status.setText("状态: 正在启动Web界面...")
 
             # 启动Streamlit线程
-            self.streamlit_thread = StreamlitUIThread(self.port_spinbox.value())
+            self.streamlit_thread = StreamlitUIThread(
+                self.port_spinbox.value())
             self.streamlit_thread.started.connect(self.on_web_ui_started)
             self.streamlit_thread.error.connect(self.on_web_ui_error)
             self.streamlit_thread.start()
@@ -454,7 +457,8 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
             # 创建回测组件窗口
             self.backtest_window = QMainWindow()
-            self.backtest_window.setWindowTitle("HIkyuu Professional Backtest System")
+            self.backtest_window.setWindowTitle(
+                "HIkyuu Professional Backtest System")
             self.backtest_window.setGeometry(150, 150, 1400, 800)
 
             # 创建回测组件
@@ -586,11 +590,13 @@ def launch_pyqt5_only():
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description="HIkyuu Professional Backtest System Launcher")
+    parser = argparse.ArgumentParser(
+        description="HIkyuu Professional Backtest System Launcher")
     parser.add_argument("--ui", choices=["web", "desktop", "launcher"], default="launcher",
                         help="选择UI类型: web(仅Web界面), desktop(仅桌面界面), launcher(启动器)")
     parser.add_argument("--port", type=int, default=8501, help="Streamlit端口号")
-    parser.add_argument("--theme", choices=["dark", "light"], default="dark", help="UI主题")
+    parser.add_argument(
+        "--theme", choices=["dark", "light"], default="dark", help="UI主题")
 
     args = parser.parse_args()
 

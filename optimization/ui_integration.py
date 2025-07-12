@@ -55,7 +55,8 @@ class OptimizationWorker(QThread if GUI_AVAILABLE else QObject):
     if GUI_AVAILABLE:
         progress_updated = pyqtSignal(str, float)  # pattern_name, progress
         task_completed = pyqtSignal(str, dict)     # pattern_name, result
-        error_occurred = pyqtSignal(str, str)      # pattern_name, error_message
+        # pattern_name, error_message
+        error_occurred = pyqtSignal(str, str)
 
     def __init__(self, auto_tuner: AutoTuner):
         super().__init__()
@@ -82,11 +83,13 @@ class OptimizationWorker(QThread if GUI_AVAILABLE else QObject):
             # 设置进度回调
             def progress_callback(task: TuningTask):
                 if GUI_AVAILABLE:
-                    self.progress_updated.emit(task.pattern_name, task.progress)
+                    self.progress_updated.emit(
+                        task.pattern_name, task.progress)
 
             def completion_callback(task: TuningTask):
                 if GUI_AVAILABLE:
-                    self.task_completed.emit(task.pattern_name, task.result or {})
+                    self.task_completed.emit(
+                        task.pattern_name, task.result or {})
 
             self.auto_tuner.set_progress_callback(progress_callback)
             self.auto_tuner.set_completion_callback(completion_callback)
@@ -102,7 +105,8 @@ class OptimizationWorker(QThread if GUI_AVAILABLE else QObject):
 
         except Exception as e:
             if GUI_AVAILABLE:
-                self.error_occurred.emit(self.current_task or "unknown", str(e))
+                self.error_occurred.emit(
+                    self.current_task or "unknown", str(e))
         finally:
             self.is_running = False
 
@@ -132,7 +136,8 @@ class OptimizationDialog(QDialog if GUI_AVAILABLE else object):
 
         # 优化方法
         self.method_combo = QComboBox()
-        self.method_combo.addItems(["genetic", "bayesian", "random", "gradient"])
+        self.method_combo.addItems(
+            ["genetic", "bayesian", "random", "gradient"])
         self.method_combo.setCurrentText("genetic")
         basic_layout.addRow("优化方法:", self.method_combo)
 
@@ -279,16 +284,20 @@ class VersionManagerDialog(QDialog if GUI_AVAILABLE else object):
 
         for i, version in enumerate(versions):
             # 版本号
-            self.version_table.setItem(i, 0, QTableWidgetItem(str(version.version_number)))
+            self.version_table.setItem(
+                i, 0, QTableWidgetItem(str(version.version_number)))
 
             # 创建时间
-            self.version_table.setItem(i, 1, QTableWidgetItem(version.created_time))
+            self.version_table.setItem(
+                i, 1, QTableWidgetItem(version.created_time))
 
             # 优化方法
-            self.version_table.setItem(i, 2, QTableWidgetItem(version.optimization_method))
+            self.version_table.setItem(
+                i, 2, QTableWidgetItem(version.optimization_method))
 
             # 描述
-            self.version_table.setItem(i, 3, QTableWidgetItem(version.description))
+            self.version_table.setItem(
+                i, 3, QTableWidgetItem(version.description))
 
             # 激活状态
             status = "✓ 激活" if version.is_active else "未激活"
@@ -331,7 +340,8 @@ class VersionManagerDialog(QDialog if GUI_AVAILABLE else object):
         )
 
         if reply == QMessageBox.Yes:
-            version_id = self.version_table.item(current_row, 0).data(Qt.UserRole)
+            version_id = self.version_table.item(
+                current_row, 0).data(Qt.UserRole)
 
             if self.version_manager.delete_version(version_id):
                 QMessageBox.information(self, "成功", "版本删除成功")
@@ -399,24 +409,28 @@ class UIIntegration:
 
             # 快速优化
             quick_action = QAction("快速优化", menu)
-            quick_action.triggered.connect(lambda: self.quick_optimize(pattern_name))
+            quick_action.triggered.connect(
+                lambda: self.quick_optimize(pattern_name))
             menu.addAction(quick_action)
 
             # 高级优化
             advanced_action = QAction("高级优化...", menu)
-            advanced_action.triggered.connect(lambda: self.show_optimization_dialog(pattern_name))
+            advanced_action.triggered.connect(
+                lambda: self.show_optimization_dialog(pattern_name))
             menu.addAction(advanced_action)
 
             menu.addSeparator()
 
             # 版本管理
             version_action = QAction("版本管理...", menu)
-            version_action.triggered.connect(lambda: self.show_version_manager(pattern_name))
+            version_action.triggered.connect(
+                lambda: self.show_version_manager(pattern_name))
             menu.addAction(version_action)
 
             # 性能评估
             eval_action = QAction("性能评估", menu)
-            eval_action.triggered.connect(lambda: self.evaluate_pattern(pattern_name))
+            eval_action.triggered.connect(
+                lambda: self.evaluate_pattern(pattern_name))
             menu.addAction(eval_action)
 
             return menu
@@ -467,9 +481,12 @@ class UIIntegration:
 
         # 连接信号
         if GUI_AVAILABLE:
-            self.optimization_worker.progress_updated.connect(self.on_progress_updated)
-            self.optimization_worker.task_completed.connect(self.on_task_completed)
-            self.optimization_worker.error_occurred.connect(self.on_error_occurred)
+            self.optimization_worker.progress_updated.connect(
+                self.on_progress_updated)
+            self.optimization_worker.task_completed.connect(
+                self.on_task_completed)
+            self.optimization_worker.error_occurred.connect(
+                self.on_error_occurred)
 
     def show_version_manager(self, pattern_name: str):
         """显示版本管理对话框"""
@@ -485,7 +502,8 @@ class UIIntegration:
         self.active_dialogs[pattern_name] = dialog
 
         # 对话框关闭时清理引用
-        dialog.finished.connect(lambda: self.active_dialogs.pop(pattern_name, None))
+        dialog.finished.connect(
+            lambda: self.active_dialogs.pop(pattern_name, None))
 
         dialog.show()
 
@@ -495,10 +513,12 @@ class UIIntegration:
             print(f"评估形态性能: {pattern_name}")
 
             # 创建测试数据集
-            test_datasets = self.evaluator.create_test_datasets(pattern_name, count=3)
+            test_datasets = self.evaluator.create_test_datasets(
+                pattern_name, count=3)
 
             # 评估性能
-            metrics = self.evaluator.evaluate_algorithm(pattern_name, test_datasets)
+            metrics = self.evaluator.evaluate_algorithm(
+                pattern_name, test_datasets)
 
             # 显示结果
             result_text = f"""
@@ -512,7 +532,8 @@ class UIIntegration:
             """.strip()
 
             if GUI_AVAILABLE:
-                QMessageBox.information(None, f"性能评估 - {pattern_name}", result_text)
+                QMessageBox.information(
+                    None, f"性能评估 - {pattern_name}", result_text)
             else:
                 print(result_text)
 
@@ -541,7 +562,8 @@ class UIIntegration:
             # 导出
             if self.version_manager.export_version(best_version.id, export_path):
                 if GUI_AVAILABLE:
-                    QMessageBox.information(None, "成功", f"算法已导出到: {export_path}")
+                    QMessageBox.information(
+                        None, "成功", f"算法已导出到: {export_path}")
                 else:
                     print(f"✅ 算法已导出到: {export_path}")
             else:

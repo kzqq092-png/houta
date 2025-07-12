@@ -111,7 +111,17 @@ class InteractionMixin:
         elif action == copy_action:
             self.copy_chart_to_clipboard()
         elif action == refresh_action:
-            self.refresh()
+            try:
+                # 使用update_chart方法而不是refresh方法
+                if hasattr(self, 'current_kdata') and self.current_kdata is not None:
+                    self.update_chart({'kdata': self.current_kdata})
+                else:
+                    self.show_no_data("无数据")
+            except Exception as e:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error(f"刷新图表失败: {str(e)}")
+                if hasattr(self, 'error_occurred'):
+                    self.error_occurred.emit(f"刷新图表失败: {str(e)}")
         elif action == clear_highlight_action:
             self.clear_highlighted_candles()
 
@@ -244,37 +254,7 @@ class InteractionMixin:
         """多屏同步所有激活指标，仅同步选中项（已废弃，自动同步主窗口get_current_indicators）"""
         self.update_chart()
 
-    def refresh(self) -> None:
-        """
-        刷新当前图表内容，异常只记录日志不抛出。
-        若有数据则重绘K线图，否则显示"无数据"提示。
-        """
-        try:
-            # 这里假设有self.current_kdata等数据
-            if hasattr(self, 'current_kdata') and self.current_kdata is not None:
-                self.update_chart({'kdata': self.current_kdata})
-            else:
-                self.show_no_data("无数据")
-        except Exception as e:
-            error_msg = f"刷新图表失败: {str(e)}"
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
-            # 发射异常信号，主窗口可捕获弹窗
-            if hasattr(self, 'error_occurred'):
-                self.error_occurred.emit(error_msg)
-
-    def update(self) -> None:
-        """
-        兼容旧接口，重定向到refresh。
-        """
-        self.refresh()
-
-    def reload(self) -> None:
-        """
-        兼容旧接口，重定向到refresh。
-        """
-        self.refresh()
+    # 删除冲突的refresh方法，使用ChartWidget或utility_mixin中的实现
 
     def plot_patterns(self, pattern_signals: list, highlight_index: int = None):
         """
@@ -321,7 +301,8 @@ class InteractionMixin:
             # 修复：严格的索引边界检查
             if not isinstance(idx, (int, float)) or idx < 0 or idx >= len(kdata):
                 if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.warning(f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
+                    self.log_manager.warning(
+                        f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
                 invalid_patterns += 1
                 continue
 
@@ -329,7 +310,8 @@ class InteractionMixin:
             idx = int(idx)
             valid_patterns += 1
 
-            pattern_name = pat.get('pattern_name', pat.get('pattern', 'Unknown'))
+            pattern_name = pat.get(
+                'pattern_name', pat.get('pattern', 'Unknown'))
             signal = pat.get('signal', 'neutral')
             confidence = pat.get('confidence', 0)
             price = kdata.iloc[idx]['high'] if signal == 'buy' else kdata.iloc[idx]['low']
@@ -341,12 +323,14 @@ class InteractionMixin:
             # 绘制专业箭头标记
             if signal == 'buy':
                 # 买入信号：空心向上三角，位于K线下方
-                arrow_y = kdata.iloc[idx]['low'] - (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                arrow_y = kdata.iloc[idx]['low'] - \
+                    (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
                 ax.scatter(idx, arrow_y, marker='^', s=80, facecolors='none',
                            edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
             elif signal == 'sell':
                 # 卖出信号：空心向下三角，位于K线上方
-                arrow_y = kdata.iloc[idx]['high'] + (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
+                arrow_y = kdata.iloc[idx]['high'] + \
+                    (kdata.iloc[idx]['high'] - kdata.iloc[idx]['low']) * 0.15
                 ax.scatter(idx, arrow_y, marker='v', s=80, facecolors='none',
                            edgecolors=color, linewidths=0.8, alpha=alpha, zorder=100)
             else:
@@ -366,7 +350,8 @@ class InteractionMixin:
 
         # 记录绘制结果
         if hasattr(self, 'log_manager') and self.log_manager:
-            self.log_manager.info(f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
+            self.log_manager.info(
+                f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
 
         # 高亮特定形态（如果指定）
         if highlight_index is not None and highlight_index in self._pattern_info:
@@ -381,7 +366,8 @@ class InteractionMixin:
     def highlight_pattern(self, idx: int):
         """外部调用高亮指定K线索引的形态"""
         if hasattr(self, '_current_pattern_signals'):
-            self.plot_patterns(self._current_pattern_signals, highlight_index=idx)
+            self.plot_patterns(self._current_pattern_signals,
+                               highlight_index=idx)
 
     def highlight_signals(self, signals):
         """高亮指定信号"""
@@ -421,7 +407,8 @@ class InteractionMixin:
                 current_xlim = self.price_ax.get_xlim()
                 window_size = current_xlim[1] - current_xlim[0]
                 new_center = idx
-                self.price_ax.set_xlim(new_center - window_size/2, new_center + window_size/2)
+                self.price_ax.set_xlim(
+                    new_center - window_size/2, new_center + window_size/2)
 
             self.canvas.draw()
 

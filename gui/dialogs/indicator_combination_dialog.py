@@ -40,7 +40,8 @@ class CombinationLoadThread(QThread):
             manager = get_combination_manager()
 
             if self.search_query or self.tags:
-                combinations = manager.search_combinations(self.search_query, self.tags)
+                combinations = manager.search_combinations(
+                    self.search_query, self.tags)
             else:
                 combinations = manager.get_all_combinations()
 
@@ -76,7 +77,8 @@ class IndicatorCombinationDialog(QDialog):
         # 标题
         title_label = QLabel("指标组合管理")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
+        title_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; margin: 10px;")
         main_layout.addWidget(title_label)
 
         # 搜索区域
@@ -144,7 +146,8 @@ class IndicatorCombinationDialog(QDialog):
         list_layout = QVBoxLayout()
 
         self.combination_list = QListWidget()
-        self.combination_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.combination_list.setSelectionMode(
+            QAbstractItemView.SingleSelection)
         list_layout.addWidget(self.combination_list)
 
         list_group.setLayout(list_layout)
@@ -223,7 +226,8 @@ class IndicatorCombinationDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
 
-        self.indicators_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.indicators_table.setSelectionBehavior(
+            QAbstractItemView.SelectRows)
         self.indicators_table.setAlternatingRowColors(True)
 
         indicators_layout.addWidget(self.indicators_table)
@@ -344,7 +348,8 @@ class IndicatorCombinationDialog(QDialog):
         self.search_input.returnPressed.connect(self._on_search)
 
         # 列表选择
-        self.combination_list.itemSelectionChanged.connect(self._on_selection_changed)
+        self.combination_list.itemSelectionChanged.connect(
+            self._on_selection_changed)
 
         # 管理按钮
         self.load_button.clicked.connect(self._on_load_combination)
@@ -364,7 +369,8 @@ class IndicatorCombinationDialog(QDialog):
 
             # 创建新的加载线程
             self.load_thread = CombinationLoadThread(search_query)
-            self.load_thread.combinations_loaded.connect(self._on_combinations_loaded)
+            self.load_thread.combinations_loaded.connect(
+                self._on_combinations_loaded)
             self.load_thread.error_occurred.connect(self._on_load_error)
             self.load_thread.start()
 
@@ -481,7 +487,8 @@ class IndicatorCombinationDialog(QDialog):
 
                 # 参数
                 params = indicator.get('params', {})
-                params_text = ", ".join([f"{k}={v}" for k, v in params.items()])
+                params_text = ", ".join(
+                    [f"{k}={v}" for k, v in params.items()])
                 params_item = QTableWidgetItem(params_text)
                 self.indicators_table.setItem(row, 2, params_item)
 
@@ -549,7 +556,8 @@ class IndicatorCombinationDialog(QDialog):
             )
 
             if reply == QMessageBox.Yes:
-                success = self.manager.delete_combination(self.selected_combination.name)
+                success = self.manager.delete_combination(
+                    self.selected_combination.name)
 
                 if success:
                     QMessageBox.information(self, "成功", "组合删除成功")
@@ -581,7 +589,8 @@ class IndicatorCombinationDialog(QDialog):
                 )
 
                 overwrite = reply == QMessageBox.Yes
-                success = self.manager.import_combinations(file_path, overwrite)
+                success = self.manager.import_combinations(
+                    file_path, overwrite)
 
                 if success:
                     QMessageBox.information(self, "成功", "组合导入成功")
@@ -607,7 +616,8 @@ class IndicatorCombinationDialog(QDialog):
                 success = self.manager.export_combinations(file_path)
 
                 if success:
-                    QMessageBox.information(self, "成功", f"组合已导出到:\n{file_path}")
+                    QMessageBox.information(
+                        self, "成功", f"组合已导出到:\n{file_path}")
                 else:
                     QMessageBox.critical(self, "错误", "导出组合失败")
 

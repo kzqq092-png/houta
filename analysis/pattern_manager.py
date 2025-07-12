@@ -27,7 +27,8 @@ class PatternManager:
             db_path: 数据库路径，默认使用项目数据库
         """
         if db_path is None:
-            self.db_path = os.path.join(os.path.dirname(__file__), '..', 'db', 'hikyuu_system.db')
+            self.db_path = os.path.join(os.path.dirname(
+                __file__), '..', 'db', 'hikyuu_system.db')
         else:
             self.db_path = db_path
 
@@ -42,12 +43,14 @@ class PatternManager:
 
         # 检查并添加新字段
         try:
-            cursor.execute('ALTER TABLE pattern_types ADD COLUMN algorithm_code TEXT')
+            cursor.execute(
+                'ALTER TABLE pattern_types ADD COLUMN algorithm_code TEXT')
         except sqlite3.OperationalError:
             pass
 
         try:
-            cursor.execute('ALTER TABLE pattern_types ADD COLUMN parameters TEXT')
+            cursor.execute(
+                'ALTER TABLE pattern_types ADD COLUMN parameters TEXT')
         except sqlite3.OperationalError:
             pass
 
@@ -153,7 +156,8 @@ class PatternManager:
                 min_periods=row[6],
                 max_periods=row[7],
                 confidence_threshold=row[8],
-                algorithm_code=row[12] if len(row) > 12 else "",  # 修复：algorithm_code是第12个字段（索引12）
+                # 修复：algorithm_code是第12个字段（索引12）
+                algorithm_code=row[12] if len(row) > 12 else "",
                 parameters=parameters,
                 is_active=bool(row[9])
             ))
@@ -181,7 +185,8 @@ class PatternManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT DISTINCT category FROM pattern_types WHERE is_active = 1 ORDER BY category")
+        cursor.execute(
+            "SELECT DISTINCT category FROM pattern_types WHERE is_active = 1 ORDER BY category")
         categories = [row[0] for row in cursor.fetchall()]
         conn.close()
 
@@ -192,7 +197,8 @@ class PatternManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT DISTINCT signal_type FROM pattern_types WHERE is_active = 1 ORDER BY signal_type")
+        cursor.execute(
+            "SELECT DISTINCT signal_type FROM pattern_types WHERE is_active = 1 ORDER BY signal_type")
         signal_types = [row[0] for row in cursor.fetchall()]
         conn.close()
 
@@ -219,7 +225,8 @@ class PatternManager:
         # 如果是DataFrame，确保包含必要字段
         if isinstance(kdata, pd.DataFrame):
             required_columns = ['open', 'high', 'low', 'close']
-            missing_columns = [col for col in required_columns if col not in kdata.columns]
+            missing_columns = [
+                col for col in required_columns if col not in kdata.columns]
             if missing_columns:
                 print(f"DataFrame缺少必要列: {missing_columns}")
                 return []
@@ -234,14 +241,16 @@ class PatternManager:
                     # 如果没有datetime信息，生成序列
                     print("[PatternManager] K线数据缺少datetime字段，自动补全")
                     kdata = kdata.copy()
-                    kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
+                    kdata['datetime'] = pd.date_range(
+                        start='2023-01-01', periods=len(kdata), freq='D')
             else:
                 # 确保datetime列是正确的时间格式
                 try:
                     kdata['datetime'] = pd.to_datetime(kdata['datetime'])
                 except Exception as e:
                     print(f"[PatternManager] datetime字段转换失败: {e}")
-                    kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
+                    kdata['datetime'] = pd.date_range(
+                        start='2023-01-01', periods=len(kdata), freq='D')
         else:
             # 如果是其他格式，尝试转换为DataFrame
             try:
@@ -254,7 +263,8 @@ class PatternManager:
         # 获取要识别的形态配置
         all_configs = self.get_pattern_configs()
         if selected_patterns:
-            configs = [c for c in all_configs if c.english_name in selected_patterns]
+            configs = [
+                c for c in all_configs if c.english_name in selected_patterns]
         else:
             configs = all_configs
 
@@ -411,7 +421,8 @@ class PatternManager:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("DELETE FROM pattern_types WHERE id = ?", (pattern_id,))
+            cursor.execute(
+                "DELETE FROM pattern_types WHERE id = ?", (pattern_id,))
             conn.commit()
 
             # 清除缓存
@@ -597,12 +608,15 @@ for i in range(len(kdata)):
             for pattern in patterns:
                 # 按类别统计
                 category = pattern.get('pattern_category', '未分类')
-                stats['by_category'][category] = stats['by_category'].get(category, 0) + 1
+                stats['by_category'][category] = stats['by_category'].get(
+                    category, 0) + 1
 
                 # 按信号统计
                 signal = pattern.get('signal', 'neutral')
-                signal_cn = {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, signal)
-                stats['by_signal'][signal_cn] = stats['by_signal'].get(signal_cn, 0) + 1
+                signal_cn = {'buy': '买入', 'sell': '卖出',
+                             'neutral': '中性'}.get(signal, signal)
+                stats['by_signal'][signal_cn] = stats['by_signal'].get(
+                    signal_cn, 0) + 1
 
                 # 按置信度统计
                 confidence = pattern.get('confidence', 0)
@@ -706,7 +720,8 @@ for i in range(len(kdata)):
             is_successful = None
 
             if result_price is not None and trigger_price > 0:
-                return_rate = (result_price - trigger_price) / trigger_price * 100
+                return_rate = (result_price - trigger_price) / \
+                    trigger_price * 100
 
                 # 根据信号类型判断是否成功
                 if signal_type == 'buy':
@@ -714,7 +729,8 @@ for i in range(len(kdata)):
                 elif signal_type == 'sell':
                     is_successful = 1 if return_rate < 0 else 0
                 else:
-                    is_successful = 1 if abs(return_rate) < 2 else 0  # 中性信号，波动小于2%算成功
+                    is_successful = 1 if abs(
+                        return_rate) < 2 else 0  # 中性信号，波动小于2%算成功
 
             cursor.execute('''
                 INSERT INTO pattern_history 

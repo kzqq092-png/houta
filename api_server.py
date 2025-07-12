@@ -97,7 +97,8 @@ def ai_select_stocks(params: Dict[str, Any]):
         return {"selected": [], "explanations": {}, "error": "数据全部无效或缺失关键字段"}
     selector = AIStockSelector(model_type=model_type)
     selected = selector.select_stocks(df, criteria)
-    explanations = {code: selector.explain_selection(code) for code in selected}
+    explanations = {code: selector.explain_selection(
+        code) for code in selected}
     return {"selected": selected, "explanations": explanations}
 
 
@@ -137,8 +138,10 @@ def ai_optimize_params(params: Dict[str, Any]):
     """
     # TODO: 实现AI参数优化逻辑（如网格搜索、贝叶斯优化等）
     # 这里简单返回第一个参数组合
-    param_space = params.get('param_space', {'fast': [5, 10], 'slow': [20, 50]})
-    best_params = {k: v[0] for k, v in param_space.items() if isinstance(v, list) and v}
+    param_space = params.get(
+        'param_space', {'fast': [5, 10], 'slow': [20, 50]})
+    best_params = {k: v[0]
+                   for k, v in param_space.items() if isinstance(v, list) and v}
     return {"best_params": best_params, "history": [best_params]}
 
 
@@ -193,7 +196,8 @@ def _kdata_preprocess(df, context="分析"):
             # 完全没有datetime信息，需要补全
             print(f"[{context}] 缺少datetime字段，自动补全")
             df = df.copy()
-            df['datetime'] = pd.date_range(start='2023-01-01', periods=len(df), freq='D')
+            df['datetime'] = pd.date_range(
+                start='2023-01-01', periods=len(df), freq='D')
             has_datetime = True
 
     # 检查其他必要字段

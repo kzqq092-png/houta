@@ -112,7 +112,8 @@ class VersionManagerDialog(QDialog):
             main_layout.addWidget(content_splitter)
 
             # 所有组件创建完成后，连接版本树的信号
-            self.version_tree.itemSelectionChanged.connect(self.on_version_selected)
+            self.version_tree.itemSelectionChanged.connect(
+                self.on_version_selected)
 
         except Exception as e:
             self.logger.error(f"初始化UI失败: {e}")
@@ -212,7 +213,8 @@ class VersionManagerDialog(QDialog):
 
             # 标题
             title_label = QLabel("版本列表")
-            title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+            title_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #333;")
             layout.addWidget(title_label)
 
             # 版本树
@@ -308,7 +310,8 @@ class VersionManagerDialog(QDialog):
 
             self.patterns_table = QTableWidget()
             self.patterns_table.setColumnCount(4)
-            self.patterns_table.setHorizontalHeaderLabels(['形态名称', '算法版本', '准确率', '状态'])
+            self.patterns_table.setHorizontalHeaderLabels(
+                ['形态名称', '算法版本', '准确率', '状态'])
 
             header = self.patterns_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Stretch)
@@ -336,7 +339,8 @@ class VersionManagerDialog(QDialog):
             # 变更记录表格
             self.changes_table = QTableWidget()
             self.changes_table.setColumnCount(4)
-            self.changes_table.setHorizontalHeaderLabels(['时间', '操作', '内容', '操作者'])
+            self.changes_table.setHorizontalHeaderLabels(
+                ['时间', '操作', '内容', '操作者'])
 
             header = self.changes_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Stretch)
@@ -378,7 +382,8 @@ class VersionManagerDialog(QDialog):
             # 性能对比表格
             self.performance_table = QTableWidget()
             self.performance_table.setColumnCount(4)
-            self.performance_table.setHorizontalHeaderLabels(['指标', '当前版本', '对比版本', '差异'])
+            self.performance_table.setHorizontalHeaderLabels(
+                ['指标', '当前版本', '对比版本', '差异'])
 
             header = self.performance_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Stretch)
@@ -433,7 +438,8 @@ class VersionManagerDialog(QDialog):
                 # 从真实的版本管理系统加载数据
                 for pattern_name in self.pattern_names:
                     try:
-                        pattern_versions = self.version_manager.get_versions(pattern_name, limit=20)
+                        pattern_versions = self.version_manager.get_versions(
+                            pattern_name, limit=20)
                         for version in pattern_versions:
                             version_data = {
                                 'version_id': f"{pattern_name}_v{version.version_number}",
@@ -453,7 +459,8 @@ class VersionManagerDialog(QDialog):
                         self.logger.warning(f"加载形态 {pattern_name} 的版本失败: {e}")
 
                 # 按创建时间排序
-                self.versions.sort(key=lambda x: x['create_time'], reverse=True)
+                self.versions.sort(
+                    key=lambda x: x['create_time'], reverse=True)
 
             else:
                 # 使用模拟数据
@@ -467,8 +474,10 @@ class VersionManagerDialog(QDialog):
                         'pattern_count': 67,
                         'description': '包含所有67种形态的稳定版本，性能优化',
                         'patterns': [
-                            {'name': '头肩顶', 'algorithm_version': 'v2.1', 'accuracy': 0.85, 'status': 'active'},
-                            {'name': '双底', 'algorithm_version': 'v2.1', 'accuracy': 0.82, 'status': 'active'},
+                            {'name': '头肩顶', 'algorithm_version': 'v2.1',
+                                'accuracy': 0.85, 'status': 'active'},
+                            {'name': '双底', 'algorithm_version': 'v2.1',
+                                'accuracy': 0.82, 'status': 'active'},
                         ]
                     },
                     {
@@ -480,16 +489,20 @@ class VersionManagerDialog(QDialog):
                         'pattern_count': 65,
                         'description': '修复了多个形态识别bug，提升准确率',
                         'patterns': [
-                            {'name': '头肩顶', 'algorithm_version': 'v2.0', 'accuracy': 0.83, 'status': 'stable'},
-                            {'name': '双底', 'algorithm_version': 'v2.0', 'accuracy': 0.80, 'status': 'stable'},
+                            {'name': '头肩顶', 'algorithm_version': 'v2.0',
+                                'accuracy': 0.83, 'status': 'stable'},
+                            {'name': '双底', 'algorithm_version': 'v2.0',
+                                'accuracy': 0.80, 'status': 'stable'},
                         ]
                     }
                 ]
 
             # 设置当前版本
             if self.versions:
-                active_versions = [v for v in self.versions if v['status'] == 'active']
-                self.current_version = active_versions[0]['version_id'] if active_versions else self.versions[0]['version_id']
+                active_versions = [
+                    v for v in self.versions if v['status'] == 'active']
+                self.current_version = active_versions[0][
+                    'version_id'] if active_versions else self.versions[0]['version_id']
 
             self.update_version_tree()
             self.update_compare_combo()
@@ -512,7 +525,8 @@ class VersionManagerDialog(QDialog):
                     self._ui_initialized):
 
                 if self.version_tree.topLevelItemCount() > 0:
-                    self.version_tree.setCurrentItem(self.version_tree.topLevelItem(0))
+                    self.version_tree.setCurrentItem(
+                        self.version_tree.topLevelItem(0))
                     self.logger.info("设置默认版本选择成功")
             else:
                 self.logger.warning("UI组件未完全初始化，跳过默认选择")
@@ -564,7 +578,8 @@ class VersionManagerDialog(QDialog):
 
             self.compare_combo.clear()
             for version in self.versions:
-                self.compare_combo.addItem(version['version_name'], version['version_id'])
+                self.compare_combo.addItem(
+                    version['version_name'], version['version_id'])
 
         except Exception as e:
             self.logger.error(f"更新对比下拉框失败: {e}")
@@ -590,7 +605,8 @@ class VersionManagerDialog(QDialog):
                 is_active = version_data['status'] == 'active'
                 self.activate_btn.setEnabled(not is_active)
                 self.rollback_btn.setEnabled(not is_active)
-                self.delete_btn.setEnabled(version_data['status'] == 'deprecated')
+                self.delete_btn.setEnabled(
+                    version_data['status'] == 'deprecated')
 
         except Exception as e:
             self.logger.error(f"处理版本选择失败: {e}")
@@ -613,7 +629,8 @@ class VersionManagerDialog(QDialog):
 
             # 检查并更新描述
             if hasattr(self, 'version_desc') and hasattr(self.version_desc, 'setPlainText'):
-                self.version_desc.setPlainText(version_data.get('description', ''))
+                self.version_desc.setPlainText(
+                    version_data.get('description', ''))
 
             # 检查并更新形态列表
             if hasattr(self, 'patterns_table') and hasattr(self.patterns_table, 'setRowCount'):
@@ -621,10 +638,14 @@ class VersionManagerDialog(QDialog):
                 self.patterns_table.setRowCount(len(patterns))
 
                 for i, pattern in enumerate(patterns):
-                    self.patterns_table.setItem(i, 0, QTableWidgetItem(pattern.get('name', '')))
-                    self.patterns_table.setItem(i, 1, QTableWidgetItem(pattern.get('algorithm_version', '')))
-                    self.patterns_table.setItem(i, 2, QTableWidgetItem(f"{pattern.get('accuracy', 0):.2%}"))
-                    self.patterns_table.setItem(i, 3, QTableWidgetItem(pattern.get('status', '')))
+                    self.patterns_table.setItem(
+                        i, 0, QTableWidgetItem(pattern.get('name', '')))
+                    self.patterns_table.setItem(i, 1, QTableWidgetItem(
+                        pattern.get('algorithm_version', '')))
+                    self.patterns_table.setItem(i, 2, QTableWidgetItem(
+                        f"{pattern.get('accuracy', 0):.2%}"))
+                    self.patterns_table.setItem(
+                        i, 3, QTableWidgetItem(pattern.get('status', '')))
 
         except Exception as e:
             # 只记录警告，不抛出错误
@@ -660,10 +681,14 @@ class VersionManagerDialog(QDialog):
                 self.changes_table.setRowCount(len(changes))
 
                 for i, change in enumerate(changes):
-                    self.changes_table.setItem(i, 0, QTableWidgetItem(change['time']))
-                    self.changes_table.setItem(i, 1, QTableWidgetItem(change['type']))
-                    self.changes_table.setItem(i, 2, QTableWidgetItem(change['content']))
-                    self.changes_table.setItem(i, 3, QTableWidgetItem(change['operator']))
+                    self.changes_table.setItem(
+                        i, 0, QTableWidgetItem(change['time']))
+                    self.changes_table.setItem(
+                        i, 1, QTableWidgetItem(change['type']))
+                    self.changes_table.setItem(
+                        i, 2, QTableWidgetItem(change['content']))
+                    self.changes_table.setItem(
+                        i, 3, QTableWidgetItem(change['operator']))
 
         except Exception as e:
             # 只记录警告，不抛出错误
@@ -703,7 +728,8 @@ class VersionManagerDialog(QDialog):
                             description=name,
                             optimization_method="manual"
                         )
-                        QMessageBox.information(self, "成功", f"版本创建成功！版本ID: {version_id}")
+                        QMessageBox.information(
+                            self, "成功", f"版本创建成功！版本ID: {version_id}")
                         self.load_versions()
                     except Exception as e:
                         QMessageBox.critical(self, "错误", f"创建版本失败: {e}")
@@ -736,9 +762,11 @@ class VersionManagerDialog(QDialog):
                         return
 
                     try:
-                        version_id = self.version_manager.import_version(file_path, pattern_name)
+                        version_id = self.version_manager.import_version(
+                            file_path, pattern_name)
                         if version_id:
-                            QMessageBox.information(self, "成功", f"版本导入成功！版本ID: {version_id}")
+                            QMessageBox.information(
+                                self, "成功", f"版本导入成功！版本ID: {version_id}")
                             self.load_versions()
                         else:
                             QMessageBox.critical(self, "错误", "版本导入失败！")
@@ -770,7 +798,8 @@ class VersionManagerDialog(QDialog):
                 if self.version_manager and 'version_obj' in self.selected_version:
                     try:
                         version_obj = self.selected_version['version_obj']
-                        success = self.version_manager.export_version(version_obj.id, file_path)
+                        success = self.version_manager.export_version(
+                            version_obj.id, file_path)
                         if success:
                             QMessageBox.information(self, "成功", "版本导出成功！")
                         else:
@@ -799,10 +828,12 @@ class VersionManagerDialog(QDialog):
                 if self.version_manager and 'version_obj' in self.selected_version:
                     try:
                         version_obj = self.selected_version['version_obj']
-                        success = self.version_manager.activate_version(version_obj.id)
+                        success = self.version_manager.activate_version(
+                            version_obj.id)
                         if success:
                             QMessageBox.information(self, "成功", "版本激活成功！")
-                            self.version_changed.emit(self.selected_version['version_id'], 'activate')
+                            self.version_changed.emit(
+                                self.selected_version['version_id'], 'activate')
                             self.load_versions()
                         else:
                             QMessageBox.critical(self, "错误", "版本激活失败！")
@@ -810,7 +841,8 @@ class VersionManagerDialog(QDialog):
                         QMessageBox.critical(self, "错误", f"激活版本失败: {e}")
                 else:
                     QMessageBox.information(self, "成功", "版本激活成功！")
-                    self.version_changed.emit(self.selected_version['version_id'], 'activate')
+                    self.version_changed.emit(
+                        self.selected_version['version_id'], 'activate')
                     self.load_versions()
 
         except Exception as e:
@@ -832,11 +864,14 @@ class VersionManagerDialog(QDialog):
                 if self.version_manager and 'version_obj' in self.selected_version:
                     try:
                         version_obj = self.selected_version['version_obj']
-                        pattern_name = self.selected_version.get('pattern_name', '')
-                        success = self.version_manager.rollback_to_version(pattern_name, version_obj.version_number)
+                        pattern_name = self.selected_version.get(
+                            'pattern_name', '')
+                        success = self.version_manager.rollback_to_version(
+                            pattern_name, version_obj.version_number)
                         if success:
                             QMessageBox.information(self, "成功", "版本回滚成功！")
-                            self.version_changed.emit(self.selected_version['version_id'], 'rollback')
+                            self.version_changed.emit(
+                                self.selected_version['version_id'], 'rollback')
                             self.load_versions()
                         else:
                             QMessageBox.critical(self, "错误", "版本回滚失败！")
@@ -844,7 +879,8 @@ class VersionManagerDialog(QDialog):
                         QMessageBox.critical(self, "错误", f"回滚版本失败: {e}")
                 else:
                     QMessageBox.information(self, "成功", "版本回滚成功！")
-                    self.version_changed.emit(self.selected_version['version_id'], 'rollback')
+                    self.version_changed.emit(
+                        self.selected_version['version_id'], 'rollback')
                     self.load_versions()
 
         except Exception as e:
@@ -866,10 +902,12 @@ class VersionManagerDialog(QDialog):
                 if self.version_manager and 'version_obj' in self.selected_version:
                     try:
                         version_obj = self.selected_version['version_obj']
-                        success = self.version_manager.delete_version(version_obj.id)
+                        success = self.version_manager.delete_version(
+                            version_obj.id)
                         if success:
                             QMessageBox.information(self, "成功", "版本删除成功！")
-                            self.version_changed.emit(self.selected_version['version_id'], 'delete')
+                            self.version_changed.emit(
+                                self.selected_version['version_id'], 'delete')
                             self.load_versions()
                         else:
                             QMessageBox.critical(self, "错误", "版本删除失败！")
@@ -877,7 +915,8 @@ class VersionManagerDialog(QDialog):
                         QMessageBox.critical(self, "错误", f"删除版本失败: {e}")
                 else:
                     QMessageBox.information(self, "成功", "版本删除成功！")
-                    self.version_changed.emit(self.selected_version['version_id'], 'delete')
+                    self.version_changed.emit(
+                        self.selected_version['version_id'], 'delete')
                     self.load_versions()
 
         except Exception as e:
@@ -917,7 +956,8 @@ class VersionManagerDialog(QDialog):
                     base_version = self.selected_version['version_obj']
                     comp_version = compare_version['version_obj']
 
-                    comparison = self.version_manager.compare_versions(base_version.id, comp_version.id)
+                    comparison = self.version_manager.compare_versions(
+                        base_version.id, comp_version.id)
 
                     if 'performance_diff' in comparison:
                         perf_diff = comparison['performance_diff']
@@ -976,27 +1016,38 @@ class VersionManagerDialog(QDialog):
                     self.logger.error(f"获取真实性能数据失败: {e}")
                     # 使用模拟数据作为后备
                     performance_data = [
-                        {'metric': '整体准确率', 'current': '85.2%', 'compare': '83.1%', 'diff': '+2.1%'},
-                        {'metric': '识别速度', 'current': '125ms', 'compare': '138ms', 'diff': '-13ms'},
-                        {'metric': '内存使用', 'current': '256MB', 'compare': '289MB', 'diff': '-33MB'},
-                        {'metric': '形态覆盖', 'current': '67', 'compare': '65', 'diff': '+2'},
+                        {'metric': '整体准确率', 'current': '85.2%',
+                            'compare': '83.1%', 'diff': '+2.1%'},
+                        {'metric': '识别速度', 'current': '125ms',
+                            'compare': '138ms', 'diff': '-13ms'},
+                        {'metric': '内存使用', 'current': '256MB',
+                            'compare': '289MB', 'diff': '-33MB'},
+                        {'metric': '形态覆盖', 'current': '67',
+                            'compare': '65', 'diff': '+2'},
                     ]
             else:
                 # 使用模拟数据
                 performance_data = [
-                    {'metric': '整体准确率', 'current': '85.2%', 'compare': '83.1%', 'diff': '+2.1%'},
-                    {'metric': '识别速度', 'current': '125ms', 'compare': '138ms', 'diff': '-13ms'},
-                    {'metric': '内存使用', 'current': '256MB', 'compare': '289MB', 'diff': '-33MB'},
-                    {'metric': '形态覆盖', 'current': '67', 'compare': '65', 'diff': '+2'},
+                    {'metric': '整体准确率', 'current': '85.2%',
+                        'compare': '83.1%', 'diff': '+2.1%'},
+                    {'metric': '识别速度', 'current': '125ms',
+                        'compare': '138ms', 'diff': '-13ms'},
+                    {'metric': '内存使用', 'current': '256MB',
+                        'compare': '289MB', 'diff': '-33MB'},
+                    {'metric': '形态覆盖', 'current': '67',
+                        'compare': '65', 'diff': '+2'},
                 ]
 
             # 更新性能对比表格
             self.performance_table.setRowCount(len(performance_data))
 
             for i, data in enumerate(performance_data):
-                self.performance_table.setItem(i, 0, QTableWidgetItem(data['metric']))
-                self.performance_table.setItem(i, 1, QTableWidgetItem(data['current']))
-                self.performance_table.setItem(i, 2, QTableWidgetItem(data['compare']))
+                self.performance_table.setItem(
+                    i, 0, QTableWidgetItem(data['metric']))
+                self.performance_table.setItem(
+                    i, 1, QTableWidgetItem(data['current']))
+                self.performance_table.setItem(
+                    i, 2, QTableWidgetItem(data['compare']))
 
                 diff_item = QTableWidgetItem(data['diff'])
                 if data['diff'].startswith('+'):

@@ -9,11 +9,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QKeySequence, QFont
 from .base_tab import BaseAnalysisTab
-from indicators_algo import (
-    get_talib_indicator_list, get_all_indicators_by_category,
-    calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci,
-    get_talib_chinese_name, get_indicator_english_name, get_indicator_params_config,
-    get_indicator_default_params, get_indicator_inputs, get_talib_category
+from core.indicator_service import (
+    calculate_indicator, get_all_indicators_metadata, get_indicator_metadata, get_indicator_categories, get_talib_category
 )
 from core.logger import LogLevel
 from datetime import datetime
@@ -50,7 +47,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 左侧：指标选择 - 更紧凑的布局
         indicator_card = QFrame()
         indicator_card.setFrameStyle(QFrame.StyledPanel)
-        indicator_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; }")
+        indicator_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; }")
         indicator_layout = QVBoxLayout(indicator_card)
         indicator_layout.setSpacing(2)  # 减少间距
         indicator_layout.setContentsMargins(8, 8, 8, 8)  # 减少边距
@@ -64,7 +62,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         category_indicators = get_all_indicators_by_category(use_chinese=True)
         categories = ["全部"] + list(category_indicators.keys())
         self.category_combo.addItems(categories)
-        self.category_combo.currentTextChanged.connect(self.on_category_changed)
+        self.category_combo.currentTextChanged.connect(
+            self.on_category_changed)
         category_layout.addWidget(self.category_combo)
         indicator_layout.addLayout(category_layout)
 
@@ -74,7 +73,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.indicator_combo.setEditable(True)  # 允许搜索
         self.indicator_combo.setInsertPolicy(QComboBox.NoInsert)
         self.populate_indicators("全部")  # 初始显示所有指标
-        self.indicator_combo.currentTextChanged.connect(self.on_indicator_changed)
+        self.indicator_combo.currentTextChanged.connect(
+            self.on_indicator_changed)
         self.indicator_combo.setToolTip("选择要计算的技术指标，支持搜索")
         indicator_layout.addWidget(self.indicator_combo)
 
@@ -88,7 +88,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.auto_calc_checkbox = QCheckBox("自动计算")
         self.auto_calc_checkbox.setChecked(True)
         self.auto_calc_checkbox.setToolTip("数据更新时自动重新计算指标")
-        self.auto_calc_checkbox.stateChanged.connect(self.toggle_auto_calculate)
+        self.auto_calc_checkbox.stateChanged.connect(
+            self.toggle_auto_calculate)
 
         batch_layout.addWidget(self.batch_checkbox)
         batch_layout.addWidget(self.auto_calc_checkbox)
@@ -100,18 +101,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         button_layout.setSpacing(4)
 
         self.calc_btn = QPushButton("计算指标")  # 保存引用
-        self.calc_btn.setStyleSheet("QPushButton { background-color: #007bff; color: white; font-weight: bold; padding: 4px 8px; }")
+        self.calc_btn.setStyleSheet(
+            "QPushButton { background-color: #007bff; color: white; font-weight: bold; padding: 4px 8px; }")
         self.calc_btn.clicked.connect(self.calculate_indicators)
         self.calc_btn.setToolTip("根据当前设置计算选定的技术指标\n快捷键：Ctrl+Enter")
 
         clear_indicators_btn = QPushButton("清除")
-        clear_indicators_btn.setStyleSheet("QPushButton { background-color: #6c757d; color: white; font-weight: bold; padding: 4px 8px; }")
+        clear_indicators_btn.setStyleSheet(
+            "QPushButton { background-color: #6c757d; color: white; font-weight: bold; padding: 4px 8px; }")
         clear_indicators_btn.clicked.connect(self.clear_indicators)
         clear_indicators_btn.setToolTip("清除所有已计算的技术指标")
 
         # 新增：缓存管理按钮
         cache_btn = QPushButton("清缓存")
-        cache_btn.setStyleSheet("QPushButton { background-color: #ffc107; color: black; font-weight: bold; padding: 4px 8px; }")
+        cache_btn.setStyleSheet(
+            "QPushButton { background-color: #ffc107; color: black; font-weight: bold; padding: 4px 8px; }")
         cache_btn.clicked.connect(self.clear_cache)
         cache_btn.setToolTip("清除指标计算缓存")
 
@@ -125,7 +129,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 右侧：动态参数设置 - 根据选择的指标动态变化
         params_card = QFrame()
         params_card.setFrameStyle(QFrame.StyledPanel)
-        params_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; }")
+        params_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; }")
         self.params_layout = QVBoxLayout(params_card)
         self.params_layout.setSpacing(2)  # 减少间距
 
@@ -173,11 +178,13 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(10)
         self.stats_label = QLabel("统计信息: 无数据")
-        self.stats_label.setStyleSheet("QLabel { font-weight: bold; color: #495057; }")
+        self.stats_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: #495057; }")
         stats_layout.addWidget(self.stats_label)
 
         self.performance_label = QLabel("性能: 无统计")
-        self.performance_label.setStyleSheet("QLabel { font-weight: bold; color: #6c757d; }")
+        self.performance_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: #6c757d; }")
         stats_layout.addWidget(self.performance_label)
         stats_layout.addStretch()
         results_layout.addLayout(stats_layout)
@@ -241,40 +248,34 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         layout.addWidget(results_group)
 
     def populate_indicators(self, category: str):
-        """根据分类填充指标列表"""
+        """根据分类填充指标选择框"""
         self.indicator_combo.clear()
 
-        if category == "全部":
-            # 显示所有指标，按分类组织
-            category_indicators = get_all_indicators_by_category(use_chinese=True)
-            all_indicators = []
-            for cat, indicators in category_indicators.items():
-                all_indicators.extend(indicators)
+        try:
+            if category == "全部":
+                # 获取所有指标
+                indicators = []
+                categories = get_indicator_categories()
+                for cat, inds in categories.items():
+                    indicators.extend(inds)
+                indicators.sort()
+            else:
+                # 获取特定分类的指标
+                categories = get_indicator_categories()
+                indicators = categories.get(category, [])
+                indicators.sort()
 
-            # 添加常用指标到顶部
-            common_indicators = [
-                "移动平均线", "MACD指标", "相对强弱指标", "随机指标",
-                "布林带", "平均真实波幅", "能量潮指标", "商品通道指标"
-            ]
+            # 添加到下拉框
+            self.indicator_combo.addItems(indicators)
 
-            # 先添加常用指标
-            for indicator in common_indicators:
-                if indicator in all_indicators:
-                    self.indicator_combo.addItem(indicator)
+            # 如果有指标，选择第一个
+            if self.indicator_combo.count() > 0:
+                self.indicator_combo.setCurrentIndex(0)
 
-            # 添加分隔符
-            self.indicator_combo.insertSeparator(len(common_indicators))
-
-            # 添加其他指标
-            for indicator in sorted(all_indicators):
-                if indicator not in common_indicators:
-                    self.indicator_combo.addItem(indicator)
-        else:
-            # 显示特定分类的指标
-            category_indicators = get_all_indicators_by_category(use_chinese=True)
-            if category in category_indicators:
-                indicators = sorted(category_indicators[category])
-                self.indicator_combo.addItems(indicators)
+        except Exception as e:
+            self.log_manager.error(f"填充指标列表失败: {str(e)}")
+            # 添加一些基本指标作为备选
+            self.indicator_combo.addItems(["MA", "MACD", "RSI", "KDJ", "BOLL"])
 
     def on_category_changed(self, category: str):
         """分类改变时更新指标列表"""
@@ -345,7 +346,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 基本信息 - 单行显示
         basic_info = QLabel(f"指标: {indicator_name} ({english_name})")
-        basic_info.setStyleSheet("QLabel { color: #495057; font-weight: bold; font-size: 11px; }")
+        basic_info.setStyleSheet(
+            "QLabel { color: #495057; font-weight: bold; font-size: 11px; }")
         info_layout.addWidget(basic_info)
 
         self.dynamic_params_layout.addWidget(info_widget)
@@ -353,7 +355,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         if not config or not config.get("params"):
             # 如果没有参数，显示简单提示
             no_params_label = QLabel("无需参数设置")
-            no_params_label.setStyleSheet("QLabel { color: #6c757d; font-style: italic; text-align: center; font-size: 11px; padding: 10px; }")
+            no_params_label.setStyleSheet(
+                "QLabel { color: #6c757d; font-style: italic; text-align: center; font-size: 11px; padding: 10px; }")
             self.dynamic_params_layout.addWidget(no_params_label)
             return
 
@@ -368,7 +371,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             param_label = QLabel(f"{param_config.get('desc', param_name)}:")
             param_label.setMinimumWidth(80)
             param_label.setMaximumWidth(120)
-            param_label.setStyleSheet("QLabel { font-size: 11px; color: #212529; }")
+            param_label.setStyleSheet(
+                "QLabel { font-size: 11px; color: #212529; }")
             param_layout.addWidget(param_label)
 
             # 参数控件 - 紧凑
@@ -376,26 +380,32 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 # MA类型选择
                 control = QComboBox()
                 control.setMaximumHeight(24)
-                ma_types = ["SMA", "EMA", "WMA", "DEMA", "TEMA", "TRIMA", "KAMA", "MAMA", "T3"]
+                ma_types = ["SMA", "EMA", "WMA", "DEMA",
+                            "TEMA", "TRIMA", "KAMA", "MAMA", "T3"]
                 control.addItems(ma_types)
                 control.setCurrentIndex(param_config.get("default", 0))
-                control.setStyleSheet("QComboBox { font-size: 11px; padding: 2px; }")
+                control.setStyleSheet(
+                    "QComboBox { font-size: 11px; padding: 2px; }")
             elif isinstance(param_config.get("default"), float):
                 # 浮点数参数
                 control = QDoubleSpinBox()
                 control.setMaximumHeight(24)
-                control.setRange(param_config.get("min", 0.0), param_config.get("max", 100.0))
+                control.setRange(param_config.get("min", 0.0),
+                                 param_config.get("max", 100.0))
                 control.setValue(param_config.get("default", 1.0))
                 control.setSingleStep(0.01)
                 control.setDecimals(3)
-                control.setStyleSheet("QDoubleSpinBox { font-size: 11px; padding: 2px; }")
+                control.setStyleSheet(
+                    "QDoubleSpinBox { font-size: 11px; padding: 2px; }")
             else:
                 # 整数参数
                 control = QSpinBox()
                 control.setMaximumHeight(24)
-                control.setRange(param_config.get("min", 1), param_config.get("max", 250))
+                control.setRange(param_config.get("min", 1),
+                                 param_config.get("max", 250))
                 control.setValue(param_config.get("default", 20))
-                control.setStyleSheet("QSpinBox { font-size: 11px; padding: 2px; }")
+                control.setStyleSheet(
+                    "QSpinBox { font-size: 11px; padding: 2px; }")
 
             # 设置工具提示
             tooltip = f"{param_config.get('desc', param_name)}\n"
@@ -405,7 +415,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
             # 参数值变化时的实时反馈
             if isinstance(control, QComboBox):
-                control.currentTextChanged.connect(lambda: self.on_param_changed())
+                control.currentTextChanged.connect(
+                    lambda: self.on_param_changed())
             else:
                 control.valueChanged.connect(lambda: self.on_param_changed())
 
@@ -414,14 +425,18 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 重置按钮 - 小型
             reset_btn = QPushButton("↺")
             reset_btn.setMaximumSize(20, 20)
-            reset_btn.setStyleSheet("QPushButton { background-color: #6c757d; color: white; font-size: 10px; border-radius: 10px; }")
+            reset_btn.setStyleSheet(
+                "QPushButton { background-color: #6c757d; color: white; font-size: 10px; border-radius: 10px; }")
             reset_btn.setToolTip("重置到默认值")
-            reset_btn.clicked.connect(lambda checked, ctrl=control, default=param_config.get("default"): self.reset_param(ctrl, default))
+            reset_btn.clicked.connect(lambda checked, ctrl=control, default=param_config.get(
+                "default"): self.reset_param(ctrl, default))
             param_layout.addWidget(reset_btn)
 
             # 范围信息 - 小字体
-            range_label = QLabel(f"[{param_config.get('min', 'N/A')}-{param_config.get('max', 'N/A')}]")
-            range_label.setStyleSheet("QLabel { color: #6c757d; font-size: 9px; }")
+            range_label = QLabel(
+                f"[{param_config.get('min', 'N/A')}-{param_config.get('max', 'N/A')}]")
+            range_label.setStyleSheet(
+                "QLabel { color: #6c757d; font-size: 9px; }")
             range_label.setMaximumWidth(60)
             param_layout.addWidget(range_label)
 
@@ -485,7 +500,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'param_preview_label') and hasattr(self, 'param_controls'):
                 current_params = self.get_current_params()
                 if current_params:
-                    preview_text = "当前参数: " + ", ".join([f"{k}={v}" for k, v in current_params.items()])
+                    preview_text = "当前参数: " + \
+                        ", ".join(
+                            [f"{k}={v}" for k, v in current_params.items()])
                 else:
                     preview_text = "当前参数: 无"
                 self.param_preview_label.setText(preview_text)
@@ -507,7 +524,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 else:
                     self._param_change_timer = QTimer()
                     self._param_change_timer.setSingleShot(True)
-                    self._param_change_timer.timeout.connect(self.calculate_indicators)
+                    self._param_change_timer.timeout.connect(
+                        self.calculate_indicators)
 
                 self._param_change_timer.start(1000)  # 1秒延迟
         except Exception as e:
@@ -518,9 +536,11 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         """重置参数到默认值"""
         try:
             if isinstance(control, QComboBox):
-                control.setCurrentIndex(default_value if isinstance(default_value, int) else 0)
+                control.setCurrentIndex(
+                    default_value if isinstance(default_value, int) else 0)
             elif isinstance(control, (QSpinBox, QDoubleSpinBox)):
-                control.setValue(default_value if default_value is not None else 0)
+                control.setValue(
+                    default_value if default_value is not None else 0)
         except Exception as e:
             # 静默处理重置错误
             pass
@@ -561,9 +581,11 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 分类筛选
         filter_layout.addWidget(QLabel("分类筛选:"))
         self.category_filter_combo = QComboBox()
-        categories = ["全部"] + list(get_all_indicators_by_category(use_chinese=True).keys())
+        categories = [
+            "全部"] + list(get_all_indicators_by_category(use_chinese=True).keys())
         self.category_filter_combo.addItems(categories)
-        self.category_filter_combo.currentTextChanged.connect(self.filter_indicators_table)
+        self.category_filter_combo.currentTextChanged.connect(
+            self.filter_indicators_table)
         filter_layout.addWidget(self.category_filter_combo)
 
         # 搜索框
@@ -579,10 +601,12 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.indicators_table = QTableWidget()
         self.indicators_table.verticalHeader().setVisible(False)
         self.indicators_table.setColumnCount(4)
-        self.indicators_table.setHorizontalHeaderLabels(["选择", "中文名称", "英文名称", "分类"])
+        self.indicators_table.setHorizontalHeaderLabels(
+            ["选择", "中文名称", "英文名称", "分类"])
 
         # 设置表格属性
-        self.indicators_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.indicators_table.setSelectionBehavior(
+            QAbstractItemView.SelectRows)
         self.indicators_table.setAlternatingRowColors(True)
         self.indicators_table.setSortingEnabled(True)
 
@@ -601,7 +625,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 统计信息
         self.selection_stats_label = QLabel("已选择: 0 个指标")
-        self.selection_stats_label.setStyleSheet("QLabel { font-weight: bold; color: #007bff; }")
+        self.selection_stats_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: #007bff; }")
         layout.addWidget(self.selection_stats_label)
 
         # 按钮区域
@@ -610,16 +635,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 左侧按钮组
         left_btn_layout = QHBoxLayout()
         select_all_btn = QPushButton("全选")
-        select_all_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; }")
-        select_all_btn.clicked.connect(lambda: self.select_all_indicators_table(True))
+        select_all_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; color: white; }")
+        select_all_btn.clicked.connect(
+            lambda: self.select_all_indicators_table(True))
 
         clear_all_btn = QPushButton("清除")
-        clear_all_btn.setStyleSheet("QPushButton { background-color: #6c757d; color: white; }")
-        clear_all_btn.clicked.connect(lambda: self.select_all_indicators_table(False))
+        clear_all_btn.setStyleSheet(
+            "QPushButton { background-color: #6c757d; color: white; }")
+        clear_all_btn.clicked.connect(
+            lambda: self.select_all_indicators_table(False))
 
         # 常用指标快选
         common_btn = QPushButton("常用指标")
-        common_btn.setStyleSheet("QPushButton { background-color: #ffc107; color: black; }")
+        common_btn.setStyleSheet(
+            "QPushButton { background-color: #ffc107; color: black; }")
         common_btn.clicked.connect(self.select_common_indicators)
 
         left_btn_layout.addWidget(select_all_btn)
@@ -630,11 +660,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 右侧按钮组
         right_btn_layout = QHBoxLayout()
         ok_btn = QPushButton("确定")
-        ok_btn.setStyleSheet("QPushButton { background-color: #007bff; color: white; font-weight: bold; }")
-        ok_btn.clicked.connect(lambda: self.apply_batch_selection_table(dialog))
+        ok_btn.setStyleSheet(
+            "QPushButton { background-color: #007bff; color: white; font-weight: bold; }")
+        ok_btn.clicked.connect(
+            lambda: self.apply_batch_selection_table(dialog))
 
         cancel_btn = QPushButton("取消")
-        cancel_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
+        cancel_btn.setStyleSheet(
+            "QPushButton { background-color: #dc3545; color: white; }")
         cancel_btn.clicked.connect(dialog.reject)
 
         right_btn_layout.addWidget(ok_btn)
@@ -699,17 +732,20 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
                 # 中文名称
                 chinese_item = QTableWidgetItem(indicator['chinese_name'])
-                chinese_item.setFlags(chinese_item.flags() & ~Qt.ItemIsEditable)
+                chinese_item.setFlags(
+                    chinese_item.flags() & ~Qt.ItemIsEditable)
                 self.indicators_table.setItem(row, 1, chinese_item)
 
                 # 英文名称
                 english_item = QTableWidgetItem(indicator['english_name'])
-                english_item.setFlags(english_item.flags() & ~Qt.ItemIsEditable)
+                english_item.setFlags(
+                    english_item.flags() & ~Qt.ItemIsEditable)
                 self.indicators_table.setItem(row, 2, english_item)
 
                 # 分类
                 category_item = QTableWidgetItem(indicator['category'])
-                category_item.setFlags(category_item.flags() & ~Qt.ItemIsEditable)
+                category_item.setFlags(
+                    category_item.flags() & ~Qt.ItemIsEditable)
                 self.indicators_table.setItem(row, 3, category_item)
 
                 # 设置行高
@@ -800,7 +836,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
             # 只有在对话框打开时才更新统计标签
             if hasattr(self, 'selection_stats_label'):
-                self.selection_stats_label.setText(f"已选择: {selected_count} 个指标")
+                self.selection_stats_label.setText(
+                    f"已选择: {selected_count} 个指标")
 
         except Exception as e:
             self.log_manager.error(f"更新选择统计失败: {str(e)}")
@@ -816,7 +853,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     indicator_data = checkbox.property('indicator_data')
                     if indicator_data:
                         # 使用中文名称作为显示名称
-                        selected_indicators.append(indicator_data['chinese_name'])
+                        selected_indicators.append(
+                            indicator_data['chinese_name'])
 
             if not selected_indicators:
                 QMessageBox.warning(dialog, "提示", "请至少选择一个指标")
@@ -831,7 +869,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 "选择完成",
                 f"已选择 {len(selected_indicators)} 个指标进行批量计算:\n" +
                 "\n".join(selected_indicators[:10]) +
-                (f"\n... 还有 {len(selected_indicators) - 10} 个指标" if len(selected_indicators) > 10 else "")
+                (f"\n... 还有 {len(selected_indicators) - 10} 个指标" if len(
+                    selected_indicators) > 10 else "")
             )
 
         except Exception as e:
@@ -883,19 +922,22 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             indicators_to_calculate = []
             if self.batch_checkbox.isChecked() and self.batch_indicators:
                 indicators_to_calculate = self.batch_indicators
-                self.log_manager.info(f"批量计算模式，选择了 {len(self.batch_indicators)} 个指标")
+                self.log_manager.info(
+                    f"批量计算模式，选择了 {len(self.batch_indicators)} 个指标")
             else:
                 current_indicator = self.indicator_combo.currentText()
                 if current_indicator:
                     indicators_to_calculate = [current_indicator]
-                    self.log_manager.info(f"单个指标计算模式，选择指标: {current_indicator}")
+                    self.log_manager.info(
+                        f"单个指标计算模式，选择指标: {current_indicator}")
 
             if not indicators_to_calculate:
                 self.hide_loading()
                 QMessageBox.warning(self, "提示", "请选择要计算的指标")
                 return
 
-            self.log_manager.info(f"准备计算 {len(indicators_to_calculate)} 个指标: {indicators_to_calculate}")
+            self.log_manager.info(
+                f"准备计算 {len(indicators_to_calculate)} 个指标: {indicators_to_calculate}")
 
             # 批量计算指标
             total_indicators = len(indicators_to_calculate)
@@ -906,11 +948,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 try:
                     # 更新进度
                     progress = int((i / total_indicators) * 100)
-                    self.update_loading_progress(f"正在计算 {indicator_name}...", progress)
-                    self.log_manager.info(f"开始计算指标 {i+1}/{total_indicators}: {indicator_name}")
+                    self.update_loading_progress(
+                        f"正在计算 {indicator_name}...", progress)
+                    self.log_manager.info(
+                        f"开始计算指标 {i+1}/{total_indicators}: {indicator_name}")
 
                     # 计算单个指标
-                    result = self._calculate_single_indicator_with_params(indicator_name)
+                    result = self._calculate_single_indicator_with_params(
+                        indicator_name)
                     if result:
                         self.indicator_results[indicator_name] = result
                         calculated_count += 1
@@ -921,11 +966,13 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                         self.log_manager.info(f"指标 {indicator_name} 已添加到结果表格")
                     else:
                         error_count += 1
-                        self.log_manager.warning(f"指标 {indicator_name} 计算失败，结果为空")
+                        self.log_manager.warning(
+                            f"指标 {indicator_name} 计算失败，结果为空")
 
                 except Exception as e:
                     error_count += 1
-                    self.log_manager.error(f"计算指标 {indicator_name} 时出错: {str(e)}")
+                    self.log_manager.error(
+                        f"计算指标 {indicator_name} 时出错: {str(e)}")
                     import traceback
                     self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
                     continue
@@ -940,7 +987,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 stats_text += f"，失败 {error_count} 个"
 
             self.stats_label.setText(stats_text)
-            self.stats_label.setStyleSheet("QLabel { font-weight: bold; color: #495057; }")
+            self.stats_label.setStyleSheet(
+                "QLabel { font-weight: bold; color: #495057; }")
 
             self.performance_label.setText(f"性能: 计算耗时 {calculation_time:.2f}秒")
 
@@ -984,42 +1032,38 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             QMessageBox.critical(self, "错误", error_msg)
 
     def _calculate_single_indicator_with_params(self, indicator_name: str) -> Optional[Dict[str, Any]]:
-        """使用动态参数计算单个指标"""
+        """计算单个指标，包含参数处理和错误处理"""
         try:
-            # 获取指标的英文名称
-            english_name = get_indicator_english_name(indicator_name)
-            if not english_name:
-                self.log_manager.warning(f"无法找到指标 {indicator_name} 的英文名称")
+            if not self.current_kdata is not None or self.current_kdata.empty:
+                self.log_manager.log(
+                    f"无法计算指标 {indicator_name}: 当前K线数据为空", LogLevel.ERROR)
                 return None
 
-            # 获取当前参数设置
+            # 获取参数
             params = self.get_current_params()
+            self.log_manager.log(
+                f"计算指标 {indicator_name} 参数: {params}", LogLevel.DEBUG)
 
-            # 获取指标配置
-            config = get_indicator_params_config(english_name)
-            inputs_needed = config.get("inputs", ["close"])
-
-            # 验证输入数据是否存在
-            for input_type in inputs_needed:
-                if input_type not in self.current_kdata.columns:
-                    self.log_manager.warning(f"缺少输入数据: {input_type}")
-                    return None
-
-            # 调用ta-lib计算指标 - 直接传递DataFrame
-            from indicators_algo import calc_talib_indicator
-            result = calc_talib_indicator(english_name, self.current_kdata, **params)
-
-            if result is None:
-                self.log_manager.warning(f"指标 {indicator_name} 计算结果为空")
-                return None
+            # 统一通过IndicatorService计算
+            result = calculate_indicator(
+                indicator_name, self.current_kdata, params)
 
             # 处理结果
-            processed_result = self._process_indicator_result(indicator_name, result)
-            return processed_result
+            if result is None:
+                self.log_manager.log(
+                    f"指标 {indicator_name} 计算结果为空", LogLevel.WARNING)
+                return None
 
+            # 记录性能
+            self.performance_label.setText(
+                f"性能: {result.get('performance', '未统计')}")
+
+            return result
         except Exception as e:
-            self.log_manager.error(f"计算指标 {indicator_name} 时出错: {str(e)}")
-            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+            error_msg = f"计算指标 {indicator_name} 失败: {str(e)}"
+            self.log_manager.log(error_msg, LogLevel.ERROR)
+            self.log_manager.log(traceback.format_exc(), LogLevel.DEBUG)
+            self.error_occurred.emit(error_msg)
             return None
 
     def _process_indicator_result(self, indicator_name: str, result: Any) -> Dict[str, Any]:
@@ -1061,7 +1105,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 processed["values"]["main"] = result
 
             # 生成信号分析
-            processed["signals"] = self._generate_signals(indicator_name, processed["values"])
+            processed["signals"] = self._generate_signals(
+                indicator_name, processed["values"])
 
             # 生成摘要统计
             processed["summary"] = self._generate_summary(processed["values"])
@@ -1106,26 +1151,34 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     latest_rsi = rsi_values[-1]
                     if not np.isnan(latest_rsi):
                         if latest_rsi > 70:
-                            signals.append({"type": "sell", "strength": "strong", "reason": f"RSI超买({latest_rsi:.2f})"})
+                            signals.append(
+                                {"type": "sell", "strength": "strong", "reason": f"RSI超买({latest_rsi:.2f})"})
                         elif latest_rsi < 30:
-                            signals.append({"type": "buy", "strength": "strong", "reason": f"RSI超卖({latest_rsi:.2f})"})
+                            signals.append(
+                                {"type": "buy", "strength": "strong", "reason": f"RSI超卖({latest_rsi:.2f})"})
                         elif latest_rsi > 50:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"RSI偏强({latest_rsi:.2f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"RSI偏强({latest_rsi:.2f})"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"RSI偏弱({latest_rsi:.2f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"RSI偏弱({latest_rsi:.2f})"})
 
             elif english_name == "MACD" and all(k in values for k in ["MACD_1", "MACD_2"]):
                 macd_line = values["MACD_1"]
                 signal_line = values["MACD_2"]
                 if len(macd_line) > 1 and len(signal_line) > 1:
                     if macd_line[-1] > signal_line[-1] and macd_line[-2] <= signal_line[-2]:
-                        signals.append({"type": "buy", "strength": "medium", "reason": "MACD金叉"})
+                        signals.append(
+                            {"type": "buy", "strength": "medium", "reason": "MACD金叉"})
                     elif macd_line[-1] < signal_line[-1] and macd_line[-2] >= signal_line[-2]:
-                        signals.append({"type": "sell", "strength": "medium", "reason": "MACD死叉"})
+                        signals.append(
+                            {"type": "sell", "strength": "medium", "reason": "MACD死叉"})
                     elif macd_line[-1] > signal_line[-1]:
-                        signals.append({"type": "buy", "strength": "weak", "reason": "MACD多头"})
+                        signals.append(
+                            {"type": "buy", "strength": "weak", "reason": "MACD多头"})
                     else:
-                        signals.append({"type": "sell", "strength": "weak", "reason": "MACD空头"})
+                        signals.append(
+                            {"type": "sell", "strength": "weak", "reason": "MACD空头"})
 
             elif english_name == "STOCH" and all(k in values for k in ["STOCH_1", "STOCH_2"]):
                 k_values = values["STOCH_1"]
@@ -1135,14 +1188,18 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     latest_d = d_values[-1]
                     if not np.isnan(latest_k) and not np.isnan(latest_d):
                         if latest_k > 80 and latest_d > 80:
-                            signals.append({"type": "sell", "strength": "strong", "reason": f"KDJ超买(K:{latest_k:.1f},D:{latest_d:.1f})"})
+                            signals.append({"type": "sell", "strength": "strong",
+                                           "reason": f"KDJ超买(K:{latest_k:.1f},D:{latest_d:.1f})"})
                         elif latest_k < 20 and latest_d < 20:
-                            signals.append({"type": "buy", "strength": "strong", "reason": f"KDJ超卖(K:{latest_k:.1f},D:{latest_d:.1f})"})
+                            signals.append(
+                                {"type": "buy", "strength": "strong", "reason": f"KDJ超卖(K:{latest_k:.1f},D:{latest_d:.1f})"})
                         elif len(k_values) > 1 and len(d_values) > 1:
                             if k_values[-1] > d_values[-1] and k_values[-2] <= d_values[-2]:
-                                signals.append({"type": "buy", "strength": "medium", "reason": "KDJ金叉"})
+                                signals.append(
+                                    {"type": "buy", "strength": "medium", "reason": "KDJ金叉"})
                             elif k_values[-1] < d_values[-1] and k_values[-2] >= d_values[-2]:
-                                signals.append({"type": "sell", "strength": "medium", "reason": "KDJ死叉"})
+                                signals.append(
+                                    {"type": "sell", "strength": "medium", "reason": "KDJ死叉"})
 
             elif english_name == "BBANDS" and all(k in values for k in ["BBANDS_1", "BBANDS_2", "BBANDS_3"]):
                 upper = values["BBANDS_1"]
@@ -1155,11 +1212,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     lower_val = lower[-1]
                     if not np.isnan(current_price):
                         if current_price >= upper_val:
-                            signals.append({"type": "sell", "strength": "medium", "reason": "触及布林上轨"})
+                            signals.append(
+                                {"type": "sell", "strength": "medium", "reason": "触及布林上轨"})
                         elif current_price <= lower_val:
-                            signals.append({"type": "buy", "strength": "medium", "reason": "触及布林下轨"})
+                            signals.append(
+                                {"type": "buy", "strength": "medium", "reason": "触及布林下轨"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": "布林带中轨区间"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": "布林带中轨区间"})
 
             elif english_name == "CCI" and "main" in values:
                 cci_values = values["main"]
@@ -1167,11 +1227,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     latest_cci = cci_values[-1]
                     if not np.isnan(latest_cci):
                         if latest_cci > 100:
-                            signals.append({"type": "sell", "strength": "medium", "reason": f"CCI超买({latest_cci:.1f})"})
+                            signals.append(
+                                {"type": "sell", "strength": "medium", "reason": f"CCI超买({latest_cci:.1f})"})
                         elif latest_cci < -100:
-                            signals.append({"type": "buy", "strength": "medium", "reason": f"CCI超卖({latest_cci:.1f})"})
+                            signals.append(
+                                {"type": "buy", "strength": "medium", "reason": f"CCI超卖({latest_cci:.1f})"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"CCI正常({latest_cci:.1f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"CCI正常({latest_cci:.1f})"})
 
             elif english_name == "ADX" and "main" in values:
                 adx_values = values["main"]
@@ -1179,11 +1242,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     latest_adx = adx_values[-1]
                     if not np.isnan(latest_adx):
                         if latest_adx > 25:
-                            signals.append({"type": "neutral", "strength": "strong", "reason": f"趋势强劲(ADX:{latest_adx:.1f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "strong", "reason": f"趋势强劲(ADX:{latest_adx:.1f})"})
                         elif latest_adx > 20:
-                            signals.append({"type": "neutral", "strength": "medium", "reason": f"趋势中等(ADX:{latest_adx:.1f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "medium", "reason": f"趋势中等(ADX:{latest_adx:.1f})"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"趋势微弱(ADX:{latest_adx:.1f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"趋势微弱(ADX:{latest_adx:.1f})"})
 
             elif english_name in ["MA", "EMA", "SMA"] and "main" in values:
                 ma_values = values["main"]
@@ -1192,11 +1258,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     prev_ma = ma_values[-2]
                     if not np.isnan(current_ma) and not np.isnan(prev_ma):
                         if current_ma > prev_ma:
-                            signals.append({"type": "buy", "strength": "weak", "reason": f"均线上升({current_ma:.2f})"})
+                            signals.append(
+                                {"type": "buy", "strength": "weak", "reason": f"均线上升({current_ma:.2f})"})
                         elif current_ma < prev_ma:
-                            signals.append({"type": "sell", "strength": "weak", "reason": f"均线下降({current_ma:.2f})"})
+                            signals.append(
+                                {"type": "sell", "strength": "weak", "reason": f"均线下降({current_ma:.2f})"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"均线平稳({current_ma:.2f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"均线平稳({current_ma:.2f})"})
 
             elif english_name == "ATR" and "main" in values:
                 atr_values = values["main"]
@@ -1207,13 +1276,17 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                         if len(atr_values) > 20:
                             avg_atr = np.mean(atr_values[-20:])
                             if latest_atr > avg_atr * 1.5:
-                                signals.append({"type": "neutral", "strength": "strong", "reason": f"波动性高(ATR:{latest_atr:.3f})"})
+                                signals.append(
+                                    {"type": "neutral", "strength": "strong", "reason": f"波动性高(ATR:{latest_atr:.3f})"})
                             elif latest_atr < avg_atr * 0.5:
-                                signals.append({"type": "neutral", "strength": "weak", "reason": f"波动性低(ATR:{latest_atr:.3f})"})
+                                signals.append(
+                                    {"type": "neutral", "strength": "weak", "reason": f"波动性低(ATR:{latest_atr:.3f})"})
                             else:
-                                signals.append({"type": "neutral", "strength": "medium", "reason": f"波动性正常(ATR:{latest_atr:.3f})"})
+                                signals.append(
+                                    {"type": "neutral", "strength": "medium", "reason": f"波动性正常(ATR:{latest_atr:.3f})"})
                         else:
-                            signals.append({"type": "neutral", "strength": "medium", "reason": f"波动性正常(ATR:{latest_atr:.3f})"})
+                            signals.append(
+                                {"type": "neutral", "strength": "medium", "reason": f"波动性正常(ATR:{latest_atr:.3f})"})
 
             elif english_name == "OBV" and "main" in values:
                 obv_values = values["main"]
@@ -1222,19 +1295,24 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     prev_obv = obv_values[-2]
                     if not np.isnan(current_obv) and not np.isnan(prev_obv):
                         if current_obv > prev_obv:
-                            signals.append({"type": "buy", "strength": "weak", "reason": f"成交量上升"})
+                            signals.append(
+                                {"type": "buy", "strength": "weak", "reason": f"成交量上升"})
                         elif current_obv < prev_obv:
-                            signals.append({"type": "sell", "strength": "weak", "reason": f"成交量下降"})
+                            signals.append(
+                                {"type": "sell", "strength": "weak", "reason": f"成交量下降"})
                         else:
-                            signals.append({"type": "neutral", "strength": "weak", "reason": f"成交量平稳"})
+                            signals.append(
+                                {"type": "neutral", "strength": "weak", "reason": f"成交量平稳"})
 
             # 如果没有生成任何信号，提供默认信号
             if not signals:
-                signals.append({"type": "neutral", "strength": "weak", "reason": "无明确信号"})
+                signals.append(
+                    {"type": "neutral", "strength": "weak", "reason": "无明确信号"})
 
         except Exception as e:
             self.log_manager.error(f"生成信号时出错: {str(e)}")
-            signals.append({"type": "neutral", "strength": "weak", "reason": "信号计算错误"})
+            signals.append(
+                {"type": "neutral", "strength": "weak", "reason": "信号计算错误"})
 
         return signals
 
@@ -1272,11 +1350,15 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 # 错误情况
                 row = self.technical_table.rowCount()
                 self.technical_table.insertRow(row)
-                self.technical_table.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%Y-%m-%d %H:%M")))
-                self.technical_table.setItem(row, 1, QTableWidgetItem(indicator_name))
+                self.technical_table.setItem(row, 0, QTableWidgetItem(
+                    datetime.now().strftime("%Y-%m-%d %H:%M")))
+                self.technical_table.setItem(
+                    row, 1, QTableWidgetItem(indicator_name))
                 self.technical_table.setItem(row, 2, QTableWidgetItem("计算错误"))
-                self.technical_table.setItem(row, 7, QTableWidgetItem(result["error"]))
-                self.log_manager.warning(f"指标 {indicator_name} 计算错误: {result['error']}")
+                self.technical_table.setItem(
+                    row, 7, QTableWidgetItem(result["error"]))
+                self.log_manager.warning(
+                    f"指标 {indicator_name} 计算错误: {result['error']}")
                 # 恢复排序设置
                 self.technical_table.setSortingEnabled(sorting_enabled)
                 return
@@ -1286,7 +1368,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             signals = result.get("signals", [])
             summary = result.get("summary", {})
 
-            self.log_manager.info(f"指标 {indicator_name} 的值: {list(values.keys())}")
+            self.log_manager.info(
+                f"指标 {indicator_name} 的值: {list(values.keys())}")
 
             # 为每个输出值创建一行
             rows_added = 0
@@ -1297,19 +1380,23 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 # 处理不同类型的数据
                 if isinstance(value_data, np.ndarray):
                     if len(value_data) > 0:
-                        current_value = value_data[-1] if not np.isnan(value_data[-1]) else None
+                        current_value = value_data[-1] if not np.isnan(
+                            value_data[-1]) else None
                     else:
                         current_value = None
                 elif isinstance(value_data, (pd.Series, pd.DataFrame)):
                     if len(value_data) > 0:
                         if isinstance(value_data, pd.Series):
-                            current_value = value_data.iloc[-1] if not pd.isna(value_data.iloc[-1]) else None
+                            current_value = value_data.iloc[-1] if not pd.isna(
+                                value_data.iloc[-1]) else None
                         else:
-                            current_value = value_data.iloc[-1, 0] if not pd.isna(value_data.iloc[-1, 0]) else None
+                            current_value = value_data.iloc[-1, 0] if not pd.isna(
+                                value_data.iloc[-1, 0]) else None
                     else:
                         current_value = None
                 elif isinstance(value_data, (int, float)):
-                    current_value = value_data if not np.isnan(value_data) else None
+                    current_value = value_data if not np.isnan(
+                        value_data) else None
                 else:
                     self.log_manager.warning(f"未知的数据类型: {type(value_data)}")
                     current_value = None
@@ -1321,7 +1408,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     self.technical_table.insertRow(row)
 
                     # 日期
-                    date_item = QTableWidgetItem(datetime.now().strftime("%Y-%m-%d %H:%M"))
+                    date_item = QTableWidgetItem(
+                        datetime.now().strftime("%Y-%m-%d %H:%M"))
                     self.technical_table.setItem(row, 0, date_item)
 
                     # 指标名称 - 改进显示逻辑
@@ -1330,10 +1418,12 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     else:
                         # 为多输出指标提供更专业的名称
                         if indicator_name == "MACD指标":
-                            name_map = {"MACD_1": "MACD线", "MACD_2": "信号线", "MACD_3": "柱状图"}
+                            name_map = {"MACD_1": "MACD线",
+                                        "MACD_2": "信号线", "MACD_3": "柱状图"}
                             display_name = f"MACD-{name_map.get(value_name, value_name)}"
                         elif indicator_name == "布林带":
-                            name_map = {"BBANDS_1": "上轨", "BBANDS_2": "中轨", "BBANDS_3": "下轨"}
+                            name_map = {"BBANDS_1": "上轨",
+                                        "BBANDS_2": "中轨", "BBANDS_3": "下轨"}
                             display_name = f"布林带-{name_map.get(value_name, value_name)}"
                         elif indicator_name == "随机指标":
                             name_map = {"STOCH_1": "%K线", "STOCH_2": "%D线"}
@@ -1427,21 +1517,27 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
                     # 为建议列设置背景色
                     if signal_text == "sell":
-                        advice_item.setBackground(QColor(240, 255, 240))  # 浅绿背景
+                        advice_item.setBackground(
+                            QColor(240, 255, 240))  # 浅绿背景
                     elif signal_text == "buy":
-                        advice_item.setBackground(QColor(255, 240, 240))  # 浅红背景
+                        advice_item.setBackground(
+                            QColor(255, 240, 240))  # 浅红背景
                     else:
-                        advice_item.setBackground(QColor(248, 248, 248))  # 浅灰背景
+                        advice_item.setBackground(
+                            QColor(248, 248, 248))  # 浅灰背景
 
                     # 数值列根据涨跌设置颜色
                     try:
                         numeric_value = float(current_value)
                         if numeric_value > 0:
-                            value_item.setForeground(QColor(220, 20, 60))  # 红色（涨）
+                            value_item.setForeground(
+                                QColor(220, 20, 60))  # 红色（涨）
                         elif numeric_value < 0:
-                            value_item.setForeground(QColor(34, 139, 34))  # 绿色（跌）
+                            value_item.setForeground(
+                                QColor(34, 139, 34))  # 绿色（跌）
                         else:
-                            value_item.setForeground(QColor(128, 128, 128))  # 灰色（平）
+                            value_item.setForeground(
+                                QColor(128, 128, 128))  # 灰色（平）
                     except:
                         # 如果不是数值，保持默认颜色
                         pass
@@ -1452,11 +1548,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     elif "布林带" in display_name:
                         indicator_item.setForeground(QColor(255, 140, 0))  # 橙色
                     elif "KDJ" in display_name or "随机" in display_name:
-                        indicator_item.setForeground(QColor(138, 43, 226))  # 紫色
+                        indicator_item.setForeground(
+                            QColor(138, 43, 226))  # 紫色
                     elif "RSI" in display_name or "相对强弱" in display_name:
-                        indicator_item.setForeground(QColor(30, 144, 255))  # 蓝色
+                        indicator_item.setForeground(
+                            QColor(30, 144, 255))  # 蓝色
                     elif "均线" in display_name or "移动平均" in display_name:
-                        indicator_item.setForeground(QColor(255, 20, 147))  # 深粉
+                        indicator_item.setForeground(
+                            QColor(255, 20, 147))  # 深粉
                     else:
                         indicator_item.setForeground(QColor(47, 79, 79))  # 深灰绿
 
@@ -1480,7 +1579,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 强制刷新表格显示
             self.technical_table.viewport().update()
 
-            self.log_manager.info(f"指标 {indicator_name} 总共添加了 {rows_added} 行到表格")
+            self.log_manager.info(
+                f"指标 {indicator_name} 总共添加了 {rows_added} 行到表格")
 
         except Exception as e:
             # 确保在异常情况下也恢复排序设置
@@ -1527,7 +1627,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 获取表头
             for col in range(self.technical_table.columnCount()):
                 header_item = self.technical_table.horizontalHeaderItem(col)
-                headers.append(header_item.text() if header_item else f"Column_{col}")
+                headers.append(header_item.text()
+                               if header_item else f"Column_{col}")
 
             # 获取数据行
             for row in range(self.technical_table.rowCount()):
@@ -1568,7 +1669,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             ext_desc, ext = file_extensions[format_type]
             default_filename = f"technical_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
 
-            filename, _ = QFileDialog.getSaveFileName(self, "导出技术分析数据", default_filename, ext_desc)
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "导出技术分析数据", default_filename, ext_desc)
             if not filename:
                 return
 
@@ -1602,10 +1704,12 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
                 # 导出技术指标表格数据
-                table_data = export_data.get('specific_data', {}).get('table_data', [])
+                table_data = export_data.get(
+                    'specific_data', {}).get('table_data', [])
                 if table_data:
                     df_indicators = pd.DataFrame(table_data)
-                    df_indicators.to_excel(writer, sheet_name='技术指标', index=False)
+                    df_indicators.to_excel(
+                        writer, sheet_name='技术指标', index=False)
 
                 # 导出元数据
                 metadata = export_data.get('metadata', {})
@@ -1659,7 +1763,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 更新状态标签
         if hasattr(self, 'stats_label'):
             self.stats_label.setText(f"状态: {message}")
-            self.stats_label.setStyleSheet("QLabel { font-weight: bold; color: #007bff; }")
+            self.stats_label.setStyleSheet(
+                "QLabel { font-weight: bold; color: #007bff; }")
 
         # 设置鼠标为等待状态
         self.setCursor(Qt.WaitCursor)
@@ -1711,7 +1816,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 导出按钮
         export_btn = QPushButton("导出技术分析结果")
-        export_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; }")
+        export_btn.setStyleSheet(
+            "QPushButton { background-color: #17a2b8; color: white; }")
         export_btn.clicked.connect(self.export_technical_data)
         export_layout.addWidget(export_btn)
 

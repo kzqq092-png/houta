@@ -16,6 +16,7 @@ from utils.theme import get_theme_manager
 from core.logger import LogManager
 from core.metrics.app_metrics_service import measure
 # Cache将在需要时动态导入
+from core.containers import get_service_container
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,8 @@ class ChartDataLoader(QThread):
 
             # 获取K线数据
             try:
-                kline_data = self.data_source.get_kdata(self.stock_code, self.period)
+                kline_data = self.data_source.get_kdata(
+                    self.stock_code, self.period)
             except AttributeError as e:
                 error_msg = f"AttributeError calling get_kdata: {e}"
                 logger.error(error_msg)
@@ -78,7 +80,8 @@ class ChartDataLoader(QThread):
                 if self._should_stop:
                     return
                 try:
-                    indicator_data = self._calculate_indicator(kline_data, indicator)
+                    indicator_data = self._calculate_indicator(
+                        kline_data, indicator)
                     indicators_data[indicator] = indicator_data
                 except Exception as e:
                     logger.warning(f"计算指标 {indicator} 失败: {e}")
@@ -117,7 +120,9 @@ class ChartDataLoader(QThread):
             # 尝试导入分析服务
             try:
                 from core.services.analysis_service import AnalysisService
-                analysis_service = AnalysisService()
+                service_container = get_service_container()
+                analysis_service = service_container.resolve(AnalysisService)
+
                 logger.debug(f"开始计算指标: {indicator_name}")
 
                 # 根据指标名称计算不同指标
@@ -127,10 +132,13 @@ class ChartDataLoader(QThread):
                     for period in [5, 10, 20, 60]:
                         try:
                             logger.debug(f"计算 MA{period}")
-                            ma_data = analysis_service.calculate_ma(kline_data, period)
+                            ma_data = analysis_service.calculate_ma(
+                                kline_data, period)
                             if ma_data is not None and len(ma_data) > 0:
-                                result[str(period)] = ma_data.tolist() if hasattr(ma_data, 'tolist') else ma_data
-                                logger.debug(f"MA{period} 计算完成，数据长度: {len(ma_data) if ma_data is not None else 0}")
+                                result[str(period)] = ma_data.tolist() if hasattr(
+                                    ma_data, 'tolist') else ma_data
+                                logger.debug(
+                                    f"MA{period} 计算完成，数据长度: {len(ma_data) if ma_data is not None else 0}")
                             else:
                                 logger.warning(f"MA{period} 计算结果为空")
                         except Exception as e:
@@ -149,7 +157,8 @@ class ChartDataLoader(QThread):
                                 'DEA': macd_data.get('Signal', []).tolist() if hasattr(macd_data.get('Signal', []), 'tolist') else macd_data.get('Signal', []),
                                 'MACD': macd_data.get('Histogram', []).tolist() if hasattr(macd_data.get('Histogram', []), 'tolist') else macd_data.get('Histogram', [])
                             }
-                            logger.debug(f"MACD 计算完成，数据长度: {len(result['DIF']) if 'DIF' in result and result['DIF'] is not None else 0}")
+                            logger.debug(
+                                f"MACD 计算完成，数据长度: {len(result['DIF']) if 'DIF' in result and result['DIF'] is not None else 0}")
                             return result
                         else:
                             logger.warning("MACD 计算结果为空")
@@ -161,14 +170,16 @@ class ChartDataLoader(QThread):
                     # 计算布林带
                     try:
                         logger.debug(f"计算 BOLL")
-                        boll_data = analysis_service.calculate_bollinger_bands(kline_data)
+                        boll_data = analysis_service.calculate_bollinger_bands(
+                            kline_data)
                         if boll_data is not None:
                             result = {
                                 'UPPER': boll_data.get('Upper', []).tolist() if hasattr(boll_data.get('Upper', []), 'tolist') else boll_data.get('Upper', []),
                                 'MID': boll_data.get('Middle', []).tolist() if hasattr(boll_data.get('Middle', []), 'tolist') else boll_data.get('Middle', []),
                                 'LOWER': boll_data.get('Lower', []).tolist() if hasattr(boll_data.get('Lower', []), 'tolist') else boll_data.get('Lower', [])
                             }
-                            logger.debug(f"BOLL 计算完成，数据长度: {len(result['MID']) if 'MID' in result and result['MID'] is not None else 0}")
+                            logger.debug(
+                                f"BOLL 计算完成，数据长度: {len(result['MID']) if 'MID' in result and result['MID'] is not None else 0}")
                             return result
                         else:
                             logger.warning("BOLL 计算结果为空")
@@ -182,7 +193,8 @@ class ChartDataLoader(QThread):
                         logger.debug(f"计算 RSI")
                         rsi_data = analysis_service.calculate_rsi(kline_data)
                         result = rsi_data.tolist() if hasattr(rsi_data, 'tolist') else rsi_data
-                        logger.debug(f"RSI 计算完成，数据长度: {len(result) if result is not None else 0}")
+                        logger.debug(
+                            f"RSI 计算完成，数据长度: {len(result) if result is not None else 0}")
                         return result
                     except Exception as e:
                         logger.error(f"计算RSI失败: {e}")
@@ -194,11 +206,13 @@ class ChartDataLoader(QThread):
                         logger.debug(f"计算 KDJ")
                         # 检查是否有公共接口
                         if hasattr(analysis_service, 'calculate_kdj'):
-                            kdj_data = analysis_service.calculate_kdj(kline_data)
+                            kdj_data = analysis_service.calculate_kdj(
+                                kline_data)
                         else:
                             # 如果没有公共接口，使用私有方法
                             logger.warning("使用私有方法计算KDJ，建议添加公共接口")
-                            kdj_data = analysis_service._calculate_kdj(kline_data)
+                            kdj_data = analysis_service._calculate_kdj(
+                                kline_data)
 
                         if kdj_data is not None:
                             result = {
@@ -206,7 +220,8 @@ class ChartDataLoader(QThread):
                                 'D': kdj_data.get('D', []).tolist() if hasattr(kdj_data.get('D', []), 'tolist') else kdj_data.get('D', []),
                                 'J': kdj_data.get('J', []).tolist() if hasattr(kdj_data.get('J', []), 'tolist') else kdj_data.get('J', [])
                             }
-                            logger.debug(f"KDJ 计算完成，数据长度: {len(result['K']) if 'K' in result and result['K'] is not None else 0}")
+                            logger.debug(
+                                f"KDJ 计算完成，数据长度: {len(result['K']) if 'K' in result and result['K'] is not None else 0}")
                             return result
                         else:
                             logger.warning("KDJ 计算结果为空")
@@ -220,12 +235,14 @@ class ChartDataLoader(QThread):
                         logger.debug(f"尝试计算 ACOS")
                         # 检查是否存在calculate_acos方法
                         if hasattr(analysis_service, 'calculate_acos'):
-                            acos_data = analysis_service.calculate_acos(kline_data)
+                            acos_data = analysis_service.calculate_acos(
+                                kline_data)
                             if acos_data is not None:
                                 if isinstance(acos_data, dict):
                                     result = {}
                                     for key, value in acos_data.items():
-                                        result[key] = value.tolist() if hasattr(value, 'tolist') else value
+                                        result[key] = value.tolist() if hasattr(
+                                            value, 'tolist') else value
                                 else:
                                     result = acos_data.tolist() if hasattr(acos_data, 'tolist') else acos_data
                                 logger.debug(f"ACOS 计算完成")
@@ -233,9 +250,11 @@ class ChartDataLoader(QThread):
                             else:
                                 logger.warning("ACOS 计算结果为空")
                         else:
-                            logger.warning(f"分析服务中不存在calculate_acos方法，无法计算ACOS指标")
+                            logger.warning(
+                                f"分析服务中不存在calculate_acos方法，无法计算ACOS指标")
                             # 添加系统内置指标支持信息
-                            logger.info("系统目前支持的内置指标: MA, MACD, BOLL, RSI, KDJ")
+                            logger.info(
+                                "系统目前支持的内置指标: MA, MACD, BOLL, RSI, KDJ")
                     except Exception as e:
                         logger.error(f"计算ACOS失败: {e}")
                     return {}
@@ -245,12 +264,14 @@ class ChartDataLoader(QThread):
                     # 检查是否有通用指标计算方法
                     if hasattr(analysis_service, 'calculate_indicator'):
                         logger.info(f"尝试使用通用方法计算指标: {indicator_name}")
-                        indicator_data = analysis_service.calculate_indicator(kline_data, indicator_name)
+                        indicator_data = analysis_service.calculate_indicator(
+                            kline_data, indicator_name)
                         if indicator_data is not None:
                             if isinstance(indicator_data, dict):
                                 result = {}
                                 for key, value in indicator_data.items():
-                                    result[key] = value.tolist() if hasattr(value, 'tolist') else value
+                                    result[key] = value.tolist() if hasattr(
+                                        value, 'tolist') else value
                                 return result
                             else:
                                 return indicator_data.tolist() if hasattr(indicator_data, 'tolist') else indicator_data
@@ -289,13 +310,21 @@ class UnifiedChartService(QObject):
     error_occurred = pyqtSignal(str)  # 错误信息
     loading_progress = pyqtSignal(int, str)  # 进度, 消息
 
-    def __init__(self, config_manager=None, theme_manager=None, data_source=None):
-        super().__init__()
+    def __init__(self, service_container: 'ServiceContainer', config_manager=None, theme_manager=None, data_source=None):
+        """
+        初始化统一图表服务
 
-        # 初始化管理器
+        Args:
+            service_container: 服务容器
+            config_manager: 配置管理器
+            theme_manager: 主题管理器
+            data_source: 数据源
+        """
+        super().__init__()
+        self.service_container = service_container
         self.config_manager = config_manager or ConfigManager()
-        self.theme_manager = theme_manager or get_theme_manager(self.config_manager)
-        self.log_manager = LogManager()
+        self.theme_manager = theme_manager or get_theme_manager()
+        self.log_manager = self.service_container.resolve(LogManager)
         self.data_source = data_source
 
         # 初始化缓存
@@ -391,7 +420,8 @@ class UnifiedChartService(QObject):
         """
         try:
             # 记录详细日志
-            logger.info(f"开始加载图表数据: 股票={stock_code}, 周期={period}, 图表ID={chart_id}")
+            logger.info(
+                f"开始加载图表数据: 股票={stock_code}, 周期={period}, 图表ID={chart_id}")
             logger.info(f"请求的指标列表: {indicators}")
 
             if not indicators:
@@ -426,7 +456,8 @@ class UnifiedChartService(QObject):
                 lambda data: self._on_data_loaded(data, cache_key, chart_id)
             )
             self.data_loader.error_occurred.connect(self.error_occurred.emit)
-            self.data_loader.progress_updated.connect(self.loading_progress.emit)
+            self.data_loader.progress_updated.connect(
+                self.loading_progress.emit)
 
             # 开始加载
             logger.debug(f"启动数据加载线程: 股票={stock_code}, 指标={indicators}")
@@ -542,7 +573,8 @@ class UnifiedChartService(QObject):
         """处理数据加载完成"""
         try:
             stock_code = data.get('stock_code', '')
-            logger.info(f"图表数据加载完成: {stock_code}, 指标数量: {len(data.get('indicators_data', {}))}")
+            logger.info(
+                f"图表数据加载完成: {stock_code}, 指标数量: {len(data.get('indicators_data', {}))}")
 
             # 记录指标数据详情
             indicators_data = data.get('indicators_data', {})
@@ -551,12 +583,16 @@ class UnifiedChartService(QObject):
 
             for indicator_name, indicator_data in indicators_data.items():
                 if isinstance(indicator_data, dict):
-                    logger.debug(f"指标 {indicator_name} 包含子项: {list(indicator_data.keys())}")
+                    logger.debug(
+                        f"指标 {indicator_name} 包含子项: {list(indicator_data.keys())}")
                     for sub_name, sub_data in indicator_data.items():
-                        data_len = len(sub_data) if hasattr(sub_data, '__len__') else 0
-                        logger.debug(f"指标 {indicator_name}.{sub_name} 数据长度: {data_len}")
+                        data_len = len(sub_data) if hasattr(
+                            sub_data, '__len__') else 0
+                        logger.debug(
+                            f"指标 {indicator_name}.{sub_name} 数据长度: {data_len}")
                 else:
-                    data_len = len(indicator_data) if hasattr(indicator_data, '__len__') else 0
+                    data_len = len(indicator_data) if hasattr(
+                        indicator_data, '__len__') else 0
                     logger.debug(f"指标 {indicator_name} 数据长度: {data_len}")
 
             # 缓存数据
@@ -587,13 +623,15 @@ class UnifiedChartService(QObject):
                             'title': data.get('stock_name', stock_code)
                         }
 
-                        logger.debug(f"更新图表 {chart_id}，数据包含指标: {list(indicators_data.keys())}")
+                        logger.debug(
+                            f"更新图表 {chart_id}，数据包含指标: {list(indicators_data.keys())}")
                         chart_widget.update_chart(chart_data)
                         logger.debug(f"已更新图表 {chart_id}")
                     else:
                         logger.warning(f"图表 {chart_id} 不存在")
                 else:
-                    logger.warning(f"找不到指定的图表ID: {chart_id}，可用图表: {list(self._chart_widgets.keys()) if hasattr(self, '_chart_widgets') else []}")
+                    logger.warning(
+                        f"找不到指定的图表ID: {chart_id}，可用图表: {list(self._chart_widgets.keys()) if hasattr(self, '_chart_widgets') else []}")
 
         except Exception as e:
             logger.error(f"处理图表数据失败: {e}", exc_info=True)
@@ -630,30 +668,21 @@ class UnifiedChartService(QObject):
 
 
 # 全局统一图表服务实例
-_unified_chart_service = None
+_chart_service_instance = None
 
 
 def get_unified_chart_service(config_manager=None, theme_manager=None, data_source=None) -> UnifiedChartService:
-    """获取统一图表服务实例
-
-    Args:
-        config_manager: 配置管理器
-        theme_manager: 主题管理器
-        data_source: 数据源
-
-    Returns:
-        UnifiedChartService实例
-    """
-    global _unified_chart_service
-
-    if _unified_chart_service is None:
-        _unified_chart_service = UnifiedChartService(
+    """获取或创建统一图表服务的单例"""
+    global _chart_service_instance
+    if _chart_service_instance is None:
+        service_container = get_service_container()
+        _chart_service_instance = UnifiedChartService(
+            service_container=service_container,
             config_manager=config_manager,
             theme_manager=theme_manager,
             data_source=data_source
         )
-
-    return _unified_chart_service
+    return _chart_service_instance
 
 
 def create_chart_widget(parent=None, chart_id=None, **kwargs) -> ChartWidget:

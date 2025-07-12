@@ -4,8 +4,10 @@
 from typing import Dict, Any, List, Optional
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer
+from PyQt5.QtGui import QColor
 import traceback
 import time
+from datetime import datetime
 
 from core.logger import LogManager
 from utils.theme import get_theme_manager
@@ -108,14 +110,16 @@ class TradingWidget(QWidget):
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = get_theme_manager(self.config_manager)
 
-            log_structured(self.log_manager, "trading_widget_init", level="info", status="success")
+            log_structured(self.log_manager, "trading_widget_init",
+                           level="info", status="success")
 
             self.process_manager = AnalysisProcessManager()
 
         except Exception as e:
             error_msg = f"初始化交易控件失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def init_ui(self):
@@ -182,7 +186,8 @@ class TradingWidget(QWidget):
             # 新增：创建信号明细表格
             self.signal_table = QTableWidget()
             self.signal_table.setColumnCount(5)
-            self.signal_table.setHorizontalHeaderLabels(["时间", "类型", "信号", "价格", "强度"])
+            self.signal_table.setHorizontalHeaderLabels(
+                ["时间", "类型", "信号", "价格", "强度"])
             layout.addWidget(self.signal_table)
 
             # 创建持仓信息表格
@@ -206,7 +211,8 @@ class TradingWidget(QWidget):
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def connect_signals(self):
@@ -226,43 +232,318 @@ class TradingWidget(QWidget):
         except Exception as e:
             error_msg = f"连接信号失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def execute_buy(self):
         """执行买入操作"""
         try:
-            # TODO: 实现买入逻辑
-            pass
+            if not self.current_stock:
+                QMessageBox.warning(self, "买入失败", "请先选择股票")
+                return
+
+            # 获取当前价格
+            current_price = self._get_current_price()
+            if not current_price:
+                QMessageBox.warning(self, "买入失败", "无法获取当前价格")
+                return
+
+            # 创建买入对话框
+            buy_dialog = QDialog(self)
+            buy_dialog.setWindowTitle("买入股票")
+            buy_dialog.setModal(True)
+            buy_dialog.resize(300, 200)
+
+            layout = QVBoxLayout(buy_dialog)
+
+            # 股票信息
+            info_label = QLabel(f"股票代码: {self.current_stock}")
+            layout.addWidget(info_label)
+
+            price_label = QLabel(f"当前价格: {current_price:.2f}")
+            layout.addWidget(price_label)
+
+            # 买入数量
+            quantity_layout = QHBoxLayout()
+            quantity_layout.addWidget(QLabel("买入数量:"))
+            quantity_spin = QSpinBox()
+            quantity_spin.setRange(100, 999999)
+            quantity_spin.setValue(100)
+            quantity_spin.setSingleStep(100)
+            quantity_layout.addWidget(quantity_spin)
+            layout.addLayout(quantity_layout)
+
+            # 预计金额
+            amount_label = QLabel(f"预计金额: {current_price * 100:.2f}")
+            layout.addWidget(amount_label)
+
+            # 更新金额显示
+            def update_amount():
+                amount = current_price * quantity_spin.value()
+                amount_label.setText(f"预计金额: {amount:.2f}")
+
+            quantity_spin.valueChanged.connect(update_amount)
+
+            # 按钮
+            button_layout = QHBoxLayout()
+            confirm_btn = QPushButton("确认买入")
+            cancel_btn = QPushButton("取消")
+            button_layout.addWidget(confirm_btn)
+            button_layout.addWidget(cancel_btn)
+            layout.addLayout(button_layout)
+
+            def on_confirm():
+                quantity = quantity_spin.value()
+                amount = current_price * quantity
+
+                # 执行买入逻辑
+                trade_record = {
+                    'time': datetime.now(),
+                    'stock_code': self.current_stock,
+                    'type': 'BUY',
+                    'price': current_price,
+                    'quantity': quantity,
+                    'amount': amount,
+                    'fee': amount * 0.0003  # 假设手续费为0.03%
+                }
+
+                # 更新持仓
+                self._update_position(trade_record)
+
+                # 记录交易
+                self._record_trade(trade_record)
+
+                # 发送信号
+                self.trade_executed.emit(trade_record)
+
+                QMessageBox.information(self, "买入成功",
+                                        f"成功买入 {self.current_stock} {quantity}股")
+                buy_dialog.accept()
+
+            confirm_btn.clicked.connect(on_confirm)
+            cancel_btn.clicked.connect(buy_dialog.reject)
+
+            buy_dialog.exec_()
 
         except Exception as e:
             error_msg = f"买入操作失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def execute_sell(self):
         """执行卖出操作"""
         try:
-            # TODO: 实现卖出逻辑
-            pass
+            if not self.current_stock:
+                QMessageBox.warning(self, "卖出失败", "请先选择股票")
+                return
+
+            # 检查持仓
+            position = self._get_position(self.current_stock)
+            if not position or position['quantity'] <= 0:
+                QMessageBox.warning(self, "卖出失败", "没有该股票的持仓")
+                return
+
+            # 获取当前价格
+            current_price = self._get_current_price()
+            if not current_price:
+                QMessageBox.warning(self, "卖出失败", "无法获取当前价格")
+                return
+
+            # 创建卖出对话框
+            sell_dialog = QDialog(self)
+            sell_dialog.setWindowTitle("卖出股票")
+            sell_dialog.setModal(True)
+            sell_dialog.resize(300, 250)
+
+            layout = QVBoxLayout(sell_dialog)
+
+            # 股票信息
+            info_label = QLabel(f"股票代码: {self.current_stock}")
+            layout.addWidget(info_label)
+
+            price_label = QLabel(f"当前价格: {current_price:.2f}")
+            layout.addWidget(price_label)
+
+            # 持仓信息
+            position_label = QLabel(f"持仓数量: {position['quantity']}")
+            layout.addWidget(position_label)
+
+            cost_label = QLabel(f"持仓成本: {position['cost']:.2f}")
+            layout.addWidget(cost_label)
+
+            # 卖出数量
+            quantity_layout = QHBoxLayout()
+            quantity_layout.addWidget(QLabel("卖出数量:"))
+            quantity_spin = QSpinBox()
+            quantity_spin.setRange(100, position['quantity'])
+            quantity_spin.setValue(min(100, position['quantity']))
+            quantity_spin.setSingleStep(100)
+            quantity_layout.addWidget(quantity_spin)
+            layout.addLayout(quantity_layout)
+
+            # 预计金额和盈亏
+            amount_label = QLabel(
+                f"预计金额: {current_price * quantity_spin.value():.2f}")
+            layout.addWidget(amount_label)
+
+            profit_label = QLabel()
+            layout.addWidget(profit_label)
+
+            # 更新金额和盈亏显示
+            def update_amount():
+                quantity = quantity_spin.value()
+                amount = current_price * quantity
+                cost_amount = position['cost'] * quantity
+                profit = amount - cost_amount
+                profit_rate = (profit / cost_amount) * \
+                    100 if cost_amount > 0 else 0
+
+                amount_label.setText(f"预计金额: {amount:.2f}")
+                profit_label.setText(
+                    f"预计盈亏: {profit:.2f} ({profit_rate:.2f}%)")
+
+                # 设置盈亏颜色
+                if profit > 0:
+                    profit_label.setStyleSheet("color: red;")
+                elif profit < 0:
+                    profit_label.setStyleSheet("color: green;")
+                else:
+                    profit_label.setStyleSheet("color: black;")
+
+            quantity_spin.valueChanged.connect(update_amount)
+            update_amount()  # 初始化显示
+
+            # 按钮
+            button_layout = QHBoxLayout()
+            confirm_btn = QPushButton("确认卖出")
+            cancel_btn = QPushButton("取消")
+            button_layout.addWidget(confirm_btn)
+            button_layout.addWidget(cancel_btn)
+            layout.addLayout(button_layout)
+
+            def on_confirm():
+                quantity = quantity_spin.value()
+                amount = current_price * quantity
+
+                # 执行卖出逻辑
+                trade_record = {
+                    'time': datetime.now(),
+                    'stock_code': self.current_stock,
+                    'type': 'SELL',
+                    'price': current_price,
+                    'quantity': quantity,
+                    'amount': amount,
+                    'fee': amount * 0.0003  # 假设手续费为0.03%
+                }
+
+                # 更新持仓
+                self._update_position(trade_record)
+
+                # 记录交易
+                self._record_trade(trade_record)
+
+                # 发送信号
+                self.trade_executed.emit(trade_record)
+
+                QMessageBox.information(self, "卖出成功",
+                                        f"成功卖出 {self.current_stock} {quantity}股")
+                sell_dialog.accept()
+
+            confirm_btn.clicked.connect(on_confirm)
+            cancel_btn.clicked.connect(sell_dialog.reject)
+
+            sell_dialog.exec_()
 
         except Exception as e:
             error_msg = f"卖出操作失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def cancel_order(self):
         """撤销订单"""
         try:
-            # TODO: 实现撤单逻辑
-            pass
+            # 获取待撤销的订单列表
+            pending_orders = self._get_pending_orders()
+
+            if not pending_orders:
+                QMessageBox.information(self, "撤单", "没有待撤销的订单")
+                return
+
+            # 创建撤单对话框
+            cancel_dialog = QDialog(self)
+            cancel_dialog.setWindowTitle("撤销订单")
+            cancel_dialog.setModal(True)
+            cancel_dialog.resize(400, 300)
+
+            layout = QVBoxLayout(cancel_dialog)
+
+            # 订单列表
+            order_table = QTableWidget()
+            order_table.setColumnCount(5)
+            order_table.setHorizontalHeaderLabels(
+                ["订单ID", "股票代码", "类型", "价格", "数量"])
+
+            for i, order in enumerate(pending_orders):
+                order_table.insertRow(i)
+                order_table.setItem(i, 0, QTableWidgetItem(str(order['id'])))
+                order_table.setItem(
+                    i, 1, QTableWidgetItem(order['stock_code']))
+                order_table.setItem(i, 2, QTableWidgetItem(order['type']))
+                order_table.setItem(
+                    i, 3, QTableWidgetItem(f"{order['price']:.2f}"))
+                order_table.setItem(
+                    i, 4, QTableWidgetItem(str(order['quantity'])))
+
+            order_table.resizeColumnsToContents()
+            layout.addWidget(order_table)
+
+            # 按钮
+            button_layout = QHBoxLayout()
+            cancel_btn = QPushButton("撤销选中订单")
+            cancel_all_btn = QPushButton("撤销全部订单")
+            close_btn = QPushButton("关闭")
+            button_layout.addWidget(cancel_btn)
+            button_layout.addWidget(cancel_all_btn)
+            button_layout.addWidget(close_btn)
+            layout.addLayout(button_layout)
+
+            def cancel_selected():
+                current_row = order_table.currentRow()
+                if current_row >= 0:
+                    order = pending_orders[current_row]
+                    self._cancel_order(order['id'])
+                    QMessageBox.information(
+                        self, "撤单成功", f"订单 {order['id']} 已撤销")
+                    cancel_dialog.accept()
+                else:
+                    QMessageBox.warning(self, "撤单失败", "请选择要撤销的订单")
+
+            def cancel_all():
+                reply = QMessageBox.question(self, "确认撤单", "确定要撤销所有订单吗？",
+                                             QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    for order in pending_orders:
+                        self._cancel_order(order['id'])
+                    QMessageBox.information(
+                        self, "撤单成功", f"已撤销 {len(pending_orders)} 个订单")
+                    cancel_dialog.accept()
+
+            cancel_btn.clicked.connect(cancel_selected)
+            cancel_all_btn.clicked.connect(cancel_all)
+            close_btn.clicked.connect(cancel_dialog.reject)
+
+            cancel_dialog.exec_()
 
         except Exception as e:
             error_msg = f"撤单操作失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def update_stock(self, stock_info: Dict[str, str]):
@@ -274,14 +555,17 @@ class TradingWidget(QWidget):
         try:
             # 自动提取股票代码
             if isinstance(stock_info, dict):
-                code = stock_info.get('code') or stock_info.get('stock') or next(iter(stock_info.values()), None)
+                code = stock_info.get('code') or stock_info.get(
+                    'stock') or next(iter(stock_info.values()), None)
             else:
                 code = stock_info
             if not isinstance(code, str) or not code.strip():
                 self.current_stock = None
                 if hasattr(self, 'log_manager') and self.log_manager:
-                    log_structured(self.log_manager, "update_stock: 股票信息无效，未能提取到股票代码", level="error")
-                QMessageBox.warning(self, "股票选择错误", "update_stock：未能提取到有效的股票代码，请重新选择股票！")
+                    log_structured(
+                        self.log_manager, "update_stock: 股票信息无效，未能提取到股票代码", level="error")
+                QMessageBox.warning(
+                    self, "股票选择错误", "update_stock：未能提取到有效的股票代码，请重新选择股票！")
                 return
             else:
                 self.current_stock = code.strip()
@@ -294,7 +578,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager, f"更新股票信息失败: {str(e)}", level="error")
+                log_structured(self.log_manager,
+                               f"更新股票信息失败: {str(e)}", level="error")
             else:
                 print(f"更新股票信息失败: {str(e)}")
 
@@ -341,7 +626,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager, f"更新信号列表失败: {str(e)}", level="error")
+                log_structured(self.log_manager,
+                               f"更新信号列表失败: {str(e)}", level="error")
             else:
                 print(f"更新信号列表失败: {str(e)}")
 
@@ -365,10 +651,12 @@ class TradingWidget(QWidget):
                 row = self.performance_table.rowCount()
                 self.performance_table.insertRow(row)
                 item0 = QTableWidgetItem(str(k))
-                item1 = QTableWidgetItem(f"{v:.4f}" if isinstance(v, float) else str(v))
+                item1 = QTableWidgetItem(
+                    f"{v:.4f}" if isinstance(v, float) else str(v))
                 # 彩色分组
                 if '率' in k or 'return' in k:
-                    item1.setForeground(QColor('green') if v >= 0 else QColor('red'))
+                    item1.setForeground(
+                        QColor('green') if v >= 0 else QColor('red'))
                 # 斑马纹
                 if row % 2 == 0:
                     item0.setBackground(QBrush(QColor(245, 245, 250)))
@@ -379,17 +667,21 @@ class TradingWidget(QWidget):
                 self.performance_table.setItem(row, 0, item0)
                 self.performance_table.setItem(row, 1, item1)
             self.performance_table.setSortingEnabled(True)
-            self.performance_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.performance_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.performance_table.setSelectionBehavior(
+                QAbstractItemView.SelectRows)
+            self.performance_table.setEditTriggers(
+                QAbstractItemView.NoEditTriggers)
             self.performance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.performance_table.setStyleSheet("QTableWidget {border-radius: 8px; border: 1px solid #d0d0d0; background: #fff;}")
+            self.performance_table.setStyleSheet(
+                "QTableWidget {border-radius: 8px; border: 1px solid #d0d0d0; background: #fff;}")
             # 风险表格
             self.risk_table.setRowCount(0)
             for i, (k, v) in enumerate(risk.items()):
                 row = self.risk_table.rowCount()
                 self.risk_table.insertRow(row)
                 item0 = QTableWidgetItem(str(k))
-                item1 = QTableWidgetItem(f"{v:.4f}" if isinstance(v, float) else str(v))
+                item1 = QTableWidgetItem(
+                    f"{v:.4f}" if isinstance(v, float) else str(v))
                 if 'drawdown' in k or '风险' in k:
                     item1.setForeground(QColor('red'))
                 if row % 2 == 0:
@@ -403,7 +695,8 @@ class TradingWidget(QWidget):
             self.risk_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.risk_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             self.risk_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.risk_table.setStyleSheet("QTableWidget {border-radius: 8px; border: 1px solid #d0d0d0; background: #fff;}")
+            self.risk_table.setStyleSheet(
+                "QTableWidget {border-radius: 8px; border: 1px solid #d0d0d0; background: #fff;}")
             # 2. 多策略对比与自定义可视化
             if hasattr(self, 'trend_chart_area'):
                 self.trend_chart_area.setHtml("")
@@ -417,25 +710,35 @@ class TradingWidget(QWidget):
             if multi_strategy:
                 # 分组柱状图：对比年化收益、最大回撤等
                 metrics = ['annualized_return', 'max_drawdown', 'sharpe_ratio']
-                data = {k: [v.get(m, 0) for m in metrics] for k, v in multi_strategy.items()}
+                data = {k: [v.get(m, 0) for m in metrics]
+                        for k, v in multi_strategy.items()}
                 for i, m in enumerate(metrics):
-                    fig.add_trace(go.Bar(name=m, x=list(data.keys()), y=[v[i] for v in data.values()]))
-                fig.update_layout(barmode='group', title='多策略分组对比', template='plotly_white')
+                    fig.add_trace(go.Bar(name=m, x=list(data.keys()), y=[
+                                  v[i] for v in data.values()]))
+                fig.update_layout(
+                    barmode='group', title='多策略分组对比', template='plotly_white')
                 # 热力图
                 heat_data = pd.DataFrame(data, index=metrics)
-                fig2 = go.Figure(data=go.Heatmap(z=heat_data.values, x=heat_data.columns, y=heat_data.index, colorscale='Viridis'))
+                fig2 = go.Figure(data=go.Heatmap(
+                    z=heat_data.values, x=heat_data.columns, y=heat_data.index, colorscale='Viridis'))
                 fig2.update_layout(title='多策略指标热力图', template='plotly_white')
                 # 雷达图
                 for k, v in data.items():
                     fig3 = go.Figure()
-                    fig3.add_trace(go.Scatterpolar(r=v, theta=metrics, fill='toself', name=k))
-                    fig3.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True, title=f'{k}雷达图', template='plotly_white')
+                    fig3.add_trace(go.Scatterpolar(
+                        r=v, theta=metrics, fill='toself', name=k))
+                    fig3.update_layout(polar=dict(radialaxis=dict(
+                        visible=True)), showlegend=True, title=f'{k}雷达图', template='plotly_white')
                     # 合并雷达图到主图
-                    html3 = pio.to_html(fig3, full_html=False, include_plotlyjs='cdn')
-                    self.trend_chart_area.setHtml(self.trend_chart_area.page().toHtml() + html3)
+                    html3 = pio.to_html(
+                        fig3, full_html=False, include_plotlyjs='cdn')
+                    self.trend_chart_area.setHtml(
+                        self.trend_chart_area.page().toHtml() + html3)
                 # 主分组图和热力图合并
-                html = pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
-                html2 = pio.to_html(fig2, full_html=False, include_plotlyjs=False)
+                html = pio.to_html(fig, full_html=False,
+                                   include_plotlyjs='cdn')
+                html2 = pio.to_html(fig2, full_html=False,
+                                    include_plotlyjs=False)
                 self.trend_chart_area.setHtml(html + html2)
             else:
                 # 单策略：趋势、回撤、收益分布
@@ -443,22 +746,28 @@ class TradingWidget(QWidget):
                 drawdown = results.get('drawdown_curve')
                 returns = results.get('returns_histogram')
                 if equity is not None:
-                    fig.add_trace(go.Scatter(y=equity, mode='lines', name='资金曲线', line=dict(color='blue')))
+                    fig.add_trace(go.Scatter(y=equity, mode='lines',
+                                  name='资金曲线', line=dict(color='blue')))
                 if drawdown is not None:
-                    fig.add_trace(go.Scatter(y=drawdown, mode='lines', name='回撤曲线', line=dict(color='red')))
+                    fig.add_trace(go.Scatter(y=drawdown, mode='lines',
+                                  name='回撤曲线', line=dict(color='red')))
                 if returns is not None:
-                    fig.add_trace(go.Bar(y=returns, name='收益分布', marker_color='orange'))
+                    fig.add_trace(
+                        go.Bar(y=returns, name='收益分布', marker_color='orange'))
                 fig.update_layout(title='回测结果可视化', template='plotly_white')
-                html = pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
+                html = pio.to_html(fig, full_html=False,
+                                   include_plotlyjs='cdn')
                 self.trend_chart_area.setHtml(html)
             # 3. 新增详细结果弹窗按钮
             if not hasattr(self, 'detail_btn'):
                 self.detail_btn = QPushButton('详细结果')
                 self.layout().addWidget(self.detail_btn)
-                self.detail_btn.clicked.connect(lambda: self.show_detail_dialog(results))
+                self.detail_btn.clicked.connect(
+                    lambda: self.show_detail_dialog(results))
         except Exception as e:
             if hasattr(self, 'log_manager'):
-                log_structured(self.log_manager, f"回测结果展示美化/多策略对比失败: {str(e)}", level="error")
+                log_structured(self.log_manager,
+                               f"回测结果展示美化/多策略对比失败: {str(e)}", level="error")
 
     def show_detail_dialog(self, results: dict):
         """弹出详细结果对话框，整合所有分组表格和图表，主UI可并行操作"""
@@ -475,7 +784,8 @@ class TradingWidget(QWidget):
             row = perf_table.rowCount()
             perf_table.insertRow(row)
             item0 = QTableWidgetItem(str(k))
-            item1 = QTableWidgetItem(f"{v:.4f}" if isinstance(v, float) else str(v))
+            item1 = QTableWidgetItem(
+                f"{v:.4f}" if isinstance(v, float) else str(v))
             perf_table.setItem(row, 0, item0)
             perf_table.setItem(row, 1, item1)
         perf_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -490,7 +800,8 @@ class TradingWidget(QWidget):
             row = risk_table.rowCount()
             risk_table.insertRow(row)
             item0 = QTableWidgetItem(str(k))
-            item1 = QTableWidgetItem(f"{v:.4f}" if isinstance(v, float) else str(v))
+            item1 = QTableWidgetItem(
+                f"{v:.4f}" if isinstance(v, float) else str(v))
             risk_table.setItem(row, 0, item0)
             risk_table.setItem(row, 1, item1)
         risk_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -506,7 +817,8 @@ class TradingWidget(QWidget):
                 row = trades_table.rowCount()
                 trades_table.insertRow(row)
                 for col, k in enumerate(trade.keys()):
-                    trades_table.setItem(row, col, QTableWidgetItem(str(trade[k])))
+                    trades_table.setItem(
+                        row, col, QTableWidgetItem(str(trade[k])))
             trades_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             layout.addWidget(QLabel("交易明细："))
             layout.addWidget(trades_table)
@@ -516,11 +828,14 @@ class TradingWidget(QWidget):
         returns = results.get('returns_histogram')
         fig = go.Figure()
         if equity is not None:
-            fig.add_trace(go.Scatter(y=equity, mode='lines', name='资金曲线', line=dict(color='blue')))
+            fig.add_trace(go.Scatter(y=equity, mode='lines',
+                          name='资金曲线', line=dict(color='blue')))
         if drawdown is not None:
-            fig.add_trace(go.Scatter(y=drawdown, mode='lines', name='回撤曲线', line=dict(color='red')))
+            fig.add_trace(go.Scatter(y=drawdown, mode='lines',
+                          name='回撤曲线', line=dict(color='red')))
         if returns is not None:
-            fig.add_trace(go.Bar(y=returns, name='收益分布', marker_color='orange'))
+            fig.add_trace(
+                go.Bar(y=returns, name='收益分布', marker_color='orange'))
         fig.update_layout(title='回测结果可视化', template='plotly_white')
         chart = QWebEngineView()
         html = pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
@@ -533,13 +848,17 @@ class TradingWidget(QWidget):
 
         def export():
             from PyQt5.QtWidgets import QFileDialog
-            file, _ = QFileDialog.getSaveFileName(dialog, "导出回测结果", "backtest_results.xlsx", "Excel Files (*.xlsx)")
+            file, _ = QFileDialog.getSaveFileName(
+                dialog, "导出回测结果", "backtest_results.xlsx", "Excel Files (*.xlsx)")
             if file:
                 with pd.ExcelWriter(file) as writer:
-                    pd.DataFrame(perf.items(), columns=["绩效指标", "数值"]).to_excel(writer, sheet_name="绩效", index=False)
-                    pd.DataFrame(risk.items(), columns=["风险指标", "数值"]).to_excel(writer, sheet_name="风险", index=False)
+                    pd.DataFrame(perf.items(), columns=["绩效指标", "数值"]).to_excel(
+                        writer, sheet_name="绩效", index=False)
+                    pd.DataFrame(risk.items(), columns=["风险指标", "数值"]).to_excel(
+                        writer, sheet_name="风险", index=False)
                     if trades:
-                        pd.DataFrame(trades).to_excel(writer, sheet_name="交易明细", index=False)
+                        pd.DataFrame(trades).to_excel(
+                            writer, sheet_name="交易明细", index=False)
         export_btn.clicked.connect(export)
         dialog.setLayout(layout)
         dialog.resize(900, 700)
@@ -548,22 +867,28 @@ class TradingWidget(QWidget):
     def export_backtest_results(self):
         """一键导出全部回测结果（绩效、风险、交易、持仓、图表）"""
         try:
-            file_path, _ = QFileDialog.getSaveFileName(self, "导出回测结果", "回测结果", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "导出回测结果", "回测结果", "Excel Files (*.xlsx);;CSV Files (*.csv)")
             if not file_path:
                 return
             # 导出绩效、风险、交易、持仓
             perf_data = [[self.performance_table.item(i, 0).text(), self.performance_table.item(i, 1).text()]
                          for i in range(self.performance_table.rowCount())]
-            risk_data = [[self.risk_table.item(i, 0).text(), self.risk_table.item(i, 1).text()] for i in range(self.risk_table.rowCount())]
+            risk_data = [[self.risk_table.item(i, 0).text(), self.risk_table.item(
+                i, 1).text()] for i in range(self.risk_table.rowCount())]
             trade_data = [[self.trade_table.item(i, j).text() for j in range(self.trade_table.columnCount())]
                           for i in range(self.trade_table.rowCount())]
             pos_data = [[self.position_table.item(i, j).text() for j in range(self.position_table.columnCount())]
                         for i in range(self.position_table.rowCount())]
             with pd.ExcelWriter(file_path) as writer:
-                pd.DataFrame(perf_data, columns=["指标", "数值"]).to_excel(writer, sheet_name="绩效指标", index=False)
-                pd.DataFrame(risk_data, columns=["风险指标", "数值"]).to_excel(writer, sheet_name="风险指标", index=False)
-                pd.DataFrame(trade_data).to_excel(writer, sheet_name="交易明细", index=False)
-                pd.DataFrame(pos_data).to_excel(writer, sheet_name="持仓明细", index=False)
+                pd.DataFrame(perf_data, columns=["指标", "数值"]).to_excel(
+                    writer, sheet_name="绩效指标", index=False)
+                pd.DataFrame(risk_data, columns=["风险指标", "数值"]).to_excel(
+                    writer, sheet_name="风险指标", index=False)
+                pd.DataFrame(trade_data).to_excel(
+                    writer, sheet_name="交易明细", index=False)
+                pd.DataFrame(pos_data).to_excel(
+                    writer, sheet_name="持仓明细", index=False)
             QMessageBox.information(self, "导出成功", "回测结果已导出")
         except Exception as e:
             QMessageBox.critical(self, "导出失败", f"导出回测结果失败: {str(e)}")
@@ -582,7 +907,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager, f"清除数据失败: {str(e)}", level="error")
+                log_structured(self.log_manager,
+                               f"清除数据失败: {str(e)}", level="error")
             else:
                 print(f"清除数据失败: {str(e)}")
 
@@ -599,7 +925,8 @@ class TradingWidget(QWidget):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
         try:
             button.clicked.disconnect()
         except Exception:
@@ -609,11 +936,13 @@ class TradingWidget(QWidget):
         def task():
             try:
                 if not getattr(button, '_interrupted', False):
-                    result = analysis_func(*args, progress_callback=progress_callback, **kwargs)
+                    result = analysis_func(
+                        *args, progress_callback=progress_callback, **kwargs)
                     return result
             except Exception as e:
                 if hasattr(self, 'log_manager'):
-                    log_structured(self.log_manager, f"分析异常: {str(e)}", level="error")
+                    log_structured(self.log_manager,
+                                   f"分析异常: {str(e)}", level="error")
                 return None
             finally:
                 QTimer.singleShot(0, lambda: on_done(None))
@@ -625,7 +954,8 @@ class TradingWidget(QWidget):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
@@ -655,13 +985,15 @@ class TradingWidget(QWidget):
             elif main_window and hasattr(main_window, 'get_kdata'):
                 kdata = main_window.get_kdata(stock_code)
             if kdata is None or kdata.empty:
-                self.set_status_message(f"股票{stock_code}的K线数据为空，无法回测", error=True)
+                self.set_status_message(
+                    f"股票{stock_code}的K线数据为空，无法回测", error=True)
                 return
             # ... 其余回测逻辑保持不变 ...
         except Exception as e:
             self.set_status_message(f"回测执行异常: {str(e)}", error=True)
             if hasattr(self, 'log_manager'):
-                log_structured(self.log_manager, f"回测执行异常: {str(e)}", level="error")
+                log_structured(self.log_manager,
+                               f"回测执行异常: {str(e)}", level="error")
 
     def reset_params(self):
         """重置参数"""
@@ -682,7 +1014,8 @@ class TradingWidget(QWidget):
             self.slippage_spin.setValue(0.0001)
 
         except Exception as e:
-            log_structured(LogManager.log_manager, f"重置参数失败: {str(e)}", level="error")
+            log_structured(LogManager.log_manager,
+                           f"重置参数失败: {str(e)}", level="error")
 
     def on_strategy_changed(self, strategy: str):
         """处理策略变更事件，仅切换参数区，不自动回测"""
@@ -691,7 +1024,8 @@ class TradingWidget(QWidget):
             # 只刷新参数区，不自动回测
             self.update_parameters_visibility()
         except Exception as e:
-            log_structured(self.log_manager, f"处理策略变更失败: {str(e)}", level="error")
+            log_structured(self.log_manager,
+                           f"处理策略变更失败: {str(e)}", level="error")
 
     def refresh(self) -> None:
         """
@@ -703,7 +1037,8 @@ class TradingWidget(QWidget):
         except Exception as e:
             error_msg = f"刷新交易控件失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             # 发射异常信号，主窗口可捕获弹窗
             self.error_occurred.emit(error_msg)
 
@@ -735,14 +1070,18 @@ class TradingWidget(QWidget):
                     params[k] = v.currentText()
             params['strategy'] = strategy
             params['stock'] = self.current_stock.strip()
-            params['start_date'] = getattr(self, 'start_date', None).date().strftime('%Y-%m-%d') if hasattr(self, 'start_date') else ''
-            params['end_date'] = getattr(self, 'end_date', None).date().strftime('%Y-%m-%d') if hasattr(self, 'end_date') else ''
+            params['start_date'] = getattr(self, 'start_date', None).date().strftime(
+                '%Y-%m-%d') if hasattr(self, 'start_date') else ''
+            params['end_date'] = getattr(self, 'end_date', None).date().strftime(
+                '%Y-%m-%d') if hasattr(self, 'end_date') else ''
             params['initial_cash'] = self.initial_cash_spin.value() if hasattr(
                 self, 'initial_cash_spin') and self.initial_cash_spin is not None else 100000.0
             params['commission_rate'] = self.commission_spin.value() if hasattr(
                 self, 'commission_spin') and self.commission_spin is not None else 0.0003
-            params['slippage'] = self.slippage_spin.value() if hasattr(self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
-            log_structured(self.log_manager, f"开始回测 - 策略: {strategy}", level="info")
+            params['slippage'] = self.slippage_spin.value() if hasattr(
+                self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
+            log_structured(self.log_manager,
+                           f"开始回测 - 策略: {strategy}", level="info")
 
             # 使用统一回测引擎
             from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
@@ -773,7 +1112,8 @@ class TradingWidget(QWidget):
                     signal_data.loc[ma_short < ma_long, 'signal'] = -1
 
                 # 创建回测引擎
-                engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+                engine = UnifiedBacktestEngine(
+                    backtest_level=BacktestLevel.PROFESSIONAL)
 
                 # 运行回测
                 result = engine.run_backtest(
@@ -808,7 +1148,8 @@ class TradingWidget(QWidget):
         except Exception as e:
             error_msg = f"回测失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            log_structured(self.log_manager,
+                           traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
 
     def on_analyze(self):
@@ -827,27 +1168,32 @@ class TradingWidget(QWidget):
         # ...参数校验逻辑...
         # 校验通过
         self.process_manager.finish_step('param_check', success=True)
-        self.analysis_progress.emit({'step_id': 'param_check', 'status': 'success', 'msg': '参数校验通过'})
+        self.analysis_progress.emit(
+            {'step_id': 'param_check', 'status': 'success', 'msg': '参数校验通过'})
         # 数据加载
         self.process_manager.start_step('data_load')
         # ...数据加载逻辑...
         self.process_manager.finish_step('data_load', success=True)
-        self.analysis_progress.emit({'step_id': 'data_load', 'status': 'success', 'msg': '数据加载完成'})
+        self.analysis_progress.emit(
+            {'step_id': 'data_load', 'status': 'success', 'msg': '数据加载完成'})
         # 信号生成
         self.process_manager.start_step('signal_gen')
         # ...信号生成逻辑...
         self.process_manager.finish_step('signal_gen', success=True)
-        self.analysis_progress.emit({'step_id': 'signal_gen', 'status': 'success', 'msg': '信号生成完成'})
+        self.analysis_progress.emit(
+            {'step_id': 'signal_gen', 'status': 'success', 'msg': '信号生成完成'})
         # 绩效计算
         self.process_manager.start_step('performance')
         # ...绩效计算逻辑...
         self.process_manager.finish_step('performance', success=True)
-        self.analysis_progress.emit({'step_id': 'performance', 'status': 'success', 'msg': '绩效计算完成'})
+        self.analysis_progress.emit(
+            {'step_id': 'performance', 'status': 'success', 'msg': '绩效计算完成'})
         # 结果展示
         self.process_manager.start_step('result')
         # ...结果展示逻辑...
         self.process_manager.finish_step('result', success=True)
-        self.analysis_progress.emit({'step_id': 'result', 'status': 'success', 'msg': '结果展示完成'})
+        self.analysis_progress.emit(
+            {'step_id': 'result', 'status': 'success', 'msg': '结果展示完成'})
         # ... existing code ...
 
     def set_parameters(self, params: Dict[str, Any]):
@@ -889,7 +1235,8 @@ class TradingWidget(QWidget):
         """优化分析逻辑，提升性能和健壮性，标准化结果结构。"""
         import numpy as np
         import threading
-        results = {'strategy': strategy, 'signals': None, 'indicators': {}, 'metrics': {}, 'error': None}
+        results = {'strategy': strategy, 'signals': None,
+                   'indicators': {}, 'metrics': {}, 'error': None}
         try:
             # 参数类型和范围校验
             def safe_int(val, default, minv=None, maxv=None):
@@ -916,7 +1263,8 @@ class TradingWidget(QWidget):
             # K线数据缓存（按股票+周期）
             stock = params.get('stock')
             if isinstance(stock, dict):
-                stock_code = stock.get('code') or stock.get('stock') or next(iter(stock.values()), None)
+                stock_code = stock.get('code') or stock.get(
+                    'stock') or next(iter(stock.values()), None)
             else:
                 stock_code = stock
             if not isinstance(stock_code, str):
@@ -924,7 +1272,8 @@ class TradingWidget(QWidget):
                 self.set_status_message(results['error'], error=True)
                 return results
             params['stock'] = stock_code  # 保证后续都是字符串
-            log_structured(self.log_manager, f"准备回测股票:{stock_code}", level="info")
+            log_structured(self.log_manager,
+                           f"准备回测股票:{stock_code}", level="info")
             cache_key = f"{stock_code}_{params.get('period','D')}"
             if not hasattr(self, '_kdata_cache'):
                 self._kdata_cache = {}
@@ -954,7 +1303,8 @@ class TradingWidget(QWidget):
                 signals[ma_short > ma_long] = 1
                 signals[ma_short < ma_long] = -1
                 results['signals'] = signals
-                results['indicators'] = {'MA_short': ma_short, 'MA_long': ma_long}
+                results['indicators'] = {
+                    'MA_short': ma_short, 'MA_long': ma_long}
             # --- MACD策略 ---
             elif strategy == "MACD策略":
                 fast = safe_int(params.get('快线周期', 12), 12, 5, 50)
@@ -975,8 +1325,10 @@ class TradingWidget(QWidget):
                 overbought = safe_float(params.get('超买阈值', 70), 70, 50, 90)
                 oversold = safe_float(params.get('超卖阈值', 30), 30, 10, 50)
                 delta = data['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+                gain = (delta.where(delta > 0, 0)).rolling(
+                    window=period).mean()
+                loss = (-delta.where(delta < 0, 0)
+                        ).rolling(window=period).mean()
                 rs = gain / loss
                 rsi = 100 - (100 / (1 + rs))
                 signals = pd.Series(0, index=data.index)
@@ -996,7 +1348,8 @@ class TradingWidget(QWidget):
                 signals[data['close'] < lower] = 1
                 signals[data['close'] > upper] = -1
                 results['signals'] = signals
-                results['indicators'] = {'MA': ma, 'Upper': upper, 'Lower': lower}
+                results['indicators'] = {
+                    'MA': ma, 'Upper': upper, 'Lower': lower}
             # --- KDJ策略 ---
             elif strategy == "KDJ策略":
                 period = safe_int(params.get('周期', 9), 9, 5, 30)
@@ -1023,7 +1376,8 @@ class TradingWidget(QWidget):
                     if code:
                         kdata_for_pattern = data.copy()
                         kdata_for_pattern['code'] = code
-                pattern_signals = recognizer.get_pattern_signals(kdata_for_pattern)
+                pattern_signals = recognizer.get_pattern_signals(
+                    kdata_for_pattern)
                 results['signals'] = pattern_signals
                 results['indicators'] = {}
             # --- DX策略 ---
@@ -1040,17 +1394,24 @@ class TradingWidget(QWidget):
                 atr = tr.rolling(window=period).mean()
                 up_move = high - high.shift(1)
                 down_move = low.shift(1) - low
-                plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
-                minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-                plus_di = 100 * pd.Series(plus_dm).ewm(alpha=1/period, adjust=False).mean() / atr
-                minus_di = 100 * pd.Series(minus_dm).ewm(alpha=1/period, adjust=False).mean() / atr
+                plus_dm = np.where((up_move > down_move) &
+                                   (up_move > 0), up_move, 0)
+                minus_dm = np.where((down_move > up_move) &
+                                    (down_move > 0), down_move, 0)
+                plus_di = 100 * \
+                    pd.Series(plus_dm).ewm(alpha=1/period,
+                                           adjust=False).mean() / atr
+                minus_di = 100 * \
+                    pd.Series(minus_dm).ewm(
+                        alpha=1/period, adjust=False).mean() / atr
                 dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di)
                 adx = pd.Series(dx).ewm(alpha=1/period, adjust=False).mean()
                 signals = pd.Series(0, index=data.index)
                 signals[(adx > threshold) & (plus_di > minus_di)] = 1
                 signals[(adx > threshold) & (plus_di < minus_di)] = -1
                 results['signals'] = signals
-                results['indicators'] = {'ADX': adx, 'DX': dx, '+DI': plus_di, '-DI': minus_di}
+                results['indicators'] = {
+                    'ADX': adx, 'DX': dx, '+DI': plus_di, '-DI': minus_di}
             else:
                 results['error'] = "请选择策略"
                 self.set_status_message(results['error'], error=True)
@@ -1104,7 +1465,8 @@ class TradingWidget(QWidget):
             'error': r.get('error', '')
         } for r in results])
         if group_by in df.columns and metric in df.columns:
-            grouped = df.groupby(group_by)[metric].mean().sort_values(ascending=False)
+            grouped = df.groupby(group_by)[
+                metric].mean().sort_values(ascending=False)
             grouped.plot(kind='bar', title=f'{metric} by {group_by}')
             plt.ylabel(metric)
             plt.tight_layout()
@@ -1167,7 +1529,8 @@ class TradingWidget(QWidget):
                     p['strategy'] = strategy
                     res = ts.run_backtest(p)
                     return {'code': code, 'strategy': strategy, 'params': p, 'result': res}
-                tasks = [single_task.remote(code, strategy, params) for code in stock_list for strategy in strategy_list for params in param_grid]
+                tasks = [single_task.remote(
+                    code, strategy, params) for code in stock_list for strategy in strategy_list for params in param_grid]
                 results = ray.get(tasks)
                 if progress_callback:
                     progress_callback(total, total)
@@ -1189,7 +1552,8 @@ class TradingWidget(QWidget):
                     p['strategy'] = strategy
                     res = ts.run_backtest(p)
                     return {'code': code, 'strategy': strategy, 'params': p, 'result': res}
-                tasks = [group(single_task.s(code, strategy, params) for code in stock_list for strategy in strategy_list for params in param_grid)]
+                tasks = [group(single_task.s(code, strategy, params)
+                               for code in stock_list for strategy in strategy_list for params in param_grid)]
                 results = tasks.apply_async().get()
                 if progress_callback:
                     progress_callback(total, total)
@@ -1212,9 +1576,11 @@ class TradingWidget(QWidget):
                                 p = dict(params)
                                 p['strategy'] = strategy
                                 res = ts.run_backtest(p)
-                                results.append({'code': code, 'strategy': strategy, 'params': p, 'result': res})
+                                results.append(
+                                    {'code': code, 'strategy': strategy, 'params': p, 'result': res})
                             except Exception as e:
-                                results.append({'code': code, 'strategy': strategy, 'params': params, 'error': str(e)})
+                                results.append(
+                                    {'code': code, 'strategy': strategy, 'params': params, 'error': str(e)})
                             done += 1
                             if progress_callback:
                                 progress_callback(done, total)
@@ -1258,9 +1624,11 @@ class TradingWidget(QWidget):
             show_group("风险类指标", risk)
             show_group("交易类指标", trade)
             if 'signals' in results:
-                self.results_area.append("<b>信号明细：</b><br>" + str(results['signals']))
+                self.results_area.append(
+                    "<b>信号明细：</b><br>" + str(results['signals']))
             if 'analysis' in results:
-                self.results_area.append("<b>分析结果：</b><br>" + str(results['analysis']))
+                self.results_area.append(
+                    "<b>分析结果：</b><br>" + str(results['analysis']))
         # 2. 自动填充表格（兼容原有update_backtest_results）
         if hasattr(self, 'update_backtest_results'):
             self.update_backtest_results(results)
@@ -1269,11 +1637,14 @@ class TradingWidget(QWidget):
         chart_widget = getattr(parent, 'chart_widget', None)
         if chart_widget:
             if 'equity_curve' in results:
-                chart_widget.update_chart({'equity_curve': results['equity_curve']})
+                chart_widget.update_chart(
+                    {'equity_curve': results['equity_curve']})
             if 'drawdown_curve' in results:
-                chart_widget.update_chart({'drawdown_curve': results['drawdown_curve']})
+                chart_widget.update_chart(
+                    {'drawdown_curve': results['drawdown_curve']})
             if 'returns_histogram' in results:
-                chart_widget.update_chart({'returns_histogram': results['returns_histogram']})
+                chart_widget.update_chart(
+                    {'returns_histogram': results['returns_histogram']})
             if 'signals' in results:
                 chart_widget.plot_signals(results['signals'])
             if 'pattern_signals' in results:
@@ -1291,3 +1662,207 @@ class TradingWidget(QWidget):
                         self.results_area.append(f"{k}: {v}")
             if chart_widget and hasattr(chart_widget, 'plot_group_comparison'):
                 chart_widget.plot_group_comparison(group_results)
+
+    # 交易功能辅助方法
+    def _get_current_price(self) -> Optional[float]:
+        """获取当前股票价格"""
+        try:
+            if not self.current_stock:
+                return None
+
+            # 尝试从data_manager获取实时价格
+            from core.data_manager import data_manager
+            realtime_data = data_manager.get_realtime_quotes(
+                [self.current_stock])
+
+            if realtime_data and self.current_stock in realtime_data:
+                return float(realtime_data[self.current_stock].get('price', 0))
+
+            # 如果没有实时数据，使用最新的K线数据
+            kdata = data_manager.get_kdata(self.current_stock, ktype='D')
+            if kdata is not None and len(kdata) > 0:
+                if hasattr(kdata, 'iloc'):  # DataFrame
+                    return float(kdata.iloc[-1]['close'])
+                else:  # KData
+                    return float(kdata[-1].close)
+
+            return None
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"获取当前价格失败: {str(e)}", level="error")
+            return None
+
+    def _get_position(self, stock_code: str) -> Optional[Dict[str, Any]]:
+        """获取指定股票的持仓信息"""
+        try:
+            for position in self.current_positions:
+                if position['stock_code'] == stock_code:
+                    return position
+            return None
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"获取持仓信息失败: {str(e)}", level="error")
+            return None
+
+    def _update_position(self, trade_record: Dict[str, Any]):
+        """更新持仓信息"""
+        try:
+            stock_code = trade_record['stock_code']
+            trade_type = trade_record['type']
+            quantity = trade_record['quantity']
+            price = trade_record['price']
+
+            # 查找现有持仓
+            position = self._get_position(stock_code)
+
+            if trade_type == 'BUY':
+                if position:
+                    # 更新持仓
+                    total_cost = position['cost'] * \
+                        position['quantity'] + price * quantity
+                    total_quantity = position['quantity'] + quantity
+                    position['cost'] = total_cost / total_quantity
+                    position['quantity'] = total_quantity
+                else:
+                    # 新增持仓
+                    self.current_positions.append({
+                        'stock_code': stock_code,
+                        'stock_name': stock_code,  # 简化处理
+                        'quantity': quantity,
+                        'cost': price,
+                        'current_price': price
+                    })
+
+            elif trade_type == 'SELL':
+                if position:
+                    position['quantity'] -= quantity
+                    if position['quantity'] <= 0:
+                        # 清仓
+                        self.current_positions.remove(position)
+
+            # 更新持仓表格显示
+            self._update_position_table()
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"更新持仓信息失败: {str(e)}", level="error")
+
+    def _record_trade(self, trade_record: Dict[str, Any]):
+        """记录交易记录"""
+        try:
+            # 添加到交易记录表格
+            row = self.trade_table.rowCount()
+            self.trade_table.insertRow(row)
+
+            self.trade_table.setItem(row, 0, QTableWidgetItem(
+                trade_record['time'].strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            self.trade_table.setItem(
+                row, 1, QTableWidgetItem(trade_record['stock_code']))
+            self.trade_table.setItem(
+                row, 2, QTableWidgetItem(trade_record['type']))
+            self.trade_table.setItem(row, 3, QTableWidgetItem(
+                f"{trade_record['price']:.2f}"))
+            self.trade_table.setItem(
+                row, 4, QTableWidgetItem(str(trade_record['quantity'])))
+            self.trade_table.setItem(row, 5, QTableWidgetItem(
+                f"{trade_record['amount']:.2f}"))
+            self.trade_table.setItem(
+                row, 6, QTableWidgetItem(f"{trade_record['fee']:.2f}"))
+
+            # 调整列宽
+            self.trade_table.resizeColumnsToContents()
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"记录交易失败: {str(e)}", level="error")
+
+    def _update_position_table(self):
+        """更新持仓表格显示"""
+        try:
+            # 清空表格
+            self.position_table.setRowCount(0)
+
+            # 添加持仓数据
+            for position in self.current_positions:
+                row = self.position_table.rowCount()
+                self.position_table.insertRow(row)
+
+                # 获取当前价格
+                current_price = self._get_current_price(
+                ) if position['stock_code'] == self.current_stock else position['current_price']
+                if current_price:
+                    position['current_price'] = current_price
+
+                # 计算盈亏
+                profit_loss = (
+                    current_price - position['cost']) / position['cost'] * 100 if position['cost'] > 0 else 0
+
+                self.position_table.setItem(
+                    row, 0, QTableWidgetItem(position['stock_code']))
+                self.position_table.setItem(
+                    row, 1, QTableWidgetItem(position['stock_name']))
+                self.position_table.setItem(
+                    row, 2, QTableWidgetItem(str(position['quantity'])))
+                self.position_table.setItem(
+                    row, 3, QTableWidgetItem(f"{position['cost']:.2f}"))
+                self.position_table.setItem(
+                    row, 4, QTableWidgetItem(f"{current_price:.2f}"))
+
+                # 设置盈亏颜色
+                profit_item = QTableWidgetItem(f"{profit_loss:.2f}%")
+                if profit_loss > 0:
+                    profit_item.setForeground(QColor('red'))
+                elif profit_loss < 0:
+                    profit_item.setForeground(QColor('green'))
+                self.position_table.setItem(row, 5, profit_item)
+
+            # 调整列宽
+            self.position_table.resizeColumnsToContents()
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"更新持仓表格失败: {str(e)}", level="error")
+
+    def _get_pending_orders(self) -> List[Dict[str, Any]]:
+        """获取待处理订单列表"""
+        try:
+            # 这里返回模拟的订单数据
+            # 在实际应用中，应该从交易接口获取真实的订单数据
+            return [
+                {
+                    'id': '12345',
+                    'stock_code': 'sh000001',
+                    'type': 'BUY',
+                    'price': 3.25,
+                    'quantity': 1000,
+                    'status': 'PENDING'
+                },
+                {
+                    'id': '12346',
+                    'stock_code': 'sz000002',
+                    'type': 'SELL',
+                    'price': 15.80,
+                    'quantity': 500,
+                    'status': 'PENDING'
+                }
+            ]
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"获取待处理订单失败: {str(e)}", level="error")
+            return []
+
+    def _cancel_order(self, order_id: str):
+        """撤销指定订单"""
+        try:
+            # 这里实现撤单逻辑
+            # 在实际应用中，应该调用交易接口撤销订单
+            log_structured(self.log_manager, f"撤销订单 {order_id}", level="info")
+
+        except Exception as e:
+            log_structured(self.log_manager,
+                           f"撤销订单失败: {str(e)}", level="error")
+            raise

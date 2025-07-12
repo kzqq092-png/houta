@@ -25,7 +25,8 @@ def suppress_warnings():
 
         # 抑制numpy警告
         warnings.filterwarnings('ignore', message='.*overflow encountered.*')
-        warnings.filterwarnings('ignore', message='.*invalid value encountered.*')
+        warnings.filterwarnings(
+            'ignore', message='.*invalid value encountered.*')
 
         # 抑制Qt警告
         os.environ['QT_LOGGING_RULES'] = '*.debug=false;qt.qpa.*=false'

@@ -353,7 +353,8 @@ class AdvancedSearchDialog(QDialog):
 
         # 结果标题
         result_title = QLabel("搜索结果")
-        result_title.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
+        result_title.setStyleSheet(
+            "font-size: 14px; font-weight: bold; padding: 5px;")
         layout.addWidget(result_title)
 
         # 结果表格
@@ -391,7 +392,8 @@ class AdvancedSearchDialog(QDialog):
 
         # 结果统计
         self.result_label = QLabel("共找到 0 只股票")
-        self.result_label.setStyleSheet("color: #6c757d; font-size: 12px; padding: 5px;")
+        self.result_label.setStyleSheet(
+            "color: #6c757d; font-size: 12px; padding: 5px;")
         layout.addWidget(self.result_label)
 
         return panel
@@ -430,9 +432,11 @@ class AdvancedSearchDialog(QDialog):
 
             # 启动搜索线程
             self.search_worker = SearchWorker(search_params)
-            self.search_worker.search_completed.connect(self._on_search_completed)
+            self.search_worker.search_completed.connect(
+                self._on_search_completed)
             self.search_worker.search_error.connect(self._on_search_error)
-            self.search_worker.search_progress.connect(self._on_search_progress)
+            self.search_worker.search_progress.connect(
+                self._on_search_progress)
             self.search_worker.start()
 
         except Exception as e:
@@ -452,14 +456,22 @@ class AdvancedSearchDialog(QDialog):
             # 更新结果表格
             self.result_table.setRowCount(len(results))
             for i, stock in enumerate(results):
-                self.result_table.setItem(i, 0, QTableWidgetItem(stock['code']))
-                self.result_table.setItem(i, 1, QTableWidgetItem(stock['name']))
-                self.result_table.setItem(i, 2, QTableWidgetItem(stock['market']))
-                self.result_table.setItem(i, 3, QTableWidgetItem(stock['industry']))
-                self.result_table.setItem(i, 4, QTableWidgetItem(f"{stock['price']:.2f}"))
-                self.result_table.setItem(i, 5, QTableWidgetItem(f"{stock['market_cap']/100000000:.2f}"))
-                self.result_table.setItem(i, 6, QTableWidgetItem(f"{stock['volume']:,}"))
-                self.result_table.setItem(i, 7, QTableWidgetItem(f"{stock['turnover_rate']:.2f}"))
+                self.result_table.setItem(
+                    i, 0, QTableWidgetItem(stock['code']))
+                self.result_table.setItem(
+                    i, 1, QTableWidgetItem(stock['name']))
+                self.result_table.setItem(
+                    i, 2, QTableWidgetItem(stock['market']))
+                self.result_table.setItem(
+                    i, 3, QTableWidgetItem(stock['industry']))
+                self.result_table.setItem(
+                    i, 4, QTableWidgetItem(f"{stock['price']:.2f}"))
+                self.result_table.setItem(i, 5, QTableWidgetItem(
+                    f"{stock['market_cap']/100000000:.2f}"))
+                self.result_table.setItem(
+                    i, 6, QTableWidgetItem(f"{stock['volume']:,}"))
+                self.result_table.setItem(i, 7, QTableWidgetItem(
+                    f"{stock['turnover_rate']:.2f}"))
 
             # 更新统计信息
             self.result_label.setText(f"共找到 {len(results)} 只股票")

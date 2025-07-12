@@ -81,25 +81,34 @@ class MarketEnvironment(EnvironmentBase):
             # 计算移动平均线
             if isinstance(df['close'], pd.Series):
                 # 已替换为新的导入
-                ma_short = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_short")})
-                ma_mid = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_mid")})
-                ma_long = calculate_indicator('MA', df, {'timeperiod': self.get_param("ma_long")})
+                ma_short = calculate_indicator(
+                    'MA', df, {'timeperiod': self.get_param("ma_short")})
+                ma_mid = calculate_indicator(
+                    'MA', df, {'timeperiod': self.get_param("ma_mid")})
+                ma_long = calculate_indicator(
+                    'MA', df, {'timeperiod': self.get_param("ma_long")})
                 macd = calculate_indicator('MACD', df, {'fast': self.get_param("macd_fast"),
                                            'slow': self.get_param("macd_slow"), 'signal': self.get_param("macd_signal")})
-                rsi = calculate_indicator('RSI', df, {'timeperiod': self.get_param("rsi_period")})
-                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param("boll_period"), 'width': self.get_param("boll_width")})
-                atr = calculate_indicator('ATR', df, {'timeperiod': self.get_param("atr_period")})
+                rsi = calculate_indicator(
+                    'RSI', df, {'timeperiod': self.get_param("rsi_period")})
+                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param(
+                    "boll_period"), 'width': self.get_param("boll_width")})
+                atr = calculate_indicator(
+                    'ATR', df, {'timeperiod': self.get_param("atr_period")})
                 obv = calculate_indicator('OBV', df, {})
-                cci = calculate_indicator('CCI', df, {'timeperiod': self.get_param("cci_period")})
+                cci = calculate_indicator(
+                    'CCI', df, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import MA, MACD, RSI, BOLL, VOL
                 close_ind = CLOSE(k)
                 ma_short = MA(close_ind, n=self.get_param("ma_short"))
                 ma_mid = MA(close_ind, n=self.get_param("ma_mid"))
                 ma_long = MA(close_ind, n=self.get_param("ma_long"))
-                macd = MACD(close_ind, n1=self.get_param("macd_fast"), n2=self.get_param("macd_slow"), n3=self.get_param("macd_signal"))
+                macd = MACD(close_ind, n1=self.get_param("macd_fast"), n2=self.get_param(
+                    "macd_slow"), n3=self.get_param("macd_signal"))
                 rsi = RSI(close_ind, n=self.get_param("rsi_period"))
-                boll = BOLL(close_ind, n=self.get_param("boll_period"), width=self.get_param("boll_width"))
+                boll = BOLL(close_ind, n=self.get_param(
+                    "boll_period"), width=self.get_param("boll_width"))
                 # 波动率
                 returns = None  # hikyuu Indicator不直接支持pct_change
                 volatility = None
@@ -109,14 +118,18 @@ class MarketEnvironment(EnvironmentBase):
             # --- 类型安全指标计算 ---
             if isinstance(df['close'], pd.Series):
                 # 已替换为新的导入
-                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param("boll_period"), 'width': self.get_param("boll_width")})
-                atr = calculate_indicator('ATR', df, {'timeperiod': self.get_param("atr_period")})
+                boll = calculate_indicator('BOLL', df, {'timeperiod': self.get_param(
+                    "boll_period"), 'width': self.get_param("boll_width")})
+                atr = calculate_indicator(
+                    'ATR', df, {'timeperiod': self.get_param("atr_period")})
                 obv = calculate_indicator('OBV', df, {})
-                cci = calculate_indicator('CCI', df, {'timeperiod': self.get_param("cci_period")})
+                cci = calculate_indicator(
+                    'CCI', df, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import BOLL, ATR, OBV, CCI, CLOSE
                 close_ind = CLOSE(k)
-                boll = BOLL(close_ind, n=self.get_param("boll_period"), width=self.get_param("boll_width"))
+                boll = BOLL(close_ind, n=self.get_param(
+                    "boll_period"), width=self.get_param("boll_width"))
                 atr = ATR(k, n=self.get_param("atr_period"))
                 obv = OBV(k)
                 cci = CCI(k, n=self.get_param("cci_period"))

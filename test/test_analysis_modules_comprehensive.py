@@ -99,10 +99,12 @@ def test_module_initialization(imported_classes):
                 print(f"   📋 关键属性: {', '.join(critical_attributes)}")
 
         except Exception as e:
-            failed_initializations.append((class_name, str(e), traceback.format_exc()))
+            failed_initializations.append(
+                (class_name, str(e), traceback.format_exc()))
             print(f"❌ {class_name}: 初始化失败 - {e}")
 
-    print(f"\n📊 初始化结果: {len(initialized_instances)}/{len(imported_classes)} 成功")
+    print(
+        f"\n📊 初始化结果: {len(initialized_instances)}/{len(imported_classes)} 成功")
     return initialized_instances, failed_initializations
 
 
@@ -172,7 +174,8 @@ def generate_comprehensive_report(imported_classes, failed_imports, initialized_
 
     print(f"\n📊 总体统计:")
     print(f"   总模块数: {total_modules}")
-    print(f"   导入成功: {successful_imports}/{total_modules} ({successful_imports/total_modules*100:.1f}%)")
+    print(
+        f"   导入成功: {successful_imports}/{total_modules} ({successful_imports/total_modules*100:.1f}%)")
     print(f"   初始化成功: {successful_initializations}/{successful_imports} ({successful_initializations/successful_imports*100:.1f}% if successful_imports > 0 else 0)")
 
     # 成功的模块
@@ -204,7 +207,8 @@ def generate_comprehensive_report(imported_classes, failed_imports, initialized_
             print(f"     {result}")
 
     # 专业级功能统计
-    pro_modules = [name for name in initialized_instances.keys() if 'Pro' in name]
+    pro_modules = [name for name in initialized_instances.keys()
+                   if 'Pro' in name]
     print(f"\n⭐ 专业级模块: {len(pro_modules)}")
     for name in pro_modules:
         print(f"   • {name}")
@@ -233,17 +237,20 @@ def generate_comprehensive_report(imported_classes, failed_imports, initialized_
 def main():
     """主测试函数"""
     print("🚀 开始 Analysis Widget 模块全面测试")
-    print("测试时间:", os.popen('date').read().strip() if os.name != 'nt' else 'Windows')
+    print("测试时间:", os.popen('date').read().strip()
+          if os.name != 'nt' else 'Windows')
 
     try:
         # 1. 测试导入
         imported_classes, failed_imports = test_module_import()
 
         # 2. 测试初始化
-        initialized_instances, failed_initializations = test_module_initialization(imported_classes)
+        initialized_instances, failed_initializations = test_module_initialization(
+            imported_classes)
 
         # 3. 测试功能
-        functionality_results = test_specific_functionality(initialized_instances)
+        functionality_results = test_specific_functionality(
+            initialized_instances)
 
         # 4. 生成报告
         report_stats = generate_comprehensive_report(

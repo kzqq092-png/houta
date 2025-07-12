@@ -111,7 +111,8 @@ class OptimizationController:
             if top_performers:
                 print("\n最佳性能形态:")
                 for performer in top_performers[:5]:
-                    print(f"  {performer['pattern']}: {performer['score']:.3f}")
+                    print(
+                        f"  {performer['pattern']}: {performer['score']:.3f}")
 
             # 当前运行状态
             tuner_status = self.auto_tuner.get_optimization_status()
@@ -133,11 +134,13 @@ class OptimizationController:
 
             for i, pattern in enumerate(patterns, 1):
                 status = "✓ 激活" if pattern.is_active else "未激活"
-                print(f"{i:2d}. {pattern.english_name:20s} ({pattern.name}) - {status}")
+                print(
+                    f"{i:2d}. {pattern.english_name:20s} ({pattern.name}) - {status}")
 
                 # 显示最新性能
                 try:
-                    history = self.db_manager.get_performance_history(pattern.english_name, limit=1)
+                    history = self.db_manager.get_performance_history(
+                        pattern.english_name, limit=1)
                     if history:
                         latest = history[0]
                         score = latest.get('overall_score', 0)
@@ -159,10 +162,12 @@ class OptimizationController:
 
         try:
             # 创建测试数据集
-            test_datasets = self.evaluator.create_test_datasets(pattern_name, count=dataset_count)
+            test_datasets = self.evaluator.create_test_datasets(
+                pattern_name, count=dataset_count)
 
             # 执行评估
-            metrics = self.evaluator.evaluate_algorithm(pattern_name, test_datasets)
+            metrics = self.evaluator.evaluate_algorithm(
+                pattern_name, test_datasets)
 
             # 显示结果
             print(f"综合评分: {metrics.overall_score:.3f}")
@@ -274,7 +279,8 @@ class OptimizationController:
                 # 智能分析结果
                 smart_analysis = result.get("smart_analysis", {})
                 if smart_analysis:
-                    print(f"目标达成率: {smart_analysis.get('target_achievement_rate', 0):.1f}%")
+                    print(
+                        f"目标达成率: {smart_analysis.get('target_achievement_rate', 0):.1f}%")
 
         except Exception as e:
             print(f"❌ 智能优化失败: {e}")
@@ -289,7 +295,8 @@ class OptimizationController:
         print("-" * 50)
 
         try:
-            versions = self.version_manager.get_versions(pattern_name, limit=10)
+            versions = self.version_manager.get_versions(
+                pattern_name, limit=10)
 
             if not versions:
                 print("暂无版本记录")
@@ -319,7 +326,8 @@ class OptimizationController:
         print(f"激活版本: {pattern_name} v{version_number}")
 
         try:
-            success = self.version_manager.rollback_to_version(pattern_name, version_number)
+            success = self.version_manager.rollback_to_version(
+                pattern_name, version_number)
 
             if success:
                 print(f"✅ 版本 {version_number} 已激活")
@@ -356,7 +364,8 @@ class OptimizationController:
             pattern_names = [p.english_name for p in patterns if p.is_active]
 
             if pattern_name:
-                pattern_names = [pattern_name] if pattern_name in pattern_names else []
+                pattern_names = [
+                    pattern_name] if pattern_name in pattern_names else []
 
             # 导出每个形态的数据
             for name in pattern_names:
@@ -387,7 +396,8 @@ class OptimizationController:
                     pattern_data["versions"].append(version_info)
 
                 # 性能历史
-                history = self.db_manager.get_performance_history(name, limit=10)
+                history = self.db_manager.get_performance_history(
+                    name, limit=10)
                 pattern_data["performance_history"] = history
 
                 export_data["patterns"].append(pattern_data)

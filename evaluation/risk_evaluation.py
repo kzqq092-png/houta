@@ -98,7 +98,8 @@ class RiskEvaluator:
             var_value = np.percentile(returns, (1 - confidence) * 100)
             var_key = f'var_{int(confidence * 100)}'
 
-            level = self._determine_risk_level(abs(var_value), self.risk_thresholds[var_key])
+            level = self._determine_risk_level(
+                abs(var_value), self.risk_thresholds[var_key])
 
             metrics[var_key] = RiskMetric(
                 name=f"VaR ({confidence:.0%})",
@@ -114,7 +115,8 @@ class RiskEvaluator:
         var_95 = np.percentile(returns, 5)
         cvar_95 = returns[returns <= var_95].mean()
 
-        level = self._determine_risk_level(abs(cvar_95), self.risk_thresholds['var_95'])
+        level = self._determine_risk_level(
+            abs(cvar_95), self.risk_thresholds['var_95'])
 
         metrics['cvar_95'] = RiskMetric(
             name="CVaR (95%)",
@@ -127,7 +129,8 @@ class RiskEvaluator:
 
         # 波动率
         volatility = returns.std() * np.sqrt(252)
-        level = self._determine_risk_level(volatility, self.risk_thresholds['volatility'])
+        level = self._determine_risk_level(
+            volatility, self.risk_thresholds['volatility'])
 
         metrics['volatility'] = RiskMetric(
             name="年化波动率",
@@ -141,7 +144,8 @@ class RiskEvaluator:
 
         # 最大回撤
         max_drawdown = self._calculate_max_drawdown(returns)
-        level = self._determine_risk_level(abs(max_drawdown), self.risk_thresholds['max_drawdown'])
+        level = self._determine_risk_level(
+            abs(max_drawdown), self.risk_thresholds['max_drawdown'])
 
         metrics['max_drawdown'] = RiskMetric(
             name="最大回撤",
@@ -190,7 +194,8 @@ class RiskEvaluator:
 
         # 赫芬达尔指数
         hhi = np.sum(weights ** 2)
-        level = self._determine_risk_level(hhi, self.risk_thresholds['concentration'])
+        level = self._determine_risk_level(
+            hhi, self.risk_thresholds['concentration'])
 
         metrics['hhi'] = RiskMetric(
             name="赫芬达尔指数",
@@ -204,7 +209,8 @@ class RiskEvaluator:
 
         # 最大权重
         max_weight = np.max(weights)
-        level = self._determine_risk_level(max_weight, self.risk_thresholds['concentration'])
+        level = self._determine_risk_level(
+            max_weight, self.risk_thresholds['concentration'])
 
         metrics['max_weight'] = RiskMetric(
             name="最大持仓权重",
@@ -255,8 +261,10 @@ class RiskEvaluator:
         volume_volatility = trading_volumes.std() / avg_volume if avg_volume > 0 else 0
 
         # 流动性比率（基于交易量稳定性）
-        liquidity_ratio = 1 / (1 + volume_volatility) if volume_volatility > 0 else 1
-        level = self._determine_risk_level(1 - liquidity_ratio, self.risk_thresholds['liquidity_ratio'])
+        liquidity_ratio = 1 / \
+            (1 + volume_volatility) if volume_volatility > 0 else 1
+        level = self._determine_risk_level(
+            1 - liquidity_ratio, self.risk_thresholds['liquidity_ratio'])
 
         metrics['liquidity_ratio'] = RiskMetric(
             name="流动性比率",
@@ -346,7 +354,8 @@ class RiskEvaluator:
 
     def generate_comprehensive_risk_report(self,
                                            returns: Optional[pd.Series] = None,
-                                           portfolio_weights: Optional[Dict[str, float]] = None,
+                                           portfolio_weights: Optional[Dict[str,
+                                                                            float]] = None,
                                            trading_volumes: Optional[pd.Series] = None,
                                            system_metrics: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
@@ -375,29 +384,36 @@ class RiskEvaluator:
         if returns is not None and not returns.empty:
             market_risk = self.evaluate_market_risk(returns)
             all_metrics.update(market_risk)
-            report['risk_metrics']['market'] = {k: self._metric_to_dict(v) for k, v in market_risk.items()}
+            report['risk_metrics']['market'] = {
+                k: self._metric_to_dict(v) for k, v in market_risk.items()}
 
         # 集中度风险评估
         if portfolio_weights:
-            concentration_risk = self.evaluate_concentration_risk(portfolio_weights)
+            concentration_risk = self.evaluate_concentration_risk(
+                portfolio_weights)
             all_metrics.update(concentration_risk)
-            report['risk_metrics']['concentration'] = {k: self._metric_to_dict(v) for k, v in concentration_risk.items()}
+            report['risk_metrics']['concentration'] = {
+                k: self._metric_to_dict(v) for k, v in concentration_risk.items()}
 
         # 流动性风险评估
         if trading_volumes is not None and not trading_volumes.empty:
             liquidity_risk = self.evaluate_liquidity_risk(trading_volumes)
             all_metrics.update(liquidity_risk)
-            report['risk_metrics']['liquidity'] = {k: self._metric_to_dict(v) for k, v in liquidity_risk.items()}
+            report['risk_metrics']['liquidity'] = {
+                k: self._metric_to_dict(v) for k, v in liquidity_risk.items()}
 
         # 操作风险评估
         operational_risk = self.evaluate_operational_risk(system_metrics)
         all_metrics.update(operational_risk)
-        report['risk_metrics']['operational'] = {k: self._metric_to_dict(v) for k, v in operational_risk.items()}
+        report['risk_metrics']['operational'] = {
+            k: self._metric_to_dict(v) for k, v in operational_risk.items()}
 
         # 生成风险总结
         report['risk_summary'] = self._generate_risk_summary(all_metrics)
-        report['recommendations'] = self._generate_risk_recommendations(all_metrics)
-        report['overall_risk_level'] = self._calculate_overall_risk_level(all_metrics)
+        report['recommendations'] = self._generate_risk_recommendations(
+            all_metrics)
+        report['overall_risk_level'] = self._calculate_overall_risk_level(
+            all_metrics)
 
         return report
 
@@ -495,10 +511,12 @@ class RiskEvaluator:
 
         for metric in metrics.values():
             if metric.level in [RiskLevel.HIGH, RiskLevel.EXTREME] and metric.recommendation:
-                recommendations.append(f"{metric.name}: {metric.recommendation}")
+                recommendations.append(
+                    f"{metric.name}: {metric.recommendation}")
 
         # 通用建议
-        high_risk_count = sum(1 for m in metrics.values() if m.level in [RiskLevel.HIGH, RiskLevel.EXTREME])
+        high_risk_count = sum(1 for m in metrics.values() if m.level in [
+                              RiskLevel.HIGH, RiskLevel.EXTREME])
         if high_risk_count > len(metrics) * 0.3:
             recommendations.append("整体风险水平较高，建议全面审查风险管理策略")
 
@@ -516,7 +534,8 @@ class RiskEvaluator:
             RiskLevel.EXTREME: 4
         }
 
-        total_score = sum(risk_scores[metric.level] for metric in metrics.values())
+        total_score = sum(risk_scores[metric.level]
+                          for metric in metrics.values())
         avg_score = total_score / len(metrics)
 
         if avg_score <= 1.5:
@@ -643,7 +662,8 @@ if __name__ == "__main__":
 
     # 生成模拟数据
     returns = pd.Series(np.random.normal(0.001, 0.02, 252))
-    portfolio_weights = {'AAPL': 0.3, 'GOOGL': 0.25, 'MSFT': 0.2, 'TSLA': 0.15, 'AMZN': 0.1}
+    portfolio_weights = {'AAPL': 0.3, 'GOOGL': 0.25,
+                         'MSFT': 0.2, 'TSLA': 0.15, 'AMZN': 0.1}
     trading_volumes = pd.Series(np.random.lognormal(10, 1, 252))
 
     # 生成风险报告

@@ -78,7 +78,8 @@ class MemoryManager:
                 try:
                     callback()
                 except Exception as e:
-                    self.log_manager.log(f"内存清理回调执行失败: {str(e)}", LogLevel.WARNING)
+                    self.log_manager.log(
+                        f"内存清理回调执行失败: {str(e)}", LogLevel.WARNING)
 
             memory_after = self.monitor_memory()
             freed_memory = memory_before["used"] - memory_after["used"]
@@ -227,7 +228,8 @@ class ParallelProcessor:
     """
 
     def __init__(self, max_workers: Optional[int] = None):
-        self.max_workers = max_workers or min(32, (multiprocessing.cpu_count() or 1) + 4)
+        self.max_workers = max_workers or min(
+            32, (multiprocessing.cpu_count() or 1) + 4)
         self.thread_pool = None
         self.process_pool = None
 
@@ -286,7 +288,8 @@ class ParallelProcessor:
             return []
 
         # 分批处理
-        batches = [data_list[i:i + batch_size] for i in range(0, len(data_list), batch_size)]
+        batches = [data_list[i:i + batch_size]
+                   for i in range(0, len(data_list), batch_size)]
 
         if use_processes:
             return self.process_parallel_processes(func, batches, **kwargs)
@@ -330,7 +333,8 @@ class ProfessionalPerformanceOptimizer:
             self.parallel_processor.max_workers = 8
         else:  # PROFESSIONAL
             self.cache_manager.max_size = 2000
-            self.parallel_processor.max_workers = min(32, multiprocessing.cpu_count() * 2)
+            self.parallel_processor.max_workers = min(
+                32, multiprocessing.cpu_count() * 2)
 
     def start_monitoring(self):
         """开始性能监控"""
@@ -379,7 +383,8 @@ class ProfessionalPerformanceOptimizer:
                 optimized_df[col] = optimized_df[col].astype('int32')
 
         for col in optimized_df.select_dtypes(include=['float64']).columns:
-            optimized_df[col] = pd.to_numeric(optimized_df[col], downcast='float')
+            optimized_df[col] = pd.to_numeric(
+                optimized_df[col], downcast='float')
 
         # 优化字符串类型
         for col in optimized_df.select_dtypes(include=['object']).columns:
@@ -398,10 +403,12 @@ class ProfessionalPerformanceOptimizer:
 
         recent_metrics = self.performance_history[-10:]  # 最近10次
 
-        avg_execution_time = np.mean([m.execution_time for m in recent_metrics])
+        avg_execution_time = np.mean(
+            [m.execution_time for m in recent_metrics])
         avg_memory_usage = np.mean([m.memory_usage for m in recent_metrics])
         avg_cpu_usage = np.mean([m.cpu_usage for m in recent_metrics])
-        avg_cache_hit_rate = np.mean([m.cache_hit_rate for m in recent_metrics])
+        avg_cache_hit_rate = np.mean(
+            [m.cache_hit_rate for m in recent_metrics])
 
         cache_stats = self.cache_manager.get_stats()
         memory_info = self.memory_manager.monitor_memory()

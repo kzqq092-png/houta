@@ -77,7 +77,8 @@ except ImportError:
                 project_root / "plugins" / "plugin_interface.py"
             )
             if spec_interface and spec_interface.loader:
-                plugin_interface_module = importlib.util.module_from_spec(spec_interface)
+                plugin_interface_module = importlib.util.module_from_spec(
+                    spec_interface)
                 sys.modules["plugin_interface"] = plugin_interface_module
                 spec_interface.loader.exec_module(plugin_interface_module)
                 IPlugin = plugin_interface_module.IPlugin
@@ -91,7 +92,8 @@ except ImportError:
                 project_root / "plugins" / "plugin_market.py"
             )
             if spec_market and spec_market.loader:
-                plugin_market_module = importlib.util.module_from_spec(spec_market)
+                plugin_market_module = importlib.util.module_from_spec(
+                    spec_market)
                 sys.modules["plugin_market"] = plugin_market_module
                 spec_market.loader.exec_module(plugin_market_module)
                 PluginMarket = plugin_market_module.PluginMarket
@@ -233,7 +235,8 @@ class PluginManager(QObject):
                 return
 
             # 需要排除的文件和模块
-            excluded_files = ["plugin_interface.py", "plugin_market.py", "__init__.py"]
+            excluded_files = ["plugin_interface.py",
+                              "plugin_market.py", "__init__.py"]
             excluded_modules = ["plugin_interface", "plugin_market"]
 
             # 加载插件目录中的插件
@@ -272,7 +275,8 @@ class PluginManager(QObject):
                     if self.load_plugin(plugin_name, plugin_path):
                         loaded_count += 1
 
-            logger.info(f"已加载 {loaded_count} 个插件 [core.plugin_manager::load_all_plugins]")
+            logger.info(
+                f"已加载 {loaded_count} 个插件 [core.plugin_manager::load_all_plugins]")
 
         except Exception as e:
             logger.error(f"加载插件失败: {e}")
@@ -296,7 +300,8 @@ class PluginManager(QObject):
                 return True
 
             # 加载插件模块
-            spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
+            spec = importlib.util.spec_from_file_location(
+                plugin_name, plugin_path)
             if spec is None or spec.loader is None:
                 logger.error(f"无法创建插件规范: {plugin_name}")
                 return False
@@ -311,9 +316,11 @@ class PluginManager(QObject):
                     parent_path = plugin_path.parent
                     parent_init = parent_path / "__init__.py"
                     if parent_init.exists():
-                        parent_spec = importlib.util.spec_from_file_location(parent_name, parent_init)
+                        parent_spec = importlib.util.spec_from_file_location(
+                            parent_name, parent_init)
                         if parent_spec and parent_spec.loader:
-                            parent_module = importlib.util.module_from_spec(parent_spec)
+                            parent_module = importlib.util.module_from_spec(
+                                parent_spec)
                             sys.modules[parent_name] = parent_module
                             parent_spec.loader.exec_module(parent_module)
 
@@ -396,12 +403,16 @@ class PluginManager(QObject):
                             # 注册指标
                             if indicators_list:
                                 if hasattr(indicator_service, 'register_indicators'):
-                                    indicator_ids = indicator_service.register_indicators(indicators_list, plugin_name)
-                                    logger.info(f"插件 {plugin_name} 成功注册了 {len(indicator_ids)} 个指标")
+                                    indicator_ids = indicator_service.register_indicators(
+                                        indicators_list, plugin_name)
+                                    logger.info(
+                                        f"插件 {plugin_name} 成功注册了 {len(indicator_ids)} 个指标")
                                 else:
-                                    logger.warning(f"IndicatorService缺少register_indicators方法，无法注册插件 {plugin_name} 的指标")
+                                    logger.warning(
+                                        f"IndicatorService缺少register_indicators方法，无法注册插件 {plugin_name} 的指标")
                         except ImportError:
-                            logger.warning(f"无法导入IndicatorService，跳过插件 {plugin_name} 的指标注册")
+                            logger.warning(
+                                f"无法导入IndicatorService，跳过插件 {plugin_name} 的指标注册")
                         except Exception as e:
                             logger.error(f"注册插件 {plugin_name} 的指标时发生错误: {e}")
                             logger.error(traceback.format_exc())
@@ -529,7 +540,8 @@ class PluginManager(QObject):
         """
         try:
             # 需要排除的类型名称
-            excluded_class_names = ["IPlugin", "PluginType", "PluginCategory", "PluginMetadata", "PluginContext"]
+            excluded_class_names = [
+                "IPlugin", "PluginType", "PluginCategory", "PluginMetadata", "PluginContext"]
 
             # 首先检查是否有使用装饰器标记的插件类
             for attr_name in dir(module):
@@ -551,10 +563,12 @@ class PluginManager(QObject):
                         if base.__name__ == 'IPlugin' or 'Plugin' in base.__name__:
                             # 检查是否是抽象类
                             if hasattr(attr, '__abstractmethods__') and attr.__abstractmethods__:
-                                logger.info(f"跳过抽象类: {attr.__name__}, 抽象方法: {attr.__abstractmethods__}")
+                                logger.info(
+                                    f"跳过抽象类: {attr.__name__}, 抽象方法: {attr.__abstractmethods__}")
                                 continue
 
-                            logger.info(f"找到继承自插件基类的类: {attr.__name__}, 基类: {[b.__name__ for b in attr.__bases__]}")
+                            logger.info(
+                                f"找到继承自插件基类的类: {attr.__name__}, 基类: {[b.__name__ for b in attr.__bases__]}")
                             return attr
 
             # 查找名称符合插件特征的类
@@ -944,7 +958,8 @@ class PluginManager(QObject):
                             try:
                                 plugin_type = PluginType(config['plugin_type'])
                             except ValueError:
-                                logger.warning(f"未知插件类型: {config['plugin_type']}")
+                                logger.warning(
+                                    f"未知插件类型: {config['plugin_type']}")
 
                         if 'category' in config:
                             try:
@@ -970,7 +985,8 @@ class PluginManager(QObject):
 
                         # 按类型分类
                         if plugin_type:
-                            self.plugins_by_type[plugin_type].append(plugin_info.name)
+                            self.plugins_by_type[plugin_type].append(
+                                plugin_info.name)
 
                     except Exception as e:
                         logger.error(f"发现插件失败 {plugin_dir}: {e}")

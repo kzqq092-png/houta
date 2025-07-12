@@ -134,7 +134,8 @@ class BaseAnalysisPanel(QWidget):
         else:
             # 兼容未集成trading_widget的情况，直接记录错误并安全返回
             if hasattr(self, 'log_manager'):
-                self.log_manager.error("分析启动失败: 未集成trading_widget，无法调用on_analyze()。")
+                self.log_manager.error(
+                    "分析启动失败: 未集成trading_widget，无法调用on_analyze()。")
         # 不再尝试super()，避免异常
 
     def on_export(self):
@@ -269,7 +270,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             self.log_manager.info("分析工具面板初始化完成")
             # 监听TradingWidget的analysis_progress信号
             if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'analysis_progress'):
-                self.trading_widget.analysis_progress.connect(self.on_analysis_progress)
+                self.trading_widget.analysis_progress.connect(
+                    self.on_analysis_progress)
         except Exception as e:
             print(f"初始化UI组件失败: {str(e)}")
             if hasattr(self, 'log_manager'):
@@ -293,7 +295,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 available_strategies = list_available_strategies()
                 if available_strategies:
                     self.strategy_combo.addItems(available_strategies)
-                    self.log_manager.info(f"从策略管理系统加载了 {len(available_strategies)} 个策略")
+                    self.log_manager.info(
+                        f"从策略管理系统加载了 {len(available_strategies)} 个策略")
                 else:
                     # 如果新系统没有策略，使用默认策略列表
                     default_strategies = [
@@ -354,7 +357,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             batch_layout.addWidget(QLabel("批量股票代码："))
             batch_layout.addWidget(self.batch_stock_input)
             self.batch_strategy_list = QListWidget()
-            self.batch_strategy_list.setSelectionMode(QListWidget.MultiSelection)
+            self.batch_strategy_list.setSelectionMode(
+                QListWidget.MultiSelection)
 
             # 使用新的策略管理系统获取策略列表
             try:
@@ -362,7 +366,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 if available_strategies:
                     for strategy in available_strategies:
                         self.batch_strategy_list.addItem(strategy)
-                    self.log_manager.info(f"批量策略列表加载了 {len(available_strategies)} 个策略")
+                    self.log_manager.info(
+                        f"批量策略列表加载了 {len(available_strategies)} 个策略")
                 else:
                     # 如果新系统没有策略，使用默认策略列表
                     default_strategies = [
@@ -387,11 +392,13 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             batch_layout.addWidget(QLabel("批量策略选择："))
             batch_layout.addWidget(self.batch_strategy_list)
             self.param_grid_table = QTableWidget(0, 3)
-            self.param_grid_table.setHorizontalHeaderLabels(["参数名", "起始值", "终止值"])
+            self.param_grid_table.setHorizontalHeaderLabels(
+                ["参数名", "起始值", "终止值"])
             batch_layout.addWidget(QLabel("参数范围设置（可选）："))
             batch_layout.addWidget(self.param_grid_table)
             add_param_btn = QPushButton("添加参数")
-            add_param_btn.clicked.connect(lambda: self.param_grid_table.insertRow(self.param_grid_table.rowCount()))
+            add_param_btn.clicked.connect(
+                lambda: self.param_grid_table.insertRow(self.param_grid_table.rowCount()))
             batch_layout.addWidget(add_param_btn)
             self.run_batch_btn = QPushButton("一键批量回测")
             batch_layout.addWidget(self.run_batch_btn)
@@ -420,7 +427,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             self.ai_stock_tab = QWidget()
             ai_stock_layout = QVBoxLayout(self.ai_stock_tab)
             self.ai_stock_input = QTextEdit()
-            self.ai_stock_input.setPlaceholderText("请输入选股需求或因子描述（如：高ROE、低估值、强势资金流等，或直接用自然语言描述）")
+            self.ai_stock_input.setPlaceholderText(
+                "请输入选股需求或因子描述（如：高ROE、低估值、强势资金流等，或直接用自然语言描述）")
             ai_stock_layout.addWidget(QLabel("AI智能选股（支持自然语言/参数化因子输入）："))
             ai_stock_layout.addWidget(self.ai_stock_input)
             self.ai_stock_run_btn = QPushButton("一键AI选股")
@@ -519,7 +527,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             self.log_manager.info("连接策略选择信号")
             # 连接策略选择信号
             if self.strategy_combo is None:
-                self.log_manager.error("connect_signals失败: self.strategy_combo为None，UI未正确初始化，跳过信号连接。")
+                self.log_manager.error(
+                    "connect_signals失败: self.strategy_combo为None，UI未正确初始化，跳过信号连接。")
                 return
             self.strategy_combo.currentTextChanged.connect(
                 self.on_strategy_changed)
@@ -635,7 +644,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 else:
                     params[k] = v
         # 获取当前策略
-        strategy = getattr(self, 'strategy_combo', None).currentText() if hasattr(self, 'strategy_combo') else ''
+        strategy = getattr(self, 'strategy_combo', None).currentText(
+        ) if hasattr(self, 'strategy_combo') else ''
         params['strategy'] = strategy
         # 股票代码只用trading_widget.current_stock
         if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'current_stock'):
@@ -703,11 +713,14 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         chart_widget = getattr(parent, 'chart_widget', None)
         if chart_widget:
             if 'equity_curve' in results:
-                chart_widget.update_chart({'equity_curve': results['equity_curve']})
+                chart_widget.update_chart(
+                    {'equity_curve': results['equity_curve']})
             if 'drawdown_curve' in results:
-                chart_widget.update_chart({'drawdown_curve': results['drawdown_curve']})
+                chart_widget.update_chart(
+                    {'drawdown_curve': results['drawdown_curve']})
             if 'returns_histogram' in results:
-                chart_widget.update_chart({'returns_histogram': results['returns_histogram']})
+                chart_widget.update_chart(
+                    {'returns_histogram': results['returns_histogram']})
             if 'signals' in results:
                 chart_widget.plot_signals(results['signals'])
             if 'pattern_signals' in results:
@@ -728,9 +741,11 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 chart_widget.plot_group_comparison(group_results)
         # 5. 兼容原有信号/分析结果展示
         if 'signals' in results:
-            self.results_area.append("<b>信号明细：</b><br>" + str(results['signals']))
+            self.results_area.append(
+                "<b>信号明细：</b><br>" + str(results['signals']))
         if 'analysis' in results:
-            self.results_area.append("<b>分析结果：</b><br>" + str(results['analysis']))
+            self.results_area.append(
+                "<b>分析结果：</b><br>" + str(results['analysis']))
         # 6. 调用TradingWidget的update_backtest_results以填充表格（如有）
         if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'update_backtest_results'):
             self.trading_widget.update_backtest_results(results)
@@ -821,7 +836,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         batch_layout.addLayout(strat_layout)
         # 参数输入（可扩展为表格）
         self.param_input = QLineEdit()
-        self.param_input.setPlaceholderText("参数组合（如 fast=5,slow=20;fast=10,slow=30）")
+        self.param_input.setPlaceholderText(
+            "参数组合（如 fast=5,slow=20;fast=10,slow=30）")
         batch_layout.addWidget(QLabel("参数组合："))
         batch_layout.addWidget(self.param_input)
         # 新增：执行模式选择
@@ -833,7 +849,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         mode_layout.addWidget(self.mode_combo)
         # 远程节点输入（仅Dask分布式时可见）
         self.remote_nodes_edit = QLineEdit()
-        self.remote_nodes_edit.setPlaceholderText("Dask调度器地址，如tcp://127.0.0.1:8786，多个用逗号分隔")
+        self.remote_nodes_edit.setPlaceholderText(
+            "Dask调度器地址，如tcp://127.0.0.1:8786，多个用逗号分隔")
         self.remote_nodes_edit.setVisible(False)
         mode_layout.addWidget(self.remote_nodes_edit)
         self.mode_combo.currentTextChanged.connect(
@@ -852,7 +869,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         batch_layout.addWidget(self.resume_all_btn)
         # 任务进度表
         self.batch_table = QTableWidget(0, 5)
-        self.batch_table.setHorizontalHeaderLabels(["股票", "策略", "参数", "进度", "状态"])
+        self.batch_table.setHorizontalHeaderLabels(
+            ["股票", "策略", "参数", "进度", "状态"])
         self.batch_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         batch_layout.addWidget(self.batch_table)
         # 新增：实时进度曲线
@@ -890,10 +908,12 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         self.task_queue_label = QLabel("任务队列：")
         batch_layout.addWidget(self.task_queue_label)
         self.task_queue_list = QListWidget()
-        self.task_queue_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.task_queue_list.setSelectionMode(
+            QAbstractItemView.ExtendedSelection)
         self.task_queue_list.setDragDropMode(QAbstractItemView.InternalMove)
         self.task_queue_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.task_queue_list.customContextMenuRequested.connect(self.show_task_queue_menu)
+        self.task_queue_list.customContextMenuRequested.connect(
+            self.show_task_queue_menu)
         batch_layout.addWidget(self.task_queue_list)
         # 批量操作按钮
         op_layout = QHBoxLayout()
@@ -936,12 +956,15 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         self.strategy_filter = QComboBox()
         self.strategy_filter.addItem("全部策略")
         # 动态填充策略
-        self.strategy_filter.addItems(sorted(set(t['strategy'] for t in getattr(self, 'batch_tasks', []))))
-        self.strategy_filter.currentTextChanged.connect(self.apply_task_filters)
+        self.strategy_filter.addItems(
+            sorted(set(t['strategy'] for t in getattr(self, 'batch_tasks', []))))
+        self.strategy_filter.currentTextChanged.connect(
+            self.apply_task_filters)
         filter_layout.addWidget(self.strategy_filter)
         self.stock_filter = QComboBox()
         self.stock_filter.addItem("全部股票")
-        self.stock_filter.addItems(sorted(set(t['stock'] for t in getattr(self, 'batch_tasks', []))))
+        self.stock_filter.addItems(
+            sorted(set(t['stock'] for t in getattr(self, 'batch_tasks', []))))
         self.stock_filter.currentTextChanged.connect(self.apply_task_filters)
         filter_layout.addWidget(self.stock_filter)
         filter_layout.addStretch()
@@ -951,7 +974,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 新增：分组显示（按状态分组）
         self.group_by_combo = QComboBox()
         self.group_by_combo.addItems(["不分组", "按状态分组", "按策略分组", "按股票分组"])
-        self.group_by_combo.currentTextChanged.connect(self.apply_task_grouping)
+        self.group_by_combo.currentTextChanged.connect(
+            self.apply_task_grouping)
         filter_layout.addWidget(QLabel("分组："))
         filter_layout.addWidget(self.group_by_combo)
         # 新增：高级筛选控件
@@ -968,22 +992,27 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         self.strategy_multi_filter.setEditable(True)
         self.strategy_multi_filter.setInsertPolicy(QComboBox.NoInsert)
         self.strategy_multi_filter.addItem("全部策略")
-        self.strategy_multi_filter.addItems(sorted(set(t['strategy'] for t in getattr(self, 'batch_tasks', []))))
+        self.strategy_multi_filter.addItems(
+            sorted(set(t['strategy'] for t in getattr(self, 'batch_tasks', []))))
         adv_filter_layout.addWidget(self.strategy_multi_filter)
         self.stock_multi_filter = QComboBox()
         self.stock_multi_filter.setEditable(True)
         self.stock_multi_filter.setInsertPolicy(QComboBox.NoInsert)
         self.stock_multi_filter.addItem("全部股票")
-        self.stock_multi_filter.addItems(sorted(set(t['stock'] for t in getattr(self, 'batch_tasks', []))))
+        self.stock_multi_filter.addItems(
+            sorted(set(t['stock'] for t in getattr(self, 'batch_tasks', []))))
         adv_filter_layout.addWidget(self.stock_multi_filter)
         self.keyword_filter = QLineEdit()
         self.keyword_filter.setPlaceholderText("关键字/区间筛选（如股票、策略、状态）")
         adv_filter_layout.addWidget(self.keyword_filter)
         adv_filter_layout.addStretch()
         self.batch_tab.layout().insertLayout(1, adv_filter_layout)
-        self.status_multi_filter.currentTextChanged.connect(self.apply_advanced_filters)
-        self.strategy_multi_filter.currentTextChanged.connect(self.apply_advanced_filters)
-        self.stock_multi_filter.currentTextChanged.connect(self.apply_advanced_filters)
+        self.status_multi_filter.currentTextChanged.connect(
+            self.apply_advanced_filters)
+        self.strategy_multi_filter.currentTextChanged.connect(
+            self.apply_advanced_filters)
+        self.stock_multi_filter.currentTextChanged.connect(
+            self.apply_advanced_filters)
         self.keyword_filter.textChanged.connect(self.apply_advanced_filters)
         # 新增：树状分组控件
         self.group_tree = QTreeWidget()
@@ -998,7 +1027,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 新增：AI智能诊断Tab
         self.init_ai_diagnosis_tab()
         self.batch_export_trace_btn = QPushButton("导出队列日志")
-        self.batch_export_trace_btn.clicked.connect(self.export_batch_trace_log)
+        self.batch_export_trace_btn.clicked.connect(
+            self.export_batch_trace_log)
         layout.addWidget(self.batch_export_trace_btn)
 
     def init_ai_strategy_tab(self):
@@ -1014,7 +1044,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         input_layout.addWidget(QLabel("股票代码:"))
         input_layout.addWidget(self.ai_strategy_stock_input)
         self.ai_strategy_candidate_input = QLineEdit()
-        self.ai_strategy_candidate_input.setPlaceholderText("候选策略（如MA,MACD,RSI，逗号分隔）")
+        self.ai_strategy_candidate_input.setPlaceholderText(
+            "候选策略（如MA,MACD,RSI，逗号分隔）")
         input_layout.addWidget(QLabel("候选策略:"))
         input_layout.addWidget(self.ai_strategy_candidate_input)
         layout.addLayout(input_layout)
@@ -1025,11 +1056,13 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 结果展示表格
         self.ai_strategy_result_table = QTableWidget()
         self.ai_strategy_result_table.setColumnCount(3)
-        self.ai_strategy_result_table.setHorizontalHeaderLabels(["股票代码", "推荐策略", "推荐理由"])
+        self.ai_strategy_result_table.setHorizontalHeaderLabels(
+            ["股票代码", "推荐策略", "推荐理由"])
         layout.addWidget(self.ai_strategy_result_table)
         # 一键应用到批量分析按钮
         self.ai_strategy_apply_btn = QPushButton("一键应用到批量分析")
-        self.ai_strategy_apply_btn.clicked.connect(self.apply_ai_strategy_to_batch)
+        self.ai_strategy_apply_btn.clicked.connect(
+            self.apply_ai_strategy_to_batch)
         layout.addWidget(self.ai_strategy_apply_btn)
         # 加入到TabWidget
         if hasattr(self, 'tab_widget'):
@@ -1048,11 +1081,13 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         self.ai_strategy_candidate_input.setCompleter(completer2)
         # 可视化按钮
         self.ai_strategy_vis_btn = QPushButton("结果可视化")
-        self.ai_strategy_vis_btn.clicked.connect(self.visualize_ai_strategy_result)
+        self.ai_strategy_vis_btn.clicked.connect(
+            self.visualize_ai_strategy_result)
         layout.addWidget(self.ai_strategy_vis_btn)
         # 导出调用链日志按钮
         self.ai_strategy_export_trace_btn = QPushButton("导出调用链日志")
-        self.ai_strategy_export_trace_btn.clicked.connect(self.export_last_trace_log)
+        self.ai_strategy_export_trace_btn.clicked.connect(
+            self.export_last_trace_log)
         layout.addWidget(self.ai_strategy_export_trace_btn)
 
     def init_ai_api_stats(self, parent_layout, tab_name):
@@ -1063,7 +1098,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         stats_layout = QHBoxLayout()
         stats_layout.addWidget(QLabel(f"{tab_name} API调用统计："))
         self.api_stats = getattr(self, 'api_stats', {})
-        self.api_stats[tab_name] = {"count": 0, "success": 0, "fail": 0, "total_time": 0.0}
+        self.api_stats[tab_name] = {"count": 0,
+                                    "success": 0, "fail": 0, "total_time": 0.0}
         self.api_stats_labels = getattr(self, 'api_stats_labels', {})
         self.api_stats_labels[tab_name] = QLabel("调用0次，成功0，失败0，平均耗时0ms")
         stats_layout.addWidget(self.api_stats_labels[tab_name])
@@ -1083,7 +1119,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         stats["total_time"] += elapsed
         avg = stats["total_time"] / stats["count"] if stats["count"] else 0
         label = self.api_stats_labels[tab_name]
-        label.setText(f"调用{stats['count']}次，成功{stats['success']}，失败{stats['fail']}，平均耗时{avg:.0f}ms")
+        label.setText(
+            f"调用{stats['count']}次，成功{stats['success']}，失败{stats['fail']}，平均耗时{avg:.0f}ms")
 
     def on_ai_strategy_recommend(self):
         """
@@ -1099,7 +1136,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 return
             code_list = [c.strip() for c in codes.split(',') if c.strip()]
             candidate_str = self.ai_strategy_candidate_input.text().strip()
-            candidates = [s.strip() for s in candidate_str.split(',') if s.strip()] or ["MA", "MACD", "RSI"]
+            candidates = [s.strip() for s in candidate_str.split(
+                ',') if s.strip()] or ["MA", "MACD", "RSI"]
             # 自动获取特征和历史表现
             stock_data = self.get_all_stock_features()
             history = self.get_stocks_history(code_list)
@@ -1115,17 +1153,22 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 # 展示到表格
                 self.ai_strategy_result_table.clear()
                 self.ai_strategy_result_table.setColumnCount(3)
-                self.ai_strategy_result_table.setHorizontalHeaderLabels(["股票代码", "推荐策略", "推荐理由"])
+                self.ai_strategy_result_table.setHorizontalHeaderLabels(
+                    ["股票代码", "推荐策略", "推荐理由"])
                 self.ai_strategy_result_table.setRowCount(len(code_list))
                 for i, code in enumerate(code_list):
-                    self.ai_strategy_result_table.setItem(i, 0, QTableWidgetItem(code))
-                    self.ai_strategy_result_table.setItem(i, 1, QTableWidgetItem(data.get("recommended", "")))
-                    self.ai_strategy_result_table.setItem(i, 2, QTableWidgetItem(data.get("reason", "")))
+                    self.ai_strategy_result_table.setItem(
+                        i, 0, QTableWidgetItem(code))
+                    self.ai_strategy_result_table.setItem(
+                        i, 1, QTableWidgetItem(data.get("recommended", "")))
+                    self.ai_strategy_result_table.setItem(
+                        i, 2, QTableWidgetItem(data.get("reason", "")))
                 if not data.get("recommended"):
                     QMessageBox.information(self, "无结果", "未能推荐出策略")
                 self.update_api_stats("策略推荐", True, (time.time()-t0)*1000)
             else:
-                QMessageBox.critical(self, "推荐失败", f"API请求失败: {resp.status_code}")
+                QMessageBox.critical(
+                    self, "推荐失败", f"API请求失败: {resp.status_code}")
                 self.update_api_stats("策略推荐", False, (time.time()-t0)*1000)
         except Exception as e:
             QMessageBox.critical(self, "推荐异常", str(e))
@@ -1164,7 +1207,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 code = self.ai_strategy_result_table.item(row, 0).text()
                 codes.append(code)
                 if not strategy:
-                    strategy = self.ai_strategy_result_table.item(row, 1).text()
+                    strategy = self.ai_strategy_result_table.item(
+                        row, 1).text()
             # 应用到批量分析输入
             if hasattr(self, 'stock_input') and hasattr(self, 'strategy_checks'):
                 self.stock_input.setText(','.join(codes))
@@ -1174,7 +1218,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                         cb.setChecked(True)
                     else:
                         cb.setChecked(False)
-                QMessageBox.information(self, "已应用到批量分析", f"已将推荐策略和股票应用到批量分析队列，可直接点击批量回测/分析。")
+                QMessageBox.information(
+                    self, "已应用到批量分析", f"已将推荐策略和股票应用到批量分析队列，可直接点击批量回测/分析。")
         except Exception as e:
             print(f"应用到批量分析失败: {e}")
 
@@ -1228,12 +1273,16 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 恢复上次任务按钮
         if not hasattr(self, 'restore_batch_btn'):
             self.restore_batch_btn = QPushButton("恢复上次任务")
-            self.restore_batch_btn.clicked.connect(self.restore_last_batch_tasks)
+            self.restore_batch_btn.clicked.connect(
+                self.restore_last_batch_tasks)
             self.main_layout.addWidget(self.restore_batch_btn)
         # 解析输入
-        stocks = [s.strip() for s in self.stock_input.text().split(',') if s.strip()]
-        strategies = [cb.text() for cb in self.strategy_checks if cb.isChecked()]
-        param_strs = [p.strip() for p in self.param_input.text().split(';') if p.strip()]
+        stocks = [s.strip()
+                  for s in self.stock_input.text().split(',') if s.strip()]
+        strategies = [cb.text()
+                      for cb in self.strategy_checks if cb.isChecked()]
+        param_strs = [p.strip()
+                      for p in self.param_input.text().split(';') if p.strip()]
         param_list = []
         for p in param_strs:
             param = {}
@@ -1258,8 +1307,10 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                     row = self.batch_table.rowCount()
                     self.batch_table.insertRow(row)
                     self.batch_table.setItem(row, 0, QTableWidgetItem(stock))
-                    self.batch_table.setItem(row, 1, QTableWidgetItem(strategy))
-                    self.batch_table.setItem(row, 2, QTableWidgetItem(str(params)))
+                    self.batch_table.setItem(
+                        row, 1, QTableWidgetItem(strategy))
+                    self.batch_table.setItem(
+                        row, 2, QTableWidgetItem(str(params)))
                     self.batch_table.setItem(row, 3, QTableWidgetItem("0%"))
                     self.batch_table.setItem(row, 4, QTableWidgetItem("未开始"))
                     # 新增：进度条控件
@@ -1285,7 +1336,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             tasks = [{k: v for k, v in t.items() if k in ('stock', 'strategy', 'params', 'row', 'status', 'retries', 'max_retries',
                                                           'progress_bar', 'eta_label', 'start_time')} for t in self.batch_tasks]
             for t in tasks:
-                t['progress'] = t['progress_bar'].value() if t.get('progress_bar') else 0
+                t['progress'] = t['progress_bar'].value() if t.get(
+                    'progress_bar') else 0
                 t['eta'] = t['eta_label'].text() if t.get('eta_label') else '--'
                 t.pop('progress_bar', None)
                 t.pop('eta_label', None)
@@ -1310,9 +1362,12 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             self.batch_table.insertRow(row)
             self.batch_table.setItem(row, 0, QTableWidgetItem(t['stock']))
             self.batch_table.setItem(row, 1, QTableWidgetItem(t['strategy']))
-            self.batch_table.setItem(row, 2, QTableWidgetItem(str(t['params'])))
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{t.get('progress',0)}%"))
-            self.batch_table.setItem(row, 4, QTableWidgetItem(t.get('status', '未开始')))
+            self.batch_table.setItem(
+                row, 2, QTableWidgetItem(str(t['params'])))
+            self.batch_table.setItem(
+                row, 3, QTableWidgetItem(f"{t.get('progress',0)}%"))
+            self.batch_table.setItem(
+                row, 4, QTableWidgetItem(t.get('status', '未开始')))
             progress_bar = QProgressBar()
             progress_bar.setValue(t.get('progress', 0))
             self.batch_table.setCellWidget(row, 5, progress_bar)
@@ -1346,8 +1401,10 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 for i in range(total_steps):
                     if task['terminate_flag'].is_set():
                         task['status'] = '已终止'
-                        self.batch_table.setItem(row, 3, QTableWidgetItem("已终止"))
-                        self.batch_table.setItem(row, 4, QTableWidgetItem("终止"))
+                        self.batch_table.setItem(
+                            row, 3, QTableWidgetItem("已终止"))
+                        self.batch_table.setItem(
+                            row, 4, QTableWidgetItem("终止"))
                         if progress_bar:
                             progress_bar.setValue(0)
                         if eta_label:
@@ -1357,8 +1414,10 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                         return
                     while task['pause_event'].is_set():
                         task['status'] = '已暂停'
-                        self.batch_table.setItem(row, 3, QTableWidgetItem("已暂停"))
-                        self.batch_table.setItem(row, 4, QTableWidgetItem("暂停"))
+                        self.batch_table.setItem(
+                            row, 3, QTableWidgetItem("已暂停"))
+                        self.batch_table.setItem(
+                            row, 4, QTableWidgetItem("暂停"))
                         if eta_label:
                             eta_label.setText("--")
                         self.update_task_queue()
@@ -1366,11 +1425,13 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                         time.sleep(0.2)
                     percent = int((i+1)/total_steps*100)
                     task['status'] = f'进行中({i+1}/{total_steps})'
-                    self.batch_table.setItem(row, 3, QTableWidgetItem(f"{percent}%"))
+                    self.batch_table.setItem(
+                        row, 3, QTableWidgetItem(f"{percent}%"))
                     if progress_bar:
                         progress_bar.setValue(percent)
                     # 剩余时间预测
-                    elapsed = time.time() - task['start_time'] if task['start_time'] else 0
+                    elapsed = time.time() - \
+                        task['start_time'] if task['start_time'] else 0
                     if eta_label and i > 0:
                         avg_time = elapsed / (i+1)
                         eta = avg_time * (total_steps - (i+1))
@@ -1384,7 +1445,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 if random.random() < 0.2 and task['retries'] < task['max_retries']:
                     task['status'] = '失败'
                     self.batch_table.setItem(row, 3, QTableWidgetItem("失败"))
-                    self.batch_table.setItem(row, 4, QTableWidgetItem(f"失败(第{task['retries']+1}次)"))
+                    self.batch_table.setItem(
+                        row, 4, QTableWidgetItem(f"失败(第{task['retries']+1}次)"))
                     if progress_bar:
                         progress_bar.setValue(0)
                     if eta_label:
@@ -1411,7 +1473,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 self.log_manager.info(f"批量任务成功: {task}", trace_id=trace_id)
                 return task
             except Exception as e:
-                self.log_manager.error(f"批量任务异常: {task} - {str(e)}", trace_id=trace_id)
+                self.log_manager.error(
+                    f"批量任务异常: {task} - {str(e)}", trace_id=trace_id)
                 self.save_batch_tasks()
                 raise
         self._task_threads = []
@@ -1430,7 +1493,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         sched_layout = QVBoxLayout(self.scheduler_tab)
         # 任务列表
         self.sched_table = QTableWidget(0, 5)
-        self.sched_table.setHorizontalHeaderLabels(["任务名", "表达式", "下次运行", "状态", "操作"])
+        self.sched_table.setHorizontalHeaderLabels(
+            ["任务名", "表达式", "下次运行", "状态", "操作"])
         self.sched_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         sched_layout.addWidget(self.sched_table)
         # 添加任务按钮
@@ -1448,7 +1512,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         name, ok = QInputDialog.getText(self, "任务名", "请输入任务名称：")
         if not ok or not name:
             return
-        cron, ok = QInputDialog.getText(self, "Cron表达式", "请输入cron表达式（如0 2 * * *表示每天2点）：")
+        cron, ok = QInputDialog.getText(
+            self, "Cron表达式", "请输入cron表达式（如0 2 * * *表示每天2点）：")
         if not ok or not cron:
             return
         try:
@@ -1456,13 +1521,15 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         except Exception as e:
             QMessageBox.warning(self, "表达式错误", f"Cron表达式无效: {e}")
             return
-        job = self.scheduler.add_job(self.run_scheduled_batch, trigger, name=name)
+        job = self.scheduler.add_job(
+            self.run_scheduled_batch, trigger, name=name)
         self.sched_jobs[job.id] = job
         row = self.sched_table.rowCount()
         self.sched_table.insertRow(row)
         self.sched_table.setItem(row, 0, QTableWidgetItem(name))
         self.sched_table.setItem(row, 1, QTableWidgetItem(cron))
-        self.sched_table.setItem(row, 2, QTableWidgetItem(str(job.next_run_time)))
+        self.sched_table.setItem(
+            row, 2, QTableWidgetItem(str(job.next_run_time)))
         self.sched_table.setItem(row, 3, QTableWidgetItem("运行中"))
         op_btn = QPushButton("删除")
         op_btn.clicked.connect(lambda: self.remove_scheduler_job(job.id, row))
@@ -1508,15 +1575,18 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
 
     def run_batch_backtest(self):
         try:
-            codes = [c.strip() for c in self.batch_stock_input.text().split(',') if c.strip()]
-            strategies = [item.text() for item in self.batch_strategy_list.selectedItems()]
+            codes = [c.strip()
+                     for c in self.batch_stock_input.text().split(',') if c.strip()]
+            strategies = [item.text()
+                          for item in self.batch_strategy_list.selectedItems()]
             param_grid = []
             for row in range(self.param_grid_table.rowCount()):
                 pname = self.param_grid_table.item(row, 0)
                 pstart = self.param_grid_table.item(row, 1)
                 pend = self.param_grid_table.item(row, 2)
                 if pname and pstart and pend:
-                    param_grid.append((pname.text(), float(pstart.text()), float(pend.text())))
+                    param_grid.append((pname.text(), float(
+                        pstart.text()), float(pend.text())))
             if not codes or not strategies:
                 QMessageBox.warning(self, "参数错误", "请至少输入股票代码和选择策略")
                 return
@@ -1524,9 +1594,11 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             from itertools import product
             param_combos = [{}]
             if param_grid:
-                param_ranges = [list(range(int(start), int(end)+1)) for _, start, end in param_grid]
+                param_ranges = [list(range(int(start), int(end)+1))
+                                for _, start, end in param_grid]
                 param_names = [name for name, _, _ in param_grid]
-                param_combos = [dict(zip(param_names, vals)) for vals in product(*param_ranges)]
+                param_combos = [dict(zip(param_names, vals))
+                                for vals in product(*param_ranges)]
             # 进度条设置
             total = len(codes) * len(strategies) * len(param_combos)
             self.batch_progress.setMaximum(total)
@@ -1545,7 +1617,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             remote_nodes = None
             if mode == "Dask分布式":
                 distributed_backend = 'dask'
-                remote_nodes = [n.strip() for n in self.remote_nodes_edit.text().split(',') if n.strip()]
+                remote_nodes = [
+                    n.strip() for n in self.remote_nodes_edit.text().split(',') if n.strip()]
 
             def batch_task(code, strategy, params, pause_event):
                 max_retries = 3
@@ -1577,16 +1650,22 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 else:
                     items += ["异常"]*8
                 self.batch_result_table.setItem(row, 0, QTableWidgetItem(code))
-                self.batch_result_table.setItem(row, 1, QTableWidgetItem(strategy))
-                self.batch_result_table.setItem(row, 2, QTableWidgetItem(str(params)))
+                self.batch_result_table.setItem(
+                    row, 1, QTableWidgetItem(strategy))
+                self.batch_result_table.setItem(
+                    row, 2, QTableWidgetItem(str(params)))
                 for col, val in enumerate(items[3:], 3):
-                    self.batch_result_table.setItem(row, col, QTableWidgetItem(val))
+                    self.batch_result_table.setItem(
+                        row, col, QTableWidgetItem(val))
                 if err:
-                    self.batch_result_table.setItem(row, 11, QTableWidgetItem("异常"))
-                    self.failed_tasks.append({"code": code, "strategy": strategy, "params": params, "error": err})
+                    self.batch_result_table.setItem(
+                        row, 11, QTableWidgetItem("异常"))
+                    self.failed_tasks.append(
+                        {"code": code, "strategy": strategy, "params": params, "error": err})
                 self.batch_progress.setValue(self.batch_progress.value()+1)
                 if hasattr(self, 'results_area') and self.results_area:
-                    self.results_area.append(f"{code}-{strategy}-{params}: {'成功' if not err else '失败'}")
+                    self.results_area.append(
+                        f"{code}-{strategy}-{params}: {'成功' if not err else '失败'}")
                 if self.batch_progress.value() == self.batch_progress.maximum():
                     arr = []
                     for i in range(self.batch_result_table.rowCount()):
@@ -1597,7 +1676,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                             arr.append(0)
                     if arr:
                         best_idx = arr.index(max(arr))
-                        self.batch_result_table.setItem(best_idx, 11, QTableWidgetItem("最优"))
+                        self.batch_result_table.setItem(
+                            best_idx, 11, QTableWidgetItem("最优"))
                     self.run_batch_btn.setText("一键批量回测")
                     self.run_batch_btn.clicked.disconnect()
                     self.run_batch_btn.clicked.connect(self.run_batch_backtest)
@@ -1627,22 +1707,28 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                             break
                         pause_event = threading.Event()
                         self._batch_pause_events.append(pause_event)
-                        future = self.async_manager.run_async(batch_task, code, strategy, params, pause_event=pause_event)
+                        future = self.async_manager.run_async(
+                            batch_task, code, strategy, params, pause_event=pause_event)
                         future.add_done_callback(on_done)
                         self._batch_futures.append(future)
 
             if distributed_backend == 'dask':
                 try:
                     tw = TradingWidget()
-                    results = tw.run_batch_analysis(codes, strategies, param_combos, distributed_backend='dask', remote_nodes=remote_nodes)
+                    results = tw.run_batch_analysis(
+                        codes, strategies, param_combos, distributed_backend='dask', remote_nodes=remote_nodes)
                     # 结果填充到表格
                     for r in results:
                         row = self.batch_result_table.rowCount()
                         self.batch_result_table.insertRow(row)
-                        self.batch_result_table.setItem(row, 0, QTableWidgetItem(r.get('code', '-')))
-                        self.batch_result_table.setItem(row, 1, QTableWidgetItem(r.get('strategy', '-')))
-                        self.batch_result_table.setItem(row, 2, QTableWidgetItem(str(r.get('params', '-'))))
-                        self.batch_result_table.setItem(row, 3, QTableWidgetItem(str(r.get('result', '-'))))
+                        self.batch_result_table.setItem(
+                            row, 0, QTableWidgetItem(r.get('code', '-')))
+                        self.batch_result_table.setItem(
+                            row, 1, QTableWidgetItem(r.get('strategy', '-')))
+                        self.batch_result_table.setItem(
+                            row, 2, QTableWidgetItem(str(r.get('params', '-'))))
+                        self.batch_result_table.setItem(
+                            row, 3, QTableWidgetItem(str(r.get('result', '-'))))
                     self.run_batch_btn.setText("一键批量回测")
                     self.run_batch_btn.clicked.disconnect()
                     self.run_batch_btn.clicked.connect(self.run_batch_backtest)
@@ -1669,7 +1755,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
             return
         if not filename:
             from PyQt5.QtWidgets import QFileDialog
-            filename, _ = QFileDialog.getSaveFileName(self, "导出批量分析结果", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "导出批量分析结果", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
             if not filename:
                 return
         # 汇总所有批量任务结果
@@ -1709,7 +1796,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
 
         try:
             button.clicked.disconnect()
@@ -1737,7 +1825,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
@@ -1828,7 +1917,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
 
     def export_process_report(self, filename=None):
         if not filename:
-            filename, _ = QFileDialog.getSaveFileName(self, "导出分析流程报告", "", "CSV Files (*.csv);;Text Files (*.txt)")
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "导出分析流程报告", "", "CSV Files (*.csv);;Text Files (*.txt)")
             if not filename:
                 return
         if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'process_manager'):
@@ -1838,7 +1928,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 if writer:
                     writer.writerow(["步骤", "状态", "耗时(s)", "日志", "错误"])
                     for step in steps:
-                        writer.writerow([step.name, step.status, f"{step.duration:.3f}" if step.duration else '', step.log, step.error])
+                        writer.writerow(
+                            [step.name, step.status, f"{step.duration:.3f}" if step.duration else '', step.log, step.error])
                 else:
                     for step in steps:
                         f.write(f"{step.name}（{step.step_id}）：{step.status}")
@@ -1854,7 +1945,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
         # 生成流程图，支持历史流程对比
         if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'process_manager'):
             if compare_history:
-                all_flows = self.trading_widget.process_manager.get_history() + [self.trading_widget.process_manager.steps]
+                all_flows = self.trading_widget.process_manager.get_history(
+                ) + [self.trading_widget.process_manager.steps]
                 fig = go.Figure()
                 y_offset = 0
                 for idx, steps in enumerate(all_flows):
@@ -1865,25 +1957,30 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                         'running': 'blue',
                         'pending': 'gray'
                     }
-                    node_colors = [status_colors.get(step.status, 'gray') for step in steps]
+                    node_colors = [status_colors.get(
+                        step.status, 'gray') for step in steps]
                     edge_x, edge_y = [], []
                     for i in range(len(nodes)-1):
                         edge_x += [i, i+1, None]
                         edge_y += [y_offset, y_offset, None]
                     node_x = list(range(len(nodes)))
                     node_y = [y_offset]*len(nodes)
-                    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(color='black', width=2), showlegend=False))
+                    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(
+                        color='black', width=2), showlegend=False))
                     fig.add_trace(go.Scatter(x=node_x, y=node_y, mode='markers+text',
-                                             marker=dict(size=40, color=node_colors),
+                                             marker=dict(
+                                                 size=40, color=node_colors),
                                              text=[
                                                  f"{step.name}<br>{step.status}<br>{step.duration:.3f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
                                              textposition='bottom center',
-                                             customdata=[json.dumps({"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
+                                             customdata=[json.dumps(
+                                                 {"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
                                              hovertemplate='%{text}<br>点击查看详情',
                                              showlegend=False,
                                              name=f'流程{idx+1}'))
                     y_offset -= 1
-                fig.update_layout(title='分析流程对比图', xaxis=dict(visible=False), yaxis=dict(visible=False), plot_bgcolor='white')
+                fig.update_layout(title='分析流程对比图', xaxis=dict(
+                    visible=False), yaxis=dict(visible=False), plot_bgcolor='white')
             else:
                 steps = self.trading_widget.process_manager.steps
                 nodes = [step.name for step in steps]
@@ -1893,7 +1990,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                     'running': 'blue',
                     'pending': 'gray'
                 }
-                node_colors = [status_colors.get(step.status, 'gray') for step in steps]
+                node_colors = [status_colors.get(
+                    step.status, 'gray') for step in steps]
                 edge_x, edge_y = [], []
                 for i in range(len(nodes)-1):
                     edge_x += [i, i+1, None]
@@ -1901,18 +1999,23 @@ class AnalysisToolsPanel(BaseAnalysisPanel):
                 node_x = list(range(len(nodes)))
                 node_y = [0]*len(nodes)
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(color='black', width=2), showlegend=False))
+                fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(
+                    color='black', width=2), showlegend=False))
                 fig.add_trace(go.Scatter(x=node_x, y=node_y, mode='markers+text',
-                                         marker=dict(size=40, color=node_colors),
+                                         marker=dict(
+                                             size=40, color=node_colors),
                                          text=[
                                              f"{step.name}<br>{step.status}<br>{step.duration:.3f}s" if step.duration else f"{step.name}<br>{step.status}" for step in steps],
                                          textposition='bottom center',
-                                         customdata=[json.dumps({"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
+                                         customdata=[json.dumps(
+                                             {"日志": step.log, "耗时": step.duration, "错误": step.error}) for step in steps],
                                          hovertemplate='%{text}<br>点击查看详情',
                                          showlegend=False))
-                fig.update_layout(title='分析流程图', xaxis=dict(visible=False), yaxis=dict(visible=False), plot_bgcolor='white')
+                fig.update_layout(title='分析流程图', xaxis=dict(
+                    visible=False), yaxis=dict(visible=False), plot_bgcolor='white')
             # 展示到弹窗，支持节点点击
-            html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={"displayModeBar": True})
+            html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={
+                               "displayModeBar": True})
             # 注入js监听点击事件，弹窗显示customdata
             html += '''
 <script>
@@ -1935,7 +2038,8 @@ document.addEventListener('DOMContentLoaded', function() {
         # 生成甘特图，支持历史流程对比
         if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'process_manager'):
             if compare_history:
-                all_flows = self.trading_widget.process_manager.get_history() + [self.trading_widget.process_manager.steps]
+                all_flows = self.trading_widget.process_manager.get_history(
+                ) + [self.trading_widget.process_manager.steps]
                 df = []
                 for idx, steps in enumerate(all_flows):
                     for step in steps:
@@ -1944,7 +2048,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                            Finish=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(step.end_time)), Resource=step.status))
                 if not df:
                     return
-                fig = ff.create_gantt(df, index_col='Resource', show_colorbar=True, group_tasks=True, title='多流程甘特图')
+                fig = ff.create_gantt(
+                    df, index_col='Resource', show_colorbar=True, group_tasks=True, title='多流程甘特图')
             else:
                 steps = self.trading_widget.process_manager.steps
                 df = []
@@ -1954,7 +2059,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                        Finish=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(step.end_time)), Resource=step.status))
                 if not df:
                     return
-                fig = ff.create_gantt(df, index_col='Resource', show_colorbar=True, group_tasks=True, title='分析流程甘特图')
+                fig = ff.create_gantt(
+                    df, index_col='Resource', show_colorbar=True, group_tasks=True, title='分析流程甘特图')
             html = fig.to_html(include_plotlyjs='cdn')
             self._show_html_dialog(html, title="分析流程甘特图")
 
@@ -1979,11 +2085,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if not hasattr(self, 'failed_tasks') or not self.failed_tasks:
             QMessageBox.information(self, "导出失败日志", "当前没有失败任务")
             return
-        file_path, _ = QFileDialog.getSaveFileName(self, "导出失败日志", "failed_tasks.csv", "CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出失败日志", "failed_tasks.csv", "CSV Files (*.csv)")
         if not file_path:
             return
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=["code", "strategy", "params", "error"])
+            writer = csv.DictWriter(
+                f, fieldnames=["code", "strategy", "params", "error"])
             writer.writeheader()
             for row in self.failed_tasks:
                 writer.writerow(row)
@@ -2008,7 +2116,8 @@ document.addEventListener('DOMContentLoaded', function() {
         for row in range(self.batch_result_table.rowCount()):
             code = self.batch_result_table.item(row, 0).text()
             strategy = self.batch_result_table.item(row, 1).text()
-            status = self.batch_result_table.item(row, 11).text() if self.batch_result_table.item(row, 11) else ""
+            status = self.batch_result_table.item(row, 11).text(
+            ) if self.batch_result_table.item(row, 11) else ""
             key = f"{strategy}-{code}"
             if key not in stats:
                 stats[key] = {"成功": 0, "失败": 0}
@@ -2024,11 +2133,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if self.batch_result_table.rowCount() == 0:
             QMessageBox.information(self, "导出结果", "当前无批量分析结果")
             return
-        file_path, _ = QFileDialog.getSaveFileName(self, "导出全部结果", "batch_results.xlsx", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出全部结果", "batch_results.xlsx", "Excel Files (*.xlsx);;CSV Files (*.csv)")
         if not file_path:
             return
         # 收集表格数据
-        columns = [self.batch_result_table.horizontalHeaderItem(i).text() for i in range(self.batch_result_table.columnCount())]
+        columns = [self.batch_result_table.horizontalHeaderItem(
+            i).text() for i in range(self.batch_result_table.columnCount())]
         data = []
         for row in range(self.batch_result_table.rowCount()):
             data.append([self.batch_result_table.item(row, col).text() if self.batch_result_table.item(
@@ -2045,7 +2156,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if self.batch_result_table.rowCount() == 0:
             QMessageBox.information(self, "分组对比", "当前无批量分析结果")
             return
-        columns = [self.batch_result_table.horizontalHeaderItem(i).text() for i in range(self.batch_result_table.columnCount())]
+        columns = [self.batch_result_table.horizontalHeaderItem(
+            i).text() for i in range(self.batch_result_table.columnCount())]
         data = []
         for row in range(self.batch_result_table.rowCount()):
             data.append([self.batch_result_table.item(row, col).text() if self.batch_result_table.item(
@@ -2053,7 +2165,8 @@ document.addEventListener('DOMContentLoaded', function() {
         df = pd.DataFrame(data, columns=columns)
         # 按策略分组，统计年化收益、最大回撤均值
         if '策略' in df.columns and '年化收益率' in df.columns and '最大回撤' in df.columns:
-            group = df.groupby('策略').agg({'年化收益率': 'mean', '最大回撤': 'mean'}).reset_index()
+            group = df.groupby('策略').agg(
+                {'年化收益率': 'mean', '最大回撤': 'mean'}).reset_index()
             # 可视化
             fig, ax = plt.subplots(figsize=(6, 4))
             group.plot(x='策略', y=['年化收益率', '最大回撤'], kind='bar', ax=ax)
@@ -2088,7 +2201,8 @@ document.addEventListener('DOMContentLoaded', function() {
         self.task_queue_list.clear()
         for i, task in enumerate(getattr(self, 'batch_tasks', [])):
             status = task.get('status', '等待中')
-            item = QListWidgetItem(f"{i+1}. {task['stock']} | {task['strategy']} | {task['params']} | {status}")
+            item = QListWidgetItem(
+                f"{i+1}. {task['stock']} | {task['strategy']} | {task['params']} | {status}")
             # 颜色高亮
             if status == '进行中':
                 item.setBackground(Qt.yellow)
@@ -2137,14 +2251,16 @@ document.addEventListener('DOMContentLoaded', function() {
     def move_task_up(self, idx):
         """将任务上移一位"""
         if 1 <= idx < len(self.batch_tasks):
-            self.batch_tasks[idx-1], self.batch_tasks[idx] = self.batch_tasks[idx], self.batch_tasks[idx-1]
+            self.batch_tasks[idx -
+                             1], self.batch_tasks[idx] = self.batch_tasks[idx], self.batch_tasks[idx-1]
             self.update_task_queue()
             self.task_queue_list.setCurrentRow(idx-1)
 
     def move_task_down(self, idx):
         """将任务下移一位"""
         if 0 <= idx < len(self.batch_tasks)-1:
-            self.batch_tasks[idx], self.batch_tasks[idx+1] = self.batch_tasks[idx+1], self.batch_tasks[idx]
+            self.batch_tasks[idx], self.batch_tasks[idx +
+                                                    1] = self.batch_tasks[idx+1], self.batch_tasks[idx]
             self.update_task_queue()
             self.task_queue_list.setCurrentRow(idx+1)
 
@@ -2167,25 +2283,29 @@ document.addEventListener('DOMContentLoaded', function() {
     # 批量优先级调整按钮
     def move_selected_tasks_up(self):
         """批量上移选中任务"""
-        selected = sorted([self.task_queue_list.row(item) for item in self.task_queue_list.selectedItems()])
+        selected = sorted([self.task_queue_list.row(item)
+                          for item in self.task_queue_list.selectedItems()])
         for idx in selected:
             self.move_task_up(idx)
 
     def move_selected_tasks_down(self):
         """批量下移选中任务"""
-        selected = sorted([self.task_queue_list.row(item) for item in self.task_queue_list.selectedItems()], reverse=True)
+        selected = sorted([self.task_queue_list.row(
+            item) for item in self.task_queue_list.selectedItems()], reverse=True)
         for idx in selected:
             self.move_task_down(idx)
 
     def move_selected_tasks_top(self):
         """批量置顶选中任务"""
-        selected = sorted([self.task_queue_list.row(item) for item in self.task_queue_list.selectedItems()])
+        selected = sorted([self.task_queue_list.row(item)
+                          for item in self.task_queue_list.selectedItems()])
         for idx in selected:
             self.move_task_top(idx)
 
     def move_selected_tasks_bottom(self):
         """批量置底选中任务"""
-        selected = sorted([self.task_queue_list.row(item) for item in self.task_queue_list.selectedItems()], reverse=True)
+        selected = sorted([self.task_queue_list.row(
+            item) for item in self.task_queue_list.selectedItems()], reverse=True)
         for idx in selected:
             self.move_task_bottom(idx)
 
@@ -2236,7 +2356,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 task['terminate_flag'] = threading.Event()
                 task['status'] = '等待中'
                 self.update_task_queue()
-                t = threading.Thread(target=self.run_single_task_worker, args=(task, idx))
+                t = threading.Thread(
+                    target=self.run_single_task_worker, args=(task, idx))
                 task['thread'] = t
                 t.start()
                 self._task_threads.append(t)
@@ -2262,7 +2383,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 self.update_task_queue()
                 time.sleep(0.2)
             task['status'] = f'进行中({i+1}/10)'
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{int((i+1)/10*100)}%"))
+            self.batch_table.setItem(
+                row, 3, QTableWidgetItem(f"{int((i+1)/10*100)}%"))
             self.update_task_queue()
             time.sleep(0.3)
         task['status'] = '已完成'
@@ -2313,7 +2435,8 @@ document.addEventListener('DOMContentLoaded', function() {
     def update_group_tree(self):
         # 树状分组+统计
         self.group_tree.clear()
-        group_by = self.group_by_combo.currentText() if hasattr(self, 'group_by_combo') else "不分组"
+        group_by = self.group_by_combo.currentText() if hasattr(
+            self, 'group_by_combo') else "不分组"
         if group_by == "不分组":
             self.group_tree.setVisible(False)
             return
@@ -2333,11 +2456,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 group_map[key] = []
             group_map[key].append(idx)
         for group, idxs in group_map.items():
-            succ = sum(1 for i in idxs if self.batch_tasks[i]['status'] == '已完成')
-            fail = sum(1 for i in idxs if self.batch_tasks[i]['status'] == '失败')
+            succ = sum(
+                1 for i in idxs if self.batch_tasks[i]['status'] == '已完成')
+            fail = sum(
+                1 for i in idxs if self.batch_tasks[i]['status'] == '失败')
             total = len(idxs)
             progress = int(succ / total * 100) if total else 0
-            group_item = QTreeWidgetItem([str(group), str(succ), str(fail), str(total), f"{progress}%"])
+            group_item = QTreeWidgetItem(
+                [str(group), str(succ), str(fail), str(total), f"{progress}%"])
             for i in idxs:
                 t = self.batch_tasks[i]
                 child = QTreeWidgetItem([f"{t['stock']}|{t['strategy']}", "✔" if t['status'] ==
@@ -2363,7 +2489,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 QMessageBox.warning(self, "数据错误", "未能获取股票特征数据，请检查数据源")
                 return
             batch_size = 500
-            batches = [stock_data[i:i+batch_size] for i in range(0, len(stock_data), batch_size)]
+            batches = [stock_data[i:i+batch_size]
+                       for i in range(0, len(stock_data), batch_size)]
             criteria = {"query": user_input}
             url = "http://localhost:8000/api/ai/select_stocks"
             all_selected, all_explanations = [], {}
@@ -2380,11 +2507,14 @@ document.addEventListener('DOMContentLoaded', function() {
             # 展示到表格
             self.ai_stock_result_table.clear()
             self.ai_stock_result_table.setColumnCount(2)
-            self.ai_stock_result_table.setHorizontalHeaderLabels(["股票代码", "推荐理由"])
+            self.ai_stock_result_table.setHorizontalHeaderLabels(
+                ["股票代码", "推荐理由"])
             self.ai_stock_result_table.setRowCount(len(all_selected))
             for i, code in enumerate(all_selected):
-                self.ai_stock_result_table.setItem(i, 0, QTableWidgetItem(code))
-                self.ai_stock_result_table.setItem(i, 1, QTableWidgetItem(all_explanations.get(code, "")))
+                self.ai_stock_result_table.setItem(
+                    i, 0, QTableWidgetItem(code))
+                self.ai_stock_result_table.setItem(
+                    i, 1, QTableWidgetItem(all_explanations.get(code, "")))
             if not all_selected:
                 QMessageBox.information(self, "无结果", "未找到符合条件的股票")
             else:
@@ -2423,7 +2553,8 @@ document.addEventListener('DOMContentLoaded', function() {
             # 假设有批量分析Tab和相关输入控件
             if hasattr(self, 'stock_input'):
                 self.stock_input.setText(','.join(selected_codes))
-                QMessageBox.information(self, "已加入批量分析", f"已将{len(selected_codes)}只股票加入批量分析队列，可直接点击批量回测/分析。")
+                QMessageBox.information(
+                    self, "已加入批量分析", f"已将{len(selected_codes)}只股票加入批量分析队列，可直接点击批量回测/分析。")
         except Exception as e:
             print(f"加入批量分析失败: {e}")
 
@@ -2440,7 +2571,8 @@ document.addEventListener('DOMContentLoaded', function() {
         input_layout.addWidget(QLabel("策略:"))
         input_layout.addWidget(self.ai_optimizer_strategy_input)
         self.ai_optimizer_param_input = QLineEdit()
-        self.ai_optimizer_param_input.setPlaceholderText("参数空间，如fast=5,10,20;slow=20,50,100")
+        self.ai_optimizer_param_input.setPlaceholderText(
+            "参数空间，如fast=5,10,20;slow=20,50,100")
         input_layout.addWidget(QLabel("参数空间:"))
         input_layout.addWidget(self.ai_optimizer_param_input)
         self.ai_optimizer_stock_input = QLineEdit()
@@ -2455,11 +2587,13 @@ document.addEventListener('DOMContentLoaded', function() {
         # 结果展示表格
         self.ai_optimizer_result_table = QTableWidget()
         self.ai_optimizer_result_table.setColumnCount(3)
-        self.ai_optimizer_result_table.setHorizontalHeaderLabels(["股票代码", "最优参数", "优化过程"])
+        self.ai_optimizer_result_table.setHorizontalHeaderLabels(
+            ["股票代码", "最优参数", "优化过程"])
         layout.addWidget(self.ai_optimizer_result_table)
         # 一键应用到批量分析按钮
         self.ai_optimizer_apply_btn = QPushButton("一键应用到批量分析")
-        self.ai_optimizer_apply_btn.clicked.connect(self.apply_ai_optimizer_to_batch)
+        self.ai_optimizer_apply_btn.clicked.connect(
+            self.apply_ai_optimizer_to_batch)
         layout.addWidget(self.ai_optimizer_apply_btn)
         # 加入到TabWidget
         if hasattr(self, 'tab_widget'):
@@ -2477,17 +2611,20 @@ document.addEventListener('DOMContentLoaded', function() {
             completer2.setCaseSensitivity(Qt.CaseInsensitive)
             self.ai_optimizer_stock_input.setCompleter(completer2)
         # 参数模板补全
-        param_templates = ["fast=5,10,20;slow=20,50,100", "period=14,20,30", "std=1.5,2.0,2.5"]
+        param_templates = ["fast=5,10,20;slow=20,50,100",
+                           "period=14,20,30", "std=1.5,2.0,2.5"]
         completer3 = QCompleter(param_templates)
         completer3.setCaseSensitivity(Qt.CaseInsensitive)
         self.ai_optimizer_param_input.setCompleter(completer3)
         # 可视化按钮
         self.ai_optimizer_vis_btn = QPushButton("结果可视化")
-        self.ai_optimizer_vis_btn.clicked.connect(self.visualize_ai_optimizer_result)
+        self.ai_optimizer_vis_btn.clicked.connect(
+            self.visualize_ai_optimizer_result)
         layout.addWidget(self.ai_optimizer_vis_btn)
         # 导出调用链日志按钮
         self.ai_optimizer_export_trace_btn = QPushButton("导出调用链日志")
-        self.ai_optimizer_export_trace_btn.clicked.connect(self.export_last_trace_log)
+        self.ai_optimizer_export_trace_btn.clicked.connect(
+            self.export_last_trace_log)
         layout.addWidget(self.ai_optimizer_export_trace_btn)
 
     def on_ai_optimizer_run(self):
@@ -2508,7 +2645,8 @@ document.addEventListener('DOMContentLoaded', function() {
             code_list = [c.strip() for c in codes.split(',') if c.strip()]
             history = self.get_stocks_history(code_list)
             batch_size = 5
-            batches = [code_list[i:i+batch_size] for i in range(0, len(code_list), batch_size)]
+            batches = [code_list[i:i+batch_size]
+                       for i in range(0, len(code_list), batch_size)]
             url = "http://localhost:8000/api/ai/optimize_params"
             t0 = time.time()
             all_best_params, all_process = [], []
@@ -2524,12 +2662,16 @@ document.addEventListener('DOMContentLoaded', function() {
             # 展示到表格
             self.ai_optimizer_result_table.clear()
             self.ai_optimizer_result_table.setColumnCount(3)
-            self.ai_optimizer_result_table.setHorizontalHeaderLabels(["股票代码", "最优参数", "优化过程"])
+            self.ai_optimizer_result_table.setHorizontalHeaderLabels(
+                ["股票代码", "最优参数", "优化过程"])
             self.ai_optimizer_result_table.setRowCount(len(code_list))
             for i, code in enumerate(code_list):
-                self.ai_optimizer_result_table.setItem(i, 0, QTableWidgetItem(code))
-                self.ai_optimizer_result_table.setItem(i, 1, QTableWidgetItem(str(all_best_params[i]) if i < len(all_best_params) else ""))
-                self.ai_optimizer_result_table.setItem(i, 2, QTableWidgetItem(str(all_process[i]) if i < len(all_process) else ""))
+                self.ai_optimizer_result_table.setItem(
+                    i, 0, QTableWidgetItem(code))
+                self.ai_optimizer_result_table.setItem(i, 1, QTableWidgetItem(
+                    str(all_best_params[i]) if i < len(all_best_params) else ""))
+                self.ai_optimizer_result_table.setItem(i, 2, QTableWidgetItem(
+                    str(all_process[i]) if i < len(all_process) else ""))
             if not all_best_params:
                 QMessageBox.information(self, "无结果", "未能找到最优参数")
             self.update_api_stats("参数优化", True, (time.time()-t0)*1000)
@@ -2549,7 +2691,8 @@ document.addEventListener('DOMContentLoaded', function() {
             for part in param_str.split(';'):
                 if '=' in part:
                     k, v = part.split('=', 1)
-                    values = [float(x) if '.' in x else int(x) for x in v.split(',') if x.strip()]
+                    values = [float(x) if '.' in x else int(x)
+                              for x in v.split(',') if x.strip()]
                     param_space[k.strip()] = values
         except Exception as e:
             print(f"参数空间解析失败: {e}")
@@ -2567,12 +2710,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 code = self.ai_optimizer_result_table.item(row, 0).text()
                 codes.append(code)
                 if not best_params:
-                    best_params = self.ai_optimizer_result_table.item(row, 1).text()
+                    best_params = self.ai_optimizer_result_table.item(
+                        row, 1).text()
             # 应用到批量分析输入
             if hasattr(self, 'stock_input') and hasattr(self, 'param_input'):
                 self.stock_input.setText(','.join(codes))
                 self.param_input.setText(best_params)
-                QMessageBox.information(self, "已应用到批量分析", f"已将最优参数和股票应用到批量分析队列，可直接点击批量回测/分析。")
+                QMessageBox.information(
+                    self, "已应用到批量分析", f"已将最优参数和股票应用到批量分析队列，可直接点击批量回测/分析。")
         except Exception as e:
             print(f"应用到批量分析失败: {e}")
 
@@ -2587,8 +2732,10 @@ document.addEventListener('DOMContentLoaded', function() {
             for row in range(self.ai_optimizer_result_table.rowCount()):
                 param = self.ai_optimizer_result_table.item(row, 1).text()
                 param_count[param] = param_count.get(param, 0) + 1
-            fig = go.Figure([go.Bar(x=list(param_count.keys()), y=list(param_count.values()))])
-            fig.update_layout(title="最优参数分布", xaxis_title="参数", yaxis_title="股票数")
+            fig = go.Figure(
+                [go.Bar(x=list(param_count.keys()), y=list(param_count.values()))])
+            fig.update_layout(
+                title="最优参数分布", xaxis_title="参数", yaxis_title="股票数")
             html = fig.to_html(include_plotlyjs='cdn')
             dlg = QDialog(self)
             dlg.setWindowTitle("AI参数优化结果可视化")
@@ -2623,7 +2770,8 @@ document.addEventListener('DOMContentLoaded', function() {
         layout.addWidget(self.ai_diagnosis_result)
         # 一键导出报告按钮
         self.ai_diagnosis_export_btn = QPushButton("导出诊断报告")
-        self.ai_diagnosis_export_btn.clicked.connect(self.export_ai_diagnosis_report)
+        self.ai_diagnosis_export_btn.clicked.connect(
+            self.export_ai_diagnosis_report)
         layout.addWidget(self.ai_diagnosis_export_btn)
         # 加入到TabWidget
         if hasattr(self, 'tab_widget'):
@@ -2631,11 +2779,13 @@ document.addEventListener('DOMContentLoaded', function() {
         self.init_ai_api_stats(layout, "智能诊断")
         # 自动填充按钮
         self.ai_diagnosis_autofill_btn = QPushButton("自动填充最近回测结果")
-        self.ai_diagnosis_autofill_btn.clicked.connect(self.autofill_latest_analysis_result)
+        self.ai_diagnosis_autofill_btn.clicked.connect(
+            self.autofill_latest_analysis_result)
         layout.addWidget(self.ai_diagnosis_autofill_btn)
         # 导出调用链日志按钮
         self.ai_diagnosis_export_trace_btn = QPushButton("导出调用链日志")
-        self.ai_diagnosis_export_trace_btn.clicked.connect(self.export_last_trace_log)
+        self.ai_diagnosis_export_trace_btn.clicked.connect(
+            self.export_last_trace_log)
         layout.addWidget(self.ai_diagnosis_export_trace_btn)
 
     def autofill_latest_analysis_result(self):
@@ -2646,9 +2796,11 @@ document.addEventListener('DOMContentLoaded', function() {
             # 假设有recent_analysis_result属性或方法
             result = getattr(self, 'recent_analysis_result', None)
             if result is None and hasattr(self.parent(), 'analysis_tools'):
-                result = getattr(self.parent().analysis_tools, 'recent_analysis_result', None)
+                result = getattr(self.parent().analysis_tools,
+                                 'recent_analysis_result', None)
             if result:
-                self.ai_diagnosis_input.setPlainText(json.dumps(result, ensure_ascii=False, indent=2))
+                self.ai_diagnosis_input.setPlainText(
+                    json.dumps(result, ensure_ascii=False, indent=2))
                 QMessageBox.information(self, "已填充", "已自动填充最近回测/分析结果")
             else:
                 QMessageBox.warning(self, "无数据", "未找到最近回测/分析结果，请先运行回测/分析")
@@ -2679,10 +2831,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 data = resp.json()
                 advice = data.get("advice", "无AI诊断建议")
                 risks = data.get("risks", "无风险提示")
-                self.ai_diagnosis_result.setPlainText(f"【AI诊断建议】\n{advice}\n\n【风险提示】\n{risks}")
+                self.ai_diagnosis_result.setPlainText(
+                    f"【AI诊断建议】\n{advice}\n\n【风险提示】\n{risks}")
                 self.update_api_stats("智能诊断", True, (time.time()-t0)*1000)
             else:
-                QMessageBox.critical(self, "诊断失败", f"API请求失败: {resp.status_code}")
+                QMessageBox.critical(
+                    self, "诊断失败", f"API请求失败: {resp.status_code}")
                 self.update_api_stats("智能诊断", False, (time.time()-t0)*1000)
         except Exception as e:
             QMessageBox.critical(self, "诊断异常", str(e))
@@ -2700,7 +2854,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if not text:
                 QMessageBox.warning(self, "无内容", "请先完成AI诊断")
                 return
-            file_path, _ = QFileDialog.getSaveFileName(None, "导出诊断报告", "ai_diagnosis_report.txt", "Text Files (*.txt)")
+            file_path, _ = QFileDialog.getSaveFileName(
+                None, "导出诊断报告", "ai_diagnosis_report.txt", "Text Files (*.txt)")
             if file_path:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(text)
@@ -2718,8 +2873,10 @@ document.addEventListener('DOMContentLoaded', function() {
             for row in range(self.ai_strategy_result_table.rowCount()):
                 strat = self.ai_strategy_result_table.item(row, 1).text()
                 strat_count[strat] = strat_count.get(strat, 0) + 1
-            fig = go.Figure([go.Bar(x=list(strat_count.keys()), y=list(strat_count.values()))])
-            fig.update_layout(title="推荐策略分布", xaxis_title="策略", yaxis_title="推荐次数")
+            fig = go.Figure(
+                [go.Bar(x=list(strat_count.keys()), y=list(strat_count.values()))])
+            fig.update_layout(
+                title="推荐策略分布", xaxis_title="策略", yaxis_title="推荐次数")
             html = fig.to_html(include_plotlyjs='cdn')
             dlg = QDialog(self)
             dlg.setWindowTitle("AI策略推荐结果可视化")
@@ -2742,7 +2899,8 @@ document.addEventListener('DOMContentLoaded', function() {
             for row in range(self.ai_stock_result_table.rowCount()):
                 reason = self.ai_stock_result_table.item(row, 1).text()
                 reason_count[reason] = reason_count.get(reason, 0) + 1
-            fig = go.Figure([go.Pie(labels=list(reason_count.keys()), values=list(reason_count.values()))])
+            fig = go.Figure(
+                [go.Pie(labels=list(reason_count.keys()), values=list(reason_count.values()))])
             fig.update_layout(title="推荐理由分布")
             html = fig.to_html(include_plotlyjs='cdn')
             dlg = QDialog(self)
@@ -2763,12 +2921,15 @@ document.addEventListener('DOMContentLoaded', function() {
         trace_id = str(uuid.uuid4())
         self.last_trace_id = trace_id
         try:
-            self.log_manager.info(f"开始调用AI API: {api_func.__name__}", trace_id=trace_id)
+            self.log_manager.info(
+                f"开始调用AI API: {api_func.__name__}", trace_id=trace_id)
             result = api_func(*args, trace_id=trace_id, **kwargs)
-            self.log_manager.info(f"AI API调用成功: {api_func.__name__}", trace_id=trace_id)
+            self.log_manager.info(
+                f"AI API调用成功: {api_func.__name__}", trace_id=trace_id)
             return result
         except Exception as e:
-            self.log_manager.error(f"AI API调用异常: {api_func.__name__} - {str(e)}", trace_id=trace_id)
+            self.log_manager.error(
+                f"AI API调用异常: {api_func.__name__} - {str(e)}", trace_id=trace_id)
             raise
 
     def export_last_trace_log(self):
@@ -2776,9 +2937,11 @@ document.addEventListener('DOMContentLoaded', function() {
         一键导出最近一次trace_id的调用链日志
         """
         if hasattr(self, 'last_trace_id') and self.last_trace_id:
-            log_content = self.log_manager.get_last_trace_log(self.last_trace_id)
+            log_content = self.log_manager.get_last_trace_log(
+                self.last_trace_id)
             # 可弹窗显示或保存为文件
-            filename, _ = QFileDialog.getSaveFileName(self, "导出调用链日志", f"trace_{self.last_trace_id}.log", "Log Files (*.log)")
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "导出调用链日志", f"trace_{self.last_trace_id}.log", "Log Files (*.log)")
             if filename:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(log_content)
@@ -2795,7 +2958,8 @@ document.addEventListener('DOMContentLoaded', function() {
         for tid in trace_ids:
             log_content += f"\n--- trace_id={tid} ---\n"
             log_content += self.log_manager.get_last_trace_log(tid)
-        filename, _ = QFileDialog.getSaveFileName(self, "导出队列日志", "batch_trace.log", "Log Files (*.log)")
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "导出队列日志", "batch_trace.log", "Log Files (*.log)")
         if filename:
             with open(filename, 'w', encoding='utf-8') as f:
                 f.write(log_content)
@@ -2818,11 +2982,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 for strategy in available_strategies:
                     self.batch_strategy_list.addItem(strategy)
 
-                self.log_manager.info(f"策略列表已刷新，共 {len(available_strategies)} 个策略")
+                self.log_manager.info(
+                    f"策略列表已刷新，共 {len(available_strategies)} 个策略")
 
                 # 发送状态更新信号
                 if hasattr(self, 'set_status_message'):
-                    self.set_status_message(f"策略列表已刷新，共 {len(available_strategies)} 个策略")
+                    self.set_status_message(
+                        f"策略列表已刷新，共 {len(available_strategies)} 个策略")
 
             else:
                 self.log_manager.warning("策略管理系统未返回任何策略")
@@ -2905,7 +3071,8 @@ class StatusBar(QStatusBar):
         """
         self._progress_bar.setVisible(True)
         self._progress_bar.setValue(100)
-        self._progress_bar.setStyleSheet("QProgressBar::chunk {background-color: #FF1744;}")
+        self._progress_bar.setStyleSheet(
+            "QProgressBar::chunk {background-color: #FF1744;}")
         self.set_status(message, error=True)
 
     def addPermanentWidget(self, widget: QWidget, stretch: int = 0):

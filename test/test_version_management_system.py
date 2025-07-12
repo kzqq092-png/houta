@@ -115,7 +115,8 @@ def calculate_confidence(window_data):
                 print(f"✅ 获取{pattern_name}版本列表成功，共{len(versions)}个版本")
 
                 for version in versions:
-                    print(f"   - 版本{version.version_number}: {version.description}")
+                    print(
+                        f"   - 版本{version.version_number}: {version.description}")
 
             except Exception as e:
                 print(f"❌ 获取{pattern_name}版本列表失败: {e}")
@@ -134,11 +135,13 @@ def calculate_confidence(window_data):
         # 测试版本对比
         if len(version_ids) >= 2:
             try:
-                comparison = version_manager.compare_versions(version_ids[0], version_ids[1])
+                comparison = version_manager.compare_versions(
+                    version_ids[0], version_ids[1])
                 print("✅ 版本对比成功")
                 print(f"   - 版本1: {comparison['version1']['description']}")
                 print(f"   - 版本2: {comparison['version2']['description']}")
-                print(f"   - 代码相似度: {comparison['code_diff']['similarity']:.2%}")
+                print(
+                    f"   - 代码相似度: {comparison['code_diff']['similarity']:.2%}")
             except Exception as e:
                 print(f"❌ 版本对比失败: {e}")
 
@@ -146,13 +149,15 @@ def calculate_confidence(window_data):
         if version_ids:
             try:
                 temp_file = tempfile.mktemp(suffix='.json')
-                success = version_manager.export_version(version_ids[0], temp_file)
+                success = version_manager.export_version(
+                    version_ids[0], temp_file)
                 if success and os.path.exists(temp_file):
                     print(f"✅ 版本导出成功: {temp_file}")
 
                     # 测试导入版本
                     try:
-                        new_version_id = version_manager.import_version(temp_file, "测试导入形态")
+                        new_version_id = version_manager.import_version(
+                            temp_file, "测试导入形态")
                         if new_version_id:
                             print(f"✅ 版本导入成功，新版本ID: {new_version_id}")
                         else:

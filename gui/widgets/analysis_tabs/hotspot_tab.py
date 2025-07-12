@@ -141,25 +141,29 @@ class HotspotAnalysisTab(BaseAnalysisTab):
 
         # 开始分析按钮
         analyze_btn = QPushButton("开始热点分析")
-        analyze_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
+        analyze_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
         analyze_btn.clicked.connect(self.analyze_hotspot)
         layout.addWidget(analyze_btn)
 
         # 实时监控按钮
         monitor_btn = QPushButton("实时监控")
-        monitor_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
+        monitor_btn.setStyleSheet(
+            "QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
         monitor_btn.clicked.connect(self.start_monitor)
         layout.addWidget(monitor_btn)
 
         # 清除结果按钮
         clear_btn = QPushButton("清除结果")
-        clear_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
+        clear_btn.setStyleSheet(
+            "QPushButton { background-color: #dc3545; color: white; }")
         clear_btn.clicked.connect(self.clear_hotspot)
         layout.addWidget(clear_btn)
 
         # 导出结果按钮
         export_btn = QPushButton("导出热点分析")
-        export_btn.setStyleSheet("QPushButton { background-color: #fd7e14; color: white; }")
+        export_btn.setStyleSheet(
+            "QPushButton { background-color: #fd7e14; color: white; }")
         export_btn.clicked.connect(self.export_hotspot_analysis)
         layout.addWidget(export_btn)
 
@@ -178,13 +182,15 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         # 热点板块数
         hotspot_card = QFrame()
         hotspot_card.setFrameStyle(QFrame.StyledPanel)
-        hotspot_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        hotspot_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         hotspot_layout = QVBoxLayout(hotspot_card)
         hotspot_layout.addWidget(QLabel("热点板块"))
 
         self.hotspot_count_label = QLabel("0")
         self.hotspot_count_label.setAlignment(Qt.AlignCenter)
-        self.hotspot_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #dc3545; }")
+        self.hotspot_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #dc3545; }")
         hotspot_layout.addWidget(self.hotspot_count_label)
 
         overview_layout.addWidget(hotspot_card)
@@ -192,13 +198,15 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         # 龙头股数
         leading_card = QFrame()
         leading_card.setFrameStyle(QFrame.StyledPanel)
-        leading_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        leading_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         leading_layout = QVBoxLayout(leading_card)
         leading_layout.addWidget(QLabel("龙头股"))
 
         self.leading_count_label = QLabel("0")
         self.leading_count_label.setAlignment(Qt.AlignCenter)
-        self.leading_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #28a745; }")
+        self.leading_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #28a745; }")
         leading_layout.addWidget(self.leading_count_label)
 
         overview_layout.addWidget(leading_card)
@@ -206,13 +214,15 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         # 主题机会
         theme_card = QFrame()
         theme_card.setFrameStyle(QFrame.StyledPanel)
-        theme_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        theme_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         theme_layout = QVBoxLayout(theme_card)
         theme_layout.addWidget(QLabel("主题机会"))
 
         self.theme_count_label = QLabel("0")
         self.theme_count_label.setAlignment(Qt.AlignCenter)
-        self.theme_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
+        self.theme_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
         theme_layout.addWidget(self.theme_count_label)
 
         overview_layout.addWidget(theme_card)
@@ -220,13 +230,15 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         # 市场热度
         heat_card = QFrame()
         heat_card.setFrameStyle(QFrame.StyledPanel)
-        heat_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        heat_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         heat_layout = QVBoxLayout(heat_card)
         heat_layout.addWidget(QLabel("市场热度"))
 
         self.market_heat_label = QLabel("中等")
         self.market_heat_label.setAlignment(Qt.AlignCenter)
-        self.market_heat_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #ffc107; }")
+        self.market_heat_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #ffc107; }")
         heat_layout.addWidget(self.market_heat_label)
 
         overview_layout.addWidget(heat_card)
@@ -343,10 +355,12 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             if self.sector_cb.isChecked():
-                self.analyze_sector_hotspots(period, heat_threshold, gain_threshold, volume_multiplier)
+                self.analyze_sector_hotspots(
+                    period, heat_threshold, gain_threshold, volume_multiplier)
 
             if self.leading_cb.isChecked():
-                self.analyze_leading_stocks(period, heat_threshold, gain_threshold)
+                self.analyze_leading_stocks(
+                    period, heat_threshold, gain_threshold)
 
             if self.theme_cb.isChecked():
                 self.analyze_theme_opportunities(period, heat_threshold)
@@ -420,7 +434,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 })
 
             # 按热度指数排序
-            self.sector_rankings.sort(key=lambda x: float(x['热度指数']), reverse=True)
+            self.sector_rankings.sort(
+                key=lambda x: float(x['热度指数']), reverse=True)
 
         except Exception as e:
             self.log_manager.error(f"板块热点分析失败: {str(e)}")
@@ -460,7 +475,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 })
 
             # 按龙头指数排序
-            self.leading_stocks.sort(key=lambda x: int(x['龙头指数']), reverse=True)
+            self.leading_stocks.sort(
+                key=lambda x: int(x['龙头指数']), reverse=True)
 
         except Exception as e:
             self.log_manager.error(f"龙头股分析失败: {str(e)}")
@@ -502,7 +518,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 })
 
             # 按热度评分排序
-            self.theme_opportunities.sort(key=lambda x: float(x['热度评分']), reverse=True)
+            self.theme_opportunities.sort(
+                key=lambda x: float(x['热度评分']), reverse=True)
 
         except Exception as e:
             self.log_manager.error(f"主题机会分析失败: {str(e)}")
@@ -585,8 +602,10 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'sector_rankings'):
                 self.sector_table.setRowCount(len(self.sector_rankings))
                 for i, sector in enumerate(self.sector_rankings):
-                    self.sector_table.setItem(i, 0, QTableWidgetItem(sector['板块名称']))
-                    self.sector_table.setItem(i, 1, QTableWidgetItem(sector['热度指数']))
+                    self.sector_table.setItem(
+                        i, 0, QTableWidgetItem(sector['板块名称']))
+                    self.sector_table.setItem(
+                        i, 1, QTableWidgetItem(sector['热度指数']))
 
                     # 涨跌幅带颜色显示
                     gain_item = QTableWidgetItem(sector['涨跌幅'])
@@ -596,9 +615,12 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                         gain_item.setForeground(QColor("green"))
                     self.sector_table.setItem(i, 2, gain_item)
 
-                    self.sector_table.setItem(i, 3, QTableWidgetItem(sector['成交量比']))
-                    self.sector_table.setItem(i, 4, QTableWidgetItem(sector['领涨股']))
-                    self.sector_table.setItem(i, 5, QTableWidgetItem(sector['上涨家数']))
+                    self.sector_table.setItem(
+                        i, 3, QTableWidgetItem(sector['成交量比']))
+                    self.sector_table.setItem(
+                        i, 4, QTableWidgetItem(sector['领涨股']))
+                    self.sector_table.setItem(
+                        i, 5, QTableWidgetItem(sector['上涨家数']))
 
                     # 热点等级带颜色显示
                     level_item = QTableWidgetItem(sector['热点等级'])
@@ -616,9 +638,12 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'leading_stocks'):
                 self.leading_table.setRowCount(len(self.leading_stocks))
                 for i, stock in enumerate(self.leading_stocks):
-                    self.leading_table.setItem(i, 0, QTableWidgetItem(stock['股票代码']))
-                    self.leading_table.setItem(i, 1, QTableWidgetItem(stock['股票名称']))
-                    self.leading_table.setItem(i, 2, QTableWidgetItem(stock['所属板块']))
+                    self.leading_table.setItem(
+                        i, 0, QTableWidgetItem(stock['股票代码']))
+                    self.leading_table.setItem(
+                        i, 1, QTableWidgetItem(stock['股票名称']))
+                    self.leading_table.setItem(
+                        i, 2, QTableWidgetItem(stock['所属板块']))
 
                     # 涨跌幅带颜色显示
                     gain_item = QTableWidgetItem(stock['涨跌幅'])
@@ -628,18 +653,25 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                         gain_item.setForeground(QColor("green"))
                     self.leading_table.setItem(i, 3, gain_item)
 
-                    self.leading_table.setItem(i, 4, QTableWidgetItem(stock['成交量比']))
-                    self.leading_table.setItem(i, 5, QTableWidgetItem(stock['龙头指数']))
-                    self.leading_table.setItem(i, 6, QTableWidgetItem(stock['市值']))
-                    self.leading_table.setItem(i, 7, QTableWidgetItem(stock['地位']))
+                    self.leading_table.setItem(
+                        i, 4, QTableWidgetItem(stock['成交量比']))
+                    self.leading_table.setItem(
+                        i, 5, QTableWidgetItem(stock['龙头指数']))
+                    self.leading_table.setItem(
+                        i, 6, QTableWidgetItem(stock['市值']))
+                    self.leading_table.setItem(
+                        i, 7, QTableWidgetItem(stock['地位']))
 
             # 更新主题机会表格
             if hasattr(self, 'theme_opportunities'):
                 self.theme_table.setRowCount(len(self.theme_opportunities))
                 for i, theme in enumerate(self.theme_opportunities):
-                    self.theme_table.setItem(i, 0, QTableWidgetItem(theme['主题名称']))
-                    self.theme_table.setItem(i, 1, QTableWidgetItem(theme['热度评分']))
-                    self.theme_table.setItem(i, 2, QTableWidgetItem(theme['相关股票数']))
+                    self.theme_table.setItem(
+                        i, 0, QTableWidgetItem(theme['主题名称']))
+                    self.theme_table.setItem(
+                        i, 1, QTableWidgetItem(theme['热度评分']))
+                    self.theme_table.setItem(
+                        i, 2, QTableWidgetItem(theme['相关股票数']))
 
                     # 平均涨幅带颜色显示
                     gain_item = QTableWidgetItem(theme['平均涨幅'])
@@ -649,7 +681,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                         gain_item.setForeground(QColor("green"))
                     self.theme_table.setItem(i, 3, gain_item)
 
-                    self.theme_table.setItem(i, 4, QTableWidgetItem(theme['资金关注度']))
+                    self.theme_table.setItem(
+                        i, 4, QTableWidgetItem(theme['资金关注度']))
 
                     # 投资机会带颜色显示
                     opp_item = QTableWidgetItem(theme['投资机会'])
@@ -667,7 +700,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'capital_flow'):
                 self.flow_table.setRowCount(len(self.capital_flow))
                 for i, flow in enumerate(self.capital_flow):
-                    self.flow_table.setItem(i, 0, QTableWidgetItem(flow['板块名称']))
+                    self.flow_table.setItem(
+                        i, 0, QTableWidgetItem(flow['板块名称']))
 
                     # 资金流入带颜色显示
                     main_item = QTableWidgetItem(flow['主力净流入'])
@@ -691,8 +725,10 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                         total_item.setForeground(QColor("green"))
                     self.flow_table.setItem(i, 3, total_item)
 
-                    self.flow_table.setItem(i, 4, QTableWidgetItem(flow['流入强度']))
-                    self.flow_table.setItem(i, 5, QTableWidgetItem(flow['资金偏好']))
+                    self.flow_table.setItem(
+                        i, 4, QTableWidgetItem(flow['流入强度']))
+                    self.flow_table.setItem(
+                        i, 5, QTableWidgetItem(flow['资金偏好']))
 
             # 调整列宽
             self.sector_table.resizeColumnsToContents()
@@ -707,9 +743,12 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         """更新热点分析统计"""
         try:
             # 统计热点数量
-            hotspot_count = len([s for s in self.sector_rankings if '热点' in s.get('热点等级', '')]) if hasattr(self, 'sector_rankings') else 0
-            leading_count = len(self.leading_stocks) if hasattr(self, 'leading_stocks') else 0
-            theme_count = len(self.theme_opportunities) if hasattr(self, 'theme_opportunities') else 0
+            hotspot_count = len([s for s in self.sector_rankings if '热点' in s.get(
+                '热点等级', '')]) if hasattr(self, 'sector_rankings') else 0
+            leading_count = len(self.leading_stocks) if hasattr(
+                self, 'leading_stocks') else 0
+            theme_count = len(self.theme_opportunities) if hasattr(
+                self, 'theme_opportunities') else 0
 
             # 计算市场热度
             if hotspot_count >= 8:
@@ -730,7 +769,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             self.leading_count_label.setText(str(leading_count))
             self.theme_count_label.setText(str(theme_count))
             self.market_heat_label.setText(market_heat)
-            self.market_heat_label.setStyleSheet(f"QLabel {{ font-size: 18px; font-weight: bold; color: {heat_color}; }}")
+            self.market_heat_label.setStyleSheet(
+                f"QLabel {{ font-size: 18px; font-weight: bold; color: {heat_color}; }}")
 
             # 更新统计数据
             self.hotspot_statistics = {
@@ -760,7 +800,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
         self.leading_count_label.setText("0")
         self.theme_count_label.setText("0")
         self.market_heat_label.setText("中等")
-        self.market_heat_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #ffc107; }")
+        self.market_heat_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #ffc107; }")
 
     def export_hotspot_analysis(self):
         """导出热点分析结果"""

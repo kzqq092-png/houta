@@ -102,7 +102,8 @@ class LogManager(BaseLogManager):
             self.logger.addHandler(console_handler)
 
         # 日志格式增加trace_id
-        formatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(trace_id)s] %(name)s: %(message)s')
+        formatter = logging.Formatter(
+            '[%(asctime)s][%(levelname)s][%(trace_id)s] %(name)s: %(message)s')
         for handler in self.logger.handlers:
             handler.setFormatter(formatter)
             handler.addFilter(TraceIdFilter())

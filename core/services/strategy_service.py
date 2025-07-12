@@ -141,16 +141,17 @@ def strategy_logic(data, params):
     def save_strategy(self, strategy_data: Dict[str, Any]) -> bool:
         """保存策略"""
         try:
-            strategy_id = strategy_data.get('name', '').lower().replace(' ', '_')
+            strategy_id = strategy_data.get(
+                'name', '').lower().replace(' ', '_')
             if not strategy_id:
                 logger.error("策略名称不能为空")
                 return False
 
             self.strategies[strategy_id] = strategy_data
-            
+
             # 这里应该保存到文件或数据库
             # 暂时只保存在内存中
-            
+
             logger.info(f"策略已保存: {strategy_data.get('name')}")
             return True
 
@@ -183,7 +184,8 @@ def strategy_logic(data, params):
             # 复制策略数据
             source_strategy = self.strategies[strategy_id].copy()
             source_strategy['name'] = new_name
-            source_strategy['created_date'] = datetime.now().strftime('%Y-%m-%d')
+            source_strategy['created_date'] = datetime.now().strftime(
+                '%Y-%m-%d')
             source_strategy['status'] = '新建'
 
             # 保存克隆的策略
@@ -205,7 +207,7 @@ def strategy_logic(data, params):
                 return {}
 
             strategy = self.strategies[strategy_id]
-            
+
             # 模拟回测结果
             backtest_result = {
                 'strategy_id': strategy_id,
@@ -249,7 +251,7 @@ def strategy_logic(data, params):
                 return {}
 
             strategy = self.strategies[strategy_id]
-            
+
             # 模拟优化结果
             optimization_result = {
                 'strategy_id': strategy_id,
@@ -293,8 +295,8 @@ def strategy_logic(data, params):
         """获取回测结果"""
         try:
             if strategy_id:
-                return [result for result in self.backtest_results.values() 
-                       if result.get('strategy_id') == strategy_id]
+                return [result for result in self.backtest_results.values()
+                        if result.get('strategy_id') == strategy_id]
             else:
                 return list(self.backtest_results.values())
 
@@ -306,8 +308,8 @@ def strategy_logic(data, params):
         """获取优化结果"""
         try:
             if strategy_id:
-                return [result for result in self.optimization_results.values() 
-                       if result.get('strategy_id') == strategy_id]
+                return [result for result in self.optimization_results.values()
+                        if result.get('strategy_id') == strategy_id]
             else:
                 return list(self.optimization_results.values())
 
@@ -323,7 +325,7 @@ def strategy_logic(data, params):
                 return False
 
             strategy = self.strategies[strategy_id]
-            
+
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(strategy, f, ensure_ascii=False, indent=2)
 
@@ -401,9 +403,12 @@ def strategy_logic(data, params):
                 return {}
 
             # 计算性能统计
-            total_returns = [result['total_return'] for result in backtest_results]
-            sharpe_ratios = [result['sharpe_ratio'] for result in backtest_results]
-            max_drawdowns = [result['max_drawdown'] for result in backtest_results]
+            total_returns = [result['total_return']
+                             for result in backtest_results]
+            sharpe_ratios = [result['sharpe_ratio']
+                             for result in backtest_results]
+            max_drawdowns = [result['max_drawdown']
+                             for result in backtest_results]
 
             performance = {
                 'total_backtests': len(backtest_results),

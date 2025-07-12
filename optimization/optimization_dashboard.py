@@ -26,10 +26,16 @@ try:
         QLabel, QPushButton, QTableWidget, QTableWidgetItem, QTabWidget,
         QGroupBox, QFormLayout, QProgressBar, QTextEdit, QSplitter,
         QTreeWidget, QTreeWidgetItem, QHeaderView, QComboBox, QSpinBox,
-        QCheckBox, QSlider, QFrame, QScrollArea, QGridLayout
+        QCheckBox, QSlider, QFrame, QScrollArea, QGridLayout, QMessageBox
     )
     from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
     from PyQt5.QtGui import QFont, QColor, QPalette
+
+    # 核心组件导入
+    from core.events import EventBus
+    from core.metrics.events import SystemResourceUpdated
+    from core.containers import get_service_container
+    from core.services import ConfigService
 
     # 图表库
     try:
@@ -48,69 +54,11 @@ except ImportError:
     GUI_AVAILABLE = False
     CHARTS_AVAILABLE = False
 
+# 再次确保核心事件类型在全局范围内可用
+from core.metrics.events import SystemResourceUpdated
+
 # 导入优化系统组件
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-class SystemMonitor(QThread if GUI_AVAILABLE else object):
-    """系统监控线程"""
-
-    if GUI_AVAILABLE:
-        stats_updated = pyqtSignal(dict)
-
-    def __init__(self):
-        super().__init__()
-        self.running = False
-        self.db_manager = OptimizationDatabaseManager()
-
-    def run(self):
-        """监控线程主循环"""
-        self.running = True
-
-        while self.running:
-            try:
-                # 获取系统统计信息
-                stats = self._collect_system_stats()
-
-                if GUI_AVAILABLE:
-                    self.stats_updated.emit(stats)
-
-                time.sleep(2)  # 每2秒更新一次
-
-            except Exception as e:
-                print(f"系统监控错误: {e}")
-                time.sleep(5)
-
-    def stop(self):
-        """停止监控"""
-        self.running = False
-
-    def _collect_system_stats(self) -> Dict[str, Any]:
-        """收集系统统计信息"""
-        try:
-            import psutil
-
-            # CPU和内存使用率
-            cpu_percent = psutil.cpu_percent(interval=1)
-            memory = psutil.virtual_memory()
-
-            # 优化系统统计
-            opt_stats = self.db_manager.get_optimization_statistics()
-
-            return {
-                "timestamp": datetime.now(),
-                "cpu_percent": cpu_percent,
-                "memory_percent": memory.percent,
-                "memory_used_gb": memory.used / (1024**3),
-                "memory_total_gb": memory.total / (1024**3),
-                "optimization_stats": opt_stats
-            }
-
-        except Exception as e:
-            return {
-                "timestamp": datetime.now(),
-                "error": str(e)
-            }
 
 
 class PerformanceChart(QWidget):
@@ -181,7 +129,8 @@ class PerformanceChart(QWidget):
         """绘制性能历史图表"""
         if self.unified_chart_available and hasattr(self, 'chart_widget'):
             # 使用统一图表服务
-            self._plot_with_unified_service(pattern_name, history_data, 'history')
+            self._plot_with_unified_service(
+                pattern_name, history_data, 'history')
         elif hasattr(self, 'axes'):
             # 使用matplotlib降级实现
             self._plot_with_matplotlib(pattern_name, history_data, 'history')
@@ -222,7 +171,8 @@ class PerformanceChart(QWidget):
         for item in history_data:
             if item.get('test_time'):
                 try:
-                    timestamp = datetime.fromisoformat(item['test_time'].replace('Z', '+00:00'))
+                    timestamp = datetime.fromisoformat(
+                        item['test_time'].replace('Z', '+00:00'))
                     timestamps.append(timestamp)
                     scores.append(item.get('overall_score', 0))
                 except Exception as e:
@@ -312,14 +262,16 @@ class PerformanceChart(QWidget):
 
         # 绘制折线图
         self.axes.plot(timestamps, scores, 'b-o', linewidth=2, markersize=6)
-        self.axes.set_title(f'{pattern_name} 性能历史', fontsize=14, fontweight='bold')
+        self.axes.set_title(f'{pattern_name} 性能历史',
+                            fontsize=14, fontweight='bold')
         self.axes.set_xlabel('时间')
         self.axes.set_ylabel('综合评分')
         self.axes.grid(True, alpha=0.3)
 
         # 格式化x轴
         if CHARTS_AVAILABLE:
-            self.axes.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+            self.axes.xaxis.set_major_formatter(
+                mdates.DateFormatter('%m-%d %H:%M'))
             self.axes.xaxis.set_major_locator(mdates.HourLocator(interval=6))
             self.figure.autofmt_xdate()
 
@@ -329,7 +281,8 @@ class PerformanceChart(QWidget):
             self.axes.annotate(f'最新: {latest_score:.3f}',
                                xy=(timestamps[-1], latest_score),
                                xytext=(10, 10), textcoords='offset points',
-                               bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                               bbox=dict(boxstyle='round,pad=0.3',
+                                         facecolor='yellow', alpha=0.7),
                                arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0'))
 
         if hasattr(self, 'canvas'):
@@ -339,7 +292,8 @@ class PerformanceChart(QWidget):
         """绘制多形态性能对比"""
         if self.unified_chart_available and hasattr(self, 'chart_widget'):
             # 使用统一图表服务
-            self._plot_with_unified_service('comparison', comparison_data, 'comparison')
+            self._plot_with_unified_service(
+                'comparison', comparison_data, 'comparison')
         elif hasattr(self, 'axes'):
             # 使用matplotlib降级实现
             self._plot_comparison_with_matplotlib(comparison_data)
@@ -382,7 +336,11 @@ class PerformanceChart(QWidget):
 class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
     """优化仪表板主窗口"""
 
-    def __init__(self):
+    # 添加一个信号，用于跨线程安全地更新UI
+    stats_updated = pyqtSignal(dict)
+
+    def __init__(self, event_bus: EventBus):
+        """初始化"""
         if not GUI_AVAILABLE:
             print("GUI不可用，仪表板将以命令行模式运行")
             return
@@ -396,21 +354,39 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         self.pattern_manager = PatternManager()
         self.db_manager = OptimizationDatabaseManager()
 
-        # 监控组件
-        self.system_monitor = SystemMonitor()
+        self._event_bus = event_bus
+        self._optimization_thread = None
 
         # 数据
         self.current_pattern = None
         self.performance_history = {}
 
+        self.setWindowTitle("HiKyuu 形态识别优化仪表板")
+        self.setGeometry(100, 100, 1400, 900)
         self.init_ui()
-        self.start_monitoring()
+        self._subscribe_to_events()
+
+    def _subscribe_to_events(self):
+        """订阅所有需要的事件。"""
+        # 订阅系统资源更新事件
+        self._event_bus.subscribe(
+            SystemResourceUpdated, self.handle_resource_update)
+        # 连接本地信号到UI更新槽
+        self.stats_updated.connect(self._update_ui_with_stats)
+
+    def handle_resource_update(self, event: SystemResourceUpdated):
+        """
+        处理从EventBus收到的SystemResourceUpdated事件。
+        在非GUI线程中被调用，通过发射信号来安全更新UI。
+        """
+        stats = {
+            "cpu_percent": event.cpu_percent,
+            "memory_percent": event.memory_percent,
+        }
+        self.stats_updated.emit(stats)
 
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle("HiKyuu 形态识别优化仪表板")
-        self.setGeometry(100, 100, 1400, 900)
-
         # 创建中央部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -427,6 +403,9 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         right_panel = self.create_right_panel()
         main_layout.addWidget(right_panel, 3)
 
+        # 初始化时刷新所有数据
+        self.refresh_all_data()
+
     def create_left_panel(self) -> QWidget:
         """创建左侧控制面板"""
         panel = QWidget()
@@ -437,8 +416,8 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         status_group = QGroupBox("系统状态")
         status_layout = QFormLayout()
 
-        self.cpu_label = QLabel("0%")
-        self.memory_label = QLabel("0%")
+        self.cpu_label = QLabel("N/A")
+        self.memory_label = QLabel("N/A")
         self.active_tasks_label = QLabel("0")
         self.total_versions_label = QLabel("0")
 
@@ -478,7 +457,8 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         pattern_layout.addWidget(self.pattern_combo)
 
         self.pattern_optimize_btn = QPushButton("优化选中形态")
-        self.pattern_optimize_btn.clicked.connect(self.optimize_selected_pattern)
+        self.pattern_optimize_btn.clicked.connect(
+            self.optimize_selected_pattern)
         pattern_layout.addWidget(self.pattern_optimize_btn)
 
         pattern_group.setLayout(pattern_layout)
@@ -639,54 +619,37 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
         return tab
 
-    def start_monitoring(self):
-        """开始系统监控"""
-        # 连接系统监控信号
-        if GUI_AVAILABLE:
-            self.system_monitor.stats_updated.connect(self.update_system_stats)
+    def _update_ui_with_stats(self, stats: Dict[str, Any]):
+        """使用收集到的统计信息更新UI标签 (槽函数)"""
+        cpu_percent = stats.get("cpu_percent", 0)
+        self.cpu_label.setText(f"{cpu_percent:.2f}%")
 
-        # 启动监控线程
-        self.system_monitor.start()
+        mem_percent = stats.get("memory_percent", 0)
+        self.memory_label.setText(f"{mem_percent:.2f}%")
 
-        # 设置定时器刷新数据
-        self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self.refresh_data)
-        self.refresh_timer.start(5000)  # 每5秒刷新一次
-
-        # 初始化数据
-        self.refresh_all_data()
-
-    def update_system_stats(self, stats: Dict[str, Any]):
-        """更新系统统计信息"""
-        if "error" in stats:
-            self.log_message(f"系统监控错误: {stats['error']}")
-            return
-
-        # 更新CPU和内存显示
-        self.cpu_label.setText(f"{stats.get('cpu_percent', 0):.1f}%")
-        self.memory_label.setText(f"{stats.get('memory_percent', 0):.1f}%")
-
-        # 更新优化统计
-        opt_stats = stats.get('optimization_stats', {})
-        self.total_versions_label.setText(str(opt_stats.get('total_versions', 0)))
-        self.active_tasks_label.setText(str(len(self.auto_tuner.running_tasks)))
+        # 优化统计数据现在从数据库中定期刷新，而不是从监控线程获取
+        # 可以在 refresh_all_data 中更新
 
     def refresh_all_data(self):
         """刷新所有数据"""
-        self.log_message("刷新所有数据...")
-
-        # 刷新形态列表
         self.refresh_pattern_list()
-
-        # 刷新优化历史
         self.refresh_optimization_history()
-
-        # 刷新版本信息
         self.refresh_version_info()
 
-        # 刷新性能数据
-        if self.current_pattern:
-            self.refresh_performance_data(self.current_pattern)
+        # 更新优化统计
+        try:
+            opt_stats = self.db_manager.get_optimization_statistics()
+            self.total_versions_label.setText(
+                str(opt_stats.get('total_versions', 'N/A')))
+            self.active_tasks_label.setText(
+                str(len(self.auto_tuner.running_tasks)))
+            self.total_patterns_label.setText(str(len(self.pattern_combo)))
+            self.active_versions_label.setText(
+                str(opt_stats.get('active_versions', 'N/A')))
+            self.avg_improvement_label.setText(
+                f"{opt_stats.get('avg_improvement', 'N/A')}%")
+        except Exception as e:
+            self.log_message(f"刷新优化统计失败: {e}", "error")
 
     def refresh_pattern_list(self):
         """刷新形态列表"""
@@ -734,10 +697,12 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                 for j, value in enumerate(record):
                     if value is None:
                         value = "N/A"
-                    elif j in [5, 6] and isinstance(value, (int, float)):  # 性能提升和最佳评分
+                    # 性能提升和最佳评分
+                    elif j in [5, 6] and isinstance(value, (int, float)):
                         value = f"{value:.3f}"
 
-                    self.history_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    self.history_table.setItem(
+                        i, j, QTableWidgetItem(str(value)))
 
         except Exception as e:
             self.log_message(f"❌ 刷新优化历史失败: {e}")
@@ -749,7 +714,8 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
             stats = self.db_manager.get_optimization_statistics()
 
             self.total_patterns_label.setText(str(len(self.pattern_combo)))
-            self.active_versions_label.setText(str(stats.get('active_versions', 0)))
+            self.active_versions_label.setText(
+                str(stats.get('active_versions', 0)))
 
             avg_improvement = stats.get('avg_improvement', 0)
             self.avg_improvement_label.setText(f"{avg_improvement:.3f}%")
@@ -784,7 +750,8 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                     elif value is None:
                         value = "N/A"
 
-                    self.version_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    self.version_table.setItem(
+                        i, j, QTableWidgetItem(str(value)))
 
         except Exception as e:
             self.log_message(f"❌ 刷新版本信息失败: {e}")
@@ -793,11 +760,13 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         """刷新性能数据"""
         try:
             # 获取性能历史
-            history = self.db_manager.get_performance_history(pattern_name, limit=20)
+            history = self.db_manager.get_performance_history(
+                pattern_name, limit=20)
 
             # 更新图表
             if CHARTS_AVAILABLE and hasattr(self, 'performance_chart'):
-                self.performance_chart.plot_performance_history(pattern_name, history)
+                self.performance_chart.plot_performance_history(
+                    pattern_name, history)
 
             # 更新性能指标表格
             if history:
@@ -819,11 +788,6 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
 
         except Exception as e:
             self.log_message(f"❌ 刷新性能数据失败: {e}")
-
-    def refresh_data(self):
-        """定时刷新数据"""
-        if self.current_pattern:
-            self.refresh_performance_data(self.current_pattern)
 
     def on_pattern_changed(self, pattern_name: str):
         """形态选择改变"""
@@ -849,8 +813,10 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                 summary = result.get("summary", {})
                 self.log_message(f"✅ 一键优化完成！")
                 self.log_message(f"   总任务数: {summary.get('total_tasks', 0)}")
-                self.log_message(f"   成功任务数: {summary.get('successful_tasks', 0)}")
-                self.log_message(f"   平均改进: {summary.get('average_improvement', 0):.3f}%")
+                self.log_message(
+                    f"   成功任务数: {summary.get('successful_tasks', 0)}")
+                self.log_message(
+                    f"   平均改进: {summary.get('average_improvement', 0):.3f}%")
 
                 self.progress_bar.setValue(100)
                 self.progress_label.setText("优化完成")
@@ -879,8 +845,10 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                 else:
                     summary = result.get("summary", {})
                     self.log_message(f"✅ 智能优化完成！")
-                    self.log_message(f"   优化形态数: {summary.get('total_tasks', 0)}")
-                    self.log_message(f"   平均改进: {summary.get('average_improvement', 0):.3f}%")
+                    self.log_message(
+                        f"   优化形态数: {summary.get('total_tasks', 0)}")
+                    self.log_message(
+                        f"   平均改进: {summary.get('average_improvement', 0):.3f}%")
 
                 self.progress_label.setText("智能优化完成")
 
@@ -916,7 +884,8 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
                 )
 
                 improvement = result.get("improvement_percentage", 0)
-                self.log_message(f"✅ {pattern_name} 优化完成！性能提升: {improvement:.3f}%")
+                self.log_message(
+                    f"✅ {pattern_name} 优化完成！性能提升: {improvement:.3f}%")
                 self.progress_label.setText("优化完成")
 
                 # 刷新数据
@@ -949,21 +918,31 @@ class OptimizationDashboard(QMainWindow if GUI_AVAILABLE else object):
         self.log_message("📝 日志已清空")
 
     def closeEvent(self, event):
-        """窗口关闭事件"""
-        # 停止监控线程
-        self.system_monitor.stop()
-        self.system_monitor.wait()
+        """处理窗口关闭事件"""
+        self.log_message("正在关闭优化仪表板...")
+        if self._optimization_thread and self._optimization_thread.isRunning():
+            reply = QMessageBox.question(self, '确认退出',
+                                         "优化仍在进行中，确定要退出吗？",
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self._optimization_thread.terminate()
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
-        # 停止定时器
-        if hasattr(self, 'refresh_timer'):
-            self.refresh_timer.stop()
 
-        event.accept()
+# 全局仪表板实例，确保只有一个
+_dashboard_instance = None
 
 
-def create_optimization_dashboard() -> OptimizationDashboard:
-    """创建优化仪表板实例"""
-    return OptimizationDashboard()
+def create_optimization_dashboard(event_bus: EventBus) -> OptimizationDashboard:
+    """创建并返回优化仪表板的单例"""
+    global _dashboard_instance
+    if _dashboard_instance is None:
+        _dashboard_instance = OptimizationDashboard(event_bus)
+    return _dashboard_instance
 
 
 def run_dashboard():
@@ -978,7 +957,7 @@ def run_dashboard():
     app.setStyle('Fusion')
 
     # 创建仪表板
-    dashboard = create_optimization_dashboard()
+    dashboard = create_optimization_dashboard(MockEventBus())
     dashboard.show()
 
     # 运行应用

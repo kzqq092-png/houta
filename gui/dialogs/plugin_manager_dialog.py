@@ -253,7 +253,8 @@ class PluginConfigDialog(QDialog):
 
             # 通知插件管理器
             if hasattr(self.plugin_manager, 'update_plugin_config'):
-                self.plugin_manager.update_plugin_config(self.plugin_info.name, new_config)
+                self.plugin_manager.update_plugin_config(
+                    self.plugin_info.name, new_config)
 
             QMessageBox.information(self, "成功", "配置已保存")
             self.accept()
@@ -483,7 +484,8 @@ class PluginManagerDialog(QDialog):
                     description=metadata.get('description', ''),
                     author=metadata.get('author', ''),
                     path=metadata.get('path', ''),
-                    status=PluginStatus.ENABLED if self.plugin_manager.is_plugin_loaded(plugin_name) else PluginStatus.UNLOADED,
+                    status=PluginStatus.ENABLED if self.plugin_manager.is_plugin_loaded(
+                        plugin_name) else PluginStatus.UNLOADED,
                     config=metadata.get('config', {}),
                     dependencies=metadata.get('dependencies', [])
                 )
@@ -533,9 +535,11 @@ class PluginManagerDialog(QDialog):
                               (plugin_info.plugin_type and plugin_info.plugin_type.value == plugin_type))
 
                 # 状态匹配
-                status_match = (not status or plugin_info.status.value == status)
+                status_match = (
+                    not status or plugin_info.status.value == status)
 
-                item.setHidden(not (text_match and type_match and status_match))
+                item.setHidden(
+                    not (text_match and type_match and status_match))
 
     def enable_plugin(self, plugin_name: str):
         """启用插件"""
@@ -572,7 +576,8 @@ class PluginManagerDialog(QDialog):
                 plugin_info = plugin_widget.plugin_info
 
                 # 打开配置对话框
-                config_dialog = PluginConfigDialog(plugin_info, self.plugin_manager, self)
+                config_dialog = PluginConfigDialog(
+                    plugin_info, self.plugin_manager, self)
                 if config_dialog.exec_() == QDialog.Accepted:
                     self.plugin_configured.emit(plugin_name)
                     self.add_log(f"插件 {plugin_name} 配置已更新")

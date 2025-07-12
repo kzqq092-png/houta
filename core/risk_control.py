@@ -35,7 +35,8 @@ class RiskControlStrategy:
                 sector_contribution = weight * sector
 
                 # 计算流动性风险贡献
-                liquidity = liquidity_risk.get('liquidity_ratio', {}).get(asset, 1.0)
+                liquidity = liquidity_risk.get(
+                    'liquidity_ratio', {}).get(asset, 1.0)
                 liquidity_contribution = weight * (1 / liquidity)
 
                 # 综合风险贡献
@@ -55,7 +56,8 @@ class RiskControlStrategy:
                     for asset, contribution in risk_contributions.items()
                 }
             else:
-                risk_budget = {asset: 1.0/len(portfolio) for asset in portfolio}
+                risk_budget = {asset: 1.0/len(portfolio)
+                               for asset in portfolio}
 
             self.risk_budget = risk_budget
             return risk_budget
@@ -91,7 +93,8 @@ class RiskControlStrategy:
                 asset_limit = base_limit * self.risk_budget[asset]
 
                 # 考虑流动性风险
-                liquidity = risk_metrics.get('liquidity_risk', {}).get('liquidity_ratio', {}).get(asset, 1.0)
+                liquidity = risk_metrics.get('liquidity_risk', {}).get(
+                    'liquidity_ratio', {}).get(asset, 1.0)
                 asset_limit *= min(1.0, liquidity)
 
                 position_limits[asset] = asset_limit
@@ -150,7 +153,8 @@ class RiskControlStrategy:
                 return None
 
             # 计算对冲比例
-            hedge_ratio = self._calculate_hedge_ratio(asset, hedge_asset, risk_metrics)
+            hedge_ratio = self._calculate_hedge_ratio(
+                asset, hedge_asset, risk_metrics)
 
             # 计算对冲头寸
             hedge_position = -position * hedge_ratio
@@ -210,14 +214,16 @@ class RiskControlStrategy:
         """选择对冲工具"""
         try:
             # 获取相关性矩阵
-            correlation_matrix = risk_metrics.get('correlation_risk', {}).get('correlation_matrix', pd.DataFrame())
+            correlation_matrix = risk_metrics.get('correlation_risk', {}).get(
+                'correlation_matrix', pd.DataFrame())
 
             if asset not in correlation_matrix.index:
                 return None
 
             # 寻找负相关性最高的资产
             correlations = correlation_matrix[asset]
-            hedge_asset = correlations[correlations < -0.7].index[0] if len(correlations[correlations < -0.7]) > 0 else None
+            hedge_asset = correlations[correlations < -0.7].index[0] if len(
+                correlations[correlations < -0.7]) > 0 else None
 
             return hedge_asset
 
@@ -230,7 +236,8 @@ class RiskControlStrategy:
         """计算对冲比例"""
         try:
             # 获取相关性
-            correlation_matrix = risk_metrics.get('correlation_risk', {}).get('correlation_matrix', pd.DataFrame())
+            correlation_matrix = risk_metrics.get('correlation_risk', {}).get(
+                'correlation_matrix', pd.DataFrame())
             correlation = correlation_matrix.loc[asset, hedge_asset]
 
             # 获取波动率
@@ -309,7 +316,8 @@ class RiskMonitor:
             alerts.extend(liquidity_alerts)
 
             # 4. 监控组合风险
-            portfolio_alerts = self._monitor_portfolio_risk(portfolio, risk_metrics)
+            portfolio_alerts = self._monitor_portfolio_risk(
+                portfolio, risk_metrics)
             alerts.extend(portfolio_alerts)
 
             # 5. 监控止损风险
@@ -435,7 +443,8 @@ class RiskMonitor:
         stop_loss_levels = risk_metrics.get('stop_loss_levels', {})
 
         for asset, stop_price in stop_loss_levels.items():
-            current_price = risk_metrics.get('current_prices', {}).get(asset, 0)
+            current_price = risk_metrics.get(
+                'current_prices', {}).get(asset, 0)
             if current_price > 0:
                 distance = (current_price - stop_price) / current_price
                 if distance < 0.02:  # 接近止损线
@@ -647,19 +656,23 @@ class RiskReportGenerator:
         recommendations = []
 
         # 1. 基于市场风险的建议
-        market_recommendations = self._generate_market_recommendations(risk_metrics)
+        market_recommendations = self._generate_market_recommendations(
+            risk_metrics)
         recommendations.extend(market_recommendations)
 
         # 2. 基于行业风险的建议
-        sector_recommendations = self._generate_sector_recommendations(risk_metrics)
+        sector_recommendations = self._generate_sector_recommendations(
+            risk_metrics)
         recommendations.extend(sector_recommendations)
 
         # 3. 基于流动性风险的建议
-        liquidity_recommendations = self._generate_liquidity_recommendations(risk_metrics)
+        liquidity_recommendations = self._generate_liquidity_recommendations(
+            risk_metrics)
         recommendations.extend(liquidity_recommendations)
 
         # 4. 基于组合风险的建议
-        portfolio_recommendations = self._generate_portfolio_recommendations(portfolio, risk_metrics)
+        portfolio_recommendations = self._generate_portfolio_recommendations(
+            portfolio, risk_metrics)
         recommendations.extend(portfolio_recommendations)
 
         return recommendations
@@ -786,11 +799,13 @@ class RiskReportGenerator:
         # 按级别统计
         for alert in alerts:
             level = alert.get('level', 'unknown')
-            summary['alert_by_level'][level] = summary['alert_by_level'].get(level, 0) + 1
+            summary['alert_by_level'][level] = summary['alert_by_level'].get(
+                level, 0) + 1
 
             # 按类型统计
             alert_type = alert.get('type', 'unknown')
-            summary['alert_by_type'][alert_type] = summary['alert_by_type'].get(alert_type, 0) + 1
+            summary['alert_by_type'][alert_type] = summary['alert_by_type'].get(
+                alert_type, 0) + 1
 
         return summary
 

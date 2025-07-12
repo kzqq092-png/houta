@@ -44,7 +44,8 @@ def test_compound_calculation():
         commission_pct=0.001,
         slippage_pct=0.001
     )
-    results_no_compound = backtester_no_compound.run_backtest(enable_compound=False)
+    results_no_compound = backtester_no_compound.run_backtest(
+        enable_compound=False)
 
     print("交易记录:")
     trades_no_compound = backtester_no_compound.get_trade_summary()

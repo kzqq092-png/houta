@@ -149,7 +149,8 @@ class FundFlowWidget(BaseAnalysisTab):
             for k, v in data.items():
                 if isinstance(v, pd.DataFrame) and 'code' not in v.columns and hasattr(self.data_manager, 'current_stock'):
                     v = v.copy()
-                    v['code'] = getattr(self.data_manager, 'current_stock', None)
+                    v['code'] = getattr(self.data_manager,
+                                        'current_stock', None)
                     data[k] = v
 
             return data
@@ -380,7 +381,8 @@ class FundFlowWidget(BaseAnalysisTab):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
 
         try:
             button.clicked.disconnect()
@@ -408,7 +410,8 @@ class FundFlowWidget(BaseAnalysisTab):
                 button.clicked.disconnect()
             except Exception:
                 pass
-            button.clicked.connect(lambda: self._run_analysis_async(button, analysis_func, *args, **kwargs))
+            button.clicked.connect(lambda: self._run_analysis_async(
+                button, analysis_func, *args, **kwargs))
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
@@ -560,7 +563,8 @@ class FundFlowWidget(BaseAnalysisTab):
                     if j > 0:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     if j == 1:
-                        item.setForeground(QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
+                        item.setForeground(
+                            QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.industry_table.setItem(i, j, item)
             # 添加合计、均值行
             row_count = len(industries)
@@ -590,10 +594,14 @@ class FundFlowWidget(BaseAnalysisTab):
             min_net_idx = np.argmin(net_flows)
             max_str_idx = np.argmax(strengths)
             min_str_idx = np.argmin(strengths)
-            self.industry_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
-            self.industry_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
-            self.industry_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
-            self.industry_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
+            self.industry_table.item(
+                max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.industry_table.item(
+                min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.industry_table.item(
+                max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.industry_table.item(
+                min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
             # 更新行业资金流向图表
             self.industry_figure.clear()
@@ -664,7 +672,8 @@ class FundFlowWidget(BaseAnalysisTab):
                     if j > 0:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     if j == 1:
-                        item.setForeground(QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
+                        item.setForeground(
+                            QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.concept_table.setItem(i, j, item)
             # 添加合计、均值行
             row_count = len(concepts)
@@ -694,10 +703,14 @@ class FundFlowWidget(BaseAnalysisTab):
             min_net_idx = np.argmin(net_flows)
             max_str_idx = np.argmax(strengths)
             min_str_idx = np.argmin(strengths)
-            self.concept_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
-            self.concept_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
-            self.concept_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
-            self.concept_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
+            self.concept_table.item(
+                max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.concept_table.item(
+                min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.concept_table.item(
+                max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.concept_table.item(
+                min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
             # 更新概念资金流向图表
             self.concept_figure.clear()
@@ -777,7 +790,8 @@ class FundFlowWidget(BaseAnalysisTab):
             ax2.set_title('资金规模分布')
             # 顶部显示总金额
             total_value = values.sum()
-            ax2.text(0.5, 1.08, f"总金额: {total_value:.3f}", transform=ax2.transAxes, ha='center', va='bottom', fontsize=11, color='#2196F3')
+            ax2.text(0.5, 1.08, f"总金额: {total_value:.3f}", transform=ax2.transAxes,
+                     ha='center', va='bottom', fontsize=11, color='#2196F3')
 
             # 3. 主力活跃度热力图
             activity_data = np.random.uniform(0, 1, (5, 5))
@@ -789,7 +803,8 @@ class FundFlowWidget(BaseAnalysisTab):
             ax3.set_title('主力活跃度分析')
             # 顶部显示均值
             act_mean = activity_data.mean()
-            ax3.text(0.5, 1.05, f"均值: {act_mean:.3f}", transform=ax3.transAxes, ha='center', va='bottom', fontsize=11, color='#f57c00')
+            ax3.text(0.5, 1.05, f"均值: {act_mean:.3f}", transform=ax3.transAxes,
+                     ha='center', va='bottom', fontsize=11, color='#f57c00')
 
             # 调整布局
             self.main_force_figure.tight_layout()
@@ -814,7 +829,8 @@ class FundFlowWidget(BaseAnalysisTab):
 
         # 创建按钮布局
         button_layout = self.create_button_layout([
-            ("应用模板", lambda: self._apply_template(template_list, dialog), '#4CAF50'),
+            ("应用模板", lambda: self._apply_template(
+                template_list, dialog), '#4CAF50'),
             ("删除模板", lambda: self._delete_template(template_list), '#F44336'),
             ("新建模板", self._create_new_template, '#2196F3')
         ])
@@ -850,7 +866,8 @@ class FundFlowWidget(BaseAnalysisTab):
                 self.show_warning_message("删除失败", "默认模板不能删除")
                 return
 
-            result = self.show_question_message("确认删除", f"确定要删除模板 '{template_name}' 吗？")
+            result = self.show_question_message(
+                "确认删除", f"确定要删除模板 '{template_name}' 吗？")
             if result == QMessageBox.Yes:
                 row = list_widget.row(current_item)
                 list_widget.takeItem(row)

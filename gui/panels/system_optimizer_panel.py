@@ -258,12 +258,14 @@ class SystemOptimizerPanel(QWidget):
                         future = executor.submit(self._init_service_in_thread)
                         future.result()
                 else:
-                    loop.run_until_complete(self.optimizer_service.initialize_async())
+                    loop.run_until_complete(
+                        self.optimizer_service.initialize_async())
             except RuntimeError:
                 # 没有事件循环，创建新的
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                loop.run_until_complete(self.optimizer_service.initialize_async())
+                loop.run_until_complete(
+                    self.optimizer_service.initialize_async())
 
             self._log_message("系统维护服务初始化成功")
         except Exception as e:
@@ -347,8 +349,10 @@ class SystemOptimizerPanel(QWidget):
             self.worker = OptimizationWorker(self.optimizer_service, level)
             self.worker.progress_updated.connect(self._on_progress_updated)
             self.worker.status_updated.connect(self._on_status_updated)
-            self.worker.optimization_completed.connect(self._on_optimization_completed)
-            self.worker.optimization_failed.connect(self._on_optimization_failed)
+            self.worker.optimization_completed.connect(
+                self._on_optimization_completed)
+            self.worker.optimization_failed.connect(
+                self._on_optimization_failed)
 
             # 更新UI状态
             self._update_ui_state(True)
@@ -390,12 +394,14 @@ class SystemOptimizerPanel(QWidget):
                         future = executor.submit(self._analyze_in_thread)
                         analysis = future.result()
                 else:
-                    analysis = loop.run_until_complete(self.optimizer_service.analyze_system())
+                    analysis = loop.run_until_complete(
+                        self.optimizer_service.analyze_system())
             except RuntimeError:
                 # 没有事件循环，创建新的
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                analysis = loop.run_until_complete(self.optimizer_service.analyze_system())
+                analysis = loop.run_until_complete(
+                    self.optimizer_service.analyze_system())
 
             # 显示分析结果
             message = f"""
@@ -414,7 +420,8 @@ class SystemOptimizerPanel(QWidget):
                 if loop.is_running():
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._get_suggestions_in_thread)
+                        future = executor.submit(
+                            self._get_suggestions_in_thread)
                         suggestions = future.result()
                 else:
                     suggestions = loop.run_until_complete(
@@ -452,8 +459,10 @@ class SystemOptimizerPanel(QWidget):
 
         # 更新统计信息
         self.files_cleaned_label.setText(f"清理文件: {result.files_cleaned}")
-        self.space_freed_label.setText(f"释放空间: {result.bytes_freed / 1024 / 1024:.2f} MB")
-        self.time_elapsed_label.setText(f"耗时: {result.duration.total_seconds():.2f}s")
+        self.space_freed_label.setText(
+            f"释放空间: {result.bytes_freed / 1024 / 1024:.2f} MB")
+        self.time_elapsed_label.setText(
+            f"耗时: {result.duration.total_seconds():.2f}s")
 
         # 显示完成消息
         self._log_message(f"维护完成！成功率: {result.success_rate:.2%}")

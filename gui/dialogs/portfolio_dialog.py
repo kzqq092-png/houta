@@ -138,13 +138,15 @@ class PortfolioDialog(QDialog):
 
             # 标题
             title_label = QLabel("投资组合")
-            title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+            title_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #333;")
             layout.addWidget(title_label)
 
             # 组合列表
             self.portfolio_list = QTableWidget()
             self.portfolio_list.setColumnCount(3)
-            self.portfolio_list.setHorizontalHeaderLabels(['组合名称', '总市值', '收益率'])
+            self.portfolio_list.setHorizontalHeaderLabels(
+                ['组合名称', '总市值', '收益率'])
 
             # 设置表格样式
             header = self.portfolio_list.horizontalHeader()
@@ -153,7 +155,8 @@ class PortfolioDialog(QDialog):
             header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
             self.portfolio_list.setSelectionBehavior(QTableWidget.SelectRows)
-            self.portfolio_list.itemSelectionChanged.connect(self.on_portfolio_selected)
+            self.portfolio_list.itemSelectionChanged.connect(
+                self.on_portfolio_selected)
 
             layout.addWidget(self.portfolio_list)
 
@@ -226,7 +229,8 @@ class PortfolioDialog(QDialog):
             header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
             self.holdings_table.setSelectionBehavior(QTableWidget.SelectRows)
-            self.holdings_table.itemDoubleClicked.connect(self.on_holding_double_clicked)
+            self.holdings_table.itemDoubleClicked.connect(
+                self.on_holding_double_clicked)
 
             layout.addWidget(self.holdings_table)
 
@@ -291,7 +295,8 @@ class PortfolioDialog(QDialog):
 
             self.performance_chart_label = QLabel("收益曲线图表区域")
             self.performance_chart_label.setAlignment(Qt.AlignCenter)
-            self.performance_chart_label.setStyleSheet("border: 1px dashed #ccc; min-height: 300px;")
+            self.performance_chart_label.setStyleSheet(
+                "border: 1px dashed #ccc; min-height: 300px;")
             chart_layout.addWidget(self.performance_chart_label)
 
             layout.addWidget(chart_group)
@@ -366,7 +371,8 @@ class PortfolioDialog(QDialog):
             btn_layout.addWidget(self.edit_transaction_btn)
 
             self.remove_transaction_btn = QPushButton("删除交易")
-            self.remove_transaction_btn.clicked.connect(self.remove_transaction)
+            self.remove_transaction_btn.clicked.connect(
+                self.remove_transaction)
             btn_layout.addWidget(self.remove_transaction_btn)
 
             btn_layout.addStretch()
@@ -384,7 +390,8 @@ class PortfolioDialog(QDialog):
             header = self.transactions_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
-            self.transactions_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.transactions_table.setSelectionBehavior(
+                QTableWidget.SelectRows)
 
             layout.addWidget(self.transactions_table)
 
@@ -446,7 +453,8 @@ class PortfolioDialog(QDialog):
 
             for i, (name, portfolio) in enumerate(self.portfolios.items()):
                 self.portfolio_list.setItem(i, 0, QTableWidgetItem(name))
-                self.portfolio_list.setItem(i, 1, QTableWidgetItem(f"{portfolio.get('total_value', 0):,.2f}"))
+                self.portfolio_list.setItem(i, 1, QTableWidgetItem(
+                    f"{portfolio.get('total_value', 0):,.2f}"))
 
                 total_return = portfolio.get('total_return', 0)
                 return_text = f"{total_return * 100:.2f}%"
@@ -468,7 +476,8 @@ class PortfolioDialog(QDialog):
         try:
             current_row = self.portfolio_list.currentRow()
             if current_row >= 0:
-                portfolio_name = self.portfolio_list.item(current_row, 0).text()
+                portfolio_name = self.portfolio_list.item(
+                    current_row, 0).text()
                 self.current_portfolio = self.portfolios.get(portfolio_name)
 
                 if self.current_portfolio:
@@ -502,27 +511,38 @@ class PortfolioDialog(QDialog):
                 market_value = quantity * current_price
                 cost_value = quantity * cost_price
                 profit = market_value - cost_value
-                profit_rate = (profit / cost_value * 100) if cost_value > 0 else 0
+                profit_rate = (profit / cost_value *
+                               100) if cost_value > 0 else 0
 
                 total_value += market_value
                 total_cost += cost_value
 
                 self.holdings_table.setItem(i, 0, QTableWidgetItem(code))
                 self.holdings_table.setItem(i, 1, QTableWidgetItem(name))
-                self.holdings_table.setItem(i, 2, QTableWidgetItem(str(quantity)))
-                self.holdings_table.setItem(i, 3, QTableWidgetItem(f"{cost_price:.2f}"))
-                self.holdings_table.setItem(i, 4, QTableWidgetItem(f"{current_price:.2f}"))
-                self.holdings_table.setItem(i, 5, QTableWidgetItem(f"{market_value:.2f}"))
-                self.holdings_table.setItem(i, 6, QTableWidgetItem(f"{cost_value:.2f}"))
-                self.holdings_table.setItem(i, 7, QTableWidgetItem(f"{profit:.2f}"))
-                self.holdings_table.setItem(i, 8, QTableWidgetItem(f"{profit_rate:.2f}%"))
+                self.holdings_table.setItem(
+                    i, 2, QTableWidgetItem(str(quantity)))
+                self.holdings_table.setItem(
+                    i, 3, QTableWidgetItem(f"{cost_price:.2f}"))
+                self.holdings_table.setItem(
+                    i, 4, QTableWidgetItem(f"{current_price:.2f}"))
+                self.holdings_table.setItem(
+                    i, 5, QTableWidgetItem(f"{market_value:.2f}"))
+                self.holdings_table.setItem(
+                    i, 6, QTableWidgetItem(f"{cost_value:.2f}"))
+                self.holdings_table.setItem(
+                    i, 7, QTableWidgetItem(f"{profit:.2f}"))
+                self.holdings_table.setItem(
+                    i, 8, QTableWidgetItem(f"{profit_rate:.2f}%"))
 
-                weight = (market_value / total_value * 100) if total_value > 0 else 0
-                self.holdings_table.setItem(i, 9, QTableWidgetItem(f"{weight:.2f}%"))
+                weight = (market_value / total_value *
+                          100) if total_value > 0 else 0
+                self.holdings_table.setItem(
+                    i, 9, QTableWidgetItem(f"{weight:.2f}%"))
 
             # 更新汇总信息
             total_profit = total_value - total_cost
-            total_return = (total_profit / total_cost * 100) if total_cost > 0 else 0
+            total_return = (total_profit / total_cost *
+                            100) if total_cost > 0 else 0
 
             self.total_value_label.setText(f"总市值: {total_value:,.2f}")
             self.total_cost_label.setText(f"总成本: {total_cost:,.2f}")
@@ -607,15 +627,19 @@ class PortfolioDialog(QDialog):
 
             # 模拟交易记录
             transactions = [
-                ("2023-01-15", "000001", "平安银行", "买入", "1000", "10.00", "10000.00", "建仓"),
-                ("2023-03-20", "000002", "万科A", "买入", "500", "20.00", "10000.00", ""),
-                ("2023-06-10", "000001", "平安银行", "卖出", "200", "11.50", "2300.00", "减仓")
+                ("2023-01-15", "000001", "平安银行", "买入",
+                 "1000", "10.00", "10000.00", "建仓"),
+                ("2023-03-20", "000002", "万科A", "买入",
+                 "500", "20.00", "10000.00", ""),
+                ("2023-06-10", "000001", "平安银行", "卖出",
+                 "200", "11.50", "2300.00", "减仓")
             ]
 
             self.transactions_table.setRowCount(len(transactions))
             for i, transaction in enumerate(transactions):
                 for j, value in enumerate(transaction):
-                    self.transactions_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    self.transactions_table.setItem(
+                        i, j, QTableWidgetItem(str(value)))
 
         except Exception as e:
             self.logger.error(f"更新交易记录显示失败: {e}")

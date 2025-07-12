@@ -143,31 +143,36 @@ class SentimentReportTab(BaseAnalysisTab):
 
         # 生成报告按钮
         generate_btn = QPushButton("生成情绪报告")
-        generate_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
+        generate_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
         generate_btn.clicked.connect(self.generate_report)
         layout.addWidget(generate_btn)
 
         # 预览报告按钮
         preview_btn = QPushButton("预览报告")
-        preview_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
+        preview_btn.setStyleSheet(
+            "QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
         preview_btn.clicked.connect(self.preview_report)
         layout.addWidget(preview_btn)
 
         # 管理模板按钮
         template_btn = QPushButton("管理模板")
-        template_btn.setStyleSheet("QPushButton { background-color: #6f42c1; color: white; }")
+        template_btn.setStyleSheet(
+            "QPushButton { background-color: #6f42c1; color: white; }")
         template_btn.clicked.connect(self.manage_templates)
         layout.addWidget(template_btn)
 
         # 设置预警按钮
         alert_btn = QPushButton("设置预警")
-        alert_btn.setStyleSheet("QPushButton { background-color: #fd7e14; color: white; }")
+        alert_btn.setStyleSheet(
+            "QPushButton { background-color: #fd7e14; color: white; }")
         alert_btn.clicked.connect(self.setup_alerts)
         layout.addWidget(alert_btn)
 
         # 清除结果按钮
         clear_btn = QPushButton("清除结果")
-        clear_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
+        clear_btn.setStyleSheet(
+            "QPushButton { background-color: #dc3545; color: white; }")
         clear_btn.clicked.connect(self.clear_report)
         layout.addWidget(clear_btn)
 
@@ -186,13 +191,15 @@ class SentimentReportTab(BaseAnalysisTab):
         # 已生成报告数
         generated_card = QFrame()
         generated_card.setFrameStyle(QFrame.StyledPanel)
-        generated_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        generated_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         generated_layout = QVBoxLayout(generated_card)
         generated_layout.addWidget(QLabel("已生成报告"))
 
         self.generated_count_label = QLabel("0")
         self.generated_count_label.setAlignment(Qt.AlignCenter)
-        self.generated_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #28a745; }")
+        self.generated_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #28a745; }")
         generated_layout.addWidget(self.generated_count_label)
 
         status_layout.addWidget(generated_card)
@@ -200,13 +207,15 @@ class SentimentReportTab(BaseAnalysisTab):
         # 定时任务数
         scheduled_card = QFrame()
         scheduled_card.setFrameStyle(QFrame.StyledPanel)
-        scheduled_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        scheduled_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         scheduled_layout = QVBoxLayout(scheduled_card)
         scheduled_layout.addWidget(QLabel("定时任务"))
 
         self.scheduled_count_label = QLabel("0")
         self.scheduled_count_label.setAlignment(Qt.AlignCenter)
-        self.scheduled_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
+        self.scheduled_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
         scheduled_layout.addWidget(self.scheduled_count_label)
 
         status_layout.addWidget(scheduled_card)
@@ -214,13 +223,15 @@ class SentimentReportTab(BaseAnalysisTab):
         # 预警规则数
         alert_card = QFrame()
         alert_card.setFrameStyle(QFrame.StyledPanel)
-        alert_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        alert_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         alert_layout = QVBoxLayout(alert_card)
         alert_layout.addWidget(QLabel("预警规则"))
 
         self.alert_count_label = QLabel("0")
         self.alert_count_label.setAlignment(Qt.AlignCenter)
-        self.alert_count_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #dc3545; }")
+        self.alert_count_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #dc3545; }")
         alert_layout.addWidget(self.alert_count_label)
 
         status_layout.addWidget(alert_card)
@@ -228,13 +239,15 @@ class SentimentReportTab(BaseAnalysisTab):
         # 最近状态
         status_card = QFrame()
         status_card.setFrameStyle(QFrame.StyledPanel)
-        status_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        status_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         status_card_layout = QVBoxLayout(status_card)
         status_card_layout.addWidget(QLabel("最近状态"))
 
         self.last_status_label = QLabel("等待生成")
         self.last_status_label.setAlignment(Qt.AlignCenter)
-        self.last_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
+        self.last_status_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
         status_card_layout.addWidget(self.last_status_label)
 
         status_layout.addWidget(status_card)
@@ -410,7 +423,8 @@ class SentimentReportTab(BaseAnalysisTab):
 
             # 保存报告
             report_name = f"情绪报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            report_file = self.save_report(report_name, report_content, report_format)
+            report_file = self.save_report(
+                report_name, report_content, report_format)
 
             # 添加到报告列表
             self.add_report_to_list(report_name, report_file, period)
@@ -463,7 +477,8 @@ class SentimentReportTab(BaseAnalysisTab):
             # 生成历史趋势数据
             data['historical_trend'] = []
             for i in range(period):
-                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+                date = (datetime.now() - timedelta(days=i)
+                        ).strftime('%Y-%m-%d')
                 trend_value = random.uniform(30, 70)
                 data['historical_trend'].append({
                     'date': date,
@@ -664,13 +679,16 @@ class SentimentReportTab(BaseAnalysisTab):
 
             # 检查极端情绪预警
             if composite_index > 80:
-                self.add_alert_record(current_time, "极度贪婪预警", f"综合情绪指数 > 80", composite_index, "高风险")
+                self.add_alert_record(
+                    current_time, "极度贪婪预警", f"综合情绪指数 > 80", composite_index, "高风险")
             elif composite_index < 20:
-                self.add_alert_record(current_time, "极度恐慌预警", f"综合情绪指数 < 20", composite_index, "高风险")
+                self.add_alert_record(
+                    current_time, "极度恐慌预警", f"综合情绪指数 < 20", composite_index, "高风险")
 
             # 检查VIX预警
             if vix_index > 30:
-                self.add_alert_record(current_time, "VIX恐慌预警", f"VIX指数 > 30", vix_index, "中风险")
+                self.add_alert_record(
+                    current_time, "VIX恐慌预警", f"VIX指数 > 30", vix_index, "中风险")
 
         except Exception as e:
             self.log_manager.error(f"检查预警条件失败: {str(e)}")
@@ -752,11 +770,16 @@ class SentimentReportTab(BaseAnalysisTab):
             # 更新报告列表
             self.reports_table.setRowCount(len(self.report_results))
             for i, report in enumerate(self.report_results):
-                self.reports_table.setItem(i, 0, QTableWidgetItem(report['报告名称']))
-                self.reports_table.setItem(i, 1, QTableWidgetItem(report['报告类型']))
-                self.reports_table.setItem(i, 2, QTableWidgetItem(report['生成时间']))
-                self.reports_table.setItem(i, 3, QTableWidgetItem(report['数据周期']))
-                self.reports_table.setItem(i, 4, QTableWidgetItem(report['文件大小']))
+                self.reports_table.setItem(
+                    i, 0, QTableWidgetItem(report['报告名称']))
+                self.reports_table.setItem(
+                    i, 1, QTableWidgetItem(report['报告类型']))
+                self.reports_table.setItem(
+                    i, 2, QTableWidgetItem(report['生成时间']))
+                self.reports_table.setItem(
+                    i, 3, QTableWidgetItem(report['数据周期']))
+                self.reports_table.setItem(
+                    i, 4, QTableWidgetItem(report['文件大小']))
 
                 # 状态带颜色显示
                 status_item = QTableWidgetItem(report['状态'])
@@ -772,10 +795,14 @@ class SentimentReportTab(BaseAnalysisTab):
             # 更新预警记录
             self.alerts_table.setRowCount(len(self.alert_rules))
             for i, alert in enumerate(self.alert_rules):
-                self.alerts_table.setItem(i, 0, QTableWidgetItem(alert['预警时间']))
-                self.alerts_table.setItem(i, 1, QTableWidgetItem(alert['预警类型']))
-                self.alerts_table.setItem(i, 2, QTableWidgetItem(alert['触发条件']))
-                self.alerts_table.setItem(i, 3, QTableWidgetItem(alert['情绪指数']))
+                self.alerts_table.setItem(
+                    i, 0, QTableWidgetItem(alert['预警时间']))
+                self.alerts_table.setItem(
+                    i, 1, QTableWidgetItem(alert['预警类型']))
+                self.alerts_table.setItem(
+                    i, 2, QTableWidgetItem(alert['触发条件']))
+                self.alerts_table.setItem(
+                    i, 3, QTableWidgetItem(alert['情绪指数']))
 
                 # 预警级别带颜色显示
                 level_item = QTableWidgetItem(alert['预警级别'])
@@ -787,7 +814,8 @@ class SentimentReportTab(BaseAnalysisTab):
                     level_item.setForeground(QColor("blue"))
                 self.alerts_table.setItem(i, 4, level_item)
 
-                self.alerts_table.setItem(i, 5, QTableWidgetItem(alert['处理状态']))
+                self.alerts_table.setItem(
+                    i, 5, QTableWidgetItem(alert['处理状态']))
 
             # 调整列宽
             self.reports_table.resizeColumnsToContents()
@@ -811,10 +839,12 @@ class SentimentReportTab(BaseAnalysisTab):
             # 更新最近状态
             if generated_count > 0:
                 self.last_status_label.setText("报告已生成")
-                self.last_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
+                self.last_status_label.setStyleSheet(
+                    "QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
             else:
                 self.last_status_label.setText("等待生成")
-                self.last_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
+                self.last_status_label.setStyleSheet(
+                    "QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
 
             # 更新统计数据
             self.report_statistics = {
@@ -841,7 +871,8 @@ class SentimentReportTab(BaseAnalysisTab):
         self.scheduled_count_label.setText("0")
         self.alert_count_label.setText("0")
         self.last_status_label.setText("等待生成")
-        self.last_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
+        self.last_status_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
 
         # 重置预览
         self.preview_text.setHtml(self.get_default_preview_content())

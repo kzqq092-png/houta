@@ -105,7 +105,8 @@ class PerformanceEvaluationDialog(QDialog):
             self.evaluation_type_combo.addItems([
                 "全面评估", "准确率评估", "性能评估", "资源评估", "稳定性评估"
             ])
-            self.evaluation_type_combo.currentTextChanged.connect(self.on_evaluation_type_changed)
+            self.evaluation_type_combo.currentTextChanged.connect(
+                self.on_evaluation_type_changed)
             layout.addWidget(self.evaluation_type_combo)
 
             layout.addStretch()
@@ -136,7 +137,8 @@ class PerformanceEvaluationDialog(QDialog):
 
             # 标题
             title_label = QLabel("评估设置")
-            title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+            title_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #333;")
             layout.addWidget(title_label)
 
             # 数据源设置
@@ -165,7 +167,8 @@ class PerformanceEvaluationDialog(QDialog):
             # 股票池选择
             layout.addWidget(QLabel("股票池:"), 0, 0)
             self.stock_pool_combo = QComboBox()
-            self.stock_pool_combo.addItems(["全部股票", "沪深300", "中证500", "创业板", "科创板"])
+            self.stock_pool_combo.addItems(
+                ["全部股票", "沪深300", "中证500", "创业板", "科创板"])
             layout.addWidget(self.stock_pool_combo, 0, 1)
 
             # 时间范围
@@ -238,7 +241,8 @@ class PerformanceEvaluationDialog(QDialog):
             self.accuracy_threshold_slider = QSlider(Qt.Horizontal)
             self.accuracy_threshold_slider.setRange(50, 95)
             self.accuracy_threshold_slider.setValue(80)
-            self.accuracy_threshold_slider.valueChanged.connect(self.update_accuracy_label)
+            self.accuracy_threshold_slider.valueChanged.connect(
+                self.update_accuracy_label)
             layout.addWidget(self.accuracy_threshold_slider, 0, 1)
 
             self.accuracy_label = QLabel("80%")
@@ -249,7 +253,8 @@ class PerformanceEvaluationDialog(QDialog):
             self.response_time_slider = QSlider(Qt.Horizontal)
             self.response_time_slider.setRange(100, 2000)
             self.response_time_slider.setValue(500)
-            self.response_time_slider.valueChanged.connect(self.update_response_time_label)
+            self.response_time_slider.valueChanged.connect(
+                self.update_response_time_label)
             layout.addWidget(self.response_time_slider, 1, 1)
 
             self.response_time_label = QLabel("500ms")
@@ -260,7 +265,8 @@ class PerformanceEvaluationDialog(QDialog):
             self.memory_threshold_slider = QSlider(Qt.Horizontal)
             self.memory_threshold_slider.setRange(256, 2048)
             self.memory_threshold_slider.setValue(512)
-            self.memory_threshold_slider.valueChanged.connect(self.update_memory_label)
+            self.memory_threshold_slider.valueChanged.connect(
+                self.update_memory_label)
             layout.addWidget(self.memory_threshold_slider, 2, 1)
 
             self.memory_label = QLabel("512MB")
@@ -305,7 +311,8 @@ class PerformanceEvaluationDialog(QDialog):
             status_layout = QHBoxLayout(status_frame)
 
             self.status_label = QLabel("就绪")
-            self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
+            self.status_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; color: #333;")
             status_layout.addWidget(self.status_label)
 
             status_layout.addStretch()
@@ -326,7 +333,8 @@ class PerformanceEvaluationDialog(QDialog):
 
             self.history_table = QTableWidget()
             self.history_table.setColumnCount(6)
-            self.history_table.setHorizontalHeaderLabels(['时间', '类型', '样本数', '准确率', '响应时间', '状态'])
+            self.history_table.setHorizontalHeaderLabels(
+                ['时间', '类型', '样本数', '准确率', '响应时间', '状态'])
 
             header = self.history_table.horizontalHeader()
             header.setSectionResizeMode(QHeaderView.Stretch)
@@ -360,19 +368,22 @@ class PerformanceEvaluationDialog(QDialog):
             for i, (title, key, default_value, color) in enumerate(metrics):
                 card = QFrame()
                 card.setFrameStyle(QFrame.StyledPanel)
-                card.setStyleSheet(f"background-color: {color}; border-radius: 8px;")
+                card.setStyleSheet(
+                    f"background-color: {color}; border-radius: 8px;")
 
                 card_layout = QVBoxLayout(card)
                 card_layout.setContentsMargins(10, 10, 10, 10)
 
                 # 标题
                 title_label = QLabel(title)
-                title_label.setStyleSheet("color: white; font-size: 12px; font-weight: bold;")
+                title_label.setStyleSheet(
+                    "color: white; font-size: 12px; font-weight: bold;")
                 card_layout.addWidget(title_label)
 
                 # 数值
                 value_label = QLabel(default_value)
-                value_label.setStyleSheet("color: white; font-size: 20px; font-weight: bold;")
+                value_label.setStyleSheet(
+                    "color: white; font-size: 20px; font-weight: bold;")
                 card_layout.addWidget(value_label)
 
                 self.metric_labels[key] = value_label
@@ -418,7 +429,8 @@ class PerformanceEvaluationDialog(QDialog):
 
             chart_type_layout.addWidget(QLabel("图表类型:"))
             self.chart_type_combo = QComboBox()
-            self.chart_type_combo.addItems(["准确率趋势", "响应时间分布", "资源使用情况", "错误统计"])
+            self.chart_type_combo.addItems(
+                ["准确率趋势", "响应时间分布", "资源使用情况", "错误统计"])
             self.chart_type_combo.currentTextChanged.connect(self.update_chart)
             chart_type_layout.addWidget(self.chart_type_combo)
 
@@ -525,12 +537,18 @@ class PerformanceEvaluationDialog(QDialog):
             self.history_table.setRowCount(len(history_data))
 
             for i, data in enumerate(history_data):
-                self.history_table.setItem(i, 0, QTableWidgetItem(data['time']))
-                self.history_table.setItem(i, 1, QTableWidgetItem(data['type']))
-                self.history_table.setItem(i, 2, QTableWidgetItem(str(data['sample_count'])))
-                self.history_table.setItem(i, 3, QTableWidgetItem(f"{data['accuracy']:.1f}%"))
-                self.history_table.setItem(i, 4, QTableWidgetItem(f"{data['response_time']}ms"))
-                self.history_table.setItem(i, 5, QTableWidgetItem(data['status']))
+                self.history_table.setItem(
+                    i, 0, QTableWidgetItem(data['time']))
+                self.history_table.setItem(
+                    i, 1, QTableWidgetItem(data['type']))
+                self.history_table.setItem(
+                    i, 2, QTableWidgetItem(str(data['sample_count'])))
+                self.history_table.setItem(
+                    i, 3, QTableWidgetItem(f"{data['accuracy']:.1f}%"))
+                self.history_table.setItem(
+                    i, 4, QTableWidgetItem(f"{data['response_time']}ms"))
+                self.history_table.setItem(
+                    i, 5, QTableWidgetItem(data['status']))
 
         except Exception as e:
             self.logger.error(f"加载评估历史失败: {e}")
@@ -610,7 +628,8 @@ class PerformanceEvaluationDialog(QDialog):
         try:
             # 创建定时器模拟评估进度
             self.evaluation_timer = QTimer()
-            self.evaluation_timer.timeout.connect(self.update_evaluation_progress)
+            self.evaluation_timer.timeout.connect(
+                self.update_evaluation_progress)
             self.evaluation_progress = 0
             self.evaluation_timer.start(100)  # 每100ms更新一次
 
@@ -645,12 +664,17 @@ class PerformanceEvaluationDialog(QDialog):
             }
 
             # 更新指标卡片
-            self.metric_labels['accuracy'].setText(f"{results['accuracy']:.1f}%")
-            self.metric_labels['response_time'].setText(f"{results['response_time']}ms")
-            self.metric_labels['memory_usage'].setText(f"{results['memory_usage']}MB")
+            self.metric_labels['accuracy'].setText(
+                f"{results['accuracy']:.1f}%")
+            self.metric_labels['response_time'].setText(
+                f"{results['response_time']}ms")
+            self.metric_labels['memory_usage'].setText(
+                f"{results['memory_usage']}MB")
             self.metric_labels['cpu_usage'].setText(f"{results['cpu_usage']}%")
-            self.metric_labels['success_rate'].setText(f"{results['success_rate']:.1f}%")
-            self.metric_labels['error_rate'].setText(f"{results['error_rate']:.1f}%")
+            self.metric_labels['success_rate'].setText(
+                f"{results['success_rate']:.1f}%")
+            self.metric_labels['error_rate'].setText(
+                f"{results['error_rate']:.1f}%")
 
             # 更新详细结果
             self.update_detailed_results()
@@ -691,13 +715,17 @@ class PerformanceEvaluationDialog(QDialog):
             for i, row_data in enumerate(detailed_data):
                 for j, value in enumerate(row_data):
                     if j == 3:  # 准确率
-                        self.detailed_table.setItem(i, j, QTableWidgetItem(f"{value:.1f}%"))
+                        self.detailed_table.setItem(
+                            i, j, QTableWidgetItem(f"{value:.1f}%"))
                     elif j == 4:  # 响应时间
-                        self.detailed_table.setItem(i, j, QTableWidgetItem(f"{value}ms"))
+                        self.detailed_table.setItem(
+                            i, j, QTableWidgetItem(f"{value}ms"))
                     elif j == 5:  # 内存使用
-                        self.detailed_table.setItem(i, j, QTableWidgetItem(f"{value}MB"))
+                        self.detailed_table.setItem(
+                            i, j, QTableWidgetItem(f"{value}MB"))
                     else:
-                        self.detailed_table.setItem(i, j, QTableWidgetItem(str(value)))
+                        self.detailed_table.setItem(
+                            i, j, QTableWidgetItem(str(value)))
 
         except Exception as e:
             self.logger.error(f"更新详细结果失败: {e}")

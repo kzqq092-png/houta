@@ -148,7 +148,8 @@ class CurrencyConverter(QDialog):
 
         # 创建状态栏
         status_layout = QHBoxLayout()
-        self.status_label = QLabel(f"汇率更新时间: {self.last_update_time.strftime('%H:%M:%S')}")
+        self.status_label = QLabel(
+            f"汇率更新时间: {self.last_update_time.strftime('%H:%M:%S')}")
         self.refresh_btn = QPushButton("刷新汇率")
 
         status_layout.addWidget(self.status_label)
@@ -218,7 +219,8 @@ class CurrencyConverter(QDialog):
             col = i % 2
 
             button = QPushButton(desc)
-            button.clicked.connect(lambda checked, f=from_cur, t=to_cur: self._quick_convert(f, t))
+            button.clicked.connect(
+                lambda checked, f=from_cur, t=to_cur: self._quick_convert(f, t))
             quick_layout.addWidget(button, row, col)
 
         converter_layout.addWidget(quick_group)
@@ -266,7 +268,8 @@ class CurrencyConverter(QDialog):
         self.from_currency.currentTextChanged.connect(self._convert_currency)
         self.to_currency.currentTextChanged.connect(self._convert_currency)
         self.from_amount.valueChanged.connect(self._convert_currency)
-        self.base_currency.currentTextChanged.connect(self._update_rates_display)
+        self.base_currency.currentTextChanged.connect(
+            self._update_rates_display)
         self.refresh_btn.clicked.connect(self._refresh_rates)
 
     def _set_default_values(self) -> None:
@@ -409,7 +412,8 @@ class CurrencyConverter(QDialog):
         # 这里可以添加实际的汇率获取逻辑
         # 目前只是更新时间戳
         self.last_update_time = datetime.now()
-        self.status_label.setText(f"汇率更新时间: {self.last_update_time.strftime('%H:%M:%S')}")
+        self.status_label.setText(
+            f"汇率更新时间: {self.last_update_time.strftime('%H:%M:%S')}")
         self._update_rates_display()
         QMessageBox.information(self, "汇率刷新", "汇率已更新到最新数据")
 

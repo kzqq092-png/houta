@@ -7,23 +7,24 @@
 
 import logging
 from typing import Dict, Any, Optional, List
+import asyncio
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QStatusBar, QMenuBar, QMessageBox, QDockWidget, QLabel, QPushButton, QFrame
 )
-from PyQt5.QtCore import Qt, pyqtSlot
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
 from .base_coordinator import BaseCoordinator
 from ..events import (
     EventBus, StockSelectedEvent, ChartUpdateEvent, AnalysisCompleteEvent,
-    DataUpdateEvent, ErrorEvent, UIUpdateEvent, ThemeChangedEvent
+    DataUpdateEvent, ErrorEvent, UIUpdateEvent, ThemeChangedEvent, UIDataReadyEvent
 )
 from ..containers import ServiceContainer
 from ..services import (
     StockService, ChartService, AnalysisService,
-    ThemeService, ConfigService
+    ThemeService, ConfigService, UnifiedDataManager
 )
 from optimization.optimization_dashboard import create_optimization_dashboard
 from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
@@ -84,15 +85,24 @@ class MainWindowCoordinator(BaseCoordinator):
             'panel_padding': 5
         }
 
+        # 中央数据状态
+        self._current_stock_code: Optional[str] = None
+        self._current_stock_data: Dict[str, Any] = {}
+        self._is_loading = False
+
     def _do_initialize(self) -> None:
         """初始化协调器"""
         try:
             # 获取服务
             self._stock_service = self.service_container.resolve(StockService)
             self._chart_service = self.service_container.resolve(ChartService)
-            self._analysis_service = self.service_container.resolve(AnalysisService)
+            self._analysis_service = self.service_container.resolve(
+                AnalysisService)
             self._theme_service = self.service_container.resolve(ThemeService)
-            self._config_service = self.service_container.resolve(ConfigService)
+            self._config_service = self.service_container.resolve(
+                ConfigService)
+            self._data_manager = self.service_container.resolve(
+                UnifiedDataManager)
 
             # 初始化窗口
             self._setup_window()
@@ -203,15 +213,19 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 主题子菜单
             theme_menu = view_menu.addMenu('主题')
-            theme_menu.addAction('默认主题', lambda: self._on_theme_changed('default'))
-            theme_menu.addAction('深色主题', lambda: self._on_theme_changed('dark'))
-            theme_menu.addAction('浅色主题', lambda: self._on_theme_changed('light'))
+            theme_menu.addAction(
+                '默认主题', lambda: self._on_theme_changed('default'))
+            theme_menu.addAction(
+                '深色主题', lambda: self._on_theme_changed('dark'))
+            theme_menu.addAction(
+                '浅色主题', lambda: self._on_theme_changed('light'))
 
             # 新增：性能仪表板菜单项
             self.performance_panel_action = view_menu.addAction("性能仪表板")
             self.performance_panel_action.setCheckable(True)
             self.performance_panel_action.setChecked(False)
-            self.performance_panel_action.triggered.connect(self._toggle_performance_panel)
+            self.performance_panel_action.triggered.connect(
+                self._toggle_performance_panel)
 
             # 工具菜单
             tools_menu = menu_bar.addMenu('工具(&T)')
@@ -268,15 +282,20 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 优化系统子菜单
             optimization_menu = advanced_menu.addMenu('优化系统')
-            optimization_menu.addAction('优化仪表板', self._on_optimization_dashboard)
-            optimization_menu.addAction('一键优化', self._on_one_click_optimization)
-            optimization_menu.addAction('智能优化', self._on_intelligent_optimization)
-            optimization_menu.addAction('性能评估', self._on_performance_evaluation)
+            optimization_menu.addAction(
+                '优化仪表板', self._on_optimization_dashboard)
+            optimization_menu.addAction(
+                '一键优化', self._on_one_click_optimization)
+            optimization_menu.addAction(
+                '智能优化', self._on_intelligent_optimization)
+            optimization_menu.addAction(
+                '性能评估', self._on_performance_evaluation)
             optimization_menu.addAction('版本管理', self._on_version_management)
 
             # 数据质量检查子菜单
             quality_menu = advanced_menu.addMenu('数据质量检查')
-            quality_menu.addAction('单股质量检查', self._on_single_stock_quality_check)
+            quality_menu.addAction(
+                '单股质量检查', self._on_single_stock_quality_check)
             quality_menu.addAction('批量质量检查', self._on_batch_quality_check)
             quality_menu.addSeparator()
             quality_menu.addAction('数据库管理', self._on_database_admin)
@@ -323,12 +342,13 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 创建左侧面板（股票列表面板）
             left_panel = LeftPanel(
-                parent=self._main_window,
-                coordinator=self,
                 stock_service=self._stock_service,
-                width=self._layout_config['left_panel_width']
+                data_manager=self._data_manager,
+                parent=self._main_window,
+                coordinator=self
             )
-            left_panel._root_frame.setMinimumWidth(self._layout_config['left_panel_width'])
+            left_panel._root_frame.setMinimumWidth(
+                self._layout_config['left_panel_width'])
             left_panel._root_frame.setMaximumWidth(300)
             horizontal_splitter.addWidget(left_panel._root_frame)
             self._panels['left'] = left_panel
@@ -347,7 +367,8 @@ class MainWindowCoordinator(BaseCoordinator):
                 coordinator=self,
                 width=self._layout_config['right_panel_width']
             )
-            right_panel._root_frame.setMinimumWidth(self._layout_config['right_panel_width'])
+            right_panel._root_frame.setMinimumWidth(
+                self._layout_config['right_panel_width'])
             right_panel._root_frame.setMaximumWidth(850)
             horizontal_splitter.addWidget(right_panel._root_frame)
             self._panels['right'] = right_panel
@@ -369,13 +390,16 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 创建性能仪表板
             repository = self.service_container.resolve(MetricsRepository)
-            performance_panel = PerformanceDashboardPanel(self.event_bus, repository)
+            performance_panel = PerformanceDashboardPanel(
+                self.event_bus, repository)
 
             # 将其放入一个可停靠的窗口
             self._performance_dock = QDockWidget("性能仪表板", self._main_window)
             self._performance_dock.setWidget(performance_panel)
-            self._performance_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea)
-            self._main_window.addDockWidget(Qt.BottomDockWidgetArea, self._performance_dock)
+            self._performance_dock.setAllowedAreas(
+                Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea)
+            self._main_window.addDockWidget(
+                Qt.BottomDockWidgetArea, self._performance_dock)
             # 默认隐藏性能仪表板
             self._performance_dock.setVisible(False)
 
@@ -434,7 +458,8 @@ class MainWindowCoordinator(BaseCoordinator):
                     bottom_height = 30 if bottom_panel else 0
 
                     # 将底部面板的大部分大小添加到主面板区域，但保留切换按钮的空间
-                    new_sizes = [sizes[0] + sizes[1] - bottom_height, bottom_height]
+                    new_sizes = [sizes[0] + sizes[1] -
+                                 bottom_height, bottom_height]
                     vertical_splitter.setSizes(new_sizes)
                     logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
 
@@ -466,7 +491,8 @@ class MainWindowCoordinator(BaseCoordinator):
                 if not bottom_panel_action and not is_visible:
                     # 如果面板隐藏且菜单项不存在，创建菜单项
                     bottom_panel_action = view_menu.addAction('显示日志面板')
-                    bottom_panel_action.triggered.connect(self._show_bottom_panel)
+                    bottom_panel_action.triggered.connect(
+                        self._show_bottom_panel)
                 elif bottom_panel_action and is_visible:
                     # 如果面板可见且菜单项存在，移除菜单项
                     view_menu.removeAction(bottom_panel_action)
@@ -505,7 +531,8 @@ class MainWindowCoordinator(BaseCoordinator):
                 if len(sizes) >= 2:
                     # 分配一部分空间给底部面板
                     total_height = sum(sizes)
-                    new_sizes = [int(total_height * 0.8), int(total_height * 0.2)]
+                    new_sizes = [int(total_height * 0.8),
+                                 int(total_height * 0.2)]
                     vertical_splitter.setSizes(new_sizes)
                     logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
 
@@ -524,13 +551,15 @@ class MainWindowCoordinator(BaseCoordinator):
         """注册事件处理器"""
         try:
             # 注册股票选择事件处理器
-            self.event_bus.subscribe(StockSelectedEvent, self._on_stock_selected)
+            self.event_bus.subscribe(
+                StockSelectedEvent, self._on_stock_selected)
 
             # 注册图表更新事件处理器
             self.event_bus.subscribe(ChartUpdateEvent, self._on_chart_updated)
 
             # 注册分析完成事件处理器
-            self.event_bus.subscribe(AnalysisCompleteEvent, self._on_analysis_completed)
+            self.event_bus.subscribe(
+                AnalysisCompleteEvent, self._on_analysis_completed)
 
             # 注册数据更新事件处理器
             self.event_bus.subscribe(DataUpdateEvent, self._on_data_update)
@@ -601,28 +630,73 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to save window configuration: {e}")
 
-    def _on_stock_selected(self, event) -> None:
-        """处理股票选择事件"""
+    @measure_performance("MainWindowCoordinator._on_stock_selected")
+    async def _on_stock_selected(self, event: StockSelectedEvent) -> None:
+        """处理股票选择事件 - 新的统一数据加载流程"""
+        if not event or not event.stock_code or self._is_loading:
+            return
+
+        self._is_loading = True
+        self._current_stock_code = event.stock_code
+        self.show_message(
+            f"正在加载 {event.stock_name} ({event.stock_code}) 的数据...", level='info')
+
         try:
-            stock_code = getattr(event, 'stock_code', '')
-            stock_name = getattr(event, 'stock_name', '')
+            # 1. 异步并行获取所有数据
+            kline_data_future = self._data_manager.request_data(
+                stock_code=event.stock_code,
+                data_type='kdata'
+            )
+            analysis_data_future = self._analysis_service.analyze_stock(
+                stock_code=event.stock_code,
+                analysis_type='comprehensive'
+            )
 
-            logger.info(f"Stock selected: {stock_code} - {stock_name}")
+            kline_data, analysis_data = await asyncio.gather(
+                kline_data_future,
+                analysis_data_future
+            )
 
-            # 通知中间面板更新图表
-            middle_panel = self._panels.get('middle')
-            if middle_panel and hasattr(middle_panel, 'load_stock_chart'):
-                middle_panel.load_stock_chart(stock_code, stock_name)
+            # 关键检查点：确认核心数据是否存在
+            if kline_data is None or kline_data.empty:
+                logger.warning(f"无法获取 {event.stock_name} 的K线数据。")
+                self.show_message(
+                    f"无法获取 {event.stock_name} ({event.stock_code}) 的K线数据，请尝试其他股票。", level='warning')
+                return  # 提前返回，不发布事件
 
-            # 通知右侧面板更新分析
-            right_panel = self._panels.get('right')
-            if right_panel and hasattr(right_panel, 'load_stock_analysis'):
-                right_panel.load_stock_analysis(stock_code, stock_name)
+            # 2. 存储到中央数据状态
+            self._current_stock_data = {
+                'stock_code': event.stock_code,
+                'stock_name': event.stock_name,
+                'market': event.market,
+                'kline': kline_data,
+                'analysis': analysis_data,
+            }
+
+            # 3. 发布数据准备就绪事件
+            data_ready_event = UIDataReadyEvent(
+                source="MainWindowCoordinator",
+                data=self._current_stock_data
+            )
+            self.event_bus.publish(data_ready_event)
+
+            self.show_message(f"{event.stock_name} 数据加载完成", level='success')
 
         except Exception as e:
-            logger.error(f"Failed to handle stock selection: {e}")
+            logger.error(f"加载股票 {event.stock_code} 数据时出错: {e}", exc_info=True)
+            self.show_message(
+                f"加载 {event.stock_name} 数据失败: {e}", level='error')
+            error_event = ErrorEvent(
+                source="MainWindowCoordinator",
+                error=e,
+                message=f"Failed to load data for {event.stock_code}"
+            )
+            self.event_bus.publish(error_event)
 
-    def _on_chart_updated(self, event) -> None:
+        finally:
+            self._is_loading = False
+
+    def _on_chart_updated(self, event: ChartUpdateEvent) -> None:
         """处理图表更新事件"""
         try:
             stock_code = getattr(event, 'stock_code', '')
@@ -658,15 +732,19 @@ class MainWindowCoordinator(BaseCoordinator):
     def _on_error(self, event: ErrorEvent) -> None:
         """处理错误事件"""
         try:
-            logger.error(f"Error occurred: {event.error_type} - {event.error_message}")
+            logger.error(
+                f"Error occurred: {event.error_type} - {event.error_message}")
 
             # 显示错误消息
             if event.severity == 'error':
-                QMessageBox.critical(self._main_window, event.error_type, event.error_message)
+                QMessageBox.critical(
+                    self._main_window, event.error_type, event.error_message)
             elif event.severity == 'warning':
-                QMessageBox.warning(self._main_window, event.error_type, event.error_message)
+                QMessageBox.warning(self._main_window,
+                                    event.error_type, event.error_message)
             else:
-                QMessageBox.information(self._main_window, event.error_type, event.error_message)
+                QMessageBox.information(
+                    self._main_window, event.error_type, event.error_message)
 
             # 更新状态栏
             self._status_label.setText(f"错误: {event.error_message}")
@@ -838,7 +916,8 @@ class MainWindowCoordinator(BaseCoordinator):
 
         except Exception as e:
             logger.error(f"高级搜索失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开高级搜索失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开高级搜索失败: {str(e)}")
 
     def _on_search_completed(self, results):
         """处理搜索完成事件"""
@@ -869,7 +948,8 @@ class MainWindowCoordinator(BaseCoordinator):
 
         except Exception as e:
             logger.error(f"数据导出失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开数据导出对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开数据导出对话框失败: {str(e)}")
 
     def _on_data_export(self) -> None:
         """数据导出（别名方法）"""
@@ -895,7 +975,8 @@ class MainWindowCoordinator(BaseCoordinator):
 
         except Exception as e:
             logger.error(f"系统设置失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开系统设置对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开系统设置对话框失败: {str(e)}")
 
     def _on_settings_applied(self, settings: dict) -> None:
         """处理设置应用事件"""
@@ -958,7 +1039,8 @@ F1 - 用户手册
 Ctrl+F1 - 快捷键说明
 Ctrl+F12 - 关于
         """
-        QMessageBox.information(self._main_window, "快捷键说明", shortcuts_text.strip())
+        QMessageBox.information(
+            self._main_window, "快捷键说明", shortcuts_text.strip())
 
     def _on_about(self) -> None:
         """关于对话框"""
@@ -978,7 +1060,8 @@ HIkyuu-UI 2.0 (重构版本)
 版本：2.0
 作者：HIkyuu开发团队
         """
-        QMessageBox.about(self._main_window, "关于 HIkyuu-UI", about_text.strip())
+        QMessageBox.about(self._main_window, "关于 HIkyuu-UI",
+                          about_text.strip())
 
     # 高级功能菜单方法（保持原有实现）
     def _on_node_management(self) -> None:
@@ -992,7 +1075,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"节点管理失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开节点管理对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开节点管理对话框失败: {str(e)}")
 
     def _on_cloud_api(self) -> None:
         """云端API管理"""
@@ -1005,7 +1089,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"云端API管理失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开云端API管理对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开云端API管理对话框失败: {str(e)}")
 
     def _on_plugin_manager(self) -> None:
         """插件管理器"""
@@ -1022,7 +1107,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"插件管理器失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开插件管理器对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开插件管理器对话框失败: {str(e)}")
 
     def _on_plugin_market(self) -> None:
         """插件市场"""
@@ -1033,13 +1119,15 @@ HIkyuu-UI 2.0 (重构版本)
             # 获取插件管理器
             plugin_manager = self._service_container.resolve(PluginManager)
 
-            dialog = EnhancedPluginMarketDialog(plugin_manager, self._main_window)
+            dialog = EnhancedPluginMarketDialog(
+                plugin_manager, self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
 
         except Exception as e:
             logger.error(f"插件市场失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开插件市场对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开插件市场对话框失败: {str(e)}")
 
     def _on_indicator_market(self) -> None:
         """指标市场"""
@@ -1052,7 +1140,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"指标市场失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开指标市场对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开指标市场对话框失败: {str(e)}")
 
     def _on_batch_analysis(self) -> None:
         """批量分析"""
@@ -1065,7 +1154,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"批量分析失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开批量分析对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开批量分析对话框失败: {str(e)}")
 
     def _on_strategy_management(self) -> None:
         """策略管理"""
@@ -1078,13 +1168,15 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"策略管理失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开策略管理对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开策略管理对话框失败: {str(e)}")
 
     def _on_optimization_dashboard(self) -> None:
         """显示优化仪表板"""
         try:
             if self._optimization_dashboard is None:
-                self._optimization_dashboard = create_optimization_dashboard(self.event_bus)
+                self._optimization_dashboard = create_optimization_dashboard(
+                    self.event_bus)
 
             self._optimization_dashboard.show()
             self._optimization_dashboard.activateWindow()
@@ -1101,7 +1193,8 @@ HIkyuu-UI 2.0 (重构版本)
             from PyQt5.QtCore import QThread, pyqtSignal
 
             # 创建进度对话框
-            progress = QProgressDialog("正在执行一键优化...", "取消", 0, 100, self._main_window)
+            progress = QProgressDialog(
+                "正在执行一键优化...", "取消", 0, 100, self._main_window)
             progress.setWindowTitle("一键优化")
             progress.setModal(True)
             progress.show()
@@ -1141,7 +1234,8 @@ HIkyuu-UI 2.0 (重构版本)
 
             def on_error_occurred(error):
                 progress.close()
-                QMessageBox.critical(self._main_window, "错误", f"一键优化失败: {error}")
+                QMessageBox.critical(
+                    self._main_window, "错误", f"一键优化失败: {error}")
                 logger.error(f"一键优化失败: {error}")
 
             def on_canceled():
@@ -1152,7 +1246,8 @@ HIkyuu-UI 2.0 (重构版本)
             # 创建并启动线程
             optimization_thread = OptimizationThread()
             optimization_thread.progress_updated.connect(on_progress_updated)
-            optimization_thread.optimization_completed.connect(on_optimization_completed)
+            optimization_thread.optimization_completed.connect(
+                on_optimization_completed)
             optimization_thread.error_occurred.connect(on_error_occurred)
 
             progress.canceled.connect(on_canceled)
@@ -1161,7 +1256,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"启动一键优化失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"启动一键优化失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"启动一键优化失败: {str(e)}")
 
     def _on_intelligent_optimization(self) -> None:
         """智能优化"""
@@ -1184,7 +1280,8 @@ HIkyuu-UI 2.0 (重构版本)
                 return
 
             # 创建进度对话框
-            progress = QProgressDialog("正在执行智能优化...", "取消", 0, 100, self._main_window)
+            progress = QProgressDialog(
+                "正在执行智能优化...", "取消", 0, 100, self._main_window)
             progress.setWindowTitle("智能优化")
             progress.setModal(True)
             progress.show()
@@ -1234,7 +1331,8 @@ HIkyuu-UI 2.0 (重构版本)
 
             def on_error_occurred(error):
                 progress.close()
-                QMessageBox.critical(self._main_window, "错误", f"智能优化失败: {error}")
+                QMessageBox.critical(
+                    self._main_window, "错误", f"智能优化失败: {error}")
                 logger.error(f"智能优化失败: {error}")
 
             def on_canceled():
@@ -1243,9 +1341,11 @@ HIkyuu-UI 2.0 (重构版本)
                 logger.info("智能优化已取消")
 
             # 创建并启动线程
-            smart_thread = SmartOptimizationThread(performance_threshold, improvement_target)
+            smart_thread = SmartOptimizationThread(
+                performance_threshold, improvement_target)
             smart_thread.progress_updated.connect(on_progress_updated)
-            smart_thread.optimization_completed.connect(on_optimization_completed)
+            smart_thread.optimization_completed.connect(
+                on_optimization_completed)
             smart_thread.error_occurred.connect(on_error_occurred)
 
             progress.canceled.connect(on_canceled)
@@ -1254,7 +1354,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"启动智能优化失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"启动智能优化失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"启动智能优化失败: {str(e)}")
 
     def _on_performance_evaluation(self):
         """性能评估"""
@@ -1309,7 +1410,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"版本管理失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开版本管理对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开版本管理对话框失败: {str(e)}")
 
     def _on_single_stock_quality_check(self) -> None:
         """单股质量检查"""
@@ -1322,7 +1424,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"单股质量检查失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开单股质量检查对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开单股质量检查对话框失败: {str(e)}")
 
     def _on_batch_quality_check(self) -> None:
         """批量质量检查"""
@@ -1335,7 +1438,8 @@ HIkyuu-UI 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"批量质量检查失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开批量质量检查对话框失败: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开批量质量检查对话框失败: {str(e)}")
 
     # 缓存管理方法
     def _on_clear_data_cache(self) -> None:
@@ -1352,7 +1456,8 @@ HIkyuu-UI 2.0 (重构版本)
                 chart_service.clear_cache()
 
             # 获取分析服务
-            analysis_service = self.service_container.get_service(AnalysisService)
+            analysis_service = self.service_container.get_service(
+                AnalysisService)
             if analysis_service:
                 analysis_service.clear_cache()
 
@@ -1547,7 +1652,8 @@ HIkyuu-UI 2.0 (重构版本)
             DataUsageTermsDialog.show_terms(self._main_window)
         except Exception as e:
             logger.error(f"Failed to show data usage terms: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"无法显示数据使用条款: {str(e)}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"无法显示数据使用条款: {str(e)}")
 
     def _toggle_performance_panel(self, checked: bool):
         """显示或隐藏性能仪表板"""
@@ -1563,7 +1669,8 @@ HIkyuu-UI 2.0 (重构版本)
                 return
 
             # 获取当前可见状态
-            is_visible = bottom_panel._root_frame.isVisible() and bottom_panel._root_frame.height() > 10
+            is_visible = bottom_panel._root_frame.isVisible(
+            ) and bottom_panel._root_frame.height() > 10
 
             # 切换状态
             if is_visible:
@@ -1603,7 +1710,8 @@ HIkyuu-UI 2.0 (重构版本)
                         if len(sizes) >= 2:
                             # 分配一部分空间给底部面板
                             total_height = sum(sizes)
-                            new_sizes = [int(total_height * 0.8), int(total_height * 0.2)]
+                            new_sizes = [int(total_height * 0.8),
+                                         int(total_height * 0.2)]
                             vertical_splitter.setSizes(new_sizes)
                             logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
 

@@ -133,7 +133,8 @@ class BottomPanel(BasePanel):
         # 日志级别选择
         layout.addWidget(QLabel("日志级别:"))
         self.level_combo = QComboBox()
-        self.level_combo.addItems(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+        self.level_combo.addItems(
+            ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
         self.level_combo.setCurrentText('INFO')
         self.level_combo.currentTextChanged.connect(self._on_level_changed)
         layout.addWidget(self.level_combo)

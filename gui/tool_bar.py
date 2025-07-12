@@ -44,7 +44,8 @@ class MainToolBar(QToolBar):
             # 初始化UI
             self.init_ui()
 
-            log_structured(self.log_manager, "toolbar_init", level="info", status="success")
+            log_structured(self.log_manager, "toolbar_init",
+                           level="info", status="success")
 
         except Exception as e:
             print(f"初始化工具栏失败: {str(e)}")
@@ -147,7 +148,8 @@ class MainToolBar(QToolBar):
         self.addAction(self.settings_action)
 
         # 系统优化器
-        self.system_optimizer_action = QAction(QIcon("icons/optimize.png"), "系统优化", self)
+        self.system_optimizer_action = QAction(
+            QIcon("icons/optimize.png"), "系统优化", self)
         self.system_optimizer_action.setStatusTip("打开系统优化器")
         self.system_optimizer_action.setShortcut("Ctrl+Shift+O")
         self.addAction(self.system_optimizer_action)

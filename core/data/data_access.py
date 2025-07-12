@@ -240,7 +240,8 @@ class DataAccess:
                 if kline_data:
                     results[stock_code] = kline_data
             except Exception as e:
-                self.logger.error(f"Failed to get kline data for {stock_code}: {e}")
+                self.logger.error(
+                    f"Failed to get kline data for {stock_code}: {e}")
 
         return results
 
@@ -262,7 +263,8 @@ class DataAccess:
                 if price is not None:
                     results[stock_code] = price
             except Exception as e:
-                self.logger.error(f"Failed to get latest price for {stock_code}: {e}")
+                self.logger.error(
+                    f"Failed to get latest price for {stock_code}: {e}")
 
         return results
 

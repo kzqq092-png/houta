@@ -229,7 +229,8 @@ class RealTimeBacktestMonitor:
                 return
 
             self.is_monitoring = True
-            self.log_manager.log(f"开始实时监控 - 级别: {self.monitoring_level.value}", LogLevel.INFO)
+            self.log_manager.log(
+                f"开始实时监控 - 级别: {self.monitoring_level.value}", LogLevel.INFO)
 
             # 启动监控线程
             self.monitor_thread = threading.Thread(
@@ -270,7 +271,8 @@ class RealTimeBacktestMonitor:
                 chunk_data = data.iloc[:end_row].copy()
 
                 # 运行回测
-                result = backtest_engine.run_professional_backtest(chunk_data, **kwargs)
+                result = backtest_engine.run_professional_backtest(
+                    chunk_data, **kwargs)
 
                 # 计算实时指标
                 metrics = self._calculate_real_time_metrics(result, start_time)
@@ -323,13 +325,15 @@ class RealTimeBacktestMonitor:
             trade_stats = backtest_result['trade_statistics']
 
             # 获取最新数据
-            latest_return = result_df['returns'].iloc[-1] if len(result_df) > 0 else 0
+            latest_return = result_df['returns'].iloc[-1] if len(
+                result_df) > 0 else 0
             cumulative_return = risk_metrics.total_return
 
             # 计算当前回撤
             cumulative_series = (1 + result_df['returns']).cumprod()
             running_max = cumulative_series.cummax()
-            current_drawdown = ((cumulative_series.iloc[-1] - running_max.iloc[-1]) / running_max.iloc[-1]) if len(cumulative_series) > 0 else 0
+            current_drawdown = (
+                (cumulative_series.iloc[-1] - running_max.iloc[-1]) / running_max.iloc[-1]) if len(cumulative_series) > 0 else 0
 
             # 性能指标
             execution_time = time.time() - start_time
@@ -345,7 +349,8 @@ class RealTimeBacktestMonitor:
                 sharpe_ratio=risk_metrics.sharpe_ratio,
                 volatility=risk_metrics.volatility,
                 var_95=risk_metrics.var_95,
-                position_count=int((result_df['position'] != 0).sum()) if len(result_df) > 0 else 0,
+                position_count=int((result_df['position'] != 0).sum()) if len(
+                    result_df) > 0 else 0,
                 trade_count=trade_stats.get('total_trades', 0),
                 win_rate=risk_metrics.win_rate,
                 profit_factor=risk_metrics.profit_factor,
@@ -562,7 +567,8 @@ class RealTimeBacktestMonitor:
 
             # 准备数据
             timestamps = [m.timestamp for m in self.metrics_history]
-            cumulative_returns = [m.cumulative_return for m in self.metrics_history]
+            cumulative_returns = [
+                m.cumulative_return for m in self.metrics_history]
             drawdowns = [m.current_drawdown for m in self.metrics_history]
             sharpe_ratios = [m.sharpe_ratio for m in self.metrics_history]
             volatilities = [m.volatility for m in self.metrics_history]
@@ -573,46 +579,54 @@ class RealTimeBacktestMonitor:
 
             # 1. 累积收益率
             fig.add_trace(
-                go.Scatter(x=timestamps, y=cumulative_returns, name="累积收益率", line=dict(color="green")),
+                go.Scatter(x=timestamps, y=cumulative_returns,
+                           name="累积收益率", line=dict(color="green")),
                 row=1, col=1
             )
 
             # 2. 回撤分析
             fig.add_trace(
-                go.Scatter(x=timestamps, y=drawdowns, name="当前回撤", fill='tonexty', line=dict(color="red")),
+                go.Scatter(x=timestamps, y=drawdowns, name="当前回撤",
+                           fill='tonexty', line=dict(color="red")),
                 row=1, col=2
             )
 
             # 3. 风险指标
             fig.add_trace(
-                go.Scatter(x=timestamps, y=sharpe_ratios, name="Sharpe比率", line=dict(color="blue")),
+                go.Scatter(x=timestamps, y=sharpe_ratios,
+                           name="Sharpe比率", line=dict(color="blue")),
                 row=2, col=1
             )
             fig.add_trace(
-                go.Scatter(x=timestamps, y=volatilities, name="波动率", line=dict(color="orange")),
+                go.Scatter(x=timestamps, y=volatilities,
+                           name="波动率", line=dict(color="orange")),
                 row=2, col=1, secondary_y=True
             )
 
             # 4. 交易统计
             fig.add_trace(
-                go.Scatter(x=timestamps, y=win_rates, name="胜率", line=dict(color="purple")),
+                go.Scatter(x=timestamps, y=win_rates, name="胜率",
+                           line=dict(color="purple")),
                 row=2, col=2
             )
 
             # 5. 系统性能
             fig.add_trace(
-                go.Scatter(x=timestamps, y=execution_times, name="执行时间", line=dict(color="brown")),
+                go.Scatter(x=timestamps, y=execution_times,
+                           name="执行时间", line=dict(color="brown")),
                 row=3, col=1
             )
             fig.add_trace(
-                go.Scatter(x=timestamps, y=memory_usages, name="内存使用", line=dict(color="pink")),
+                go.Scatter(x=timestamps, y=memory_usages,
+                           name="内存使用", line=dict(color="pink")),
                 row=3, col=1, secondary_y=True
             )
 
             # 6. 预警统计
             alert_counts = self._get_alert_statistics()
             fig.add_trace(
-                go.Bar(x=list(alert_counts.keys()), y=list(alert_counts.values()), name="预警次数"),
+                go.Bar(x=list(alert_counts.keys()), y=list(
+                    alert_counts.values()), name="预警次数"),
                 row=3, col=2
             )
 

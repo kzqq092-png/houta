@@ -103,10 +103,12 @@ class HikyuuDataManager:
                     valid_count += 1
 
                 except Exception as e:
-                    logger.warning(f"Failed to process stock {getattr(stock, 'code', 'unknown')}: {e}")
+                    logger.warning(
+                        f"Failed to process stock {getattr(stock, 'code', 'unknown')}: {e}")
                     continue
 
-            logger.info(f"Loaded {valid_count} valid stocks out of {total_count} total stocks")
+            logger.info(
+                f"Loaded {valid_count} valid stocks out of {total_count} total stocks")
             return stock_list
 
         except Exception as e:
@@ -126,25 +128,29 @@ class HikyuuDataManager:
             K线数据DataFrame
         """
         try:
-            logger.debug(f"Getting K-data for {stock_code}, period={period}, count={count}")
+            logger.debug(
+                f"Getting K-data for {stock_code}, period={period}, count={count}")
 
             # 检查缓存，避免重复查询无效股票
             if stock_code in self._invalid_stocks_cache:
-                logger.debug(f"Stock {stock_code} is in invalid cache, skipping")
+                logger.debug(
+                    f"Stock {stock_code} is in invalid cache, skipping")
                 return pd.DataFrame()
 
             # 获取股票对象
             try:
                 stock = self.sm[stock_code]
                 if not stock.valid:
-                    logger.warning(f"Stock {stock_code} is not valid in HIkyuu data")
+                    logger.warning(
+                        f"Stock {stock_code} is not valid in HIkyuu data")
                     self._invalid_stocks_cache.add(stock_code)
                     return pd.DataFrame()
                 else:
                     # 添加到有效股票缓存
                     self._valid_stocks_cache.add(stock_code)
             except Exception as e:
-                logger.warning(f"Stock {stock_code} not found in HIkyuu data: {e}")
+                logger.warning(
+                    f"Stock {stock_code} not found in HIkyuu data: {e}")
                 self._invalid_stocks_cache.add(stock_code)
                 return pd.DataFrame()
 
@@ -158,7 +164,8 @@ class HikyuuDataManager:
             try:
                 kdata = stock.get_kdata(query)
                 if kdata is None or len(kdata) == 0:
-                    logger.warning(f"No K-data available for {stock_code} (period={period}, count={count})")
+                    logger.warning(
+                        f"No K-data available for {stock_code} (period={period}, count={count})")
                     # 将无数据的股票加入缓存
                     self._invalid_stocks_cache.add(stock_code)
                     return pd.DataFrame()
@@ -171,7 +178,8 @@ class HikyuuDataManager:
             # 转换为DataFrame
             df = self._convert_kdata_to_dataframe(kdata, stock_code)
 
-            logger.debug(f"Successfully loaded {len(df)} K-data records for {stock_code}")
+            logger.debug(
+                f"Successfully loaded {len(df)} K-data records for {stock_code}")
             return df
 
         except Exception as e:
@@ -244,7 +252,8 @@ class HikyuuDataManager:
             return True
         elif pure_code.startswith('43'):  # 新三板
             return True
-        elif pure_code.startswith('9') and not pure_code.startswith('98'):  # 港股通（排除98开头的无效代码）
+        # 港股通（排除98开头的无效代码）
+        elif pure_code.startswith('9') and not pure_code.startswith('98'):
             return True
         else:
             # 其他格式都是无效的
@@ -336,7 +345,8 @@ class HikyuuDataManager:
             if len(df) > 1:
                 df['prev_close'] = df['close'].shift(1)
                 df['change'] = df['close'] - df['prev_close']
-                df['change_percent'] = (df['change'] / df['prev_close'] * 100).round(2)
+                df['change_percent'] = (
+                    df['change'] / df['prev_close'] * 100).round(2)
 
                 # 填充第一行数据
                 df.loc[df.index[0], 'prev_close'] = df.loc[df.index[0], 'close']
@@ -398,21 +408,24 @@ class HikyuuDataManager:
 
             # 检查缓存，避免重复查询无效股票
             if stock_code in self._invalid_stocks_cache:
-                logger.debug(f"Stock {stock_code} is in invalid cache, skipping")
+                logger.debug(
+                    f"Stock {stock_code} is in invalid cache, skipping")
                 return None
 
             # 获取股票对象
             try:
                 stock = self.sm[stock_code]
                 if not stock.valid:
-                    logger.warning(f"Stock {stock_code} is not valid in HIkyuu data")
+                    logger.warning(
+                        f"Stock {stock_code} is not valid in HIkyuu data")
                     self._invalid_stocks_cache.add(stock_code)
                     return None
                 else:
                     # 添加到有效股票缓存
                     self._valid_stocks_cache.add(stock_code)
             except Exception as e:
-                logger.warning(f"Stock {stock_code} not found in HIkyuu data: {e}")
+                logger.warning(
+                    f"Stock {stock_code} not found in HIkyuu data: {e}")
                 self._invalid_stocks_cache.add(stock_code)
                 return None
 
@@ -431,7 +444,8 @@ class HikyuuDataManager:
                 'end_date': str(stock.last_datetime) if stock.last_datetime else None
             }
 
-            logger.debug(f"Successfully got stock info for {stock_code}: {stock.name}")
+            logger.debug(
+                f"Successfully got stock info for {stock_code}: {stock.name}")
             return stock_info
 
         except Exception as e:

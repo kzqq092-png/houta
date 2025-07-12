@@ -23,18 +23,21 @@ from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 from functools import lru_cache
 
 # 添加项目根目录到Python路径
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
 
 
 # 指标数据库文件路径
-INDICATOR_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'indicators.db')
+INDICATOR_DB_PATH = os.path.join(
+    os.path.dirname(__file__), '..', 'db', 'indicators.db')
 
 # 设置日志
 logger = logging.getLogger('indicator_service')
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
 
 # 尝试导入TA-Lib
@@ -184,18 +187,21 @@ class IndicatorService:
             return None
 
         # 首先尝试获取默认实现
-        default_impl = next((impl for impl in indicator.implementations if impl.is_default), None)
+        default_impl = next(
+            (impl for impl in indicator.implementations if impl.is_default), None)
         if default_impl:
             return default_impl
 
         # 如果没有默认实现，根据可用性选择实现
         if TALIB_AVAILABLE:
-            talib_impl = next((impl for impl in indicator.implementations if impl.engine == 'talib'), None)
+            talib_impl = next(
+                (impl for impl in indicator.implementations if impl.engine == 'talib'), None)
             if talib_impl:
                 return talib_impl
 
         # 如果没有TA-Lib或没有TA-Lib实现，尝试pandas实现
-        pandas_impl = next((impl for impl in indicator.implementations if impl.engine == 'pandas'), None)
+        pandas_impl = next(
+            (impl for impl in indicator.implementations if impl.engine == 'pandas'), None)
         if pandas_impl:
             return pandas_impl
 
@@ -292,7 +298,8 @@ class IndicatorService:
                             if col_name in result.columns:
                                 call_args[param_name] = result[col_name].values
                             else:
-                                logger.warning(f"指标 {name} 需要列 {col_name}，但DataFrame中不存在")
+                                logger.warning(
+                                    f"指标 {name} 需要列 {col_name}，但DataFrame中不存在")
                                 return result
                         # 如果是计算参数，从params中获取
                         elif param_name in params:
@@ -321,7 +328,8 @@ class IndicatorService:
                     if impl.function_name in ['MA', 'SMA', 'RSI', 'MACD', 'OBV', 'ADX']:
                         # 这些函数第一个参数是close
                         if 'close' not in call_args:
-                            logger.error(f"调用TA-Lib函数 {impl.function_name} 时缺少close参数")
+                            logger.error(
+                                f"调用TA-Lib函数 {impl.function_name} 时缺少close参数")
                             return result
 
                         # 提取close参数和其他参数
@@ -338,7 +346,8 @@ class IndicatorService:
                         # 这些函数可能需要high, low, close等多个输入
                         if impl.function_name == 'BBANDS':
                             if 'close' not in call_args:
-                                logger.error(f"调用TA-Lib函数 {impl.function_name} 时缺少close参数")
+                                logger.error(
+                                    f"调用TA-Lib函数 {impl.function_name} 时缺少close参数")
                                 return result
                             talib_result = talib_func(
                                 call_args['close'],
@@ -349,7 +358,8 @@ class IndicatorService:
 
                         elif impl.function_name == 'ATR':
                             if not all(k in call_args for k in ['high', 'low', 'close']):
-                                logger.error(f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
+                                logger.error(
+                                    f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
                                 return result
                             talib_result = talib_func(
                                 call_args['high'],
@@ -360,7 +370,8 @@ class IndicatorService:
 
                         elif impl.function_name == 'CCI':
                             if not all(k in call_args for k in ['high', 'low', 'close']):
-                                logger.error(f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
+                                logger.error(
+                                    f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
                                 return result
                             talib_result = talib_func(
                                 call_args['high'],
@@ -371,7 +382,8 @@ class IndicatorService:
 
                         elif impl.function_name == 'STOCH':
                             if not all(k in call_args for k in ['high', 'low', 'close']):
-                                logger.error(f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
+                                logger.error(
+                                    f"调用TA-Lib函数 {impl.function_name} 时缺少必要参数")
                                 return result
                             talib_result = talib_func(
                                 call_args['high'],
@@ -399,7 +411,8 @@ class IndicatorService:
                         talib_result = talib_func(**call_args)
 
                 except Exception as e:
-                    logger.error(f"调用TA-Lib函数 {impl.function_name} 时发生错误: {str(e)}")
+                    logger.error(
+                        f"调用TA-Lib函数 {impl.function_name} 时发生错误: {str(e)}")
                     import traceback
                     logger.error(traceback.format_exc())
                     return result
@@ -419,7 +432,8 @@ class IndicatorService:
                 # 编译自定义函数或导入自定义模块
                 if impl.engine == 'pandas':
                     # 编译自定义函数
-                    func = self._compile_custom_function(impl.code, impl.function_name)
+                    func = self._compile_custom_function(
+                        impl.code, impl.function_name)
                 else:  # custom
                     # 导入自定义模块
                     try:
@@ -466,7 +480,8 @@ class IndicatorService:
                         if col_name in result.columns:
                             call_args[param_name] = result[col_name]
                         else:
-                            logger.warning(f"指标 {name} 需要列 {col_name}，但DataFrame中不存在")
+                            logger.warning(
+                                f"指标 {name} 需要列 {col_name}，但DataFrame中不存在")
                             return result
                     # 如果是计算参数，从params中获取
                     elif param_name in params:
@@ -533,7 +548,8 @@ class IndicatorService:
                     id=None,  # 自动分配ID
                     name=indicator_dict.get('name'),
                     display_name=indicator_dict.get('display_name'),
-                    category_id=indicator_dict.get('category_id', 6),  # 默认为"其他"类别
+                    category_id=indicator_dict.get(
+                        'category_id', 6),  # 默认为"其他"类别
                     description=indicator_dict.get('description', ''),
                     formula=indicator_dict.get('formula', ''),
                     is_builtin=False,  # 插件指标不是内置的
@@ -575,7 +591,8 @@ class IndicatorService:
                 logger.info(f"成功注册指标: {indicator.name} (ID: {indicator_id})")
 
             except Exception as e:
-                logger.error(f"注册指标 {indicator_dict.get('name', 'unknown')} 时发生错误: {str(e)}")
+                logger.error(
+                    f"注册指标 {indicator_dict.get('name', 'unknown')} 时发生错误: {str(e)}")
 
         return indicator_ids
 
@@ -660,7 +677,8 @@ def calculate_indicator(df: pd.DataFrame, indicator_name: str, params: dict = No
                     if input_name.lower() in df.columns:
                         input_data.append(df[input_name.lower()].values)
                     else:
-                        raise ValueError(f"指标 {indicator_name} 需要 {input_name} 数据，但在DataFrame中找不到")
+                        raise ValueError(
+                            f"指标 {indicator_name} 需要 {input_name} 数据，但在DataFrame中找不到")
 
                 # 计算指标
                 outputs = func(*input_data, **params)

@@ -56,7 +56,8 @@ class AdaptiveHikuuStrategy(BaseStrategy):
         self.add_parameter("profit_lock", 0.05, float, "利润锁定", 0.02, 0.1)
 
         # 滑点参数
-        self.add_parameter("slippage_percent", 0.01, float, "滑点百分比", 0.001, 0.05)
+        self.add_parameter("slippage_percent", 0.01,
+                           float, "滑点百分比", 0.001, 0.05)
 
     def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
         """
@@ -81,7 +82,8 @@ class AdaptiveHikuuStrategy(BaseStrategy):
                 # 计算简单的移动平均信号
                 ma_period = self.get_parameter("ma_period")
                 data_copy = data.copy()
-                data_copy['ma'] = data_copy['close'].rolling(window=ma_period).mean()
+                data_copy['ma'] = data_copy['close'].rolling(
+                    window=ma_period).mean()
 
                 for i in range(ma_period, len(data_copy)):
                     current = data_copy.iloc[i]
@@ -96,8 +98,10 @@ class AdaptiveHikuuStrategy(BaseStrategy):
                             confidence=0.7,
                             strategy_name=self.name,
                             reason=f"价格突破{ma_period}日移动平均线",
-                            stop_loss=current['close'] * (1 - self.get_parameter("fixed_stop_loss")),
-                            take_profit=current['close'] * (1 + self.get_parameter("min_take_profit"))
+                            stop_loss=current['close'] *
+                            (1 - self.get_parameter("fixed_stop_loss")),
+                            take_profit=current['close'] *
+                            (1 + self.get_parameter("min_take_profit"))
                         ))
 
                     elif current['close'] < current['ma'] and prev['close'] >= prev['ma']:
@@ -108,8 +112,10 @@ class AdaptiveHikuuStrategy(BaseStrategy):
                             confidence=0.7,
                             strategy_name=self.name,
                             reason=f"价格跌破{ma_period}日移动平均线",
-                            stop_loss=current['close'] * (1 + self.get_parameter("fixed_stop_loss")),
-                            take_profit=current['close'] * (1 - self.get_parameter("min_take_profit"))
+                            stop_loss=current['close'] *
+                            (1 + self.get_parameter("fixed_stop_loss")),
+                            take_profit=current['close'] *
+                            (1 - self.get_parameter("min_take_profit"))
                         ))
 
         except Exception as e:
@@ -165,7 +171,8 @@ class AdaptiveHikuuStrategy(BaseStrategy):
             sp = SP_FixedPercent(self.get_parameter("slippage_percent"))
 
             # 创建系统
-            system = SYS_Simple(tm=tm, mm=mm, ev=ev, cn=cn, sl=sl, pg=pg, sp=sp)
+            system = SYS_Simple(tm=tm, mm=mm, ev=ev,
+                                cn=cn, sl=sl, pg=pg, sp=sp)
 
             self._system = system
             return system

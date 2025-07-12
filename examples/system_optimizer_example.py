@@ -65,8 +65,10 @@ class SystemOptimizerExample(QMainWindow):
         layout.addWidget(self.optimizer_panel)
 
         # 连接面板信号
-        self.optimizer_panel.optimization_completed.connect(self.on_optimization_completed)
-        self.optimizer_panel.optimization_failed.connect(self.on_optimization_failed)
+        self.optimizer_panel.optimization_completed.connect(
+            self.on_optimization_completed)
+        self.optimizer_panel.optimization_failed.connect(
+            self.on_optimization_failed)
 
         # 创建优化器服务
         self.optimizer_service = SystemOptimizerService()

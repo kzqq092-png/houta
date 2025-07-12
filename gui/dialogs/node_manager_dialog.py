@@ -373,15 +373,20 @@ class NodeManagerDialog(QDialog):
 
         for row, (node_id, node_data) in enumerate(self.nodes.items()):
             self.discovered_table.setItem(row, 0, QTableWidgetItem(node_id))
-            self.discovered_table.setItem(row, 1, QTableWidgetItem(node_data['ip']))
-            self.discovered_table.setItem(row, 2, QTableWidgetItem(str(node_data['port'])))
-            self.discovered_table.setItem(row, 3, QTableWidgetItem(node_data['status']))
-            self.discovered_table.setItem(row, 4, QTableWidgetItem(node_data['type']))
+            self.discovered_table.setItem(
+                row, 1, QTableWidgetItem(node_data['ip']))
+            self.discovered_table.setItem(
+                row, 2, QTableWidgetItem(str(node_data['port'])))
+            self.discovered_table.setItem(
+                row, 3, QTableWidgetItem(node_data['status']))
+            self.discovered_table.setItem(
+                row, 4, QTableWidgetItem(node_data['type']))
 
             # 操作按钮
             if node_data['status'] == 'discovered':
                 connect_btn = QPushButton("连接")
-                connect_btn.clicked.connect(lambda checked, nid=node_id: self.connect_to_node(nid))
+                connect_btn.clicked.connect(
+                    lambda checked, nid=node_id: self.connect_to_node(nid))
                 self.discovered_table.setCellWidget(row, 5, connect_btn)
             else:
                 self.discovered_table.setItem(row, 5, QTableWidgetItem("已连接"))
@@ -395,16 +400,24 @@ class NodeManagerDialog(QDialog):
 
         for row, (node_id, node_data) in enumerate(self.nodes.items()):
             self.node_details_table.setItem(row, 0, QTableWidgetItem(node_id))
-            self.node_details_table.setItem(row, 1, QTableWidgetItem(node_data['ip']))
-            self.node_details_table.setItem(row, 2, QTableWidgetItem(str(node_data['port'])))
-            self.node_details_table.setItem(row, 3, QTableWidgetItem(node_data['status']))
-            self.node_details_table.setItem(row, 4, QTableWidgetItem(f"{node_data['cpu_usage']}%"))
-            self.node_details_table.setItem(row, 5, QTableWidgetItem(f"{node_data['memory_usage']}%"))
-            self.node_details_table.setItem(row, 6, QTableWidgetItem(str(node_data['task_count'])))
+            self.node_details_table.setItem(
+                row, 1, QTableWidgetItem(node_data['ip']))
+            self.node_details_table.setItem(
+                row, 2, QTableWidgetItem(str(node_data['port'])))
+            self.node_details_table.setItem(
+                row, 3, QTableWidgetItem(node_data['status']))
+            self.node_details_table.setItem(
+                row, 4, QTableWidgetItem(f"{node_data['cpu_usage']}%"))
+            self.node_details_table.setItem(
+                row, 5, QTableWidgetItem(f"{node_data['memory_usage']}%"))
+            self.node_details_table.setItem(
+                row, 6, QTableWidgetItem(str(node_data['task_count'])))
 
             # 格式化最后心跳时间
-            last_heartbeat = time.strftime("%H:%M:%S", time.localtime(node_data['last_heartbeat']))
-            self.node_details_table.setItem(row, 7, QTableWidgetItem(last_heartbeat))
+            last_heartbeat = time.strftime(
+                "%H:%M:%S", time.localtime(node_data['last_heartbeat']))
+            self.node_details_table.setItem(
+                row, 7, QTableWidgetItem(last_heartbeat))
 
             # 统计活跃节点
             if node_data['status'] == 'connected':
@@ -429,9 +442,11 @@ class NodeManagerDialog(QDialog):
             config = json.loads(config_text)
 
             # 应用配置
-            self.discovery_port_spin.setValue(config.get('discovery_port', 8888))
+            self.discovery_port_spin.setValue(
+                config.get('discovery_port', 8888))
             self.local_port_spin.setValue(config.get('listen_port', 8889))
-            self.max_connections_spin.setValue(config.get('max_connections', 10))
+            self.max_connections_spin.setValue(
+                config.get('max_connections', 10))
             self.enable_ssl_check.setChecked(config.get('ssl_enabled', False))
 
             QMessageBox.information(self, "成功", "配置加载成功")

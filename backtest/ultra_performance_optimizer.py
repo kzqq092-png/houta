@@ -164,7 +164,8 @@ class UltraPerformanceOptimizer:
                         threads_per_worker=2,
                         memory_limit=f"{self.config['memory_limit'] // self.config['max_workers']}B"
                     )
-                    self.log_manager.log(f"Dask客户端已初始化: {self.dask_client.dashboard_link}", LogLevel.INFO)
+                    self.log_manager.log(
+                        f"Dask客户端已初始化: {self.dask_client.dashboard_link}", LogLevel.INFO)
                 except Exception as e:
                     self.log_manager.log(f"Dask初始化失败: {e}", LogLevel.WARNING)
 
@@ -174,7 +175,8 @@ class UltraPerformanceOptimizer:
                     if not ray.is_initialized():
                         ray.init(
                             num_cpus=self.cpu_count,
-                            object_store_memory=int(self.config['memory_limit'] * 0.3)
+                            object_store_memory=int(
+                                self.config['memory_limit'] * 0.3)
                         )
                         self.ray_initialized = True
                         self.log_manager.log("Ray已初始化", LogLevel.INFO)
@@ -225,7 +227,8 @@ class UltraPerformanceOptimizer:
                         current_cash -= cost
                 elif signal == -1:  # 卖出
                     if current_position > 0:
-                        proceeds = current_position * price * (1 - commission_pct)
+                        proceeds = current_position * \
+                            price * (1 - commission_pct)
                         current_cash += proceeds
                         current_position = 0
 
@@ -276,7 +279,8 @@ class UltraPerformanceOptimizer:
                                 current_position = shares
                                 current_cash -= cost
                         elif signal == -1 and current_position > 0:
-                            proceeds = current_position * price * (1 - commission_pct)
+                            proceeds = current_position * \
+                                price * (1 - commission_pct)
                             current_cash += proceeds
                             current_position = 0
 
@@ -302,7 +306,8 @@ class UltraPerformanceOptimizer:
             result['position'] = cp.asnumpy(positions_gpu)
             result['capital'] = cp.asnumpy(capital_gpu)
             result['returns'] = cp.asnumpy(returns_gpu)
-            result['cumulative_returns'] = (1 + result['returns']).cumprod() - 1
+            result['cumulative_returns'] = (
+                1 + result['returns']).cumprod() - 1
 
             return result
 
@@ -331,7 +336,8 @@ class UltraPerformanceOptimizer:
             result['position'] = positions
             result['capital'] = capital
             result['returns'] = returns
-            result['cumulative_returns'] = (1 + pd.Series(returns)).cumprod() - 1
+            result['cumulative_returns'] = (
+                1 + pd.Series(returns)).cumprod() - 1
 
             return result
 
@@ -346,7 +352,8 @@ class UltraPerformanceOptimizer:
                 raise RuntimeError("Dask客户端未初始化")
 
             # 将数据转换为Dask DataFrame
-            dask_data = dd.from_pandas(data, npartitions=self.config["max_workers"])
+            dask_data = dd.from_pandas(
+                data, npartitions=self.config["max_workers"])
 
             # 定义分布式计算函数
             def distributed_backtest_partition(partition):
@@ -381,10 +388,12 @@ class UltraPerformanceOptimizer:
 
             # 分割数据
             chunk_size = len(data) // self.config["max_workers"]
-            chunks = [data.iloc[i:i+chunk_size] for i in range(0, len(data), chunk_size)]
+            chunks = [data.iloc[i:i+chunk_size]
+                      for i in range(0, len(data), chunk_size)]
 
             # 提交任务
-            futures = [self._ray_backtest_worker.remote(self, chunk, **kwargs) for chunk in chunks]
+            futures = [self._ray_backtest_worker.remote(
+                self, chunk, **kwargs) for chunk in chunks]
 
             # 收集结果
             results = ray.get(futures)
@@ -428,7 +437,8 @@ class UltraPerformanceOptimizer:
             result['position'] = positions
             result['capital'] = capital
             result['returns'] = returns
-            result['cumulative_returns'] = (1 + pd.Series(returns)).cumprod() - 1
+            result['cumulative_returns'] = (
+                1 + pd.Series(returns)).cumprod() - 1
 
             # 清理临时文件
             temp_file.unlink(missing_ok=True)
@@ -454,26 +464,32 @@ class UltraPerformanceOptimizer:
         start_memory = psutil.virtual_memory().used
 
         try:
-            self.log_manager.log(f"开始超高性能回测 - 级别: {self.performance_level.value}, 后端: {self.compute_backend.value}", LogLevel.INFO)
+            self.log_manager.log(
+                f"开始超高性能回测 - 级别: {self.performance_level.value}, 后端: {self.compute_backend.value}", LogLevel.INFO)
 
             # 数据预处理
             processed_data = self._preprocess_data(data)
 
             # 选择最优计算方法
             if self.compute_backend == ComputeBackend.GPU and self.gpu_available:
-                result = self._gpu_accelerated_backtest(processed_data, **kwargs)
+                result = self._gpu_accelerated_backtest(
+                    processed_data, **kwargs)
             elif self.compute_backend == ComputeBackend.DISTRIBUTED and self.dask_client:
                 result = self._distributed_backtest(processed_data, **kwargs)
             elif self.compute_backend == ComputeBackend.HYBRID:
                 # 根据数据大小选择最优方法
                 if len(data) > 1000000 and self.gpu_available:
-                    result = self._gpu_accelerated_backtest(processed_data, **kwargs)
+                    result = self._gpu_accelerated_backtest(
+                        processed_data, **kwargs)
                 elif len(data) > 500000 and self.dask_client:
-                    result = self._distributed_backtest(processed_data, **kwargs)
+                    result = self._distributed_backtest(
+                        processed_data, **kwargs)
                 elif len(data) > 100000:
-                    result = self._memory_mapped_backtest(processed_data, **kwargs)
+                    result = self._memory_mapped_backtest(
+                        processed_data, **kwargs)
                 else:
-                    result = self._cpu_optimized_backtest(processed_data, **kwargs)
+                    result = self._cpu_optimized_backtest(
+                        processed_data, **kwargs)
             else:
                 result = self._cpu_optimized_backtest(processed_data, **kwargs)
 
@@ -482,7 +498,8 @@ class UltraPerformanceOptimizer:
             end_memory = psutil.virtual_memory().used
             memory_usage = (end_memory - start_memory) / 1024 / 1024  # MB
 
-            throughput = len(data) / execution_time if execution_time > 0 else 0
+            throughput = len(data) / \
+                execution_time if execution_time > 0 else 0
             cache_hit_rate = self.cache_stats["hits"] / (self.cache_stats["hits"] + self.cache_stats["misses"]
                                                          ) if (self.cache_stats["hits"] + self.cache_stats["misses"]) > 0 else 0
 
@@ -493,11 +510,13 @@ class UltraPerformanceOptimizer:
                 cpu_utilization=psutil.cpu_percent(),
                 gpu_utilization=self._get_gpu_utilization(),
                 cache_hit_rate=cache_hit_rate,
-                parallel_efficiency=self._calculate_parallel_efficiency(execution_time, len(data)),
+                parallel_efficiency=self._calculate_parallel_efficiency(
+                    execution_time, len(data)),
                 optimization_level=self.performance_level.value
             )
 
-            self.log_manager.log(f"超高性能回测完成 - 耗时: {execution_time:.3f}秒, 吞吐量: {throughput:.0f}点/秒", LogLevel.INFO)
+            self.log_manager.log(
+                f"超高性能回测完成 - 耗时: {execution_time:.3f}秒, 吞吐量: {throughput:.0f}点/秒", LogLevel.INFO)
 
             return result, performance_metrics
 
@@ -522,7 +541,8 @@ class UltraPerformanceOptimizer:
             # 确保数据类型优化
             for col in ['close', 'signal']:
                 if col in processed.columns:
-                    processed[col] = pd.to_numeric(processed[col], errors='coerce', downcast='float')
+                    processed[col] = pd.to_numeric(
+                        processed[col], errors='coerce', downcast='float')
 
             # 移除缺失值
             processed = processed.dropna()
@@ -557,10 +577,12 @@ class UltraPerformanceOptimizer:
             estimated_single_thread_time = data_size / 10000  # 假设单线程处理10000点/秒
 
             # 理论最优时间
-            theoretical_optimal_time = estimated_single_thread_time / self.config["max_workers"]
+            theoretical_optimal_time = estimated_single_thread_time / \
+                self.config["max_workers"]
 
             # 并行效率
-            efficiency = theoretical_optimal_time / execution_time if execution_time > 0 else 0
+            efficiency = theoretical_optimal_time / \
+                execution_time if execution_time > 0 else 0
 
             return min(efficiency, 1.0)  # 效率不能超过100%
 
@@ -604,7 +626,8 @@ class UltraPerformanceOptimizer:
                         }
 
                     except Exception as e:
-                        benchmark_results[f"{backend.value}_{size}"] = {"error": str(e)}
+                        benchmark_results[f"{backend.value}_{size}"] = {
+                            "error": str(e)}
 
                     finally:
                         self.compute_backend = original_backend
@@ -673,7 +696,8 @@ def benchmark_all_backends(
     log_manager: Optional[LogManager] = None
 ) -> Dict[str, Any]:
     """基准测试所有后端"""
-    optimizer = create_ultra_optimizer(PerformanceLevel.EXTREME, ComputeBackend.HYBRID, log_manager)
+    optimizer = create_ultra_optimizer(
+        PerformanceLevel.EXTREME, ComputeBackend.HYBRID, log_manager)
     try:
         return optimizer.benchmark_performance([len(data)])
     finally:

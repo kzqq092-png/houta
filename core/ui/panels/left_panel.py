@@ -7,7 +7,8 @@
 import logging
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
-
+import asyncio  # Added for asyncio.create_task
+import pandas as pd
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QLineEdit, QComboBox, QPushButton, QLabel, QFrame,
@@ -21,47 +22,11 @@ from PyQt5.QtGui import QIcon, QFont
 from .base_panel import BasePanel
 from core.events.events import StockSelectedEvent
 from utils.performance_monitor import measure_performance
+# 引入服务和类型
+from core.services import StockService
+from core.services.unified_data_manager import UnifiedDataManager
 
 logger = logging.getLogger(__name__)
-
-
-class StockDataLoader(QThread):
-    """异步股票数据加载器"""
-
-    data_loaded = pyqtSignal(list)  # 数据加载完成信号
-    error_occurred = pyqtSignal(str)  # 错误信号
-    finished = pyqtSignal()  # 线程完成信号
-
-    def __init__(self, stock_service, market_filter=None, search_text=None):
-        super().__init__()
-        self.stock_service = stock_service
-        self.market_filter = market_filter
-        self.search_text = search_text
-
-    @measure_performance("StockDataLoader.run")
-    def run(self):
-        """运行数据加载"""
-        try:
-            # 模拟异步加载
-            stocks = self.stock_service.get_stock_list()
-
-            # 应用筛选
-            if self.market_filter and self.market_filter != "全部":
-                stocks = [s for s in stocks if s.get('market') == self.market_filter]
-
-            if self.search_text:
-                search_lower = self.search_text.lower()
-                stocks = [s for s in stocks
-                          if search_lower in s.get('name', '').lower()
-                          or search_lower in s.get('code', '').lower()]
-
-            self.data_loaded.emit(stocks)
-
-        except Exception as e:
-            self.error_occurred.emit(str(e))
-
-        finally:
-            self.finished.emit()
 
 
 class LeftPanel(BasePanel):
@@ -75,18 +40,24 @@ class LeftPanel(BasePanel):
     4. 股票信息展示
     """
 
-    def __init__(self, parent, coordinator, **kwargs):
+    def __init__(self,
+                 stock_service: StockService,
+                 data_manager: UnifiedDataManager,
+                 parent,
+                 coordinator,
+                 **kwargs):
         """初始化左侧面板"""
+        self.stock_service = stock_service
+        self.data_manager = data_manager
+
         # 添加防抖相关属性
         self._selection_timer = None
         self._pending_selection = None
         self._no_data_cache = set()  # 缓存没有数据的股票
 
-        self.stock_service = None
         self.current_stocks = []
         self.favorites = set()
         self.search_timer = QTimer()
-        self.data_loader = None
 
         # 初始化指标相关属性
         self.builtin_indicators = []
@@ -252,17 +223,22 @@ class LeftPanel(BasePanel):
         try:
             # 搜索事件
             self.search_input.textChanged.connect(self._on_search_text_changed)
-            self.get_widget('search_btn').clicked.connect(self._on_search_clicked)
+            self.get_widget('search_btn').clicked.connect(
+                self._on_search_clicked)
 
             # 筛选事件
-            self.market_combo.currentTextChanged.connect(self._on_market_changed)
+            self.market_combo.currentTextChanged.connect(
+                self._on_market_changed)
             self.favorites_btn.toggled.connect(self._on_favorites_toggled)
-            self.get_widget('refresh_btn').clicked.connect(self._on_refresh_clicked)
+            self.get_widget('refresh_btn').clicked.connect(
+                self._on_refresh_clicked)
 
             # 股票列表事件
             self.stock_tree.itemClicked.connect(self._on_stock_clicked)
-            self.stock_tree.itemDoubleClicked.connect(self._on_stock_double_clicked)
-            self.stock_tree.customContextMenuRequested.connect(self._on_context_menu)
+            self.stock_tree.itemDoubleClicked.connect(
+                self._on_stock_double_clicked)
+            self.stock_tree.customContextMenuRequested.connect(
+                self._on_context_menu)
 
             # 搜索延迟定时器
             self.search_timer.timeout.connect(self._perform_search)
@@ -270,7 +246,8 @@ class LeftPanel(BasePanel):
 
             # 股票选择防抖定时器
             self._selection_timer = QTimer()
-            self._selection_timer.timeout.connect(self._process_pending_selection)
+            self._selection_timer.timeout.connect(
+                self._process_pending_selection)
             self._selection_timer.setSingleShot(True)
 
             logger.debug("LeftPanel events bound successfully")
@@ -282,11 +259,6 @@ class LeftPanel(BasePanel):
     def _initialize_data(self) -> None:
         """初始化数据"""
         try:
-            # 获取股票服务
-            if self.coordinator and hasattr(self.coordinator, 'service_container'):
-                from core.services import StockService
-                self.stock_service = self.coordinator.service_container.get_service(StockService)
-
             # 加载初始数据
             self._load_stock_data()
 
@@ -326,19 +298,16 @@ class LeftPanel(BasePanel):
         if item:
             stock_code = item.text(0)
             stock_name = item.text(1)
-            market = item.text(2)
+            market = item.data(0, Qt.UserRole).get('market', '')
             self._debounced_select_stock(stock_code, stock_name, market)
 
     @pyqtSlot(QTreeWidgetItem, int)
     def _on_stock_double_clicked(self, item: QTreeWidgetItem, column: int) -> None:
-        """股票双击处理"""
-        if item:
-            stock_code = item.text(0)
-            stock_name = item.text(1)
-            market = item.text(2)
-            # 双击立即执行，不使用防抖
-            self._select_stock(stock_code, stock_name, market)
-            # 双击可以触发额外操作，比如添加到收藏
+        """处理股票双击事件"""
+        stock_code = item.text(0)
+        stock_name = item.text(1)
+        market = item.data(0, Qt.UserRole).get('market', '')
+        self._select_stock(stock_code, stock_name, market)
 
     def _on_context_menu(self, position) -> None:
         """右键菜单处理"""
@@ -354,55 +323,66 @@ class LeftPanel(BasePanel):
 
         # 查看详情
         action = menu.addAction("查看详情")
-        action.triggered.connect(lambda: self._show_stock_details(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._show_stock_details(stock_code, stock_name))
 
         # 添加到收藏/取消收藏
         if stock_code in self.favorites:
             action = menu.addAction("从收藏移除")
-            action.triggered.connect(lambda: self._remove_from_favorites(stock_code))
+            action.triggered.connect(
+                lambda: self._remove_from_favorites(stock_code))
         else:
             action = menu.addAction("添加到收藏")
-            action.triggered.connect(lambda: self._add_to_favorites(stock_code, stock_name))
+            action.triggered.connect(
+                lambda: self._add_to_favorites(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 导出数据
         action = menu.addAction("导出数据")
-        action.triggered.connect(lambda: self._export_stock_data(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._export_stock_data(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 添加到自选股
         action = menu.addAction("添加到自选股")
-        action.triggered.connect(lambda: self._add_to_watchlist(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._add_to_watchlist(stock_code, stock_name))
 
         # 添加到投资组合
         action = menu.addAction("添加到投资组合")
-        action.triggered.connect(lambda: self._add_to_portfolio(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._add_to_portfolio(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 分析功能
         action = menu.addAction("技术分析")
-        action.triggered.connect(lambda: self._analyze_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._analyze_stock(stock_code, stock_name))
 
         action = menu.addAction("策略回测")
-        action.triggered.connect(lambda: self._backtest_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._backtest_stock(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 管理功能
         action = menu.addAction("历史数据管理")
-        action.triggered.connect(lambda: self._manage_history_data(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_history_data(stock_code, stock_name))
 
         action = menu.addAction("策略管理")
-        action.triggered.connect(lambda: self._manage_strategy(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_strategy(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 工具功能
         action = menu.addAction("数据质量检查")
-        action.triggered.connect(lambda: self._check_data_quality(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._check_data_quality(stock_code, stock_name))
 
         action = menu.addAction("计算器")
         action.triggered.connect(lambda: self._show_calculator())
@@ -427,7 +407,8 @@ class LeftPanel(BasePanel):
             # 获取主窗口作为父窗口
             main_window = self.coordinator.get_main_window() if self.coordinator else None
 
-            dialog = AdvancedSearchDialog(parent=main_window, stock_service=self.stock_service)
+            dialog = AdvancedSearchDialog(
+                parent=main_window, stock_service=self.stock_service)
             dialog.search_requested.connect(self._on_advanced_search)
             dialog.exec_()
 
@@ -441,7 +422,8 @@ class LeftPanel(BasePanel):
         """处理高级搜索请求"""
         try:
             # 执行高级搜索
-            filtered_stocks = self.stock_service.perform_advanced_search(conditions)
+            filtered_stocks = self.stock_service.perform_advanced_search(
+                conditions)
 
             # 更新股票列表显示
             self._update_stock_tree(filtered_stocks)
@@ -464,11 +446,13 @@ class LeftPanel(BasePanel):
             # 获取股票详细信息
             stock_info = self.stock_service.get_stock_info(stock_code)
             if not stock_info:
-                QMessageBox.warning(main_window, "警告", f"无法获取股票 {stock_name} 的信息")
+                QMessageBox.warning(main_window, "警告",
+                                    f"无法获取股票 {stock_name} 的信息")
                 return
 
             # 获取历史数据
-            stock_data = self.stock_service.get_stock_data(stock_code, period='D', count=100)
+            stock_data = self.stock_service.get_stock_data(
+                stock_code, period='D', count=100)
 
             # 准备基本信息
             basic_info = [
@@ -520,7 +504,8 @@ class LeftPanel(BasePanel):
                 # 检查是否已在自选股中
                 favorites = self.stock_service.get_favorites()
                 if stock_code in favorites:
-                    QMessageBox.information(main_window, "提示", f"股票 {stock_name}({stock_code}) 已在自选股中")
+                    QMessageBox.information(
+                        main_window, "提示", f"股票 {stock_name}({stock_code}) 已在自选股中")
                     return
 
                 # 添加到自选股
@@ -530,7 +515,8 @@ class LeftPanel(BasePanel):
                     # 更新本地收藏列表
                     self.favorites.add(stock_code)
 
-                    QMessageBox.information(main_window, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
+                    QMessageBox.information(
+                        main_window, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
                     logger.info(f"添加到自选股成功: {stock_name}({stock_code})")
 
                     # 如果当前正在显示收藏列表，则刷新显示
@@ -540,13 +526,15 @@ class LeftPanel(BasePanel):
                         # 刷新当前股票列表显示，更新收藏状态
                         self._update_stock_tree(self.current_stocks)
                 else:
-                    QMessageBox.warning(main_window, "失败", f"添加 {stock_name}({stock_code}) 到自选股失败")
+                    QMessageBox.warning(
+                        main_window, "失败", f"添加 {stock_name}({stock_code}) 到自选股失败")
                     logger.error(f"添加到自选股失败: {stock_name}({stock_code})")
             else:
                 # 当服务不可用时，至少更新本地状态
                 self.favorites.add(stock_code)
                 self._update_stock_tree(self.current_stocks)
-                QMessageBox.information(main_window, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
+                QMessageBox.information(
+                    main_window, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
                 logger.info(f"添加到自选股: {stock_name}({stock_code})")
 
         except Exception as e:
@@ -582,7 +570,8 @@ class LeftPanel(BasePanel):
                 logger.warning(f"无法创建投资组合管理器: {e}")
 
             # 显示投资组合管理对话框
-            dialog = PortfolioDialog(parent=main_window, portfolio_manager=portfolio_manager)
+            dialog = PortfolioDialog(
+                parent=main_window, portfolio_manager=portfolio_manager)
 
             # 预填充股票代码
             if hasattr(dialog, 'stock_code_input'):
@@ -612,7 +601,8 @@ class LeftPanel(BasePanel):
             main_window = self.coordinator.get_main_window() if self.coordinator else None
 
             # 创建技术分析对话框
-            dialog = TechnicalAnalysisDialog(main_window, stock_code=stock_code, stock_name=stock_name)
+            dialog = TechnicalAnalysisDialog(
+                main_window, stock_code=stock_code, stock_name=stock_name)
 
             # 居中显示
             if self.coordinator:
@@ -679,7 +669,8 @@ class LeftPanel(BasePanel):
 
             dialog.exec_()
 
-            logger.info(f"Opened history data management for stock: {stock_code}")
+            logger.info(
+                f"Opened history data management for stock: {stock_code}")
 
         except Exception as e:
             logger.error(f"Failed to open history data management: {e}")
@@ -720,244 +711,162 @@ class LeftPanel(BasePanel):
             )
 
     def _update_stock_tree(self, stocks: List[Dict[str, Any]]) -> None:
-        """更新股票树显示"""
+        """更新股票列表树，这是更新UI的唯一入口点"""
         try:
             self.stock_tree.clear()
+            if not stocks:
+                self.count_label.setText("股票: 0")
+                return
 
+            items = []
             for stock in stocks:
-                item = QTreeWidgetItem()
-                item.setText(0, stock.get('code', ''))
-                item.setText(1, stock.get('name', ''))
-                item.setText(2, stock.get('market', ''))
+                item = QTreeWidgetItem(
+                    [stock.get('code', ''), stock.get('name', '')])
+                # 将完整的股票信息字典存储在item中
+                item.setData(0, Qt.UserRole, stock)
+                items.append(item)
 
-                # 设置收藏状态
-                if stock.get('code') in self.favorites:
-                    item.setText(1, f"★ {stock.get('name', '')}")
-
-                self.stock_tree.addTopLevelItem(item)
-
-            # 调整列宽
-            self.stock_tree.resizeColumnToContents(0)
-            self.stock_tree.resizeColumnToContents(1)
+            self.stock_tree.addTopLevelItems(items)
+            self.count_label.setText(f"股票: {len(stocks)}")
 
         except Exception as e:
-            logger.error(f"更新股票树显示失败: {e}")
+            logger.error(f"更新股票树失败: {e}", exc_info=True)
+            self.show_message(f"更新股票列表失败: {e}", 'error')
 
     def _load_stock_data(self, search_text: str = None) -> None:
         """加载股票数据"""
+        self._show_loading(True)
+        self.status_label.setText("正在加载股票列表...")
+
         try:
-            # 停止之前的加载线程
-            if hasattr(self, 'data_loader') and self.data_loader and self.data_loader.isRunning():
-                self.data_loader.quit()
-                self.data_loader.wait(3000)  # 等待最多3秒
-                if self.data_loader.isRunning():
-                    self.data_loader.terminate()
-                    self.data_loader.wait()
+            # 使用股票服务同步获取股票列表
+            # 注意：这是一个同步调用，如果数据量大，未来可能需要优化为在工作线程中执行
+            if search_text:
+                stocks = self.stock_service.search_stocks(search_text)
+            else:
+                market = self.market_combo.currentText()
+                if market == "全部":
+                    market = None
+                stocks = self.stock_service.get_stock_list(market=market)
 
-            self._show_loading(True)
-            self.status_label.setText("正在加载股票数据...")
-
-            # 获取筛选条件
-            market_filter = self.market_combo.currentText()
-            if market_filter == "全部":
-                market_filter = None
-
-            # 创建数据加载器
-            self.data_loader = StockDataLoader(
-                self.stock_service,
-                market_filter,
-                search_text
-            )
-
-            # 连接信号
-            self.data_loader.data_loaded.connect(self._on_data_loaded)
-            self.data_loader.error_occurred.connect(self._on_data_error)
-            self.data_loader.finished.connect(self._on_data_loader_finished)
-
-            # 开始加载
-            self.data_loader.start()
+            self._on_data_loaded(stocks)
 
         except Exception as e:
-            logger.error(f"Failed to load stock data: {e}")
-            self._show_loading(False)
-            self.status_label.setText(f"加载失败: {e}")
-
-    def _on_data_loader_finished(self) -> None:
-        """数据加载线程完成处理"""
-        try:
-            # 清理线程引用
-            if hasattr(self, 'data_loader'):
-                self.data_loader.deleteLater()
-                self.data_loader = None
-        except Exception as e:
-            logger.error(f"Failed to handle data loader finished: {e}")
+            logger.error(f"Failed to load stock list: {e}", exc_info=True)
+            self._on_data_error(str(e))
 
     @pyqtSlot(list)
     def _on_data_loaded(self, stocks: List[Dict[str, Any]]) -> None:
-        """数据加载完成处理"""
-        try:
-            self.current_stocks = stocks
-            self._update_stock_list(stocks)
-            self._show_loading(False)
-            self.status_label.setText("就绪")
-            self.count_label.setText(f"股票: {len(stocks)}")
-
-        except Exception as e:
-            logger.error(f"Failed to process loaded data: {e}")
-            self._on_data_error(str(e))
+        """数据加载成功后的回调"""
+        self.current_stocks = stocks
+        self.update_stock_list(stocks)
+        self._show_loading(False)
+        self.status_label.setText("就绪")
 
     @pyqtSlot(str)
     def _on_data_error(self, error: str) -> None:
-        """数据加载错误处理"""
+        """数据加载失败后的回调"""
         logger.error(f"Stock data loading error: {error}")
+        self.show_message(f"加载股票数据失败: {error}", 'error')
         self._show_loading(False)
-        self.status_label.setText(f"加载失败: {error}")
+        self.status_label.setText("数据加载失败")
 
     def update_stock_list(self, stocks):
-        """更新股票列表显示搜索结果"""
-        try:
-            # 清空现有数据
-            self.stock_tree.clear()
-
-            # 添加股票数据
-            for stock in stocks:
-                # 处理搜索结果数据格式
-                item = QTreeWidgetItem([
-                    stock.get('code', ''),
-                    stock.get('name', ''),
-                    stock.get('market', ''),
-                ])
-
-                # 设置数据
-                item.setData(0, Qt.UserRole, stock.get('code', ''))
-                item.setData(1, Qt.UserRole, stock.get('name', ''))
-                item.setData(2, Qt.UserRole, stock.get('market', ''))
-
-                self.stock_tree.addTopLevelItem(item)
-
-            # 调整列宽
-            self.stock_tree.resizeColumnToContents(0)
-            self.stock_tree.resizeColumnToContents(1)
-            self.stock_tree.resizeColumnToContents(2)
-
-            # 更新状态
-            self.status_label.setText("显示搜索结果")
-            self.count_label.setText(f"股票: {len(stocks)}")
-
-        except Exception as e:
-            logger.error(f"Failed to update stock list: {e}")
-
-    def _update_stock_list(self, stocks: List[Dict[str, Any]]) -> None:
-        """更新股票列表"""
-        try:
-            # 清空现有数据
-            self.stock_tree.clear()
-
-            # 添加股票数据
-            for stock in stocks:
-                # 显示基本信息，不显示实时价格（避免性能问题）
-                item = QTreeWidgetItem([
-                    stock.get('code', ''),
-                    stock.get('name', ''),
-                    stock.get('market', ''),
-                    stock.get('industry', '其他'),
-                    stock.get('type', '')
-                ])
-
-                # 收藏标记
-                if stock.get('code') in self.favorites:
-                    item.setForeground(1, Qt.blue)
-                    font = item.font(1)
-                    font.setBold(True)
-                    item.setFont(1, font)
-
-                # 设置工具提示
-                tooltip = (f"代码: {stock.get('code', '')}\n"
-                           f"名称: {stock.get('name', '')}\n"
-                           f"市场: {stock.get('market', '')}\n"
-                           f"行业: {stock.get('industry', '其他')}\n"
-                           f"类型: {stock.get('type', '')}")
-                item.setToolTip(0, tooltip)
-                item.setToolTip(1, tooltip)
-
-                self.stock_tree.addTopLevelItem(item)
-
-        except Exception as e:
-            logger.error(f"Failed to update stock list: {e}")
+        """
+        更新股票列表的公共接口
+        """
+        self._update_stock_tree(stocks)
 
     def _debounced_select_stock(self, stock_code: str, stock_name: str, market: str = '') -> None:
-        """防抖的股票选择"""
-        try:
-            # 如果已经是当前选择的股票，直接返回
-            if hasattr(self, '_current_selected_stock') and self._current_selected_stock == stock_code:
-                return
-
-            # 保存待处理的选择
-            self._pending_selection = (stock_code, stock_name, market)
-
-            # 重启定时器（防抖）
+        """防抖处理股票选择，避免快速点击时重复触发"""
+        if self._selection_timer:
             self._selection_timer.stop()
-            self._selection_timer.start(150)  # 150ms防抖延迟
 
-        except Exception as e:
-            logger.error(f"Failed to debounce stock selection: {e}")
+        self._pending_selection = (stock_code, stock_name, market)
+        self._selection_timer = QTimer()
+        self._selection_timer.setSingleShot(True)
+        self._selection_timer.timeout.connect(self._process_pending_selection)
+        self._selection_timer.start(150)  # 150ms防抖
 
     def _process_pending_selection(self) -> None:
-        """处理待处理的股票选择"""
+        """处理待处理的选择请求"""
         if self._pending_selection:
-            stock_code, stock_name, market = self._pending_selection
+            code, name, market = self._pending_selection
+            self._select_stock(code, name, market)
             self._pending_selection = None
-            self._select_stock(stock_code, stock_name, market)
 
     def _select_stock(self, stock_code: str, stock_name: str, market: str = '') -> None:
-        """选择股票"""
+        """
+        处理股票选择，启动一个异步任务来验证数据并发布事件
+        """
+        logger.info(f"开始处理股票选择: {stock_code} - {stock_name}")
+
+        # 检查是否在无数据缓存中
+        if stock_code in self._no_data_cache:
+            self.show_message(f"'{stock_name}' 之前已确认无可用数据。", 'warning')
+            return
+
+        # UI反馈：显示加载状态
+        self.status_label.setText(f"正在加载 {stock_name} 数据...")
+        self._show_loading(True)
+
+        # 启动异步任务
+        asyncio.create_task(self._async_select_stock(
+            stock_code, stock_name, market))
+
+    async def _async_select_stock(self, stock_code: str, stock_name: str, market: str) -> None:
+        """
+        异步执行数据请求和后续处理
+        """
         try:
-            # 检查是否是无数据股票
-            if stock_code in self._no_data_cache:
-                logger.warning(f"Stock {stock_code} has no data, skipping selection")
-                self.show_message(f"股票 {stock_name} 暂无数据", 'warning')
-                return
+            # 直接等待数据管理器的异步方法
+            data = await self.data_manager.request_data(
+                stock_code=stock_code,
+                data_type='kdata'
+            )
 
-            # 预检查股票数据
-            if self.stock_service:
-                # 快速检查是否有基本信息
-                stock_info = self.stock_service.get_stock_info(stock_code)
-                if not stock_info:
-                    logger.warning(f"No stock info for {stock_code}")
-                    self._no_data_cache.add(stock_code)
-                    self.show_message(f"股票 {stock_name} 信息不存在", 'warning')
-                    return
-
-                # 快速检查是否有K线数据（只检查最近1条）
-                try:
-                    test_data = self.stock_service.get_stock_data(stock_code, period='D', count=1)
-                    if test_data is None or test_data.empty:
-                        logger.warning(f"No K-data for {stock_code}")
-                        self._no_data_cache.add(stock_code)
-                        self.show_message(f"股票 {stock_name} 暂无K线数据", 'warning')
-                        return
-                except Exception as e:
-                    logger.warning(f"Failed to check K-data for {stock_code}: {e}")
-                    self._no_data_cache.add(stock_code)
-                    self.show_message(f"股票 {stock_name} 数据查询失败", 'error')
-                    return
-
-            # 记录当前选择的股票
-            self._current_selected_stock = stock_code
-
-            # 发送股票选择事件
-            if self.event_bus:
-                event = StockSelectedEvent(stock_code=stock_code, stock_name=stock_name, market=market)
-                self.event_bus.publish(event)
-
-            logger.info(f"Stock selected: {stock_code} - {stock_name}")
+            # 安全地将结果处理调度回主线程
+            QTimer.singleShot(0, lambda data=data: self._handle_data_result(
+                data, stock_code, stock_name, market))
 
         except Exception as e:
-            logger.error(f"Failed to select stock: {e}")
-            self.show_message(f"选择股票失败: {e}", 'error')
+            logger.error(f"处理股票选择时发生异常: {e}", exc_info=True)
+            # 同样在主线程中处理错误UI
+            QTimer.singleShot(
+                0, lambda e=e: self._handle_data_error(e, stock_name))
+
+    def _handle_data_result(self, data: Optional[pd.DataFrame], stock_code: str, stock_name: str, market: str) -> None:
+        """在主线程中处理数据结果"""
+        try:
+            is_available = data is not None and not data.empty
+
+            if is_available:
+                logger.info(f"数据加载成功: {stock_code}, 发布StockSelectedEvent")
+                event = StockSelectedEvent(
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    market=market
+                )
+                self.event_bus.publish(event)
+                self.status_label.setText(f"已选择: {stock_name}")
+            else:
+                logger.warning(f"数据加载成功但无数据: {stock_code}")
+                self.show_message(f"'{stock_name}' 暂无可用K线数据。", 'warning')
+                self._no_data_cache.add(stock_code)
+                self.status_label.setText(f"数据加载失败: {stock_name}")
+
+        finally:
+            self._show_loading(False)
+
+    def _handle_data_error(self, error: Exception, stock_name: str) -> None:
+        """在主线程中处理错误"""
+        self.show_message(f"加载'{stock_name}'数据时出错: {error}", 'error')
+        self.status_label.setText("数据加载出错")
+        self._show_loading(False)
 
     def show_message(self, message: str, level: str = 'info') -> None:
-        """显示消息"""
+        """显示消息提示"""
+        msg_box = QMessageBox(self._root_frame)
         try:
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText(message)
@@ -971,7 +880,8 @@ class LeftPanel(BasePanel):
                     self.status_label.setStyleSheet("color: green;")
 
                 # 3秒后清除消息
-                QTimer.singleShot(3000, lambda: self.status_label.setText("就绪"))
+                QTimer.singleShot(
+                    3000, lambda: self.status_label.setText("就绪"))
         except Exception as e:
             logger.error(f"Failed to show message: {e}")
 
@@ -983,7 +893,7 @@ class LeftPanel(BasePanel):
                 self.stock_service.add_to_favorites(stock_code)
 
             # 刷新显示
-            self._update_stock_list(self.current_stocks)
+            self._update_stock_tree(self.current_stocks)
 
             self.show_message(f"已添加 {stock_name} 到收藏", 'info')
             logger.info(f"Added to favorites: {stock_code}")
@@ -1000,7 +910,7 @@ class LeftPanel(BasePanel):
                 self.stock_service.remove_from_favorites(stock_code)
 
             # 刷新显示
-            self._update_stock_list(self.current_stocks)
+            self._update_stock_tree(self.current_stocks)
 
             self.show_message(f"已从收藏中移除 {stock_code}", 'info')
             logger.info(f"Removed from favorites: {stock_code}")
@@ -1020,15 +930,18 @@ class LeftPanel(BasePanel):
             main_window = self.coordinator.get_main_window() if self.coordinator else None
 
             # 获取股票详细信息
-            stock_info = self.stock_service.get_stock_info(stock_code) if self.stock_service else {}
+            stock_info = self.stock_service.get_stock_info(
+                stock_code) if self.stock_service else {}
             if not stock_info:
-                QMessageBox.warning(main_window, "警告", f"无法获取股票 {stock_name} 的信息")
+                QMessageBox.warning(main_window, "警告",
+                                    f"无法获取股票 {stock_name} 的信息")
                 return
 
             # 获取历史数据
             history_data = None
             if self.stock_service:
-                history_data = self.stock_service.get_stock_data(stock_code, period='D', count=20)
+                history_data = self.stock_service.get_stock_data(
+                    stock_code, period='D', count=20)
 
             # 准备股票数据
             stock_data = dict(stock_info)
@@ -1109,18 +1022,8 @@ class LeftPanel(BasePanel):
         """释放资源"""
         try:
             # 停止数据加载线程
-            if hasattr(self, 'data_loader') and self.data_loader and self.data_loader.isRunning():
-                logger.info("Stopping stock data loader thread...")
-                self.data_loader.quit()
-
-                # 等待线程正常退出
-                if not self.data_loader.wait(5000):  # 等待5秒
-                    logger.warning("Data loader thread did not quit gracefully, terminating...")
-                    self.data_loader.terminate()
-                    self.data_loader.wait()
-
-                self.data_loader.deleteLater()
-                self.data_loader = None
+            # The data_manager handles its own thread management
+            # self.data_loader.quit()
 
             # 停止定时器
             if hasattr(self, 'search_timer') and self.search_timer:
@@ -1278,7 +1181,8 @@ class LeftPanel(BasePanel):
         type_label.setFixedWidth(30)
 
         self.indicator_type_combo = QComboBox()
-        self.indicator_type_combo.addItems(["全部", "趋势类", "震荡类", "成交量类", "ta-lib"])
+        self.indicator_type_combo.addItems(
+            ["全部", "趋势类", "震荡类", "成交量类", "ta-lib"])
         self.indicator_type_combo.setFixedWidth(80)
 
         # 指标搜索
@@ -1338,7 +1242,8 @@ class LeftPanel(BasePanel):
         buttons_layout2.setSpacing(1)
 
         delete_combo_btn = QPushButton("删除组合")
-        delete_combo_btn.clicked.connect(self._delete_indicator_combination_dialog)
+        delete_combo_btn.clicked.connect(
+            self._delete_indicator_combination_dialog)
 
         clear_btn = QPushButton("取消指标")
         clear_btn.clicked.connect(self._clear_all_selected_indicators)
@@ -1374,9 +1279,11 @@ class LeftPanel(BasePanel):
             try:
                 from indicators_algo import get_talib_indicator_list
                 talib_names = get_talib_indicator_list()
-                self.talib_indicators = [{"name": name, "type": "ta-lib"} for name in talib_names]
+                self.talib_indicators = [
+                    {"name": name, "type": "ta-lib"} for name in talib_names]
             except ImportError:
-                logger.warning("indicators_algo module not found, using default ta-lib indicators")
+                logger.warning(
+                    "indicators_algo module not found, using default ta-lib indicators")
                 self.talib_indicators = [
                     {"name": "SMA", "type": "ta-lib"},
                     {"name": "EMA", "type": "ta-lib"},
@@ -1388,7 +1295,8 @@ class LeftPanel(BasePanel):
             self.custom_indicators = []
 
             # 合并所有指标
-            self.all_indicators = self.builtin_indicators + self.talib_indicators + self.custom_indicators
+            self.all_indicators = self.builtin_indicators + \
+                self.talib_indicators + self.custom_indicators
 
             # 填充指标列表
             self._populate_indicator_list()
@@ -1422,13 +1330,16 @@ class LeftPanel(BasePanel):
         """绑定指标相关事件"""
         try:
             # 指标类型筛选事件
-            self.indicator_type_combo.currentTextChanged.connect(self._on_indicator_type_changed)
+            self.indicator_type_combo.currentTextChanged.connect(
+                self._on_indicator_type_changed)
 
             # 指标搜索事件
-            self.indicator_search.textChanged.connect(self._on_indicator_search_changed)
+            self.indicator_search.textChanged.connect(
+                self._on_indicator_search_changed)
 
             # 指标选择事件
-            self.indicator_list.itemSelectionChanged.connect(self._on_indicators_changed)
+            self.indicator_list.itemSelectionChanged.connect(
+                self._on_indicators_changed)
 
         except Exception as e:
             logger.error(f"Failed to bind indicator events: {e}")
@@ -1468,10 +1379,12 @@ class LeftPanel(BasePanel):
                 ind_type = item.data(Qt.UserRole)
 
                 # 类型筛选
-                type_match = (indicator_type == "全部" or ind_type == indicator_type)
+                type_match = (indicator_type ==
+                              "全部" or ind_type == indicator_type)
 
                 # 搜索文本筛选
-                text_match = (not search_text or search_text.lower() in indicator_name.lower())
+                text_match = (not search_text or search_text.lower()
+                              in indicator_name.lower())
 
                 # 显示/隐藏项目
                 should_show = type_match and text_match
@@ -1486,7 +1399,8 @@ class LeftPanel(BasePanel):
                 no_item.setFlags(Qt.NoItemFlags)
                 self.indicator_list.addItem(no_item)
 
-            logger.debug(f"Filtered indicators: type={indicator_type}, search={search_text}, visible={visible_count}")
+            logger.debug(
+                f"Filtered indicators: type={indicator_type}, search={search_text}, visible={visible_count}")
 
         except Exception as e:
             logger.error(f"Failed to filter indicator list: {e}")
@@ -1496,7 +1410,8 @@ class LeftPanel(BasePanel):
         """处理指标选择变化"""
         try:
             selected_items = self.indicator_list.selectedItems()
-            selected_indicators = [item.text() for item in selected_items if item.text() != "无可用指标"]
+            selected_indicators = [
+                item.text() for item in selected_items if item.text() != "无可用指标"]
 
             logger.debug(f"Selected indicators changed: {selected_indicators}")
 
@@ -1516,7 +1431,8 @@ class LeftPanel(BasePanel):
                 from core.events import IndicatorChangedEvent
                 logger.info(f"发布指标变化事件，选中指标: {selected_indicators}")
                 # 创建事件并确保selected_indicators属性正确设置
-                event = IndicatorChangedEvent(selected_indicators=selected_indicators)
+                event = IndicatorChangedEvent(
+                    selected_indicators=selected_indicators)
                 # 同时确保data字典中也包含selected_indicators
                 event.data['selected_indicators'] = selected_indicators
                 # 发布事件
@@ -1526,7 +1442,8 @@ class LeftPanel(BasePanel):
                 logger.warning("无法发布指标变化事件：协调器或事件总线不可用")
 
         except Exception as e:
-            logger.error(f"Failed to handle indicators change: {e}", exc_info=True)
+            logger.error(
+                f"Failed to handle indicators change: {e}", exc_info=True)
 
     def _show_indicator_params_dialog(self):
         """显示指标参数设置对话框"""
@@ -1555,7 +1472,8 @@ class LeftPanel(BasePanel):
             # 创建对话框实例
             try:
                 # 使用self._root_frame作为父窗口，而不是self.window()
-                dialog = IndicatorParamsDialog(selected_indicators, self._root_frame)
+                dialog = IndicatorParamsDialog(
+                    selected_indicators, self._root_frame)
                 logger.debug(f"创建指标参数对话框成功，选中指标: {selected_indicators}")
             except Exception as e:
                 logger.error(f"创建指标参数对话框失败: {e}")
@@ -1568,7 +1486,8 @@ class LeftPanel(BasePanel):
 
             # 连接参数变化信号
             try:
-                dialog.params_changed.connect(self._on_indicator_params_changed)
+                dialog.params_changed.connect(
+                    self._on_indicator_params_changed)
                 # 显示对话框
                 dialog.exec_()
             except Exception as e:
@@ -1635,13 +1554,16 @@ class LeftPanel(BasePanel):
             )
 
             if success:
-                QMessageBox.information(self._root_frame, "成功", f"指标组合 '{name}' 保存成功！")
-                logger.info(f"Saved indicator combination: {name} with {len(indicators)} indicators")
+                QMessageBox.information(
+                    self._root_frame, "成功", f"指标组合 '{name}' 保存成功！")
+                logger.info(
+                    f"Saved indicator combination: {name} with {len(indicators)} indicators")
             else:
                 QMessageBox.critical(self._root_frame, "错误", "保存指标组合失败")
 
         except Exception as e:
-            QMessageBox.critical(self._root_frame, "错误", f"保存指标组合失败:\n{str(e)}")
+            QMessageBox.critical(self._root_frame, "错误",
+                                 f"保存指标组合失败:\n{str(e)}")
             logger.error(f"Failed to save indicator combination: {e}")
 
     def _load_indicator_combination_dialog(self) -> None:

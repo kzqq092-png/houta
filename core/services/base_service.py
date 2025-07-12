@@ -141,9 +141,11 @@ class AsyncBaseService(BaseService):
         try:
             await self._do_initialize_async()
             self._initialized = True
-            logger.info(f"Service {self._name} initialized successfully (async)")
+            logger.info(
+                f"Service {self._name} initialized successfully (async)")
         except Exception as e:
-            logger.error(f"Failed to initialize service {self._name} (async): {e}")
+            logger.error(
+                f"Failed to initialize service {self._name} (async): {e}")
             raise
 
     async def dispose_async(self) -> None:
@@ -160,7 +162,8 @@ class AsyncBaseService(BaseService):
             self._initialized = False
             logger.info(f"Service {self._name} disposed successfully (async)")
         except Exception as e:
-            logger.error(f"Failed to dispose service {self._name} (async): {e}")
+            logger.error(
+                f"Failed to dispose service {self._name} (async): {e}")
             raise
 
     async def _do_initialize_async(self) -> None:

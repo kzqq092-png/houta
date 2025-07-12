@@ -21,7 +21,8 @@ class SystemResourceService:
         """
         self.event_bus = event_bus
         # 优先使用传入的interval，否则从配置中心获取，最后使用默认值
-        self._interval = interval or config_manager.get('monitoring.resource_interval', 1.0)
+        self._interval = interval or config_manager.get(
+            'monitoring.resource_interval', 1.0)
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
 

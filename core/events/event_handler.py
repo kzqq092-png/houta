@@ -135,7 +135,8 @@ class FunctionEventHandler(EventHandler):
         try:
             return self.func(event)
         except Exception as e:
-            logger.error(f"Event handler {self.name} failed to handle event {event.event_id}: {e}")
+            logger.error(
+                f"Event handler {self.name} failed to handle event {event.event_id}: {e}")
             raise
 
 
@@ -205,7 +206,8 @@ class CompositeEventHandler(EventHandler):
             name: 处理器名称
         """
         super().__init__(name or "CompositeHandler")
-        self.handlers = sorted(handlers, key=lambda h: h.priority, reverse=True)
+        self.handlers = sorted(
+            handlers, key=lambda h: h.priority, reverse=True)
 
     def handle(self, event: BaseEvent) -> List[Any]:
         """

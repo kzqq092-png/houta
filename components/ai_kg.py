@@ -8,7 +8,8 @@ class AIKnowledgeGraph:
     def __init__(self, api_key: str, log_manager=None):
         self.api_key = api_key
         self.log_manager = log_manager or LogManager()
-        self.llm = ChatOpenAI(temperature=0, model_name="gpt-4-turbo", openai_api_key=api_key)
+        self.llm = ChatOpenAI(
+            temperature=0, model_name="gpt-4-turbo", openai_api_key=api_key)
         self.transformer = LLMGraphTransformer(llm=self.llm)
         self.graph = None
         self.qa_chain = None
@@ -19,7 +20,8 @@ class AIKnowledgeGraph:
             self.graph = self.transformer.from_text(text)
             triples = self.graph.get_triples()
             # 可选：初始化问答链
-            self.qa_chain = GraphQAChain.from_llm(self.llm, graph=self.graph, verbose=False)
+            self.qa_chain = GraphQAChain.from_llm(
+                self.llm, graph=self.graph, verbose=False)
             return {"triples": triples}
         except Exception as e:
             self.log_manager.error(f"知识图谱构建失败: {e}")

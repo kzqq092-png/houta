@@ -63,7 +63,8 @@ class StrategyRegistry:
                 metadata.setdefault('name', strategy_name)
                 metadata.setdefault('class_name', strategy_class.__name__)
                 metadata.setdefault('module', strategy_class.__module__)
-                metadata.setdefault('registered_at', datetime.now().isoformat())
+                metadata.setdefault(
+                    'registered_at', datetime.now().isoformat())
 
                 # 注册到内存
                 self._strategies[strategy_name] = strategy_class
@@ -71,7 +72,8 @@ class StrategyRegistry:
 
                 # 注册到数据库
                 try:
-                    strategy_id = self.db_manager.register_strategy(strategy_class, metadata)
+                    strategy_id = self.db_manager.register_strategy(
+                        strategy_class, metadata)
                     metadata['database_id'] = strategy_id
                 except Exception as e:
                     self.logger.warning(f"数据库注册失败，仅注册到内存: {e}")
@@ -137,7 +139,8 @@ class StrategyRegistry:
 
             if strategy_class is None:
                 # 尝试从数据库加载
-                strategy_class = self._load_strategy_from_database(strategy_name)
+                strategy_class = self._load_strategy_from_database(
+                    strategy_name)
 
             return strategy_class
 
@@ -208,7 +211,8 @@ class StrategyRegistry:
 
                     # 类型过滤
                     if strategy_type:
-                        strategy_type_str = metadata.get('strategy_type', 'CUSTOM')
+                        strategy_type_str = metadata.get(
+                            'strategy_type', 'CUSTOM')
                         if strategy_type_str != strategy_type.value:
                             continue
 
@@ -313,7 +317,8 @@ class StrategyRegistry:
         """
         if search_paths is None:
             # 从配置获取搜索路径
-            search_paths = self.config.get('strategy_discovery', {}).get('paths', ['strategies'])
+            search_paths = self.config.get(
+                'strategy_discovery', {}).get('paths', ['strategies'])
 
         discovered_count = 0
 
@@ -331,7 +336,8 @@ class StrategyRegistry:
                     try:
                         # 构建模块名
                         relative_path = py_file.relative_to(Path.cwd())
-                        module_name = str(relative_path.with_suffix('')).replace('/', '.').replace('\\', '.')
+                        module_name = str(relative_path.with_suffix(
+                            '')).replace('/', '.').replace('\\', '.')
 
                         # 导入模块
                         module = importlib.import_module(module_name)
@@ -343,7 +349,8 @@ class StrategyRegistry:
                                     obj.__module__ == module_name):
 
                                 # 检查是否已注册
-                                strategy_name = getattr(obj, '_strategy_name', name)
+                                strategy_name = getattr(
+                                    obj, '_strategy_name', name)
                                 if strategy_name not in self._strategies:
                                     metadata = self._extract_metadata(obj)
                                     if self.register(strategy_name, obj, metadata):
@@ -426,14 +433,16 @@ class StrategyRegistry:
             type_counts = {}
             for metadata in self._metadata.values():
                 strategy_type = metadata.get('strategy_type', 'CUSTOM')
-                type_counts[strategy_type] = type_counts.get(strategy_type, 0) + 1
+                type_counts[strategy_type] = type_counts.get(
+                    strategy_type, 0) + 1
             stats['by_type'] = type_counts
 
             # 按分类统计
             category_counts = {}
             for metadata in self._metadata.values():
                 category = metadata.get('category', 'uncategorized')
-                category_counts[category] = category_counts.get(category, 0) + 1
+                category_counts[category] = category_counts.get(
+                    category, 0) + 1
             stats['by_category'] = category_counts
 
             # 数据库统计

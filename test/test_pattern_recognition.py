@@ -45,7 +45,8 @@ def test_database_initialization():
         print(f"✓ pattern_types表存在，包含 {count} 条记录")
 
         # 显示前几条记录
-        cursor.execute("SELECT name, english_name, category, signal_type FROM pattern_types LIMIT 5")
+        cursor.execute(
+            "SELECT name, english_name, category, signal_type FROM pattern_types LIMIT 5")
         records = cursor.fetchall()
         print("前5条形态记录:")
         for record in records:
@@ -78,7 +79,8 @@ def test_pattern_manager():
         # 显示各类别统计
         categories = {}
         for config in configs:
-            categories[config.category] = categories.get(config.category, 0) + 1
+            categories[config.category] = categories.get(
+                config.category, 0) + 1
 
         print("形态类别统计:")
         for category, count in categories.items():
@@ -175,7 +177,8 @@ def test_pattern_recognition(manager, kdata):
     try:
         # 测试识别所有形态
         print("开始识别形态...")
-        patterns = manager.identify_all_patterns(kdata, confidence_threshold=0.3)
+        patterns = manager.identify_all_patterns(
+            kdata, confidence_threshold=0.3)
 
         print(f"✓ 识别完成，共找到 {len(patterns)} 个形态")
 
@@ -188,7 +191,8 @@ def test_pattern_recognition(manager, kdata):
             for pattern in patterns:
                 # 统计类型
                 pattern_type = pattern.get('type', 'unknown')
-                type_counts[pattern_type] = type_counts.get(pattern_type, 0) + 1
+                type_counts[pattern_type] = type_counts.get(
+                    pattern_type, 0) + 1
 
                 # 统计信号
                 signal = pattern.get('signal', 'unknown')

@@ -32,7 +32,8 @@ class RiskExporter:
             output_dir: 输出目录路径
         """
         self.output_dir = output_dir
-        self.template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        self.template_dir = os.path.join(
+            os.path.dirname(__file__), "templates")
         self._setup_logging()
 
     def _setup_logging(self):
@@ -169,7 +170,8 @@ class RiskExporter:
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"quality_report_{timestamp}"
-        output_path = os.path.join(self.output_dir, f"{filename}.{format if format != 'excel' else 'xlsx'}")
+        output_path = os.path.join(
+            self.output_dir, f"{filename}.{format if format != 'excel' else 'xlsx'}")
         os.makedirs(self.output_dir, exist_ok=True)
         # 主体表格
         main_df = pd.DataFrame({

@@ -115,7 +115,8 @@ def calculate_adx(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
 
         if TALIB_AVAILABLE:
             # 使用TA-Lib计算ADX
-            adx = talib.ADX(high.values, low.values, close.values, timeperiod=timeperiod)
+            adx = talib.ADX(high.values, low.values,
+                            close.values, timeperiod=timeperiod)
             result['ADX'] = pd.Series(adx, index=close.index)
         else:
             # 使用pandas实现ADX
@@ -132,11 +133,13 @@ def calculate_adx(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
             down_move = low.shift(1) - low
 
             # 正方向运动(+DM)
-            plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
+            plus_dm = np.where((up_move > down_move) &
+                               (up_move > 0), up_move, 0)
             plus_dm = pd.Series(plus_dm, index=close.index)
 
             # 负方向运动(-DM)
-            minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
+            minus_dm = np.where((down_move > up_move) &
+                                (down_move > 0), down_move, 0)
             minus_dm = pd.Series(minus_dm, index=close.index)
 
             # 平滑化+DM和-DM

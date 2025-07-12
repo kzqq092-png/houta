@@ -468,7 +468,8 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
 
         for angle_name, config in self.gann_config['angles'].items():
             # 计算支撑阻力位
-            level_price = recent_low + (recent_high - recent_low) * (config['angle'] / 90)
+            level_price = recent_low + \
+                (recent_high - recent_low) * (config['angle'] / 90)
 
             levels.append({
                 'type': f"江恩{angle_name}",
@@ -554,7 +555,8 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
                 results['fibonacci_levels'] = self._calculate_fibonacci_levels()
 
             # 生成综合报告
-            results['comprehensive_report'] = self._generate_comprehensive_report(results)
+            results['comprehensive_report'] = self._generate_comprehensive_report(
+                results)
 
             return results
         except Exception as e:

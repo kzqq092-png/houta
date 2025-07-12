@@ -5,18 +5,95 @@ HIkyuu-UI 插件市场系统
 """
 
 import os
+import sys
 import json
 import requests
 import zipfile
 import shutil
 import hashlib
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5.QtWidgets import QApplication
+from pathlib import Path
 
-from .plugin_interface import PluginMetadata, PluginType, PluginCategory
+# 添加项目根目录到Python路径，确保可以导入plugins包
+current_dir = Path(__file__).parent
+project_root = current_dir.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 定义基础类型，以防导入失败
+logger = logging.getLogger(__name__)
+
+# 尝试导入插件接口
+PluginMetadata = None
+PluginType = None
+PluginCategory = None
+
+try:
+    # 直接使用绝对导入
+    from plugins.plugin_interface import PluginMetadata, PluginType, PluginCategory
+    logger.info("成功通过绝对导入加载插件接口")
+except ImportError:
+    try:
+        # 尝试使用相对导入
+        from .plugin_interface import PluginMetadata, PluginType, PluginCategory
+        logger.info("成功通过相对导入加载插件接口")
+    except ImportError:
+        try:
+            # 尝试使用项目根目录路径
+            sys.path.append(str(project_root))
+            from hikyuu_ui.plugins.plugin_interface import PluginMetadata, PluginType, PluginCategory
+            logger.info("成功通过项目路径导入加载插件接口")
+        except ImportError as e:
+            # 如果仍然失败，尝试直接从文件加载
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    "plugin_interface",
+                    current_dir / "plugin_interface.py"
+                )
+                if spec and spec.loader:
+                    plugin_interface_module = importlib.util.module_from_spec(
+                        spec)
+                    sys.modules["plugin_interface"] = plugin_interface_module
+                    spec.loader.exec_module(plugin_interface_module)
+                    PluginMetadata = plugin_interface_module.PluginMetadata
+                    PluginType = plugin_interface_module.PluginType
+                    PluginCategory = plugin_interface_module.PluginCategory
+                    logger.info("成功通过spec导入插件接口")
+            except Exception as e2:
+                # 如果仍然失败，创建占位类
+                logger.error(f"导入插件接口失败: {e} / {e2}")
+
+                # 如果仍然失败，定义基本类型
+                class PluginType:
+                    """插件类型枚举"""
+                    INDICATOR = "indicator"
+                    STRATEGY = "strategy"
+                    DATA_SOURCE = "data_source"
+                    ANALYSIS = "analysis"
+                    UI_COMPONENT = "ui_component"
+                    EXPORT = "export"
+                    NOTIFICATION = "notification"
+                    CHART_TOOL = "chart_tool"
+
+                class PluginCategory:
+                    """插件分类枚举"""
+                    CORE = "core"
+                    COMMUNITY = "community"
+                    COMMERCIAL = "commercial"
+                    EXPERIMENTAL = "experimental"
+
+                class PluginMetadata:
+                    """插件元数据占位类"""
+
+                    def __init__(self, **kwargs):
+                        for key, value in kwargs.items():
+                            setattr(self, key, value)
 
 
 @dataclass
@@ -97,7 +174,8 @@ class PluginMarketAPI:
             params['type'] = plugin_type.value
 
         try:
-            response = self.session.get(f"{self.base_url}/search", params=params)
+            response = self.session.get(
+                f"{self.base_url}/search", params=params)
             response.raise_for_status()
 
             data = response.json()
@@ -178,7 +256,8 @@ class PluginMarketAPI:
         }
 
         try:
-            response = self.session.post(f"{self.base_url}/{plugin_id}/rate", json=data)
+            response = self.session.post(
+                f"{self.base_url}/{plugin_id}/rate", json=data)
             response.raise_for_status()
 
             return response.json()['success']
@@ -204,7 +283,8 @@ class PluginMarketAPI:
         }
 
         try:
-            response = self.session.post(f"{self.base_url}/{plugin_id}/report", json=data)
+            response = self.session.post(
+                f"{self.base_url}/{plugin_id}/report", json=data)
             response.raise_for_status()
 
             return response.json()['success']

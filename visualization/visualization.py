@@ -22,11 +22,13 @@ from .common_visualization import CommonVisualization
 logger = logging.getLogger(__name__)
 
 # 获取sklearn.metrics中的具体函数
-confusion_matrix = getattr(sklearn_metrics, 'confusion_matrix', None) if sklearn_metrics else None
+confusion_matrix = getattr(
+    sklearn_metrics, 'confusion_matrix', None) if sklearn_metrics else None
 
 # 获取plotly子模块
 _plotly_modules = get_plotly()
-make_subplots = getattr(_plotly_modules.get('subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
+make_subplots = getattr(_plotly_modules.get(
+    'subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
 
 
 class Visualization:

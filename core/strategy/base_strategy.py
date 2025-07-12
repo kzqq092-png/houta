@@ -201,7 +201,8 @@ class BaseStrategy(ABC):
             if param.required and param.value is None:
                 errors.append(f"Required parameter '{name}' is missing")
             elif param.value is not None and not param.validate(param.value):
-                errors.append(f"Parameter '{name}' has invalid value: {param.value}")
+                errors.append(
+                    f"Parameter '{name}' has invalid value: {param.value}")
 
         return len(errors) == 0, errors
 
@@ -304,8 +305,10 @@ class BaseStrategy(ABC):
     def get_cache_key(self, data: pd.DataFrame) -> str:
         """生成缓存键"""
         # 基于数据哈希和参数生成缓存键
-        data_hash = hashlib.md5(str(data.values.tobytes()).encode()).hexdigest()[:8]
-        params_hash = hashlib.md5(str(self.get_parameters_dict()).encode()).hexdigest()[:8]
+        data_hash = hashlib.md5(
+            str(data.values.tobytes()).encode()).hexdigest()[:8]
+        params_hash = hashlib.md5(
+            str(self.get_parameters_dict()).encode()).hexdigest()[:8]
         return f"{self.name}_{data_hash}_{params_hash}"
 
     def _clear_cache(self):

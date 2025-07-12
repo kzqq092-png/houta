@@ -65,8 +65,10 @@ def create_three_white_soldiers_test_data():
             price = base_price * (1 + change)
             open_price = price * (1 + np.random.normal(0, 0.005))
             close_price = price * (1 + np.random.normal(0, 0.005))
-            high_price = max(open_price, close_price) * (1 + abs(np.random.normal(0, 0.005)))
-            low_price = min(open_price, close_price) * (1 - abs(np.random.normal(0, 0.005)))
+            high_price = max(open_price, close_price) * \
+                (1 + abs(np.random.normal(0, 0.005)))
+            low_price = min(open_price, close_price) * \
+                (1 - abs(np.random.normal(0, 0.005)))
 
             base_price = close_price
 
@@ -157,13 +159,15 @@ def test_three_white_soldiers():
                     print(f"     K线数据:")
                     for idx, row in pattern_data.iterrows():
                         date_str = row['datetime'].strftime('%Y-%m-%d')
-                        print(f"       {date_str}: O={row['open']:.3f} H={row['high']:.3f} L={row['low']:.3f} C={row['close']:.3f}")
+                        print(
+                            f"       {date_str}: O={row['open']:.3f} H={row['high']:.3f} L={row['low']:.3f} C={row['close']:.3f}")
                 else:
                     # 如果没有start_index和end_index，显示单个位置的数据
                     if pattern.index < len(test_data):
                         row = test_data.iloc[pattern.index]
                         date_str = row['datetime'].strftime('%Y-%m-%d')
-                        print(f"     K线数据: {date_str}: O={row['open']:.3f} H={row['high']:.3f} L={row['low']:.3f} C={row['close']:.3f}")
+                        print(
+                            f"     K线数据: {date_str}: O={row['open']:.3f} H={row['high']:.3f} L={row['low']:.3f} C={row['close']:.3f}")
                 print()
         else:
             print("⚠️  未识别到三白兵形态")

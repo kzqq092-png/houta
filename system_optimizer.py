@@ -150,7 +150,8 @@ class SystemOptimizerService(AsyncBaseService):
             await self._load_configuration()
 
             # 初始化项目根目录
-            self._project_root = Path(self._config_manager.get('project.root_path', '.'))
+            self._project_root = Path(
+                self._config_manager.get('project.root_path', '.'))
 
             # 确保日志目录存在
             logs_dir = self._project_root / 'logs'
@@ -197,9 +198,12 @@ class SystemOptimizerService(AsyncBaseService):
 
     def _register_event_listeners(self) -> None:
         """注册事件监听器"""
-        self.event_bus.subscribe('system.optimization.start', self._on_optimization_start)
-        self.event_bus.subscribe('system.optimization.complete', self._on_optimization_complete)
-        self.event_bus.subscribe('system.optimization.error', self._on_optimization_error)
+        self.event_bus.subscribe(
+            'system.optimization.start', self._on_optimization_start)
+        self.event_bus.subscribe(
+            'system.optimization.complete', self._on_optimization_complete)
+        self.event_bus.subscribe(
+            'system.optimization.error', self._on_optimization_error)
 
     def _on_optimization_start(self, event_data) -> None:
         """优化开始事件处理"""
@@ -287,7 +291,8 @@ class SystemOptimizerService(AsyncBaseService):
 
             try:
                 total_files = list(self._project_root.rglob('*'))
-                analysis['total_files'] = len([f for f in total_files if f.is_file()])
+                analysis['total_files'] = len(
+                    [f for f in total_files if f.is_file()])
 
                 processed = 0
                 for file_path in total_files:
@@ -297,7 +302,8 @@ class SystemOptimizerService(AsyncBaseService):
                     processed += 1
                     if self._progress_callback and processed % 100 == 0:
                         progress = processed / len(total_files)
-                        self._progress_callback(f"分析文件: {file_path.name}", progress)
+                        self._progress_callback(
+                            f"分析文件: {file_path.name}", progress)
 
                     await self._analyze_file(file_path, analysis)
 
@@ -525,11 +531,13 @@ class SystemOptimizerService(AsyncBaseService):
     async def _create_backup(self) -> None:
         """创建备份"""
         try:
-            backup_dir = self._project_root / 'backups' / f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            backup_dir = self._project_root / 'backups' / \
+                f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
             backup_dir.mkdir(parents=True, exist_ok=True)
 
             # 备份重要文件
-            important_files = ['requirements.txt', 'setup.py', 'config.json', 'settings.json']
+            important_files = ['requirements.txt',
+                               'setup.py', 'config.json', 'settings.json']
             for file_name in important_files:
                 src_file = self._project_root / file_name
                 if src_file.exists():
@@ -637,14 +645,16 @@ class SystemOptimizerService(AsyncBaseService):
 
         cleaned_count = 0
         bytes_freed = 0
-        cache_patterns = ['__pycache__', '.pytest_cache', '.cache', '.mypy_cache']
+        cache_patterns = ['__pycache__',
+                          '.pytest_cache', '.cache', '.mypy_cache']
 
         for pattern in cache_patterns:
             for cache_dir in self._project_root.rglob(pattern):
                 if cache_dir.is_dir():
                     try:
                         # 计算目录大小
-                        dir_size = sum(f.stat().st_size for f in cache_dir.rglob('*') if f.is_file())
+                        dir_size = sum(
+                            f.stat().st_size for f in cache_dir.rglob('*') if f.is_file())
 
                         shutil.rmtree(cache_dir)
                         cleaned_count += 1
@@ -671,7 +681,8 @@ class SystemOptimizerService(AsyncBaseService):
         self._current_result.files_cleaned += cleaned_count
         self._current_result.bytes_freed += bytes_freed
 
-        logger.info(f"缓存文件清理完成，删除了 {cleaned_count} 个文件/目录，释放 {bytes_freed / 1024 / 1024:.2f} MB")
+        logger.info(
+            f"缓存文件清理完成，删除了 {cleaned_count} 个文件/目录，释放 {bytes_freed / 1024 / 1024:.2f} MB")
         return cleaned_count
 
     async def _clean_temp_files(self) -> int:
@@ -700,16 +711,19 @@ class SystemOptimizerService(AsyncBaseService):
         self._current_result.files_cleaned += cleaned_count
         self._current_result.bytes_freed += bytes_freed
 
-        logger.info(f"临时文件清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
+        logger.info(
+            f"临时文件清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
         return cleaned_count
 
     async def _clean_old_logs(self) -> int:
         """清理旧日志文件"""
-        logger.info(f"开始清理 {self._optimization_config.log_retention_days} 天前的日志文件...")
+        logger.info(
+            f"开始清理 {self._optimization_config.log_retention_days} 天前的日志文件...")
 
         cleaned_count = 0
         bytes_freed = 0
-        cutoff_time = datetime.now().timestamp() - (self._optimization_config.log_retention_days * 24 * 60 * 60)
+        cutoff_time = datetime.now().timestamp() - \
+            (self._optimization_config.log_retention_days * 24 * 60 * 60)
 
         logs_dir = self._project_root / 'logs'
         if logs_dir.exists():
@@ -730,7 +744,8 @@ class SystemOptimizerService(AsyncBaseService):
         self._current_result.files_cleaned += cleaned_count
         self._current_result.bytes_freed += bytes_freed
 
-        logger.info(f"日志清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
+        logger.info(
+            f"日志清理完成，删除了 {cleaned_count} 个文件，释放 {bytes_freed / 1024 / 1024:.2f} MB")
         return cleaned_count
 
     async def _optimize_imports(self) -> int:
@@ -889,11 +904,13 @@ HIkyuu系统优化报告
         """保存优化历史"""
         try:
             history_file = self._project_root / 'logs' / 'optimization_history.json'
-            history_data = [asdict(result) for result in self._optimization_history]
+            history_data = [asdict(result)
+                            for result in self._optimization_history]
 
             import json
             with open(history_file, 'w', encoding='utf-8') as f:
-                json.dump(history_data, f, indent=2, ensure_ascii=False, default=str)
+                json.dump(history_data, f, indent=2,
+                          ensure_ascii=False, default=str)
 
             logger.info(f"优化历史已保存到: {history_file}")
 
@@ -910,22 +927,27 @@ HIkyuu系统优化报告
 
             # 基于分析结果提供建议
             if analysis['large_files']:
-                suggestions.append(f"发现 {len(analysis['large_files'])} 个大文件，建议检查是否可以压缩或删除")
+                suggestions.append(
+                    f"发现 {len(analysis['large_files'])} 个大文件，建议检查是否可以压缩或删除")
 
             if analysis['import_analysis']['duplicate_imports']:
                 suggestions.append("发现重复导入，建议运行导入优化")
 
             if analysis['cache_files']:
-                suggestions.append(f"发现 {len(analysis['cache_files'])} 个缓存文件，建议清理")
+                suggestions.append(
+                    f"发现 {len(analysis['cache_files'])} 个缓存文件，建议清理")
 
             if analysis['temp_files']:
-                suggestions.append(f"发现 {len(analysis['temp_files'])} 个临时文件，建议清理")
+                suggestions.append(
+                    f"发现 {len(analysis['temp_files'])} 个临时文件，建议清理")
 
             if analysis['performance_issues']:
-                suggestions.append(f"发现 {len(analysis['performance_issues'])} 个性能问题，建议深度优化")
+                suggestions.append(
+                    f"发现 {len(analysis['performance_issues'])} 个性能问题，建议深度优化")
 
             if analysis['security_issues']:
-                suggestions.append(f"发现 {len(analysis['security_issues'])} 个安全问题，建议检查")
+                suggestions.append(
+                    f"发现 {len(analysis['security_issues'])} 个安全问题，建议检查")
 
             if not suggestions:
                 suggestions.append("系统状态良好，暂无优化建议")
@@ -954,7 +976,8 @@ HIkyuu系统优化报告
             report = await self.generate_report()
 
             # 4. 保存报告
-            report_file = self._project_root / 'logs' / f'optimization_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+            report_file = self._project_root / 'logs' / \
+                f'optimization_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
             with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
 

@@ -39,7 +39,8 @@ def calculate_atr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
 
         if TALIB_AVAILABLE:
             result['ATR'] = pd.Series(
-                talib.ATR(high.values, low.values, close.values, timeperiod=timeperiod),
+                talib.ATR(high.values, low.values,
+                          close.values, timeperiod=timeperiod),
                 index=close.index
             )
         else:
@@ -81,7 +82,8 @@ def calculate_natr(df: pd.DataFrame, timeperiod: int = 14) -> pd.DataFrame:
 
         if TALIB_AVAILABLE:
             result['NATR'] = pd.Series(
-                talib.NATR(high.values, low.values, close.values, timeperiod=timeperiod),
+                talib.NATR(high.values, low.values,
+                           close.values, timeperiod=timeperiod),
                 index=close.index
             )
         else:

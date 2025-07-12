@@ -58,7 +58,8 @@ class PerformanceMonitor:
         self.max_metrics = max_metrics
 
         # 性能指标存储
-        self._metrics: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_metrics))
+        self._metrics: Dict[str, deque] = defaultdict(
+            lambda: deque(maxlen=max_metrics))
         self._active_metrics: Dict[str, PerformanceMetric] = {}
         self._lock = threading.Lock()
 
@@ -114,7 +115,8 @@ class PerformanceMonitor:
         """
         with self._lock:
             if metric_id not in self._active_metrics:
-                logger.warning(f"Metric {metric_id} not found in active metrics")
+                logger.warning(
+                    f"Metric {metric_id} not found in active metrics")
                 return None
 
             metric = self._active_metrics[metric_id]
@@ -127,7 +129,8 @@ class PerformanceMonitor:
             # 更新统计信息
             self._update_stats(metric)
 
-        logger.debug(f"Ended metric: {metric.name} ({metric_id}) - {duration:.3f}s")
+        logger.debug(
+            f"Ended metric: {metric.name} ({metric_id}) - {duration:.3f}s")
         return duration
 
     def measure_event(self, event_name: str, stock_code: str = None):
@@ -167,7 +170,8 @@ class PerformanceMonitor:
                 if stock_code:
                     metadata['stock_code'] = stock_code
 
-                metric_id = self.start_metric(f"data_load_{data_type}", metadata)
+                metric_id = self.start_metric(
+                    f"data_load_{data_type}", metadata)
                 try:
                     result = func(*args, **kwargs)
                     return result
@@ -288,14 +292,16 @@ class PerformanceMonitor:
             # 更新平均事件时间
             total = self._stats['total_events']
             current_avg = self._stats['avg_event_time']
-            self._stats['avg_event_time'] = (current_avg * (total - 1) + metric.duration) / total
+            self._stats['avg_event_time'] = (
+                current_avg * (total - 1) + metric.duration) / total
 
         elif metric.name.startswith('data_load_'):
             self._stats['total_data_loads'] += 1
             # 更新平均数据加载时间
             total = self._stats['total_data_loads']
             current_avg = self._stats['avg_data_load_time']
-            self._stats['avg_data_load_time'] = (current_avg * (total - 1) + metric.duration) / total
+            self._stats['avg_data_load_time'] = (
+                current_avg * (total - 1) + metric.duration) / total
 
         # 更新快慢操作计数
         if metric.duration > self.slow_threshold:

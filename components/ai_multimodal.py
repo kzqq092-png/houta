@@ -29,7 +29,8 @@ class AIMultimodalAnalyzer:
     def analyze_table(self, table_path: str, user_input: str = "") -> dict:
         """用PandasAI/LLM分析表格内容，可结合文本分析"""
         try:
-            df = pd.read_csv(table_path) if table_path.endswith('.csv') else pd.read_excel(table_path)
+            df = pd.read_csv(table_path) if table_path.endswith(
+                '.csv') else pd.read_excel(table_path)
             prompt = f"请分析以下表格内容，结合用户输入：{user_input}\n表格数据：{df.head(20).to_string()}"
             resp = openai.ChatCompletion.create(
                 model="gpt-4o",

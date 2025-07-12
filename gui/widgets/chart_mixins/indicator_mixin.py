@@ -1,16 +1,22 @@
 """
-指标功能Mixin - 处理技术指标计算、渲染和管理
+Chart组件的指标渲染混入类
 """
-from typing import Optional, List, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from typing import Dict, Any, List, Tuple, Optional
+from PyQt5.QtCore import QTimer, pyqtSignal
 import traceback
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QMessageBox
+import time
+from datetime import datetime
+
+# 替换旧的指标系统导入
+from core.indicator_service import get_indicator_metadata, calculate_indicator
+from core.indicator_adapter import get_indicator_english_name
 
 
 class IndicatorMixin:
-    """指标功能Mixin类 - 负责技术指标的计算、渲染和管理"""
+    """指标渲染混入类"""
 
     def _calculate_macd(self, data: pd.DataFrame) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """计算MACD指标"""
@@ -61,96 +67,186 @@ class IndicatorMixin:
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
         """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
         try:
+            if not hasattr(self, 'log_manager'):
+                # 如果没有日志管理器，创建一个简单的错误处理函数
+                def log_error(msg):
+                    print(f"Error: {msg}")
+                self.log_error = log_error
+            else:
+                self.log_error = self.log_manager.error
+
             indicators = getattr(self, 'active_indicators', [])
             if not indicators:
                 return
+
             if x is None:
                 x = np.arange(len(kdata))
+
             for i, indicator in enumerate(indicators):
                 name = indicator.get('name', '')
                 group = indicator.get('group', '')
                 params = indicator.get('params', {})
                 formula = indicator.get('formula', None)
                 style = self._get_indicator_style(name, i)
-                # 内置MA
-                if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
-                    period = int(params.get('n', name[2:]) or 5)
-                    ma = kdata['close'].rolling(period).mean().dropna()
-                    self.price_ax.plot(x[-len(ma):], ma.values, color=style['color'],
-                                       linewidth=style['linewidth'], alpha=style['alpha'], label=name)
-                elif name == 'MACD' and group == 'builtin':
-                    macd, sig, hist = self._calculate_macd(kdata)
-                    macd = macd.dropna()
-                    sig = sig.dropna()
-                    hist = hist.dropna()
-                    self.indicator_ax.plot(x[-len(macd):], macd.values, color=self._get_indicator_style('MACD', i)['color'],
-                                           linewidth=0.7, alpha=0.85, label='MACD')
-                    self.indicator_ax.plot(x[-len(sig):], sig.values, color=self._get_indicator_style('MACD-Signal', i+1)['color'],
-                                           linewidth=0.7, alpha=0.85, label='Signal')
-                    if not hist.empty:
-                        colors = ['red' if h >= 0 else 'green' for h in hist]
-                        self.indicator_ax.bar(
-                            x[-len(hist):], hist.values, color=colors, alpha=0.5)
-                elif name == 'RSI' and group == 'builtin':
-                    period = int(params.get('n', 14))
-                    rsi = self._calculate_rsi(kdata, period).dropna()
-                    self.indicator_ax.plot(x[-len(rsi):], rsi.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label='RSI')
-                elif name == 'BOLL' and group == 'builtin':
-                    n = int(params.get('n', 20))
-                    p = float(params.get('p', 2))
-                    mid, upper, lower = self._calculate_boll(kdata, n, p)
-                    mid = mid.dropna()
-                    upper = upper.dropna()
-                    lower = lower.dropna()
-                    self.price_ax.plot(x[-len(mid):], mid.values, color=self._get_indicator_style('BOLL-Mid', i)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Mid')
-                    self.price_ax.plot(x[-len(upper):], upper.values, color=self._get_indicator_style('BOLL-Upper', i+1)['color'],
-                                       linewidth=0.7, alpha=0.85, label='BOLL-Upper')
-                    self.price_ax.plot(x[-len(lower):], lower.values, color=self._get_indicator_style('BOLL-Lower', i+2)['color'],
-                                       linewidth=0.5, alpha=0.85, label='BOLL-Lower')
-                elif group == 'talib':
-                    try:
-                        import talib
-                        # 如果name是中文名称，需要转换为英文名称
-                        from indicators_algo import get_indicator_english_name
-                        english_name = get_indicator_english_name(name)
 
-                        func = getattr(talib, english_name)
-                        # 只传递非空参数
-                        func_params = {k: v for k,
-                                       v in params.items() if v != ''}
-                        # 传递收盘价等
-                        result = func(
-                            kdata['close'].values, **{k: float(v) if v else None for k, v in func_params.items()})
-                        if isinstance(result, tuple):
-                            for j, arr in enumerate(result):
-                                arr = np.asarray(arr)
-                                arr = arr[~np.isnan(arr)]
-                                # 使用中文名称作为标签显示
-                                display_name = name
-                                self.indicator_ax.plot(x[-len(arr):], arr, color=self._get_indicator_style(display_name, i+j)['color'],
-                                                       linewidth=0.7, alpha=0.85, label=f'{display_name}-{j}')
-                        else:
-                            arr = np.asarray(result)
-                            arr = arr[~np.isnan(arr)]
-                            display_name = name
-                            self.indicator_ax.plot(x[-len(arr):], arr, color=style['color'],
-                                                   linewidth=0.7, alpha=0.85, label=display_name)
-                    except Exception as e:
-                        self.error_occurred.emit(f"ta-lib指标渲染失败: {str(e)}")
-                elif group == 'custom' and formula:
-                    try:
-                        # 安全地用pandas.eval计算表达式
-                        local_vars = {col: kdata[col] for col in kdata.columns}
-                        arr = pd.eval(formula, local_dict=local_vars)
-                        arr = arr.dropna()
-                        self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
-                                           linewidth=style['linewidth'], alpha=style['alpha'], label=name)
-                    except Exception as e:
-                        self.error_occurred.emit(f"自定义公式渲染失败: {str(e)}")
+                try:
+                    # 使用新的指标系统计算指标
+                    if name.startswith('MA') and (group == 'builtin' or name[2:].isdigit()):
+                        # 处理MA指标
+                        period = int(params.get('n', name[2:]) or 5)
+                        result_df = calculate_indicator(
+                            'MA', kdata, {'timeperiod': period})
+                        if 'MA' in result_df.columns:
+                            ma_values = result_df['MA'].values
+                            valid_indices = ~np.isnan(ma_values)
+                            if np.any(valid_indices):
+                                valid_x = x[valid_indices]
+                                valid_values = ma_values[valid_indices]
+                                self.price_ax.plot(valid_x, valid_values, color=style['color'],
+                                                   linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+
+                    elif name == 'MACD' and group == 'builtin':
+                        # 处理MACD指标
+                        result_df = calculate_indicator('MACD', kdata, {
+                            'fastperiod': int(params.get('fast', 12)),
+                            'slowperiod': int(params.get('slow', 26)),
+                            'signalperiod': int(params.get('signal', 9))
+                        })
+
+                        if all(col in result_df.columns for col in ['MACD', 'MACDSignal', 'MACDHist']):
+                            macd_values = result_df['MACD'].values
+                            signal_values = result_df['MACDSignal'].values
+                            hist_values = result_df['MACDHist'].values
+
+                            # 过滤NaN值
+                            valid_indices = ~np.isnan(macd_values)
+                            if np.any(valid_indices):
+                                valid_x = x[valid_indices]
+                                valid_macd = macd_values[valid_indices]
+                                valid_signal = signal_values[valid_indices]
+                                valid_hist = hist_values[valid_indices]
+
+                                self.indicator_ax.plot(valid_x, valid_macd,
+                                                       color=self._get_indicator_style('MACD', i)[
+                                                           'color'],
+                                                       linewidth=0.7, alpha=0.85, label='MACD')
+                                self.indicator_ax.plot(valid_x, valid_signal,
+                                                       color=self._get_indicator_style(
+                                                           'MACD-Signal', i+1)['color'],
+                                                       linewidth=0.7, alpha=0.85, label='Signal')
+
+                                # 绘制柱状图
+                                colors = ['red' if h >=
+                                          0 else 'green' for h in valid_hist]
+                                self.indicator_ax.bar(
+                                    valid_x, valid_hist, color=colors, alpha=0.5, width=0.6)
+
+                    elif name == 'RSI' and group == 'builtin':
+                        # 处理RSI指标
+                        period = int(params.get('n', 14))
+                        result_df = calculate_indicator(
+                            'RSI', kdata, {'timeperiod': period})
+
+                        if 'RSI' in result_df.columns:
+                            rsi_values = result_df['RSI'].values
+                            valid_indices = ~np.isnan(rsi_values)
+                            if np.any(valid_indices):
+                                valid_x = x[valid_indices]
+                                valid_values = rsi_values[valid_indices]
+                                self.indicator_ax.plot(valid_x, valid_values, color=style['color'],
+                                                       linewidth=style['linewidth'], alpha=style['alpha'], label='RSI')
+
+                    elif name == 'BOLL' and group == 'builtin':
+                        # 处理布林带指标
+                        n = int(params.get('n', 20))
+                        p = float(params.get('p', 2))
+                        result_df = calculate_indicator('BBANDS', kdata, {
+                            'timeperiod': n,
+                            'nbdevup': p,
+                            'nbdevdn': p
+                        })
+
+                        if all(col in result_df.columns for col in ['BBMiddle', 'BBUpper', 'BBLower']):
+                            mid_values = result_df['BBMiddle'].values
+                            upper_values = result_df['BBUpper'].values
+                            lower_values = result_df['BBLower'].values
+
+                            # 过滤NaN值
+                            valid_indices = ~np.isnan(mid_values)
+                            if np.any(valid_indices):
+                                valid_x = x[valid_indices]
+                                valid_mid = mid_values[valid_indices]
+                                valid_upper = upper_values[valid_indices]
+                                valid_lower = lower_values[valid_indices]
+
+                                self.price_ax.plot(valid_x, valid_mid,
+                                                   color=self._get_indicator_style(
+                                                       'BOLL-Mid', i)['color'],
+                                                   linewidth=0.5, alpha=0.85, label='BOLL-Mid')
+                                self.price_ax.plot(valid_x, valid_upper,
+                                                   color=self._get_indicator_style(
+                                                       'BOLL-Upper', i+1)['color'],
+                                                   linewidth=0.7, alpha=0.85, label='BOLL-Upper')
+                                self.price_ax.plot(valid_x, valid_lower,
+                                                   color=self._get_indicator_style(
+                                                       'BOLL-Lower', i+2)['color'],
+                                                   linewidth=0.5, alpha=0.85, label='BOLL-Lower')
+
+                    elif group == 'talib':
+                        # 处理其他TA-Lib指标
+                        try:
+                            # 如果name是中文名称，需要转换为英文名称
+                            english_name = get_indicator_english_name(name)
+
+                            # 使用新的指标系统计算
+                            result_df = calculate_indicator(
+                                english_name, kdata, params)
+
+                            # 遍历结果中的每一列，绘制到图表上
+                            for j, col in enumerate(result_df.columns):
+                                if col in ['open', 'high', 'low', 'close', 'volume', 'datetime']:
+                                    continue  # 跳过原始数据列
+
+                                values = result_df[col].values
+                                valid_indices = ~np.isnan(values)
+                                if np.any(valid_indices):
+                                    valid_x = x[valid_indices]
+                                    valid_values = values[valid_indices]
+
+                                    # 决定绘制在哪个坐标轴上
+                                    target_ax = self.indicator_ax
+                                    if col.startswith('BB') or name in ['MA', 'EMA', 'SMA', 'WMA']:
+                                        target_ax = self.price_ax
+
+                                    target_ax.plot(valid_x, valid_values,
+                                                   color=self._get_indicator_style(
+                                                       f"{name}-{col}", i+j)['color'],
+                                                   linewidth=0.7, alpha=0.85,
+                                                   label=f"{name}-{col}" if len(result_df.columns) > 1 else name)
+                        except Exception as e:
+                            self.log_error(f"TA-Lib指标 {name} 渲染失败: {str(e)}")
+
+                    elif group == 'custom' and formula:
+                        try:
+                            # 安全地用pandas.eval计算表达式
+                            local_vars = {col: kdata[col]
+                                          for col in kdata.columns}
+                            arr = pd.eval(formula, local_dict=local_vars)
+                            arr = arr.dropna()
+                            self.price_ax.plot(x[-len(arr):], arr.values, color=style['color'],
+                                               linewidth=style['linewidth'], alpha=style['alpha'], label=name)
+                        except Exception as e:
+                            self.log_error(f"自定义公式渲染失败: {str(e)}")
+
+                except Exception as e:
+                    self.log_error(f"渲染指标 {name} 失败: {str(e)}")
+                    continue
+
         except Exception as e:
-            self.error_occurred.emit(f"渲染指标失败: {str(e)}")
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(f"渲染指标失败: {str(e)}")
+            else:
+                print(f"渲染指标失败: {str(e)}")
 
     def _get_indicator_style(self, name: str, index: int = 0) -> Dict[str, Any]:
         """获取指标样式，颜色从theme_manager.get_theme_colors获取"""
@@ -347,7 +443,8 @@ class IndicatorMixin:
             if not self.current_kdata.empty:
                 step = max(1, len(self.current_kdata)//8)
                 xticks = np.arange(0, len(self.current_kdata), step)
-                xticklabels = [self._safe_format_date(self.current_kdata.iloc[i], i, self.current_kdata) for i in xticks]
+                xticklabels = [self._safe_format_date(
+                    self.current_kdata.iloc[i], i, self.current_kdata) for i in xticks]
                 self.indicator_ax.set_xticks(xticks)
                 self.indicator_ax.set_xticklabels(
                     xticklabels, rotation=0, fontsize=7)
@@ -385,7 +482,7 @@ class IndicatorMixin:
                 colors = self.theme_manager.get_theme_colors()
                 text_color = colors.get('chart_text', '#222b45')
                 bg_color = colors.get('chart_background', '#ffffff')
-                
+
                 self._indicator_info_text = self.price_ax.text(
                     0.01, 0.9, indicator_str,
                     transform=self.price_ax.transAxes,
@@ -423,8 +520,10 @@ class IndicatorMixin:
             # 绘制K线简化版
             for i in range(len(kdata)):
                 color = k_up if closes.iloc[i] >= opens.iloc[i] else k_down
-                ax.plot([x[i], x[i]], [lows.iloc[i], highs.iloc[i]], color=color, linewidth=0.5)
-                ax.plot([x[i], x[i]], [opens.iloc[i], closes.iloc[i]], color=color, linewidth=1.5)
+                ax.plot([x[i], x[i]], [lows.iloc[i], highs.iloc[i]],
+                        color=color, linewidth=0.5)
+                ax.plot([x[i], x[i]], [opens.iloc[i], closes.iloc[i]],
+                        color=color, linewidth=1.5)
 
             ax.set_xlim(0, len(kdata))
             ax.set_ylim(lows.min() * 0.98, highs.max() * 1.02)

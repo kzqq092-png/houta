@@ -12,6 +12,8 @@ from datetime import datetime
 from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
 from utils.cache import Cache
+from utils.trace_context import get_trace_id, set_trace_id
+from utils.performance_monitor import measure_performance
 
 
 class BaseAnalysisTab(QWidget):
@@ -84,7 +86,8 @@ class BaseAnalysisTab(QWidget):
             # 检测数据是否变化
             new_hash = self._calculate_data_hash(kdata)
             if new_hash == self.data_hash:
-                self.log_manager.debug(f"{self.__class__.__name__}: 数据未变化，跳过更新")
+                self.log_manager.debug(
+                    f"{self.__class__.__name__}: 数据未变化，跳过更新")
                 return
 
             # 更新数据
@@ -130,7 +133,8 @@ class BaseAnalysisTab(QWidget):
                 return False
             # 检查必要的列
             required_columns = ['open', 'high', 'low', 'close']
-            missing_columns = [col for col in required_columns if col not in kdata.columns]
+            missing_columns = [
+                col for col in required_columns if col not in kdata.columns]
             if missing_columns:
                 self.log_manager.warning(f"缺少必要列: {missing_columns}")
                 return False
@@ -246,7 +250,8 @@ class BaseAnalysisTab(QWidget):
             # 如果没有父组件，直接同步执行
             try:
                 result = analysis_func(*args, **kwargs)
-                self.analysis_completed.emit(result if isinstance(result, dict) else {"result": result})
+                self.analysis_completed.emit(result if isinstance(
+                    result, dict) else {"result": result})
                 return result
             except Exception as e:
                 self.error_occurred.emit(f"分析执行失败: {str(e)}")
@@ -295,7 +300,8 @@ class BaseAnalysisTab(QWidget):
             # 如果有K线数据，添加基本统计信息
             if self.current_kdata is not None and hasattr(self.current_kdata, 'describe'):
                 try:
-                    export_data['data_statistics'] = self.current_kdata.describe().to_dict()
+                    export_data['data_statistics'] = self.current_kdata.describe(
+                    ).to_dict()
                 except Exception:
                     pass
 
@@ -326,7 +332,8 @@ class BaseAnalysisTab(QWidget):
                 import csv
                 with open(filename, 'w', newline='', encoding='utf-8') as f:
                     if flattened_data:
-                        writer = csv.DictWriter(f, fieldnames=flattened_data[0].keys())
+                        writer = csv.DictWriter(
+                            f, fieldnames=flattened_data[0].keys())
                         writer.writeheader()
                         writer.writerows(flattened_data)
             else:
@@ -355,7 +362,8 @@ class BaseAnalysisTab(QWidget):
                         # 对于列表，只取前几个元素或转为字符串
                         if len(v) > 0 and isinstance(v[0], dict):
                             # 如果是字典列表，只取第一个
-                            items.extend(flatten_dict(v[0], new_key, sep=sep).items())
+                            items.extend(flatten_dict(
+                                v[0], new_key, sep=sep).items())
                         else:
                             items.append((new_key, str(v)))
                     else:
@@ -481,7 +489,8 @@ class BaseAnalysisTab(QWidget):
                         value = item.get(key, '')
                         if isinstance(value, (int, float)):
                             if isinstance(value, float):
-                                text = f"{value:.2f}" if abs(value) < 1000 else f"{value:.0f}"
+                                text = f"{value:.2f}" if abs(
+                                    value) < 1000 else f"{value:.0f}"
                             else:
                                 text = str(value)
                         else:
@@ -492,14 +501,16 @@ class BaseAnalysisTab(QWidget):
                     for col, value in enumerate(item.values()):
                         if col >= table.columnCount():
                             break
-                        text = str(value) if not isinstance(value, (int, float)) else f"{value:.2f}"
+                        text = str(value) if not isinstance(
+                            value, (int, float)) else f"{value:.2f}"
                         table.setItem(row, col, QTableWidgetItem(text))
             elif isinstance(item, (list, tuple)):
                 # 列表数据
                 for col, value in enumerate(item):
                     if col >= table.columnCount():
                         break
-                    text = str(value) if not isinstance(value, (int, float)) else f"{value:.2f}"
+                    text = str(value) if not isinstance(
+                        value, (int, float)) else f"{value:.2f}"
                     table.setItem(row, col, QTableWidgetItem(text))
 
     def clear_table(self, table: QTableWidget):
@@ -520,7 +531,8 @@ class BaseAnalysisTab(QWidget):
         headers = []
         for col in range(table.columnCount()):
             header_item = table.horizontalHeaderItem(col)
-            headers.append(header_item.text() if header_item else f"Column {col}")
+            headers.append(header_item.text()
+                           if header_item else f"Column {col}")
         data.append(headers)
 
         # 获取数据行
@@ -698,7 +710,8 @@ class BaseAnalysisTab(QWidget):
 
         value_label = QLabel(value)
         value_label.setAlignment(Qt.AlignCenter)
-        value_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {color};")
+        value_label.setStyleSheet(
+            f"font-size: 18px; font-weight: bold; color: {color};")
 
         layout.addWidget(title_label)
         layout.addWidget(value_label)
@@ -804,7 +817,8 @@ class BaseAnalysisTab(QWidget):
                     card_layout = card.layout()
                     if card_layout:
                         trend_label = QLabel(trend)
-                        trend_label.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold;")
+                        trend_label.setStyleSheet(
+                            f"color: {color}; font-size: 16px; font-weight: bold;")
                         card_layout.addWidget(trend_label)
 
                 row = i // columns
@@ -1045,13 +1059,17 @@ class BaseAnalysisTab(QWidget):
         if buttons == "ok":
             button_box = QDialogButtonBox(QDialogButtonBox.Ok)
         elif buttons == "ok_cancel":
-            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         elif buttons == "yes_no":
-            button_box = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Yes | QDialogButtonBox.No)
         elif buttons == "save_cancel":
-            button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         else:
-            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
 
         # 应用样式
         button_box.setStyleSheet("""
@@ -1162,7 +1180,8 @@ class BaseAnalysisTab(QWidget):
                     df.to_csv(file_path, index=False, encoding='utf-8-sig')
                 else:
                     # 如果数据不是列表格式，尝试转换
-                    df = pd.DataFrame([data] if isinstance(data, dict) else data)
+                    df = pd.DataFrame(
+                        [data] if isinstance(data, dict) else data)
                     df.to_csv(file_path, index=False, encoding='utf-8-sig')
 
             elif file_path.endswith('.xlsx'):
@@ -1170,7 +1189,8 @@ class BaseAnalysisTab(QWidget):
                     df = pd.DataFrame(data)
                     df.to_excel(file_path, index=False)
                 else:
-                    df = pd.DataFrame([data] if isinstance(data, dict) else data)
+                    df = pd.DataFrame(
+                        [data] if isinstance(data, dict) else data)
                     df.to_excel(file_path, index=False)
 
             else:
@@ -1344,8 +1364,10 @@ class BaseDataUpdateThread(QThread):
 
         self._stop_requested = False
 
+    @measure_performance("BaseDataUpdateThread.run")
     def run(self):
         """运行数据更新线程"""
+        set_trace_id(get_trace_id())
         self.running = True
         retry_count = 0
 
@@ -1417,10 +1439,12 @@ class BaseAnalysisThread(QThread):
         # 使用统一的管理器工厂
         self.log_manager = log_manager or get_log_manager()
 
+    @measure_performance("BaseAnalysisThread.run")
     def run(self):
         """运行分析线程"""
+        set_trace_id(self.kwargs.get('trace_id', get_trace_id()))
         try:
-            self.log_manager.info("开始分析...")
+            self.log_manager.info(f"开始分析... trace_id={get_trace_id()}")
             self.progress_updated.emit(0, "开始分析...")
 
             # 执行分析函数
@@ -1428,10 +1452,10 @@ class BaseAnalysisThread(QThread):
 
             self.progress_updated.emit(100, "分析完成")
             self.analysis_completed.emit(results)
-            self.log_manager.info("分析完成")
+            self.log_manager.info(f"分析完成 trace_id={get_trace_id()}")
 
         except Exception as e:
-            error_msg = f"分析失败: {str(e)}"
+            error_msg = f"分析失败: {str(e)} trace_id={get_trace_id()}"
             self.log_manager.error(error_msg)
             self.error_occurred.emit(error_msg)
 
@@ -1453,10 +1477,14 @@ class BaseExportThread(QThread):
         # 使用统一的管理器工厂
         self.log_manager = log_manager or get_log_manager()
 
+    @measure_performance("BaseExportThread.run")
     def run(self):
         """运行导出线程"""
+        set_trace_id(self.kwargs.get('trace_id', get_trace_id())
+                     if hasattr(self, 'kwargs') else get_trace_id())
         try:
-            self.log_manager.info(f"开始导出到: {self.file_path}")
+            self.log_manager.info(
+                f"开始导出到: {self.file_path} trace_id={get_trace_id()}")
             self.progress_updated.emit(0, "开始导出...")
 
             # 执行导出函数
@@ -1465,11 +1493,12 @@ class BaseExportThread(QThread):
             if success:
                 self.progress_updated.emit(100, "导出完成")
                 self.export_completed.emit(self.file_path)
-                self.log_manager.info(f"导出完成: {self.file_path}")
+                self.log_manager.info(
+                    f"导出完成: {self.file_path} trace_id={get_trace_id()}")
             else:
                 raise Exception("导出函数返回失败")
 
         except Exception as e:
-            error_msg = f"导出失败: {str(e)}"
+            error_msg = f"导出失败: {str(e)} trace_id={get_trace_id()}"
             self.log_manager.error(error_msg)
             self.error_occurred.emit(error_msg)

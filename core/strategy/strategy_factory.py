@@ -61,7 +61,8 @@ class StrategyFactory:
                 self.logger.info(f"开始创建策略实例: {strategy_name}")
 
                 # 获取策略类
-                strategy_class = self.registry.get_strategy_class(strategy_name)
+                strategy_class = self.registry.get_strategy_class(
+                    strategy_name)
                 if not strategy_class:
                     self.logger.error(f"策略 '{strategy_name}' 未在注册器中找到")
                     self._creation_stats['failed_creations'] += 1
@@ -71,7 +72,8 @@ class StrategyFactory:
                 if instance_name is None:
                     instance_name = strategy_name
 
-                self.logger.debug(f"创建策略实例: {strategy_name} -> {instance_name}")
+                self.logger.debug(
+                    f"创建策略实例: {strategy_name} -> {instance_name}")
 
                 # 创建策略实例
                 strategy = strategy_class(name=instance_name)
@@ -81,9 +83,11 @@ class StrategyFactory:
                 for param_name, param_value in kwargs.items():
                     if strategy.set_parameter(param_name, param_value):
                         param_count += 1
-                        self.logger.debug(f"设置参数: {param_name} = {param_value}")
+                        self.logger.debug(
+                            f"设置参数: {param_name} = {param_value}")
                     else:
-                        self.logger.warning(f"设置参数失败: {param_name} = {param_value}")
+                        self.logger.warning(
+                            f"设置参数失败: {param_name} = {param_value}")
 
                 self.logger.info(f"成功设置 {param_count} 个参数")
 
@@ -106,7 +110,8 @@ class StrategyFactory:
                 return strategy
 
             except Exception as e:
-                self.logger.error(f"创建策略 '{strategy_name}' 失败: {e}", exc_info=True)
+                self.logger.error(
+                    f"创建策略 '{strategy_name}' 失败: {e}", exc_info=True)
                 self._creation_stats['total_created'] += 1
                 self._creation_stats['failed_creations'] += 1
                 return None
@@ -127,18 +132,22 @@ class StrategyFactory:
                 self._creation_stats['database_loads'] += 1
 
                 # 从数据库获取策略信息
-                strategy_info = self.db_manager.get_strategy_info(strategy_name)
+                strategy_info = self.db_manager.get_strategy_info(
+                    strategy_name)
                 if not strategy_info:
                     self.logger.error(f"数据库中未找到策略: {strategy_name}")
                     self._creation_stats['failed_database_loads'] += 1
                     return None
 
-                self.logger.debug(f"从数据库获取策略信息: {strategy_info['name']}, 类型: {strategy_info['strategy_type']}")
+                self.logger.debug(
+                    f"从数据库获取策略信息: {strategy_info['name']}, 类型: {strategy_info['strategy_type']}")
 
                 # 动态导入策略类
-                strategy_class = self._import_strategy_class(strategy_info['class_path'])
+                strategy_class = self._import_strategy_class(
+                    strategy_info['class_path'])
                 if not strategy_class:
-                    self.logger.error(f"无法导入策略类: {strategy_info['class_path']}")
+                    self.logger.error(
+                        f"无法导入策略类: {strategy_info['class_path']}")
                     self._creation_stats['failed_database_loads'] += 1
                     return None
 
@@ -146,7 +155,8 @@ class StrategyFactory:
                 if instance_name is None:
                     instance_name = strategy_name
 
-                self.logger.debug(f"创建数据库策略实例: {strategy_name} -> {instance_name}")
+                self.logger.debug(
+                    f"创建数据库策略实例: {strategy_name} -> {instance_name}")
 
                 # 创建策略实例
                 strategy = strategy_class(name=instance_name)
@@ -158,17 +168,21 @@ class StrategyFactory:
                     param_value = param_info['value']
                     if strategy.set_parameter(param_name, param_value):
                         param_count += 1
-                        self.logger.debug(f"应用数据库参数: {param_name} = {param_value}")
+                        self.logger.debug(
+                            f"应用数据库参数: {param_name} = {param_value}")
                     else:
-                        self.logger.warning(f"应用数据库参数失败: {param_name} = {param_value}")
+                        self.logger.warning(
+                            f"应用数据库参数失败: {param_name} = {param_value}")
 
                 self.logger.info(f"成功应用 {param_count} 个数据库参数")
 
                 # 设置元数据
                 strategy.metadata.update(strategy_info.get('metadata', {}))
                 strategy.metadata['loaded_from_database'] = True
-                strategy.metadata['database_version'] = strategy_info.get('version', '1.0.0')
-                strategy.metadata['database_updated_at'] = strategy_info.get('updated_at')
+                strategy.metadata['database_version'] = strategy_info.get(
+                    'version', '1.0.0')
+                strategy.metadata['database_updated_at'] = strategy_info.get(
+                    'updated_at')
 
                 # 验证参数
                 valid, errors = strategy.validate_parameters()
@@ -190,7 +204,8 @@ class StrategyFactory:
                 return strategy
 
             except Exception as e:
-                self.logger.error(f"从数据库创建策略 '{strategy_name}' 失败: {e}", exc_info=True)
+                self.logger.error(
+                    f"从数据库创建策略 '{strategy_name}' 失败: {e}", exc_info=True)
                 self._creation_stats['failed_database_loads'] += 1
                 return None
 
@@ -206,10 +221,12 @@ class StrategyFactory:
             策略名称到实例的映射
         """
         try:
-            self.logger.info(f"开始从数据库批量加载策略: category={category}, type={strategy_type}")
+            self.logger.info(
+                f"开始从数据库批量加载策略: category={category}, type={strategy_type}")
 
             # 获取策略列表
-            strategies_info = self.db_manager.list_strategies(category=category, strategy_type=strategy_type)
+            strategies_info = self.db_manager.list_strategies(
+                category=category, strategy_type=strategy_type)
             if not strategies_info:
                 self.logger.warning("数据库中没有找到匹配的策略")
                 return {}
@@ -224,7 +241,8 @@ class StrategyFactory:
             for strategy_info in strategies_info:
                 strategy_name = strategy_info['name']
                 try:
-                    strategy = self.create_strategy_from_database(strategy_name)
+                    strategy = self.create_strategy_from_database(
+                        strategy_name)
                     if strategy:
                         loaded_strategies[strategy_name] = strategy
                         success_count += 1
@@ -236,7 +254,8 @@ class StrategyFactory:
                     failed_count += 1
                     self.logger.error(f"加载策略 '{strategy_name}' 异常: {e}")
 
-            self.logger.info(f"批量加载完成: 成功 {success_count} 个, 失败 {failed_count} 个")
+            self.logger.info(
+                f"批量加载完成: 成功 {success_count} 个, 失败 {failed_count} 个")
             return loaded_strategies
 
         except Exception as e:
@@ -271,7 +290,8 @@ class StrategyFactory:
             }
 
             # 注册策略到数据库
-            strategy_id = self.db_manager.register_strategy(type(strategy), metadata)
+            strategy_id = self.db_manager.register_strategy(
+                type(strategy), metadata)
 
             # 保存参数
             parameters = {}
@@ -280,11 +300,13 @@ class StrategyFactory:
 
             self.db_manager.save_strategy_parameters(strategy.name, parameters)
 
-            self.logger.info(f"策略保存到数据库成功: {instance_name} (ID: {strategy_id})")
+            self.logger.info(
+                f"策略保存到数据库成功: {instance_name} (ID: {strategy_id})")
             return True
 
         except Exception as e:
-            self.logger.error(f"保存策略到数据库失败 '{instance_name}': {e}", exc_info=True)
+            self.logger.error(
+                f"保存策略到数据库失败 '{instance_name}': {e}", exc_info=True)
             return False
 
     def _import_strategy_class(self, class_path: str) -> Optional[Type[BaseStrategy]]:
@@ -357,7 +379,8 @@ class StrategyFactory:
                 failed_count += 1
                 continue
 
-            self.logger.debug(f"处理配置 {i+1}/{len(strategy_configs)}: {strategy_name}")
+            self.logger.debug(
+                f"处理配置 {i+1}/{len(strategy_configs)}: {strategy_name}")
 
             try:
                 strategy = self.create_strategy(
@@ -394,7 +417,8 @@ class StrategyFactory:
         """
         with self._lock:
             try:
-                self.logger.info(f"开始克隆策略实例: {source_instance_name} -> {target_instance_name}")
+                self.logger.info(
+                    f"开始克隆策略实例: {source_instance_name} -> {target_instance_name}")
 
                 source_strategy = self._instances.get(source_instance_name)
                 if not source_strategy:
@@ -405,7 +429,8 @@ class StrategyFactory:
                 strategy_class = type(source_strategy)
                 parameters = source_strategy.get_parameters_dict()
 
-                self.logger.debug(f"克隆策略类: {strategy_class.__name__}, 参数数量: {len(parameters)}")
+                self.logger.debug(
+                    f"克隆策略类: {strategy_class.__name__}, 参数数量: {len(parameters)}")
 
                 # 创建新实例
                 cloned_strategy = strategy_class(name=target_instance_name)
@@ -416,7 +441,8 @@ class StrategyFactory:
                     if cloned_strategy.set_parameter(param_name, param_value):
                         param_count += 1
                     else:
-                        self.logger.warning(f"克隆参数失败: {param_name} = {param_value}")
+                        self.logger.warning(
+                            f"克隆参数失败: {param_name} = {param_value}")
 
                 self.logger.debug(f"成功克隆 {param_count} 个参数")
 
@@ -432,7 +458,8 @@ class StrategyFactory:
                 return cloned_strategy
 
             except Exception as e:
-                self.logger.error(f"克隆策略实例失败 '{source_instance_name}': {e}", exc_info=True)
+                self.logger.error(
+                    f"克隆策略实例失败 '{source_instance_name}': {e}", exc_info=True)
                 return None
 
     def remove_strategy(self, instance_name: str) -> bool:
@@ -544,7 +571,8 @@ class StrategyFactory:
                 errors.extend(validation_errors)
 
             if errors:
-                self.logger.warning(f"策略配置验证失败 {strategy_name}: {len(errors)} 个错误")
+                self.logger.warning(
+                    f"策略配置验证失败 {strategy_name}: {len(errors)} 个错误")
             else:
                 self.logger.debug(f"策略配置验证成功: {strategy_name}")
 

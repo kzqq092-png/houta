@@ -4,4 +4,4 @@
 
 from .basic_indicators import *
 from .advanced_indicators import *
-from .feature_selection import * 
+from .feature_selection import *

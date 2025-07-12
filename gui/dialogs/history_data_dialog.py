@@ -26,34 +26,34 @@ logger = logging.getLogger(__name__)
 
 class DataUpdateThread(QThread):
     """数据更新线程"""
-    
+
     progress_updated = pyqtSignal(int)
     status_updated = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
-    
+
     def __init__(self, stocks, start_date, end_date):
         super().__init__()
         self.stocks = stocks
         self.start_date = start_date
         self.end_date = end_date
-        
+
     def run(self):
         try:
             total = len(self.stocks)
             for i, stock in enumerate(self.stocks):
                 if self.isInterruptionRequested():
                     break
-                    
+
                 self.status_updated.emit(f"正在更新 {stock} 的数据...")
-                
+
                 # 模拟数据更新过程
                 self.msleep(100)  # 模拟网络请求时间
-                
+
                 progress = int((i + 1) / total * 100)
                 self.progress_updated.emit(progress)
-                
+
             self.finished_signal.emit(True, "数据更新完成")
-            
+
         except Exception as e:
             self.finished_signal.emit(False, f"数据更新失败: {e}")
 
@@ -108,21 +108,21 @@ class HistoryDataDialog(QDialog):
 
         # 按钮区域
         button_layout = QHBoxLayout()
-        
+
         refresh_button = QPushButton("刷新数据")
         refresh_button.clicked.connect(self._refresh_data)
-        
+
         export_button = QPushButton("导出数据")
         export_button.clicked.connect(self._export_data)
-        
+
         close_button = QPushButton("关闭")
         close_button.clicked.connect(self.accept)
-        
+
         button_layout.addWidget(refresh_button)
         button_layout.addWidget(export_button)
         button_layout.addStretch()
         button_layout.addWidget(close_button)
-        
+
         layout.addLayout(button_layout)
 
     def _create_data_view_tab(self) -> None:
@@ -132,35 +132,36 @@ class HistoryDataDialog(QDialog):
 
         # 股票选择区域
         selection_layout = QHBoxLayout()
-        
+
         selection_layout.addWidget(QLabel("股票代码:"))
         self.stock_combo = QComboBox()
         self.stock_combo.setEditable(True)
         self.stock_combo.currentTextChanged.connect(self._on_stock_changed)
         selection_layout.addWidget(self.stock_combo)
-        
+
         selection_layout.addWidget(QLabel("数据周期:"))
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["日线", "周线", "月线", "5分钟", "15分钟", "30分钟", "60分钟"])
+        self.period_combo.addItems(
+            ["日线", "周线", "月线", "5分钟", "15分钟", "30分钟", "60分钟"])
         self.period_combo.currentTextChanged.connect(self._on_period_changed)
         selection_layout.addWidget(self.period_combo)
-        
+
         selection_layout.addWidget(QLabel("开始日期:"))
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setDate(QDate.currentDate().addDays(-365))
         self.start_date_edit.setCalendarPopup(True)
         selection_layout.addWidget(self.start_date_edit)
-        
+
         selection_layout.addWidget(QLabel("结束日期:"))
         self.end_date_edit = QDateEdit()
         self.end_date_edit.setDate(QDate.currentDate())
         self.end_date_edit.setCalendarPopup(True)
         selection_layout.addWidget(self.end_date_edit)
-        
+
         query_button = QPushButton("查询")
         query_button.clicked.connect(self._query_data)
         selection_layout.addWidget(query_button)
-        
+
         selection_layout.addStretch()
         layout.addLayout(selection_layout)
 
@@ -191,7 +192,7 @@ class HistoryDataDialog(QDialog):
         # 数据源选择
         self.data_source_combo = QComboBox()
         self.data_source_combo.addItems([
-            "CSV文件", "Excel文件", "JSON文件", "通达信数据", 
+            "CSV文件", "Excel文件", "JSON文件", "通达信数据",
             "同花顺数据", "Wind数据", "在线数据源"
         ])
         import_layout.addRow("数据源:", self.data_source_combo)
@@ -259,17 +260,17 @@ class HistoryDataDialog(QDialog):
 
         # 导入按钮
         import_button_layout = QHBoxLayout()
-        
+
         preview_button = QPushButton("预览数据")
         preview_button.clicked.connect(self._preview_import_data)
-        
+
         import_button = QPushButton("开始导入")
         import_button.clicked.connect(self._import_data)
-        
+
         import_button_layout.addWidget(preview_button)
         import_button_layout.addWidget(import_button)
         import_button_layout.addStretch()
-        
+
         layout.addLayout(import_button_layout)
 
         self.tab_widget.addTab(tab, "数据导入")
@@ -322,7 +323,7 @@ class HistoryDataDialog(QDialog):
         self.progress_bar.setWindowModality(Qt.WindowModal)
         self.progress_bar.setAutoClose(False)
         self.progress_bar.setAutoReset(False)
-        
+
         self.status_label = QLabel("准备就绪")
         progress_layout.addWidget(self.status_label)
 
@@ -336,18 +337,18 @@ class HistoryDataDialog(QDialog):
 
         # 更新按钮
         update_button_layout = QHBoxLayout()
-        
+
         self.start_update_button = QPushButton("开始更新")
         self.start_update_button.clicked.connect(self._start_update)
-        
+
         self.stop_update_button = QPushButton("停止更新")
         self.stop_update_button.clicked.connect(self._stop_update)
         self.stop_update_button.setEnabled(False)
-        
+
         update_button_layout.addWidget(self.start_update_button)
         update_button_layout.addWidget(self.stop_update_button)
         update_button_layout.addStretch()
-        
+
         layout.addLayout(update_button_layout)
 
         self.tab_widget.addTab(tab, "数据更新")
@@ -417,10 +418,11 @@ class HistoryDataDialog(QDialog):
                 # 从股票服务获取股票列表
                 stocks = self.stock_service.get_all_stocks()
                 self.stock_combo.clear()
-                
+
                 for stock in stocks[:100]:  # 限制显示数量
-                    self.stock_combo.addItem(f"{stock['code']} - {stock['name']}")
-                    
+                    self.stock_combo.addItem(
+                        f"{stock['code']} - {stock['name']}")
+
                 logger.info(f"已加载 {len(stocks)} 只股票到下拉列表")
             else:
                 # 使用示例数据
@@ -438,7 +440,8 @@ class HistoryDataDialog(QDialog):
         try:
             if stock_text:
                 # 提取股票代码
-                stock_code = stock_text.split(' - ')[0] if ' - ' in stock_text else stock_text
+                stock_code = stock_text.split(
+                    ' - ')[0] if ' - ' in stock_text else stock_text
                 self.current_stock = stock_code
                 logger.info(f"选择股票: {stock_code}")
 
@@ -461,13 +464,15 @@ class HistoryDataDialog(QDialog):
             period = self.period_combo.currentText()
 
             # 生成示例数据
-            data = self._generate_sample_data(self.current_stock, start_date, end_date)
-            
+            data = self._generate_sample_data(
+                self.current_stock, start_date, end_date)
+
             # 显示数据
             self._display_data(data)
-            
+
             # 更新统计信息
-            self.stats_label.setText(f"数据统计: 共 {len(data)} 条记录，时间范围: {start_date} 至 {end_date}")
+            self.stats_label.setText(
+                f"数据统计: 共 {len(data)} 条记录，时间范围: {start_date} 至 {end_date}")
 
             logger.info(f"查询数据完成: {self.current_stock}, {len(data)} 条记录")
 
@@ -482,24 +487,26 @@ class HistoryDataDialog(QDialog):
 
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
-        
+
         data = []
         current_date = start
         base_price = 10.0
-        
+
         while current_date <= end:
             # 跳过周末
             if current_date.weekday() < 5:
                 # 生成随机价格数据
                 change = random.uniform(-0.1, 0.1)
                 base_price *= (1 + change)
-                
+
                 open_price = base_price * random.uniform(0.99, 1.01)
-                high_price = max(open_price, base_price) * random.uniform(1.0, 1.05)
-                low_price = min(open_price, base_price) * random.uniform(0.95, 1.0)
+                high_price = max(open_price, base_price) * \
+                    random.uniform(1.0, 1.05)
+                low_price = min(open_price, base_price) * \
+                    random.uniform(0.95, 1.0)
                 close_price = base_price
                 volume = random.randint(1000000, 10000000)
-                
+
                 data.append({
                     'date': current_date.strftime("%Y-%m-%d"),
                     'open': round(open_price, 2),
@@ -509,9 +516,9 @@ class HistoryDataDialog(QDialog):
                     'volume': volume,
                     'amount': round(volume * close_price, 2)
                 })
-            
+
             current_date += timedelta(days=1)
-        
+
         return data
 
     def _display_data(self, data: List[Dict]) -> None:
@@ -529,13 +536,20 @@ class HistoryDataDialog(QDialog):
 
             # 填充数据
             for row, record in enumerate(data):
-                self.data_table.setItem(row, 0, QTableWidgetItem(record['date']))
-                self.data_table.setItem(row, 1, QTableWidgetItem(str(record['open'])))
-                self.data_table.setItem(row, 2, QTableWidgetItem(str(record['high'])))
-                self.data_table.setItem(row, 3, QTableWidgetItem(str(record['low'])))
-                self.data_table.setItem(row, 4, QTableWidgetItem(str(record['close'])))
-                self.data_table.setItem(row, 5, QTableWidgetItem(f"{record['volume']:,}"))
-                self.data_table.setItem(row, 6, QTableWidgetItem(f"{record['amount']:,.2f}"))
+                self.data_table.setItem(
+                    row, 0, QTableWidgetItem(record['date']))
+                self.data_table.setItem(
+                    row, 1, QTableWidgetItem(str(record['open'])))
+                self.data_table.setItem(
+                    row, 2, QTableWidgetItem(str(record['high'])))
+                self.data_table.setItem(
+                    row, 3, QTableWidgetItem(str(record['low'])))
+                self.data_table.setItem(
+                    row, 4, QTableWidgetItem(str(record['close'])))
+                self.data_table.setItem(
+                    row, 5, QTableWidgetItem(f"{record['volume']:,}"))
+                self.data_table.setItem(
+                    row, 6, QTableWidgetItem(f"{record['amount']:,.2f}"))
 
             # 调整列宽
             self.data_table.horizontalHeader().setStretchLastSection(True)
@@ -550,7 +564,7 @@ class HistoryDataDialog(QDialog):
         """浏览导入文件"""
         try:
             file_path, _ = QFileDialog.getOpenFileName(
-                self, "选择导入文件", "", 
+                self, "选择导入文件", "",
                 "所有支持的文件 (*.csv *.xlsx *.xls *.json);;CSV文件 (*.csv);;Excel文件 (*.xlsx *.xls);;JSON文件 (*.json)"
             )
 
@@ -570,7 +584,8 @@ class HistoryDataDialog(QDialog):
 
             # 读取文件前几行作为预览
             if file_path.endswith('.csv'):
-                df = pd.read_csv(file_path, encoding=self.encoding_combo.currentText(), nrows=10)
+                df = pd.read_csv(
+                    file_path, encoding=self.encoding_combo.currentText(), nrows=10)
             elif file_path.endswith(('.xlsx', '.xls')):
                 df = pd.read_excel(file_path, nrows=10)
             elif file_path.endswith('.json'):
@@ -652,9 +667,11 @@ class HistoryDataDialog(QDialog):
 
             # 创建更新线程
             self.update_thread = DataUpdateThread(stocks, None, None)
-            self.update_thread.progress_updated.connect(self._on_update_progress)
+            self.update_thread.progress_updated.connect(
+                self._on_update_progress)
             self.update_thread.status_updated.connect(self._on_update_status)
-            self.update_thread.finished_signal.connect(self._on_update_finished)
+            self.update_thread.finished_signal.connect(
+                self._on_update_finished)
 
             # 显示进度对话框
             self.progress_bar.setLabelText("正在更新数据...")
@@ -670,7 +687,8 @@ class HistoryDataDialog(QDialog):
             self.update_thread.start()
 
             # 添加日志
-            self.update_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] 开始更新数据")
+            self.update_log.append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] 开始更新数据")
             self.update_log.append(f"更新范围: {scope}")
             self.update_log.append(f"更新周期: {period}")
             self.update_log.append(f"更新模式: {mode}")
@@ -687,12 +705,13 @@ class HistoryDataDialog(QDialog):
                 self.update_thread.wait(3000)  # 等待3秒
 
             self.progress_bar.close()
-            
+
             # 恢复按钮状态
             self.start_update_button.setEnabled(True)
             self.stop_update_button.setEnabled(False)
 
-            self.update_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] 数据更新已停止")
+            self.update_log.append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] 数据更新已停止")
 
         except Exception as e:
             logger.error(f"停止数据更新失败: {e}")
@@ -706,29 +725,32 @@ class HistoryDataDialog(QDialog):
     def _on_update_status(self, status: str) -> None:
         """更新状态处理"""
         self.status_label.setText(status)
-        self.update_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] {status}")
+        self.update_log.append(
+            f"[{datetime.now().strftime('%H:%M:%S')}] {status}")
 
     @pyqtSlot(bool, str)
     def _on_update_finished(self, success: bool, message: str) -> None:
         """更新完成处理"""
         self.progress_bar.close()
-        
+
         # 恢复按钮状态
         self.start_update_button.setEnabled(True)
         self.stop_update_button.setEnabled(False)
 
         if success:
             self.status_label.setText("更新完成")
-            self.update_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
-            
+            self.update_log.append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+
             # 发送更新完成信号
             stocks = self.update_thread.stocks if self.update_thread else []
             self.data_updated.emit(stocks)
-            
+
             QMessageBox.information(self, "成功", message)
         else:
             self.status_label.setText("更新失败")
-            self.update_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] 错误: {message}")
+            self.update_log.append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] 错误: {message}")
             QMessageBox.critical(self, "错误", message)
 
     def _refresh_data(self) -> None:
@@ -756,7 +778,7 @@ class HistoryDataDialog(QDialog):
 
             if file_path:
                 df = pd.DataFrame(self.current_data)
-                
+
                 if file_path.endswith('.xlsx'):
                     df.to_excel(file_path, index=False)
                 elif file_path.endswith('.csv'):
@@ -785,7 +807,7 @@ class HistoryDataDialog(QDialog):
 
             # 更新市场分布
             self.market_tree.clear()
-            
+
             markets = [
                 ("沪市主板", 1200, 2400000, "2024-01-15"),
                 ("深市主板", 800, 1600000, "2024-01-15"),
@@ -795,7 +817,8 @@ class HistoryDataDialog(QDialog):
             ]
 
             for market, stock_count, record_count, last_update in markets:
-                item = QTreeWidgetItem([market, str(stock_count), f"{record_count:,}", last_update])
+                item = QTreeWidgetItem(
+                    [market, str(stock_count), f"{record_count:,}", last_update])
                 self.market_tree.addTopLevelItem(item)
 
             self.market_tree.expandAll()

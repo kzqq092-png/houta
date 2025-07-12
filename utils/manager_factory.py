@@ -59,10 +59,12 @@ class ManagerFactory:
                 except ImportError as e:
                     warnings.warn(f"无法导入ConfigManager: {e}")
                     # 创建简化版配置管理器
-                    self._instances[cache_key] = self._create_simple_config_manager()
+                    self._instances[cache_key] = self._create_simple_config_manager(
+                    )
                 except Exception as e:
                     warnings.warn(f"创建ConfigManager失败: {e}")
-                    self._instances[cache_key] = self._create_simple_config_manager()
+                    self._instances[cache_key] = self._create_simple_config_manager(
+                    )
 
             return self._instances[cache_key]
 
@@ -92,7 +94,8 @@ class ManagerFactory:
                     except ImportError as e:
                         warnings.warn(f"无法导入LogManager: {e}")
                         # 创建简化版日志管理器
-                        self._instances[cache_key] = self._create_simple_log_manager()
+                        self._instances[cache_key] = self._create_simple_log_manager(
+                        )
                 except Exception as e:
                     warnings.warn(f"创建LogManager失败: {e}")
                     self._instances[cache_key] = self._create_simple_log_manager()
@@ -121,10 +124,12 @@ class ManagerFactory:
                     self._instances[cache_key] = ThemeManager(config_manager)
                 except ImportError as e:
                     warnings.warn(f"无法导入ThemeManager: {e}")
-                    self._instances[cache_key] = self._create_simple_theme_manager()
+                    self._instances[cache_key] = self._create_simple_theme_manager(
+                    )
                 except Exception as e:
                     warnings.warn(f"创建ThemeManager失败: {e}")
-                    self._instances[cache_key] = self._create_simple_theme_manager()
+                    self._instances[cache_key] = self._create_simple_theme_manager(
+                    )
 
             return self._instances[cache_key]
 
@@ -179,7 +184,8 @@ class ManagerFactory:
             try:
                 # 检查PyQt5环境
                 pyqt5_status = self._check_pyqt5_environment()
-                log_manager.info(f"开始获取行业管理器 - 缓存键: {cache_key}, 强制新建: {force_new}, PyQt5状态: {pyqt5_status}")
+                log_manager.info(
+                    f"开始获取行业管理器 - 缓存键: {cache_key}, 强制新建: {force_new}, PyQt5状态: {pyqt5_status}")
             except Exception:
                 # 如果日志记录失败，不影响主要逻辑
                 log_manager.error("获取行业管理器失败")
@@ -197,15 +203,17 @@ class ManagerFactory:
 
                     # 创建实例 - 添加额外的错误处理
                     try:
-                        log_manager.info("开始创建行业管理器实例1111")
-                        self._instances[cache_key] = IndustryManager(log_manager=log_manager)
+                        self._instances[cache_key] = IndustryManager(
+                            log_manager=log_manager)
 
                         # 记录创建成功
-                        log_manager.info(f"行业管理器创建成功 - 类型: {type(self._instances[cache_key]).__name__}")
+                        log_manager.info(
+                            f"行业管理器创建成功 - 类型: {type(self._instances[cache_key]).__name__}")
 
                     except Exception as creation_error:
                         # 记录创建过程中的具体错误
-                        log_manager.error(f"创建行业管理器失败: {creation_error} (类型: {type(creation_error).__name__})")
+                        log_manager.error(
+                            f"创建行业管理器失败: {creation_error} (类型: {type(creation_error).__name__})")
 
                         # 重新抛出原始错误
                         raise creation_error
@@ -215,17 +223,20 @@ class ManagerFactory:
                     log_manager.error(f"导入行业管理器失败: {e}")
 
                     # 创建简化版管理器
-                    self._instances[cache_key] = self._create_simple_industry_manager()
+                    self._instances[cache_key] = self._create_simple_industry_manager(
+                    )
 
                     # 记录回退操作
                     log_manager.warning(f"使用简化版行业管理器")
 
                 except Exception as e:
                     # 记录创建错误
-                    log_manager.error(f"创建行业管理器失败: {e} (类型: {type(e).__name__})")
+                    log_manager.error(
+                        f"创建行业管理器失败: {e} (类型: {type(e).__name__})")
 
                     # 创建简化版管理器
-                    self._instances[cache_key] = self._create_simple_industry_manager()
+                    self._instances[cache_key] = self._create_simple_industry_manager(
+                    )
 
                     # 记录回退操作
                     log_manager.warning(f"使用简化版行业管理器，原因: {e}")
@@ -234,7 +245,8 @@ class ManagerFactory:
                 log_manager.debug(f"缓存命中 - 缓存键: {cache_key}")
 
             # 记录获取完成
-            log_manager.info(f"行业管理器获取完成 - 类型: {type(self._instances[cache_key]).__name__}")
+            log_manager.info(
+                f"行业管理器获取完成 - 类型: {type(self._instances[cache_key]).__name__}")
 
             return self._instances[cache_key]
 
@@ -290,7 +302,8 @@ class ManagerFactory:
 
             if manager_type:
                 # 清除特定类型的管理器
-                keys_to_remove = [key for key in self._instances.keys() if key.startswith(manager_type)]
+                keys_to_remove = [
+                    key for key in self._instances.keys() if key.startswith(manager_type)]
                 removed_count = 0
 
                 for key in keys_to_remove:
@@ -489,16 +502,19 @@ class ManagerFactory:
                     self.log_manager = log_manager
 
                     # 记录简化版管理器初始化
-                    self.log_manager.info(f"简化版行业管理器初始化成功 - 行业数量: {len(self.industries)}")
+                    self.log_manager.info(
+                        f"简化版行业管理器初始化成功 - 行业数量: {len(self.industries)}")
 
                 def get_industry(self, code: str):
                     """获取行业信息"""
                     try:
                         result = self.industries.get(code, '未知行业')
-                        self.log_manager.debug(f"获取行业信息 - 代码: {code}, 结果: {result}")
+                        self.log_manager.debug(
+                            f"获取行业信息 - 代码: {code}, 结果: {result}")
                         return result
                     except Exception as e:
-                        self.log_manager.error(f"获取行业信息失败 - 代码: {code}, 错误: {e}")
+                        self.log_manager.error(
+                            f"获取行业信息失败 - 代码: {code}, 错误: {e}")
                         return '未知行业'
 
                 def update_industry_data(self):
@@ -522,14 +538,19 @@ class ManagerFactory:
                     try:
                         # 返回一些示例股票数据
                         example_stocks = [
-                            {"code": "000001", "name": "平安银行", "industry": industry_code},
-                            {"code": "600036", "name": "招商银行", "industry": industry_code},
-                            {"code": "000002", "name": "万科A", "industry": industry_code}
+                            {"code": "000001", "name": "平安银行",
+                                "industry": industry_code},
+                            {"code": "600036", "name": "招商银行",
+                                "industry": industry_code},
+                            {"code": "000002", "name": "万科A",
+                                "industry": industry_code}
                         ]
-                        self.log_manager.debug(f"获取行业股票成功 - 行业: {industry_code}, 数量: {len(example_stocks)}")
+                        self.log_manager.debug(
+                            f"获取行业股票成功 - 行业: {industry_code}, 数量: {len(example_stocks)}")
                         return example_stocks
                     except Exception as e:
-                        self.log_manager.error(f"获取行业股票失败 - 行业: {industry_code}, 错误: {e}")
+                        self.log_manager.error(
+                            f"获取行业股票失败 - 行业: {industry_code}, 错误: {e}")
                         return []
 
             simple_manager = SimpleIndustryManager()

@@ -18,7 +18,8 @@ def init_pattern_algorithms():
 
     # 首先添加algorithm_code和parameters字段到pattern_types表
     try:
-        cursor.execute('ALTER TABLE pattern_types ADD COLUMN algorithm_code TEXT')
+        cursor.execute(
+            'ALTER TABLE pattern_types ADD COLUMN algorithm_code TEXT')
         cursor.execute('ALTER TABLE pattern_types ADD COLUMN parameters TEXT')
     except sqlite3.OperationalError:
         # 字段已存在

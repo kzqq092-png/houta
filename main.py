@@ -12,17 +12,16 @@ HIkyuu-UI 主程序入口
 作者: HIkyuu-UI Team
 """
 
+from optimization.chart_renderer import initialize_chart_renderer
 from utils.exception_handler import setup_exception_handler
 from utils.warning_suppressor import suppress_warnings
-from core.services import (
-    ConfigService, ThemeService, StockService,
-    ChartService, AnalysisService, IndustryService
-)
-
 from core.coordinators import MainWindowCoordinator
 from core.events import EventBus, get_event_bus
 from core.containers import ServiceContainer, get_service_container
+from core.containers.service_registry import ServiceScope
+from core.services.service_bootstrap import bootstrap_services
 import sys
+import asyncio
 import logging
 import traceback
 from pathlib import Path
@@ -36,11 +35,16 @@ try:
     from PyQt5.QtWidgets import QApplication, QMessageBox
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QIcon
+    from qasync import QEventLoop
 except ImportError as e:
     print(f"PyQt5导入失败: {e}")
     print("请安装PyQt5: pip install PyQt5")
-    sys.exit(1)
+    QEventLoop = None
 
+# 添加图表渲染器初始化
+
+# 初始化图表渲染器
+initialize_chart_renderer(max_workers=4, enable_progressive=True)
 
 # 配置日志
 logging.basicConfig(
@@ -98,7 +102,8 @@ class HIkyuuUIApplication:
             self._initialize_core_components()
 
             # 5. 注册服务
-            self._register_services()
+            if not self._register_services():
+                return False
 
             # 6. 创建主窗口协调器
             self._create_main_window()
@@ -142,21 +147,9 @@ class HIkyuuUIApplication:
     def _register_qt_meta_types(self) -> None:
         """注册Qt元类型"""
         try:
-            from PyQt5.QtCore import QMetaType
-            from utils.qt_helpers import register_meta_types
-
-            # 注册常用的Qt类型 - 修复注册方式
-            # 在 PyQt5 中，没有直接的 qRegisterMetaType 函数
-            # 而是在 QObject.connect 时自动处理这些类型
-            # 使用 QtCore.Q_DECLARE_METATYPE 方式
-            logger.info("使用 QMetaType 注册元类型")
-
-            # 使用工具类注册元类型
-            success = register_meta_types()
-            if success:
-                logger.info("使用辅助函数成功注册元类型")
-
-            # 注册完成消息
+            # 注册Qt类型以解决信号槽问题
+            # 由于core/qt_types.py已在导入时调用init_qt_types()，这里不需要再次调用
+            # 避免重复注册导致的问题
             logger.info("✓ Qt元类型注册完成")
 
         except Exception as e:
@@ -250,78 +243,26 @@ class HIkyuuUIApplication:
         logger.info(f"✓ 服务容器: {type(self.service_container).__name__}")
         logger.info(f"✓ 事件总线: {type(self.event_bus).__name__}")
 
-    def _register_services(self) -> None:
-        """注册服务"""
+    def _register_services(self) -> bool:
+        """
+        注册服务
+
+        Returns:
+            注册是否成功
+        """
         logger.info("3. 注册服务...")
 
-        # 配置服务（使用单例）
-        config_service = ConfigService(config_file='config/config.json')
-        config_service.initialize()  # 立即初始化
-        self.service_container.register_instance(ConfigService, config_service)
-        logger.info("✓ 配置服务注册完成")
+        # 使用服务引导器注册所有服务
+        if not bootstrap_services():
+            logger.error("❌ 服务注册失败")
+            return False
 
-        # 主题服务
-        self.service_container.register(ThemeService)
-        theme_service = self.service_container.resolve(ThemeService)
-        theme_service.initialize()  # 立即初始化
-        logger.info("✓ 主题服务注册完成")
-
-        # 股票服务
-        self.service_container.register(StockService)
-        stock_service = self.service_container.resolve(StockService)
-        stock_service.initialize()  # 立即初始化
-        logger.info("✓ 股票服务注册完成")
-
-        # 图表服务
-        self.service_container.register(ChartService)
-        chart_service = self.service_container.resolve(ChartService)
-        chart_service.initialize()  # 立即初始化
-        logger.info("✓ 图表服务注册完成")
-
-        # 分析服务
-        self.service_container.register(AnalysisService)
-        analysis_service = self.service_container.resolve(AnalysisService)
-        analysis_service.initialize()  # 立即初始化
-        logger.info("✓ 分析服务注册完成")
-
-        # 行业服务
-        logger.info("开始注册行业服务...")
-        try:
-            self.service_container.register(IndustryService)
-            logger.info("行业服务类已注册到容器")
-
-            industry_service = self.service_container.resolve(IndustryService)
-            logger.info("行业服务实例已创建")
-
-            industry_service.initialize()  # 立即初始化
-            logger.info("✓ 行业服务注册完成")
-        except Exception as e:
-            logger.error(f"❌ 行业服务注册失败: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-
-        # 插件管理器服务
-        logger.info("开始注册插件管理器服务...")
-        try:
-            from core.plugin_manager import PluginManager
-            logger.info("插件管理器类已导入")
-
-            self.service_container.register(PluginManager)
-            logger.info("插件管理器类已注册到容器")
-
-            plugin_manager = self.service_container.resolve(PluginManager)
-            logger.info("插件管理器实例已创建")
-
-            plugin_manager.initialize()  # 立即初始化
-            logger.info("✓ 插件管理器服务注册完成")
-        except Exception as e:
-            logger.error(f"❌ 插件管理器服务注册失败: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+        logger.info("✓ 所有服务注册完成")
+        return True
 
     def _create_main_window(self) -> None:
         """创建主窗口协调器"""
-        logger.info("4. 创建主窗口...")
+        logger.info("5. 创建主窗口...")
 
         try:
             # 创建主窗口协调器
@@ -355,26 +296,19 @@ class HIkyuuUIApplication:
             if not self.initialize():
                 return 1
 
-            logger.info("5. 启动主窗口...")
+            logger.info("6. 启动主窗口...")
 
             # 启动主窗口
             self.main_window_coordinator.run()
 
-            logger.info("6. 进入事件循环...")
+            logger.info("7. 事件循环将由外部管理...")
+            return 0  # 成功
 
-            # 进入Qt事件循环
-            return self.app.exec_()
-
-        except KeyboardInterrupt:
-            logger.info("用户中断程序")
-            return 0
         except Exception as e:
             logger.error(f"运行时错误: {e}")
             logger.error(traceback.format_exc())
             self._show_error_message("运行时错误", str(e))
             return 1
-        finally:
-            self._cleanup()
 
     def _cleanup(self) -> None:
         """清理资源"""
@@ -386,15 +320,13 @@ class HIkyuuUIApplication:
 
             if self.service_container:
                 # 清理所有服务
-                from core.plugin_manager import PluginManager
-                for service_type in [ConfigService, ThemeService, StockService, ChartService, AnalysisService, PluginManager]:
-                    try:
-                        service = self.service_container.resolve(service_type)
-                        if hasattr(service, 'dispose'):
-                            service.dispose()
-                    except Exception as e:
-                        logger.debug(f"Failed to dispose {service_type.__name__}: {e}")
-                        pass
+                self.service_container.dispose()
+                logger.info("✓ 服务容器已清理")
+
+            # 停止事件循环
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.stop()
 
             logger.info("✓ 资源清理完成")
 
@@ -417,14 +349,35 @@ def main():
         log_dir.mkdir(exist_ok=True)
 
         # 创建并运行应用程序
-        app = HIkyuuUIApplication()
-        exit_code = app.run()
+        if QEventLoop is not None:
+            app = QApplication(sys.argv)
+            event_loop = QEventLoop(app)
+            asyncio.set_event_loop(event_loop)
 
-        logger.info("=" * 60)
-        logger.info(f"HIkyuu-UI 2.0 退出，退出代码: {exit_code}")
-        logger.info("=" * 60)
+            hikyuu_app = HIkyuuUIApplication()
+            hikyuu_app.app = app  # Pass app instance
 
-        sys.exit(exit_code)
+            # 优雅地退出
+            app.aboutToQuit.connect(event_loop.stop)
+
+            if hikyuu_app.run() != 0:
+                logger.error("Application setup failed. Exiting.")
+                sys.exit(1)
+
+            event_loop.run_forever()  # 运行事件循环
+
+            hikyuu_app._cleanup()
+            logger.info("Application shutdown complete.")
+            # sys.exit(0) # Let the application exit naturally
+
+        else:
+            # Fallback for systems without qasync
+            logger.error(
+                "qasync is not installed. Please install it with 'pip install qasync'")
+            app = HIkyuuUIApplication()
+            # This part will likely not work correctly without an event loop manager.
+            exit_code = app.run()
+            sys.exit(exit_code)
 
     except Exception as e:
         print(f"程序启动失败: {e}")

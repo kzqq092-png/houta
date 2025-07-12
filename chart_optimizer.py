@@ -156,7 +156,8 @@ class UnifiedChartOptimizer:
 
             # 配置子图表
             for name, data in data_dict.items():
-                chart_type = chart_types.get(name, 'candlestick') if chart_types else 'candlestick'
+                chart_type = chart_types.get(
+                    name, 'candlestick') if chart_types else 'candlestick'
 
                 # 添加子图表
                 chart_widget.add_sub_chart(name, data, chart_type)
@@ -199,7 +200,8 @@ class UnifiedChartOptimizer:
                     )
 
                     # 添加到图表
-                    chart_widget.add_indicator(indicator_type, indicator_data, params)
+                    chart_widget.add_indicator(
+                        indicator_type, indicator_data, params)
 
             logger.info(f"成功添加 {len(indicators)} 个技术指标")
             return True
@@ -396,4 +398,5 @@ class ChartOptimizer:
         # 重定向到统一优化器
         if hasattr(self.unified_optimizer, name):
             return getattr(self.unified_optimizer, name)
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'")

@@ -122,7 +122,8 @@ class StrategyCache:
             return
 
         # 找到最久未访问的键
-        lru_key = min(self._access_times.keys(), key=lambda k: self._access_times[k])
+        lru_key = min(self._access_times.keys(),
+                      key=lambda k: self._access_times[k])
         self._remove_key(lru_key)
         self.logger.debug(f"LRU淘汰缓存项: {lru_key}")
 
@@ -219,7 +220,8 @@ class StrategyEngine:
 
             # 验证数据
             required_columns = strategy_instance.get_required_columns()
-            missing_columns = [col for col in required_columns if col not in data.columns]
+            missing_columns = [
+                col for col in required_columns if col not in data.columns]
             if missing_columns:
                 raise ValueError(f"缺少必需的数据列: {missing_columns}")
 
@@ -249,7 +251,8 @@ class StrategyEngine:
                         signals=signals,
                         execution_time=execution_info['execution_time'],
                         success=True,
-                        performance_metrics=self._calculate_performance_metrics(signals)
+                        performance_metrics=self._calculate_performance_metrics(
+                            signals)
                     )
                 except Exception as e:
                     self.logger.warning(f"保存执行结果到数据库失败: {e}")
@@ -257,7 +260,8 @@ class StrategyEngine:
             # 更新统计
             self._update_stats('success', execution_info['execution_time'])
 
-            self.logger.info(f"策略执行成功: {strategy_name}, 信号数: {len(signals)}, 耗时: {execution_info['execution_time']:.3f}s")
+            self.logger.info(
+                f"策略执行成功: {strategy_name}, 信号数: {len(signals)}, 耗时: {execution_info['execution_time']:.3f}s")
             return signals, execution_info
 
         except Exception as e:
@@ -419,7 +423,8 @@ class StrategyEngine:
             for key in keys_to_remove:
                 self.cache.invalidate(key)
 
-            self.logger.info(f"已清理策略缓存: {strategy_name} ({len(keys_to_remove)}项)")
+            self.logger.info(
+                f"已清理策略缓存: {strategy_name} ({len(keys_to_remove)}项)")
 
     def get_engine_stats(self) -> Dict[str, Any]:
         """获取引擎统计信息"""
@@ -431,13 +436,15 @@ class StrategyEngine:
 
         # 计算平均执行时间
         if stats['total_executions'] > 0:
-            stats['average_execution_time'] = stats['total_execution_time'] / stats['total_executions']
+            stats['average_execution_time'] = stats['total_execution_time'] / \
+                stats['total_executions']
         else:
             stats['average_execution_time'] = 0.0
 
         # 计算成功率
         if stats['total_executions'] > 0:
-            stats['success_rate'] = stats['successful_executions'] / stats['total_executions']
+            stats['success_rate'] = stats['successful_executions'] / \
+                stats['total_executions']
         else:
             stats['success_rate'] = 0.0
 
@@ -483,7 +490,8 @@ class StrategyEngine:
 
         try:
             buy_signals = [s for s in signals if s.signal_type.value == 'BUY']
-            sell_signals = [s for s in signals if s.signal_type.value == 'SELL']
+            sell_signals = [
+                s for s in signals if s.signal_type.value == 'SELL']
 
             metrics = {
                 'total_signals': len(signals),

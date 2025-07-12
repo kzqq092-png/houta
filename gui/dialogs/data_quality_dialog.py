@@ -39,7 +39,8 @@ class DataQualityDialog(QDialog):
             # 加载股票列表
             stocks = self.parent_window.stock_service.get_stock_list()
             for stock in stocks[:100]:  # 限制显示数量
-                self.stock_combo.addItem(f"{stock['code']} - {stock['name']}", stock['code'])
+                self.stock_combo.addItem(
+                    f"{stock['code']} - {stock['name']}", stock['code'])
 
         # 检查类型
         type_label = QLabel("检查类型:")
@@ -81,7 +82,8 @@ class DataQualityDialog(QDialog):
         # 连接信号
         self.check_button.clicked.connect(self.start_quality_check)
         self.export_button.clicked.connect(self.export_report)
-        self.check_type_combo.currentTextChanged.connect(self.on_check_type_changed)
+        self.check_type_combo.currentTextChanged.connect(
+            self.on_check_type_changed)
 
         # 如果指定了股票代码，设置默认值
         if self.stock_code:
@@ -193,7 +195,8 @@ class DataQualityDialog(QDialog):
 
             # 获取股票数据
             if hasattr(self.parent_window, 'stock_service'):
-                kdata = self.parent_window.stock_service.get_stock_data(stock_code)
+                kdata = self.parent_window.stock_service.get_stock_data(
+                    stock_code)
                 if kdata is None or len(kdata) == 0:
                     QMessageBox.warning(self, "提示", f"无法获取股票 {stock_code} 的数据")
                     progress.close()
@@ -242,7 +245,8 @@ class DataQualityDialog(QDialog):
             ]
 
         # 显示批量检查进度
-        progress = QProgressDialog(f"正在批量检查 {len(stocks_to_check)} 只股票...", "取消", 0, len(stocks_to_check), self)
+        progress = QProgressDialog(
+            f"正在批量检查 {len(stocks_to_check)} 只股票...", "取消", 0, len(stocks_to_check), self)
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
 
@@ -341,7 +345,8 @@ class DataQualityDialog(QDialog):
         if 'close' in kdata.columns:
             price_changes = kdata['close'].pct_change().dropna()
             extreme_changes = abs(price_changes) > 0.2  # 超过20%的变化
-            price_score = max(0, 100 - (extreme_changes.sum() / len(price_changes) * 100 * 10))
+            price_score = max(
+                0, 100 - (extreme_changes.sum() / len(price_changes) * 100 * 10))
             total_score += price_score
             max_score += 100
 
@@ -369,7 +374,8 @@ class DataQualityDialog(QDialog):
         if 'date' in kdata.columns:
             date_gaps = pd.to_datetime(kdata['date']).diff().dt.days
             large_gaps = (date_gaps > 7).sum()  # 超过7天的间隔
-            continuity_score = max(0, 100 - (large_gaps / len(kdata) * 100 * 5))
+            continuity_score = max(
+                0, 100 - (large_gaps / len(kdata) * 100 * 5))
             total_score += continuity_score
             max_score += 100
 
@@ -381,7 +387,8 @@ class DataQualityDialog(QDialog):
             })
 
         # 计算总体质量得分
-        report['quality_score'] = round(total_score / max_score * 100, 2) if max_score > 0 else 0
+        report['quality_score'] = round(
+            total_score / max_score * 100, 2) if max_score > 0 else 0
 
         return report
 
@@ -407,8 +414,10 @@ class DataQualityDialog(QDialog):
         self.overview_table.setRowCount(len(report['checks']))
         for i, check in enumerate(report['checks']):
             self.overview_table.setItem(i, 0, QTableWidgetItem(check['name']))
-            self.overview_table.setItem(i, 1, QTableWidgetItem(f"{check['score']:.1f}"))
-            self.overview_table.setItem(i, 2, QTableWidgetItem(check['status']))
+            self.overview_table.setItem(
+                i, 1, QTableWidgetItem(f"{check['score']:.1f}"))
+            self.overview_table.setItem(
+                i, 2, QTableWidgetItem(check['status']))
 
         # 更新详细报告
         detail_text = f"""
@@ -455,17 +464,21 @@ class DataQualityDialog(QDialog):
         # 更新概览表格显示批量结果
         self.overview_table.setRowCount(len(reports))
         self.overview_table.setColumnCount(4)
-        self.overview_table.setHorizontalHeaderLabels(["股票代码", "质量得分", "状态", "问题数"])
+        self.overview_table.setHorizontalHeaderLabels(
+            ["股票代码", "质量得分", "状态", "问题数"])
 
         for i, report in enumerate(reports):
             score = report['quality_score']
             status = "优秀" if score > 90 else "良好" if score > 70 else "需要改进"
-            problem_count = sum(1 for check in report['checks'] if check['score'] < 80)
+            problem_count = sum(
+                1 for check in report['checks'] if check['score'] < 80)
 
-            self.overview_table.setItem(i, 0, QTableWidgetItem(report['stock_code']))
+            self.overview_table.setItem(
+                i, 0, QTableWidgetItem(report['stock_code']))
             self.overview_table.setItem(i, 1, QTableWidgetItem(f"{score:.1f}"))
             self.overview_table.setItem(i, 2, QTableWidgetItem(status))
-            self.overview_table.setItem(i, 3, QTableWidgetItem(str(problem_count)))
+            self.overview_table.setItem(
+                i, 3, QTableWidgetItem(str(problem_count)))
 
         # 更新详细报告
         detail_text = f"""

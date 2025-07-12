@@ -10,7 +10,8 @@ import uuid
 import asyncio
 from typing import Dict, List, Optional, Any, Tuple
 from .base_service import CacheableService, ConfigurableService
-from ..events import ChartUpdateEvent, StockSelectedEvent
+from ..events import ChartUpdateEvent, StockSelectedEvent, EventBus
+from .unified_data_manager import UnifiedDataManager
 
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,8 @@ class RetryManager:
                 last_error = e
                 retries += 1
                 if retries < self.max_retries:
-                    logger.warning(f"Retry {retries}/{self.max_retries} after error: {e}")
+                    logger.warning(
+                        f"Retry {retries}/{self.max_retries} after error: {e}")
                     await asyncio.sleep(self.retry_delay * retries)
                 else:
                     logger.error(f"Failed after {retries} retries: {e}")
@@ -113,18 +115,28 @@ class ChartService(CacheableService, ConfigurableService):
     负责图表的创建、渲染和管理。
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, cache_size: int = 100, **kwargs):
+    def __init__(self,
+                 unified_data_manager: UnifiedDataManager,
+                 event_bus: EventBus,
+                 config: Optional[Dict[str, Any]] = None,
+                 cache_size: int = 100,
+                 **kwargs):
         """
         初始化图表服务
 
         Args:
+            unified_data_manager: 统一数据管理器
+            event_bus: 事件总线
             config: 服务配置
             cache_size: 缓存大小
             **kwargs: 其他参数
         """
         # 初始化各个基类
-        CacheableService.__init__(self, cache_size=cache_size, **kwargs)
+        super().__init__(**kwargs)
         ConfigurableService.__init__(self, config=config, **kwargs)
+
+        self.data_manager = unified_data_manager
+
         self._current_chart_type = 'candlestick'
         self._current_period = 'D'
         self._current_indicators = []
@@ -143,15 +155,14 @@ class ChartService(CacheableService, ConfigurableService):
         """初始化图表服务"""
         try:
             # 加载默认配置
-            self._current_chart_type = self.get_config_value('default_chart_type', 'candlestick')
+            self._current_chart_type = self.get_config_value(
+                'default_chart_type', 'candlestick')
             self._current_period = self.get_config_value('default_period', 'D')
-            self._current_indicators = self.get_config_value('default_indicators', [])
+            self._current_indicators = self.get_config_value(
+                'default_indicators', [])
 
             # 初始化图表主题
             self._load_chart_themes()
-
-            # 订阅股票选择事件
-            self.event_bus.subscribe(StockSelectedEvent, self._on_stock_selected)
 
             logger.info("Chart service initialized successfully")
 
@@ -163,76 +174,14 @@ class ChartService(CacheableService, ConfigurableService):
                      period: str = None, indicators: List[str] = None,
                      time_range: int = 365) -> Optional[Dict[str, Any]]:
         """
-        创建图表
+        [已废弃] 创建图表。请改为发布StockSelectedEvent事件来触发图表更新。
 
-        Args:
-            stock_code: 股票代码
-            chart_type: 图表类型
-            period: 周期
-            indicators: 指标列表
-            time_range: 时间范围
-
-        Returns:
-            图表配置信息
+        Raises:
+            NotImplementedError: 此方法已被废弃，以推广事件驱动的异步模型。
         """
-        self._ensure_initialized()
-
-        # 使用默认值
-        chart_type = chart_type or self._current_chart_type
-        period = period or self._current_period
-        indicators = indicators or self._current_indicators
-
-        cache_key = f"chart_{stock_code}_{chart_type}_{period}_{time_range}_{hash(tuple(indicators))}"
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
-
-        try:
-            # 获取股票服务
-            stock_service = self._get_stock_service()
-            if not stock_service:
-                logger.error("Stock service not available")
-                return None
-
-            # 获取股票数据
-            stock_data = stock_service.get_stock_data(stock_code, period, time_range)
-            if stock_data is None or stock_data.empty:
-                logger.warning(f"No data available for {stock_code}")
-                return None
-
-            # 创建图表配置
-            chart_config = {
-                'stock_code': stock_code,
-                'chart_type': chart_type,
-                'period': period,
-                'indicators': indicators,
-                'time_range': time_range,
-                'data': stock_data,
-                'theme': self._get_current_theme(),
-                'layout': self._get_chart_layout(chart_type, indicators)
-            }
-
-            # 缓存结果
-            self.put_to_cache(cache_key, chart_config)
-
-            # 发布图表更新事件
-            event = ChartUpdateEvent(
-                stock_code=stock_code,
-                chart_type=chart_type,
-                period=period,
-                indicators=indicators,
-                time_range=time_range
-            )
-            event.data.update({
-                'chart_config': chart_config
-            })
-            self.event_bus.publish(event)
-
-            return chart_config
-
-        except Exception as e:
-            logger.error(f"Failed to create chart for {stock_code}: {e}")
-            return None
+        logger.warning("create_chart方法已被废弃，请改为发布StockSelectedEvent事件。")
+        raise NotImplementedError(
+            "create_chart is deprecated. Publish StockSelectedEvent instead.")
 
     def update_chart_type(self, chart_type: str) -> bool:
         """
@@ -249,18 +198,16 @@ class ChartService(CacheableService, ConfigurableService):
         try:
             if chart_type in self._get_supported_chart_types():
                 self._current_chart_type = chart_type
-                self.update_config({'default_chart_type': chart_type})
-
-                # 如果有当前股票，重新创建图表
+                logger.info(f"Chart type updated to: {chart_type}")
+                # 触发图表重新加载
                 if self._current_stock_code:
-                    self.create_chart(self._current_stock_code)
-
-                logger.info(f"Updated chart type to {chart_type}")
+                    event = StockSelectedEvent(
+                        stock_code=self._current_stock_code)
+                    self.event_bus.publish(event)
                 return True
             else:
                 logger.warning(f"Unsupported chart type: {chart_type}")
                 return False
-
         except Exception as e:
             logger.error(f"Failed to update chart type: {e}")
             return False
@@ -276,25 +223,19 @@ class ChartService(CacheableService, ConfigurableService):
             是否成功更新
         """
         self._ensure_initialized()
-
         try:
-            if period in self._get_supported_periods():
+            if period in self.get_supported_periods():
                 self._current_period = period
-                self.update_config({'default_period': period})
-
-                # 清除相关缓存
-                self._clear_period_cache()
-
-                # 如果有当前股票，重新创建图表
+                logger.info(f"Period updated to: {period}")
+                # 触发图表重新加载
                 if self._current_stock_code:
-                    self.create_chart(self._current_stock_code)
-
-                logger.info(f"Updated period to {period}")
+                    event = StockSelectedEvent(
+                        stock_code=self._current_stock_code)
+                    self.event_bus.publish(event)
                 return True
             else:
                 logger.warning(f"Unsupported period: {period}")
                 return False
-
         except Exception as e:
             logger.error(f"Failed to update period: {e}")
             return False
@@ -314,21 +255,16 @@ class ChartService(CacheableService, ConfigurableService):
         try:
             if indicator not in self._current_indicators:
                 self._current_indicators.append(indicator)
-                self.update_config({'default_indicators': self._current_indicators})
-
-                # 清除相关缓存
-                self._clear_indicator_cache()
-
-                # 如果有当前股票，重新创建图表
+                logger.info(f"Indicator added: {indicator}")
+                # 触发图表重新加载
                 if self._current_stock_code:
-                    self.create_chart(self._current_stock_code)
-
-                logger.info(f"Added indicator {indicator}")
+                    event = StockSelectedEvent(
+                        stock_code=self._current_stock_code)
+                    self.event_bus.publish(event)
                 return True
             return False
-
         except Exception as e:
-            logger.error(f"Failed to add indicator {indicator}: {e}")
+            logger.error(f"Failed to add indicator: {e}")
             return False
 
     def remove_indicator(self, indicator: str) -> bool:
@@ -346,21 +282,16 @@ class ChartService(CacheableService, ConfigurableService):
         try:
             if indicator in self._current_indicators:
                 self._current_indicators.remove(indicator)
-                self.update_config({'default_indicators': self._current_indicators})
-
-                # 清除相关缓存
-                self._clear_indicator_cache()
-
-                # 如果有当前股票，重新创建图表
+                logger.info(f"Indicator removed: {indicator}")
+                # 触发图表重新加载
                 if self._current_stock_code:
-                    self.create_chart(self._current_stock_code)
-
-                logger.info(f"Removed indicator {indicator}")
+                    event = StockSelectedEvent(
+                        stock_code=self._current_stock_code)
+                    self.event_bus.publish(event)
                 return True
             return False
-
         except Exception as e:
-            logger.error(f"Failed to remove indicator {indicator}: {e}")
+            logger.error(f"Failed to remove indicator: {e}")
             return False
 
     def get_current_chart_config(self) -> Dict[str, Any]:
@@ -450,7 +381,8 @@ class ChartService(CacheableService, ConfigurableService):
                 stock_name = stock_code
 
             # 获取K线数据
-            kline_data = stock_service.get_stock_data(stock_code, period, time_range)
+            kline_data = stock_service.get_stock_data(
+                stock_code, period, time_range)
             if kline_data is None or kline_data.empty:
                 logger.warning(f"No kline data available for {stock_code}")
                 return {
@@ -481,7 +413,8 @@ class ChartService(CacheableService, ConfigurableService):
                 })
 
             # 计算技术指标（这里是简化版本，实际应该调用专门的指标计算服务）
-            indicators_data = self._calculate_indicators(kline_data, indicators)
+            indicators_data = self._calculate_indicators(
+                kline_data, indicators)
 
             return {
                 'stock_code': stock_code,
@@ -522,12 +455,15 @@ class ChartService(CacheableService, ConfigurableService):
                 if indicator.startswith('MA') and not indicator.startswith('MACD'):
                     # 移动平均线
                     try:
-                        period = int(indicator[2:]) if len(indicator) > 2 else 5
+                        period = int(indicator[2:]) if len(
+                            indicator) > 2 else 5
                         ma_values = close_prices.rolling(window=period).mean()
-                        indicators_data[indicator] = ma_values.fillna(0).tolist()
+                        indicators_data[indicator] = ma_values.fillna(
+                            0).tolist()
                     except ValueError:
                         # 如果无法解析周期，跳过该指标
-                        logger.warning(f"Cannot parse period from indicator: {indicator}")
+                        logger.warning(
+                            f"Cannot parse period from indicator: {indicator}")
                         continue
 
                 elif indicator == 'VOL':
@@ -551,8 +487,10 @@ class ChartService(CacheableService, ConfigurableService):
                 elif indicator == 'RSI':
                     # RSI指标（简化计算）
                     delta = close_prices.diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    gain = (delta.where(delta > 0, 0)
+                            ).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)
+                            ).rolling(window=14).mean()
                     rs = gain / loss
                     rsi = 100 - (100 / (1 + rs))
                     indicators_data[indicator] = rsi.fillna(50).tolist()
@@ -578,112 +516,28 @@ class ChartService(CacheableService, ConfigurableService):
         return indicators_data
 
     def export_chart(self, format: str = 'png', **kwargs) -> Optional[str]:
-        """
-        导出图表
-
-        Args:
-            format: 导出格式
-            **kwargs: 其他参数
-
-        Returns:
-            导出的文件路径
-        """
-        self._ensure_initialized()
-
-        try:
-            if not self._current_stock_code:
-                logger.warning("No current stock for chart export")
-                return None
-
-            # 这里应该调用具体的图表渲染引擎进行导出
-            # 暂时返回模拟路径
-            export_path = f"charts/{self._current_stock_code}_{self._current_chart_type}.{format}"
-
-            logger.info(f"Chart exported to {export_path}")
-            return export_path
-
-        except Exception as e:
-            logger.error(f"Failed to export chart: {e}")
-            return None
-
-    async def _on_stock_selected(self, event: StockSelectedEvent) -> None:
-        """
-        处理股票选择事件
-
-        Args:
-            event: 股票选择事件
-        """
-        stock_code = event.stock_code
-        freq = event.period or self._current_period
-
-        request_id = str(uuid.uuid4())
-
-        # 取消之前的请求
-        await self._cancel_previous_requests()
-
-        try:
-            # 发出图表加载开始信号
-            self.chart_loading_started.emit(stock_code)
-
-            # 使用重试管理器包装数据请求
-            data_manager = self._get_data_manager()
-            if not data_manager:
-                self.error_handler.handle_error(
-                    ErrorType.DATA_LOAD_ERROR,
-                    "Data manager not available",
-                    self._on_data_load_error,
-                    {'code': stock_code}
-                )
-                return
-
-            data = await self.retry_manager.execute_with_retry(
-                lambda: data_manager.get_stock_data(stock_code, freq, request_id=request_id)
-            )
-
-            if data is None:
-                # 数据加载失败处理
-                self.error_handler.handle_error(
-                    ErrorType.DATA_LOAD_ERROR,
-                    f"Failed to load data for {stock_code}",
-                    self._on_data_load_error,
-                    {'code': stock_code}
-                )
-                return
-
-            # 数据加载成功，更新图表
-            self.chart_data_loaded.emit(stock_code, data)
-
-            # 预加载相关股票数据
-            self._preload_related_stocks(stock_code, freq)
-
-        except asyncio.CancelledError:
-            # 请求被取消
-            logger.info(f"Request for {stock_code} was cancelled")
-            self.chart_loading_cancelled.emit(stock_code)
-        except Exception as e:
-            # 其他错误处理
-            logger.error(f"Error loading chart for {stock_code}: {e}")
-            self.error_handler.handle_error(
-                ErrorType.UNKNOWN_ERROR,
-                f"Error: {str(e)}",
-                self._on_unknown_error,
-                {'code': stock_code}
-            )
+        """导出图表"""
+        # 实现图表导出逻辑
+        logger.warning("导出图表功能待实现")
+        return None
 
     async def _cancel_previous_requests(self):
-        """取消之前的请求"""
+        """取消先前的请求"""
         async with self.request_lock:
-            for request_id, request_info in list(self.active_requests.items()):
-                data_manager = self._get_data_manager()
-                if data_manager and hasattr(data_manager, 'cancel_request'):
-                    data_manager.cancel_request(request_id)
-                    logger.debug(f"Cancelled previous request {request_id}")
-
-            # 清空请求列表
+            for request_id, task in list(self.active_requests.items()):
+                if not task.done():
+                    task.cancel()
+                    logger.info(f"已取消先前的请求: {request_id}")
             self.active_requests.clear()
+
+    async def _remove_active_request(self, request_id: str):
+        """从活动请求字典中安全地移除一个请求"""
+        async with self.request_lock:
+            self.active_requests.pop(request_id, None)
 
     def _on_data_load_error(self, error_info):
         """处理数据加载错误"""
+        logger.error(f"数据加载错误: {error_info}")
         code = error_info.get('context', {}).get('code')
         self.chart_loading_failed.emit(code, "Failed to load data")
 
@@ -696,7 +550,8 @@ class ChartService(CacheableService, ConfigurableService):
     def _on_unknown_error(self, error_info):
         """处理未知错误"""
         code = error_info.get('context', {}).get('code')
-        self.chart_loading_failed.emit(code, f"Error: {error_info.get('message')}")
+        self.chart_loading_failed.emit(
+            code, f"Error: {error_info.get('message')}")
 
         # 显示用户友好的错误信息
         self.show_error_message.emit(
@@ -715,7 +570,8 @@ class ChartService(CacheableService, ConfigurableService):
 
             industry = industry_service.get_stock_industry(code)
             if industry:
-                related_stocks = industry_service.get_stocks_by_industry(industry)
+                related_stocks = industry_service.get_stocks_by_industry(
+                    industry)
                 # 限制预加载数量
                 related_stocks = related_stocks[:5]  # 最多预加载5只
 
@@ -727,9 +583,11 @@ class ChartService(CacheableService, ConfigurableService):
                 # 低优先级预加载
                 for related_code in related_stocks:
                     if related_code != code:  # 跳过当前股票
-                        data_manager.preload_data(related_code, freq, priority='low')
+                        data_manager.preload_data(
+                            related_code, freq, priority='low')
 
-                logger.debug(f"Preloaded {len(related_stocks)} related stocks for {code}")
+                logger.debug(
+                    f"Preloaded {len(related_stocks)} related stocks for {code}")
         except Exception as e:
             logger.warning(f"Failed to preload related stocks: {e}")
 

@@ -25,7 +25,8 @@ class CrosshairMixin:
         """初始化十字光标相关变量"""
         super().__init__()
         # 十字光标相关变量
-        self._crosshair_lines: Dict[str, object] = {}  # 改为字典管理，键为 'price_v', 'volume_v', 'indicator_v', 'price_h'
+        # 改为字典管理，键为 'price_v', 'volume_v', 'indicator_v', 'price_h'
+        self._crosshair_lines: Dict[str, object] = {}
         self._crosshair_text = None
         self._crosshair_xtext = None
         self._crosshair_ytext = None
@@ -59,7 +60,8 @@ class CrosshairMixin:
                 for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                     if ax is not None:
                         current_xlim = ax.get_xlim()
-                        new_xlim = (max(0, current_xlim[0]), min(max_x, current_xlim[1]))
+                        new_xlim = (max(0, current_xlim[0]), min(
+                            max_x, current_xlim[1]))
                         ax.set_xlim(new_xlim)
         except Exception as e:
             self.log_manager.error(f"限制X轴范围失败: {str(e)}")
@@ -391,13 +393,16 @@ class CrosshairMixin:
                 self._update_crosshair_lines(x_val, y_val, primary_color)
 
                 # 创建信息文本
-                info, text_color = self._create_crosshair_info_text(row, idx, kdata)
+                info, text_color = self._create_crosshair_info_text(
+                    row, idx, kdata)
 
                 # 更新信息文本
-                self._update_crosshair_text(event, x_val, y_val, info, text_color)
+                self._update_crosshair_text(
+                    event, x_val, y_val, info, text_color)
 
                 # 更新轴标签
-                self._update_crosshair_axis_labels(row, idx, kdata, x_val, y_val, primary_color)
+                self._update_crosshair_axis_labels(
+                    row, idx, kdata, x_val, y_val, primary_color)
 
                 # 刷新画布
                 self.canvas.draw_idle()
@@ -410,7 +415,8 @@ class CrosshairMixin:
                     pass
 
             # 绑定新的事件处理器
-            self._crosshair_event_id = self.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+            self._crosshair_event_id = self.canvas.mpl_connect(
+                'motion_notify_event', on_mouse_move)
 
         except Exception as e:
             self.log_manager.error(f"创建十字光标处理器失败: {str(e)}")

@@ -42,7 +42,8 @@ class StockDataLoader(QThread):
 
             # 应用筛选
             if self.market_filter and self.market_filter != "全部":
-                stocks = [s for s in stocks if s.get('market') == self.market_filter]
+                stocks = [s for s in stocks if s.get(
+                    'market') == self.market_filter]
 
             if self.search_text:
                 search_lower = self.search_text.lower()
@@ -230,17 +231,22 @@ class LeftPanel(BasePanel):
         try:
             # 搜索事件
             self.search_input.textChanged.connect(self._on_search_text_changed)
-            self.get_widget('search_btn').clicked.connect(self._on_search_clicked)
+            self.get_widget('search_btn').clicked.connect(
+                self._on_search_clicked)
 
             # 筛选事件
-            self.market_combo.currentTextChanged.connect(self._on_market_changed)
+            self.market_combo.currentTextChanged.connect(
+                self._on_market_changed)
             self.favorites_btn.toggled.connect(self._on_favorites_toggled)
-            self.get_widget('refresh_btn').clicked.connect(self._on_refresh_clicked)
+            self.get_widget('refresh_btn').clicked.connect(
+                self._on_refresh_clicked)
 
             # 股票列表事件
             self.stock_tree.itemClicked.connect(self._on_stock_clicked)
-            self.stock_tree.itemDoubleClicked.connect(self._on_stock_double_clicked)
-            self.stock_tree.customContextMenuRequested.connect(self._on_context_menu)
+            self.stock_tree.itemDoubleClicked.connect(
+                self._on_stock_double_clicked)
+            self.stock_tree.customContextMenuRequested.connect(
+                self._on_context_menu)
 
             # 搜索延迟定时器
             self.search_timer.timeout.connect(self._perform_search)
@@ -258,7 +264,8 @@ class LeftPanel(BasePanel):
             # 获取股票服务
             if self.coordinator and hasattr(self.coordinator, 'service_container'):
                 from core.services import StockService
-                self.stock_service = self.coordinator.service_container.get_service(StockService)
+                self.stock_service = self.coordinator.service_container.get_service(
+                    StockService)
 
             # 加载初始数据
             self._load_stock_data()
@@ -326,55 +333,66 @@ class LeftPanel(BasePanel):
 
         # 查看详情
         action = menu.addAction("查看详情")
-        action.triggered.connect(lambda: self._show_stock_details(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._show_stock_details(stock_code, stock_name))
 
         # 添加到收藏/取消收藏
         if stock_code in self.favorites:
             action = menu.addAction("从收藏移除")
-            action.triggered.connect(lambda: self._remove_from_favorites(stock_code))
+            action.triggered.connect(
+                lambda: self._remove_from_favorites(stock_code))
         else:
             action = menu.addAction("添加到收藏")
-            action.triggered.connect(lambda: self._add_to_favorites(stock_code, stock_name))
+            action.triggered.connect(
+                lambda: self._add_to_favorites(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 导出数据
         action = menu.addAction("导出数据")
-        action.triggered.connect(lambda: self._export_stock_data(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._export_stock_data(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 添加到自选股
         action = menu.addAction("添加到自选股")
-        action.triggered.connect(lambda: self._add_to_watchlist(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._add_to_watchlist(stock_code, stock_name))
 
         # 添加到投资组合
         action = menu.addAction("添加到投资组合")
-        action.triggered.connect(lambda: self._add_to_portfolio(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._add_to_portfolio(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 分析功能
         action = menu.addAction("技术分析")
-        action.triggered.connect(lambda: self._analyze_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._analyze_stock(stock_code, stock_name))
 
         action = menu.addAction("策略回测")
-        action.triggered.connect(lambda: self._backtest_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._backtest_stock(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 管理功能
         action = menu.addAction("历史数据管理")
-        action.triggered.connect(lambda: self._manage_history_data(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_history_data(stock_code, stock_name))
 
         action = menu.addAction("策略管理")
-        action.triggered.connect(lambda: self._manage_strategy(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_strategy(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 工具功能
         action = menu.addAction("数据质量检查")
-        action.triggered.connect(lambda: self._check_data_quality(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._check_data_quality(stock_code, stock_name))
 
         action = menu.addAction("计算器")
         action.triggered.connect(lambda: self._show_calculator())
@@ -384,25 +402,30 @@ class LeftPanel(BasePanel):
 
         # 添加到投资组合
         action = menu.addAction("添加到投资组合")
-        action.triggered.connect(lambda: self._add_to_portfolio(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._add_to_portfolio(stock_code, stock_name))
 
         menu.addSeparator()
 
         # 技术分析
         action = menu.addAction("技术分析")
-        action.triggered.connect(lambda: self._analyze_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._analyze_stock(stock_code, stock_name))
 
         # 策略回测
         action = menu.addAction("策略回测")
-        action.triggered.connect(lambda: self._backtest_stock(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._backtest_stock(stock_code, stock_name))
 
         # 历史数据管理
         action = menu.addAction("历史数据管理")
-        action.triggered.connect(lambda: self._manage_history_data(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_history_data(stock_code, stock_name))
 
         # 策略管理
         action = menu.addAction("策略管理")
-        action.triggered.connect(lambda: self._manage_strategy(stock_code, stock_name))
+        action.triggered.connect(
+            lambda: self._manage_strategy(stock_code, stock_name))
 
         # 显示菜单
         menu.exec_(self.stock_tree.mapToGlobal(position))
@@ -417,7 +440,8 @@ class LeftPanel(BasePanel):
         try:
             from gui.dialogs.advanced_search_dialog import AdvancedSearchDialog
 
-            dialog = AdvancedSearchDialog(parent=self, stock_service=self.stock_service)
+            dialog = AdvancedSearchDialog(
+                parent=self, stock_service=self.stock_service)
             dialog.search_requested.connect(self._on_advanced_search)
             dialog.exec_()
 
@@ -428,7 +452,8 @@ class LeftPanel(BasePanel):
         """处理高级搜索请求"""
         try:
             # 执行高级搜索
-            filtered_stocks = self.stock_service.perform_advanced_search(conditions)
+            filtered_stocks = self.stock_service.perform_advanced_search(
+                conditions)
 
             # 更新股票列表显示
             self._update_stock_tree(filtered_stocks)
@@ -452,7 +477,8 @@ class LeftPanel(BasePanel):
                 return
 
             # 获取历史数据
-            stock_data = self.stock_service.get_stock_data(stock_code, period='D', count=100)
+            stock_data = self.stock_service.get_stock_data(
+                stock_code, period='D', count=100)
 
             # 准备基本信息
             basic_info = [
@@ -493,7 +519,8 @@ class LeftPanel(BasePanel):
 
             # 这里可以调用自选股服务或者通过事件系统处理
             # 暂时使用简单的消息提示
-            QMessageBox.information(self, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
+            QMessageBox.information(
+                self, "成功", f"已添加 {stock_name}({stock_code}) 到自选股")
             logger.info(f"添加到自选股: {stock_name}({stock_code})")
 
         except Exception as e:
@@ -543,8 +570,10 @@ class LeftPanel(BasePanel):
                 portfolio_name = portfolio_combo.currentText()
                 amount = amount_spin.value()
 
-                QMessageBox.information(self, "成功", f"已添加 {stock_name} 到投资组合 {portfolio_name}")
-                logger.info(f"添加到投资组合: {stock_name}({stock_code}) -> {portfolio_name}, 金额: {amount}")
+                QMessageBox.information(
+                    self, "成功", f"已添加 {stock_name} 到投资组合 {portfolio_name}")
+                logger.info(
+                    f"添加到投资组合: {stock_name}({stock_code}) -> {portfolio_name}, 金额: {amount}")
 
         except Exception as e:
             logger.error(f"添加到投资组合失败: {e}")
@@ -558,10 +587,12 @@ class LeftPanel(BasePanel):
             analysis_service = None
             if self.coordinator and hasattr(self.coordinator, 'service_container'):
                 from core.services.analysis_service import AnalysisService
-                analysis_service = self.coordinator.service_container.try_resolve(AnalysisService)
+                analysis_service = self.coordinator.service_container.try_resolve(
+                    AnalysisService)
 
             # 显示技术分析对话框
-            dialog = TechnicalAnalysisDialog(self, stock_code, analysis_service)
+            dialog = TechnicalAnalysisDialog(
+                self, stock_code, analysis_service)
             dialog.exec_()
 
             logger.info(f"启动技术分析: {stock_name}({stock_code})")
@@ -580,7 +611,8 @@ class LeftPanel(BasePanel):
             strategy_service = None
             if self.coordinator and hasattr(self.coordinator, 'service_container'):
                 from core.services.strategy_service import StrategyService
-                strategy_service = self.coordinator.service_container.try_resolve(StrategyService)
+                strategy_service = self.coordinator.service_container.try_resolve(
+                    StrategyService)
 
             # 显示策略管理对话框，并切换到回测选项卡
             dialog = StrategyManagerDialog(self, strategy_service)
@@ -604,7 +636,8 @@ class LeftPanel(BasePanel):
 
             # 设置当前股票
             if hasattr(dialog, 'stock_combo'):
-                dialog.stock_combo.setCurrentText(f"{stock_code} - {stock_name}")
+                dialog.stock_combo.setCurrentText(
+                    f"{stock_code} - {stock_name}")
 
             dialog.exec_()
 
@@ -624,7 +657,8 @@ class LeftPanel(BasePanel):
             strategy_service = None
             if self.coordinator and hasattr(self.coordinator, 'service_container'):
                 from core.services.strategy_service import StrategyService
-                strategy_service = self.coordinator.service_container.try_resolve(StrategyService)
+                strategy_service = self.coordinator.service_container.try_resolve(
+                    StrategyService)
 
             # 显示策略管理对话框
             dialog = StrategyManagerDialog(self, strategy_service)
@@ -762,7 +796,8 @@ class LeftPanel(BasePanel):
         try:
             # 发送股票选择事件
             if self.event_bus:
-                event = StockSelectedEvent(stock_code=stock_code, stock_name=stock_name, market=market)
+                event = StockSelectedEvent(
+                    stock_code=stock_code, stock_name=stock_name, market=market)
                 self.event_bus.publish(event)
 
             logger.info(f"Stock selected: {stock_code} - {stock_name}")
@@ -811,7 +846,8 @@ class LeftPanel(BasePanel):
             from PyQt5.QtWidgets import QMessageBox
 
             # 获取股票详细信息
-            stock_info = self.stock_service.get_stock_info(stock_code) if self.stock_service else {}
+            stock_info = self.stock_service.get_stock_info(
+                stock_code) if self.stock_service else {}
             if not stock_info:
                 QMessageBox.warning(self, "警告", f"无法获取股票 {stock_name} 的信息")
                 return
@@ -819,7 +855,8 @@ class LeftPanel(BasePanel):
             # 获取历史数据
             history_data = None
             if self.stock_service:
-                history_data = self.stock_service.get_stock_data(stock_code, period='D', count=20)
+                history_data = self.stock_service.get_stock_data(
+                    stock_code, period='D', count=20)
 
             # 准备股票数据
             stock_data = dict(stock_info)

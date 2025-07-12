@@ -130,44 +130,56 @@ class EnhancedSignal(SignalBase):
             n_fast = self.get_param("n_fast")
             n_slow = self.get_param("n_slow")
             if isinstance(close_data, pd.Series):
-                ma_fast = indicators.get('MA', calculate_indicator('MA', k, {'timeperiod': n_fast}))
-                ma_slow = indicators.get('EMA', calculate_indicator('EMA', k, {'timeperiod': n_slow}))
-                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
+                ma_fast = indicators.get('MA', calculate_indicator(
+                    'MA', k, {'timeperiod': n_fast}))
+                ma_slow = indicators.get('EMA', calculate_indicator(
+                    'EMA', k, {'timeperiod': n_slow}))
+                macd = indicators.get(
+                    'MACD_1', None) or indicators.get('MACD', None)
                 if macd is None:
-                    macd = calculate_indicator('MACD', k, {'fast': n_fast, 'slow': n_slow, 'signal': self.get_param('n_signal')})
-                rsi = indicators.get('RSI', None) or calculate_indicator('RSI', k, {'timeperiod': self.get_param("rsi_window")})
+                    macd = calculate_indicator(
+                        'MACD', k, {'fast': n_fast, 'slow': n_slow, 'signal': self.get_param('n_signal')})
+                rsi = indicators.get('RSI', None) or calculate_indicator(
+                    'RSI', k, {'timeperiod': self.get_param("rsi_window")})
                 volume_data = k['volume'] if 'volume' in k else None
                 if volume_data is not None and isinstance(volume_data, pd.Series):
-                    volume_ma = volume_data.rolling(window=self.get_param("volume_ma")).mean()
+                    volume_ma = volume_data.rolling(
+                        window=self.get_param("volume_ma")).mean()
                 else:
                     volume_ma = None
             else:
                 ma_fast = indicators.get('MA', MA(close_data, n=n_fast))
                 ma_slow = indicators.get('EMA', MA(close_data, n=n_slow))
                 from hikyuu.indicator import MACD, RSI, VOL, MA
-                macd = indicators.get('MACD_1', None) or indicators.get('MACD', None)
+                macd = indicators.get(
+                    'MACD_1', None) or indicators.get('MACD', None)
                 if macd is None:
                     macd = MACD(close_data, n1=n_fast, n2=n_slow, n3=9)
-                rsi = indicators.get('RSI', None) or RSI(close_data, n=self.get_param("rsi_window"))
+                rsi = indicators.get('RSI', None) or RSI(
+                    close_data, n=self.get_param("rsi_window"))
                 volume_ma = MA(VOL(k), n=self.get_param("volume_ma"))
             kdj = calculate_indicator('KDJ', k, {'n': self.get_param("kdj_n")})
             # --- 类型安全指标计算 ---
             # BOLL
             if isinstance(k['close'], pd.Series):
-                boll = calculate_indicator('BOLL', k, {'timeperiod': self.get_param("boll_n"), 'width': self.get_param("boll_width")})
+                boll = calculate_indicator('BOLL', k, {'timeperiod': self.get_param(
+                    "boll_n"), 'width': self.get_param("boll_width")})
             else:
                 from hikyuu.indicator import BOLL
                 close_ind = CLOSE(k) if hasattr(k, 'to_df') else k['close']
-                boll = BOLL(close_ind, n=self.get_param("boll_n"), width=self.get_param("boll_width"))
+                boll = BOLL(close_ind, n=self.get_param("boll_n"),
+                            width=self.get_param("boll_width"))
             # ATR
             if hasattr(k, 'to_df'):
-                atr = calculate_indicator('ATR', k, {'timeperiod': self.get_param("atr_period")})
+                atr = calculate_indicator(
+                    'ATR', k, {'timeperiod': self.get_param("atr_period")})
             else:
                 from hikyuu.indicator import ATR
                 atr = ATR(k, n=self.get_param("atr_period"))
             # CCI
             if hasattr(k, 'to_df'):
-                cci = calculate_indicator('CCI', k, {'timeperiod': self.get_param("cci_period")})
+                cci = calculate_indicator(
+                    'CCI', k, {'timeperiod': self.get_param("cci_period")})
             else:
                 from hikyuu.indicator import CCI
                 cci = CCI(k, n=self.get_param("cci_period"))

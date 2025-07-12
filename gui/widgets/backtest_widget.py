@@ -242,19 +242,23 @@ class MetricsPanel(QWidget):
     def create_metric_cards(self):
         """创建指标卡片"""
         # 总收益率卡片
-        self.return_card = self.create_metric_card("💰 总收益率", "0.00%", "年化收益: 0.00%")
+        self.return_card = self.create_metric_card(
+            "💰 总收益率", "0.00%", "年化收益: 0.00%")
         self.metrics_container.addWidget(self.return_card)
 
         # Sharpe比率卡片
-        self.sharpe_card = self.create_metric_card("📈 Sharpe比率", "0.000", "最大回撤: 0.00%")
+        self.sharpe_card = self.create_metric_card(
+            "📈 Sharpe比率", "0.000", "最大回撤: 0.00%")
         self.metrics_container.addWidget(self.sharpe_card)
 
         # 胜率卡片
-        self.winrate_card = self.create_metric_card("🎯 胜率", "0.00%", "盈利因子: 0.00")
+        self.winrate_card = self.create_metric_card(
+            "🎯 胜率", "0.00%", "盈利因子: 0.00")
         self.metrics_container.addWidget(self.winrate_card)
 
         # 风险指标卡片
-        self.risk_card = self.create_metric_card("⚠️ 风险指标", "VaR: 0.00%", "波动率: 0.00%")
+        self.risk_card = self.create_metric_card(
+            "⚠️ 风险指标", "VaR: 0.00%", "波动率: 0.00%")
         self.metrics_container.addWidget(self.risk_card)
 
     def create_metric_card(self, title: str, value: str, subtitle: str) -> QFrame:
@@ -274,12 +278,14 @@ class MetricsPanel(QWidget):
 
         # 标题
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b0b3b8; font-size: 12px; font-weight: bold;")
+        title_label.setStyleSheet(
+            "color: #b0b3b8; font-size: 12px; font-weight: bold;")
         layout.addWidget(title_label)
 
         # 数值
         value_label = QLabel(value)
-        value_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
+        value_label.setStyleSheet(
+            "color: white; font-size: 18px; font-weight: bold;")
         layout.addWidget(value_label)
 
         # 副标题
@@ -300,19 +306,22 @@ class MetricsPanel(QWidget):
             total_return = metrics.get('total_return', 0)
             annualized_return = metrics.get('annualized_return', 0)
             self.return_card.value_label.setText(f"{total_return:.2%}")
-            self.return_card.subtitle_label.setText(f"年化收益: {annualized_return:.2%}")
+            self.return_card.subtitle_label.setText(
+                f"年化收益: {annualized_return:.2%}")
 
             # 更新Sharpe比率
             sharpe_ratio = metrics.get('sharpe_ratio', 0)
             max_drawdown = metrics.get('max_drawdown', 0)
             self.sharpe_card.value_label.setText(f"{sharpe_ratio:.3f}")
-            self.sharpe_card.subtitle_label.setText(f"最大回撤: {max_drawdown:.2%}")
+            self.sharpe_card.subtitle_label.setText(
+                f"最大回撤: {max_drawdown:.2%}")
 
             # 更新胜率
             win_rate = metrics.get('win_rate', 0)
             profit_factor = metrics.get('profit_factor', 0)
             self.winrate_card.value_label.setText(f"{win_rate:.2%}")
-            self.winrate_card.subtitle_label.setText(f"盈利因子: {profit_factor:.2f}")
+            self.winrate_card.subtitle_label.setText(
+                f"盈利因子: {profit_factor:.2f}")
 
             # 更新风险指标
             var_95 = metrics.get('var_95', 0)
@@ -738,13 +747,15 @@ class ProfessionalBacktestWidget(QWidget):
         try:
             # 初始化验证器（如果可用）
             try:
-                self.validator = ProfessionalBacktestValidator(self.log_manager)
+                self.validator = ProfessionalBacktestValidator(
+                    self.log_manager)
             except:
                 self.validator = None
 
             # 初始化优化器（如果可用）
             try:
-                self.optimizer = UltraPerformanceOptimizer(log_manager=self.log_manager)
+                self.optimizer = UltraPerformanceOptimizer(
+                    log_manager=self.log_manager)
             except:
                 self.optimizer = None
 
@@ -761,7 +772,8 @@ class ProfessionalBacktestWidget(QWidget):
 
             # 创建回测引擎（如果可用）
             try:
-                backtest_level = getattr(BacktestLevel, params['professional_level'])
+                backtest_level = getattr(
+                    BacktestLevel, params['professional_level'])
                 self.backtest_engine = UnifiedBacktestEngine(
                     backtest_level=backtest_level,
                     log_manager=self.log_manager
@@ -824,7 +836,8 @@ class ProfessionalBacktestWidget(QWidget):
                     self.chart_widget.add_data(monitoring_data)
 
                     # 更新指标面板
-                    QTimer.singleShot(0, lambda: self.metrics_panel.update_metrics(monitoring_data))
+                    QTimer.singleShot(
+                        0, lambda: self.metrics_panel.update_metrics(monitoring_data))
 
                     # 检查预警
                     self._check_alerts(monitoring_data)
@@ -844,14 +857,16 @@ class ProfessionalBacktestWidget(QWidget):
                     break
 
         # 启动监控线程
-        self.monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
+        self.monitoring_thread = threading.Thread(
+            target=monitoring_loop, daemon=True)
         self.monitoring_thread.start()
 
     def _generate_demo_data(self) -> pd.DataFrame:
         """生成演示数据"""
         try:
             # 生成模拟K线数据
-            dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
+            dates = pd.date_range(start='2023-01-01',
+                                  end='2023-12-31', freq='D')
             n_days = len(dates)
 
             np.random.seed(42)

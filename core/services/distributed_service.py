@@ -49,7 +49,8 @@ class NodeInfo:
     def from_dict(cls, data: Dict[str, Any]) -> 'NodeInfo':
         """从字典创建"""
         if 'last_heartbeat' in data and data['last_heartbeat']:
-            data['last_heartbeat'] = datetime.fromisoformat(data['last_heartbeat'])
+            data['last_heartbeat'] = datetime.fromisoformat(
+                data['last_heartbeat'])
         return cls(**data)
 
 
@@ -107,7 +108,8 @@ class NodeDiscovery:
             return
 
         self.running = True
-        self.discovery_thread = threading.Thread(target=self._discovery_worker, daemon=True)
+        self.discovery_thread = threading.Thread(
+            target=self._discovery_worker, daemon=True)
         self.discovery_thread.start()
         logger.info(f"节点发现服务已启动，端口: {self.discovery_port}")
 
@@ -193,7 +195,8 @@ class NodeDiscovery:
                 memory_usage=message.get('memory_usage', 0.0),
                 task_count=message.get('task_count', 0),
                 last_heartbeat=datetime.now(),
-                capabilities=message.get('capabilities', ["analysis", "backtest"])
+                capabilities=message.get(
+                    'capabilities', ["analysis", "backtest"])
             )
 
             self.discovered_nodes[node_info.node_id] = node_info
@@ -268,7 +271,8 @@ class TaskScheduler:
             self.running_tasks[task.task_id] = task
 
             # 提交到线程池执行
-            future = self.executor.submit(self._execute_task_on_node, task, node)
+            future = self.executor.submit(
+                self._execute_task_on_node, task, node)
 
             logger.info(f"任务 {task.task_id} 已分配给节点 {node.node_id}")
 
@@ -379,7 +383,8 @@ class DistributedService:
         self.running = False
 
         # 连接节点发现和任务调度
-        self.node_discovery.add_discovery_callback(self.task_scheduler.add_node)
+        self.node_discovery.add_discovery_callback(
+            self.task_scheduler.add_node)
 
     def start_service(self):
         """启动分布式服务"""
@@ -390,7 +395,8 @@ class DistributedService:
         self.node_discovery.start_discovery()
 
         # 启动任务调度循环
-        self.schedule_thread = threading.Thread(target=self._schedule_loop, daemon=True)
+        self.schedule_thread = threading.Thread(
+            target=self._schedule_loop, daemon=True)
         self.schedule_thread.start()
 
         logger.info("分布式服务已启动")

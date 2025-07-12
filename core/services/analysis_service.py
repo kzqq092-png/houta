@@ -9,8 +9,11 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime, timedelta
+import asyncio
+
 from .base_service import CacheableService, ConfigurableService
-from ..events import AnalysisCompleteEvent, StockSelectedEvent
+from ..events import AnalysisCompleteEvent, StockSelectedEvent, EventBus
+from .unified_data_manager import UnifiedDataManager
 
 
 logger = logging.getLogger(__name__)
@@ -23,18 +26,28 @@ class AnalysisService(CacheableService, ConfigurableService):
     负责技术分析、策略分析和数据分析。
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, cache_size: int = 100, **kwargs):
+    def __init__(self,
+                 unified_data_manager: UnifiedDataManager,
+                 event_bus: EventBus,
+                 config: Optional[Dict[str, Any]] = None,
+                 cache_size: int = 100,
+                 **kwargs):
         """
         初始化分析服务
 
         Args:
+            unified_data_manager: 统一数据管理器
+            event_bus: 事件总线
             config: 服务配置
             cache_size: 缓存大小
             **kwargs: 其他参数
         """
         # 初始化各个基类
-        CacheableService.__init__(self, cache_size=cache_size, **kwargs)
+        super().__init__(**kwargs)
         ConfigurableService.__init__(self, config=config, **kwargs)
+
+        self.data_manager = unified_data_manager
+
         self._current_stock_code = None
         self._analysis_results = {}
         self._strategies = {}
@@ -45,21 +58,18 @@ class AnalysisService(CacheableService, ConfigurableService):
             # 初始化分析策略
             self._load_analysis_strategies()
 
-            # 订阅股票选择事件
-            self.event_bus.subscribe(StockSelectedEvent, self._on_stock_selected)
-
             logger.info("Analysis service initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize analysis service: {e}")
             raise
 
-    def calculate_technical_indicators(self, stock_code: str,
-                                       indicators: List[str] = None,
-                                       period: str = 'D',
-                                       time_range: int = 365) -> Optional[Dict[str, Any]]:
+    async def calculate_technical_indicators(self, stock_code: str,
+                                             indicators: List[str] = None,
+                                             period: str = 'D',
+                                             time_range: int = 365) -> Optional[Dict[str, Any]]:
         """
-        计算技术指标
+        异步计算技术指标
 
         Args:
             stock_code: 股票代码
@@ -80,10 +90,18 @@ class AnalysisService(CacheableService, ConfigurableService):
             return cached_result
 
         try:
-            # 获取股票数据
-            stock_data = self._get_stock_data(stock_code, period, time_range)
+            # 异步获取股票数据
+            stock_data_result = await self.data_manager.request_chart_data(
+                stock_code=stock_code,
+                period=period,
+                indicators=[]  # 指标在这里单独计算，不依赖chart_data
+            )
+            stock_data = stock_data_result.get(
+                'kline_data') if stock_data_result else None
+
             if stock_data is None or stock_data.empty:
-                logger.warning(f"No data available for {stock_code}")
+                logger.warning(
+                    f"No data available for {stock_code} to calculate indicators")
                 return None
 
             results = {}
@@ -93,9 +111,11 @@ class AnalysisService(CacheableService, ConfigurableService):
                 if indicator.startswith('MA') and not indicator.startswith('MACD'):
                     try:
                         period_num = int(indicator[2:])
-                        results[indicator] = self._calculate_ma(stock_data, period_num)
+                        results[indicator] = self._calculate_ma(
+                            stock_data, period_num)
                     except ValueError:
-                        logger.warning(f"Cannot parse period from indicator: {indicator}")
+                        logger.warning(
+                            f"Cannot parse period from indicator: {indicator}")
                         continue
                 elif indicator == 'MACD':
                     results['MACD'] = self._calculate_macd(stock_data)
@@ -104,9 +124,11 @@ class AnalysisService(CacheableService, ConfigurableService):
                 elif indicator == 'KDJ':
                     results['KDJ'] = self._calculate_kdj(stock_data)
                 elif indicator == 'BOLL':
-                    results['BOLL'] = self._calculate_bollinger_bands(stock_data)
+                    results['BOLL'] = self._calculate_bollinger_bands(
+                        stock_data)
                 elif indicator == 'VOL':
-                    results['VOL'] = self._calculate_volume_indicators(stock_data)
+                    results['VOL'] = self._calculate_volume_indicators(
+                        stock_data)
                 elif indicator == 'BIAS':
                     results['BIAS'] = self._calculate_bias(stock_data)
                 elif indicator == 'WR':
@@ -120,13 +142,14 @@ class AnalysisService(CacheableService, ConfigurableService):
             return results
 
         except Exception as e:
-            logger.error(f"Failed to calculate technical indicators for {stock_code}: {e}")
+            logger.error(
+                f"Failed to calculate technical indicators for {stock_code}: {e}")
             return None
 
-    def analyze_trend(self, stock_code: str, period: str = 'D',
-                      time_range: int = 90) -> Optional[Dict[str, Any]]:
+    async def analyze_trend(self, stock_code: str, period: str = 'D',
+                            time_range: int = 90) -> Optional[Dict[str, Any]]:
         """
-        趋势分析
+        异步趋势分析
 
         Args:
             stock_code: 股票代码
@@ -144,7 +167,13 @@ class AnalysisService(CacheableService, ConfigurableService):
             return cached_result
 
         try:
-            stock_data = self._get_stock_data(stock_code, period, time_range)
+            # 异步获取股票数据
+            stock_data_result = await self.data_manager.request_chart_data(
+                stock_code=stock_code, period=period, indicators=[]
+            )
+            stock_data = stock_data_result.get(
+                'kline_data') if stock_data_result else None
+
             if stock_data is None or stock_data.empty:
                 return None
 
@@ -161,7 +190,8 @@ class AnalysisService(CacheableService, ConfigurableService):
             trend_long = self._judge_trend(current_price, ma60.iloc[-1])
 
             # 多空排列
-            ma_arrangement = self._analyze_ma_arrangement(ma5.iloc[-1], ma20.iloc[-1], ma60.iloc[-1])
+            ma_arrangement = self._analyze_ma_arrangement(
+                ma5.iloc[-1], ma20.iloc[-1], ma60.iloc[-1])
 
             # 趋势强度
             trend_strength = self._calculate_trend_strength(stock_data)
@@ -186,10 +216,10 @@ class AnalysisService(CacheableService, ConfigurableService):
             logger.error(f"Failed to analyze trend for {stock_code}: {e}")
             return None
 
-    def analyze_support_resistance(self, stock_code: str, period: str = 'D',
-                                   time_range: int = 180) -> Optional[Dict[str, Any]]:
+    async def analyze_support_resistance(self, stock_code: str, period: str = 'D',
+                                         time_range: int = 180) -> Optional[Dict[str, Any]]:
         """
-        支撑阻力分析
+        异步支撑阻力分析
 
         Args:
             stock_code: 股票代码
@@ -207,7 +237,13 @@ class AnalysisService(CacheableService, ConfigurableService):
             return cached_result
 
         try:
-            stock_data = self._get_stock_data(stock_code, period, time_range)
+            # 异步获取股票数据
+            stock_data_result = await self.data_manager.request_chart_data(
+                stock_code=stock_code, period=period, indicators=[]
+            )
+            stock_data = stock_data_result.get(
+                'kline_data') if stock_data_result else None
+
             if stock_data is None or stock_data.empty:
                 return None
 
@@ -236,13 +272,14 @@ class AnalysisService(CacheableService, ConfigurableService):
             return result
 
         except Exception as e:
-            logger.error(f"Failed to analyze support/resistance for {stock_code}: {e}")
+            logger.error(
+                f"Failed to analyze support/resistance for {stock_code}: {e}")
             return None
 
-    def run_strategy_analysis(self, stock_code: str, strategy_name: str,
-                              parameters: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+    async def run_strategy_analysis(self, stock_code: str, strategy_name: str,
+                                    parameters: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """
-        运行策略分析
+        异步运行策略分析
 
         Args:
             stock_code: 股票代码
@@ -255,23 +292,33 @@ class AnalysisService(CacheableService, ConfigurableService):
         self._ensure_initialized()
 
         if strategy_name not in self._strategies:
-            logger.warning(f"Unknown strategy: {strategy_name}")
+            logger.error(f"Strategy not found: {strategy_name}")
             return None
 
-        cache_key = f"strategy_{strategy_name}_{stock_code}_{hash(str(parameters))}"
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
+        # 这是一个示例，实际策略可能需要不同的数据
+        time_range = parameters.get('time_range', 365)
 
+        # 异步获取数据
+        stock_data_result = await self.data_manager.request_chart_data(
+            stock_code=stock_code, period='D', indicators=[]
+        )
+        stock_data = stock_data_result.get(
+            'kline_data') if stock_data_result else None
+
+        if stock_data is None or stock_data.empty:
+            logger.warning(
+                f"No data for {stock_code} to run strategy {strategy_name}")
+            return None
+
+        # 运行策略
         try:
             strategy_func = self._strategies[strategy_name]
-            result = strategy_func(stock_code, parameters or {})
+            # 策略函数现在是异步的
+            result = await strategy_func(stock_code, parameters or {})
 
             if result:
-                result['strategy_name'] = strategy_name
-                result['analysis_time'] = datetime.now().isoformat()
-
                 # 缓存结果
+                cache_key = f"strategy_{strategy_name}_{stock_code}_{hash(str(parameters))}"
                 self.put_to_cache(cache_key, result)
 
                 # 发布分析完成事件
@@ -288,7 +335,8 @@ class AnalysisService(CacheableService, ConfigurableService):
             return result
 
         except Exception as e:
-            logger.error(f"Failed to run strategy {strategy_name} for {stock_code}: {e}")
+            logger.error(
+                f"Failed to run strategy {strategy_name} for {stock_code}: {e}")
             return None
 
     def get_available_strategies(self) -> List[str]:
@@ -331,63 +379,10 @@ class AnalysisService(CacheableService, ConfigurableService):
 
         return results
 
-    def _on_stock_selected(self, event: StockSelectedEvent) -> None:
-        """处理股票选择事件"""
-        try:
-            stock_code = event.stock_code
-
-            # 避免重复处理相同股票
-            if self._current_stock_code == stock_code:
-                logger.debug(f"Analysis service already handling {stock_code}, skipping")
-                return
-
-            self._current_stock_code = stock_code
-
-            # 使用统一数据管理器请求分析数据，避免重复加载
-            try:
-                from .unified_data_manager import UnifiedDataManager
-                from ..containers import get_service_container
-
-                container = get_service_container()
-                data_manager = container.try_resolve(UnifiedDataManager)
-
-                if data_manager:
-                    # 检查事件循环，兜底处理
-                    import asyncio
-                    try:
-                        loop = asyncio.get_event_loop()
-                        if not loop.is_running():
-                            loop.run_until_complete(asyncio.sleep(0))  # 激活事件循环
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(asyncio.sleep(0))
-                    # 异步请求分析数据，优先级设为中等
-                    data_manager.request_data(
-                        stock_code=stock_code,
-                        data_type='analysis',
-                        period='D',
-                        time_range=60,  # 减少数据量
-                        parameters={'analysis_type': 'comprehensive'},
-                        priority=1,  # 中优先级
-                        callback=self._on_analysis_data_received
-                    )
-
-                    logger.info(f"Starting comprehensive analysis for {stock_code}")
-                else:
-                    # 降级到原有逻辑
-                    logger.warning("Unified data manager not available, falling back to direct analysis")
-                    self._fallback_analysis(stock_code)
-
-            except Exception as e:
-                logger.warning(f"Failed to use unified data manager: {e}")
-                self._fallback_analysis(stock_code)
-
-        except Exception as e:
-            logger.error(f"Failed to handle stock selected event: {e}")
-
     def _on_analysis_data_received(self, data, error=None):
-        """处理接收到的分析数据"""
+        """
+        异步数据接收回调
+        """
         try:
             if error:
                 logger.error(f"Analysis data request failed: {error}")
@@ -403,33 +398,27 @@ class AnalysisService(CacheableService, ConfigurableService):
                 event.data.update(data)
                 self.event_bus.publish(event)
 
-                logger.debug(f"Analysis data received and published for {self._current_stock_code}")
+                logger.debug(
+                    f"Analysis data received and published for {self._current_stock_code}")
             else:
-                logger.warning(f"No analysis data received for {self._current_stock_code}")
+                logger.warning(
+                    f"No analysis data received for {self._current_stock_code}")
 
         except Exception as e:
             logger.error(f"Error processing analysis data: {e}")
 
-    def _fallback_analysis(self, stock_code: str):
-        """降级分析逻辑"""
+    async def _fallback_analysis(self, stock_code: str):
+        """降级分析，直接请求数据并运行"""
         try:
-            # 获取股票服务
-            stock_service = self._get_stock_service()
-            if not stock_service:
-                logger.warning("Stock service not available for analysis")
-                return
-
-            # 快速检查股票是否有数据
-            test_data = stock_service.get_stock_data(stock_code, period='D', count=1)
-            if test_data is None or test_data.empty:
-                logger.warning(f"No data available for {stock_code}")
-                return
-
-            # 异步运行自动分析，避免阻塞
-            self._run_auto_analysis_async(stock_code)
-
+            # 异步请求分析数据，优先级设为中等
+            await self.data_manager.request_data(
+                stock_code=stock_code,
+                data_type='analysis',
+                priority='medium'
+            )
+            logger.info(f"Fallback analysis requested for {stock_code}")
         except Exception as e:
-            logger.error(f"Fallback analysis failed: {e}")
+            logger.error(f"Fallback analysis failed for {stock_code}: {e}")
 
     def _run_auto_analysis_async(self, stock_code: str) -> None:
         """异步运行自动分析"""
@@ -445,56 +434,42 @@ class AnalysisService(CacheableService, ConfigurableService):
             logger.error(f"Failed to schedule auto analysis: {e}")
 
     def _run_auto_analysis(self, stock_code: str) -> None:
-        """运行自动分析"""
-        try:
-            # 只进行基础分析，避免过度计算
-            logger.info(f"Starting basic analysis for {stock_code}")
+        """自动执行一系列分析"""
+        async def analysis_coroutine():
+            try:
+                logger.info(f"开始为 {stock_code} 自动执行异步分析...")
+                # 并发执行所有分析任务
+                tasks = [
+                    self.calculate_technical_indicators(stock_code),
+                    self.analyze_trend(stock_code),
+                    self.analyze_support_resistance(stock_code)
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # 计算基础技术指标（减少数据量）
-            indicators = self.calculate_technical_indicators(stock_code, time_range=60)
+                # 处理结果
+                final_result = {'stock_code': stock_code}
+                for res in results:
+                    if isinstance(res, dict):
+                        final_result.update(res)
+                    elif isinstance(res, Exception):
+                        logger.error(f"分析任务失败: {res}")
 
-            if indicators:
-                # 简单的趋势分析
-                trend = self.analyze_trend(stock_code, time_range=30)
+                self._on_analysis_data_received(final_result)
+                logger.info(f"为 {stock_code} 完成自动异步分析。")
 
-                logger.info(f"Basic analysis completed for {stock_code}")
-            else:
-                logger.warning(f"No indicators calculated for {stock_code}")
+            except Exception as e:
+                logger.error(f"自动分析协程失败: {e}", exc_info=True)
+                self._on_analysis_data_received(None, error=str(e))
 
-        except Exception as e:
-            logger.error(f"Failed to run auto analysis for {stock_code}: {e}")
+        asyncio.create_task(analysis_coroutine())
 
     def _get_stock_service(self):
-        """获取股票服务"""
-        try:
-            if hasattr(self, 'service_container') and self.service_container:
-                from . import StockService
-                return self.service_container.get_service(StockService)
-            else:
-                # 通过事件总线获取服务容器
-                from ..containers import get_service_container
-                from .stock_service import StockService
-                container = get_service_container()
-                return container.try_resolve(StockService)
-        except Exception as e:
-            logger.error(f"Failed to get stock service: {e}")
-        return None
+        raise NotImplementedError(
+            "_get_stock_service is deprecated. Use self.data_manager instead.")
 
     def _get_stock_data(self, stock_code: str, period: str, time_range: int) -> Optional[pd.DataFrame]:
-        """获取股票数据"""
-        try:
-            from ..containers import get_service_container
-            from .stock_service import StockService
-            container = get_service_container()
-            stock_service = container.try_resolve(StockService)
-
-            if stock_service:
-                return stock_service.get_stock_data(stock_code, period, time_range)
-            return None
-
-        except Exception as e:
-            logger.error(f"Failed to get stock data: {e}")
-            return None
+        raise NotImplementedError(
+            "_get_stock_data is deprecated. Use self.data_manager instead.")
 
     def _calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
         """计算移动平均线"""
@@ -605,7 +580,8 @@ class AnalysisService(CacheableService, ConfigurableService):
 
         tp = (high + low + close) / 3
         ma_tp = tp.rolling(window=period).mean()
-        mad = tp.rolling(window=period).apply(lambda x: np.mean(np.abs(x - x.mean())))
+        mad = tp.rolling(window=period).apply(
+            lambda x: np.mean(np.abs(x - x.mean())))
         cci = (tp - ma_tp) / (0.015 * mad)
 
         return cci
@@ -701,49 +677,84 @@ class AnalysisService(CacheableService, ConfigurableService):
             'bollinger_squeeze': self._bollinger_squeeze_strategy
         }
 
-    def _golden_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """黄金交叉策略"""
-        return {
-            'signal': 'BUY',
-            'confidence': 0.8,
-            'description': '黄金交叉信号'
-        }
+    async def _golden_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """金叉策略"""
+        short_ma = parameters.get('short_ma', 5)
+        long_ma = parameters.get('long_ma', 20)
 
-    def _death_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """死亡交叉策略"""
-        return {
-            'signal': 'SELL',
-            'confidence': 0.8,
-            'description': '死亡交叉信号'
-        }
+        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=long_ma + 2)
+        if data is None or data.empty:
+            return None
 
-    def _rsi_oversold_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        ma_short = self._calculate_ma(data, short_ma)
+        ma_long = self._calculate_ma(data, long_ma)
+
+        if ma_short.iloc[-2] < ma_long.iloc[-2] and ma_short.iloc[-1] > ma_long.iloc[-1]:
+            return {'signal': 'buy', 'desc': f'金叉: MA{short_ma}上穿MA{long_ma}'}
+        return None
+
+    async def _death_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """死叉策略"""
+        short_ma = parameters.get('short_ma', 5)
+        long_ma = parameters.get('long_ma', 20)
+
+        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=long_ma + 2)
+        if data is None or data.empty:
+            return None
+
+        ma_short = self._calculate_ma(data, short_ma)
+        ma_long = self._calculate_ma(data, long_ma)
+
+        if ma_short.iloc[-2] > ma_long.iloc[-2] and ma_short.iloc[-1] < ma_long.iloc[-1]:
+            return {'signal': 'sell', 'desc': f'死叉: MA{short_ma}下穿MA{long_ma}'}
+        return None
+
+    async def _rsi_oversold_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """RSI超卖策略"""
-        return {
-            'signal': 'BUY',
-            'confidence': 0.7,
-            'description': 'RSI超卖信号'
-        }
+        period = parameters.get('period', 14)
+        threshold = parameters.get('threshold', 30)
 
-    def _rsi_overbought_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
+        if data is None or data.empty:
+            return None
+
+        rsi = self._calculate_rsi(data, period)
+        if rsi.iloc[-1] < threshold:
+            return {'signal': 'buy', 'desc': f'RSI({period})进入超卖区: {rsi.iloc[-1]:.2f}'}
+        return None
+
+    async def _rsi_overbought_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """RSI超买策略"""
-        return {
-            'signal': 'SELL',
-            'confidence': 0.7,
-            'description': 'RSI超买信号'
-        }
+        period = parameters.get('period', 14)
+        threshold = parameters.get('threshold', 70)
 
-    def _bollinger_squeeze_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """布林带收窄策略"""
-        return {
-            'signal': 'WATCH',
-            'confidence': 0.6,
-            'description': '布林带收窄信号'
-        }
+        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
+        if data is None or data.empty:
+            return None
 
-    def start_technical_analysis(self, stock_code: str = None) -> bool:
+        rsi = self._calculate_rsi(data, period)
+        if rsi.iloc[-1] > threshold:
+            return {'signal': 'sell', 'desc': f'RSI({period})进入超买区: {rsi.iloc[-1]:.2f}'}
+        return None
+
+    async def _bollinger_squeeze_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """布林带挤压策略"""
+        period = parameters.get('period', 20)
+
+        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
+        if data is None or data.empty:
+            return None
+
+        boll = self._calculate_bollinger_bands(data)
+        band_width = (boll['upper'] - boll['lower']) / boll['middle']
+
+        if band_width.iloc[-1] < 0.1:  # 示例阈值
+            return {'signal': 'observe', 'desc': f'布林带收窄，可能预示变盘'}
+        return None
+
+    async def start_technical_analysis(self, stock_code: str = None) -> bool:
         """
-        启动技术分析
+        异步启动技术分析
 
         Args:
             stock_code: 股票代码，如果为None则使用当前选择的股票
@@ -751,67 +762,62 @@ class AnalysisService(CacheableService, ConfigurableService):
         Returns:
             是否成功启动分析
         """
-        try:
-            # 确定要分析的股票代码
-            target_stock_code = stock_code or self._current_stock_code
-            if not target_stock_code:
-                logger.warning("No stock selected for technical analysis")
-                return False
+        # 确定要分析的股票代码
+        target_stock_code = stock_code or self._current_stock_code
+        if not target_stock_code:
+            logger.warning("No stock selected for technical analysis")
+            return False
 
-            logger.info(f"开始技术分析: {target_stock_code}")
+        logger.info(f"开始技术分析: {target_stock_code}")
 
-            # 运行完整的技术分析
-            analysis_results = {}
+        # 运行完整的技术分析
+        analysis_results = {}
 
-            # 1. 计算技术指标
-            indicators_result = self.calculate_technical_indicators(
-                target_stock_code,
-                indicators=['MA', 'MACD', 'RSI', 'KDJ', 'BOLL']
+        # 1. 计算技术指标
+        indicators_result = await self.calculate_technical_indicators(
+            target_stock_code,
+            indicators=['MA', 'MACD', 'RSI', 'KDJ', 'BOLL']
+        )
+        if indicators_result:
+            analysis_results['technical_indicators'] = indicators_result
+
+        # 2. 趋势分析
+        trend_result = await self.analyze_trend(target_stock_code)
+        if trend_result:
+            analysis_results['trend_analysis'] = trend_result
+
+        # 3. 支撑阻力分析
+        support_resistance_result = await self.analyze_support_resistance(target_stock_code)
+        if support_resistance_result:
+            analysis_results['support_resistance'] = support_resistance_result
+
+        # 4. 运行策略分析
+        strategy_results = {}
+        for strategy_name in self.get_available_strategies():
+            strategy_result = await self.run_strategy_analysis(target_stock_code, strategy_name)
+            if strategy_result:
+                strategy_results[strategy_name] = strategy_result
+
+        if strategy_results:
+            analysis_results['strategy_analysis'] = strategy_results
+
+        # 发布分析完成事件
+        if analysis_results:
+            event = AnalysisCompleteEvent(
+                analysis_type='technical',
+                stock_code=target_stock_code
             )
-            if indicators_result:
-                analysis_results['technical_indicators'] = indicators_result
+            event.data.update({
+                'comprehensive_analysis': True,
+                'results': analysis_results,
+                'analysis_time': datetime.now().isoformat()
+            })
+            self.event_bus.publish(event)
 
-            # 2. 趋势分析
-            trend_result = self.analyze_trend(target_stock_code)
-            if trend_result:
-                analysis_results['trend_analysis'] = trend_result
-
-            # 3. 支撑阻力分析
-            support_resistance_result = self.analyze_support_resistance(target_stock_code)
-            if support_resistance_result:
-                analysis_results['support_resistance'] = support_resistance_result
-
-            # 4. 运行策略分析
-            strategy_results = {}
-            for strategy_name in self.get_available_strategies():
-                strategy_result = self.run_strategy_analysis(target_stock_code, strategy_name)
-                if strategy_result:
-                    strategy_results[strategy_name] = strategy_result
-
-            if strategy_results:
-                analysis_results['strategy_analysis'] = strategy_results
-
-            # 发布分析完成事件
-            if analysis_results:
-                event = AnalysisCompleteEvent(
-                    analysis_type='technical',
-                    stock_code=target_stock_code
-                )
-                event.data.update({
-                    'comprehensive_analysis': True,
-                    'results': analysis_results,
-                    'analysis_time': datetime.now().isoformat()
-                })
-                self.event_bus.publish(event)
-
-                logger.info(f"技术分析完成: {target_stock_code}")
-                return True
-            else:
-                logger.warning(f"技术分析未产生结果: {target_stock_code}")
-                return False
-
-        except Exception as e:
-            logger.error(f"Failed to start technical analysis: {e}")
+            logger.info(f"技术分析完成: {target_stock_code}")
+            return True
+        else:
+            logger.warning(f"技术分析未产生结果: {target_stock_code}")
             return False
 
     def _do_dispose(self) -> None:
@@ -821,66 +827,87 @@ class AnalysisService(CacheableService, ConfigurableService):
         self._strategies.clear()
         super()._do_dispose()
 
-    def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive') -> Optional[Dict[str, Any]]:
+    async def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive') -> Optional[Dict[str, Any]]:
         """
-        综合股票分析
+        异步分析股票
 
         Args:
             stock_code: 股票代码
-            analysis_type: 分析类型 ('comprehensive', 'technical', 'trend', 'support_resistance')
+            analysis_type: comprehensive | technical | trend | support_resistance | strategy
 
         Returns:
-            分析结果
+            分析结果字典
         """
         self._ensure_initialized()
+        target_stock_code = stock_code or self._current_stock_code
+        if not target_stock_code:
+            logger.warning("No stock selected for analysis.")
+            return None
 
         try:
-            logger.info(f"Starting {analysis_type} analysis for {stock_code}")
-
             if analysis_type == 'comprehensive':
-                # 综合分析
-                result = {
-                    'stock_code': stock_code,
-                    'analysis_type': analysis_type,
-                    'timestamp': datetime.now().isoformat()
+                analysis_results = {'stock_code': target_stock_code}
+
+                # 并发执行分析
+                tasks = {
+                    'technical': self.calculate_technical_indicators(target_stock_code),
+                    'trend': self.analyze_trend(target_stock_code),
+                    'support_resistance': self.analyze_support_resistance(target_stock_code)
                 }
 
-                # 技术指标分析
-                technical_result = self.calculate_technical_indicators(stock_code)
-                if technical_result:
-                    result['technical_indicators'] = technical_result
+                results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-                # 趋势分析
-                trend_result = self.analyze_trend(stock_code)
-                if trend_result:
-                    result['trend_analysis'] = trend_result
+                for key, result in zip(tasks.keys(), results):
+                    if not isinstance(result, Exception):
+                        analysis_results[key] = result
+                    else:
+                        logger.error(
+                            f"Comprehensive analysis sub-task '{key}' failed: {result}")
 
-                # 支撑阻力分析
-                sr_result = self.analyze_support_resistance(stock_code)
-                if sr_result:
-                    result['support_resistance'] = sr_result
+                # 策略分析
+                strategy_results = {}
+                strategy_tasks = [self.run_strategy_analysis(
+                    target_stock_code, name) for name in self.get_available_strategies()]
+                strategy_run_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)
 
-                return result
+                for i, name in enumerate(self.get_available_strategies()):
+                    if not isinstance(strategy_run_results[i], Exception) and strategy_run_results[i] is not None:
+                        strategy_results[name] = strategy_run_results[i]
+
+                analysis_results['strategy_analysis'] = strategy_results
+                return analysis_results
 
             elif analysis_type == 'technical':
-                return self.calculate_technical_indicators(stock_code)
+                return await self.calculate_technical_indicators(target_stock_code)
 
             elif analysis_type == 'trend':
-                return self.analyze_trend(stock_code)
+                return await self.analyze_trend(target_stock_code)
 
             elif analysis_type == 'support_resistance':
-                return self.analyze_support_resistance(stock_code)
+                return await self.analyze_support_resistance(target_stock_code)
+
+            elif analysis_type == 'strategy':
+                strategy_results = {}
+                strategy_tasks = [self.run_strategy_analysis(
+                    target_stock_code, name) for name in self.get_available_strategies()]
+                strategy_run_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)
+
+                for i, name in enumerate(self.get_available_strategies()):
+                    if not isinstance(strategy_run_results[i], Exception) and strategy_run_results[i] is not None:
+                        strategy_results[name] = strategy_run_results[i]
+                return strategy_results
 
             else:
-                logger.warning(f"Unknown analysis type: {analysis_type}")
+                logger.warning(f"Unsupported analysis type: {analysis_type}")
                 return None
 
         except Exception as e:
-            logger.error(f"Failed to analyze stock {stock_code}: {e}")
+            logger.error(
+                f"Failed to analyze stock {target_stock_code}: {e}", exc_info=True)
             return None
 
     def calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
-        """计算移动平均线的公共接口"""
+        """计算移动平均线"""
         return self._calculate_ma(data, period)
 
     def calculate_macd(self, data: pd.DataFrame) -> Dict[str, pd.Series]:

@@ -123,7 +123,8 @@ def test_analysis_widget_preprocess():
                 else:
                     print(f"   [{context}] 缺少datetime字段，自动补全")
                     kdata = kdata.copy()
-                    kdata['datetime'] = pd.date_range(start='2023-01-01', periods=len(kdata), freq='D')
+                    kdata['datetime'] = pd.date_range(
+                        start='2023-01-01', periods=len(kdata), freq='D')
                     has_datetime = True
 
             return kdata

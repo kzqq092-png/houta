@@ -97,7 +97,8 @@ class ProfessionalUISystem:
         if 'monitoring_data' not in st.session_state:
             st.session_state.monitoring_data = []
         if 'selected_metrics' not in st.session_state:
-            st.session_state.selected_metrics = ['cumulative_return', 'drawdown', 'sharpe_ratio']
+            st.session_state.selected_metrics = [
+                'cumulative_return', 'drawdown', 'sharpe_ratio']
         if 'alerts' not in st.session_state:
             st.session_state.alerts = []
         if 'backtest_engine' not in st.session_state:
@@ -300,7 +301,8 @@ class ProfessionalUISystem:
     def render_main_dashboard(self):
         """渲染主仪表板"""
         # 主标�?
-        st.markdown('<h1 class="main-title">📈 HIkyuu Professional Backtest System</h1>', unsafe_allow_html=True)
+        st.markdown(
+            '<h1 class="main-title">📈 HIkyuu Professional Backtest System</h1>', unsafe_allow_html=True)
 
         # 顶部状态栏
         self._render_status_bar()
@@ -333,14 +335,18 @@ class ProfessionalUISystem:
 
         with col2:
             current_time = datetime.now().strftime("%H:%M:%S")
-            st.markdown(f'<div class="real-time-data">⏰ 当前时间: {current_time}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="real-time-data">⏰ 当前时间: {current_time}</div>', unsafe_allow_html=True)
 
         with col3:
             if st.session_state.backtest_results:
-                latest_result = list(st.session_state.backtest_results.values())[-1]
+                latest_result = list(
+                    st.session_state.backtest_results.values())[-1]
                 risk_metrics = latest_result.get('risk_metrics', {})
-                sharpe = getattr(risk_metrics, 'sharpe_ratio', 0) if hasattr(risk_metrics, 'sharpe_ratio') else risk_metrics.get('sharpe_ratio', 0)
-                st.markdown(f'<div class="real-time-data">📊 Sharpe比率: {sharpe:.3f}</div>', unsafe_allow_html=True)
+                sharpe = getattr(risk_metrics, 'sharpe_ratio', 0) if hasattr(
+                    risk_metrics, 'sharpe_ratio') else risk_metrics.get('sharpe_ratio', 0)
+                st.markdown(
+                    f'<div class="real-time-data">📊 Sharpe比率: {sharpe:.3f}</div>', unsafe_allow_html=True)
 
         with col4:
             if st.session_state.monitoring_data:
@@ -356,24 +362,30 @@ class ProfessionalUISystem:
             if st.session_state.monitoring_data:
                 latest_data = st.session_state.monitoring_data[-1]
                 drawdown = latest_data.get('max_drawdown', 0) * 100
-                st.markdown(f'<div class="real-time-data">📉 最大回撤: {drawdown:.2f}%</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="real-time-data">📉 最大回撤: {drawdown:.2f}%</div>', unsafe_allow_html=True)
 
     def _render_control_panel(self):
         """渲染控制面板"""
-        st.markdown('<h3 class="sub-title">🎛�?控制面板</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="sub-title">🎛�?控制面板</h3>',
+                    unsafe_allow_html=True)
 
         with st.container():
             # 回测参数设置
             st.subheader("回测参数")
 
-            initial_capital = st.number_input("初始资金", min_value=10000, max_value=10000000, value=1000000, step=10000)
-            position_size = st.slider("仓位大小", min_value=0.1, max_value=1.0, value=0.95, step=0.05)
-            commission_pct = st.number_input("手续费率", min_value=0.0001, max_value=0.01, value=0.0003, step=0.0001, format="%.4f")
+            initial_capital = st.number_input(
+                "初始资金", min_value=10000, max_value=10000000, value=1000000, step=10000)
+            position_size = st.slider(
+                "仓位大小", min_value=0.1, max_value=1.0, value=0.95, step=0.05)
+            commission_pct = st.number_input(
+                "手续费率", min_value=0.0001, max_value=0.01, value=0.0003, step=0.0001, format="%.4f")
 
             # 专业级别选择
             professional_level = st.selectbox(
                 "专业级别",
-                options=["RETAIL", "INSTITUTIONAL", "HEDGE_FUND", "INVESTMENT_BANK"],
+                options=["RETAIL", "INSTITUTIONAL",
+                         "HEDGE_FUND", "INVESTMENT_BANK"],
                 index=3,
                 help="选择回测的专业级别，影响计算精度和指标数量"
             )
@@ -398,7 +410,8 @@ class ProfessionalUISystem:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🚀 开始回测", use_container_width=True):
-                    self._start_backtest(initial_capital, position_size, commission_pct, professional_level, performance_level)
+                    self._start_backtest(
+                        initial_capital, position_size, commission_pct, professional_level, performance_level)
 
             with col2:
                 if st.button("⏹️ 停止监控", use_container_width=True):
@@ -406,10 +419,12 @@ class ProfessionalUISystem:
 
     def _render_metrics_summary(self):
         """渲染指标摘要"""
-        st.markdown('<h3 class="sub-title">📊 关键指标</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="sub-title">📊 关键指标</h3>',
+                    unsafe_allow_html=True)
 
         if st.session_state.backtest_results:
-            latest_result = list(st.session_state.backtest_results.values())[-1]
+            latest_result = list(
+                st.session_state.backtest_results.values())[-1]
             risk_metrics = latest_result.get('risk_metrics', {})
 
             # 处理风险指标（可能是对象或字典）
@@ -461,10 +476,12 @@ class ProfessionalUISystem:
 
     def _render_main_charts(self):
         """渲染主要图表"""
-        st.markdown('<h3 class="sub-title">📈 实时图表</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="sub-title">📈 实时图表</h3>',
+                    unsafe_allow_html=True)
 
         # 图表选项�?
-        tab1, tab2, tab3, tab4 = st.tabs(["📊 收益分析", "⚠️ 风险分析", "💹 交易分析", "🔧 性能分析"])
+        tab1, tab2, tab3, tab4 = st.tabs(
+            ["📊 收益分析", "⚠️ 风险分析", "💹 交易分析", "🔧 性能分析"])
 
         with tab1:
             self._render_performance_charts()
@@ -617,7 +634,8 @@ class ProfessionalUISystem:
 
         # 回撤持续期
         if 'current_drawdown' in df.columns:
-            drawdown_duration = self._calculate_drawdown_duration(df['current_drawdown'])
+            drawdown_duration = self._calculate_drawdown_duration(
+                df['current_drawdown'])
             fig.add_trace(
                 go.Bar(
                     x=list(range(len(drawdown_duration))),
@@ -707,7 +725,8 @@ class ProfessionalUISystem:
                         y=[1] * len(buy_signals),
                         mode='markers',
                         name="买入信号",
-                        marker=dict(color=self.theme["accent_green"], size=10, symbol='triangle-up')
+                        marker=dict(
+                            color=self.theme["accent_green"], size=10, symbol='triangle-up')
                     ),
                     row=1, col=2
                 )
@@ -719,7 +738,8 @@ class ProfessionalUISystem:
                         y=[-1] * len(sell_signals),
                         mode='markers',
                         name="卖出信号",
-                        marker=dict(color=self.theme["accent_red"], size=10, symbol='triangle-down')
+                        marker=dict(
+                            color=self.theme["accent_red"], size=10, symbol='triangle-down')
                     ),
                     row=1, col=2
                 )
@@ -789,7 +809,8 @@ class ProfessionalUISystem:
             st.metric("CPU使用率", f"{cpu_usage:.1f}%")
 
             # 向量化比?
-            vectorization_ratio = performance_metrics.get('vectorization_ratio', 0)
+            vectorization_ratio = performance_metrics.get(
+                'vectorization_ratio', 0)
             st.metric("向量化比率", f"{vectorization_ratio:.2%}")
 
         # 性能趋势图
@@ -819,7 +840,8 @@ class ProfessionalUISystem:
 
     def _render_real_time_monitor(self):
         """渲染实时监控面板"""
-        st.markdown('<h3 class="sub-title">📡 实时监控</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="sub-title">📡 实时监控</h3>',
+                    unsafe_allow_html=True)
 
         # 监控状态
         if self.is_running:
@@ -851,7 +873,8 @@ class ProfessionalUISystem:
 
         # 监控历史
         if len(st.session_state.monitoring_data) > 1:
-            df = pd.DataFrame(st.session_state.monitoring_data[-20:])  # 显示最近20个数据点
+            df = pd.DataFrame(
+                st.session_state.monitoring_data[-20:])  # 显示最近20个数据点
 
             # 简化的实时图表
             fig = go.Figure()
@@ -878,7 +901,8 @@ class ProfessionalUISystem:
 
     def _render_alerts_panel(self):
         """渲染预警面板"""
-        st.markdown('<h3 class="sub-title">⚠️ 预警中心</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="sub-title">⚠️ 预警中心</h3>',
+                    unsafe_allow_html=True)
 
         # 获取当前预警
         current_alerts = self._get_current_alerts()
@@ -954,7 +978,8 @@ class ProfessionalUISystem:
             st.info("正在启动回测...")
 
             # 生成模拟数据进行演示
-            backtest_result = self._generate_mock_backtest_result(initial_capital)
+            backtest_result = self._generate_mock_backtest_result(
+                initial_capital)
 
             # 存储结果
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -973,7 +998,8 @@ class ProfessionalUISystem:
         """生成模拟回测结果用于演示"""
         try:
             # 生成模拟数据
-            dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
+            dates = pd.date_range(start='2023-01-01',
+                                  end='2023-12-31', freq='D')
             n_days = len(dates)
 
             # 模拟价格数据
@@ -995,7 +1021,8 @@ class ProfessionalUISystem:
             }, index=dates)
 
             # 计算风险指标
-            total_return = (backtest_df['capital'].iloc[-1] / initial_capital) - 1
+            total_return = (
+                backtest_df['capital'].iloc[-1] / initial_capital) - 1
             annualized_return = (1 + total_return) ** (252 / n_days) - 1
             volatility = returns.std() * np.sqrt(252)
             sharpe_ratio = annualized_return / volatility if volatility != 0 else 0
@@ -1081,7 +1108,8 @@ class ProfessionalUISystem:
                     break
 
         # 启动监控线程
-        self.update_thread = threading.Thread(target=monitoring_loop, daemon=True)
+        self.update_thread = threading.Thread(
+            target=monitoring_loop, daemon=True)
         self.update_thread.start()
 
     def _stop_monitoring(self):

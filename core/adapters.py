@@ -97,7 +97,8 @@ class DataValidator:
     """数据验证器适配器"""
 
     def __init__(self):
-        self._validator = ProfessionalDataValidator(validation_level=ValidationLevel.STANDARD)
+        self._validator = ProfessionalDataValidator(
+            validation_level=ValidationLevel.STANDARD)
 
     def validate_strategy_data(self, strategy_data: Dict[str, Any]) -> bool:
         """

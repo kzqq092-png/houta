@@ -96,9 +96,11 @@ class EnhancedPatternRecognizer:
             cached_result = cache.get(kdata, cache_config)
             if cached_result is not None:
                 monitor.record_cache_hit()
-                monitor.end_recognition(success=True, pattern_count=len(cached_result))
+                monitor.end_recognition(
+                    success=True, pattern_count=len(cached_result))
                 if self.debug_mode:
-                    print(f"[EnhancedPatternRecognizer] 缓存命中，返回 {len(cached_result)} 个形态")
+                    print(
+                        f"[EnhancedPatternRecognizer] 缓存命中，返回 {len(cached_result)} 个形态")
                 return cached_result
 
             monitor.record_cache_miss()
@@ -142,7 +144,8 @@ class EnhancedPatternRecognizer:
 
                     except Exception as e:
                         if self.debug_mode:
-                            print(f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 失败: {e}")
+                            print(
+                                f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 失败: {e}")
                         continue
 
             except ImportError:
@@ -175,17 +178,20 @@ class EnhancedPatternRecognizer:
                         all_results.extend(filtered_results)
                     except Exception as e:
                         if self.debug_mode:
-                            print(f"[EnhancedPatternRecognizer] 内置方法 {pattern_name} 失败: {e}")
+                            print(
+                                f"[EnhancedPatternRecognizer] 内置方法 {pattern_name} 失败: {e}")
                         continue
 
             # 缓存结果
             cache.put(kdata, cache_config, all_results)
 
             # 结束性能监控
-            monitor.end_recognition(success=True, pattern_count=len(all_results))
+            monitor.end_recognition(
+                success=True, pattern_count=len(all_results))
 
             if self.debug_mode:
-                print(f"[EnhancedPatternRecognizer] 识别完成，共找到 {len(all_results)} 个形态")
+                print(
+                    f"[EnhancedPatternRecognizer] 识别完成，共找到 {len(all_results)} 个形态")
 
             return all_results
 
@@ -263,7 +269,8 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 数据大小检查，防止处理过大数据集
             if len(kdata) > 50000:  # 限制最大数据量
-                print(f"[DatabaseAlgorithmRecognizer] 数据量过大({len(kdata)})，跳过算法: {self.config.english_name}")
+                print(
+                    f"[DatabaseAlgorithmRecognizer] 数据量过大({len(kdata)})，跳过算法: {self.config.english_name}")
                 return []
 
             # 创建增强的安全执行环境
@@ -274,7 +281,8 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             return self._execute_algorithm_safely(algorithm_code, safe_globals, safe_locals)
 
         except Exception as e:
-            print(f"[DatabaseAlgorithmRecognizer] 执行算法失败 {self.config.english_name}: {e}")
+            print(
+                f"[DatabaseAlgorithmRecognizer] 执行算法失败 {self.config.english_name}: {e}")
             return []
 
     def _execute_algorithm_safely(self, algorithm_code: str, safe_globals: dict, safe_locals: dict) -> List[PatternResult]:
@@ -325,13 +333,15 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 检查是否超时
             if execution_thread.is_alive():
-                print(f"[DatabaseAlgorithmRecognizer] 算法执行超时 {self.config.english_name} (>{timeout_seconds}秒)")
+                print(
+                    f"[DatabaseAlgorithmRecognizer] 算法执行超时 {self.config.english_name} (>{timeout_seconds}秒)")
                 return []
 
             # 检查执行过程中是否有错误
             if '_execution_error' in safe_locals:
                 error = safe_locals['_execution_error']
-                print(f"[DatabaseAlgorithmRecognizer] 算法执行错误 {self.config.english_name}: {error}")
+                print(
+                    f"[DatabaseAlgorithmRecognizer] 算法执行错误 {self.config.english_name}: {error}")
                 return []
 
             # 检查内存使用是否异常增长
@@ -341,7 +351,8 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                     memory_increase = end_memory - start_memory
 
                     if memory_increase > 500:  # 如果内存增长超过500MB
-                        print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 内存使用异常增长 {memory_increase:.1f}MB")
+                        print(
+                            f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 内存使用异常增长 {memory_increase:.1f}MB")
                 except:
                     pass
 
@@ -350,23 +361,28 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 限制结果数量，防止内存问题
             if len(raw_results) > 10000:
-                print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 返回结果过多({len(raw_results)})，截取前10000个")
+                print(
+                    f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 返回结果过多({len(raw_results)})，截取前10000个")
                 raw_results = raw_results[:10000]
 
             execution_time = time.time() - start_time
             if execution_time > 10:  # 如果执行时间超过10秒，给出警告
-                print(f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 执行时间较长 {execution_time:.1f}秒")
+                print(
+                    f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 执行时间较长 {execution_time:.1f}秒")
 
             return self._convert_enhanced_results(raw_results)
 
         except MemoryError as e:
-            print(f"[DatabaseAlgorithmRecognizer] 内存不足 {self.config.english_name}: {e}")
+            print(
+                f"[DatabaseAlgorithmRecognizer] 内存不足 {self.config.english_name}: {e}")
             return []
         except RecursionError as e:
-            print(f"[DatabaseAlgorithmRecognizer] 递归深度超限 {self.config.english_name}: {e}")
+            print(
+                f"[DatabaseAlgorithmRecognizer] 递归深度超限 {self.config.english_name}: {e}")
             return []
         except Exception as e:
-            print(f"[DatabaseAlgorithmRecognizer] 算法执行异常 {self.config.english_name}: {e}")
+            print(
+                f"[DatabaseAlgorithmRecognizer] 算法执行异常 {self.config.english_name}: {e}")
             return []
 
     def _create_enhanced_safe_globals(self) -> Dict[str, Any]:
@@ -683,17 +699,21 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
                 # 创建结果对象
                 result = PatternResult(
-                    pattern_type=raw_result.get('pattern_type', self.config.english_name),
+                    pattern_type=raw_result.get(
+                        'pattern_type', self.config.english_name),
                     pattern_name=self.config.name,
                     pattern_category=self.config.category.value,
                     signal_type=signal_type,
                     confidence=confidence,
-                    confidence_level=self.calculate_confidence_level(confidence),
+                    confidence_level=self.calculate_confidence_level(
+                        confidence),
                     index=int(raw_result.get('index', 0)),
                     datetime_val=raw_result.get('datetime_val'),
                     price=float(raw_result.get('price', 0.0)),
-                    start_index=int(raw_result.get('start_index')) if raw_result.get('start_index') is not None else None,
-                    end_index=int(raw_result.get('end_index')) if raw_result.get('end_index') is not None else None,
+                    start_index=int(raw_result.get('start_index')) if raw_result.get(
+                        'start_index') is not None else None,
+                    end_index=int(raw_result.get('end_index')) if raw_result.get(
+                        'end_index') is not None else None,
                     extra_data=raw_result.get('extra_data', {})
                 )
                 converted_results.append(result)
@@ -765,7 +785,8 @@ class PerformanceMonitor:
         # 更新平均处理时间
         total_time = (self.metrics['average_processing_time'] *
                       (self.metrics['total_recognitions'] - 1) + processing_time)
-        self.metrics['average_processing_time'] = total_time / self.metrics['total_recognitions']
+        self.metrics['average_processing_time'] = total_time / \
+            self.metrics['total_recognitions']
 
         # 记录历史
         self.metrics['performance_history'].append({
@@ -850,8 +871,10 @@ class PatternCache:
         import hashlib
 
         # 使用数据的哈希值和配置生成键
-        data_hash = hashlib.md5(str(kdata.values.tobytes()).encode()).hexdigest()[:16]
-        config_hash = hashlib.md5(str(sorted(config.items())).encode()).hexdigest()[:16]
+        data_hash = hashlib.md5(
+            str(kdata.values.tobytes()).encode()).hexdigest()[:16]
+        config_hash = hashlib.md5(
+            str(sorted(config.items())).encode()).hexdigest()[:16]
 
         return f"{data_hash}_{config_hash}"
 
@@ -883,7 +906,8 @@ class PatternCache:
         if not self.access_times:
             return
 
-        oldest_key = min(self.access_times.keys(), key=lambda k: self.access_times[k])
+        oldest_key = min(self.access_times.keys(),
+                         key=lambda k: self.access_times[k])
         del self.cache[oldest_key]
         del self.access_times[oldest_key]
 

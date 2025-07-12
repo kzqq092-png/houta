@@ -135,7 +135,8 @@ class DatabaseAdminDialog(QDialog):
         right_layout.addWidget(self.table_view, 8)
         # 主题表特殊说明
         self.theme_hint = QLabel()
-        self.theme_hint.setStyleSheet("color:#1976D2;font-size:13px;background:#E3F2FD;border-radius:4px;padding:4px;")
+        self.theme_hint.setStyleSheet(
+            "color:#1976D2;font-size:13px;background:#E3F2FD;border-radius:4px;padding:4px;")
         self.theme_hint.setVisible(False)
         right_layout.addWidget(self.theme_hint)
         # 分页

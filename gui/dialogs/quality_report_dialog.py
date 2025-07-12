@@ -185,7 +185,8 @@ class QualityReportDialog(QDialog):
     def apply_filters(self):
         """应用筛选条件"""
         try:
-            min_score = 0 if self.filter_score.currentText() == "全部" else int(self.filter_score.currentText())
+            min_score = 0 if self.filter_score.currentText(
+            ) == "全部" else int(self.filter_score.currentText())
             keyword = self.search_edit.text().strip().lower()
 
             self.filtered_reports = []
@@ -240,17 +241,28 @@ class QualityReportDialog(QDialog):
                     self.table.insertRow(row)
 
                     # 填充各列数据
-                    self.table.setItem(row, 0, QTableWidgetItem(str(report.get("code", ""))))
-                    self.table.setItem(row, 1, QTableWidgetItem(str(report.get("quality_score", ""))))
-                    self.table.setItem(row, 2, QTableWidgetItem(str(report.get("market", ""))))
-                    self.table.setItem(row, 3, QTableWidgetItem(str(report.get("industry", ""))))
-                    self.table.setItem(row, 4, QTableWidgetItem(str(report.get("missing_fields", ""))))
-                    self.table.setItem(row, 5, QTableWidgetItem(str(report.get("anomaly_stats", ""))))
-                    self.table.setItem(row, 6, QTableWidgetItem(str(report.get("empty_ratio", ""))))
-                    self.table.setItem(row, 7, QTableWidgetItem(str(report.get("price_relation_errors", ""))))
-                    self.table.setItem(row, 8, QTableWidgetItem(str(report.get("logic_errors", ""))))
-                    self.table.setItem(row, 9, QTableWidgetItem(", ".join(report.get("errors", []))))
-                    self.table.setItem(row, 10, QTableWidgetItem(", ".join(report.get("warnings", []))))
+                    self.table.setItem(row, 0, QTableWidgetItem(
+                        str(report.get("code", ""))))
+                    self.table.setItem(row, 1, QTableWidgetItem(
+                        str(report.get("quality_score", ""))))
+                    self.table.setItem(row, 2, QTableWidgetItem(
+                        str(report.get("market", ""))))
+                    self.table.setItem(row, 3, QTableWidgetItem(
+                        str(report.get("industry", ""))))
+                    self.table.setItem(row, 4, QTableWidgetItem(
+                        str(report.get("missing_fields", ""))))
+                    self.table.setItem(row, 5, QTableWidgetItem(
+                        str(report.get("anomaly_stats", ""))))
+                    self.table.setItem(row, 6, QTableWidgetItem(
+                        str(report.get("empty_ratio", ""))))
+                    self.table.setItem(row, 7, QTableWidgetItem(
+                        str(report.get("price_relation_errors", ""))))
+                    self.table.setItem(row, 8, QTableWidgetItem(
+                        str(report.get("logic_errors", ""))))
+                    self.table.setItem(row, 9, QTableWidgetItem(
+                        ", ".join(report.get("errors", []))))
+                    self.table.setItem(row, 10, QTableWidgetItem(
+                        ", ".join(report.get("warnings", []))))
 
         except Exception as e:
             print(f"填充表格失败: {e}")
@@ -321,7 +333,8 @@ class QualityReportDialog(QDialog):
         """创建字段分布直方图"""
         try:
             if "quality_score" in df.columns:
-                fig = px.histogram(df, x="quality_score", nbins=20, title="质量评分分布直方图")
+                fig = px.histogram(df, x="quality_score",
+                                   nbins=20, title="质量评分分布直方图")
                 self.hist_view.setHtml(fig.to_html(include_plotlyjs='cdn'))
             else:
                 self.hist_view.setHtml("<b>无评分数据</b>")
@@ -359,7 +372,8 @@ class QualityReportDialog(QDialog):
                     mode='markers',
                     marker=dict(color='red', size=8)
                 ))
-                fig.update_layout(title="异常点分布", xaxis_title="样本", yaxis_title="异常点数")
+                fig.update_layout(
+                    title="异常点分布", xaxis_title="样本", yaxis_title="异常点数")
                 self.outlier_view.setHtml(fig.to_html(include_plotlyjs='cdn'))
             else:
                 self.outlier_view.setHtml("<b>无异常点数据</b>")
@@ -375,8 +389,10 @@ class QualityReportDialog(QDialog):
                     mode='lines+markers',
                     line=dict(color='blue')
                 ))
-                fig.update_layout(title="评分趋势", xaxis_title="样本", yaxis_title="评分")
-                self.score_trend_view.setHtml(fig.to_html(include_plotlyjs='cdn'))
+                fig.update_layout(
+                    title="评分趋势", xaxis_title="样本", yaxis_title="评分")
+                self.score_trend_view.setHtml(
+                    fig.to_html(include_plotlyjs='cdn'))
             else:
                 self.score_trend_view.setHtml("<b>无评分数据</b>")
         except Exception as e:

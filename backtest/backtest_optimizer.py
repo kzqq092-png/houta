@@ -92,16 +92,19 @@ class VectorizedBacktestEngine:
 
                 if signal == 1:  # 买入信号
                     if current_position <= 0:  # 开多仓或平空仓
-                        shares = (current_capital * position_size) / (price + trade_cost)
+                        shares = (current_capital * position_size) / \
+                            (price + trade_cost)
                         current_position = shares
                         current_capital -= shares * (price + trade_cost)
                 elif signal == -1:  # 卖出信号
                     if current_position >= 0:  # 开空仓或平多仓
                         if current_position > 0:  # 平多仓
-                            current_capital += current_position * (price - trade_cost)
+                            current_capital += current_position * \
+                                (price - trade_cost)
                             current_position = 0
                         else:  # 开空仓
-                            shares = (current_capital * position_size) / (price + trade_cost)
+                            shares = (current_capital * position_size) / \
+                                (price + trade_cost)
                             current_position = -shares
                             current_capital += shares * (price - trade_cost)
 
@@ -157,7 +160,8 @@ class VectorizedBacktestEngine:
             result['position'] = positions
             result['capital'] = capital
             result['returns'] = returns
-            result['cumulative_returns'] = (1 + pd.Series(returns)).cumprod() - 1
+            result['cumulative_returns'] = (
+                1 + pd.Series(returns)).cumprod() - 1
 
             return result
 
@@ -174,7 +178,8 @@ class ParallelBacktestEngine:
 
     def __init__(self, max_workers: Optional[int] = None,
                  optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
-        self.max_workers = max_workers or min(32, (multiprocessing.cpu_count() or 1) + 4)
+        self.max_workers = max_workers or min(
+            32, (multiprocessing.cpu_count() or 1) + 4)
         self.optimization_level = optimization_level
         self.logger = logging.getLogger(__name__)
         self.vectorized_engine = VectorizedBacktestEngine(optimization_level)
@@ -195,7 +200,8 @@ class ParallelBacktestEngine:
             Dict: 回测结果字典
         """
         try:
-            self.logger.info(f"开始并行回测 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}")
+            self.logger.info(
+                f"开始并行回测 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}")
 
             # 生成任务列表
             tasks = []
@@ -305,14 +311,17 @@ class ParallelBacktestEngine:
                     try:
                         # 运行回测
                         data_with_signals = strategy_func(fold_data, **params)
-                        result = self.vectorized_engine.run_vectorized_backtest(data_with_signals)
+                        result = self.vectorized_engine.run_vectorized_backtest(
+                            data_with_signals)
 
                         # 计算评估指标
-                        score = self._calculate_optimization_metric(result, optimization_metric)
+                        score = self._calculate_optimization_metric(
+                            result, optimization_metric)
                         fold_scores.append(score)
 
                     except Exception as e:
-                        self.logger.warning(f"参数组合 {params} 在fold {fold} 失败: {e}")
+                        self.logger.warning(
+                            f"参数组合 {params} 在fold {fold} 失败: {e}")
                         continue
 
                 if fold_scores:
@@ -403,7 +412,8 @@ class MemoryOptimizedBacktestEngine:
             pd.DataFrame: 回测结果
         """
         try:
-            self.logger.info(f"开始分块回测 - 数据长度: {len(data)}, 块大小: {self.chunk_size}")
+            self.logger.info(
+                f"开始分块回测 - 数据长度: {len(data)}, 块大小: {self.chunk_size}")
 
             # 初始化结果列表
             result_chunks = []
@@ -417,8 +427,10 @@ class MemoryOptimizedBacktestEngine:
                 chunk_with_signals = strategy_func(chunk_data, **kwargs)
 
                 # 运行回测
-                vectorized_engine = VectorizedBacktestEngine(self.optimization_level)
-                chunk_result = vectorized_engine.run_vectorized_backtest(chunk_with_signals)
+                vectorized_engine = VectorizedBacktestEngine(
+                    self.optimization_level)
+                chunk_result = vectorized_engine.run_vectorized_backtest(
+                    chunk_with_signals)
 
                 result_chunks.append(chunk_result)
 
@@ -443,7 +455,8 @@ class MemoryOptimizedBacktestEngine:
         """重新计算累积指标"""
         try:
             if 'returns' in result.columns:
-                result['cumulative_returns'] = (1 + result['returns']).cumprod() - 1
+                result['cumulative_returns'] = (
+                    1 + result['returns']).cumprod() - 1
 
             if 'capital' in result.columns:
                 # 确保资金连续性
@@ -471,8 +484,10 @@ class ProfessionalBacktestOptimizer:
 
         # 初始化各个引擎
         self.vectorized_engine = VectorizedBacktestEngine(optimization_level)
-        self.parallel_engine = ParallelBacktestEngine(optimization_level=optimization_level)
-        self.memory_engine = MemoryOptimizedBacktestEngine(optimization_level=optimization_level)
+        self.parallel_engine = ParallelBacktestEngine(
+            optimization_level=optimization_level)
+        self.memory_engine = MemoryOptimizedBacktestEngine(
+            optimization_level=optimization_level)
 
         # 性能监控
         self.performance_optimizer = ProfessionalPerformanceOptimizer(
@@ -502,14 +517,16 @@ class ProfessionalBacktestOptimizer:
             else:
                 engine = self.vectorized_engine
 
-            self.log_manager.log(f"使用引擎: {type(engine).__name__}", LogLevel.INFO)
+            self.log_manager.log(
+                f"使用引擎: {type(engine).__name__}", LogLevel.INFO)
 
             # 执行回测
             if isinstance(engine, VectorizedBacktestEngine):
                 data_with_signals = strategy_func(data, **kwargs)
                 result = engine.run_vectorized_backtest(data_with_signals)
             elif isinstance(engine, MemoryOptimizedBacktestEngine):
-                result = engine.run_chunked_backtest(data, strategy_func, **kwargs)
+                result = engine.run_chunked_backtest(
+                    data, strategy_func, **kwargs)
             else:
                 raise ValueError(f"不支持的引擎类型: {type(engine)}")
 
@@ -521,7 +538,8 @@ class ProfessionalBacktestOptimizer:
                 execution_time=perf_metrics.execution_time,
                 memory_usage=perf_metrics.memory_usage,
                 cpu_usage=perf_metrics.cpu_usage,
-                vectorization_ratio=self._calculate_vectorization_ratio(result),
+                vectorization_ratio=self._calculate_vectorization_ratio(
+                    result),
                 parallel_efficiency=1.0,  # 单线程执行
                 optimization_level=self.optimization_level,
                 timestamp=datetime.now()
@@ -581,7 +599,8 @@ class ProfessionalBacktestOptimizer:
             Dict: 批量优化结果
         """
         try:
-            self.log_manager.log(f"开始批量优化 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}", LogLevel.INFO)
+            self.log_manager.log(
+                f"开始批量优化 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}", LogLevel.INFO)
 
             # 设置并行引擎的工作线程数
             if max_workers:
@@ -631,7 +650,8 @@ class ProfessionalBacktestOptimizer:
                         })
 
             # 排序并分析
-            performance_metrics.sort(key=lambda x: x['sharpe_ratio'], reverse=True)
+            performance_metrics.sort(
+                key=lambda x: x['sharpe_ratio'], reverse=True)
 
             return {
                 'best_performance': performance_metrics[0] if performance_metrics else None,
@@ -659,7 +679,8 @@ def optimize_backtest_performance(optimization_level: BacktestOptimizationLevel 
                 data = args[0]
 
                 # 内存优化
-                optimized_data = optimizer.performance_optimizer.optimize_dataframe(data)
+                optimized_data = optimizer.performance_optimizer.optimize_dataframe(
+                    data)
                 args = (optimized_data,) + args[1:]
 
             return func(*args, **kwargs)

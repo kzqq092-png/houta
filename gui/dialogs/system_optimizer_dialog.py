@@ -55,7 +55,8 @@ class OptimizationWorker(QThread):
             asyncio.set_event_loop(loop)
 
             result = loop.run_until_complete(
-                self.optimizer_service.run_full_optimization(self.optimization_level)
+                self.optimizer_service.run_full_optimization(
+                    self.optimization_level)
             )
 
             if self._is_running:
@@ -370,12 +371,14 @@ class SystemOptimizerDialog(QDialog):
                         future = executor.submit(self._init_service_in_thread)
                         future.result()
                 else:
-                    loop.run_until_complete(self.optimizer_service.initialize_async())
+                    loop.run_until_complete(
+                        self.optimizer_service.initialize_async())
             except RuntimeError:
                 # 没有事件循环，创建新的
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                loop.run_until_complete(self.optimizer_service.initialize_async())
+                loop.run_until_complete(
+                    self.optimizer_service.initialize_async())
 
             logger.info("系统维护服务初始化成功")
         except Exception as e:
@@ -459,8 +462,10 @@ class SystemOptimizerDialog(QDialog):
             self.worker = OptimizationWorker(self.optimizer_service, level)
             self.worker.progress_updated.connect(self._on_progress_updated)
             self.worker.status_updated.connect(self._on_status_updated)
-            self.worker.optimization_completed.connect(self._on_optimization_completed)
-            self.worker.optimization_failed.connect(self._on_optimization_failed)
+            self.worker.optimization_completed.connect(
+                self._on_optimization_completed)
+            self.worker.optimization_failed.connect(
+                self._on_optimization_failed)
 
             # 更新UI状态
             self.start_btn.setEnabled(False)
@@ -547,12 +552,14 @@ class SystemOptimizerDialog(QDialog):
                         future = executor.submit(self._analyze_in_thread)
                         analysis = future.result()
                 else:
-                    analysis = loop.run_until_complete(self.optimizer_service.analyze_system())
+                    analysis = loop.run_until_complete(
+                        self.optimizer_service.analyze_system())
             except RuntimeError:
                 # 没有事件循环，创建新的
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                analysis = loop.run_until_complete(self.optimizer_service.analyze_system())
+                analysis = loop.run_until_complete(
+                    self.optimizer_service.analyze_system())
 
             # 显示分析结果
             text = f"""
@@ -587,7 +594,8 @@ class SystemOptimizerDialog(QDialog):
                 if loop.is_running():
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._get_suggestions_in_thread)
+                        future = executor.submit(
+                            self._get_suggestions_in_thread)
                         suggestions = future.result()
                 else:
                     suggestions = loop.run_until_complete(

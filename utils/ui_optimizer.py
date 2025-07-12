@@ -30,8 +30,10 @@ class UIOptimizer(QObject):
         self.config = get_config()
 
         # 配置参数
-        self.default_delay = self.config.get('ui_optimizer', {}).get('default_delay', 0)
-        self.max_update_frequency = self.config.get('ui_optimizer', {}).get('max_update_frequency', 60)  # Hz
+        self.default_delay = self.config.get(
+            'ui_optimizer', {}).get('default_delay', 0)
+        self.max_update_frequency = self.config.get(
+            'ui_optimizer', {}).get('max_update_frequency', 60)  # Hz
 
         # 更新频率控制
         self._last_update_time = 0
@@ -57,7 +59,8 @@ class UIOptimizer(QObject):
             current_time = time.time()
             if current_time - self._last_update_time < self._min_update_interval:
                 # 如果更新太频繁，延迟到下一个允许的时间点
-                remaining_time = self._min_update_interval - (current_time - self._last_update_time)
+                remaining_time = self._min_update_interval - \
+                    (current_time - self._last_update_time)
                 delay = max(delay, int(remaining_time * 1000))
 
             if callback:
@@ -132,7 +135,8 @@ class UIOptimizer(QObject):
             else:
                 # 如果调用太频繁，使用QTimer延迟执行
                 remaining_delay = delay - (current_time - last_call_time[0])
-                QTimer.singleShot(int(remaining_delay), lambda: func(*args, **kwargs))
+                QTimer.singleShot(int(remaining_delay),
+                                  lambda: func(*args, **kwargs))
 
         return throttled_func
 

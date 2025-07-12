@@ -76,7 +76,8 @@ class AlgorithmOptimizer:
 
         # 创建测试数据集（如果没有提供）
         if test_datasets is None:
-            test_datasets = self.evaluator.create_test_datasets(pattern_name, count=5)
+            test_datasets = self.evaluator.create_test_datasets(
+                pattern_name, count=5)
 
         # 评估基准性能
         baseline_metrics = self.evaluator.evaluate_algorithm(
@@ -146,7 +147,8 @@ class AlgorithmOptimizer:
         print("🧬 使用遗传算法优化...")
 
         # 初始化种群
-        population = self._initialize_population(pattern_config, config.population_size)
+        population = self._initialize_population(
+            pattern_config, config.population_size)
 
         best_individual = None
         best_score = baseline_metrics.overall_score
@@ -160,10 +162,12 @@ class AlgorithmOptimizer:
             for individual in population:
                 try:
                     # 创建临时算法配置
-                    temp_config = self._create_temp_config(pattern_config, individual)
+                    temp_config = self._create_temp_config(
+                        pattern_config, individual)
 
                     # 评估性能
-                    metrics = self._evaluate_individual(temp_config, test_datasets)
+                    metrics = self._evaluate_individual(
+                        temp_config, test_datasets)
                     score = getattr(metrics, config.target_metric, 0)
                     fitness_scores.append(score)
 
@@ -207,7 +211,8 @@ class AlgorithmOptimizer:
                 f"遗传算法优化 - 第{len(optimization_log)}代", best_score
             )
 
-        improvement_percentage = (best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
+        improvement_percentage = (
+            best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
 
         return {
             "method": "genetic",
@@ -244,11 +249,13 @@ class AlgorithmOptimizer:
                 individual = self._random_sample_parameters(param_space)
             else:
                 # 基于历史结果选择有希望的区域
-                individual = self._bayesian_sample_parameters(param_space, optimization_log)
+                individual = self._bayesian_sample_parameters(
+                    param_space, optimization_log)
 
             try:
                 # 评估参数组合
-                temp_config = self._create_temp_config(pattern_config, individual)
+                temp_config = self._create_temp_config(
+                    pattern_config, individual)
                 metrics = self._evaluate_individual(temp_config, test_datasets)
                 score = getattr(metrics, config.target_metric, 0)
 
@@ -283,7 +290,8 @@ class AlgorithmOptimizer:
                 f"贝叶斯优化 - {len(optimization_log)}次迭代", best_score
             )
 
-        improvement_percentage = (best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
+        improvement_percentage = (
+            best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
 
         return {
             "method": "bayesian",
@@ -314,7 +322,8 @@ class AlgorithmOptimizer:
             individual = self._random_sample_parameters(param_space)
 
             try:
-                temp_config = self._create_temp_config(pattern_config, individual)
+                temp_config = self._create_temp_config(
+                    pattern_config, individual)
                 metrics = self._evaluate_individual(temp_config, test_datasets)
                 score = getattr(metrics, config.target_metric, 0)
 
@@ -341,7 +350,8 @@ class AlgorithmOptimizer:
                 f"随机搜索优化 - {len(optimization_log)}次尝试", best_score
             )
 
-        improvement_percentage = (best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
+        improvement_percentage = (
+            best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
 
         return {
             "method": "random",
@@ -381,12 +391,14 @@ class AlgorithmOptimizer:
                     # 正向扰动
                     params_plus = current_params.copy()
                     params_plus[param_name] = param_value + epsilon
-                    score_plus = self._evaluate_params(pattern_config, params_plus, test_datasets, config.target_metric)
+                    score_plus = self._evaluate_params(
+                        pattern_config, params_plus, test_datasets, config.target_metric)
 
                     # 负向扰动
                     params_minus = current_params.copy()
                     params_minus[param_name] = param_value - epsilon
-                    score_minus = self._evaluate_params(pattern_config, params_minus, test_datasets, config.target_metric)
+                    score_minus = self._evaluate_params(
+                        pattern_config, params_minus, test_datasets, config.target_metric)
 
                     # 计算梯度
                     gradient = (score_plus - score_minus) / (2 * epsilon)
@@ -397,10 +409,12 @@ class AlgorithmOptimizer:
                 current_params[param_name] += learning_rate * gradient
 
                 # 参数约束
-                current_params[param_name] = max(0.01, min(10.0, current_params[param_name]))
+                current_params[param_name] = max(
+                    0.01, min(10.0, current_params[param_name]))
 
             # 评估当前参数
-            current_score = self._evaluate_params(pattern_config, current_params, test_datasets, config.target_metric)
+            current_score = self._evaluate_params(
+                pattern_config, current_params, test_datasets, config.target_metric)
 
             optimization_log.append({
                 "iteration": iteration + 1,
@@ -419,7 +433,8 @@ class AlgorithmOptimizer:
             f"梯度优化 - {len(optimization_log)}次迭代", best_score
         )
 
-        improvement_percentage = (best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
+        improvement_percentage = (
+            best_score - baseline_metrics.overall_score) / baseline_metrics.overall_score * 100
 
         return {
             "method": "gradient",
@@ -520,9 +535,11 @@ class AlgorithmOptimizer:
                     best_value = best_params[param_name]
                     noise_scale = (param_info["max"] - param_info["min"]) * 0.1
                     value = best_value + random.gauss(0, noise_scale)
-                    value = max(param_info["min"], min(param_info["max"], value))
+                    value = max(param_info["min"], min(
+                        param_info["max"], value))
                 else:
-                    value = random.uniform(param_info["min"], param_info["max"])
+                    value = random.uniform(
+                        param_info["min"], param_info["max"])
                 individual[param_name] = value
             elif param_info["type"] == "boolean":
                 if param_name in best_params:
@@ -642,7 +659,8 @@ class AlgorithmOptimizer:
 
         for i in range(len(population)):
             for j in range(i + 1, len(population)):
-                distance = self._calculate_individual_distance(population[i], population[j])
+                distance = self._calculate_individual_distance(
+                    population[i], population[j])
                 total_distance += distance
                 count += 1
 
@@ -685,7 +703,8 @@ class AlgorithmOptimizer:
                                 description: str, score: float) -> int:
         """保存优化后的版本"""
         # 生成优化后的算法代码
-        optimized_code = self._generate_optimized_code(base_config, optimized_params)
+        optimized_code = self._generate_optimized_code(
+            base_config, optimized_params)
 
         # 保存版本
         version_id = self.version_manager.save_version(

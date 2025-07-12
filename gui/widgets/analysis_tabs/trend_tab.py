@@ -454,7 +454,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 results['alerts'] = alerts
 
             # 6. 更新显示
-            QTimer.singleShot(100, lambda: self._update_results_display(results))
+            QTimer.singleShot(
+                100, lambda: self._update_results_display(results))
 
             return results
 
@@ -469,17 +470,20 @@ class TrendAnalysisTab(BaseAnalysisTab):
         threshold = self.threshold_spin.value()
 
         # 价格趋势分析
-        price_trend = self._analyze_price_trend_advanced(algorithm, period, threshold)
+        price_trend = self._analyze_price_trend_advanced(
+            algorithm, period, threshold)
         if price_trend:
             trends.append(price_trend)
 
         # 成交量趋势分析
-        volume_trend = self._analyze_volume_trend_advanced(algorithm, period, threshold)
+        volume_trend = self._analyze_volume_trend_advanced(
+            algorithm, period, threshold)
         if volume_trend:
             trends.append(volume_trend)
 
         # 技术指标趋势分析
-        indicator_trends = self._analyze_indicator_trends(algorithm, period, threshold)
+        indicator_trends = self._analyze_indicator_trends(
+            algorithm, period, threshold)
         trends.extend(indicator_trends)
 
         return trends
@@ -637,7 +641,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
             smoothed.append(alpha * prices[i] + (1 - alpha) * smoothed[-1])
 
         # 计算趋势
-        recent_trend = (smoothed[-1] - smoothed[-5]) / smoothed[-5] if len(smoothed) >= 5 else 0
+        recent_trend = (smoothed[-1] - smoothed[-5]) / \
+            smoothed[-5] if len(smoothed) >= 5 else 0
         direction = '上升' if recent_trend > 0 else '下降'
         strength = min(abs(recent_trend) * 100, 100)
 
@@ -993,7 +998,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
         layout.addWidget(params_group)
 
         # 按钮
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
@@ -1068,7 +1074,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
             data = []
             headers = []
             for col in range(self.trend_table.columnCount()):
-                headers.append(self.trend_table.horizontalHeaderItem(col).text())
+                headers.append(
+                    self.trend_table.horizontalHeaderItem(col).text())
 
             for row in range(self.trend_table.rowCount()):
                 row_data = {}
@@ -1098,7 +1105,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
                 # 更新统计信息
                 if 'statistics' in results:
-                    self._update_trend_statistics_display(results['statistics'])
+                    self._update_trend_statistics_display(
+                        results['statistics'])
 
             # 更新多时间框架结果
             if 'multi_timeframe' in results:
@@ -1110,7 +1118,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
             # 更新支撑阻力
             if 'support_resistance' in results:
-                self._update_support_resistance_table(results['support_resistance'])
+                self._update_support_resistance_table(
+                    results['support_resistance'])
 
             # 处理预警
             if 'alerts' in results:
@@ -1123,7 +1132,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _update_trend_table(self, trend_results):
         """更新趋势表格"""
-        column_keys = ['timeframe', 'direction', 'strength', 'confidence', 'duration', 'target_price', 'risk_level', 'recommendation']
+        column_keys = ['timeframe', 'direction', 'strength', 'confidence',
+                       'duration', 'target_price', 'risk_level', 'recommendation']
         self.update_table_data(self.trend_table, trend_results, column_keys)
 
     def _update_trend_statistics_display(self, stats):
@@ -1140,8 +1150,10 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _update_multi_timeframe_table(self, multi_tf_results):
         """更新多时间框架表格"""
-        column_keys = ['timeframe', 'direction', 'strength', 'consistency', 'weight', 'score']
-        self.update_table_data(self.multi_tf_table, multi_tf_results, column_keys)
+        column_keys = ['timeframe', 'direction',
+                       'strength', 'consistency', 'weight', 'score']
+        self.update_table_data(self.multi_tf_table,
+                               multi_tf_results, column_keys)
 
     def _update_prediction_display(self, predictions):
         """更新预测显示"""
@@ -1203,7 +1215,8 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
     def _do_clear_data(self):
         """数据清除处理"""
-        self.clear_multiple_tables(self.trend_table, self.multi_tf_table, self.sr_table)
+        self.clear_multiple_tables(
+            self.trend_table, self.multi_tf_table, self.sr_table)
         self.prediction_text.clear()
         self.alert_list.clear()
         self.trend_stats_label.setText("等待分析...")

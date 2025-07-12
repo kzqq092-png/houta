@@ -114,12 +114,18 @@ class PluginConfigManager:
                 self.security_policies = {}
                 for policy_name, policy_data in policies_data.items():
                     self.security_policies[policy_name] = PluginSecurityPolicy(
-                        allowed_permissions=[PluginPermission(p) for p in policy_data.get('allowed_permissions', [])],
-                        denied_permissions=[PluginPermission(p) for p in policy_data.get('denied_permissions', [])],
-                        sandbox_enabled=policy_data.get('sandbox_enabled', True),
-                        network_whitelist=policy_data.get('network_whitelist', []),
-                        file_access_paths=policy_data.get('file_access_paths', []),
-                        max_memory_usage=policy_data.get('max_memory_usage', 100 * 1024 * 1024),
+                        allowed_permissions=[PluginPermission(
+                            p) for p in policy_data.get('allowed_permissions', [])],
+                        denied_permissions=[PluginPermission(
+                            p) for p in policy_data.get('denied_permissions', [])],
+                        sandbox_enabled=policy_data.get(
+                            'sandbox_enabled', True),
+                        network_whitelist=policy_data.get(
+                            'network_whitelist', []),
+                        file_access_paths=policy_data.get(
+                            'file_access_paths', []),
+                        max_memory_usage=policy_data.get(
+                            'max_memory_usage', 100 * 1024 * 1024),
                         max_cpu_usage=policy_data.get('max_cpu_usage', 0.5),
                         timeout_seconds=policy_data.get('timeout_seconds', 30)
                     )
@@ -201,8 +207,10 @@ class PluginConfigManager:
                     config_data = json.load(f)
 
                 # 创建安全策略
-                security_policy_name = config_data.get('security_policy', 'default')
-                security_policy = self.security_policies.get(security_policy_name)
+                security_policy_name = config_data.get(
+                    'security_policy', 'default')
+                security_policy = self.security_policies.get(
+                    security_policy_name)
 
                 if not security_policy:
                     logger.warning(f"未找到安全策略 {security_policy_name}，使用默认策略")
@@ -402,7 +410,8 @@ class PluginConfigManager:
             backup_path.mkdir(parents=True, exist_ok=True)
 
             import shutil
-            shutil.copytree(self.config_dir, backup_path / "plugins", dirs_exist_ok=True)
+            shutil.copytree(self.config_dir, backup_path /
+                            "plugins", dirs_exist_ok=True)
 
             logger.info(f"配置文件已备份到: {backup_path}")
             return True

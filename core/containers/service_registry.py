@@ -117,7 +117,8 @@ class ServiceRegistry:
             # 更新依赖图
             self._dependency_graph[service_type] = set(dependencies)
 
-            logger.debug(f"Registered service {service_type.__name__} with scope {scope.value}")
+            logger.debug(
+                f"Registered service {service_type.__name__} with scope {scope.value}")
 
             return self
 
@@ -160,7 +161,8 @@ class ServiceRegistry:
             if service_info.name:
                 self._named_services[service_info.name] = service_info
 
-            logger.debug(f"Registered service instance {service_type.__name__}")
+            logger.debug(
+                f"Registered service instance {service_type.__name__}")
 
             return self
 

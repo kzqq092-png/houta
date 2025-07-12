@@ -118,7 +118,8 @@ class ProfessionalStockAnalyzer:
         self.logger = logging.getLogger(__name__)
 
         # 初始化组件
-        self.data_validator = ProfessionalDataValidator(ValidationLevel.PROFESSIONAL)
+        self.data_validator = ProfessionalDataValidator(
+            ValidationLevel.PROFESSIONAL)
         self.pattern_recognizer = EnhancedPatternRecognizer(debug_mode=False)
         self.technical_analyzer = TechnicalAnalyzer()
 
@@ -148,7 +149,8 @@ class ProfessionalStockAnalyzer:
         with performance_monitor(f"股票分析_{stock_code}"):
             try:
                 # 1. 数据验证
-                validation_result = self.data_validator.validate_kdata(kdata, stock_code)
+                validation_result = self.data_validator.validate_kdata(
+                    kdata, stock_code)
                 if not validation_result.is_valid:
                     raise ValueError(f"数据验证失败: {validation_result.errors}")
 
@@ -156,13 +158,16 @@ class ProfessionalStockAnalyzer:
                 processed_data = self._preprocess_data(kdata)
 
                 # 3. 基础信息提取
-                basic_info = self._extract_basic_info(processed_data, stock_code, stock_name)
+                basic_info = self._extract_basic_info(
+                    processed_data, stock_code, stock_name)
 
                 # 4. 技术分析
-                technical_analysis = self._perform_technical_analysis(processed_data)
+                technical_analysis = self._perform_technical_analysis(
+                    processed_data)
 
                 # 5. 形态识别
-                pattern_analysis = self._perform_pattern_analysis(processed_data)
+                pattern_analysis = self._perform_pattern_analysis(
+                    processed_data)
 
                 # 6. 基本面分析（如果有数据）
                 fundamental_analysis = self._perform_fundamental_analysis(
@@ -170,7 +175,8 @@ class ProfessionalStockAnalyzer:
                 )
 
                 # 7. 风险评估
-                risk_assessment = self._assess_risk(processed_data, market_data)
+                risk_assessment = self._assess_risk(
+                    processed_data, market_data)
 
                 # 8. 投资建议生成
                 investment_recommendation = self._generate_investment_recommendation(
@@ -244,7 +250,8 @@ class ProfessionalStockAnalyzer:
                     warnings=validation_result.warnings + self._generate_analysis_warnings(
                         technical_analysis, pattern_analysis, risk_assessment
                     ),
-                    suggestions=validation_result.suggestions + investment_recommendation.get('suggestions', [])
+                    suggestions=validation_result.suggestions +
+                    investment_recommendation.get('suggestions', [])
                 )
 
                 return result
@@ -270,7 +277,8 @@ class ProfessionalStockAnalyzer:
 
             # 计算收益率
             data['returns'] = data['close'].pct_change()
-            data['log_returns'] = np.log(data['close'] / data['close'].shift(1))
+            data['log_returns'] = np.log(
+                data['close'] / data['close'].shift(1))
 
             # 计算累计收益
             data['cumulative_returns'] = (1 + data['returns']).cumprod()
@@ -289,7 +297,8 @@ class ProfessionalStockAnalyzer:
         """提取基础信息"""
         try:
             current_price = data['close'].iloc[-1]
-            previous_price = data['close'].iloc[-2] if len(data) > 1 else current_price
+            previous_price = data['close'].iloc[-2] if len(
+                data) > 1 else current_price
 
             return {
                 'current_price': current_price,
@@ -412,7 +421,8 @@ class ProfessionalStockAnalyzer:
 
             # 去重并排序
             support_levels = sorted(list(set(support_levels)))[-5:]  # 取最近5个
-            resistance_levels = sorted(list(set(resistance_levels)), reverse=True)[:5]  # 取最近5个
+            resistance_levels = sorted(list(set(resistance_levels)), reverse=True)[
+                :5]  # 取最近5个
 
             return {
                 'support': support_levels,
@@ -507,7 +517,8 @@ class ProfessionalStockAnalyzer:
             pattern_score = 0.0
             if patterns:
                 # 基于形态的信号强度和置信度计算得分
-                total_confidence = sum(p.get('confidence', 0) for p in patterns)
+                total_confidence = sum(p.get('confidence', 0)
+                                       for p in patterns)
                 pattern_score = min(total_confidence / len(patterns), 1.0)
 
             return {
@@ -674,7 +685,8 @@ class ProfessionalStockAnalyzer:
                 buy_strength = sum(s['strength'] for s in buy_signals)
                 sell_strength = sum(s['strength'] for s in sell_signals)
 
-                signal_score = (buy_strength - sell_strength) / max(len(signals), 1)
+                signal_score = (buy_strength - sell_strength) / \
+                    max(len(signals), 1)
                 score += signal_score * 0.2
 
             return max(0.0, min(1.0, score))
@@ -732,7 +744,8 @@ class ProfessionalStockAnalyzer:
             # 风险警告
             risk_level = risk.get('risk_level', RiskLevel.MEDIUM)
             if risk_level in [RiskLevel.HIGH, RiskLevel.VERY_HIGH]:
-                warnings.append(f"高风险警告：该股票波动率较高 ({risk.get('volatility', 0):.2%})")
+                warnings.append(
+                    f"高风险警告：该股票波动率较高 ({risk.get('volatility', 0):.2%})")
 
             # 技术指标警告
             signals = technical.get('signals', [])
@@ -742,7 +755,8 @@ class ProfessionalStockAnalyzer:
 
             # 形态警告
             patterns = pattern.get('patterns', [])
-            bearish_patterns = [p for p in patterns if p.get('signal_type') == 'SELL']
+            bearish_patterns = [
+                p for p in patterns if p.get('signal_type') == 'SELL']
             if bearish_patterns:
                 warnings.append("识别到看跌形态")
 
@@ -775,9 +789,11 @@ class ProfessionalStockAnalyzer:
             if patterns:
                 recent_pattern = patterns[-1]  # 最近的形态
                 if recent_pattern.get('signal_type') == 'BUY':
-                    suggestions.append(f"识别到看涨形态：{recent_pattern.get('pattern_type', '')}")
+                    suggestions.append(
+                        f"识别到看涨形态：{recent_pattern.get('pattern_type', '')}")
                 elif recent_pattern.get('signal_type') == 'SELL':
-                    suggestions.append(f"识别到看跌形态：{recent_pattern.get('pattern_type', '')}")
+                    suggestions.append(
+                        f"识别到看跌形态：{recent_pattern.get('pattern_type', '')}")
 
         except Exception as e:
             self.logger.error(f"投资建议生成失败: {e}")

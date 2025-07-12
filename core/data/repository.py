@@ -217,7 +217,8 @@ class StockRepository(BaseRepository):
             return stock_info
 
         except Exception as e:
-            self.logger.error(f"Failed to get stock info for {stock_code}: {e}")
+            self.logger.error(
+                f"Failed to get stock info for {stock_code}: {e}")
             return None
 
     def get_stock_list(self, market: Optional[str] = None) -> List[StockInfo]:
@@ -233,7 +234,8 @@ class StockRepository(BaseRepository):
                 except TypeError:
                     # 如果不支持参数，则获取全部并手动筛选
                     all_stocks = self.data_manager.get_stock_list()
-                    stock_list_dict = [s for s in all_stocks if hasattr(s, 'get') and s.get('market') == market] if market else all_stocks
+                    stock_list_dict = [s for s in all_stocks if hasattr(
+                        s, 'get') and s.get('market') == market] if market else all_stocks
             else:
                 stock_list_dict = self.data_manager.get_stock_list()
 
@@ -270,7 +272,8 @@ class StockRepository(BaseRepository):
                     )
                 else:
                     # 跳过无法处理的数据类型
-                    self.logger.warning(f"Skipping unsupported stock data type: {type(stock_dict)}")
+                    self.logger.warning(
+                        f"Skipping unsupported stock data type: {type(stock_dict)}")
                     continue
 
                 stock_list.append(stock_info)
@@ -344,7 +347,8 @@ class StockRepository(BaseRepository):
                     )
                 else:
                     # 跳过无法处理的数据类型
-                    self.logger.warning(f"Skipping unsupported stock data type: {type(stock_dict)}")
+                    self.logger.warning(
+                        f"Skipping unsupported stock data type: {type(stock_dict)}")
                     continue
 
                 stock_list.append(stock_info)
@@ -352,7 +356,8 @@ class StockRepository(BaseRepository):
             return stock_list
 
         except Exception as e:
-            self.logger.error(f"Failed to search stocks with keyword '{keyword}': {e}")
+            self.logger.error(
+                f"Failed to search stocks with keyword '{keyword}': {e}")
             return []
 
 
@@ -390,7 +395,8 @@ class KlineRepository(BaseRepository):
         """创建备用数据管理器"""
         try:
             self.data_manager = FallbackDataManager()
-            self.logger.info("Created fallback data manager for kline repository")
+            self.logger.info(
+                "Created fallback data manager for kline repository")
         except Exception as e:
             self.logger.error(f"Failed to create fallback data manager: {e}")
             self.data_manager = MinimalDataManager()
@@ -457,7 +463,8 @@ class KlineRepository(BaseRepository):
             return None
 
         except Exception as e:
-            self.logger.error(f"Failed to get latest price for {stock_code}: {e}")
+            self.logger.error(
+                f"Failed to get latest price for {stock_code}: {e}")
             return None
 
 
@@ -495,7 +502,8 @@ class MarketRepository(BaseRepository):
         """创建备用数据管理器"""
         try:
             self.data_manager = FallbackDataManager()
-            self.logger.info("Created fallback data manager for market repository")
+            self.logger.info(
+                "Created fallback data manager for market repository")
         except Exception as e:
             self.logger.error(f"Failed to create fallback data manager: {e}")
             self.data_manager = MinimalDataManager()
@@ -529,7 +537,8 @@ class MarketRepository(BaseRepository):
             return market_data
 
         except Exception as e:
-            self.logger.error(f"Failed to get market data for {index_code}: {e}")
+            self.logger.error(
+                f"Failed to get market data for {index_code}: {e}")
             return None
 
     def get_market_indices(self) -> List[str]:

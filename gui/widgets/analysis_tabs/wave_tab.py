@@ -67,7 +67,8 @@ class WaveAnalysisTab(WaveAnalysisTabPro):
 
     def _update_elliott_table(self, waves):
         """更新艾略特波浪表格"""
-        column_keys = ['wave', 'type', 'start_date', 'end_date', 'amplitude', 'time', 'confidence', 'status']
+        column_keys = ['wave', 'type', 'start_date', 'end_date',
+                       'amplitude', 'time', 'confidence', 'status']
 
         # 预处理数据
         processed_waves = []
@@ -84,7 +85,8 @@ class WaveAnalysisTab(WaveAnalysisTabPro):
             }
             processed_waves.append(processed_wave)
 
-        self.update_table_data(self.elliott_table, processed_waves, column_keys)
+        self.update_table_data(
+            self.elliott_table, processed_waves, column_keys)
 
     def _update_gann_table(self, levels):
         """更新江恩表格"""
@@ -121,7 +123,8 @@ class WaveAnalysisTab(WaveAnalysisTabPro):
             }
             processed_levels.append(processed_level)
 
-        self.update_table_data(self.fibonacci_table, processed_levels, column_keys)
+        self.update_table_data(self.fibonacci_table,
+                               processed_levels, column_keys)
 
     # 保持向后兼容的方法
     def analyze_wave(self):

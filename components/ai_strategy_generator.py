@@ -30,7 +30,8 @@ class AIStrategyGenerator:
             if not code:
                 return {"error": "策略代码生成失败"}
             # 假设run_backtest支持动态策略代码
-            result = run_backtest("auto", "AI策略", params or {}, custom_code=code)
+            result = run_backtest(
+                "auto", "AI策略", params or {}, custom_code=code)
             return {"code": code, "result": result}
         except Exception as e:
             self.log_manager.error(f"AI策略生成与回测失败: {e}")

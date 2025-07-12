@@ -76,7 +76,8 @@ class CalculatorDialog(QDialog):
         for i, text in enumerate(buttons):
             button = QPushButton(text)
             button.setStyleSheet("font-size: 16px;")
-            button.clicked.connect(lambda checked, t=text: self.calculator_button_clicked(t))
+            button.clicked.connect(
+                lambda checked, t=text: self.calculator_button_clicked(t))
             grid.addWidget(button, i // 4, i % 4)
 
         # 添加清除按钮

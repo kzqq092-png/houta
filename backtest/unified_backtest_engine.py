@@ -188,7 +188,8 @@ class UnifiedBacktestEngine:
             self.logger.info(f"开始统一回测，级别: {self.backtest_level.value}")
 
             # 数据预处理和验证
-            processed_data = self._preprocess_and_validate_data(data, signal_col, price_col)
+            processed_data = self._preprocess_and_validate_data(
+                data, signal_col, price_col)
 
             # 运行核心回测逻辑
             results = self._run_core_backtest(
@@ -225,7 +226,8 @@ class UnifiedBacktestEngine:
         processed_data = data.copy()
 
         # 数据预处理（使用修复版的预处理逻辑）
-        processed_data = self._kdata_preprocess(processed_data, context="统一回测引擎")
+        processed_data = self._kdata_preprocess(
+            processed_data, context="统一回测引擎")
 
         # 确保日期索引
         self._ensure_datetime_index(processed_data)
@@ -248,7 +250,8 @@ class UnifiedBacktestEngine:
         """验证数据完整性"""
         # 检查必要列
         required_columns = ['open', 'high', 'low', 'close', 'volume']
-        missing_columns = [col for col in required_columns if col not in data.columns]
+        missing_columns = [
+            col for col in required_columns if col not in data.columns]
 
         if missing_columns:
             self.logger.warning(f"数据缺少列: {missing_columns}")
@@ -343,7 +346,8 @@ class UnifiedBacktestEngine:
             elif col in ['position', 'holding_periods', 'shares']:
                 results[col] = 0
             elif col in ['capital', 'equity']:
-                results[col] = float(results.iloc[0]['close'] if 'close' in results.columns else 100000)
+                results[col] = float(
+                    results.iloc[0]['close'] if 'close' in results.columns else 100000)
             elif col == 'trade_value':
                 results[col] = 0.0
 
@@ -400,11 +404,13 @@ class UnifiedBacktestEngine:
 
         # 如果需要平仓（信号变化或触发退出条件）
         if trade_state['position'] != 0 and (signal == -trade_state['position'] or exit_triggered):
-            self._execute_close_position(results, i, trade_state, price, exit_reason or 'Signal')
+            self._execute_close_position(
+                results, i, trade_state, price, exit_reason or 'Signal')
 
         # 如果需要开仓（当前无持仓且有信号）
         if trade_state['position'] == 0 and signal != 0:
-            self._execute_open_position(results, i, trade_state, signal, price, enable_compound)
+            self._execute_open_position(
+                results, i, trade_state, signal, price, enable_compound)
 
     def _execute_open_position(self, results: pd.DataFrame, i: int,
                                trade_state: Dict[str, Any], signal: float,
@@ -498,15 +504,18 @@ class UnifiedBacktestEngine:
 
         # 计算交易收益
         if trade_state['position'] > 0:
-            trade_profit = trade_state['shares'] * (actual_price - trade_state['entry_price'])
+            trade_profit = trade_state['shares'] * \
+                (actual_price - trade_state['entry_price'])
         else:
-            trade_profit = trade_state['shares'] * (trade_state['entry_price'] - actual_price)
+            trade_profit = trade_state['shares'] * \
+                (trade_state['entry_price'] - actual_price)
 
         # 扣除手续费
         net_profit = trade_profit - commission
 
         # 更新资金（收回股票价值，扣除手续费）
-        trade_state['current_capital'] += (trade_state['shares'] * actual_price - commission)
+        trade_state['current_capital'] += (trade_state['shares']
+                                           * actual_price - commission)
 
         # 记录到结果中
         results.loc[results.index[i], 'exit_price'] = actual_price
@@ -514,7 +523,8 @@ class UnifiedBacktestEngine:
         results.loc[results.index[i], 'exit_reason'] = exit_reason
         results.loc[results.index[i], 'trade_profit'] = net_profit
         results.loc[results.index[i], 'commission'] += commission
-        results.loc[results.index[i], 'holding_periods'] = trade_state['holding_periods']
+        results.loc[results.index[i],
+                    'holding_periods'] = trade_state['holding_periods']
 
         # 更新最后一笔交易记录
         if self.trades:
@@ -541,19 +551,22 @@ class UnifiedBacktestEngine:
         # 计算当前权益
         if trade_state['position'] != 0:
             position_value = trade_state['shares'] * current_price
-            trade_state['current_equity'] = trade_state['current_capital'] + position_value
+            trade_state['current_equity'] = trade_state['current_capital'] + \
+                position_value
         else:
             trade_state['current_equity'] = trade_state['current_capital']
 
         # 记录到结果中
-        results.loc[results.index[i], 'capital'] = trade_state['current_capital']
+        results.loc[results.index[i],
+                    'capital'] = trade_state['current_capital']
         results.loc[results.index[i], 'equity'] = trade_state['current_equity']
 
         # 计算收益率
         if i > 0:
             prev_equity = results.iloc[i-1]['equity']
             if prev_equity != 0:
-                returns = (trade_state['current_equity'] - prev_equity) / prev_equity
+                returns = (trade_state['current_equity'] -
+                           prev_equity) / prev_equity
                 results.loc[results.index[i], 'returns'] = returns
 
     def _calculate_unified_risk_metrics(self, results: pd.DataFrame,
@@ -568,25 +581,30 @@ class UnifiedBacktestEngine:
                 return self._empty_risk_metrics()
 
             # 基础收益指标
-            total_return = (results['equity'].iloc[-1] / results['equity'].iloc[0]) - 1
+            total_return = (results['equity'].iloc[-1] /
+                            results['equity'].iloc[0]) - 1
             annualized_return = (1 + returns.mean()) ** 252 - 1
             volatility = returns.std() * np.sqrt(252)
 
             # 风险调整收益指标
             risk_free_rate = 0.02
-            sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0
+            sharpe_ratio = (annualized_return - risk_free_rate) / \
+                volatility if volatility != 0 else 0
 
             # 下行风险指标
             downside_returns = returns[returns < 0]
-            downside_deviation = downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0
-            sortino_ratio = (annualized_return - risk_free_rate) / downside_deviation if downside_deviation != 0 else 0
+            downside_deviation = downside_returns.std(
+            ) * np.sqrt(252) if len(downside_returns) > 0 else 0
+            sortino_ratio = (annualized_return - risk_free_rate) / \
+                downside_deviation if downside_deviation != 0 else 0
 
             # 最大回撤
             cumulative = (1 + returns).cumprod()
             running_max = cumulative.cummax()
             drawdown = (cumulative - running_max) / running_max
             max_drawdown = abs(drawdown.min())
-            max_drawdown_duration = self._calculate_max_drawdown_duration(drawdown)
+            max_drawdown_duration = self._calculate_max_drawdown_duration(
+                drawdown)
 
             # Calmar比率
             calmar_ratio = annualized_return / max_drawdown if max_drawdown != 0 else 0
@@ -594,8 +612,10 @@ class UnifiedBacktestEngine:
             # VaR和CVaR
             var_95 = np.percentile(returns, 5)
             var_99 = np.percentile(returns, 1)
-            cvar_95 = returns[returns <= var_95].mean() if len(returns[returns <= var_95]) > 0 else 0
-            cvar_99 = returns[returns <= var_99].mean() if len(returns[returns <= var_99]) > 0 else 0
+            cvar_95 = returns[returns <= var_95].mean() if len(
+                returns[returns <= var_95]) > 0 else 0
+            cvar_99 = returns[returns <= var_99].mean() if len(
+                returns[returns <= var_99]) > 0 else 0
 
             # 高阶矩
             skewness = stats.skew(returns) if len(returns) > 2 else 0
@@ -606,7 +626,8 @@ class UnifiedBacktestEngine:
 
             # 尾部风险指标
             tail_ratio = self._calculate_tail_ratio(returns)
-            common_sense_ratio = self._calculate_common_sense_ratio(returns, tail_ratio)
+            common_sense_ratio = self._calculate_common_sense_ratio(
+                returns, tail_ratio)
 
             # 交易统计
             trade_stats = self._calculate_trade_statistics()
@@ -616,7 +637,8 @@ class UnifiedBacktestEngine:
             upside_capture, downside_capture = 0, 0
 
             if benchmark_data is not None:
-                benchmark_returns = self._extract_benchmark_returns(benchmark_data, results.index)
+                benchmark_returns = self._extract_benchmark_returns(
+                    benchmark_data, results.index)
                 if benchmark_returns is not None:
                     (beta, alpha, tracking_error, information_ratio, treynor_ratio,
                      upside_capture, downside_capture) = self._calculate_relative_metrics(
@@ -713,7 +735,8 @@ class UnifiedBacktestEngine:
         """提取基准收益率"""
         try:
             if 'close' in benchmark_data.columns:
-                benchmark_returns = benchmark_data['close'].pct_change().dropna()
+                benchmark_returns = benchmark_data['close'].pct_change(
+                ).dropna()
             elif 'returns' in benchmark_data.columns:
                 benchmark_returns = benchmark_data['returns'].dropna()
             else:
@@ -752,14 +775,17 @@ class UnifiedBacktestEngine:
             alpha = alpha * 252  # 年化
 
             # 跟踪误差
-            tracking_error = (aligned_returns - aligned_benchmark).std() * np.sqrt(252)
+            tracking_error = (aligned_returns -
+                              aligned_benchmark).std() * np.sqrt(252)
 
             # 信息比率
             excess_return = aligned_returns.mean() - aligned_benchmark.mean()
-            information_ratio = excess_return / tracking_error * np.sqrt(252) if tracking_error != 0 else 0
+            information_ratio = excess_return / tracking_error * \
+                np.sqrt(252) if tracking_error != 0 else 0
 
             # Treynor比率
-            treynor_ratio = (aligned_returns.mean() * 252 - risk_free_rate) / beta if beta != 0 else 0
+            treynor_ratio = (aligned_returns.mean() * 252 -
+                             risk_free_rate) / beta if beta != 0 else 0
 
             # 上行/下行捕获率
             up_market = aligned_benchmark > 0
@@ -769,10 +795,12 @@ class UnifiedBacktestEngine:
             downside_capture = 0
 
             if up_market.sum() > 0:
-                upside_capture = aligned_returns[up_market].mean() / aligned_benchmark[up_market].mean()
+                upside_capture = aligned_returns[up_market].mean(
+                ) / aligned_benchmark[up_market].mean()
 
             if down_market.sum() > 0:
-                downside_capture = aligned_returns[down_market].mean() / aligned_benchmark[down_market].mean()
+                downside_capture = aligned_returns[down_market].mean(
+                ) / aligned_benchmark[down_market].mean()
 
             return beta, alpha, tracking_error, information_ratio, treynor_ratio, upside_capture, downside_capture
 
@@ -793,18 +821,23 @@ class UnifiedBacktestEngine:
                 return {'win_rate': 0, 'profit_factor': 0, 'recovery_factor': 0}
 
             # 胜率
-            winning_trades = [t for t in completed_trades if t['trade_profit'] > 0]
+            winning_trades = [
+                t for t in completed_trades if t['trade_profit'] > 0]
             win_rate = len(winning_trades) / len(completed_trades)
 
             # 盈利因子
-            total_profit = sum(t['trade_profit'] for t in completed_trades if t['trade_profit'] > 0)
-            total_loss = abs(sum(t['trade_profit'] for t in completed_trades if t['trade_profit'] < 0))
+            total_profit = sum(t['trade_profit']
+                               for t in completed_trades if t['trade_profit'] > 0)
+            total_loss = abs(sum(t['trade_profit']
+                             for t in completed_trades if t['trade_profit'] < 0))
             profit_factor = total_profit / total_loss if total_loss != 0 else 0
 
             # 恢复因子
             if self.results is not None and 'equity' in self.results.columns:
-                total_return = (self.results['equity'].iloc[-1] / self.results['equity'].iloc[0]) - 1
-                max_dd = self._calculate_max_drawdown_from_equity(self.results['equity'])
+                total_return = (
+                    self.results['equity'].iloc[-1] / self.results['equity'].iloc[0]) - 1
+                max_dd = self._calculate_max_drawdown_from_equity(
+                    self.results['equity'])
                 recovery_factor = total_return / max_dd if max_dd != 0 else 0
             else:
                 recovery_factor = 0
@@ -994,7 +1027,8 @@ class PortfolioBacktestEngine:
             aligned_data = self._align_portfolio_data(portfolio_data)
 
             # 计算组合收益
-            portfolio_returns = self._calculate_portfolio_returns(aligned_data, weights, rebalance_frequency)
+            portfolio_returns = self._calculate_portfolio_returns(
+                aligned_data, weights, rebalance_frequency)
 
             # 构建结果DataFrame
             result = pd.DataFrame({
@@ -1010,7 +1044,8 @@ class PortfolioBacktestEngine:
                     result[f'{stock}_returns'] = aligned_data[stock]['returns']
 
             # 计算组合风险指标
-            portfolio_metrics = self._calculate_portfolio_metrics(portfolio_returns)
+            portfolio_metrics = self._calculate_portfolio_metrics(
+                portfolio_returns)
 
             self.logger.info("组合回测完成")
 
@@ -1049,7 +1084,8 @@ class PortfolioBacktestEngine:
                 # 计算收益率
                 if 'returns' not in aligned_data[stock].columns:
                     if 'close' in aligned_data[stock].columns:
-                        aligned_data[stock]['returns'] = aligned_data[stock]['close'].pct_change()
+                        aligned_data[stock]['returns'] = aligned_data[stock]['close'].pct_change(
+                        )
                     else:
                         raise ValueError(f"股票 {stock} 缺少价格或收益率数据")
 
@@ -1076,9 +1112,11 @@ class PortfolioBacktestEngine:
             if rebalance_frequency == 'D':  # 每日再平衡
                 portfolio_returns = self._daily_rebalance(returns_df, weights)
             elif rebalance_frequency == 'M':  # 每月再平衡
-                portfolio_returns = self._monthly_rebalance(returns_df, weights)
+                portfolio_returns = self._monthly_rebalance(
+                    returns_df, weights)
             elif rebalance_frequency == 'Q':  # 每季度再平衡
-                portfolio_returns = self._quarterly_rebalance(returns_df, weights)
+                portfolio_returns = self._quarterly_rebalance(
+                    returns_df, weights)
             else:  # 买入持有
                 portfolio_returns = self._buy_and_hold(returns_df, weights)
 
@@ -1152,7 +1190,8 @@ class PortfolioBacktestEngine:
 
             # 风险调整指标
             risk_free_rate = 0.02
-            sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0
+            sharpe_ratio = (annualized_return - risk_free_rate) / \
+                volatility if volatility != 0 else 0
 
             # 最大回撤
             cumulative = (1 + portfolio_returns).cumprod()

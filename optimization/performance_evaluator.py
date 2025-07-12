@@ -63,19 +63,24 @@ class PerformanceMetrics:
         """计算派生指标"""
         # 计算精确度和召回率
         if self.true_positives + self.false_positives > 0:
-            self.precision = self.true_positives / (self.true_positives + self.false_positives)
+            self.precision = self.true_positives / \
+                (self.true_positives + self.false_positives)
 
         if self.true_positives + self.false_negatives > 0:
-            self.recall = self.true_positives / (self.true_positives + self.false_negatives)
+            self.recall = self.true_positives / \
+                (self.true_positives + self.false_negatives)
 
         # 计算F1分数
         if self.precision + self.recall > 0:
-            self.f1_score = 2 * (self.precision * self.recall) / (self.precision + self.recall)
+            self.f1_score = 2 * (self.precision * self.recall) / \
+                (self.precision + self.recall)
 
         # 计算准确率
-        total_samples = self.true_positives + self.false_positives + self.true_negatives + self.false_negatives
+        total_samples = self.true_positives + self.false_positives + \
+            self.true_negatives + self.false_negatives
         if total_samples > 0:
-            self.accuracy = (self.true_positives + self.true_negatives) / total_samples
+            self.accuracy = (self.true_positives +
+                             self.true_negatives) / total_samples
 
         # 计算错误率
         if self.sample_count > 0:
@@ -132,16 +137,20 @@ class PerformanceEvaluator:
 
         try:
             # 1. 基础性能评估
-            basic_metrics = self._evaluate_basic_performance(pattern_name, test_datasets)
+            basic_metrics = self._evaluate_basic_performance(
+                pattern_name, test_datasets)
 
             # 2. 稳定性评估
-            stability_score = self._evaluate_stability(pattern_name, test_datasets)
+            stability_score = self._evaluate_stability(
+                pattern_name, test_datasets)
 
             # 3. 鲁棒性评估
-            robustness_score = self._evaluate_robustness(pattern_name, test_datasets)
+            robustness_score = self._evaluate_robustness(
+                pattern_name, test_datasets)
 
             # 4. 效率评估
-            efficiency_score = self._evaluate_efficiency(pattern_name, test_datasets)
+            efficiency_score = self._evaluate_efficiency(
+                pattern_name, test_datasets)
 
             # 合并指标
             metrics.accuracy = basic_metrics.get('accuracy', 0.0)
@@ -195,7 +204,8 @@ class PerformanceEvaluator:
         tn = int(total_samples * accuracy * 0.5)
         fn = int(total_samples * (1 - recall) * 0.3)
 
-        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision +
+                                         recall) if (precision + recall) > 0 else 0
 
         return {
             'accuracy': accuracy,
@@ -308,12 +318,14 @@ class PerformanceEvaluator:
             df['rsi'] = np.random.uniform(20, 80, size)  # 模拟RSI
 
             # 添加形态标记（模拟）
-            df['pattern_signal'] = np.random.choice([0, 1], size=size, p=[0.8, 0.2])
+            df['pattern_signal'] = np.random.choice(
+                [0, 1], size=size, p=[0.8, 0.2])
 
             datasets.append(df)
 
         if self.debug_mode:
-            logger.info(f"创建了 {count} 个测试数据集，总样本数: {sum(len(df) for df in datasets)}")
+            logger.info(
+                f"创建了 {count} 个测试数据集，总样本数: {sum(len(df) for df in datasets)}")
 
         return datasets
 
@@ -416,7 +428,8 @@ class PerformanceEvaluator:
 
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(history_data, f, indent=2, ensure_ascii=False, default=str)
+                json.dump(history_data, f, indent=2,
+                          ensure_ascii=False, default=str)
 
             if self.debug_mode:
                 logger.info(f"评估历史已保存到: {filename}")

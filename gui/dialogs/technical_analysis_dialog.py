@@ -66,21 +66,21 @@ class TechnicalAnalysisDialog(QDialog):
 
         # 按钮区域
         button_layout = QHBoxLayout()
-        
+
         calculate_button = QPushButton("重新计算")
         calculate_button.clicked.connect(self._calculate_indicators)
-        
+
         export_button = QPushButton("导出分析")
         export_button.clicked.connect(self._export_analysis)
-        
+
         close_button = QPushButton("关闭")
         close_button.clicked.connect(self.accept)
-        
+
         button_layout.addWidget(calculate_button)
         button_layout.addWidget(export_button)
         button_layout.addStretch()
         button_layout.addWidget(close_button)
-        
+
         layout.addLayout(button_layout)
 
     def _create_indicators_tab(self) -> None:
@@ -153,23 +153,24 @@ class TechnicalAnalysisDialog(QDialog):
     def _generate_sample_data(self) -> pd.DataFrame:
         """生成示例数据"""
         import random
-        
+
         dates = pd.date_range(start='2023-01-01', end='2024-01-01', freq='D')
         dates = dates[dates.weekday < 5]  # 只保留工作日
-        
+
         data = []
         base_price = 10.0
-        
+
         for date in dates:
             change = random.uniform(-0.05, 0.05)
             base_price *= (1 + change)
-            
+
             open_price = base_price * random.uniform(0.99, 1.01)
-            high_price = max(open_price, base_price) * random.uniform(1.0, 1.03)
+            high_price = max(open_price, base_price) * \
+                random.uniform(1.0, 1.03)
             low_price = min(open_price, base_price) * random.uniform(0.97, 1.0)
             close_price = base_price
             volume = random.randint(1000000, 10000000)
-            
+
             data.append({
                 'date': date,
                 'open': round(open_price, 2),
@@ -178,7 +179,7 @@ class TechnicalAnalysisDialog(QDialog):
                 'close': round(close_price, 2),
                 'volume': volume
             })
-        
+
         return pd.DataFrame(data)
 
     def _calculate_indicators(self) -> None:
@@ -190,18 +191,20 @@ class TechnicalAnalysisDialog(QDialog):
 
             # 计算各种技术指标
             self.indicators_data = {}
-            
+
             # 移动平均线
             ma_period = self.ma_period_spin.value()
-            self.indicators_data['MA'] = self.current_data['close'].rolling(window=ma_period).mean()
-            
+            self.indicators_data['MA'] = self.current_data['close'].rolling(
+                window=ma_period).mean()
+
             # RSI
             rsi_period = self.rsi_period_spin.value()
-            self.indicators_data['RSI'] = self._calculate_rsi(self.current_data['close'], rsi_period)
+            self.indicators_data['RSI'] = self._calculate_rsi(
+                self.current_data['close'], rsi_period)
 
             # 显示指标结果
             self._display_indicators()
-            
+
             # 生成分析报告
             self._generate_analysis_report()
 
@@ -228,7 +231,7 @@ class TechnicalAnalysisDialog(QDialog):
 
             # 准备表格数据
             dates = self.current_data['date'].dt.strftime('%Y-%m-%d').tolist()
-            
+
             # 设置表格
             columns = ['日期', '收盘价'] + list(self.indicators_data.keys())
             self.indicators_table.setColumnCount(len(columns))
@@ -237,14 +240,18 @@ class TechnicalAnalysisDialog(QDialog):
 
             # 填充数据
             for row in range(len(dates)):
-                self.indicators_table.setItem(row, 0, QTableWidgetItem(dates[row]))
-                self.indicators_table.setItem(row, 1, QTableWidgetItem(f"{self.current_data.iloc[row]['close']:.2f}"))
-                
+                self.indicators_table.setItem(
+                    row, 0, QTableWidgetItem(dates[row]))
+                self.indicators_table.setItem(row, 1, QTableWidgetItem(
+                    f"{self.current_data.iloc[row]['close']:.2f}"))
+
                 for col, (indicator, values) in enumerate(self.indicators_data.items(), start=2):
                     if row < len(values) and not pd.isna(values.iloc[row]):
-                        self.indicators_table.setItem(row, col, QTableWidgetItem(f"{values.iloc[row]:.2f}"))
+                        self.indicators_table.setItem(
+                            row, col, QTableWidgetItem(f"{values.iloc[row]:.2f}"))
                     else:
-                        self.indicators_table.setItem(row, col, QTableWidgetItem("--"))
+                        self.indicators_table.setItem(
+                            row, col, QTableWidgetItem("--"))
 
             # 调整列宽
             self.indicators_table.resizeColumnsToContents()
@@ -261,7 +268,7 @@ class TechnicalAnalysisDialog(QDialog):
             # 获取最新数据
             latest_data = self.current_data.iloc[-1]
             latest_price = latest_data['close']
-            
+
             report = f"""
 技术分析报告
 股票代码: {self.stock_code}
@@ -270,7 +277,7 @@ class TechnicalAnalysisDialog(QDialog):
 
 === 趋势分析 ===
 """
-            
+
             # MA分析
             if 'MA' in self.indicators_data:
                 ma_value = self.indicators_data['MA'].iloc[-1]
@@ -307,9 +314,9 @@ class TechnicalAnalysisDialog(QDialog):
         """导出分析结果"""
         try:
             from PyQt5.QtWidgets import QFileDialog
-            
+
             file_path, _ = QFileDialog.getSaveFileName(
-                self, "导出分析结果", 
+                self, "导出分析结果",
                 f"{self.stock_code}_技术分析.txt",
                 "文本文件 (*.txt);;所有文件 (*)"
             )

@@ -135,8 +135,10 @@ class AutoTuner:
         print("评估当前性能...")
         for pattern_name in pattern_names:
             try:
-                test_datasets = self.evaluator.create_test_datasets(pattern_name, count=3)
-                metrics = self.evaluator.evaluate_algorithm(pattern_name, test_datasets)
+                test_datasets = self.evaluator.create_test_datasets(
+                    pattern_name, count=3)
+                metrics = self.evaluator.evaluate_algorithm(
+                    pattern_name, test_datasets)
                 performance_scores[pattern_name] = metrics.overall_score
 
                 if self.debug_mode:
@@ -166,7 +168,8 @@ class AutoTuner:
         patterns_to_optimize.sort(key=lambda x: performance_scores[x])
 
         # 创建智能优化配置
-        smart_configs = self._create_smart_configs(patterns_to_optimize, performance_scores)
+        smart_configs = self._create_smart_configs(
+            patterns_to_optimize, performance_scores)
 
         # 添加优化任务
         for pattern_name, config in smart_configs.items():
@@ -250,10 +253,12 @@ class AutoTuner:
                 self.completed_tasks.append(task)
 
                 # 启动下一个任务（如果有）
-                remaining_tasks = [t for t in self.task_queue if t.status == "pending"]
+                remaining_tasks = [
+                    t for t in self.task_queue if t.status == "pending"]
                 if remaining_tasks and len(self.running_tasks) < self.max_workers:
                     next_task = remaining_tasks[0]
-                    future = self.executor.submit(self._run_single_task, next_task)
+                    future = self.executor.submit(
+                        self._run_single_task, next_task)
                     future_to_task[future] = next_task
                     next_task.status = "running"
                     next_task.start_time = datetime.now()
@@ -316,9 +321,12 @@ class AutoTuner:
             # 检查线程池状态
             if hasattr(self, 'executor') and self.executor:
                 # 统计正在运行的任务
-                active_count = len([f for f in self.optimization_futures if not f.done()])
-                completed_count = len([f for f in self.optimization_futures if f.done() and not f.exception()])
-                failed_count = len([f for f in self.optimization_futures if f.done() and f.exception()])
+                active_count = len(
+                    [f for f in self.optimization_futures if not f.done()])
+                completed_count = len(
+                    [f for f in self.optimization_futures if f.done() and not f.exception()])
+                failed_count = len(
+                    [f for f in self.optimization_futures if f.done() and f.exception()])
 
             # 获取数据库中的统计信息
             db_stats = self.db_manager.get_optimization_statistics()
@@ -423,10 +431,12 @@ class AutoTuner:
             return {"status": "no_results", "message": "没有优化结果"}
 
         total_tasks = len(results)
-        successful_tasks = len([r for r in results if r.get("improvement_percentage", 0) > 0])
+        successful_tasks = len(
+            [r for r in results if r.get("improvement_percentage", 0) > 0])
 
         improvements = [r.get("improvement_percentage", 0) for r in results]
-        avg_improvement = sum(improvements) / len(improvements) if improvements else 0
+        avg_improvement = sum(improvements) / \
+            len(improvements) if improvements else 0
 
         best_improvement = max(improvements) if improvements else 0
         best_pattern = None
@@ -498,7 +508,8 @@ class AutoTuner:
                 methods[method] = []
             methods[method].append(improvement)
 
-        best_method = max(methods.keys(), key=lambda m: sum(methods[m])/len(methods[m])) if methods else None
+        best_method = max(methods.keys(), key=lambda m: sum(
+            methods[m])/len(methods[m])) if methods else None
         if best_method:
             recommendations.append(f"'{best_method}' 方法效果最佳，建议优先使用")
 
@@ -510,7 +521,8 @@ class AutoTuner:
         ]
 
         if poor_performers:
-            recommendations.append(f"以下形态优化效果不佳，需要人工检查: {', '.join(poor_performers[:3])}")
+            recommendations.append(
+                f"以下形态优化效果不佳，需要人工检查: {', '.join(poor_performers[:3])}")
 
         return recommendations
 

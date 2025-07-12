@@ -246,8 +246,10 @@ class OptimizationDatabaseManager:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             version_id, pattern_name, metrics.get('test_dataset_id'),
-            metrics.get('true_positives', 0), metrics.get('false_positives', 0),
-            metrics.get('true_negatives', 0), metrics.get('false_negatives', 0),
+            metrics.get('true_positives', 0), metrics.get(
+                'false_positives', 0),
+            metrics.get('true_negatives', 0), metrics.get(
+                'false_negatives', 0),
             metrics.get('precision'), metrics.get('recall'),
             metrics.get('f1_score'), metrics.get('accuracy'),
             metrics.get('execution_time'), metrics.get('memory_usage'),
@@ -283,7 +285,8 @@ class OptimizationDatabaseManager:
         for row in cursor.fetchall():
             record = dict(zip(columns, row))
             if record['test_conditions']:
-                record['test_conditions'] = json.loads(record['test_conditions'])
+                record['test_conditions'] = json.loads(
+                    record['test_conditions'])
             history.append(record)
 
         conn.close()
@@ -386,7 +389,8 @@ class OptimizationDatabaseManager:
         stats['total_versions'] = cursor.fetchone()[0]
 
         # 活跃版本数
-        cursor.execute('SELECT COUNT(*) FROM algorithm_versions WHERE is_active = 1')
+        cursor.execute(
+            'SELECT COUNT(*) FROM algorithm_versions WHERE is_active = 1')
         stats['active_versions'] = cursor.fetchone()[0]
 
         # 优化任务统计

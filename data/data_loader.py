@@ -592,7 +592,8 @@ def generate_quality_report(df: pd.DataFrame, context: str = "数据质量") -> 
         'errors': []
     }
     # 缺失字段统计
-    required_cols = ['open', 'high', 'low', 'close', 'volume', 'datetime', 'code']
+    required_cols = ['open', 'high', 'low',
+                     'close', 'volume', 'datetime', 'code']
     for col in required_cols:
         if col not in df.columns:
             report['missing_fields'][col] = '缺失'
@@ -602,14 +603,17 @@ def generate_quality_report(df: pd.DataFrame, context: str = "数据质量") -> 
         null_count = df[col].isnull().sum()
         ratio = null_count / len(df) if len(df) > 0 else 0
         if null_count > 0:
-            report['empty_ratio'][col] = {'count': int(null_count), 'ratio': float(ratio)}
+            report['empty_ratio'][col] = {
+                'count': int(null_count), 'ratio': float(ratio)}
             report['quality_score'] -= min(5, int(ratio*100))
     # 异常值统计
     for col in df.select_dtypes(include=[np.number]).columns:
         negatives = (df[col] < 0).sum()
-        extreme = ((df[col] > df[col].mean() + 5*df[col].std()) | (df[col] < df[col].mean() - 5*df[col].std())).sum()
+        extreme = ((df[col] > df[col].mean() + 5*df[col].std())
+                   | (df[col] < df[col].mean() - 5*df[col].std())).sum()
         if negatives > 0 or extreme > 0:
-            report['anomaly_stats'][col] = {'negatives': int(negatives), 'extreme': int(extreme)}
+            report['anomaly_stats'][col] = {
+                'negatives': int(negatives), 'extreme': int(extreme)}
             report['quality_score'] -= min(5, negatives+extreme)
     # 类型检查
     for col in df.columns:

@@ -56,10 +56,12 @@ class SystemHealthChecker:
         }
 
         # 计算总体健康状态
-        health_report['overall_health'] = self._calculate_overall_health(health_report)
+        health_report['overall_health'] = self._calculate_overall_health(
+            health_report)
 
         # 生成建议
-        health_report['recommendations'] = self._generate_recommendations(health_report)
+        health_report['recommendations'] = self._generate_recommendations(
+            health_report)
 
         print(f"✅ 系统健康检查完成，总体状态: {health_report['overall_health']}")
 
@@ -99,7 +101,8 @@ class SystemHealthChecker:
 
             # 测试形态识别
             start_time = time.time()
-            patterns = recognizer.identify_patterns(test_data, confidence_threshold=0.1)
+            patterns = recognizer.identify_patterns(
+                test_data, confidence_threshold=0.1)
             processing_time = time.time() - start_time
 
             return {
@@ -471,7 +474,8 @@ def main():
     agg_service = MetricsAggregationService(event_bus, repo)
 
     # 3. 实例化检查器
-    checker = SystemHealthChecker(aggregation_service=agg_service, repository=repo)
+    checker = SystemHealthChecker(
+        aggregation_service=agg_service, repository=repo)
 
     # 4. 运行检查并打印报告
     report = checker.run_comprehensive_check()

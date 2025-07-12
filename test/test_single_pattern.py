@@ -120,7 +120,8 @@ def test_algorithm_execution():
         # 获取hammer算法代码
         conn = sqlite3.connect('db/hikyuu_system.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT algorithm_code FROM pattern_types WHERE english_name = 'hammer'")
+        cursor.execute(
+            "SELECT algorithm_code FROM pattern_types WHERE english_name = 'hammer'")
         row = cursor.fetchone()
         conn.close()
 

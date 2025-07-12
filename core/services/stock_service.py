@@ -69,15 +69,18 @@ class StockService(CacheableService, ConfigurableService):
                     self._data_access = DataAccess(hikyuu_data_manager)
                     self._data_access.connect()
                 else:
-                    raise RuntimeError("HIkyuu data manager connection test failed")
+                    raise RuntimeError(
+                        "HIkyuu data manager connection test failed")
 
             except Exception as hikyuu_error:
-                logger.warning(f"Failed to initialize HIkyuu data manager: {hikyuu_error}")
+                logger.warning(
+                    f"Failed to initialize HIkyuu data manager: {hikyuu_error}")
                 logger.warning("Falling back to default data access layer")
 
                 # 回退到默认数据访问层
                 if not self._data_access.connect():
-                    logger.warning("Data access layer connection failed, using mock data mode")
+                    logger.warning(
+                        "Data access layer connection failed, using mock data mode")
                     self.use_mock_data = True
                 else:
                     self.use_mock_data = False
@@ -165,7 +168,8 @@ class StockService(CacheableService, ConfigurableService):
 
         try:
             # 使用股票管理器获取股票列表
-            stock_info_list = self._stock_manager.get_stock_list(market, industry)
+            stock_info_list = self._stock_manager.get_stock_list(
+                market, industry)
             stock_list = []
 
             for stock_info in stock_info_list:
@@ -204,7 +208,8 @@ class StockService(CacheableService, ConfigurableService):
 
         # 检查负缓存
         if stock_code in self._no_data_cache:
-            logger.debug(f"Stock {stock_code} is in no-data cache, returning None")
+            logger.debug(
+                f"Stock {stock_code} is in no-data cache, returning None")
             return None
 
         cache_key = f"stock_data_{stock_code}_{period}_{count}"
@@ -246,7 +251,8 @@ class StockService(CacheableService, ConfigurableService):
             else:
                 # 添加到负缓存
                 self._no_data_cache.add(stock_code)
-                logger.debug(f"No data for {stock_code}, added to no-data cache")
+                logger.debug(
+                    f"No data for {stock_code}, added to no-data cache")
                 return None
 
         except Exception as e:
@@ -442,7 +448,8 @@ class StockService(CacheableService, ConfigurableService):
             return results
 
         except Exception as e:
-            logger.error(f"Failed to search stocks with keyword '{keyword}': {e}")
+            logger.error(
+                f"Failed to search stocks with keyword '{keyword}': {e}")
             return []
 
     def get_stock_info(self, stock_code: str) -> Optional[Dict[str, Any]]:
@@ -459,7 +466,8 @@ class StockService(CacheableService, ConfigurableService):
 
         # 检查负缓存
         if stock_code in self._no_info_cache:
-            logger.debug(f"Stock {stock_code} is in no-info cache, returning None")
+            logger.debug(
+                f"Stock {stock_code} is in no-info cache, returning None")
             return None
 
         cache_key = f"stock_info_{stock_code}"
@@ -478,7 +486,8 @@ class StockService(CacheableService, ConfigurableService):
             else:
                 # 添加到负缓存
                 self._no_info_cache.add(stock_code)
-                logger.debug(f"No info for {stock_code}, added to no-info cache")
+                logger.debug(
+                    f"No info for {stock_code}, added to no-info cache")
                 return None
 
         except Exception as e:
@@ -496,14 +505,16 @@ class StockService(CacheableService, ConfigurableService):
                 logger.info(f"Loaded {len(self._stock_list)} mock stocks")
             else:
                 stock_info_list = self._data_access.get_stock_list()
-                self._stock_list = [stock_info.to_dict() for stock_info in stock_info_list]
+                self._stock_list = [stock_info.to_dict()
+                                    for stock_info in stock_info_list]
                 logger.debug(f"Loaded {len(self._stock_list)} stocks")
         except Exception as e:
             logger.error(f"Failed to load stock list: {e}")
             # 如果加载失败，回退到模拟数据
             self._stock_list = self._generate_mock_stock_list()
             self.use_mock_data = True
-            logger.info(f"Fallback to mock data: {len(self._stock_list)} stocks")
+            logger.info(
+                f"Fallback to mock data: {len(self._stock_list)} stocks")
 
     def _load_favorites(self) -> None:
         """加载收藏列表"""
@@ -567,7 +578,8 @@ class StockService(CacheableService, ConfigurableService):
                     if hasattr(self._data_access, 'refresh_data'):
                         self._data_access.refresh_data()
                 except Exception as e:
-                    logger.warning(f"Failed to refresh data from data access layer: {e}")
+                    logger.warning(
+                        f"Failed to refresh data from data access layer: {e}")
 
             logger.info(f"股票数据刷新完成，共加载 {len(self._stock_list)} 只股票")
             return True
@@ -605,7 +617,8 @@ class StockService(CacheableService, ConfigurableService):
 
                     # 检查市场
                     if conditions.get("market") and conditions["market"] != "全部":
-                        market_match = self._check_market_match(stock_info.get('code', ''), conditions["market"])
+                        market_match = self._check_market_match(
+                            stock_info.get('code', ''), conditions["market"])
                         if not market_match:
                             continue
 
@@ -615,7 +628,8 @@ class StockService(CacheableService, ConfigurableService):
                             continue
 
                     # 获取股票的实时数据进行价格、市值、成交量等筛选
-                    stock_data = self._get_stock_realtime_data(stock_info.get('code', ''))
+                    stock_data = self._get_stock_realtime_data(
+                        stock_info.get('code', ''))
                     if stock_data:
                         # 检查价格范围
                         latest_price = stock_data.get('price', 0)
@@ -644,7 +658,8 @@ class StockService(CacheableService, ConfigurableService):
                     filtered_stocks.append(stock_info)
 
                 except Exception as e:
-                    logger.warning(f"处理股票 {stock_info.get('code', '未知')} 失败: {e}")
+                    logger.warning(
+                        f"处理股票 {stock_info.get('code', '未知')} 失败: {e}")
                     continue
 
             logger.info(f"高级搜索完成，找到 {len(filtered_stocks)} 只符合条件的股票")
@@ -710,7 +725,8 @@ class StockService(CacheableService, ConfigurableService):
                 return None
 
             # 从数据访问层获取实时数据
-            kdata = self._data_access.get_stock_data(stock_code, period='D', count=1)
+            kdata = self._data_access.get_stock_data(
+                stock_code, period='D', count=1)
             if kdata is None or kdata.empty:
                 return None
 
@@ -730,7 +746,8 @@ class StockService(CacheableService, ConfigurableService):
             if stock_info and 'total_shares' in stock_info:
                 total_shares = stock_info['total_shares']
                 if total_shares > 0:
-                    realtime_data['market_cap'] = realtime_data['price'] * total_shares / 100000000  # 转换为亿元
+                    realtime_data['market_cap'] = realtime_data['price'] * \
+                        total_shares / 100000000  # 转换为亿元
 
             return realtime_data
 
@@ -741,16 +758,26 @@ class StockService(CacheableService, ConfigurableService):
     def _generate_mock_stock_list(self) -> List[Dict[str, Any]]:
         """生成模拟股票列表"""
         mock_stocks = [
-            {'code': '000001', 'name': '平安银行', 'market': '深圳', 'industry': '银行', 'type': '股票'},
-            {'code': '000002', 'name': '万科A', 'market': '深圳', 'industry': '房地产', 'type': '股票'},
-            {'code': '000858', 'name': '五粮液', 'market': '深圳', 'industry': '食品饮料', 'type': '股票'},
-            {'code': '600000', 'name': '浦发银行', 'market': '上海', 'industry': '银行', 'type': '股票'},
-            {'code': '600036', 'name': '招商银行', 'market': '上海', 'industry': '银行', 'type': '股票'},
-            {'code': '600519', 'name': '贵州茅台', 'market': '上海', 'industry': '食品饮料', 'type': '股票'},
-            {'code': '000166', 'name': '申万宏源', 'market': '深圳', 'industry': '证券', 'type': '股票'},
-            {'code': '600887', 'name': '伊利股份', 'market': '上海', 'industry': '食品饮料', 'type': '股票'},
-            {'code': '002415', 'name': '海康威视', 'market': '深圳', 'industry': '电子', 'type': '股票'},
-            {'code': '300059', 'name': '东方财富', 'market': '深圳', 'industry': '互联网', 'type': '股票'},
+            {'code': '000001', 'name': '平安银行', 'market': '深圳',
+                'industry': '银行', 'type': '股票'},
+            {'code': '000002', 'name': '万科A', 'market': '深圳',
+                'industry': '房地产', 'type': '股票'},
+            {'code': '000858', 'name': '五粮液', 'market': '深圳',
+                'industry': '食品饮料', 'type': '股票'},
+            {'code': '600000', 'name': '浦发银行', 'market': '上海',
+                'industry': '银行', 'type': '股票'},
+            {'code': '600036', 'name': '招商银行', 'market': '上海',
+                'industry': '银行', 'type': '股票'},
+            {'code': '600519', 'name': '贵州茅台', 'market': '上海',
+                'industry': '食品饮料', 'type': '股票'},
+            {'code': '000166', 'name': '申万宏源', 'market': '深圳',
+                'industry': '证券', 'type': '股票'},
+            {'code': '600887', 'name': '伊利股份', 'market': '上海',
+                'industry': '食品饮料', 'type': '股票'},
+            {'code': '002415', 'name': '海康威视', 'market': '深圳',
+                'industry': '电子', 'type': '股票'},
+            {'code': '300059', 'name': '东方财富', 'market': '深圳',
+                'industry': '互联网', 'type': '股票'},
         ]
 
         # 扩展到更多股票
@@ -813,7 +840,8 @@ class StockService(CacheableService, ConfigurableService):
         self._no_data_cache.discard(stock_code)
         self._no_info_cache.discard(stock_code)
         # 清理相关的查询时间记录
-        keys_to_remove = [key for key in self._last_query_time.keys() if stock_code in key]
+        keys_to_remove = [
+            key for key in self._last_query_time.keys() if stock_code in key]
         for key in keys_to_remove:
             del self._last_query_time[key]
         logger.debug(f"Removed {stock_code} from negative cache")

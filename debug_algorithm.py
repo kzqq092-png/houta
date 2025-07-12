@@ -11,7 +11,8 @@ def debug_algorithm():
     conn = sqlite3.connect('db/hikyuu_system.db')
     cursor = conn.cursor()
 
-    cursor.execute('SELECT algorithm_code FROM pattern_types WHERE english_name = "hammer"')
+    cursor.execute(
+        'SELECT algorithm_code FROM pattern_types WHERE english_name = "hammer"')
     code = cursor.fetchone()[0]
 
     print("算法代码前100个字符:")

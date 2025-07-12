@@ -9,6 +9,7 @@ from hikyuu.indicator import *
 from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 
+
 @dataclass
 class AnalysisResult:
     """分析结果数据类"""
@@ -47,7 +48,8 @@ class AdvancedAnalyzer:
             if isinstance(kdata, pd.DataFrame):
                 # 已替换为新的导入
                 ma_periods = [5, 10, 20, 60, 120]
-                mas = {f'MA{p}': calc_ma(kdata['close'], p) for p in ma_periods}
+                mas = {f'MA{p}': calc_ma(kdata['close'], p)
+                       for p in ma_periods}
                 macd, _, _ = calc_macd(kdata['close'], fast=, slow=, signal=)
             else:
                 from hikyuu.indicator import MA, MACD
@@ -72,7 +74,8 @@ class AdvancedAnalyzer:
             }
 
             # 计算趋势强度
-            trend_strength = self._calculate_trend_strength(kdata, mas, macd, adx)
+            trend_strength = self._calculate_trend_strength(
+                kdata, mas, macd, adx)
 
             return AnalysisResult(
                 indicator_name='trend',

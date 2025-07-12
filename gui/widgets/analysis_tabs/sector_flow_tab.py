@@ -72,7 +72,8 @@ class SectorFlowTab(SectorFlowTabPro):
 
     def _update_ranking_table(self, ranking_data):
         """更新排行表格"""
-        column_keys = ['rank', 'sector', 'net_inflow', 'inflow_intensity', 'activity', 'change_pct', 'leading_stock', 'status']
+        column_keys = ['rank', 'sector', 'net_inflow', 'inflow_intensity',
+                       'activity', 'change_pct', 'leading_stock', 'status']
 
         # 预处理数据
         processed_data = []
@@ -93,7 +94,8 @@ class SectorFlowTab(SectorFlowTabPro):
 
     def _update_rotation_table(self, rotation_data):
         """更新轮动表格"""
-        column_keys = ['direction', 'outflow_sector', 'inflow_sector', 'amount', 'strength', 'time']
+        column_keys = ['direction', 'outflow_sector',
+                       'inflow_sector', 'amount', 'strength', 'time']
 
         # 预处理数据
         processed_data = []
@@ -108,11 +110,13 @@ class SectorFlowTab(SectorFlowTabPro):
             }
             processed_data.append(processed_item)
 
-        self.update_table_data(self.rotation_table, processed_data, column_keys)
+        self.update_table_data(self.rotation_table,
+                               processed_data, column_keys)
 
     def _update_smart_money_table(self, smart_money_data):
         """更新聪明资金表格"""
-        column_keys = ['time', 'sector', 'money_type', 'amount', 'direction', 'confidence', 'impact']
+        column_keys = ['time', 'sector', 'money_type',
+                       'amount', 'direction', 'confidence', 'impact']
 
         # 预处理数据
         processed_data = []
@@ -128,7 +132,8 @@ class SectorFlowTab(SectorFlowTabPro):
             }
             processed_data.append(processed_item)
 
-        self.update_table_data(self.smart_money_table, processed_data, column_keys)
+        self.update_table_data(self.smart_money_table,
+                               processed_data, column_keys)
 
     def _update_monitor_table(self, monitor_data):
         """更新监控表格"""
@@ -155,10 +160,13 @@ class SectorFlowTab(SectorFlowTabPro):
             return
 
         # 计算统计数据
-        total_inflow = sum(max(0, data.get('net_inflow', 0)) for data in ranking_data)
-        total_outflow = sum(abs(min(0, data.get('net_inflow', 0))) for data in ranking_data)
+        total_inflow = sum(max(0, data.get('net_inflow', 0))
+                           for data in ranking_data)
+        total_outflow = sum(abs(min(0, data.get('net_inflow', 0)))
+                            for data in ranking_data)
         net_inflow = total_inflow - total_outflow
-        active_sectors = len([data for data in ranking_data if data.get('activity', 0) > 0.6])
+        active_sectors = len(
+            [data for data in ranking_data if data.get('activity', 0) > 0.6])
 
         # 更新显示
         if hasattr(self, 'inflow_label'):

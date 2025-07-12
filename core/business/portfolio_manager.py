@@ -35,9 +35,12 @@ class Position:
         """更新当前数据"""
         self.current_price = current_price
         self.market_value = current_price * self.quantity
-        self.profit_loss = self.market_value - (self.cost_price * self.quantity)
-        self.profit_loss_ratio = float(self.profit_loss / (self.cost_price * self.quantity)) * 100
-        self.weight = float(self.market_value / total_value) * 100 if total_value > 0 else 0
+        self.profit_loss = self.market_value - \
+            (self.cost_price * self.quantity)
+        self.profit_loss_ratio = float(
+            self.profit_loss / (self.cost_price * self.quantity)) * 100
+        self.weight = float(self.market_value / total_value) * \
+            100 if total_value > 0 else 0
 
 
 @dataclass
@@ -86,7 +89,8 @@ class PortfolioManager:
             # 计算所需资金
             required_cash = Decimal(quantity) * cost_price
             if required_cash > self._cash_available:
-                self.logger.error(f"Insufficient cash: required {required_cash}, available {self._cash_available}")
+                self.logger.error(
+                    f"Insufficient cash: required {required_cash}, available {self._cash_available}")
                 return False
 
             # 添加或更新持仓
@@ -94,7 +98,8 @@ class PortfolioManager:
                 # 更新现有持仓
                 existing = self._positions[stock_code]
                 total_quantity = existing.quantity + quantity
-                total_cost = (existing.quantity * existing.cost_price) + (quantity * cost_price)
+                total_cost = (existing.quantity *
+                              existing.cost_price) + (quantity * cost_price)
                 new_cost_price = total_cost / total_quantity
 
                 existing.quantity = total_quantity
@@ -122,7 +127,8 @@ class PortfolioManager:
                 'total_amount': required_cash
             })
 
-            self.logger.info(f"Added position: {stock_code} x{quantity} @ {cost_price}")
+            self.logger.info(
+                f"Added position: {stock_code} x{quantity} @ {cost_price}")
             return True
 
         except Exception as e:
@@ -149,7 +155,8 @@ class PortfolioManager:
 
             position = self._positions[stock_code]
             if quantity > position.quantity:
-                self.logger.error(f"Insufficient position: trying to sell {quantity}, available {position.quantity}")
+                self.logger.error(
+                    f"Insufficient position: trying to sell {quantity}, available {position.quantity}")
                 return False
 
             # 计算收回资金
@@ -174,7 +181,8 @@ class PortfolioManager:
                 'total_amount': cash_received
             })
 
-            self.logger.info(f"Reduced position: {stock_code} x{quantity} @ {sell_price}")
+            self.logger.info(
+                f"Reduced position: {stock_code} x{quantity} @ {sell_price}")
             return True
 
         except Exception as e:
@@ -195,7 +203,8 @@ class PortfolioManager:
             total_value = Decimal('0')
             for position in positions:
                 # 获取当前价格
-                current_price = self.data_access.get_latest_price(position.stock_code)
+                current_price = self.data_access.get_latest_price(
+                    position.stock_code)
                 if current_price:
                     position.current_price = Decimal(str(current_price))
                     position.market_value = position.current_price * position.quantity
@@ -204,7 +213,8 @@ class PortfolioManager:
             # 计算权重和盈亏
             for position in positions:
                 if position.market_value:
-                    position.update_current_data(position.current_price, total_value)
+                    position.update_current_data(
+                        position.current_price, total_value)
 
             return positions
 
@@ -251,7 +261,8 @@ class PortfolioManager:
                     total_market_value += position.market_value
 
             total_profit_loss = total_market_value - total_cost
-            total_profit_loss_ratio = float(total_profit_loss / total_cost) * 100 if total_cost > 0 else 0
+            total_profit_loss_ratio = float(
+                total_profit_loss / total_cost) * 100 if total_cost > 0 else 0
             total_assets = total_market_value + self._cash_available
 
             return PortfolioSummary(
@@ -305,9 +316,11 @@ class PortfolioManager:
         positions = self.get_positions()
 
         if profit_only:
-            positions = [p for p in positions if p.profit_loss and p.profit_loss > 0]
+            positions = [
+                p for p in positions if p.profit_loss and p.profit_loss > 0]
 
-        positions.sort(key=lambda x: x.profit_loss or Decimal('0'), reverse=True)
+        positions.sort(
+            key=lambda x: x.profit_loss or Decimal('0'), reverse=True)
         return positions
 
     def calculate_risk_metrics(self) -> Dict[str, Any]:
@@ -331,19 +344,23 @@ class PortfolioManager:
             # 计算行业分散度
             industries = {}
             for position in positions:
-                stock_info = self.data_access.get_stock_info(position.stock_code)
+                stock_info = self.data_access.get_stock_info(
+                    position.stock_code)
                 if stock_info and stock_info.industry:
                     industry = stock_info.industry
-                    industries[industry] = industries.get(industry, 0) + (position.weight or 0)
+                    industries[industry] = industries.get(
+                        industry, 0) + (position.weight or 0)
 
-            industry_concentration = max(industries.values()) if industries else 0
+            industry_concentration = max(
+                industries.values()) if industries else 0
 
             return {
                 'max_position_weight': max_weight,
                 'industry_concentration': industry_concentration,
                 'position_count': len(positions),
                 'cash_ratio': float(summary.cash_available / summary.total_assets) * 100,
-                'diversification_score': min(100, len(positions) * 10),  # 简单的分散度评分
+                # 简单的分散度评分
+                'diversification_score': min(100, len(positions) * 10),
                 'risk_level': self._assess_risk_level(max_weight, industry_concentration, len(positions))
             }
 
@@ -403,7 +420,8 @@ class PortfolioManager:
             ]
 
             # 按时间倒序排列
-            recent_transactions.sort(key=lambda x: x['timestamp'], reverse=True)
+            recent_transactions.sort(
+                key=lambda x: x['timestamp'], reverse=True)
             return recent_transactions
 
         except Exception as e:

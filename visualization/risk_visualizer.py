@@ -9,7 +9,8 @@ import logging
 
 # 获取plotly子模块
 _plotly_modules = get_plotly()
-make_subplots = getattr(_plotly_modules.get('subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
+make_subplots = getattr(_plotly_modules.get(
+    'subplots'), 'make_subplots', None) if _plotly_modules.get('subplots') else None
 
 # 检查seaborn可用性
 HAS_SEABORN = sns is not None
@@ -58,13 +59,16 @@ class RiskVisualizer:
             self._plot_sector_risk(fig, report['sector_risk'], row=2, col=1)
 
             # 4. 流动性风险分析
-            self._plot_liquidity_risk(fig, report['liquidity_risk'], row=2, col=2)
+            self._plot_liquidity_risk(
+                fig, report['liquidity_risk'], row=2, col=2)
 
             # 5. 组合风险分析
-            self._plot_portfolio_risk(fig, report['portfolio_risk'], row=3, col=1)
+            self._plot_portfolio_risk(
+                fig, report['portfolio_risk'], row=3, col=1)
 
             # 6. 预警分析
-            self._plot_alert_analysis(fig, report['alert_analysis'], row=3, col=2)
+            self._plot_alert_analysis(
+                fig, report['alert_analysis'], row=3, col=2)
 
             # 更新布局
             fig.update_layout(

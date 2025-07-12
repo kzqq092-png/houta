@@ -44,7 +44,8 @@ class PluginSearchThread(QThread):
     def run(self):
         """执行搜索"""
         try:
-            plugins, total = self.plugin_market.search_plugins(**self.search_params)
+            plugins, total = self.plugin_market.search_plugins(
+                **self.search_params)
             self.search_completed.emit(plugins, total)
         except Exception as e:
             self.search_failed.emit(str(e))
@@ -124,7 +125,8 @@ class PluginCard(QFrame):
         info_layout.addStretch()
 
         # 评分
-        rating_label = QLabel(f"★ {self.plugin_info.rating:.1f} ({self.plugin_info.rating_count})")
+        rating_label = QLabel(
+            f"★ {self.plugin_info.rating:.1f} ({self.plugin_info.rating_count})")
         rating_label.setStyleSheet("color: #ff9500; font-size: 10px;")
         info_layout.addWidget(rating_label)
 
@@ -136,7 +138,8 @@ class PluginCard(QFrame):
         # 详情按钮
         details_btn = QPushButton("详情")
         details_btn.setMaximumWidth(60)
-        details_btn.clicked.connect(lambda: self.details_requested.emit(self.plugin_info.metadata.name))
+        details_btn.clicked.connect(
+            lambda: self.details_requested.emit(self.plugin_info.metadata.name))
         button_layout.addWidget(details_btn)
 
         button_layout.addStretch()
@@ -145,11 +148,14 @@ class PluginCard(QFrame):
         if self.is_installed:
             install_btn = QPushButton("已安装")
             install_btn.setEnabled(False)
-            install_btn.setStyleSheet("background-color: #28a745; color: white;")
+            install_btn.setStyleSheet(
+                "background-color: #28a745; color: white;")
         else:
             install_btn = QPushButton("安装")
-            install_btn.clicked.connect(lambda: self.install_requested.emit(self.plugin_info.metadata.name))
-            install_btn.setStyleSheet("background-color: #0078d4; color: white;")
+            install_btn.clicked.connect(
+                lambda: self.install_requested.emit(self.plugin_info.metadata.name))
+            install_btn.setStyleSheet(
+                "background-color: #0078d4; color: white;")
 
         install_btn.setMaximumWidth(80)
         button_layout.addWidget(install_btn)
@@ -339,7 +345,8 @@ class EnhancedPluginMarketDialog(QDialog):
 
         self.project_type_combo = QComboBox()
         for plugin_type in PluginType:
-            self.project_type_combo.addItem(plugin_type.value.title(), plugin_type)
+            self.project_type_combo.addItem(
+                plugin_type.value.title(), plugin_type)
         create_layout.addRow("插件类型:", self.project_type_combo)
 
         self.project_author_edit = QLineEdit()
@@ -425,7 +432,8 @@ class EnhancedPluginMarketDialog(QDialog):
         }
 
         # 启动搜索线程
-        self.search_thread = PluginSearchThread(self.plugin_market, search_params)
+        self.search_thread = PluginSearchThread(
+            self.plugin_market, search_params)
         self.search_thread.search_completed.connect(self.on_search_completed)
         self.search_thread.search_failed.connect(self.on_search_failed)
         self.search_thread.start()
@@ -479,7 +487,8 @@ class EnhancedPluginMarketDialog(QDialog):
         """安装插件"""
         try:
             # 这里应该实现实际的插件安装逻辑
-            QMessageBox.information(self, "安装插件", f"插件 {plugin_name} 安装功能正在开发中")
+            QMessageBox.information(
+                self, "安装插件", f"插件 {plugin_name} 安装功能正在开发中")
             self.status_label.setText(f"插件 {plugin_name} 安装中...")
         except Exception as e:
             QMessageBox.warning(self, "安装失败", f"安装插件时发生错误:\n{e}")
@@ -488,7 +497,8 @@ class EnhancedPluginMarketDialog(QDialog):
         """显示插件详情"""
         try:
             # 这里应该实现插件详情对话框
-            QMessageBox.information(self, "插件详情", f"插件 {plugin_name} 的详情功能正在开发中")
+            QMessageBox.information(
+                self, "插件详情", f"插件 {plugin_name} 的详情功能正在开发中")
         except Exception as e:
             QMessageBox.warning(self, "错误", f"显示插件详情时发生错误:\n{e}")
 
@@ -506,14 +516,17 @@ class EnhancedPluginMarketDialog(QDialog):
 
                 # 填充表格
                 self.installed_table.setItem(row, 0, QTableWidgetItem(name))
-                self.installed_table.setItem(row, 1, QTableWidgetItem(metadata.get('version', '1.0.0')))
-                self.installed_table.setItem(row, 2, QTableWidgetItem(metadata.get('plugin_type', '未知')))
+                self.installed_table.setItem(
+                    row, 1, QTableWidgetItem(metadata.get('version', '1.0.0')))
+                self.installed_table.setItem(
+                    row, 2, QTableWidgetItem(metadata.get('plugin_type', '未知')))
 
                 # 状态
                 status = "已启用" if instance else "已禁用"
                 self.installed_table.setItem(row, 3, QTableWidgetItem(status))
 
-                self.installed_table.setItem(row, 4, QTableWidgetItem(metadata.get('author', '未知')))
+                self.installed_table.setItem(
+                    row, 4, QTableWidgetItem(metadata.get('author', '未知')))
 
                 # 操作按钮
                 btn_widget = QWidget()

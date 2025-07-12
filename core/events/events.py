@@ -205,3 +205,14 @@ class IndicatorChangedEvent(BaseEvent):
             'selected_indicators': self.selected_indicators,
             'indicator_params': self.indicator_params
         })
+
+
+@dataclass
+class UIDataReadyEvent(BaseEvent):
+    """
+    UI数据准备就绪事件
+
+    当Coordinator准备好所有UI所需的数据时触发。
+    这个事件携带了用于更新UI的完整数据包，避免了各个面板的重复加载。
+    """
+    pass

@@ -324,22 +324,26 @@ class CommissionCalculator(QDialog):
             commission_rate = Decimal(str(self.commission_rate.value() / 100))
             min_commission = Decimal(str(self.min_commission.value()))
             stamp_tax_rate = Decimal(str(self.stamp_tax_rate.value() / 100))
-            transfer_fee_rate = Decimal(str(self.transfer_fee_rate.value() / 100))
+            transfer_fee_rate = Decimal(
+                str(self.transfer_fee_rate.value() / 100))
 
             # 计算佣金
             commission = max(trade_amount * commission_rate, min_commission)
-            commission = commission.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            commission = commission.quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP)
 
             # 计算印花税（仅卖出时收取）
             if self.trade_type.currentText() == "卖出":
                 stamp_tax = trade_amount * stamp_tax_rate
-                stamp_tax = stamp_tax.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                stamp_tax = stamp_tax.quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP)
             else:
                 stamp_tax = Decimal('0')
 
             # 计算过户费
             transfer_fee = trade_amount * transfer_fee_rate
-            transfer_fee = transfer_fee.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            transfer_fee = transfer_fee.quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP)
 
             # 计算总费用
             total_fee = commission + stamp_tax + transfer_fee

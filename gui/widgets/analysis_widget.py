@@ -1,6 +1,23 @@
 """
 重构后的分析控件模块 - 使用模块化标签页组件
 """
+from utils.manager_factory import get_config_manager, get_log_manager
+from analysis.pattern_manager import PatternManager
+from .analysis_tabs import (
+    TechnicalAnalysisTab,
+    PatternAnalysisTab,
+    TrendAnalysisTab,
+    SectorFlowTab,
+    WaveAnalysisTab,
+    SentimentAnalysisTab,
+    HotspotAnalysisTab,
+    SentimentReportTab
+)
+from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
+from PyQt5.QtWidgets import QWidget
+from core.risk_exporter import RiskExporter
+from data.data_loader import generate_quality_report
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, QTimer
 from typing import Dict, Any, List, Optional, Callable
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -26,36 +43,97 @@ from utils.config_manager import ConfigManager
 from hikyuu.indicator import *
 from hikyuu import sm
 from hikyuu import Query
-from indicators_algo import get_talib_indicator_list, get_talib_category, calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, get_all_indicators_by_category, calc_talib_indicator
+# 替换旧的指标系统导入
+from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 from utils.cache import Cache
 import requests
 from bs4 import BeautifulSoup
 from analysis.pattern_recognition import PatternRecognizer
 from core.data_manager import data_manager
-from features.advanced_indicators import create_pattern_recognition_features, ALL_PATTERN_TYPES
-from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
-from data.data_loader import generate_quality_report
-from core.risk_exporter import RiskExporter
-from PyQt5.QtWidgets import QWidget
-from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
+# 移除旧的形态特征导入
+# 定义ALL_PATTERN_TYPES常量
+ALL_PATTERN_TYPES = [
+    'CDLHAMMER', 'CDLENGULFING', 'CDLDOJI', 'CDLMORNINGSTAR', 'CDLEVENINGSTAR',
+    'CDLHARAMI', 'CDLHARAMICROSS', 'CDLMARUBOZU', 'CDLSHOOTINGSTAR', 'CDLINVERTEDHAMMER'
+]
 
 # 导入新的模块化标签页组件
-from .analysis_tabs import (
-    TechnicalAnalysisTab,
-    PatternAnalysisTab,
-    TrendAnalysisTab,
-    SectorFlowTab,
-    WaveAnalysisTab,
-    SentimentAnalysisTab,
-    HotspotAnalysisTab,
-    SentimentReportTab
-)
 
 # 新增导入形态管理器
-from analysis.pattern_manager import PatternManager
 
 # 使用统一的管理器工厂
-from utils.manager_factory import get_config_manager, get_log_manager
+
+
+class UpdateThrottler:
+    """更新节流器 - 控制更新频率，避免过于频繁的重绘"""
+
+    def __init__(self, min_interval_ms: int = 100):
+        """
+        Args:
+            min_interval_ms: 最小更新间隔（毫秒）
+        """
+        self.min_interval_ms = min_interval_ms
+        self.last_update_time = 0
+        self.pending_updates = {}  # 待处理的更新
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self._process_pending_updates)
+        self.update_timer.setSingleShot(True)
+
+    def request_update(self, update_id: str, update_func: Callable, *args, **kwargs):
+        """请求更新
+
+        Args:
+            update_id: 更新标识符
+            update_func: 更新函数
+            *args, **kwargs: 函数参数
+        """
+        current_time = time.time() * 1000  # 转换为毫秒
+
+        # 存储待处理的更新
+        self.pending_updates[update_id] = {
+            'func': update_func,
+            'args': args,
+            'kwargs': kwargs,
+            'timestamp': current_time
+        }
+
+        # 检查是否可以立即执行
+        if current_time - self.last_update_time >= self.min_interval_ms:
+            self._process_pending_updates()
+        else:
+            # 延迟执行
+            remaining_time = self.min_interval_ms - \
+                (current_time - self.last_update_time)
+            if not self.update_timer.isActive():
+                self.update_timer.start(int(remaining_time))
+
+    def _process_pending_updates(self):
+        """处理待处理的更新"""
+        if not self.pending_updates:
+            return
+
+        current_time = time.time() * 1000
+        self.last_update_time = current_time
+
+        # 执行所有待处理的更新
+        updates_to_process = list(self.pending_updates.items())
+        self.pending_updates.clear()
+
+        for update_id, update_info in updates_to_process:
+            try:
+                update_info['func'](*update_info['args'],
+                                    **update_info['kwargs'])
+            except Exception as e:
+                print(f"更新执行失败 {update_id}: {str(e)}")
+
+    def cancel_update(self, update_id: str):
+        """取消指定的更新"""
+        self.pending_updates.pop(update_id, None)
+
+    def cancel_all_updates(self):
+        """取消所有待处理的更新"""
+        self.pending_updates.clear()
+        self.update_timer.stop()
 
 
 class AnalysisWidget(QWidget):
@@ -81,6 +159,16 @@ class AnalysisWidget(QWidget):
         # 使用统一的管理器工厂
         self.config_manager = config_manager or get_config_manager()
         self.log_manager = get_log_manager()
+
+        # 初始化更新节流器
+        self.update_throttler = UpdateThrottler(
+            min_interval_ms=150)  # 最小150ms间隔
+
+        # 图表更新防抖
+        self.chart_update_timer = QTimer()
+        self.chart_update_timer.timeout.connect(self._execute_chart_update)
+        self.chart_update_timer.setSingleShot(True)
+        self._pending_chart_update = None
 
         # 初始化形态管理器
         try:
@@ -146,13 +234,15 @@ class AnalysisWidget(QWidget):
 
             # 加载图标（使用文字代替）
             loading_icon = QLabel("⏳")
-            loading_icon.setStyleSheet("QLabel { color: white; font-size: 48px; }")
+            loading_icon.setStyleSheet(
+                "QLabel { color: white; font-size: 48px; }")
             loading_icon.setAlignment(Qt.AlignCenter)
             overlay_layout.addWidget(loading_icon)
 
             # 加载文字
             self.loading_label = QLabel(message)
-            self.loading_label.setStyleSheet("QLabel { color: white; font-size: 16px; font-weight: bold; }")
+            self.loading_label.setStyleSheet(
+                "QLabel { color: white; font-size: 16px; font-weight: bold; }")
             self.loading_label.setAlignment(Qt.AlignCenter)
             overlay_layout.addWidget(self.loading_label)
 
@@ -353,17 +443,20 @@ class AnalysisWidget(QWidget):
         try:
             # 连接技术分析信号
             if hasattr(self.technical_tab, 'analysis_completed'):
-                self.technical_tab.analysis_completed.connect(self.analysis_completed)
+                self.technical_tab.analysis_completed.connect(
+                    self.analysis_completed)
             if hasattr(self.technical_tab, 'error_occurred'):
                 self.technical_tab.error_occurred.connect(self.error_occurred)
 
             # 连接形态分析信号
             if hasattr(self.pattern_tab, 'analysis_completed'):
-                self.pattern_tab.analysis_completed.connect(self.analysis_completed)
+                self.pattern_tab.analysis_completed.connect(
+                    self.analysis_completed)
             if hasattr(self.pattern_tab, 'error_occurred'):
                 self.pattern_tab.error_occurred.connect(self.error_occurred)
             if hasattr(self.pattern_tab, 'pattern_selected'):
-                self.pattern_tab.pattern_selected.connect(self.pattern_selected)
+                self.pattern_tab.pattern_selected.connect(
+                    self.pattern_selected)
 
         except Exception as e:
             self.log_manager.error(f"连接标签页信号失败: {e}")
@@ -447,32 +540,81 @@ class AnalysisWidget(QWidget):
             self.log_manager.error(f"Tab切换处理失败: {e}")
 
     def set_kdata(self, kdata):
-        """设置K线数据并同步到所有标签页"""
-        try:
-            self.current_kdata = kdata
+        """设置K线数据 - 使用防抖机制
 
-            # 同步数据到所有标签页组件
+        Args:
+            kdata: K线数据
+        """
+        # 使用更新节流器来控制K线数据更新频率
+        self.update_throttler.request_update(
+            'set_kdata',
+            self._do_set_kdata,
+            kdata
+        )
+
+    def _do_set_kdata(self, kdata):
+        """实际执行K线数据设置"""
+        try:
+            if kdata is None or kdata.empty:
+                self.log_manager.warning("传入的K线数据为空")
+                return
+
+            # 预处理数据
+            processed_kdata = self._kdata_preprocess(kdata, "设置K线数据")
+            if processed_kdata is None or processed_kdata.empty:
+                self.log_manager.warning("K线数据预处理后为空")
+                return
+
+            self.current_kdata = processed_kdata
+
+            # 通知所有标签页更新数据
             for tab_name, tab_component in self.tab_components.items():
                 if hasattr(tab_component, 'set_kdata'):
-                    tab_component.set_kdata(kdata)
+                    try:
+                        tab_component.set_kdata(processed_kdata)
+                    except Exception as e:
+                        self.log_manager.warning(
+                            f"标签页 {tab_name} 设置K线数据失败: {str(e)}")
 
-            self.log_manager.info("K线数据已同步到所有标签页")
+            self.log_manager.info(f"K线数据设置完成，共 {len(processed_kdata)} 条记录")
 
         except Exception as e:
-            self.log_manager.error(f"设置K线数据失败: {e}")
+            self.log_manager.error(f"设置K线数据失败: {str(e)}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
 
     def refresh_all_tabs(self):
-        """刷新所有标签页"""
-        try:
-            for tab_name, tab_component in self.tab_components.items():
-                if hasattr(tab_component, 'refresh_data'):
-                    tab_component.refresh_data()
+        """刷新所有标签页 - 使用防抖机制"""
+        self.update_throttler.request_update(
+            'refresh_all_tabs',
+            self._do_refresh_all_tabs
+        )
 
-            self.log_manager.info("所有标签页已刷新")
+    def _do_refresh_all_tabs(self):
+        """实际执行刷新所有标签页"""
+        try:
+            if self.current_kdata is None:
+                self.log_manager.warning("当前没有K线数据，无法刷新")
+                return
+
+            self.log_manager.info("开始刷新所有分析标签页...")
+
+            for tab_name, tab_component in self.tab_components.items():
+                if hasattr(tab_component, 'refresh'):
+                    try:
+                        # 使用节流器为每个标签页的刷新请求添加延迟
+                        self.update_throttler.request_update(
+                            f'refresh_tab_{tab_name}',
+                            tab_component.refresh
+                        )
+                    except Exception as e:
+                        self.log_manager.warning(
+                            f"刷新标签页 {tab_name} 失败: {str(e)}")
+
+            self.log_manager.info("所有标签页刷新请求已提交")
 
         except Exception as e:
-            self.log_manager.error(f"刷新标签页失败: {e}")
+            self.log_manager.error(f"刷新所有标签页失败: {str(e)}")
+            self.error_occurred.emit(f"刷新失败: {str(e)}")
 
     def refresh(self) -> None:
         """刷新当前标签页"""
@@ -504,7 +646,8 @@ class AnalysisWidget(QWidget):
                     if isinstance(result, dict) and "error" in result:
                         self.error_occurred.emit(result["error"])
                     else:
-                        self.analysis_completed.emit(result if isinstance(result, dict) else {"result": result})
+                        self.analysis_completed.emit(result if isinstance(
+                            result, dict) else {"result": result})
                 except Exception as e:
                     self.hide_loading()
                     self.error_occurred.emit(f"分析执行失败: {str(e)}")
@@ -536,9 +679,11 @@ class AnalysisWidget(QWidget):
             # 确保必要的列存在
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             if hasattr(kdata, 'columns'):
-                missing_columns = [col for col in required_columns if col not in kdata.columns]
+                missing_columns = [
+                    col for col in required_columns if col not in kdata.columns]
                 if missing_columns:
-                    self.log_manager.warning(f"{context}数据缺少必要列: {missing_columns}")
+                    self.log_manager.warning(
+                        f"{context}数据缺少必要列: {missing_columns}")
 
             return kdata
 
@@ -573,7 +718,7 @@ class AnalysisWidget(QWidget):
             self.pattern_tab.identify_patterns()
 
     def calculate_indicators(self):
-        """计算技术指标 - 兼容原接口"""
+        """计算技术指标 - 兼容原接口，直接调用技术分析标签页的统一接口"""
         if hasattr(self.technical_tab, 'calculate_indicators'):
             self.technical_tab.calculate_indicators()
 
@@ -587,7 +732,8 @@ class AnalysisWidget(QWidget):
 
                 # 连接其他可能的图表信号
                 if hasattr(self.chart_widget, 'stock_changed'):
-                    self.chart_widget.stock_changed.connect(self._on_stock_changed)
+                    self.chart_widget.stock_changed.connect(
+                        self._on_stock_changed)
 
                 self.log_manager.info("图表组件信号连接成功")
             else:
@@ -605,20 +751,190 @@ class AnalysisWidget(QWidget):
         except Exception as e:
             self.log_manager.error(f"处理股票切换事件失败: {e}")
 
+    def request_chart_update(self, chart_data: Dict[str, Any], delay_ms: int = 200):
+        """请求图表更新 - 使用防抖机制
+
+        Args:
+            chart_data: 图表数据
+            delay_ms: 延迟时间（毫秒）
+        """
+        self._pending_chart_update = chart_data
+        self.chart_update_timer.start(delay_ms)
+
+    def _execute_chart_update(self):
+        """执行实际的图表更新"""
+        if self._pending_chart_update is None:
+            return
+
+        try:
+            chart_data = self._pending_chart_update
+            self._pending_chart_update = None
+
+            # 执行图表更新逻辑
+            current_tab = self.tab_widget.currentWidget()
+            if hasattr(current_tab, 'update_chart'):
+                current_tab.update_chart(chart_data)
+
+        except Exception as e:
+            self.log_manager.error(f"执行图表更新失败: {str(e)}")
+
+    def on_tab_changed(self, index):
+        """标签页切换事件 - 优化频率"""
+        # 取消之前的更新请求
+        self.update_throttler.cancel_all_updates()
+
+        # 使用节流器处理标签页切换
+        self.update_throttler.request_update(
+            'tab_changed',
+            self._do_tab_changed,
+            index
+        )
+
+    def _do_tab_changed(self, index):
+        """实际处理标签页切换"""
+        try:
+            if index < 0 or index >= self.tab_widget.count():
+                return
+
+            current_tab = self.tab_widget.widget(index)
+            tab_name = self.tab_widget.tabText(index)
+
+            self.log_manager.debug(f"切换到标签页: {tab_name}")
+
+            # 如果当前标签页有数据且需要刷新
+            if (self.current_kdata is not None and
+                hasattr(current_tab, 'refresh') and
+                hasattr(current_tab, 'needs_refresh') and
+                    getattr(current_tab, 'needs_refresh', True)):
+
+                # 延迟刷新，避免频繁切换时的重复计算
+                self.update_throttler.request_update(
+                    f'refresh_current_tab_{tab_name}',
+                    current_tab.refresh
+                )
+
+        except Exception as e:
+            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
+
+    def refresh_current_tab(self):
+        """刷新当前标签页 - 优化版本"""
+        try:
+            current_tab = self.tab_widget.currentWidget()
+            if current_tab and hasattr(current_tab, 'refresh'):
+                tab_name = self.tab_widget.tabText(
+                    self.tab_widget.currentIndex())
+
+                # 使用节流器控制刷新频率
+                self.update_throttler.request_update(
+                    f'refresh_current_{tab_name}',
+                    current_tab.refresh
+                )
+
+        except Exception as e:
+            self.log_manager.error(f"刷新当前标签页失败: {str(e)}")
+
+    def batch_update_indicators(self, indicators: List[str], delay_ms: int = 300):
+        """批量更新指标 - 避免频繁的单个更新
+
+        Args:
+            indicators: 指标列表
+            delay_ms: 延迟时间
+        """
+        # 取消之前的指标更新
+        for indicator in indicators:
+            self.update_throttler.cancel_update(
+                f'update_indicator_{indicator}')
+
+        # 批量更新
+        self.update_throttler.request_update(
+            'batch_update_indicators',
+            self._do_batch_update_indicators,
+            indicators
+        )
+
+    def _do_batch_update_indicators(self, indicators: List[str]):
+        """实际执行批量指标更新"""
+        try:
+            if not self.current_kdata or self.current_kdata.empty:
+                return
+
+            self.log_manager.info(f"批量更新指标: {indicators}")
+
+            # 并行计算所有指标
+            with ThreadPoolExecutor(max_workers=min(len(indicators), 4)) as executor:
+                futures = []
+                for indicator in indicators:
+                    future = executor.submit(
+                        self._calculate_single_indicator, indicator)
+                    futures.append((indicator, future))
+
+                # 收集结果
+                results = {}
+                for indicator, future in futures:
+                    try:
+                        result = future.result(timeout=10)  # 10秒超时
+                        if result is not None:
+                            results[indicator] = result
+                    except Exception as e:
+                        self.log_manager.warning(
+                            f"计算指标 {indicator} 失败: {str(e)}")
+
+                # 批量更新UI
+                if results:
+                    self._batch_update_ui(results)
+
+        except Exception as e:
+            self.log_manager.error(f"批量更新指标失败: {str(e)}")
+
+    def _calculate_single_indicator(self, indicator: str):
+        """计算单个指标"""
+        try:
+            # 这里应该调用实际的指标计算逻辑
+            # 暂时返回None作为占位符
+            return None
+        except Exception as e:
+            self.log_manager.error(f"计算指标 {indicator} 失败: {str(e)}")
+            return None
+
+    def _batch_update_ui(self, indicator_results: Dict[str, Any]):
+        """批量更新UI"""
+        try:
+            # 批量更新当前标签页的指标显示
+            current_tab = self.tab_widget.currentWidget()
+            if hasattr(current_tab, 'batch_update_indicators'):
+                current_tab.batch_update_indicators(indicator_results)
+            elif hasattr(current_tab, 'update_indicators'):
+                for indicator, result in indicator_results.items():
+                    current_tab.update_indicators(indicator, result)
+
+        except Exception as e:
+            self.log_manager.error(f"批量更新UI失败: {str(e)}")
+
+    def get_update_stats(self) -> Dict[str, Any]:
+        """获取更新统计信息"""
+        return {
+            'pending_updates': len(self.update_throttler.pending_updates),
+            'last_update_time': self.update_throttler.last_update_time,
+            'min_interval_ms': self.update_throttler.min_interval_ms,
+            'chart_update_pending': self._pending_chart_update is not None,
+            'timer_active': self.chart_update_timer.isActive()
+        }
+
+    def optimize_update_frequency(self, min_interval_ms: int = 150):
+        """优化更新频率设置
+
+        Args:
+            min_interval_ms: 最小更新间隔（毫秒）
+        """
+        self.update_throttler.min_interval_ms = min_interval_ms
+        self.log_manager.info(f"更新频率已优化为最小 {min_interval_ms}ms 间隔")
+
 
 # 保持向后兼容性的函数
 def get_indicator_categories():
-    """获取指标分类 - 兼容原接口"""
-    try:
-        from indicators_algo import get_all_indicators_by_category
-        return get_all_indicators_by_category()
-    except Exception:
-        return {
-            "趋势指标": ["MA", "EMA", "MACD"],
-            "震荡指标": ["RSI", "KDJ", "CCI"],
-            "成交量指标": ["OBV", "VOLUME"],
-            "波动率指标": ["ATR", "BOLL"]
-        }
+    """获取指标分类"""
+    from core.indicator_service import get_indicator_categories as get_categories
+    return get_categories()
 
 
 # 为了完全向后兼容，添加原有的一些重要方法

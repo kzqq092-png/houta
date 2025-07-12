@@ -51,7 +51,8 @@ class StarRatingWidget(QWidget):
             star_width = 16
             star_spacing = 2
             x = event.x()
-            rating = min(self.max_rating, max(1, int(x / (star_width + star_spacing)) + 1))
+            rating = min(self.max_rating, max(
+                1, int(x / (star_width + star_spacing)) + 1))
             self.rating = rating
             self.update()
 
@@ -153,11 +154,13 @@ class IndicatorCard(QFrame):
         button_layout = QHBoxLayout()
 
         details_btn = QPushButton("详情")
-        details_btn.clicked.connect(lambda: self.details_clicked.emit(self.indicator_data))
+        details_btn.clicked.connect(
+            lambda: self.details_clicked.emit(self.indicator_data))
         button_layout.addWidget(details_btn)
 
         install_btn = QPushButton("安装")
-        install_btn.clicked.connect(lambda: self.install_clicked.emit(self.indicator_data))
+        install_btn.clicked.connect(
+            lambda: self.install_clicked.emit(self.indicator_data))
         install_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007acc;
@@ -262,7 +265,8 @@ class IndicatorMarketDialog(QDialog):
         # 分类筛选
         self.category_combo = QComboBox()
         self.category_combo.addItems(self.categories)
-        self.category_combo.currentTextChanged.connect(self.on_category_changed)
+        self.category_combo.currentTextChanged.connect(
+            self.on_category_changed)
         filter_layout.addWidget(QLabel("分类:"))
         filter_layout.addWidget(self.category_combo)
 
@@ -396,7 +400,8 @@ class IndicatorMarketDialog(QDialog):
         publish_layout.addRow("价格:", self.price_spin)
 
         self.license_combo = QComboBox()
-        self.license_combo.addItems(["MIT", "GPL v3", "Apache 2.0", "BSD", "商业许可"])
+        self.license_combo.addItems(
+            ["MIT", "GPL v3", "Apache 2.0", "BSD", "商业许可"])
         publish_layout.addRow("许可证:", self.license_combo)
 
         self.public_check = QCheckBox("公开发布")
@@ -568,7 +573,8 @@ class IndicatorMarketDialog(QDialog):
 
         # 按分类筛选
         if self.current_category != "全部":
-            filtered = [ind for ind in filtered if ind['category'] == self.current_category]
+            filtered = [ind for ind in filtered if ind['category']
+                        == self.current_category]
 
         # 按搜索关键词筛选
         search_text = self.search_edit.text().lower()
@@ -624,7 +630,8 @@ class IndicatorMarketDialog(QDialog):
                     progress.setValue(i)
                     time.sleep(0.01)
 
-                QMessageBox.information(self, "安装成功", f"指标 '{indicator_name}' 安装成功！")
+                QMessageBox.information(
+                    self, "安装成功", f"指标 '{indicator_name}' 安装成功！")
                 self.indicator_installed.emit(indicator_data)
 
         except Exception as e:
@@ -664,7 +671,8 @@ class IndicatorMarketDialog(QDialog):
         favorite_btn = QPushButton("收藏")
         close_btn = QPushButton("关闭")
 
-        install_btn.clicked.connect(lambda: self.install_indicator(indicator_data))
+        install_btn.clicked.connect(
+            lambda: self.install_indicator(indicator_data))
         close_btn.clicked.connect(details_dialog.accept)
 
         button_layout.addWidget(install_btn)

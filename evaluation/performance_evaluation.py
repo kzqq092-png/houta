@@ -446,18 +446,22 @@ class PerformanceEvaluator:
         # 计算业务指标
         if all_results:
             metrics.patterns_found = len(all_results)
-            confidences = [r.confidence for r in all_results if hasattr(r, 'confidence')]
+            confidences = [
+                r.confidence for r in all_results if hasattr(r, 'confidence')]
             if confidences:
                 metrics.confidence_avg = np.mean(confidences)
                 metrics.confidence_std = np.std(confidences)
-                metrics.signal_quality = self._calculate_signal_quality(all_results)
+                metrics.signal_quality = self._calculate_signal_quality(
+                    all_results)
 
         # 计算稳定性指标
         if execution_times:
-            metrics.robustness_score = 1.0 - min(1.0, np.std(execution_times) / np.mean(execution_times))
+            metrics.robustness_score = 1.0 - \
+                min(1.0, np.std(execution_times) / np.mean(execution_times))
 
         # 计算综合评分
-        metrics.overall_score = self._calculate_algorithm_overall_score(metrics)
+        metrics.overall_score = self._calculate_algorithm_overall_score(
+            metrics)
 
         if self.debug_mode:
             print(f"  ✓ 评估完成，综合评分: {metrics.overall_score:.3f}")
@@ -470,12 +474,14 @@ class PerformanceEvaluator:
             return 0.0
 
         # 基于置信度分布和信号一致性计算质量
-        confidences = [r.confidence for r in results if hasattr(r, 'confidence')]
+        confidences = [
+            r.confidence for r in results if hasattr(r, 'confidence')]
         if not confidences:
             return 0.0
 
         # 高置信度结果的比例
-        high_confidence_ratio = sum(1 for c in confidences if c > 0.7) / len(confidences)
+        high_confidence_ratio = sum(
+            1 for c in confidences if c > 0.7) / len(confidences)
 
         # 置信度的稳定性（标准差越小越好）
         confidence_stability = 1.0 - min(1.0, np.std(confidences))
@@ -529,7 +535,8 @@ class PerformanceEvaluator:
             return 0.5  # 默认评分
 
         # 加权平均
-        weighted_score = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
+        weighted_score = sum(
+            s * w for s, w in zip(scores, weights)) / sum(weights)
         return max(0.0, min(1.0, weighted_score))
 
     def create_test_datasets(self, pattern_name: str, count: int = 3) -> List[pd.DataFrame]:
@@ -548,8 +555,10 @@ class PerformanceEvaluator:
             # 生成OHLCV数据
             opens = prices * (1 + np.random.normal(0, 0.005, 100))
             closes = prices
-            highs = np.maximum(opens, closes) * (1 + np.random.uniform(0, 0.02, 100))
-            lows = np.minimum(opens, closes) * (1 - np.random.uniform(0, 0.02, 100))
+            highs = np.maximum(opens, closes) * \
+                (1 + np.random.uniform(0, 0.02, 100))
+            lows = np.minimum(opens, closes) * \
+                (1 - np.random.uniform(0, 0.02, 100))
             volumes = np.random.lognormal(15, 1, 100)
 
             dataset = pd.DataFrame({
@@ -592,22 +601,27 @@ class PerformanceEvaluator:
             # 这里需要从数据库获取策略收益数据
             # 暂时使用模拟数据
             returns = pd.Series(np.random.normal(0.001, 0.02, 252))
-            strategy_metrics = self.evaluate_strategy_performance(strategy_name, returns)
-            report['metrics']['strategy'] = {k: self._metric_to_dict(v) for k, v in strategy_metrics.items()}
+            strategy_metrics = self.evaluate_strategy_performance(
+                strategy_name, returns)
+            report['metrics']['strategy'] = {k: self._metric_to_dict(
+                v) for k, v in strategy_metrics.items()}
 
         # 形态性能评估
         if pattern_name:
             pattern_metrics = self.evaluate_pattern_performance(pattern_name)
-            report['metrics']['pattern'] = {k: self._metric_to_dict(v) for k, v in pattern_metrics.items()}
+            report['metrics']['pattern'] = {k: self._metric_to_dict(
+                v) for k, v in pattern_metrics.items()}
 
         # 系统性能评估
         if include_system:
             system_metrics = self.evaluate_system_performance()
-            report['metrics']['system'] = {k: self._metric_to_dict(v) for k, v in system_metrics.items()}
+            report['metrics']['system'] = {k: self._metric_to_dict(
+                v) for k, v in system_metrics.items()}
 
         # 生成总结和建议
         report['summary'] = self._generate_summary(report['metrics'])
-        report['recommendations'] = self._generate_recommendations(report['metrics'])
+        report['recommendations'] = self._generate_recommendations(
+            report['metrics'])
 
         return report
 
@@ -643,7 +657,8 @@ class PerformanceEvaluator:
 
         # 策略评分
         if 'strategy' in metrics:
-            strategy_score = self._calculate_strategy_score(metrics['strategy'])
+            strategy_score = self._calculate_strategy_score(
+                metrics['strategy'])
             scores.append(strategy_score)
             summary['key_metrics']['strategy_score'] = strategy_score
 

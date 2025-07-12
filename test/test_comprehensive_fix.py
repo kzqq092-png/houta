@@ -158,7 +158,8 @@ def test_pattern_statistics_generation():
             return False
 
         if stats['by_category'] != expected_categories:
-            print(f"❌ 类别统计错误: 期望{expected_categories}, 实际{stats['by_category']}")
+            print(
+                f"❌ 类别统计错误: 期望{expected_categories}, 实际{stats['by_category']}")
             return False
 
         if stats['by_signal'] != expected_signals:
@@ -166,7 +167,8 @@ def test_pattern_statistics_generation():
             return False
 
         if stats['confidence_distribution'] != expected_confidence:
-            print(f"❌ 置信度统计错误: 期望{expected_confidence}, 实际{stats['confidence_distribution']}")
+            print(
+                f"❌ 置信度统计错误: 期望{expected_confidence}, 实际{stats['confidence_distribution']}")
             return False
 
         print("✅ 统计数据生成测试通过")
@@ -210,7 +212,8 @@ def test_chart_integration():
 
             def update_chart(self, data):
                 self.chart_data_received.append(data)
-                print(f"MockChartWidget.update_chart 接收到数据: {list(data.keys())}")
+                print(
+                    f"MockChartWidget.update_chart 接收到数据: {list(data.keys())}")
 
         # 设置模拟图表控件
         widget.chart_widget = MockChartWidget()

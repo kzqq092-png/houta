@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import logging
 
+
 class RiskAlertSystem:
     def __init__(self):
         self.alert_history = []
@@ -18,47 +19,52 @@ class RiskAlertSystem:
             'stop_trading': self._stop_trading,
             'emergency_liquidation': self._emergency_liquidation
         }
-        
+
     def check_risk_alerts(self, risk_metrics: Dict) -> List[Dict]:
         """检查风险指标并生成预警"""
         alerts = []
-        
+
         # 检查市场风险
-        market_alerts = self._check_market_risk(risk_metrics.get('market_risk', {}))
+        market_alerts = self._check_market_risk(
+            risk_metrics.get('market_risk', {}))
         alerts.extend(market_alerts)
-        
+
         # 检查行业风险
-        sector_alerts = self._check_sector_risk(risk_metrics.get('sector_risk', {}))
+        sector_alerts = self._check_sector_risk(
+            risk_metrics.get('sector_risk', {}))
         alerts.extend(sector_alerts)
-        
+
         # 检查流动性风险
-        liquidity_alerts = self._check_liquidity_risk(risk_metrics.get('liquidity_risk', {}))
+        liquidity_alerts = self._check_liquidity_risk(
+            risk_metrics.get('liquidity_risk', {}))
         alerts.extend(liquidity_alerts)
-        
+
         # 检查VaR和ES
-        var_alerts = self._check_var_es(risk_metrics.get('var', 0), risk_metrics.get('es', 0))
+        var_alerts = self._check_var_es(
+            risk_metrics.get('var', 0), risk_metrics.get('es', 0))
         alerts.extend(var_alerts)
-        
+
         # 检查相关性风险
-        correlation_alerts = self._check_correlation_risk(risk_metrics.get('correlation_risk', {}))
+        correlation_alerts = self._check_correlation_risk(
+            risk_metrics.get('correlation_risk', {}))
         alerts.extend(correlation_alerts)
-        
+
         # 检查尾部风险
         tail_alerts = self._check_tail_risk(risk_metrics.get('tail_risk', {}))
         alerts.extend(tail_alerts)
-        
+
         # 执行风险控制措施
         self._execute_risk_controls(alerts)
-        
+
         # 记录预警历史
         self._record_alerts(alerts)
-        
+
         return alerts
-        
+
     def _check_market_risk(self, market_risk: Dict) -> List[Dict]:
         """检查市场风险指标"""
         alerts = []
-        
+
         # 检查Beta
         if market_risk.get('beta', 0) > 1.5:
             alerts.append({
@@ -68,7 +74,7 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': '投资组合Beta值过高，市场风险较大'
             })
-            
+
         # 检查夏普比率
         if market_risk.get('sharpe_ratio', 0) < 0.5:
             alerts.append({
@@ -78,13 +84,13 @@ class RiskAlertSystem:
                 'level': 'medium',
                 'message': '夏普比率偏低，风险调整后收益不理想'
             })
-            
+
         return alerts
-        
+
     def _check_sector_risk(self, sector_risk: Dict) -> List[Dict]:
         """检查行业风险指标"""
         alerts = []
-        
+
         # 检查行业集中度
         if sector_risk.get('herfindahl_index', 0) > 0.3:
             alerts.append({
@@ -94,7 +100,7 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': '行业集中度过高，分散化不足'
             })
-            
+
         # 检查单一行业暴露
         for sector, exposure in sector_risk.get('sector_exposure', {}).items():
             if exposure > 0.3:
@@ -105,13 +111,13 @@ class RiskAlertSystem:
                     'level': 'medium',
                     'message': f'{sector}行业暴露度过高'
                 })
-                
+
         return alerts
-        
+
     def _check_liquidity_risk(self, liquidity_risk: Dict) -> List[Dict]:
         """检查流动性风险指标"""
         alerts = []
-        
+
         # 检查成交量波动率
         if liquidity_risk.get('volume_volatility', 0) > 0.5:
             alerts.append({
@@ -121,7 +127,7 @@ class RiskAlertSystem:
                 'level': 'medium',
                 'message': '成交量波动率过高，流动性风险增加'
             })
-            
+
         # 检查买卖价差
         if liquidity_risk.get('avg_spread', 0) > 0.01:
             alerts.append({
@@ -131,13 +137,13 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': '买卖价差过大，交易成本增加'
             })
-            
+
         return alerts
-        
+
     def _check_var_es(self, var: float, es: float) -> List[Dict]:
         """检查VaR和ES指标"""
         alerts = []
-        
+
         # 检查VaR
         if var < -0.05:
             alerts.append({
@@ -147,7 +153,7 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': 'VaR值超过阈值，潜在损失风险较大'
             })
-            
+
         # 检查ES
         if es < -0.07:
             alerts.append({
@@ -157,13 +163,13 @@ class RiskAlertSystem:
                 'level': 'critical',
                 'message': '预期损失超过阈值，极端风险较大'
             })
-            
+
         return alerts
-        
+
     def _check_correlation_risk(self, correlation_risk: Dict) -> List[Dict]:
         """检查相关性风险指标"""
         alerts = []
-        
+
         # 检查平均相关性
         if correlation_risk.get('avg_correlation', 0) > 0.7:
             alerts.append({
@@ -173,13 +179,13 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': '资产间相关性过高，分散化效果不佳'
             })
-            
+
         return alerts
-        
+
     def _check_tail_risk(self, tail_risk: Dict) -> List[Dict]:
         """检查尾部风险指标"""
         alerts = []
-        
+
         # 检查峰度
         if tail_risk.get('kurtosis', 0) > 3:
             alerts.append({
@@ -189,7 +195,7 @@ class RiskAlertSystem:
                 'level': 'medium',
                 'message': '收益分布峰度过高，尾部风险增加'
             })
-            
+
         # 检查极端损失概率
         if tail_risk.get('extreme_loss_prob', 0) > 0.1:
             alerts.append({
@@ -199,35 +205,35 @@ class RiskAlertSystem:
                 'level': 'high',
                 'message': '极端损失概率过高，需要加强风险控制'
             })
-            
+
         return alerts
-        
+
     def _execute_risk_controls(self, alerts: List[Dict]):
         """执行风险控制措施"""
         for alert in alerts:
             level = alert['level']
             action = self.alert_levels[level]['action']
             self.risk_controls[action](alert)
-            
+
     def _monitor_risk(self, alert: Dict):
         """监控风险"""
         logging.warning(f"风险监控: {alert['message']}")
-        
+
     def _reduce_position(self, alert: Dict):
         """减少持仓"""
         logging.warning(f"执行减仓: {alert['message']}")
         # 实现减仓逻辑
-        
+
     def _stop_trading(self, alert: Dict):
         """停止交易"""
         logging.error(f"停止交易: {alert['message']}")
         # 实现停止交易逻辑
-        
+
     def _emergency_liquidation(self, alert: Dict):
         """紧急平仓"""
         logging.critical(f"执行紧急平仓: {alert['message']}")
         # 实现紧急平仓逻辑
-        
+
     def _record_alerts(self, alerts: List[Dict]):
         """记录预警历史"""
         for alert in alerts:
@@ -235,34 +241,34 @@ class RiskAlertSystem:
                 'timestamp': datetime.now(),
                 'alert': alert
             })
-            
-    def get_alert_history(self, start_time: Optional[datetime] = None, 
-                         end_time: Optional[datetime] = None) -> List[Dict]:
+
+    def get_alert_history(self, start_time: Optional[datetime] = None,
+                          end_time: Optional[datetime] = None) -> List[Dict]:
         """获取预警历史记录"""
         if start_time and end_time:
-            return [record for record in self.alert_history 
-                   if start_time <= record['timestamp'] <= end_time]
+            return [record for record in self.alert_history
+                    if start_time <= record['timestamp'] <= end_time]
         return self.alert_history
-        
+
     def analyze_alert_history(self) -> Dict:
         """分析预警历史"""
         if not self.alert_history:
             return {}
-            
+
         # 统计各类型预警数量
         alert_counts = {}
         for record in self.alert_history:
             alert_type = record['alert']['type']
             alert_counts[alert_type] = alert_counts.get(alert_type, 0) + 1
-            
+
         # 统计各等级预警数量
         level_counts = {}
         for record in self.alert_history:
             level = record['alert']['level']
             level_counts[level] = level_counts.get(level, 0) + 1
-            
+
         return {
             'alert_counts': alert_counts,
             'level_counts': level_counts,
             'total_alerts': len(self.alert_history)
-        } 
+        }

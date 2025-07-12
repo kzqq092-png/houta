@@ -107,7 +107,8 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
         if not has_datetime:
             # 完全没有datetime信息，创建默认时间序列
             log_manager.warning(f"[{context}] 缺少datetime字段，自动补全")
-            df['datetime'] = pd.date_range(start='2023-01-01', periods=len(df), freq='D')
+            df['datetime'] = pd.date_range(
+                start='2023-01-01', periods=len(df), freq='D')
             datetime_col_name = 'datetime'
             has_datetime = True
 
@@ -171,7 +172,8 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
 
             after_count = len(df)
             if after_count < before_count:
-                log_manager.info(f"[{context}] 已过滤{before_count-after_count}行{col}异常数据")
+                log_manager.info(
+                    f"[{context}] 已过滤{before_count-after_count}行{col}异常数据")
 
     # 检查价格逻辑关系
     if all(col in df.columns for col in ['open', 'high', 'low', 'close']):
@@ -231,7 +233,8 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
 
     # 检查必要列
     required_columns = ['open', 'high', 'low', 'close']
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    missing_columns = [
+        col for col in required_columns if col not in df.columns]
     if missing_columns:
         log_manager.warning(f"[{context}] 缺少必要列: {missing_columns}")
         return False

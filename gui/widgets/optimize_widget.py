@@ -1,1 +1,1 @@
-from core.logger import LogManager 
+from core.logger import LogManager

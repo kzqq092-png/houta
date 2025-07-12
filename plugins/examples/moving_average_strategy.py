@@ -9,7 +9,8 @@ import pandas as pd
 from typing import Dict, Any, Optional
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpinBox, QComboBox, QFormLayout
 
-from ..plugin_interface import (
+# 修改导入方式，使用绝对导入
+from plugins.plugin_interface import (
     IStrategyPlugin, PluginMetadata, PluginType, PluginCategory,
     plugin_metadata, register_plugin, PluginContext
 )
@@ -51,7 +52,7 @@ class MovingAverageStrategyPlugin(IStrategyPlugin):
         """获取插件元数据"""
         return self._plugin_metadata
 
-    def initialize(self, context: PluginContext) -> bool:
+    def initialize(self, context: PluginContext = None) -> bool:
         """
         初始化插件
 
@@ -64,21 +65,30 @@ class MovingAverageStrategyPlugin(IStrategyPlugin):
         try:
             self._context = context
 
-            # 加载配置
-            config = context.get_plugin_config(self.metadata.name)
-            if config:
-                self._config.update(config)
+            # 如果上下文不为空，加载配置和注册事件
+            if context:
+                # 加载配置
+                config = context.get_plugin_config(self.metadata.name)
+                if config:
+                    self._config.update(config)
 
-            # 注册事件处理器
-            context.register_event_handler("market_open", self._on_market_open)
-            context.register_event_handler("market_close", self._on_market_close)
+                # 注册事件处理器
+                context.register_event_handler(
+                    "market_open", self._on_market_open)
+                context.register_event_handler(
+                    "market_close", self._on_market_close)
 
-            context.log_manager.info(f"双均线策略插件初始化成功")
+                context.log_manager.info(f"双均线策略插件初始化成功")
+            else:
+                print("双均线策略插件初始化成功（无上下文）")
+
             return True
 
         except Exception as e:
             if context:
                 context.log_manager.error(f"双均线策略插件初始化失败: {e}")
+            else:
+                print(f"双均线策略插件初始化失败: {e}")
             return False
 
     def cleanup(self) -> None:
@@ -167,11 +177,13 @@ class MovingAverageStrategyPlugin(IStrategyPlugin):
         sell_signal = pd.Series(False, index=data.index)
 
         # 金叉买入信号：快线上穿慢线
-        golden_cross = (fast_ma > slow_ma) & (fast_ma.shift(1) <= slow_ma.shift(1))
+        golden_cross = (fast_ma > slow_ma) & (
+            fast_ma.shift(1) <= slow_ma.shift(1))
         buy_signal = golden_cross
 
         # 死叉卖出信号：快线下穿慢线
-        death_cross = (fast_ma < slow_ma) & (fast_ma.shift(1) >= slow_ma.shift(1))
+        death_cross = (fast_ma < slow_ma) & (
+            fast_ma.shift(1) >= slow_ma.shift(1))
         sell_signal = death_cross
 
         # 计算持仓状态
@@ -211,8 +223,10 @@ class MovingAverageStrategyPlugin(IStrategyPlugin):
         signals = self.generate_signals(data, **params)
 
         # 获取参数
-        stop_loss_pct = params.get('stop_loss_pct', self._config['stop_loss_pct'])
-        take_profit_pct = params.get('take_profit_pct', self._config['take_profit_pct'])
+        stop_loss_pct = params.get(
+            'stop_loss_pct', self._config['stop_loss_pct'])
+        take_profit_pct = params.get(
+            'take_profit_pct', self._config['take_profit_pct'])
 
         # 模拟交易
         trades = []
@@ -492,7 +506,8 @@ class MovingAverageStrategyPlugin(IStrategyPlugin):
             self._config['ma_type'] = ma_type_combo.currentText()
 
             if self._context:
-                self._context.save_plugin_config(self.metadata.name, self._config)
+                self._context.save_plugin_config(
+                    self.metadata.name, self._config)
 
         # 连接信号
         fast_period_spinbox.valueChanged.connect(on_config_changed)

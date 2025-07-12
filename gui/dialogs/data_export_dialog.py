@@ -64,7 +64,8 @@ class ExportWorker(QThread):
             import numpy as np
 
             # 生成模拟K线数据
-            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+            date_range = pd.date_range(
+                start=start_date, end=end_date, freq='D')
             dates = [d for d in date_range if d.weekday() < 5]  # 只包含工作日
 
             self.export_progress.emit(20)
@@ -248,7 +249,8 @@ class DataExportDialog(QDialog):
 
         # 状态标签
         self.status_label = QLabel("就绪")
-        self.status_label.setStyleSheet("color: #6c757d; font-size: 12px; padding: 5px;")
+        self.status_label.setStyleSheet(
+            "color: #6c757d; font-size: 12px; padding: 5px;")
         layout.addWidget(self.status_label)
 
         # 按钮栏
@@ -373,14 +375,18 @@ class DataExportDialog(QDialog):
         # 股票列表表格
         self.stocks_table = QTableWidget()
         self.stocks_table.setColumnCount(4)
-        self.stocks_table.setHorizontalHeaderLabels(["股票代码", "股票名称", "市场", "状态"])
+        self.stocks_table.setHorizontalHeaderLabels(
+            ["股票代码", "股票名称", "市场", "状态"])
 
         # 填充股票数据
         self.stocks_table.setRowCount(len(self.stocks))
         for i, stock in enumerate(self.stocks):
-            self.stocks_table.setItem(i, 0, QTableWidgetItem(stock.get('code', '')))
-            self.stocks_table.setItem(i, 1, QTableWidgetItem(stock.get('name', '')))
-            self.stocks_table.setItem(i, 2, QTableWidgetItem(stock.get('market', '')))
+            self.stocks_table.setItem(
+                i, 0, QTableWidgetItem(stock.get('code', '')))
+            self.stocks_table.setItem(
+                i, 1, QTableWidgetItem(stock.get('name', '')))
+            self.stocks_table.setItem(
+                i, 2, QTableWidgetItem(stock.get('market', '')))
             self.stocks_table.setItem(i, 3, QTableWidgetItem("待导出"))
 
         # 调整列宽
@@ -499,9 +505,11 @@ class DataExportDialog(QDialog):
 
             # 启动导出线程
             self.export_worker = ExportWorker(export_params)
-            self.export_worker.export_completed.connect(self._on_export_completed)
+            self.export_worker.export_completed.connect(
+                self._on_export_completed)
             self.export_worker.export_error.connect(self._on_export_error)
-            self.export_worker.export_progress.connect(self._on_export_progress)
+            self.export_worker.export_progress.connect(
+                self._on_export_progress)
             self.export_worker.start()
 
         except Exception as e:
@@ -536,9 +544,11 @@ class DataExportDialog(QDialog):
 
             # 启动导出线程
             self.export_worker = ExportWorker(export_params)
-            self.export_worker.export_completed.connect(self._on_export_completed)
+            self.export_worker.export_completed.connect(
+                self._on_export_completed)
             self.export_worker.export_error.connect(self._on_export_error)
-            self.export_worker.export_progress.connect(self._on_export_progress)
+            self.export_worker.export_progress.connect(
+                self._on_export_progress)
             self.export_worker.start()
 
         except Exception as e:

@@ -138,25 +138,29 @@ class SentimentAnalysisTab(BaseAnalysisTab):
 
         # 开始分析按钮
         analyze_btn = QPushButton("开始情绪分析")
-        analyze_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
+        analyze_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; color: white; font-weight: bold; }")
         analyze_btn.clicked.connect(self.analyze_sentiment)
         layout.addWidget(analyze_btn)
 
         # 历史分析按钮
         history_btn = QPushButton("历史情绪分析")
-        history_btn.setStyleSheet("QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
+        history_btn.setStyleSheet(
+            "QPushButton { background-color: #17a2b8; color: white; font-weight: bold; }")
         history_btn.clicked.connect(self.analyze_history)
         layout.addWidget(history_btn)
 
         # 清除结果按钮
         clear_btn = QPushButton("清除结果")
-        clear_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
+        clear_btn.setStyleSheet(
+            "QPushButton { background-color: #dc3545; color: white; }")
         clear_btn.clicked.connect(self.clear_sentiment)
         layout.addWidget(clear_btn)
 
         # 导出结果按钮
         export_btn = QPushButton("导出情绪分析")
-        export_btn.setStyleSheet("QPushButton { background-color: #6f42c1; color: white; }")
+        export_btn.setStyleSheet(
+            "QPushButton { background-color: #6f42c1; color: white; }")
         export_btn.clicked.connect(self.export_sentiment_analysis)
         layout.addWidget(export_btn)
 
@@ -175,13 +179,15 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         # 情绪指数
         sentiment_card = QFrame()
         sentiment_card.setFrameStyle(QFrame.StyledPanel)
-        sentiment_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        sentiment_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         sentiment_layout = QVBoxLayout(sentiment_card)
         sentiment_layout.addWidget(QLabel("情绪指数"))
 
         self.sentiment_index_label = QLabel("50")
         self.sentiment_index_label.setAlignment(Qt.AlignCenter)
-        self.sentiment_index_label.setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
+        self.sentiment_index_label.setStyleSheet(
+            "QLabel { font-size: 24px; font-weight: bold; color: #007bff; }")
         sentiment_layout.addWidget(self.sentiment_index_label)
 
         current_layout.addWidget(sentiment_card)
@@ -189,13 +195,15 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         # 情绪状态
         status_card = QFrame()
         status_card.setFrameStyle(QFrame.StyledPanel)
-        status_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        status_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         status_layout = QVBoxLayout(status_card)
         status_layout.addWidget(QLabel("情绪状态"))
 
         self.sentiment_status_label = QLabel("中性")
         self.sentiment_status_label.setAlignment(Qt.AlignCenter)
-        self.sentiment_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
+        self.sentiment_status_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
         status_layout.addWidget(self.sentiment_status_label)
 
         current_layout.addWidget(status_card)
@@ -203,13 +211,15 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         # 变化趋势
         trend_card = QFrame()
         trend_card.setFrameStyle(QFrame.StyledPanel)
-        trend_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        trend_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         trend_layout = QVBoxLayout(trend_card)
         trend_layout.addWidget(QLabel("变化趋势"))
 
         self.sentiment_trend_label = QLabel("稳定")
         self.sentiment_trend_label.setAlignment(Qt.AlignCenter)
-        self.sentiment_trend_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
+        self.sentiment_trend_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
         trend_layout.addWidget(self.sentiment_trend_label)
 
         current_layout.addWidget(trend_card)
@@ -217,13 +227,15 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         # 预警等级
         alert_card = QFrame()
         alert_card.setFrameStyle(QFrame.StyledPanel)
-        alert_card.setStyleSheet("QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
+        alert_card.setStyleSheet(
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }")
         alert_layout = QVBoxLayout(alert_card)
         alert_layout.addWidget(QLabel("预警等级"))
 
         self.sentiment_alert_label = QLabel("正常")
         self.sentiment_alert_label.setAlignment(Qt.AlignCenter)
-        self.sentiment_alert_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
+        self.sentiment_alert_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
         alert_layout.addWidget(self.sentiment_alert_label)
 
         current_layout.addWidget(alert_card)
@@ -585,7 +597,8 @@ class SentimentAnalysisTab(BaseAnalysisTab):
                 color = "#6c757d"
 
             self.sentiment_status_label.setText(status)
-            self.sentiment_status_label.setStyleSheet(f"QLabel {{ font-size: 18px; font-weight: bold; color: {color}; }}")
+            self.sentiment_status_label.setStyleSheet(
+                f"QLabel {{ font-size: 18px; font-weight: bold; color: {color}; }}")
 
             # 设置预警等级
             if composite_index > 85 or composite_index < 15:
@@ -599,7 +612,8 @@ class SentimentAnalysisTab(BaseAnalysisTab):
                 alert_color = "#28a745"
 
             self.sentiment_alert_label.setText(alert)
-            self.sentiment_alert_label.setStyleSheet(f"QLabel {{ font-size: 18px; font-weight: bold; color: {alert_color}; }}")
+            self.sentiment_alert_label.setStyleSheet(
+                f"QLabel {{ font-size: 18px; font-weight: bold; color: {alert_color}; }}")
 
         except Exception as e:
             self.log_manager.error(f"计算综合情绪指数失败: {str(e)}")
@@ -613,7 +627,8 @@ class SentimentAnalysisTab(BaseAnalysisTab):
             self.sentiment_history = []
 
             for i in range(30):  # 30天历史数据
-                date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+                date = (datetime.now() - timedelta(days=i)
+                        ).strftime('%Y-%m-%d')
                 sentiment_index = random.uniform(20, 80)
 
                 self.sentiment_history.append({
@@ -637,9 +652,12 @@ class SentimentAnalysisTab(BaseAnalysisTab):
             self.sentiment_table.setRowCount(len(self.sentiment_results))
 
             for i, result in enumerate(self.sentiment_results):
-                self.sentiment_table.setItem(i, 0, QTableWidgetItem(result['指标名称']))
-                self.sentiment_table.setItem(i, 1, QTableWidgetItem(result['当前值']))
-                self.sentiment_table.setItem(i, 2, QTableWidgetItem(result['历史均值']))
+                self.sentiment_table.setItem(
+                    i, 0, QTableWidgetItem(result['指标名称']))
+                self.sentiment_table.setItem(
+                    i, 1, QTableWidgetItem(result['当前值']))
+                self.sentiment_table.setItem(
+                    i, 2, QTableWidgetItem(result['历史均值']))
 
                 # 情绪状态带颜色显示
                 status_item = QTableWidgetItem(result['情绪状态'])
@@ -651,8 +669,10 @@ class SentimentAnalysisTab(BaseAnalysisTab):
                     status_item.setForeground(QColor("gray"))
 
                 self.sentiment_table.setItem(i, 3, status_item)
-                self.sentiment_table.setItem(i, 4, QTableWidgetItem(result['变化趋势']))
-                self.sentiment_table.setItem(i, 5, QTableWidgetItem(result['影响权重']))
+                self.sentiment_table.setItem(
+                    i, 4, QTableWidgetItem(result['变化趋势']))
+                self.sentiment_table.setItem(
+                    i, 5, QTableWidgetItem(result['影响权重']))
 
             self.sentiment_table.resizeColumnsToContents()
 
@@ -690,7 +710,8 @@ class SentimentAnalysisTab(BaseAnalysisTab):
                 trend_color = "#6c757d"
 
             self.sentiment_trend_label.setText(trend)
-            self.sentiment_trend_label.setStyleSheet(f"QLabel {{ font-size: 18px; font-weight: bold; color: {trend_color}; }}")
+            self.sentiment_trend_label.setStyleSheet(
+                f"QLabel {{ font-size: 18px; font-weight: bold; color: {trend_color}; }}")
 
         except Exception as e:
             self.log_manager.error(f"更新情绪分析统计失败: {str(e)}")
@@ -708,9 +729,12 @@ class SentimentAnalysisTab(BaseAnalysisTab):
         self.sentiment_alert_label.setText("正常")
 
         # 重置样式
-        self.sentiment_status_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
-        self.sentiment_trend_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
-        self.sentiment_alert_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
+        self.sentiment_status_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #6c757d; }")
+        self.sentiment_trend_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
+        self.sentiment_alert_label.setStyleSheet(
+            "QLabel { font-size: 18px; font-weight: bold; color: #28a745; }")
 
     def export_sentiment_analysis(self):
         """导出情绪分析结果"""

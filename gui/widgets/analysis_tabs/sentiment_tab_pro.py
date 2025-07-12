@@ -157,7 +157,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         # 综合分析
         comprehensive_btn = QPushButton("🎯 综合分析")
         comprehensive_btn.setStyleSheet(self._get_button_style('#17a2b8'))
-        comprehensive_btn.clicked.connect(self.comprehensive_sentiment_analysis)
+        comprehensive_btn.clicked.connect(
+            self.comprehensive_sentiment_analysis)
 
         ai_layout.addWidget(prediction_btn)
         ai_layout.addWidget(comprehensive_btn)
@@ -204,13 +205,15 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
         # AI模型选择
         self.ai_model_combo = QComboBox()
-        self.ai_model_combo.addItems(list(self.ai_config['sentiment_models'].keys()))
+        self.ai_model_combo.addItems(
+            list(self.ai_config['sentiment_models'].keys()))
         self.ai_model_combo.setCurrentText('ensemble')
         params_layout.addRow("AI模型:", self.ai_model_combo)
 
         # 预测周期
         self.prediction_horizon_combo = QComboBox()
-        self.prediction_horizon_combo.addItems(list(self.ai_config['prediction_horizons'].keys()))
+        self.prediction_horizon_combo.addItems(
+            list(self.ai_config['prediction_horizons'].keys()))
         params_layout.addRow("预测周期:", self.prediction_horizon_combo)
 
         # 敏感度
@@ -255,7 +258,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         indicator_list.setSelectionMode(QAbstractItemView.MultiSelection)
 
         for indicator_key, indicator_info in indicators.items():
-            item = QListWidgetItem(f"{indicator_info['name']} ({indicator_key})")
+            item = QListWidgetItem(
+                f"{indicator_info['name']} ({indicator_key})")
             item.setData(Qt.UserRole, indicator_key)
             indicator_list.addItem(item)
             # 默认选中前几个指标
@@ -265,7 +269,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         layout.addWidget(indicator_list)
 
         # 保存列表引用
-        setattr(self, f"{category.replace(' ', '_').lower()}_list", indicator_list)
+        setattr(
+            self, f"{category.replace(' ', '_').lower()}_list", indicator_list)
 
         return widget
 
@@ -309,7 +314,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         cards_layout = QGridLayout()
 
         # 综合情绪指数
-        sentiment_card = self._create_sentiment_card("综合情绪", "50", "中性", "#007bff")
+        sentiment_card = self._create_sentiment_card(
+            "综合情绪", "50", "中性", "#007bff")
         cards_layout.addWidget(sentiment_card, 0, 0)
 
         # 恐慌指数
@@ -321,7 +327,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         cards_layout.addWidget(greed_card, 0, 2)
 
         # 市场情绪
-        market_card = self._create_sentiment_card("市场情绪", "乐观", "上升", "#17a2b8")
+        market_card = self._create_sentiment_card(
+            "市场情绪", "乐观", "上升", "#17a2b8")
         cards_layout.addWidget(market_card, 1, 0)
 
         # 资金情绪
@@ -329,7 +336,8 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         cards_layout.addWidget(money_card, 1, 1)
 
         # 社交情绪
-        social_card = self._create_sentiment_card("社交情绪", "积极", "活跃", "#fd7e14")
+        social_card = self._create_sentiment_card(
+            "社交情绪", "积极", "活跃", "#fd7e14")
         cards_layout.addWidget(social_card, 1, 2)
 
         layout.addLayout(cards_layout)
@@ -361,11 +369,13 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 14px; color: #6c757d; font-weight: bold;")
+        title_label.setStyleSheet(
+            "font-size: 14px; color: #6c757d; font-weight: bold;")
 
         value_label = QLabel(value)
         value_label.setAlignment(Qt.AlignCenter)
-        value_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        value_label.setStyleSheet(
+            f"font-size: 24px; font-weight: bold; color: {color};")
 
         status_label = QLabel(status)
         status_label.setAlignment(Qt.AlignCenter)

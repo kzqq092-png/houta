@@ -93,12 +93,15 @@ class StockScreener:
                     category_map[cat] = []
                 category_map[cat].append(ind['name'])
 
-            visible_count = {cat: len(names) for cat, names in category_map.items() if names}
+            visible_count = {cat: len(names)
+                             for cat, names in category_map.items() if names}
             for cat, count in visible_count.items():
-                self.log_manager.log(f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
+                self.log_manager.log(
+                    f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
 
             if not indicators:
-                self.log_manager.log("未检测到任何指标，请检查指标系统是否正确初始化！", LogLevel.ERROR)
+                self.log_manager.log(
+                    "未检测到任何指标，请检查指标系统是否正确初始化！", LogLevel.ERROR)
                 print("【错误】未检测到任何指标，请检查指标系统是否正确初始化！")
                 return pd.DataFrame()
         except Exception as e:
@@ -109,18 +112,21 @@ class StockScreener:
             try:
                 kdata = self.data_manager.get_kdata(stock)
                 if kdata.empty or len(kdata) < 30:
-                    self.log_manager.log(f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
+                    self.log_manager.log(
+                        f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
                     continue
 
                 # 计算常用指标
                 indicator_values = {}
                 try:
                     # 计算MA
-                    ma_result = calculate_indicator("MA", kdata, {"timeperiod": 5})
+                    ma_result = calculate_indicator(
+                        "MA", kdata, {"timeperiod": 5})
                     indicator_values['MA'] = ma_result['MA']
 
                     # 计算EMA
-                    ema_result = calculate_indicator("EMA", kdata, {"timeperiod": 12})
+                    ema_result = calculate_indicator(
+                        "EMA", kdata, {"timeperiod": 12})
                     indicator_values['EMA'] = ema_result['EMA']
 
                     # 计算MACD
@@ -130,10 +136,12 @@ class StockScreener:
                     indicator_values['MACD_HIST'] = macd_result['MACD_HIST']
 
                     # 计算RSI
-                    rsi_result = calculate_indicator("RSI", kdata, {"timeperiod": 14})
+                    rsi_result = calculate_indicator(
+                        "RSI", kdata, {"timeperiod": 14})
                     indicator_values['RSI'] = rsi_result['RSI']
                 except Exception as e:
-                    self.log_manager.log(f"股票 {stock} 指标计算失败: {str(e)}", LogLevel.WARNING)
+                    self.log_manager.log(
+                        f"股票 {stock} 指标计算失败: {str(e)}", LogLevel.WARNING)
                     continue
 
                 # 提取指标值
@@ -171,7 +179,8 @@ class StockScreener:
                         macd_val = last_val(macd)
                         rsi_val = last_val(rsi)
                         if ma_short_val is None or ma_long_val is None or macd_val is None or rsi_val is None:
-                            self.log_manager.log(f"股票 {stock} 指标有空值，跳过。", LogLevel.WARNING)
+                            self.log_manager.log(
+                                f"股票 {stock} 指标有空值，跳过。", LogLevel.WARNING)
                             continue
                         if ma_short_val > ma_long_val and macd_val > 0 and rsi_val > params.get('rsi_value', 50):
                             info = self.data_manager.get_stock_info(stock)
@@ -188,12 +197,15 @@ class StockScreener:
                                 'north_money': self.get_north_money(stock)
                             })
                     except Exception as e:
-                        self.log_manager.log(f"股票 {stock} 指标筛选判断异常: {str(e)}", LogLevel.WARNING)
+                        self.log_manager.log(
+                            f"股票 {stock} 指标筛选判断异常: {str(e)}", LogLevel.WARNING)
                         continue
                 else:
-                    self.log_manager.log(f"股票 {stock} 指标缺失，未参与筛选。", LogLevel.WARNING)
+                    self.log_manager.log(
+                        f"股票 {stock} 指标缺失，未参与筛选。", LogLevel.WARNING)
             except Exception as e:
-                self.log_manager.log(f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                self.log_manager.log(
+                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
                 continue
         return pd.DataFrame(results)
 

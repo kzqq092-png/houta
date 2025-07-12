@@ -24,7 +24,8 @@ logger = get_logger(__name__)
 class IndicatorParamWidget(QWidget):
     """单个指标参数设置小部件"""
 
-    param_changed = pyqtSignal(str, str, object)  # indicator_name, param_name, value
+    # indicator_name, param_name, value
+    param_changed = pyqtSignal(str, str, object)
 
     def __init__(self, indicator_name: str, param_config: Dict[str, Any], parent=None):
         super().__init__(parent)
@@ -39,7 +40,8 @@ class IndicatorParamWidget(QWidget):
 
         # 指标名称标签
         title_label = QLabel(f"<b>{self.indicator_name}</b>")
-        title_label.setStyleSheet("color: #2196F3; font-size: 14px; margin-bottom: 10px;")
+        title_label.setStyleSheet(
+            "color: #2196F3; font-size: 14px; margin-bottom: 10px;")
         layout.addRow(title_label)
 
         # 参数设置
@@ -47,7 +49,8 @@ class IndicatorParamWidget(QWidget):
             param_widget = self._create_param_widget(param_name, param_info)
             if param_widget:
                 self.param_widgets[param_name] = param_widget
-                layout.addRow(QLabel(f"{param_info.get('label', param_name)}:"), param_widget)
+                layout.addRow(
+                    QLabel(f"{param_info.get('label', param_name)}:"), param_widget)
 
         self.setLayout(layout)
 
@@ -63,7 +66,8 @@ class IndicatorParamWidget(QWidget):
             widget.setRange(min_value, max_value)
             widget.setValue(default_value)
             widget.valueChanged.connect(
-                lambda v: self.param_changed.emit(self.indicator_name, param_name, v)
+                lambda v: self.param_changed.emit(
+                    self.indicator_name, param_name, v)
             )
             return widget
 
@@ -73,7 +77,8 @@ class IndicatorParamWidget(QWidget):
             widget.setValue(default_value)
             widget.setDecimals(param_info.get('decimals', 2))
             widget.valueChanged.connect(
-                lambda v: self.param_changed.emit(self.indicator_name, param_name, v)
+                lambda v: self.param_changed.emit(
+                    self.indicator_name, param_name, v)
             )
             return widget
 
@@ -81,7 +86,8 @@ class IndicatorParamWidget(QWidget):
             widget = QCheckBox()
             widget.setChecked(default_value)
             widget.toggled.connect(
-                lambda v: self.param_changed.emit(self.indicator_name, param_name, v)
+                lambda v: self.param_changed.emit(
+                    self.indicator_name, param_name, v)
             )
             return widget
 
@@ -89,7 +95,8 @@ class IndicatorParamWidget(QWidget):
             widget = QLineEdit()
             widget.setText(str(default_value))
             widget.textChanged.connect(
-                lambda v: self.param_changed.emit(self.indicator_name, param_name, v)
+                lambda v: self.param_changed.emit(
+                    self.indicator_name, param_name, v)
             )
             return widget
 
@@ -100,7 +107,8 @@ class IndicatorParamWidget(QWidget):
             if default_value in choices:
                 widget.setCurrentText(str(default_value))
             widget.currentTextChanged.connect(
-                lambda v: self.param_changed.emit(self.indicator_name, param_name, v)
+                lambda v: self.param_changed.emit(
+                    self.indicator_name, param_name, v)
             )
             return widget
 
@@ -182,7 +190,8 @@ class IndicatorParamsDialog(QDialog):
         # 标题
         title_label = QLabel("指标参数设置")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
+        title_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; margin: 10px;")
         main_layout.addWidget(title_label)
 
         # 创建选项卡
@@ -321,7 +330,8 @@ class IndicatorParamsDialog(QDialog):
         # 为每个选中的指标创建参数设置页面
         for indicator_name in self.selected_indicators:
             if indicator_name in indicator_configs:
-                self._create_indicator_tab(indicator_name, indicator_configs[indicator_name])
+                self._create_indicator_tab(
+                    indicator_name, indicator_configs[indicator_name])
 
     def _create_indicator_tab(self, indicator_name: str, config: Dict[str, Any]):
         """创建指标参数设置选项卡"""
@@ -345,7 +355,8 @@ class IndicatorParamsDialog(QDialog):
             self.indicator_params[indicator_name] = {}
 
         self.indicator_params[indicator_name][param_name] = value
-        logger.debug(f"Parameter changed: {indicator_name}.{param_name} = {value}")
+        logger.debug(
+            f"Parameter changed: {indicator_name}.{param_name} = {value}")
 
     def _reset_all_params(self):
         """重置所有参数为默认值"""
@@ -373,13 +384,75 @@ class IndicatorParamsDialog(QDialog):
 
     def _load_preset(self):
         """加载预设参数"""
-        # TODO: 实现预设加载功能
-        QMessageBox.information(self, "功能暂未实现", "预设加载功能正在开发中")
+        try:
+            import os
+            import json
+            from PyQt5.QtWidgets import QFileDialog
+
+            # 选择预设文件
+            preset_dir = "configs/indicator_presets"
+            if not os.path.exists(preset_dir):
+                os.makedirs(preset_dir, exist_ok=True)
+
+            filepath, _ = QFileDialog.getOpenFileName(
+                self,
+                "选择指标预设文件",
+                preset_dir,
+                "JSON文件 (*.json)"
+            )
+
+            if not filepath:
+                return
+
+            # 加载预设
+            with open(filepath, 'r', encoding='utf-8') as f:
+                preset_data = json.load(f)
+
+            # 应用预设参数
+            self.set_params(preset_data.get('parameters', {}))
+
+            QMessageBox.information(
+                self, "成功", f"预设 '{preset_data.get('name', '未命名')}' 已加载")
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"加载预设失败: {str(e)}")
 
     def _save_preset(self):
         """保存当前参数为预设"""
-        # TODO: 实现预设保存功能
-        QMessageBox.information(self, "功能暂未实现", "预设保存功能正在开发中")
+        try:
+            import os
+            import json
+            from datetime import datetime
+            from PyQt5.QtWidgets import QInputDialog
+
+            # 输入预设名称
+            name, ok = QInputDialog.getText(self, "保存预设", "请输入预设名称:")
+            if not ok or not name.strip():
+                return
+
+            # 创建预设目录
+            preset_dir = "configs/indicator_presets"
+            os.makedirs(preset_dir, exist_ok=True)
+
+            # 构建预设数据
+            preset_data = {
+                'name': name.strip(),
+                'description': f"指标参数预设 - {', '.join(self.selected_indicators)}",
+                'created_time': datetime.now().isoformat(),
+                'parameters': self.get_params()
+            }
+
+            # 保存到文件
+            filename = f"{name.strip().replace(' ', '_')}.json"
+            filepath = os.path.join(preset_dir, filename)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(preset_data, f, ensure_ascii=False, indent=2)
+
+            QMessageBox.information(self, "成功", f"预设 '{name}' 已保存")
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"保存预设失败: {str(e)}")
 
     def _accept(self):
         """确认并关闭对话框"""

@@ -232,7 +232,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
         # 时间窗口
         self.time_window_combo = QComboBox()
-        self.time_window_combo.addItems(list(self.flow_config['time_windows'].keys()))
+        self.time_window_combo.addItems(
+            list(self.flow_config['time_windows'].keys()))
         self.time_window_combo.setCurrentText('日线')
         params_layout.addRow("时间窗口:", self.time_window_combo)
 
@@ -509,7 +510,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
         for i in range(5):
             outflow_sector = np.random.choice(sectors)
-            inflow_sector = np.random.choice([s for s in sectors if s != outflow_sector])
+            inflow_sector = np.random.choice(
+                [s for s in sectors if s != outflow_sector])
 
             rotation_data.append({
                 'direction': f"{outflow_sector} → {inflow_sector}",
@@ -593,7 +595,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
         ranking_data = []
 
         sectors = ['科技', '消费', '医药', '金融', '周期', '地产', '公用', '交运']
-        leading_stocks = ['股票A', '股票B', '股票C', '股票D', '股票E', '股票F', '股票G', '股票H']
+        leading_stocks = ['股票A', '股票B', '股票C',
+                          '股票D', '股票E', '股票F', '股票G', '股票H']
 
         for i, sector in enumerate(sectors):
             ranking_data.append({
