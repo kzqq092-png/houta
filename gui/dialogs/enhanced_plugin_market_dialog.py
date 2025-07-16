@@ -193,7 +193,7 @@ class EnhancedPluginMarketDialog(QDialog):
 
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("HIkyuu-UI 插件市场")
+        self.setWindowTitle("YS-Quant‌ 插件市场")
         self.setMinimumSize(1000, 700)
 
         layout = QVBoxLayout(self)

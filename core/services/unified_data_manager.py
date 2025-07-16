@@ -17,9 +17,26 @@ import asyncio
 from asyncio import Future as AsyncioFuture
 
 from ..events import EventBus, DataUpdateEvent
-from ..containers import ServiceContainer
+from ..containers import ServiceContainer, get_service_container
 
 logger = logging.getLogger(__name__)
+
+
+def get_unified_data_manager() -> Optional['UnifiedDataManager']:
+    """
+    获取统一数据管理器的实例
+
+    Returns:
+        统一数据管理器实例，如果未注册则返回None
+    """
+    try:
+        container = get_service_container()
+        if container:
+            return container.resolve(UnifiedDataManager)
+        return None
+    except Exception as e:
+        logger.error(f"获取统一数据管理器失败: {e}")
+        return None
 
 
 class DataRequestStatus(Enum):
@@ -174,77 +191,154 @@ class UnifiedDataManager:
 
         return end_date >= today
 
-    async def request_data(self, stock_code: str, data_type: str, period: str = 'D',
-                           time_range: int = 365, parameters: Dict[str, Any] = None,
-                           priority: int = 1) -> Any:
-        """
-        异步请求数据，返回一个可以等待的Future
+    async def request_data(self, stock_code: str, data_type: str = 'kdata',
+                           period: str = 'D', time_range: str = "最近1年", **kwargs) -> Any:
+        """请求数据
 
         Args:
             stock_code: 股票代码
-            data_type: 数据类型 ('kdata', 'indicators', 'analysis', 'chart')
-            period: 周期
-            time_range: 时间范围
-            parameters: 额外参数
-            priority: 优先级 (0=高, 1=中, 2=低)
+            data_type: 数据类型，如'kdata', 'financial', 'news'等
+            period: 周期，如'D'(日线)、'W'(周线)、'M'(月线)、'60'(60分钟)等
+            time_range: 时间范围，如"最近7天"、"最近30天"、"最近1年"等
+            **kwargs: 其他参数
 
         Returns:
-            一个包含请求结果的Future
+            请求的数据
         """
-        # 在异步上下文中安全地获取事件循环
-        if self.loop is None:
-            self.loop = asyncio.get_running_loop()
+        try:
+            # 处理周期映射
+            period_map = {
+                '分时': 'min',
+                '日线': 'D',
+                '周线': 'W',
+                '月线': 'M',
+                '5分钟': '5',
+                '15分钟': '15',
+                '30分钟': '30',
+                '60分钟': '60'
+            }
 
-        # 生成请求ID
-        request_id = f"{data_type}_{stock_code}_{period}_{time_range}_{hash(str(parameters or {}))}"
+            # 如果period是中文描述，转换为对应代码
+            actual_period = period_map.get(period, period)
 
-        # 检查缓存
-        cache_key = self._get_cache_key(
-            stock_code, data_type, period, time_range, parameters)
-        cached_data = self._get_from_cache(cache_key)
-        if cached_data is not None:
-            self._stats['cache_hits'] += 1
-            logger.debug(f"Cache hit for {cache_key}")
-            return cached_data
+            # 处理时间范围映射（转换为天数）
+            time_range_map = {
+                "最近7天": 7,
+                "最近30天": 30,
+                "最近90天": 90,
+                "最近180天": 180,
+                "最近1年": 365,
+                "最近2年": 365 * 2,
+                "最近3年": 365 * 3,
+                "最近5年": 365 * 5,
+                "全部": -1  # 表示所有可用数据
+            }
 
-        self._stats['cache_misses'] += 1
+            # 获取天数，默认为365天（约1年）
+            count = time_range_map.get(time_range, 365)
 
-        # 为这个请求创建一个新的Future
-        future = self.loop.create_future()
+            logger.info(f"请求数据：股票={stock_code}, 类型={data_type}, 周期={actual_period}, 时间范围={count}天")
 
-        # 创建数据请求
-        request = DataRequest(
-            request_id=request_id,
-            stock_code=stock_code,
-            data_type=data_type,
-            period=period,
-            time_range=time_range,
-            parameters=parameters or {},
-            priority=priority,
-            future=future
-        )
-
-        # 检查是否有重复请求
-        request_key = self._get_request_key(
-            stock_code, data_type, period, time_range, parameters)
-
-        with self._dedup_lock:
-            if request_key in self._request_dedup:
-                # 有重复请求，添加到现有请求组
-                self._request_dedup[request_key].add(request)
-                self._stats['requests_deduplicated'] += 1
-                logger.debug(
-                    f"Deduplicated request {request_id} with key {request_key}")
+            if data_type == 'kdata':
+                # 获取K线数据
+                return await self._get_kdata(stock_code, period=actual_period, count=count)
+            elif data_type == 'financial':
+                # 获取财务数据
+                return await self._get_financial_data(stock_code)
+            elif data_type == 'news':
+                # 获取新闻数据
+                return await self._get_news(stock_code)
+            elif data_type == 'all':
+                # 获取所有数据
+                kdata = await self._get_kdata(stock_code, period=actual_period, count=count)
+                financial = await self._get_financial_data(stock_code)
+                news = await self._get_news(stock_code)
+                return {
+                    'kdata': kdata,
+                    'financial': financial,
+                    'news': news
+                }
             else:
-                # 新请求
-                self._request_dedup[request_key] = {request}
-                # 提交请求到线程池
-                self._executor.submit(self._process_request, request)
+                logger.error(f"未知的数据类型: {data_type}")
+                return None
+        except Exception as e:
+            logger.error(f"请求数据失败: {e}", exc_info=True)
+            return None
 
-        self._stats['requests_total'] += 1
+    async def _get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """获取K线数据
 
-        # 等待并返回Future的结果
-        return await future
+        Args:
+            stock_code: 股票代码
+            period: 周期，如'D'、'W'、'M'
+            count: 获取的天数
+
+        Returns:
+            K线DataFrame
+        """
+        try:
+            logger.info(f"获取K线数据: {stock_code}, 周期={period}, 数量={count}")
+
+            # 尝试从服务容器解析ChartService
+            from core.services.chart_service import ChartService
+            chart_service = self.service_container.resolve(ChartService)
+
+            if chart_service:
+                return chart_service.get_kdata(stock_code, period, count)
+
+            # 如果没有ChartService，尝试使用数据源直接获取
+            from core.data_manager import get_data_manager
+            data_manager = get_data_manager()
+
+            if data_manager:
+                return data_manager.get_kdata(stock_code, period, count)
+
+            logger.error("无法获取K线数据：未找到数据服务")
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"获取K线数据失败: {e}", exc_info=True)
+            return pd.DataFrame()
+
+    async def _get_financial_data(self, stock_code: str) -> Dict[str, Any]:
+        """获取财务数据
+
+        Args:
+            stock_code: 股票代码
+
+        Returns:
+            财务数据字典
+        """
+        try:
+            logger.info(f"获取财务数据: {stock_code}")
+
+            # 获取财务数据可能需要特定的服务
+            # 这里仅作为示例实现，返回空字典
+            return {}
+
+        except Exception as e:
+            logger.error(f"获取财务数据失败: {e}", exc_info=True)
+            return {}
+
+    async def _get_news(self, stock_code: str) -> Dict[str, Any]:
+        """获取新闻数据
+
+        Args:
+            stock_code: 股票代码
+
+        Returns:
+            新闻数据字典
+        """
+        try:
+            logger.info(f"获取新闻数据: {stock_code}")
+
+            # 获取新闻数据可能需要特定的服务
+            # 这里仅作为示例实现，返回空字典
+            return {}
+
+        except Exception as e:
+            logger.error(f"获取新闻数据失败: {e}", exc_info=True)
+            return {}
 
     def cancel_request(self, request_id: str) -> bool:
         """
@@ -439,7 +533,13 @@ class UnifiedDataManager:
         try:
             data = None
             if request.data_type == 'kdata':
-                data = self._load_kdata(request)
+                kline_data = self._load_kdata(request)
+                # 修改：将K线数据包装在字典中，保持数据结构一致性
+                data = {
+                    'kline_data': kline_data,
+                    'stock_code': request.stock_code,
+                    'period': request.period
+                }
             elif request.data_type == 'indicators':
                 data = self._load_indicators(request)
             elif request.data_type == 'analysis':

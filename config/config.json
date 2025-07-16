@@ -53,17 +53,17 @@
     "enable_gpu": false
   },
   "_meta": {
-    "last_saved": "2025-07-12T20:37:16.403773",
+    "last_saved": "2025-07-14T23:50:31.836532",
     "version": "1.0"
   },
   "window": {
     "geometry": [
-      100,
-      100,
-      1400,
-      900
+      0,
+      23,
+      2560,
+      1417
     ],
-    "maximized": false
+    "maximized": true
   },
   "appearance": {
     "theme": "default",

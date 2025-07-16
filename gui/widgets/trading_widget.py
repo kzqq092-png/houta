@@ -133,8 +133,8 @@ class TradingWidget(QWidget):
 
             self.strategy_combo = QComboBox()
             self.strategy_combo.addItems([
-                "均线策略", "MACD策略", "RSI策略", "布林带策略",
-                "KDJ策略", "自定义策略"
+                "MA策略", "MACD策略", "RSI策略", "布林带策略",
+                "KDJ策略", "形态分析策略", "自定义策略"
             ])
             strategy_layout.addWidget(self.strategy_combo)
 
@@ -967,33 +967,36 @@ class TradingWidget(QWidget):
     def calculate_signals(self):
         self._run_analysis_async(self.signal_btn, self._calculate_signals_impl)
 
-    def run_backtest(self):
-        """执行回测，自动获取主图K线数据，避免数据为空"""
+    def _calculate_signals_impl(self):
+        """计算交易信号的实际实现"""
         try:
-            # 获取当前股票代码
-            stock_code = self.current_stock
-            if not stock_code:
-                self.set_status_message("未选择股票，无法回测", error=True)
-                return
-            # 优先复用主图缓存数据
-            kdata = None
-            main_window = self.parent()
-            while main_window and not hasattr(main_window, 'get_kdata'):
-                main_window = main_window.parent() if hasattr(main_window, 'parent') else None
-            if main_window and hasattr(main_window, 'chart_cache') and stock_code in main_window.chart_cache:
-                kdata = main_window.chart_cache[stock_code]
-            elif main_window and hasattr(main_window, 'get_kdata'):
-                kdata = main_window.get_kdata(stock_code)
-            if kdata is None or kdata.empty:
-                self.set_status_message(
-                    f"股票{stock_code}的K线数据为空，无法回测", error=True)
-                return
-            # ... 其余回测逻辑保持不变 ...
+            strategy_name = self.strategy_combo.currentText()
+            if not strategy_name or strategy_name == "自定义策略":
+                QMessageBox.warning(self, "提示", "请选择一个有效的策略。")
+                return None
+
+            self.log_manager.info(f"开始计算信号，策略: {strategy_name}")
+
+            # 调用核心交易系统计算信号
+            signals = trading_system.calculate_signals(strategy=strategy_name)
+
+            if signals is None:
+                self.log_manager.error(f"策略 {strategy_name} 未能生成信号。")
+                return {"error": f"策略 {strategy_name} 未能生成信号。"}
+
+            self.log_manager.info(f"成功计算 {len(signals)} 个信号")
+
+            # 更新UI
+            self.update_signals(signals)
+
+            return {"signals": signals}
         except Exception as e:
-            self.set_status_message(f"回测执行异常: {str(e)}", error=True)
-            if hasattr(self, 'log_manager'):
-                log_structured(self.log_manager,
-                               f"回测执行异常: {str(e)}", level="error")
+            error_msg = f"计算信号时出错: {e}"
+            self.log_manager.error(error_msg, exc_info=True)
+            return {"error": error_msg}
+
+    def run_backtest(self):
+        self._run_analysis_async(self.backtest_btn, self._run_backtest_impl)
 
     def reset_params(self):
         """重置参数"""

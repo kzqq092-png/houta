@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HIkyuu-UI 系统全量测试脚本
+YS-Quant‌ 系统全量测试脚本
 测试所有核心功能模块和性能优化效果
 """
 
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 class HIkyuuUIComprehensiveTest(unittest.TestCase):
-    """HIkyuu-UI 综合测试类"""
+    """YS-Quant‌ 综合测试类"""
 
     def setUp(self):
         """测试前准备"""
@@ -126,10 +126,11 @@ class HIkyuuUIComprehensiveTest(unittest.TestCase):
             self.assertEqual(ts.current_stock, "sh000001")
             print("✓ 股票设置功能正常")
 
-            # 测试信号计算
-            signals = ts.calculate_signals("MA")
+            # Test signal calculation
+            ts.load_kdata("2023-01-01", "2023-02-01")
+            self.assertIsNotNone(ts.current_kdata)
+            signals = ts.calculate_signals("MA策略")
             self.assertIsInstance(signals, list)
-            print("✓ 信号计算功能正常")
 
         except Exception as e:
             self.fail(f"交易功能测试失败: {str(e)}")
@@ -329,7 +330,7 @@ class HIkyuuUIComprehensiveTest(unittest.TestCase):
 def run_comprehensive_test():
     """运行全量测试"""
     print(f"\n{'='*80}")
-    print("HIkyuu-UI 系统全量测试开始")
+    print("YS-Quant‌ 系统全量测试开始")
     print(f"测试时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*80}")
 

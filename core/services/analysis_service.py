@@ -10,6 +10,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime, timedelta
 import asyncio
+import time  # Added for time.time()
 
 from .base_service import CacheableService, ConfigurableService
 from ..events import AnalysisCompleteEvent, StockSelectedEvent, EventBus
@@ -52,6 +53,10 @@ class AnalysisService(CacheableService, ConfigurableService):
         self._analysis_results = {}
         self._strategies = {}
 
+        # 新增：请求管理
+        self.active_requests: Dict[str, asyncio.Task] = {}
+        self.request_lock = asyncio.Lock()
+
     def _do_initialize(self) -> None:
         """初始化分析服务"""
         try:
@@ -66,46 +71,26 @@ class AnalysisService(CacheableService, ConfigurableService):
 
     async def calculate_technical_indicators(self, stock_code: str,
                                              indicators: List[str] = None,
-                                             period: str = 'D',
-                                             time_range: int = 365) -> Optional[Dict[str, Any]]:
+                                             kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
         异步计算技术指标
 
         Args:
             stock_code: 股票代码
             indicators: 指标列表
-            period: 周期
-            time_range: 时间范围
-
-        Returns:
-            技术指标结果
+            kline_data: 预先加载的K线数据.
         """
         self._ensure_initialized()
 
-        indicators = indicators or ['MA5', 'MA10', 'MA20', 'MACD', 'RSI']
-        cache_key = f"indicators_{stock_code}_{period}_{time_range}_{hash(tuple(indicators))}"
+        if kline_data is None or kline_data.empty:
+            logger.warning(f"无法为 {stock_code} 提供K线数据，无法计算技术指标")
+            return None
 
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
+        stock_data = kline_data
+        indicators = indicators or ['MA5', 'MA10', 'MA20', 'MACD', 'RSI']
 
         try:
-            # 异步获取股票数据
-            stock_data_result = await self.data_manager.request_chart_data(
-                stock_code=stock_code,
-                period=period,
-                indicators=[]  # 指标在这里单独计算，不依赖chart_data
-            )
-            stock_data = stock_data_result.get(
-                'kline_data') if stock_data_result else None
-
-            if stock_data is None or stock_data.empty:
-                logger.warning(
-                    f"No data available for {stock_code} to calculate indicators")
-                return None
-
             results = {}
-
             # 计算各种技术指标
             for indicator in indicators:
                 if indicator.startswith('MA') and not indicator.startswith('MACD'):
@@ -135,48 +120,29 @@ class AnalysisService(CacheableService, ConfigurableService):
                     results['WR'] = self._calculate_wr(stock_data)
                 elif indicator == 'CCI':
                     results['CCI'] = self._calculate_cci(stock_data)
-
-            # 缓存结果
-            self.put_to_cache(cache_key, results)
-
             return results
-
         except Exception as e:
             logger.error(
                 f"Failed to calculate technical indicators for {stock_code}: {e}")
             return None
 
-    async def analyze_trend(self, stock_code: str, period: str = 'D',
-                            time_range: int = 90) -> Optional[Dict[str, Any]]:
+    async def analyze_trend(self, stock_code: str, kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
         异步趋势分析
 
         Args:
             stock_code: 股票代码
-            period: 周期
-            time_range: 时间范围
-
-        Returns:
-            趋势分析结果
+            kline_data: 预先加载的K线数据.
         """
         self._ensure_initialized()
 
-        cache_key = f"trend_{stock_code}_{period}_{time_range}"
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
+        if kline_data is None or kline_data.empty:
+            logger.error(f"Failed to get k-line data for {stock_code} for trend analysis")
+            return None
+
+        stock_data = kline_data
 
         try:
-            # 异步获取股票数据
-            stock_data_result = await self.data_manager.request_chart_data(
-                stock_code=stock_code, period=period, indicators=[]
-            )
-            stock_data = stock_data_result.get(
-                'kline_data') if stock_data_result else None
-
-            if stock_data is None or stock_data.empty:
-                return None
-
             # 计算趋势指标
             ma5 = self._calculate_ma(stock_data, 5)
             ma20 = self._calculate_ma(stock_data, 20)
@@ -206,74 +172,64 @@ class AnalysisService(CacheableService, ConfigurableService):
                 'trend_strength': trend_strength,
                 'analysis_time': datetime.now().isoformat()
             }
-
-            # 缓存结果
-            self.put_to_cache(cache_key, result)
-
             return result
-
         except Exception as e:
             logger.error(f"Failed to analyze trend for {stock_code}: {e}")
             return None
 
-    async def analyze_support_resistance(self, stock_code: str, period: str = 'D',
-                                         time_range: int = 180) -> Optional[Dict[str, Any]]:
+    async def cancel_previous_requests(self):
+        """取消先前的所有分析请求"""
+        async with self.request_lock:
+            if not self.active_requests:
+                return
+
+            logger.info(f"正在取消 {len(self.active_requests)} 个活动的分析任务...")
+            for task_id, task in list(self.active_requests.items()):
+                if not task.done():
+                    task.cancel()
+                    logger.debug(f"已取消分析任务: {task_id}")
+            self.active_requests.clear()
+
+    async def analyze_support_resistance(self, stock_code: str, kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
         异步支撑阻力分析
 
         Args:
             stock_code: 股票代码
-            period: 周期
-            time_range: 时间范围
-
-        Returns:
-            支撑阻力分析结果
+            kline_data: 预先加载的K线数据.
         """
         self._ensure_initialized()
 
-        cache_key = f"support_resistance_{stock_code}_{period}_{time_range}"
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
+        if kline_data is None or kline_data.empty:
+            logger.error(f"Failed to get k-line data for {stock_code} for support/resistance analysis")
+            return None
+
+        stock_data = kline_data
 
         try:
-            # 异步获取股票数据
-            stock_data_result = await self.data_manager.request_chart_data(
-                stock_code=stock_code, period=period, indicators=[]
-            )
-            stock_data = stock_data_result.get(
-                'kline_data') if stock_data_result else None
-
-            if stock_data is None or stock_data.empty:
-                return None
-
-            # 寻找支撑位和阻力位
+            # 计算支撑位和阻力位
             support_levels = self._find_support_levels(stock_data)
             resistance_levels = self._find_resistance_levels(stock_data)
 
-            # 当前价格相对位置
+            # 获取当前价格
             current_price = stock_data['close'].iloc[-1]
-            position_analysis = self._analyze_price_position(
-                current_price, support_levels, resistance_levels
-            )
 
+            # 分析价格位置
+            position_analysis = self._analyze_price_position(
+                current_price, support_levels, resistance_levels)
+
+            # 构建结果
             result = {
                 'stock_code': stock_code,
                 'current_price': current_price,
-                'support_levels': support_levels,
-                'resistance_levels': resistance_levels,
+                'support_levels': support_levels[:3],  # 最多返回3个支撑位
+                'resistance_levels': resistance_levels[:3],  # 最多返回3个阻力位
                 'position_analysis': position_analysis,
                 'analysis_time': datetime.now().isoformat()
             }
-
-            # 缓存结果
-            self.put_to_cache(cache_key, result)
-
             return result
-
         except Exception as e:
-            logger.error(
-                f"Failed to analyze support/resistance for {stock_code}: {e}")
+            logger.error(f"Failed to analyze support/resistance for {stock_code}: {e}")
             return None
 
     async def run_strategy_analysis(self, stock_code: str, strategy_name: str,
@@ -299,15 +255,21 @@ class AnalysisService(CacheableService, ConfigurableService):
         time_range = parameters.get('time_range', 365)
 
         # 异步获取数据
-        stock_data_result = await self.data_manager.request_chart_data(
-            stock_code=stock_code, period='D', indicators=[]
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
         )
-        stock_data = stock_data_result.get(
-            'kline_data') if stock_data_result else None
-
-        if stock_data is None or stock_data.empty:
+        if kdata is None or kdata.empty:
             logger.warning(
                 f"No data for {stock_code} to run strategy {strategy_name}")
+            return None
+
+        stock_data = kdata.get('kline_data')
+        if stock_data is None or stock_data.empty:
+            logger.warning(
+                f"No data for {stock_code} to run strategy {strategy_name} from package")
             return None
 
         # 运行策略
@@ -682,12 +644,17 @@ class AnalysisService(CacheableService, ConfigurableService):
         short_ma = parameters.get('short_ma', 5)
         long_ma = parameters.get('long_ma', 20)
 
-        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=long_ma + 2)
-        if data is None or data.empty:
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
+        )
+        if kdata is None or kdata.empty:
             return None
 
-        ma_short = self._calculate_ma(data, short_ma)
-        ma_long = self._calculate_ma(data, long_ma)
+        ma_short = self._calculate_ma(kdata, short_ma)
+        ma_long = self._calculate_ma(kdata, long_ma)
 
         if ma_short.iloc[-2] < ma_long.iloc[-2] and ma_short.iloc[-1] > ma_long.iloc[-1]:
             return {'signal': 'buy', 'desc': f'金叉: MA{short_ma}上穿MA{long_ma}'}
@@ -698,12 +665,17 @@ class AnalysisService(CacheableService, ConfigurableService):
         short_ma = parameters.get('short_ma', 5)
         long_ma = parameters.get('long_ma', 20)
 
-        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=long_ma + 2)
-        if data is None or data.empty:
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
+        )
+        if kdata is None or kdata.empty:
             return None
 
-        ma_short = self._calculate_ma(data, short_ma)
-        ma_long = self._calculate_ma(data, long_ma)
+        ma_short = self._calculate_ma(kdata, short_ma)
+        ma_long = self._calculate_ma(kdata, long_ma)
 
         if ma_short.iloc[-2] > ma_long.iloc[-2] and ma_short.iloc[-1] < ma_long.iloc[-1]:
             return {'signal': 'sell', 'desc': f'死叉: MA{short_ma}下穿MA{long_ma}'}
@@ -714,11 +686,16 @@ class AnalysisService(CacheableService, ConfigurableService):
         period = parameters.get('period', 14)
         threshold = parameters.get('threshold', 30)
 
-        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
-        if data is None or data.empty:
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
+        )
+        if kdata is None or kdata.empty:
             return None
 
-        rsi = self._calculate_rsi(data, period)
+        rsi = self._calculate_rsi(kdata, period)
         if rsi.iloc[-1] < threshold:
             return {'signal': 'buy', 'desc': f'RSI({period})进入超卖区: {rsi.iloc[-1]:.2f}'}
         return None
@@ -728,11 +705,16 @@ class AnalysisService(CacheableService, ConfigurableService):
         period = parameters.get('period', 14)
         threshold = parameters.get('threshold', 70)
 
-        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
-        if data is None or data.empty:
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
+        )
+        if kdata is None or kdata.empty:
             return None
 
-        rsi = self._calculate_rsi(data, period)
+        rsi = self._calculate_rsi(kdata, period)
         if rsi.iloc[-1] > threshold:
             return {'signal': 'sell', 'desc': f'RSI({period})进入超买区: {rsi.iloc[-1]:.2f}'}
         return None
@@ -741,12 +723,17 @@ class AnalysisService(CacheableService, ConfigurableService):
         """布林带挤压策略"""
         period = parameters.get('period', 20)
 
-        data = await self.data_manager.request_kline_data(stock_code=stock_code, period='D', limit=period + 50)
-        if data is None or data.empty:
+        kdata = await self.data_manager.request_data(
+            data_type='kdata',
+            stock_code=stock_code,
+            period='D',
+            parameters={'indicators': ()}
+        )
+        if kdata is None or kdata.empty:
             return None
 
-        boll = self._calculate_bollinger_bands(data)
-        band_width = (boll['upper'] - boll['lower']) / boll['middle']
+        boll = self._calculate_bollinger_bands(kdata)
+        band_width = (boll['Upper'] - boll['Lower']) / boll['Middle']
 
         if band_width.iloc[-1] < 0.1:  # 示例阈值
             return {'signal': 'observe', 'desc': f'布林带收窄，可能预示变盘'}
@@ -825,86 +812,98 @@ class AnalysisService(CacheableService, ConfigurableService):
         self._current_stock_code = None
         self._analysis_results.clear()
         self._strategies.clear()
+        # 确保在退出时也取消所有任务
+        try:
+            # 不能在非异步方法中直接await，所以我们创建一个临时任务来运行它
+            asyncio.run(self.cancel_previous_requests())
+        except RuntimeError:
+            # 如果没有正在运行的事件循环，则可能无需清理
+            pass
         super()._do_dispose()
 
-    async def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive') -> Optional[Dict[str, Any]]:
+    async def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive', kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
-        异步分析股票
+        对指定股票进行全面异步分析。
 
         Args:
-            stock_code: 股票代码
-            analysis_type: comprehensive | technical | trend | support_resistance | strategy
+            stock_code (str): 股票代码.
+            analysis_type (str, optional): 分析类型. Defaults to 'comprehensive'.
+            kline_data (pd.DataFrame, optional): 预先加载的K线数据. Defaults to None.
 
         Returns:
-            分析结果字典
+            Optional[Dict[str, Any]]: 分析结果字典.
         """
         self._ensure_initialized()
-        target_stock_code = stock_code or self._current_stock_code
-        if not target_stock_code:
-            logger.warning("No stock selected for analysis.")
-            return None
+
+        request_id = f"analyze_{stock_code}_{analysis_type}_{int(time.time())}"
+
+        # 使用asyncio.create_task来创建任务，以便我们可以跟踪它
+        task = asyncio.create_task(self._perform_comprehensive_analysis(stock_code, kline_data=kline_data))
+
+        async with self.request_lock:
+            self.active_requests[request_id] = task
 
         try:
-            if analysis_type == 'comprehensive':
-                analysis_results = {'stock_code': target_stock_code}
+            # 等待任务完成并获取结果
+            result = await task
+            return result
+        except asyncio.CancelledError:
+            logger.info(f"分析任务 {request_id} 已被取消。")
+            return None
+        except Exception as e:
+            logger.error(f"执行股票分析任务 {request_id} 时发生错误: {e}", exc_info=True)
+            return None
+        finally:
+            # 任务完成后，从活动字典中移除
+            async with self.request_lock:
+                self.active_requests.pop(request_id, None)
 
-                # 并发执行分析
-                tasks = {
-                    'technical': self.calculate_technical_indicators(target_stock_code),
-                    'trend': self.analyze_trend(target_stock_code),
-                    'support_resistance': self.analyze_support_resistance(target_stock_code)
-                }
+    async def _perform_comprehensive_analysis(self, stock_code: str, kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
+        """执行实际的全面分析"""
+        cache_key = f"analysis_{stock_code}_comprehensive"
+        cached_result = self.get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
 
-                results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        try:
+            # 如果没有提供K线数据，则通过数据管理器获取
+            if kline_data is None:
+                kdata_response = await self.data_manager.request_data(stock_code=stock_code, data_type='kdata')
 
-                for key, result in zip(tasks.keys(), results):
-                    if not isinstance(result, Exception):
-                        analysis_results[key] = result
-                    else:
-                        logger.error(
-                            f"Comprehensive analysis sub-task '{key}' failed: {result}")
+                # 处理数据结构
+                if isinstance(kdata_response, dict):
+                    kline_data = kdata_response.get('kline_data')
+                else:
+                    kline_data = kdata_response
 
-                # 策略分析
-                strategy_results = {}
-                strategy_tasks = [self.run_strategy_analysis(
-                    target_stock_code, name) for name in self.get_available_strategies()]
-                strategy_run_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)
-
-                for i, name in enumerate(self.get_available_strategies()):
-                    if not isinstance(strategy_run_results[i], Exception) and strategy_run_results[i] is not None:
-                        strategy_results[name] = strategy_run_results[i]
-
-                analysis_results['strategy_analysis'] = strategy_results
-                return analysis_results
-
-            elif analysis_type == 'technical':
-                return await self.calculate_technical_indicators(target_stock_code)
-
-            elif analysis_type == 'trend':
-                return await self.analyze_trend(target_stock_code)
-
-            elif analysis_type == 'support_resistance':
-                return await self.analyze_support_resistance(target_stock_code)
-
-            elif analysis_type == 'strategy':
-                strategy_results = {}
-                strategy_tasks = [self.run_strategy_analysis(
-                    target_stock_code, name) for name in self.get_available_strategies()]
-                strategy_run_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)
-
-                for i, name in enumerate(self.get_available_strategies()):
-                    if not isinstance(strategy_run_results[i], Exception) and strategy_run_results[i] is not None:
-                        strategy_results[name] = strategy_run_results[i]
-                return strategy_results
-
-            else:
-                logger.warning(f"Unsupported analysis type: {analysis_type}")
+            # 检查数据有效性
+            if kline_data is None or kline_data.empty:
+                logger.warning(f"无法为 {stock_code} 获取K线数据，分析中止。")
                 return None
 
+            # 并行执行所有分析任务
+            tasks = {
+                "technical_analysis": self.calculate_technical_indicators(stock_code, kline_data=kline_data),
+                "trend_analysis": self.analyze_trend(stock_code, kline_data=kline_data),
+                "support_resistance": self.analyze_support_resistance(stock_code, kline_data=kline_data),
+            }
+
+            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+            final_result = {}
+            for task_name, result in zip(tasks.keys(), results):
+                if isinstance(result, Exception):
+                    logger.error(f"分析任务 '{task_name}' for {stock_code} 失败: {result}")
+                    final_result[task_name] = {"error": str(result)}
+                else:
+                    final_result[task_name] = result
+
+            self.put_to_cache(cache_key, final_result)
+            return final_result
+
         except Exception as e:
-            logger.error(
-                f"Failed to analyze stock {target_stock_code}: {e}", exc_info=True)
-            return None
+            logger.error(f"为 {stock_code} 执行全面分析时发生意外错误: {e}", exc_info=True)
+            return {"error": str(e)}
 
     def calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
         """计算移动平均线"""

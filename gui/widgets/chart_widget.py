@@ -51,13 +51,15 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
     request_indicator_dialog = pyqtSignal()
     request_stat_dialog = pyqtSignal(tuple)  # (start_idx, end_idx)
     pattern_selected = pyqtSignal(int)  # 新增：主图高亮信号，参数为K线索引
+    chart_type_changed = pyqtSignal(str)  # 新增：图表类型变更信号
+    time_range_changed = pyqtSignal(str)  # 新增：时间范围变更信号
 
     # 渐进式加载信号
     progressive_loading_progress = pyqtSignal(int, str)  # 进度, 阶段名称
     progressive_loading_complete = pyqtSignal()  # 加载完成
 
     def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None,
-                 theme_manager=None, log_manager=None, data_manager=None):
+                 theme_manager=None, log_manager=None, data_manager=None, chart_id: str = None):
         """初始化图表控件
 
         Args:
@@ -66,119 +68,89 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             theme_manager: Optional theme manager to use
             log_manager: Optional log manager to use
             data_manager: Optional data manager to use
+            chart_id: 唯一的图表ID
         """
         try:
-            # 首先初始化QWidget
-            QWidget.__init__(self, parent)
-
-            # 初始化基础属性（在调用Mixin之前）
+            # 1. 初始化父类和基础属性
+            super().__init__(parent)
             self.setAcceptDrops(True)  # 确保控件能接收拖拽
 
-            # 初始化管理器（必须在Mixin初始化之前）
+            # 2. 初始化管理器
             self.config_manager = config_manager or ConfigManager()
-            self.theme_manager = theme_manager or get_theme_manager(
-                self.config_manager)
+            self.theme_manager = theme_manager or get_theme_manager(self.config_manager)
             self.log_manager = log_manager or LogManager()
-            self.data_manager = data_manager
+            self.log_manager.info("ChartWidget __init__: 开始初始化...")
 
-            # 初始化基础变量
+            self.data_manager = data_manager
+            self.chart_id = chart_id or f"chart_{int(time.time() * 1000)}"
+
+            # 3. 初始化非UI的核心变量
             self.current_kdata = None
             self.current_signals = []
             self.current_period = 'D'
-            self.current_indicator = None
-            self._zoom_level = 1.0
-            self._zoom_history = []
-            self._max_zoom = 5.0
-            self._min_zoom = 0.2
-            self.crosshair_enabled = True  # 默认开启十字线
-            self.active_indicators = []  # 当前激活的指标列表，初始化为空，仅通过外部信号设置
+            self._update_lock = QMutex()
+            self._render_lock = QMutex()
+            self.crosshair_enabled = True
+            self.log_manager.info(f"ChartWidget __init__: crosshair_enabled 设置为 {self.crosshair_enabled}")
 
-            # 初始化缓存管理器
-            self.cache_manager = Cache()  # 图表最多缓存100个
+            # 4. 初始化UI (调用UIMixin中的init_ui)
+            # 这一步会创建 self.canvas, self.figure, self.price_ax 等
+            self.log_manager.info("ChartWidget __init__: 即将调用 init_ui()...")
+            self.init_ui()
+            self.log_manager.info("ChartWidget __init__: init_ui() 调用完成。")
 
-            # 启用双缓冲
+            # 5. 在UI元素创建后，再初始化依赖它们的Mixin
+            # 直接调用Mixin的__init__是错误的，应该由super()自动处理
+            # CrosshairMixin.__init__(self)
+            # InteractionMixin.__init__(self)
+            # ZoomMixin.__init__(self)
+
+            # 正确的做法是，在UI初始化后，调用需要设置的Mixin方法
+            self.log_manager.info(f"ChartWidget __init__: 准备检查是否启用十字光标，值为: {self.crosshair_enabled}")
+            if self.crosshair_enabled:
+                self.log_manager.info("ChartWidget __init__: 条件满足，即将调用 enable_crosshair()...")
+                self.enable_crosshair()
+                self.log_manager.info("ChartWidget __init__: enable_crosshair() 调用完成。")
+            else:
+                self.log_manager.warning("ChartWidget __init__: 十字光标未启用，跳过调用 enable_crosshair()")
+
+            # 6. 初始化其余组件和状态
+            self.cache_manager = Cache()
             self.setAttribute(Qt.WA_OpaquePaintEvent)
             self.setAttribute(Qt.WA_NoSystemBackground)
             self.setAutoFillBackground(True)
 
-            # 初始化数据更新锁
-            self._update_lock = QMutex()
-            self._render_lock = QMutex()
-
-            # 新增：合并指标栏UI引用
-            self.indicator_bar = None  # 合并后的指标栏
-            self.volume_bar = None     # 成交量栏
-            self.macd_bar = None      # MACD栏
-
-            # 初始化更新队列
-            self._update_queue = []
-
-            # 初始化渐进式加载（不再创建本地实例）
-            self.is_progressive_loading_enabled = self.config_manager.get(
-                'chart.progressive_loading.enabled', True)
-
-            # 初始化所有Mixin（在基础属性初始化之后）
-            BaseMixin.__init__(self)
-            UIMixin.__init__(self)
-            RenderingMixin.__init__(self)
-            IndicatorMixin.__init__(self)
-            CrosshairMixin.__init__(self)
-            InteractionMixin.__init__(self)
-            ZoomMixin.__init__(self)
-            SignalMixin.__init__(self)
-            ExportMixin.__init__(self)
-            UtilityMixin.__init__(self)
-
-            # 初始化UI
-            self.init_ui()
-
-            # 创建更新定时器
-            self._update_timer = QTimer()
-            self._update_timer.timeout.connect(self._process_update_queue)
-            self._update_timer.start(100)  # 100ms 间隔
-
-            # 添加渲染优化
-            self._optimize_rendering()
-
-            # 初始化异步数据处理器
-            self.data_processor = AsyncDataProcessor()
-            self.data_processor.calculation_progress.connect(
-                self._on_calculation_progress)
-            self.data_processor.calculation_complete.connect(
-                self._on_calculation_complete)
-            self.data_processor.calculation_error.connect(
-                self._on_calculation_error)
-
-            # 初始化渲染器
             self.renderer = ChartRenderer()
             self.renderer.render_progress.connect(self._on_render_progress)
             self.renderer.render_complete.connect(self._on_render_complete)
             self.renderer.render_error.connect(self._on_render_error)
-            self.renderer.priority_render_complete.connect(
-                self._on_priority_render_complete)
 
-            # 应用初始主题
+            # 7. 应用初始主题
             self._apply_initial_theme()
 
             self.log_manager.info("图表控件初始化完成")
 
-            self.highlighted_indices = set()  # 高亮K线索引
-            self._replay_timer = None         # 回放定时器
-            self._replay_index = None         # 回放当前索引
-
         except Exception as e:
             error_msg = f"初始化失败: {str(e)}"
-            # 安全地记录错误
             if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+                self.log_manager.error(error_msg, exc_info=True)
             else:
-                print(f"ChartWidget初始化错误: {error_msg}")
-                print(traceback.format_exc())
-
-            # 安全地发射信号
+                print(f"ChartWidget初始化错误: {error_msg}\n{traceback.format_exc()}")
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)
+
+    # 删除mouseMoveEvent，因为matplotlib的canvas会自动处理事件
+    # def mouseMoveEvent(self, event):
+    #     """处理鼠标移动事件，用于触发十字光标"""
+    #     # Manually trigger the 'motion_notify_event' for the crosshair
+    #     if hasattr(self, 'canvas') and hasattr(self.canvas, 'callbacks'):
+    #         self.canvas.callbacks.process('motion_notify_event', event)
+    #     super().mouseMoveEvent(event)
+
+    def dragEnterEvent(self, event):
+        """处理拖拽进入事件"""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
 
     def _process_update_queue(self):
         """处理更新队列中的任务"""
@@ -248,13 +220,46 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self.show_no_data(f"刷新失败: {str(e)}")
 
     @measure("chart.update")
+    def update_chart(self, data: dict = None) -> None:
+        """更新图表数据
+
+        Args:
+            data: 图表数据字典
+        """
+        try:
+            # 调用RenderingMixin中的update_chart方法
+            super().update_chart(data)
+
+            # 重置十字光标状态，确保在图表更新后仍然正常工作
+            if hasattr(self, 'reset_crosshair'):
+                self.reset_crosshair()
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("已重置十字光标状态")
+            else:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning("ChartWidget没有reset_crosshair方法，无法重置十字光标")
+
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新图表失败: {e}")
+            self.error_occurred.emit(f"更新图表失败: {e}")
+
+    @measure("chart.update")
     def update(self) -> None:
         """更新图表"""
         try:
-            super().update()  # 调用QWidget的update方法
+            if self.canvas:
+                self.canvas.draw_idle()
+
+            # 重置十字光标状态
+            if hasattr(self, 'reset_crosshair'):
+                self.reset_crosshair()
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("已重置十字光标状态")
         except Exception as e:
-            self.log_manager.error(f"更新图表失败: {str(e)}")
-            self.error_occurred.emit(f"更新图表失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新图表失败: {e}")
+            self.error_occurred.emit(f"更新图表失败: {e}")
 
     @measure("chart.reload")
     def reload(self) -> None:
@@ -335,88 +340,105 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
 
     @measure("chart.update_basic_kdata")
     def update_basic_kdata(self, kdata):
-        """更新基础K线数据（第一阶段渐进式加载）
+        """更新基础K线数据 - 高性能实现
 
         Args:
-            kdata: K线数据DataFrame
+            kdata: K线数据，可以是DataFrame或字典
         """
         try:
-            self.log_manager.info(f"开始更新基础K线数据: 类型={type(kdata)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"开始更新基础K线数据: 类型={type(kdata)}")
 
-            # 增强对kdata的验证
-            if kdata is None:
-                self.log_manager.warning("K线数据为空")
-                self.show_no_data("无K线数据")
-                return
+            # 清除图表
+            self.clear_chart()
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("已清除图表")
 
+            # 处理不同的数据类型
             import pandas as pd
-            if not isinstance(kdata, pd.DataFrame):
-                self.log_manager.warning(f"K线数据格式错误: {type(kdata)}")
-                self.show_no_data("K线数据格式错误")
+            if isinstance(kdata, pd.DataFrame):
+                # DataFrame直接使用
+                if kdata.empty:
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.warning("K线数据为空DataFrame")
+                    return
+                self.current_kdata = kdata
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(
+                        f"K线数据形状: {kdata.shape}, 列: {list(kdata.columns)}")
+            elif isinstance(kdata, dict):
+                # 字典格式，尝试转换
+                if 'data' in kdata and isinstance(kdata['data'], pd.DataFrame):
+                    self.current_kdata = kdata['data']
+                else:
+                    # 尝试将整个字典转换为DataFrame
+                    try:
+                        self.current_kdata = pd.DataFrame([kdata])
+                    except Exception as e:
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.error(f"无法将字典转换为DataFrame: {e}")
+                        return
+            elif isinstance(kdata, list):
+                # 列表格式，转换为DataFrame
+                if not kdata:
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.warning("K线数据为空列表")
+                    return
+                self.current_kdata = pd.DataFrame(kdata)
+            else:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.error(f"不支持的K线数据类型: {type(kdata)}")
                 return
-
-            self.log_manager.info(
-                f"K线数据形状: {kdata.shape}, 列: {list(kdata.columns)}")
-
-            if kdata.empty:
-                self.log_manager.warning("K线数据为空DataFrame")
-                self.show_no_data("无K线数据")
-                return
-
-            # 确保包含必要的列
-            required_columns = ['open', 'high', 'low', 'close', 'volume']
-            missing_columns = [
-                col for col in required_columns if col not in kdata.columns]
-            if missing_columns:
-                self.log_manager.warning(f"K线数据缺少必要列: {missing_columns}")
-                self.show_no_data(f"K线数据缺少必要列: {', '.join(missing_columns)}")
-                return
-
-            # 更新当前K线数据
-            self.current_kdata = kdata
-            self.log_manager.info(
-                f"已设置current_kdata: {id(self.current_kdata)}")
-
-            # 清除现有图表
-            for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
-                ax.cla()
-
-            self.log_manager.info("已清除图表")
 
             # 获取样式
             style = self._get_chart_style()
-            self.log_manager.info(f"获取样式: {style}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"获取样式: {style}")
 
-            # 绘制K线
-            try:
-                x = np.arange(len(kdata))
+            # 创建X轴
+            x = np.arange(len(self.current_kdata))
+            if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.info(f"创建x轴: 长度={len(x)}")
-                self.log_manager.info(
-                    f"调用renderer.render_candlesticks: price_ax={self.price_ax}, kdata形状={kdata.shape}")
-                self.renderer.render_candlesticks(
-                    self.price_ax, kdata, style, x=x)
-                self.log_manager.info("K线绘制完成")
-            except Exception as e:
-                self.log_manager.error(f"绘制K线失败: {str(e)}")
-                raise
 
-            # 设置基础显示范围
-            if not kdata.empty:
-                self._ymin = float(kdata['low'].min())
-                self._ymax = float(kdata['high'].max())
-                self.log_manager.info(f"设置Y轴范围: {self._ymin} - {self._ymax}")
-                for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
-                    ax.set_xlim(0, len(kdata)-1)
-                self.price_ax.set_ylim(self._ymin, self._ymax)
+            # 渲染K线图
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(
+                    f"调用renderer.render_candlesticks: price_ax={self.price_ax}, kdata形状={self.current_kdata.shape}")
+            self.renderer.render_candlesticks(
+                self.price_ax, self.current_kdata, style, x=x)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("K线绘制完成")
+
+            # 设置Y轴范围
+            ymin = float(self.current_kdata['low'].min())
+            ymax = float(self.current_kdata['high'].max())
+            margin = (ymax - ymin) * 0.05  # 5% 边距
+            self.price_ax.set_ylim(ymin - margin, ymax + margin)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"设置Y轴范围: {ymin - margin} - {ymax + margin}")
+
+            # 设置X轴范围
+            self.price_ax.set_xlim(0, len(self.current_kdata) - 1)
 
             # 更新画布
-            self.log_manager.info("更新画布")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("更新画布")
             self.canvas.draw_idle()
-            self.log_manager.info("基础K线数据更新完成")
+
+            # 重置十字光标状态，确保在图表更新后仍然正常工作
+            if hasattr(self, 'reset_crosshair'):
+                self.reset_crosshair()
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("已重置十字光标状态")
+
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("基础K线数据更新完成")
 
         except Exception as e:
-            self.log_manager.error(f"更新基础K线数据失败: {str(e)}", exc_info=True)
-            self.error_occurred.emit(f"更新基础K线数据失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新基础K线数据失败: {str(e)}", exc_info=True)
+            else:
+                print(f"更新基础K线数据失败: {str(e)}")
 
     @measure("chart.update_volume")
     def update_volume(self, kdata):

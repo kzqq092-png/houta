@@ -21,38 +21,151 @@ class RenderingMixin:
             if not data:
                 return
 
+            # 记录传入的数据结构
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"RenderingMixin.update_chart接收到数据类型: {type(data)}")
+                if isinstance(data, dict):
+                    self.log_manager.info(f"RenderingMixin.update_chart接收到数据键: {list(data.keys())}")
+
             # 处理不同的数据字段格式，兼容kdata和kline_data
             kdata = None
             if 'kdata' in data:
                 kdata = data['kdata']
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"从'kdata'键获取数据，类型: {type(kdata)}")
             elif 'kline_data' in data:
                 kdata = data['kline_data']
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"从'kline_data'键获取数据，类型: {type(kdata)}")
             else:
                 # 没有找到有效的K线数据
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.error("未找到有效的K线数据键")
                 self.show_no_data("无K线数据")
                 return
+
+            # 处理嵌套的数据结构
+            if isinstance(kdata, dict) and 'kline_data' in kdata:
+                # 这是一个嵌套的数据结构，真正的K线数据在kline_data键中
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"检测到嵌套的数据结构，从kline_data键中提取真正的K线数据")
+                nested_kdata = kdata.get('kline_data')
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"嵌套的K线数据类型: {type(nested_kdata)}")
+                kdata = nested_kdata
+
+            # 处理kdata是字典的情况
+            if isinstance(kdata, dict):
+                # 如果kdata是字典，尝试从中提取DataFrame
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"kdata是字典，包含键: {list(kdata.keys())}")
+
+                if 'data' in kdata:
+                    # 如果字典中有data键，使用它
+                    df_data = kdata.get('data')
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.info(f"从字典的'data'键获取数据，类型: {type(df_data)}")
+
+                    if isinstance(df_data, pd.DataFrame):
+                        kdata = df_data
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.info(f"成功从字典的'data'键获取DataFrame，形状: {kdata.shape}")
+                    elif isinstance(df_data, list) and df_data:
+                        kdata = pd.DataFrame(df_data)
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.info(f"将列表转换为DataFrame，形状: {kdata.shape}")
+                    else:
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.error(f"字典中的'data'键内容无效: {type(df_data)}")
+                        self.show_no_data(f"K线数据格式错误: {type(df_data)}")
+                        return
+                else:
+                    # 尝试将整个字典转换为DataFrame
+                    try:
+                        kdata = pd.DataFrame([kdata])
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.info(f"将整个字典转换为DataFrame，形状: {kdata.shape}")
+                    except Exception as e:
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.error(f"无法将字典转换为DataFrame: {e}")
+                        self.show_no_data("K线数据格式错误")
+                        return
+
+            # 记录处理后的kdata信息
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"处理后的kdata类型: {type(kdata)}")
+                if hasattr(kdata, 'shape'):
+                    self.log_manager.info(f"处理后的kdata形状: {kdata.shape}")
+                    if not kdata.empty:
+                        self.log_manager.info(f"处理后的kdata列: {list(kdata.columns)}")
+                        self.log_manager.info(f"处理后的kdata前5行: \n{kdata.head()}")
+
+            # 检查kdata是否包含必要的列
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            if isinstance(kdata, pd.DataFrame):
+                missing_columns = [col for col in required_columns if col not in kdata.columns]
+                if missing_columns:
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.error(f"K线数据缺少必要列: {missing_columns}")
+                    self.show_no_data(f"K线数据缺少必要列: {', '.join(missing_columns)}")
+                    return
 
             kdata = self._downsample_kdata(kdata)
             kdata = kdata.dropna(how='any')
             kdata = kdata.loc[~kdata.index.duplicated(keep='first')]
             self.current_kdata = kdata
+
+            # 记录清理后的kdata信息
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"清理后的kdata形状: {kdata.shape}")
+                if not kdata.empty:
+                    self.log_manager.info(f"清理后的kdata列: {list(kdata.columns)}")
+
             if not kdata.empty:
                 self._ymin = float(kdata['low'].min())
                 self._ymax = float(kdata['high'].max())
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"Y轴范围: {self._ymin} - {self._ymax}")
             else:
                 self._ymin = 0
                 self._ymax = 1
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning("kdata为空，设置默认Y轴范围")
+
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 ax.cla()
             style = self._get_chart_style()
             x = np.arange(len(kdata))  # 用等距序号做X轴
-            self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
-            self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
+
+            # 记录渲染参数
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"准备调用renderer.render_candlesticks，x轴长度: {len(x)}")
+                self.log_manager.info(f"price_ax: {self.price_ax}")
+
+            # 调用渲染器
+            try:
+                self.renderer.render_candlesticks(self.price_ax, kdata, style, x=x)
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("K线渲染成功")
+            except Exception as e:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.error(f"K线渲染失败: {e}", exc_info=True)
+                raise
+
+            try:
+                self.renderer.render_volume(self.volume_ax, kdata, style, x=x)
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("成交量渲染成功")
+            except Exception as e:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.error(f"成交量渲染失败: {e}", exc_info=True)
 
             # 处理indicators_data（如果存在）
             indicators_data = data.get('indicators_data', {})
             if indicators_data:
                 # 将indicators_data传递给渲染函数
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info(f"开始渲染指标数据，指标数量: {len(indicators_data)}")
                 self._render_indicator_data(indicators_data, kdata, x)
 
             # 修复：自动同步主窗口指标
@@ -130,7 +243,7 @@ class RenderingMixin:
                           edgecolor='none', boxstyle='round,pad=0.2'),
                 zorder=200
             )
-            self.canvas.draw()
+            self.canvas.draw_idle()
             for ax in [self.price_ax, self.volume_ax, self.indicator_ax]:
                 for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                     label.set_fontsize(8)
@@ -438,12 +551,22 @@ class RenderingMixin:
 
             # 清空十字光标
             if hasattr(self, '_crosshair_lines'):
-                for line in self._crosshair_lines:
-                    try:
-                        line.remove()
-                    except:
-                        pass
-                self._crosshair_lines = []
+                # 确保_crosshair_lines是字典类型
+                if isinstance(self._crosshair_lines, dict):
+                    for line in self._crosshair_lines.values():
+                        try:
+                            line.remove()
+                        except:
+                            pass
+                else:
+                    # 兼容处理列表类型
+                    for line in self._crosshair_lines:
+                        try:
+                            line.remove()
+                        except:
+                            pass
+                # 重置为空字典，与CrosshairMixin保持一致
+                self._crosshair_lines = {}
 
             if hasattr(self, '_crosshair_text') and self._crosshair_text:
                 try:

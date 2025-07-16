@@ -67,6 +67,15 @@ class LeftPanel(BasePanel):
 
         super().__init__(parent, coordinator, **kwargs)
 
+    def _register_event_handlers(self) -> None:
+        """注册事件处理器"""
+        # 调用父类方法
+        super()._register_event_handlers()
+
+        # 注册多屏模式切换事件处理
+        from core.events.events import MultiScreenToggleEvent
+        self.event_bus.subscribe(MultiScreenToggleEvent, self.on_multi_screen_toggled)
+
     def _create_widgets(self) -> None:
         """创建UI组件"""
         # 创建主布局
@@ -178,6 +187,13 @@ class LeftPanel(BasePanel):
         # self.stock_tree.setColumnWidth(3, 100)  # 行业
         # self.stock_tree.setColumnWidth(4, 60)   # 类型
 
+        # 启用拖拽功能
+        self.stock_tree.setDragEnabled(True)
+        self.stock_tree.setDragDropMode(QAbstractItemView.DragOnly)
+
+        # 自定义拖拽开始事件
+        self.stock_tree.startDrag = lambda action: self._start_drag(action)
+
         # 启用右键菜单
         self.stock_tree.setContextMenuPolicy(Qt.CustomContextMenu)
 
@@ -185,6 +201,37 @@ class LeftPanel(BasePanel):
 
         # 保存组件引用
         self.add_widget('stock_tree', self.stock_tree)
+
+    def _start_drag(self, action):
+        """自定义拖拽开始事件，设置MIME数据"""
+        try:
+            item = self.stock_tree.currentItem()
+            if not item:
+                return
+
+            stock_code = item.text(0)
+            stock_name = item.text(1)
+
+            # 创建MIME数据
+            from PyQt5.QtCore import QMimeData
+            from PyQt5.QtGui import QDrag
+
+            mime_data = QMimeData()
+            # 设置文本格式，便于通用处理
+            mime_data.setText(f"{stock_code} {stock_name}")
+            # 设置自定义格式，便于特定处理
+            mime_data.setData("application/x-stock-code", stock_code.encode("utf-8"))
+            mime_data.setData("application/x-stock-name", stock_name.encode("utf-8"))
+
+            # 创建拖拽对象
+            drag = QDrag(self.stock_tree)
+            drag.setMimeData(mime_data)
+
+            # 执行拖拽
+            drag.exec_(action)
+
+        except Exception as e:
+            logger.error(f"开始拖拽时出错: {e}", exc_info=True)
 
     def _create_status_bar(self, parent_layout: QVBoxLayout) -> None:
         """创建状态栏"""
@@ -292,9 +339,33 @@ class LeftPanel(BasePanel):
         """刷新按钮点击处理"""
         self._load_stock_data()
 
+    def _is_multi_screen_mode(self) -> bool:
+        """
+        检查当前是否处于多屏模式
+
+        Returns:
+            bool: 如果当前处于多屏模式返回True，否则返回False
+        """
+        try:
+            # 通过协调器获取中间面板
+            if self.coordinator:
+                middle_panel = self.coordinator.get_panel('middle')
+                if middle_panel and hasattr(middle_panel, '_multi_screen_panel'):
+                    return middle_panel._multi_screen_panel is not None
+            return False
+        except Exception as e:
+            logger.error(f"检查多屏模式失败: {e}")
+            return False
+
     @pyqtSlot(QTreeWidgetItem, int)
     def _on_stock_clicked(self, item: QTreeWidgetItem, column: int) -> None:
         """股票点击处理"""
+        # 在多屏模式下，不响应点击事件，只支持拖拽
+        if self._is_multi_screen_mode():
+            logger.debug("多屏模式下不响应股票点击事件，请使用拖拽功能")
+            self.show_message("多屏模式下请拖拽股票到目标图表", level="info")
+            return
+
         if item:
             stock_code = item.text(0)
             stock_name = item.text(1)
@@ -304,6 +375,12 @@ class LeftPanel(BasePanel):
     @pyqtSlot(QTreeWidgetItem, int)
     def _on_stock_double_clicked(self, item: QTreeWidgetItem, column: int) -> None:
         """处理股票双击事件"""
+        # 在多屏模式下，不响应双击事件，只支持拖拽
+        if self._is_multi_screen_mode():
+            logger.debug("多屏模式下不响应股票双击事件，请使用拖拽功能")
+            self.show_message("多屏模式下请拖拽股票到目标图表", level="info")
+            return
+
         stock_code = item.text(0)
         stock_name = item.text(1)
         market = item.data(0, Qt.UserRole).get('market', '')
@@ -835,10 +912,24 @@ class LeftPanel(BasePanel):
             QTimer.singleShot(
                 0, lambda e=e: self._handle_data_error(e, stock_name))
 
-    def _handle_data_result(self, data: Optional[pd.DataFrame], stock_code: str, stock_name: str, market: str) -> None:
+    def _handle_data_result(self, data: Optional[Dict[str, Any]], stock_code: str, stock_name: str, market: str) -> None:
         """在主线程中处理数据结果"""
         try:
-            is_available = data is not None and not data.empty
+            # 适应新的数据结构：data可能是字典或直接是DataFrame
+            kline_data = None
+            if isinstance(data, dict):
+                # 新结构：从字典中获取K线数据
+                kline_data = data.get('kline_data')
+                logger.debug(f"从字典中获取K线数据: {type(kline_data)}")
+            else:
+                # 旧结构：直接使用data作为K线数据
+                kline_data = data
+                logger.debug(f"直接使用data作为K线数据: {type(kline_data)}")
+
+            # 检查数据有效性
+            is_available = kline_data is not None
+            if hasattr(kline_data, 'empty'):
+                is_available = is_available and not kline_data.empty
 
             if is_available:
                 logger.info(f"数据加载成功: {stock_code}, 发布StockSelectedEvent")
@@ -1043,8 +1134,8 @@ class LeftPanel(BasePanel):
     # 事件处理方法
     def on_stock_selected(self, event) -> None:
         """处理股票选择事件"""
-        # 这里可以处理来自其他组件的股票选择事件
-        pass
+        # 更新股票列表鼠标指针样式
+        self._update_stock_list_cursor()
 
     def on_data_update(self, event) -> None:
         """处理数据更新事件"""
@@ -1717,3 +1808,41 @@ class LeftPanel(BasePanel):
 
         except Exception as e:
             logger.error(f"处理指标参数变化失败: {e}", exc_info=True)
+
+    def _update_stock_list_cursor(self) -> None:
+        """
+        根据当前模式更新股票列表的鼠标指针样式
+        """
+        try:
+            if self._is_multi_screen_mode():
+                # 多屏模式下使用拖拽指针
+                self.stock_tree.setCursor(Qt.OpenHandCursor)
+                self.show_message("多屏模式：请拖拽股票到目标图表", level="info")
+            else:
+                # 单屏模式下使用默认指针
+                self.stock_tree.setCursor(Qt.ArrowCursor)
+        except Exception as e:
+            logger.error(f"更新股票列表鼠标指针失败: {e}")
+
+    def on_multi_screen_toggled(self, event=None) -> None:
+        """
+        处理多屏模式切换事件
+
+        Args:
+            event: 多屏模式切换事件对象，如果为None则通过_is_multi_screen_mode方法检测
+        """
+        try:
+            # 如果提供了事件对象，从事件中获取多屏模式状态
+            if event and hasattr(event, 'is_multi_screen'):
+                is_multi_screen = event.is_multi_screen
+            else:
+                # 否则通过方法检测
+                is_multi_screen = self._is_multi_screen_mode()
+
+            logger.info(f"多屏模式切换: {'开启' if is_multi_screen else '关闭'}")
+
+            # 更新股票列表鼠标指针样式
+            self._update_stock_list_cursor()
+
+        except Exception as e:
+            logger.error(f"处理多屏模式切换事件失败: {e}")

@@ -9,6 +9,8 @@ from core.data_manager import data_manager
 from core.logger import LogManager, LogLevel
 from hikyuu import KData, KRecord
 from utils.performance_monitor import monitor_performance
+from core.strategy.strategy_factory import create_strategy
+from dataclasses import asdict
 
 
 class TradingSystem:
@@ -67,127 +69,28 @@ class TradingSystem:
         except Exception as e:
             LogManager.log(f"加载K线数据失败: {str(e)}", LogLevel.ERROR)
 
-    def calculate_signals(self, strategy: str = 'MA') -> List[Dict[str, Any]]:
-        """计算交易信号，自动兼容KData和DataFrame"""
+    def calculate_signals(self, strategy: str = 'MA策略') -> List[Dict[str, Any]]:
+        """
+        计算交易信号。
+        该方法使用策略工厂动态创建策略实例，并调用其generate_signals方法。
+        """
         try:
-            if self.current_kdata is None or (hasattr(self.current_kdata, 'empty') and self.current_kdata.empty):
+            if self.current_kdata is None or len(self.current_kdata) == 0:
                 raise ValueError("未加载K线数据")
-            kdata = self.current_kdata
-            if isinstance(kdata, pd.DataFrame):
-                try:
-                    kdata = data_manager.df_to_kdata(kdata)
-                except Exception as e:
-                    LogManager.log(f"K线数据转换KData失败: {str(e)}", LogLevel.ERROR)
-                    return []
-            signals = []
 
-            if strategy == 'MA':
-                # 计算MA指标
-                ma5 = TA_MA(kdata.close, 5)
-                ma10 = TA_MA(kdata.close, 10)
+            # 从工厂创建策略实例
+            strategy_instance = create_strategy(strategy)
+            if not strategy_instance:
+                raise ValueError(f"不支持的策略: {strategy}")
 
-                # 生成交易信号
-                for i in range(1, len(kdata)):
-                    if (ma5[i] > ma10[i] and ma5[i-1] <= ma10[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'MA',
-                            'signal': 'BUY',
-                            'price': float(kdata[i].close),
-                            'strength': abs(ma5[i] - ma10[i])
-                        })
-                    elif (ma5[i] < ma10[i] and ma5[i-1] >= ma10[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'MA',
-                            'signal': 'SELL',
-                            'price': float(kdata[i].close),
-                            'strength': abs(ma5[i] - ma10[i])
-                        })
+            # 将hikyuu.KData转换为pandas.DataFrame
+            kdata_df = data_manager.kdata_to_df(self.current_kdata)
 
-            elif strategy == 'MACD':
-                # 计算MACD指标
-                macd = TA_MACD(kdata.close)
+            # 生成信号
+            signals_obj_list = strategy_instance.generate_signals(kdata_df)
 
-                # 生成交易信号
-                for i in range(1, len(kdata)):
-                    if (macd.dif[i] > macd.dea[i] and
-                            macd.dif[i-1] <= macd.dea[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'MACD',
-                            'signal': 'BUY',
-                            'price': float(kdata[i].close),
-                            'strength': abs(macd.dif[i] - macd.dea[i])
-                        })
-                    elif (macd.dif[i] < macd.dea[i] and
-                          macd.dif[i-1] >= macd.dea[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'MACD',
-                            'signal': 'SELL',
-                            'price': float(kdata[i].close),
-                            'strength': abs(macd.dif[i] - macd.dea[i])
-                        })
-
-            elif strategy == 'KDJ':
-                # 计算KDJ指标
-                kdj = TA_STOCH(kdata)
-
-                # 生成交易信号
-                for i in range(1, len(kdata)):
-                    if (kdj.k[i] > kdj.d[i] and kdj.k[i-1] <= kdj.d[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'KDJ',
-                            'signal': 'BUY',
-                            'price': float(kdata[i].close),
-                            'strength': abs(kdj.k[i] - kdj.d[i])
-                        })
-                    elif (kdj.k[i] < kdj.d[i] and kdj.k[i-1] >= kdj.d[i-1]):
-                        signals.append({
-                            'time': kdata[i].datetime.datetime(),
-                            'type': 'KDJ',
-                            'signal': 'SELL',
-                            'price': float(kdata[i].close),
-                            'strength': abs(kdj.k[i] - kdj.d[i])
-                        })
-
-            elif strategy == "形态分析":
-                self.log_manager.info(
-                    f"形态分析收到数据: shape={kdata.shape}, columns={list(kdata.columns)}")
-                self.log_manager.info(f"前5行数据:\n{kdata.head()}")
-                from analysis.pattern_recognition import PatternRecognizer
-                recognizer = PatternRecognizer()
-                kdata_for_pattern = kdata
-                if isinstance(kdata, pd.DataFrame) and 'code' not in kdata.columns:
-                    code = None
-                    if hasattr(self, 'current_stock') and self.current_stock:
-                        code = getattr(self, 'current_stock', None)
-                    if not code and hasattr(self, 'selected_code'):
-                        code = getattr(self, 'selected_code', None)
-                    if not code and hasattr(self, 'code'):
-                        code = getattr(self, 'code', None)
-                    if code:
-                        kdata_for_pattern = kdata.copy()
-                        kdata_for_pattern['code'] = code
-                        self.log_manager.info(
-                            f"形态分析自动补全DataFrame code字段: {code}")
-                    else:
-                        self.log_manager.error(
-                            "形态分析无法自动补全DataFrame code字段，请确保DataFrame包含股票代码")
-                pattern_signals = recognizer.get_pattern_signals(
-                    kdata_for_pattern)
-                results = {
-                    'strategy': strategy,
-                    'pattern_signals': pattern_signals
-                }
-                if not pattern_signals:
-                    self.log_manager.info("形态分析未识别到任何形态")
-                else:
-                    self.log_manager.info(
-                        f"形态分析识别到{len(pattern_signals)}个形态信号")
-                return results
+            # 为了兼容旧接口，将StrategySignal对象列表转换为字典列表
+            signals = [asdict(s) for s in signals_obj_list]
 
             self.current_signals = signals
             return signals

@@ -14,6 +14,7 @@ from utils.theme import get_theme_manager
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
+from PyQt5.QtCore import QMetaObject, Qt, Q_ARG
 
 
 class DragHandle(QWidget):
@@ -58,10 +59,8 @@ class DragHandle(QWidget):
 class LogWidget(QWidget):
     """日志控件类"""
 
-    # 定义信号
-    log_added = pyqtSignal(str, str)  # 日志消息, 级别
-    log_cleared = pyqtSignal()
-    error_occurred = pyqtSignal(str)  # 错误信号
+    # 定义信号，确保日志更新在主线程进行
+    _log_received = pyqtSignal(str, str)  # level, message
 
     def __init__(self, log_manager: LogManager = None, parent=None):
         """初始化日志控件
@@ -90,6 +89,7 @@ class LogWidget(QWidget):
             self.init_ui()
 
             # 连接信号
+            self._log_received.connect(self._update_log_text)
             self.connect_signals()
 
             # 设置样式
@@ -245,46 +245,71 @@ class LogWidget(QWidget):
         pass  # 移除自定义样式，统一由主题管理器apply_theme
 
     def add_log(self, message: str, level: str = "INFO"):
-        """添加日志，自动识别结构化字段"""
+        """
+        线程安全的日志添加方法。
+        发射信号，由主线程的槽函数来更新UI。
+        """
+        self._log_received.emit(level, message)
+
+    @pyqtSlot(str, str)
+    def _update_log_text(self, level: str, message: str):
+        """在主线程更新日志文本"""
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            try:
-                data = json.loads(message)
-                self._all_logs.append((data, level, timestamp))
-                self._structured_fields.update(data.keys())
-            except Exception:
-                self._all_logs.append((message, level, timestamp))
-            self.refresh_display(scroll_to_end=not self.pause_scroll)
-            if level.upper() == "ERROR":
-                self.flash_error()
-            self.log_added.emit(message, level)
-            self.setVisible(True)
-            self.update()
-            if self.log_text is not None:
-                QTimer.singleShot(
-                    0, lambda: self.log_text.moveCursor(QTextCursor.End))
+            # 存储原始日志
+            log_entry = {
+                'timestamp': timestamp,
+                'level': level,
+                'message': message
+            }
+            self._all_logs.append(log_entry)
+
+            # 根据当前过滤器判断是否显示
+            if not self._should_display(log_entry):
+                return
+
+            color = self._get_level_color(level)
+            formatted_message = f'<span style="color: {color};"><b>[{level}]</b> {timestamp}: {message}</span>'
+
+            if self.log_text:
+                self.log_text.append(formatted_message)
         except Exception as e:
-            error_msg = f"添加日志失败: {str(e)}"
-            if self.log_text is None:
-                self.log_text = QTextEdit()
-                self.log_text.setReadOnly(True)
-                self.log_text.setSizePolicy(
-                    QSizePolicy.Expanding, QSizePolicy.Expanding)
-                self.log_text.setHorizontalScrollBarPolicy(
-                    Qt.ScrollBarAlwaysOff)
-                self.log_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-                self.layout().addWidget(self.log_text, 1)
-            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.apply_style()
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
-            self.setVisible(True)
-            self.update()
-            self.adjustSize()
+            # 记录到原始日志系统，避免无限循环
+            print(f"Error in _update_log_text: {e}")
+
+    def _get_level_color(self, level: str) -> str:
+        """根据日志级别获取颜色"""
+        if level == "ERROR":
+            return "red"
+        elif level == "WARNING":
+            return "orange"
+        elif level == "DEBUG":
+            return "purple"
+        else:
+            return "black"  # 默认颜色
+
+    def _should_display(self, log_entry: dict) -> bool:
+        """根据当前过滤器判断日志是否应该显示"""
+        # 级别过滤
+        current_level_filter = self.level_combo.currentText()
+        log_level = log_entry['level']
+        level_map = {"全部": 5, "调试": 4, "信息": 3, "警告": 2, "错误": 1}
+
+        log_level_value = level_map.get(log_level.upper(), 3)
+        filter_level_value = level_map.get(current_level_filter, 5)
+
+        if log_level_value > filter_level_value:
+            return False
+
+        # 文本过滤
+        search_text = self.search_box.text().lower()
+        if search_text and search_text not in log_entry['message'].lower():
+            return False
+
+        return True
 
     def flash_error(self):
-        """只让日志文本区闪烁红色背景，不影响整体布局"""
+        """错误闪烁提示"""
         try:
             orig_style = self.log_text.styleSheet() if self.log_text else ""
             self.log_text.setStyleSheet(
@@ -411,20 +436,18 @@ class LogWidget(QWidget):
             self.maximize_btn.setText("还原")
 
     def show_popup(self):
-        """弹出独立日志窗口，普通浮动窗，主题一致，功能完整"""
+        """显示日志弹窗"""
         try:
-            if self.popup_dialog is not None:
-                self.popup_dialog.raise_()
+            # 如果已有弹窗，则激活它
+            if hasattr(self, 'popup_dialog') and self.popup_dialog:
                 self.popup_dialog.activateWindow()
-                self.popup_dialog.show()
+                self.popup_dialog.raise_()
                 return
 
-            self.popup_dialog = QDialog()
-            self.popup_dialog.setWindowTitle("系统日志详情")
-            self.popup_dialog.resize(800, 1000)
-            self.popup_dialog.setMinimumSize(600, 300)
-
-            # 设置窗口标志
+            # 创建弹窗
+            self.popup_dialog = QDialog(self.window())
+            self.popup_dialog.setWindowTitle("日志详情")
+            self.popup_dialog.setMinimumSize(800, 600)
             self.popup_dialog.setWindowFlags(
                 Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinMaxButtonsHint
             )
@@ -442,7 +465,7 @@ class LogWidget(QWidget):
             toolbar_layout.setContentsMargins(0, 0, 0, 0)
 
             # 日志级别过滤
-            level_label = QLabel("日志级别1:")
+            level_label = QLabel("日志级别:")
             level_label.setFixedWidth(60)
             level_label.setFixedHeight(45)
             level_label.setAlignment(Qt.AlignCenter)
@@ -487,7 +510,7 @@ class LogWidget(QWidget):
                     font-size: 13px;
                     background: #f8fafc;
                     color: #23293a;
-                    border: 1px solid #e0e0e0;
+        
                     border-radius: 4px;
                     padding: 8px;
                     margin: 0;
@@ -525,48 +548,23 @@ class LogWidget(QWidget):
                                    QSizePolicy.Expanding)
             layout.addWidget(log_text, 1)
 
-            # 日志内容渲染逻辑
-            def get_filtered_logs_html():
-                level_text = level_combo.currentText()
-                search_text = search_box.text().strip().lower()
-                html_logs = []
-                for msg, lvl, ts in self._all_logs:
-                    if level_text != "全部":
-                        if level_text == "信息" and lvl.upper() != "INFO":
-                            continue
-                        if level_text == "警告" and lvl.upper() != "WARNING":
-                            continue
-                        if level_text == "错误" and lvl.upper() != "ERROR":
-                            continue
-                        if level_text == "调试" and lvl.upper() != "DEBUG":
-                            continue
-                    if search_text and search_text not in msg.lower():
-                        continue
-                    color = {
-                        "ERROR": "#FF0000",
-                        "WARNING": "#FFA500",
-                        "INFO": "#000000",
-                        "DEBUG": "#808080"
-                    }.get(lvl.upper(), "#000000")
-                    html_logs.append(
-                        f'<div style="text-align:left;color:{color};word-break:break-all;white-space:pre-wrap;width:100%;">[{ts}] [{lvl}] {msg}</div>')
-                if not html_logs:
-                    return '<div style="color:#888;text-align:center;margin-top:40px;">暂无日志内容</div>'
-                return "".join(html_logs)
+            # 保存对话框组件的引用，供refresh_popup方法使用
+            self._popup_log_text = log_text
+            self._popup_level_combo = level_combo
+            self._popup_search_box = search_box
 
-            def refresh_popup():
-                log_text.setHtml(get_filtered_logs_html())
-                QTimer.singleShot(
-                    0, lambda: log_text.moveCursor(QTextCursor.End))
+            # 日志内容渲染逻辑 - 定义为实例方法
+            self.get_filtered_logs_html = lambda: self._get_popup_filtered_logs_html(level_combo, search_box)
 
-            refresh_popup()
+            # 初始刷新
+            self.refresh_popup()
 
             # 工具栏交互同步
             def on_level_changed(text):
-                refresh_popup()
+                self.refresh_popup()
 
             def on_search_changed(text):
-                refresh_popup()
+                self.refresh_popup()
 
             level_combo.currentTextChanged.connect(on_level_changed)
             search_box.textChanged.connect(on_search_changed)
@@ -582,23 +580,29 @@ class LogWidget(QWidget):
             export_btn.clicked.connect(do_export)
 
             # 右键菜单
-            menu = QMenu(self.popup_dialog)
-            copy_action = menu.addAction("复制")
-            select_all_action = menu.addAction("全选")
-            clear_action = menu.addAction("清空")
-            export_action = menu.addAction("导出")
-            action = menu.exec_(log_text.mapToGlobal(pos))
-            if action == copy_action:
-                log_text.copy()
-            elif action == select_all_action:
-                log_text.selectAll()
-            elif action == clear_action:
-                log_text.clear()
-            elif action == export_action:
-                do_export()
+            def show_context_menu(pos):
+                menu = QMenu(self.popup_dialog)
+                copy_action = menu.addAction("复制")
+                select_all_action = menu.addAction("全选")
+                clear_action = menu.addAction("清空")
+                export_action = menu.addAction("导出")
+                action = menu.exec_(log_text.mapToGlobal(pos))
+                if action == copy_action:
+                    log_text.copy()
+                elif action == select_all_action:
+                    log_text.selectAll()
+                elif action == clear_action:
+                    log_text.clear()
+                elif action == export_action:
+                    do_export()
+
+            log_text.customContextMenuRequested.connect(show_context_menu)
 
             def on_close():
                 self.popup_dialog = None
+                self._popup_log_text = None
+                self._popup_level_combo = None
+                self._popup_search_box = None
 
             self.popup_dialog.finished.connect(on_close)
 
@@ -684,11 +688,11 @@ class LogWidget(QWidget):
             self.log_manager.error(f"滚动条监听失败: {str(e)}")
 
     def restore_scroll_position(self, scroll_to_end: bool = False):
-        """刷新后还原滚动条位置或自动滚动到底部，供所有日志区/弹窗复用"""
+        """刷新后还原滚动条位置或自动滚动到底部，供所有日志区/弹窗复用 - 线程安全版本"""
         scrollbar = self.log_text.verticalScrollBar()
         if scroll_to_end:
-            QTimer.singleShot(
-                0, lambda: scrollbar.setValue(scrollbar.maximum()))
+            # 使用单次计时器在主线程中设置滚动条位置
+            QTimer.singleShot(0, lambda: scrollbar.setValue(scrollbar.maximum()))
         elif self.pause_scroll:
             # 恢复原有滚动条相对位置（防止跳到顶部）
             def restore():
@@ -837,3 +841,71 @@ class LogWidget(QWidget):
         dialog.setLayout(layout)
         dialog.resize(900, 700)
         dialog.exec_()
+
+
+def _get_popup_filtered_logs_html(self, level_combo, search_box):
+    """获取弹窗中经过筛选的日志HTML内容"""
+    # 获取筛选条件
+    level_text = level_combo.currentText()
+    search_text = search_box.text().strip().lower()
+
+    # 筛选日志
+    filtered_logs = []
+    for msg, lvl, ts in self._all_logs:
+        # 按级别筛选
+        if level_text != "全部":
+            if level_text == "信息" and lvl.upper() != "INFO":
+                continue
+            if level_text == "警告" and lvl.upper() != "WARNING":
+                continue
+            if level_text == "错误" and lvl.upper() != "ERROR":
+                continue
+            if level_text == "调试" and lvl.upper() != "DEBUG":
+                continue
+
+        # 按关键词搜索
+        if search_text and search_text not in str(msg).lower():
+            continue
+
+        # 格式化日志
+        color = self._get_level_color(lvl)
+        if isinstance(msg, dict):
+            formatted_msg = json.dumps(msg, ensure_ascii=False)
+        else:
+            formatted_msg = str(msg)
+
+        html_log = f'<div style="color:{color};">[{ts}] [{lvl}] {formatted_msg}</div>'
+        filtered_logs.append(html_log)
+
+    # 返回HTML
+    if not filtered_logs:
+        return '<div style="color:#888;text-align:center;margin-top:40px;">暂无符合条件的日志</div>'
+    return "".join(filtered_logs)
+
+
+def refresh_popup(self):
+    """刷新弹窗内容 - 线程安全版本"""
+    if not hasattr(self, 'popup_dialog') or not self.popup_dialog or not hasattr(self, '_popup_log_text') or not self._popup_log_text:
+        return
+
+    # 获取HTML内容
+    html_content = self.get_filtered_logs_html()
+
+    # 使用信号/槽机制确保在主线程中更新UI
+    QMetaObject.invokeMethod(
+        self._popup_log_text,
+        "setHtml",
+        Qt.QueuedConnection,
+        Q_ARG(str, html_content)
+    )
+
+    # 使用单次计时器在主线程中移动光标
+    QTimer.singleShot(0, lambda: self._move_cursor_to_end(self._popup_log_text))
+
+
+def _move_cursor_to_end(self, text_edit):
+    """在主线程中安全地将光标移动到文本末尾"""
+    if text_edit:
+        cursor = text_edit.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        text_edit.setTextCursor(cursor)

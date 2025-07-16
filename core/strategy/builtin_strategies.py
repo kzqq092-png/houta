@@ -4,6 +4,7 @@
 提供标准的技术分析策略实现
 """
 
+from analysis.pattern_recognition import PatternRecognizer
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Any
@@ -521,3 +522,43 @@ class BollingerBandsStrategy(BaseStrategy):
             0.1, (bb_width * 5 + abs(0.5 - price_position) * 2 + volume_ratio * 0.3) / 3))
 
         return confidence
+
+
+@register_strategy("形态分析策略", {
+    "category": "形态识别",
+    "description": "基于K线形态识别的策略"
+})
+class PatternAnalysisStrategy(BaseStrategy):
+    """形态分析策略"""
+
+    def __init__(self, name: str = "形态分析策略"):
+        super().__init__(name, StrategyType.PATTERN)
+        self.recognizer = PatternRecognizer()
+
+    def _init_default_parameters(self):
+        """形态分析策略无额外参数"""
+        pass
+
+    def generate_signals(self, data: pd.DataFrame) -> List[StrategySignal]:
+        """生成形态分析信号"""
+        signals = []
+        if 'code' not in data.columns:
+            # 尝试从其他地方获取股票代码，但这应该是数据准备阶段的工作
+            # log_manager.warning("K线数据缺少'code'列，形态分析可能不准确")
+            # 假设一个默认代码或跳过
+            return signals
+
+        pattern_results = self.recognizer.recognize_all(data)
+
+        for result in pattern_results:
+            # result 格式: {'pattern_name': 'ThreeWhiteSoldiers', 'stock_code': 'SH.600000', 'start_date': Timestamp('2023-01-03 00:00:00'), 'end_date': Timestamp('2023-01-05 00:00:00'), 'signal': 'buy', 'confidence': 0.8, 'description': '...', 'index': 2}
+            signals.append(StrategySignal(
+                timestamp=result['end_date'],
+                signal_type=SignalType.BUY if result['signal'] == 'buy' else SignalType.SELL if result['signal'] == 'sell' else SignalType.HOLD,
+                price=data.loc[result['end_date']]['close'],
+                confidence=result.get('confidence', 0.5),
+                strategy_name=self.name,
+                reason=result.get('pattern_name', '未知形态'),
+            ))
+
+        return signals

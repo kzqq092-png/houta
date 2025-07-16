@@ -158,8 +158,13 @@ class MultiChartPanel(QWidget):
         try:
             if self.single_chart is None:
                 self.single_chart = ChartCanvas(self)
-                self.single_chart.stock_selected.connect(
-                    self.stock_selected.emit)
+                # 移除对不存在的stock_selected信号的连接
+                # 如果需要这个功能，可以在单击事件中手动发出信号
+                self.single_chart.figure.canvas.mpl_connect('button_press_event',
+                                                            lambda event: self._on_chart_clicked(event))
+
+                # 确保单屏图表也能接收拖拽
+                self.single_chart.setAcceptDrops(True)
 
             # 清空单屏容器并添加图表
             layout = self.single_container.layout()
@@ -170,6 +175,16 @@ class MultiChartPanel(QWidget):
 
         except Exception as e:
             self.logger.error(f"设置单屏模式失败: {e}")
+
+    def _on_chart_clicked(self, event):
+        """处理图表点击事件，模拟stock_selected信号"""
+        try:
+            if self.single_chart and hasattr(self.single_chart, 'current_kdata') and self.single_chart.current_kdata is not None:
+                # 获取当前显示的股票代码
+                if hasattr(self, 'current_stock_code') and self.current_stock_code:
+                    self.stock_selected.emit(self.current_stock_code)
+        except Exception as e:
+            self.logger.error(f"处理图表点击事件失败: {e}")
 
     def setup_multi_mode(self):
         """设置多屏模式"""
@@ -192,7 +207,9 @@ class MultiChartPanel(QWidget):
                 for col in range(cols):
                     chart = ChartCanvas(self)
                     chart.setMinimumSize(300, 200)
-                    chart.stock_selected.connect(self.stock_selected.emit)
+                    # 添加点击事件处理
+                    chart.figure.canvas.mpl_connect('button_press_event',
+                                                    lambda event, r=row, c=col: self._on_multi_chart_clicked(event, r, c))
 
                     # 添加图表标题
                     chart_frame = QFrame()
@@ -205,19 +222,16 @@ class MultiChartPanel(QWidget):
                     title_layout = QHBoxLayout(title_bar)
                     title_layout.setContentsMargins(5, 2, 5, 2)
 
+                    # 股票标题标签 - 现在只使用这个标签，不再使用下拉框
                     title_label = QLabel(f"图表 {row+1}-{col+1}")
                     title_label.setStyleSheet(
                         "font-weight: bold; color: #333;")
                     title_layout.addWidget(title_label)
 
-                    # 股票选择下拉框
-                    stock_combo = QComboBox()
-                    stock_combo.setMaximumWidth(120)
-                    stock_combo.currentTextChanged.connect(
-                        lambda code, r=row, c=col: self.on_chart_stock_changed(
-                            r, c, code)
-                    )
-                    title_layout.addWidget(stock_combo)
+                    # 添加拖拽提示
+                    drag_hint = QLabel("← 拖拽股票到此处")
+                    drag_hint.setStyleSheet("color: #999; font-style: italic;")
+                    title_layout.addWidget(drag_hint)
 
                     title_layout.addStretch()
 
@@ -226,11 +240,20 @@ class MultiChartPanel(QWidget):
 
                     grid_layout.addWidget(chart_frame, row, col)
 
+                    # 启用接收拖拽
+                    chart.setAcceptDrops(True)
+                    # 保存原始的拖拽事件处理方法
+                    chart._original_dragEnterEvent = chart.dragEnterEvent
+                    chart._original_dropEvent = chart.dropEvent
+                    # 重写拖拽事件处理方法
+                    chart.dragEnterEvent = lambda event, r=row, c=col: self._on_chart_drag_enter(event, r, c, chart)
+                    chart.dropEvent = lambda event, r=row, c=col: self._on_chart_drop(event, r, c, chart)
+
                     chart_row.append({
                         'chart': chart,
                         'frame': chart_frame,
                         'title': title_label,
-                        'combo': stock_combo,
+                        'drag_hint': drag_hint,
                         'stock_code': None
                     })
 
@@ -239,13 +262,82 @@ class MultiChartPanel(QWidget):
             # 设置到滚动区域
             self.multi_container.setWidget(multi_widget)
 
-            # 更新股票下拉框
-            self.update_stock_combos()
-
             self.logger.debug(f"多屏模式设置完成，网格大小: {rows}x{cols}")
 
         except Exception as e:
             self.logger.error(f"设置多屏模式失败: {e}")
+
+    def _on_chart_drag_enter(self, event, row, col, chart):
+        """处理图表拖拽进入事件"""
+        try:
+            # 检查是否包含股票代码
+            if event.mimeData().hasText() or event.mimeData().hasFormat("application/x-stock-code"):
+                event.acceptProposedAction()
+            else:
+                # 调用原始方法处理其他类型的拖拽
+                if hasattr(chart, '_original_dragEnterEvent'):
+                    chart._original_dragEnterEvent(event)
+        except Exception as e:
+            self.logger.error(f"处理图表拖拽进入事件失败: {e}")
+
+    def _on_multi_chart_clicked(self, event, row, col):
+        """处理多屏模式下的图表点击事件"""
+        try:
+            if row < len(self.chart_widgets) and col < len(self.chart_widgets[row]):
+                chart_info = self.chart_widgets[row][col]
+                if chart_info['stock_code']:
+                    self.stock_selected.emit(chart_info['stock_code'])
+        except Exception as e:
+            self.logger.error(f"处理多屏图表点击事件失败: {e}")
+
+    def _on_chart_drop(self, event, row, col, chart):
+        """处理图表拖拽释放事件"""
+        try:
+            # 解析拖拽数据
+            stock_code = None
+            stock_name = ""
+
+            # 尝试从自定义MIME类型获取
+            if event.mimeData().hasFormat("application/x-stock-code"):
+                stock_code = bytes(event.mimeData().data("application/x-stock-code")).decode("utf-8")
+                if event.mimeData().hasFormat("application/x-stock-name"):
+                    stock_name = bytes(event.mimeData().data("application/x-stock-name")).decode("utf-8")
+
+            # 如果自定义MIME类型获取失败，尝试从文本获取
+            if not stock_code and event.mimeData().hasText():
+                text = event.mimeData().text().strip()
+                parts = text.split()
+                if parts:
+                    stock_code = parts[0]
+                    if len(parts) > 1:
+                        stock_name = " ".join(parts[1:])
+
+            if stock_code:
+                chart_info = self.chart_widgets[row][col]
+
+                # 更新图表标题，显示股票代码和名称
+                if stock_name:
+                    chart_info['title'].setText(f"{stock_code} {stock_name}")
+                else:
+                    chart_info['title'].setText(f"{stock_code}")
+
+                # 隐藏拖拽提示
+                if 'drag_hint' in chart_info:
+                    chart_info['drag_hint'].setVisible(False)
+
+                # 更新图表数据
+                self.update_chart_data(row, col, stock_code)
+
+                event.acceptProposedAction()
+            else:
+                # 调用原始方法处理其他类型的拖拽
+                if hasattr(chart, '_original_dropEvent'):
+                    chart._original_dropEvent(event)
+
+        except Exception as e:
+            self.logger.error(f"处理图表拖拽释放事件失败: {e}")
+            if hasattr(chart, '_original_dropEvent'):
+                chart._original_dropEvent(event)
 
     def toggle_mode(self):
         """切换显示模式"""
@@ -290,25 +382,6 @@ class MultiChartPanel(QWidget):
         except Exception as e:
             self.logger.error(f"更改网格大小失败: {e}")
 
-    def on_chart_stock_changed(self, row: int, col: int, stock_code: str):
-        """图表股票选择改变事件"""
-        try:
-            if not stock_code or stock_code == "请选择股票":
-                return
-
-            if row < len(self.chart_widgets) and col < len(self.chart_widgets[row]):
-                chart_info = self.chart_widgets[row][col]
-                chart_info['stock_code'] = stock_code
-                chart_info['title'].setText(f"{stock_code}")
-
-                # 更新图表数据
-                self.update_chart_data(row, col, stock_code)
-
-                self.logger.debug(f"图表 {row}-{col} 股票已更改为: {stock_code}")
-
-        except Exception as e:
-            self.logger.error(f"更改图表股票失败: {e}")
-
     def auto_fill_multi_charts(self):
         """自动填充多屏图表"""
         try:
@@ -321,10 +394,23 @@ class MultiChartPanel(QWidget):
                     if stock_index < len(self.stock_list):
                         stock = self.stock_list[stock_index]
                         stock_code = stock.get('code', '')
+                        stock_name = stock.get('name', '')
 
                         if stock_code:
                             chart_info = self.chart_widgets[row][col]
-                            chart_info['combo'].setCurrentText(stock_code)
+
+                            # 更新标题显示股票代码和名称
+                            if stock_name:
+                                chart_info['title'].setText(f"{stock_code} {stock_name}")
+                            else:
+                                chart_info['title'].setText(f"{stock_code}")
+
+                            # 隐藏拖拽提示
+                            if 'drag_hint' in chart_info:
+                                chart_info['drag_hint'].setVisible(False)
+
+                            # 更新图表数据
+                            self.update_chart_data(row, col, stock_code)
 
                         stock_index += 1
                     else:
@@ -345,10 +431,13 @@ class MultiChartPanel(QWidget):
                 for row in range(len(self.chart_widgets)):
                     for col in range(len(self.chart_widgets[row])):
                         chart_info = self.chart_widgets[row][col]
-                        chart_info['combo'].setCurrentIndex(0)
                         chart_info['chart'].clear()
                         chart_info['title'].setText(f"图表 {row+1}-{col+1}")
                         chart_info['stock_code'] = None
+
+                        # 显示拖拽提示
+                        if 'drag_hint' in chart_info:
+                            chart_info['drag_hint'].setVisible(True)
             else:
                 if self.single_chart:
                     self.single_chart.clear()
@@ -358,30 +447,10 @@ class MultiChartPanel(QWidget):
         except Exception as e:
             self.logger.error(f"清空图表失败: {e}")
 
-    def update_chart_data(self, row: int, col: int, stock_code: str):
-        """更新指定图表的数据"""
-        try:
-            if not self.data_manager:
-                return
-
-            chart_info = self.chart_widgets[row][col]
-            chart = chart_info['chart']
-
-            # 获取K线数据
-            kdata = self.data_manager.get_kdata(stock_code)
-            if kdata is not None and not kdata.empty:
-                # 更新图表
-                chart.update_chart(kdata, self.current_indicators)
-                self.chart_updated.emit(stock_code, {'kdata': kdata})
-
-        except Exception as e:
-            self.logger.error(f"更新图表数据失败: {e}")
-
     def set_stock_list(self, stock_list: List[Dict[str, Any]]):
         """设置股票列表"""
         try:
             self.stock_list = stock_list or []
-            self.update_stock_combos()
             self.logger.debug(f"股票列表已更新，共 {len(self.stock_list)} 只股票")
         except Exception as e:
             self.logger.error(f"设置股票列表失败: {e}")
@@ -416,33 +485,87 @@ class MultiChartPanel(QWidget):
         except Exception as e:
             self.logger.error(f"设置技术指标失败: {e}")
 
-    def update_stock_combos(self):
-        """更新股票下拉框选项"""
+    def update_chart_data(self, row: int, col: int, stock_code: str):
+        """更新指定图表的数据"""
         try:
-            if not self.is_multi or not self.chart_widgets:
+            if not self.data_manager:
+                self.logger.error("数据管理器未初始化，无法更新图表")
                 return
 
-            stock_items = ["请选择股票"]
-            for stock in self.stock_list:
-                code = stock.get('code', '')
-                name = stock.get('name', '')
-                if code:
-                    display_text = f"{code} {name}" if name else code
-                    stock_items.append(display_text.split()[0])  # 只保留代码部分
+            chart_info = self.chart_widgets[row][col]
+            chart = chart_info['chart']
 
-            for row in range(len(self.chart_widgets)):
-                for col in range(len(self.chart_widgets[row])):
-                    combo = self.chart_widgets[row][col]['combo']
-                    current_text = combo.currentText()
-                    combo.clear()
-                    combo.addItems(stock_items)
+            # 获取K线数据
+            kdata = self._get_kdata_from_manager(stock_code)
+            if kdata is not None and not kdata.empty:
+                # 保存股票代码到chart_info
+                chart_info['stock_code'] = stock_code
 
-                    # 恢复之前的选择
-                    if current_text in stock_items:
-                        combo.setCurrentText(current_text)
+                # 构建正确的数据格式传递给update_chart
+                chart_data = {
+                    'kdata': kdata,
+                    'stock_code': stock_code
+                }
+
+                # 添加指标数据（如果有）
+                if self.current_indicators:
+                    chart_data['indicators'] = self.current_indicators
+
+                # 更新图表
+                self.logger.info(f"更新图表 [{row}][{col}] 股票代码: {stock_code}, 数据行数: {len(kdata)}")
+                chart.update_chart(chart_data)
+                self.chart_updated.emit(stock_code, {'kdata': kdata})
+            else:
+                self.logger.warning(f"获取股票 {stock_code} 的K线数据失败或数据为空")
+                chart_info['title'].setText(f"{stock_code} (无数据)")
 
         except Exception as e:
-            self.logger.error(f"更新股票下拉框失败: {e}")
+            self.logger.error(f"更新图表数据失败: {e}", exc_info=True)
+
+    def _get_kdata_from_manager(self, stock_code: str):
+        """从数据管理器获取K线数据，适配不同类型的数据管理器"""
+        try:
+            # 检查数据管理器类型
+            manager_type = self.data_manager.__class__.__name__
+            self.logger.info(f"数据管理器类型: {manager_type}")
+
+            # 如果是UnifiedDataManager
+            if manager_type == 'UnifiedDataManager':
+                # 尝试从服务容器中获取StockService
+                from core.containers import get_service_container
+                from core.services.stock_service import StockService
+
+                container = get_service_container()
+                if container:
+                    stock_service = container.resolve(StockService)
+                    if stock_service:
+                        return stock_service.get_stock_data(stock_code, 'D', 365)
+
+                self.logger.warning("无法从UnifiedDataManager获取数据，尝试其他方法")
+                return None
+
+            # 如果数据管理器有get_kdata方法
+            elif hasattr(self.data_manager, 'get_kdata'):
+                return self.data_manager.get_kdata(stock_code)
+
+            # 如果数据管理器有get_stock_data方法
+            elif hasattr(self.data_manager, 'get_stock_data'):
+                # 注意：这个方法可能是异步的，这里简单处理
+                import asyncio
+                try:
+                    # 尝试使用同步方式调用异步方法
+                    loop = asyncio.get_event_loop()
+                    return loop.run_until_complete(self.data_manager.get_stock_data(stock_code, 'D'))
+                except:
+                    # 如果失败，尝试直接调用（可能不是异步方法）
+                    return self.data_manager.get_stock_data(stock_code, 'D')
+
+            self.logger.error(f"数据管理器 {manager_type} 没有可用的获取K线数据的方法")
+            return None
+
+        except Exception as e:
+            self.logger.error(f"从数据管理器获取K线数据失败: {e}", exc_info=True)
+            return None
 
     def parse_grid_size(self, grid_text: str) -> tuple:
         """解析网格大小文本"""

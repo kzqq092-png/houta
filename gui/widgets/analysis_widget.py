@@ -64,78 +64,6 @@ ALL_PATTERN_TYPES = [
 # 使用统一的管理器工厂
 
 
-class UpdateThrottler:
-    """更新节流器 - 控制更新频率，避免过于频繁的重绘"""
-
-    def __init__(self, min_interval_ms: int = 100):
-        """
-        Args:
-            min_interval_ms: 最小更新间隔（毫秒）
-        """
-        self.min_interval_ms = min_interval_ms
-        self.last_update_time = 0
-        self.pending_updates = {}  # 待处理的更新
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self._process_pending_updates)
-        self.update_timer.setSingleShot(True)
-
-    def request_update(self, update_id: str, update_func: Callable, *args, **kwargs):
-        """请求更新
-
-        Args:
-            update_id: 更新标识符
-            update_func: 更新函数
-            *args, **kwargs: 函数参数
-        """
-        current_time = time.time() * 1000  # 转换为毫秒
-
-        # 存储待处理的更新
-        self.pending_updates[update_id] = {
-            'func': update_func,
-            'args': args,
-            'kwargs': kwargs,
-            'timestamp': current_time
-        }
-
-        # 检查是否可以立即执行
-        if current_time - self.last_update_time >= self.min_interval_ms:
-            self._process_pending_updates()
-        else:
-            # 延迟执行
-            remaining_time = self.min_interval_ms - \
-                (current_time - self.last_update_time)
-            if not self.update_timer.isActive():
-                self.update_timer.start(int(remaining_time))
-
-    def _process_pending_updates(self):
-        """处理待处理的更新"""
-        if not self.pending_updates:
-            return
-
-        current_time = time.time() * 1000
-        self.last_update_time = current_time
-
-        # 执行所有待处理的更新
-        updates_to_process = list(self.pending_updates.items())
-        self.pending_updates.clear()
-
-        for update_id, update_info in updates_to_process:
-            try:
-                update_info['func'](*update_info['args'],
-                                    **update_info['kwargs'])
-            except Exception as e:
-                print(f"更新执行失败 {update_id}: {str(e)}")
-
-    def cancel_update(self, update_id: str):
-        """取消指定的更新"""
-        self.pending_updates.pop(update_id, None)
-
-    def cancel_all_updates(self):
-        """取消所有待处理的更新"""
-        self.pending_updates.clear()
-        self.update_timer.stop()
-
-
 class AnalysisWidget(QWidget):
     """重构后的分析控件类 - 使用模块化标签页组件"""
 
@@ -161,8 +89,7 @@ class AnalysisWidget(QWidget):
         self.log_manager = get_log_manager()
 
         # 初始化更新节流器
-        self.update_throttler = UpdateThrottler(
-            min_interval_ms=150)  # 最小150ms间隔
+        self.update_throttler = get_update_throttler()
 
         # 图表更新防抖
         self.chart_update_timer = QTimer()

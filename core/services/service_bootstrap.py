@@ -87,6 +87,12 @@ class ServiceBootstrap:
             type(self.event_bus), self.event_bus)
         logger.info("✓ 事件总线注册完成")
 
+        # 注册 ConfigManager
+        from utils.config_manager import ConfigManager
+        config_manager = ConfigManager()
+        self.service_container.register_instance(ConfigManager, config_manager)
+        logger.info("✓ ConfigManager 注册完成")
+
         # 注册配置服务
         config_service = ConfigService(config_file='config/config.json')
         config_service.initialize()

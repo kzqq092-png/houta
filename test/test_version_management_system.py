@@ -383,7 +383,7 @@ def generate_test_report():
 
 
 if __name__ == "__main__":
-    print("HIkyuu-UI 版本管理系统综合测试")
+    print("YS-Quant‌ 版本管理系统综合测试")
     print("=" * 60)
 
     try:

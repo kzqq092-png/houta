@@ -126,7 +126,7 @@ class PerformanceMonitor:
     4. 生成性能报告
     """
 
-    def __init__(self, auto_tune: bool = True, monitor_interval: int = 60):
+    def __init__(self, auto_tune: bool = True, monitor_interval: int = 180):
         """
         初始化性能监控器
 
@@ -467,9 +467,9 @@ class PerformanceMonitor:
 
         old_value = state.value
         if state.direction == TuningDirection.INCREASE:
-            state.value = min(old_value + step, 10000)  # 上限10000
+            state.value = min(old_value + step, 100000)  # 上限10000
         else:  # DECREASE
-            state.value = max(old_value - step, 100)  # 下限100
+            state.value = max(old_value - step, 1000)  # 下限100
 
         if old_value != state.value:
             state.last_metric = memory_usage

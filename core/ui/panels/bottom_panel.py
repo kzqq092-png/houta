@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QPushButton, QComboBox, QLabel,
     QSplitter, QFrame, QCheckBox, QSpinBox
 )
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QTextCursor
 
 from .base_panel import BasePanel
@@ -32,6 +32,9 @@ class LogHandler(logging.Handler):
 
 class LogWidget(QTextEdit):
     """日志显示组件"""
+
+    # 添加信号用于线程安全的日志追加
+    log_appended = pyqtSignal(str, str)  # 参数: formatted_msg, level
 
     def __init__(self):
         super().__init__()
@@ -57,10 +60,20 @@ class LogWidget(QTextEdit):
             'CRITICAL': '#8B0000'
         }
 
+        # 连接信号到槽
+        self.log_appended.connect(self._append_log_safe)
+
     def append_log(self, message: str, level: str = 'INFO'):
-        """添加日志消息"""
+        """添加日志消息 - 线程安全版本，通过信号/槽机制确保在主线程中执行"""
         color = self.level_colors.get(level, '#000000')
         formatted_msg = f'<span style="color: {color};">[{level}] {message}</span>'
+        # 发射信号而不是直接操作UI
+        self.log_appended.emit(formatted_msg, level)
+
+    @pyqtSlot(str, str)
+    def _append_log_safe(self, formatted_msg: str, level: str):
+        """在主线程中安全地追加日志 - 由信号触发"""
+        # 追加格式化的消息
         self.append(formatted_msg)
 
         # 自动滚动到底部
@@ -212,7 +225,7 @@ class BottomPanel(BasePanel):
     def _add_welcome_logs(self):
         """添加欢迎日志"""
         logger = logging.getLogger(__name__)
-        logger.info("HIkyuu-UI 2.0 系统启动成功")
+        logger.info("YS-Quant‌ 2.0 系统启动成功")
         logger.info("日志系统已初始化")
         logger.debug("调试模式已启用")
 

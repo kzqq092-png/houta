@@ -1,8 +1,8 @@
-# HIkyuu-UI 2.0 开发使用文档
+# YS-Quant‌ 2.0 开发使用文档
 
 ## 项目概述
 
-HIkyuu-UI 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用现代化的模块化架构设计，提供完整的股票分析、形态识别、策略回测、优化系统等功能。
+YS-Quant‌ 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用现代化的模块化架构设计，提供完整的股票分析、形态识别、策略回测、优化系统等功能。
 
 ### 核心特性
 
@@ -18,7 +18,7 @@ HIkyuu-UI 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用�
 ### 目录结构
 
 ```
-hikyuu-ui/
+YS-Quant‌/
 ├── core/                    # 核心模块
 │   ├── services/           # 服务层
 │   ├── coordinators/       # 协调器
@@ -328,7 +328,7 @@ from core.services.cloud_api_service import CloudAPIService, CloudConfig
 
 # 配置云端服务
 config = CloudConfig(
-    api_url='https://api.hikyuu-ui.com',
+    api_url='https://api.YS-Quant‌.com',
     api_key='your_api_key',
     secret_key='your_secret_key'
 )
@@ -716,8 +716,8 @@ pip install -r requirements.txt
 
 1. **克隆项目**:
 ```bash
-git clone https://github.com/your-repo/hikyuu-ui.git
-cd hikyuu-ui
+git clone https://github.com/your-repo/YS-Quant‌.git
+cd YS-Quant‌
 ```
 
 2. **安装依赖**:
@@ -801,7 +801,7 @@ def calculate_indicators(self, kdata: pd.DataFrame, indicators: List[str]) -> Di
 **使用自定义异常**:
 ```python
 class HIkyuuUIException(Exception):
-    """HIkyuu-UI基础异常"""
+    """YS-Quant‌基础异常"""
     pass
 
 class DataValidationError(HIkyuuUIException):
@@ -1025,11 +1025,92 @@ A:
 
 ## 联系方式
 
-- **项目主页**: https://github.com/your-repo/hikyuu-ui
-- **文档网站**: https://docs.hikyuu-ui.com
-- **问题反馈**: https://github.com/your-repo/hikyuu-ui/issues
-- **讨论社区**: https://community.hikyuu-ui.com
+- **项目主页**: https://github.com/your-repo/YS-Quant‌
+- **文档网站**: https://docs.YS-Quant‌.com
+- **问题反馈**: https://github.com/your-repo/YS-Quant‌/issues
+- **讨论社区**: https://community.YS-Quant‌.com
 
 ---
 
 **版权声明**: 本文档遵循 MIT 许可证，详见 LICENSE 文件。
+
+## 异步环境下日志与性能监控最佳实践
+
+### 1. 异步任务日志上下文与异常捕获
+- 在async/await、线程池、QThread等异步环境中，日志应包含trace_id、request_id等上下文信息，便于跨线程追踪。
+- 异步任务中所有异常必须被try...except捕获，并通过logger.error记录详细堆栈。
+
+**示例：**
+```python
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def async_task(trace_id=None):
+    try:
+        # ... 异步逻辑 ...
+        logger.info(f"[trace_id={trace_id}] 异步任务开始")
+        await asyncio.sleep(1)
+    except Exception as e:
+        logger.error(f"[trace_id={trace_id}] 异步任务异常: {e}", exc_info=True)
+
+# 调用时传递trace_id
+asyncio.run(async_task(trace_id="abc123"))
+```
+
+### 2. 异步函数性能监控装饰器用法
+- 推荐在所有高耗时异步函数、回调、数据处理等环节加性能监控装饰器。
+- 支持同步与异步函数的统一监控。
+
+**示例：**
+```python
+from utils.performance_monitor import measure_performance
+
+@measure_performance("async_data_load")
+async def load_data_async():
+    # ... 异步数据加载 ...
+    pass
+```
+
+### 3. 主线程与异步线程日志合并与追踪ID设计
+- 日志格式建议统一包含trace_id、request_id等字段。
+- 日志处理器可用logging.Filter或上下文变量自动注入追踪信息。
+- 合并日志时可用多文件Handler或集中式日志系统。
+
+**示例：**
+```python
+import logging
+import contextvars
+
+trace_id_var = contextvars.ContextVar('trace_id', default='')
+
+class TraceIdFilter(logging.Filter):
+    def filter(self, record):
+        record.trace_id = trace_id_var.get()
+        return True
+
+logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(levelname)s [trace_id=%(trace_id)s] %(message)s')
+handler.setFormatter(formatter)
+handler.addFilter(TraceIdFilter())
+logger.addHandler(handler)
+
+# 在主线程和异步任务中设置trace_id
+trace_id_var.set('main-xyz')
+logger.info('主线程日志')
+
+async def async_func():
+    trace_id_var.set('async-abc')
+    logger.info('异步日志')
+```
+
+### 4. 典型问题与建议
+- 避免在主线程直接执行耗时操作，所有IO/计算密集型任务应异步或线程池处理。
+- 异步回调/信号中如需UI更新，务必用QMetaObject.invokeMethod或QTimer.singleShot切回主线程。
+- 日志与性能监控建议定期归档、分析，发现瓶颈及时优化。
+
+---
+
+如需更多异步编程、日志与性能监控的最佳实践，请参考[Python官方文档](https://docs.python.org/3/howto/logging-cookbook.html)和[asyncio官方文档](https://docs.python.org/3/library/asyncio.html)。

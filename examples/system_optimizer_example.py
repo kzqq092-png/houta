@@ -2,7 +2,7 @@
 """
 系统优化器使用示例
 
-展示如何在HIkyuu-UI中使用系统优化器的各种功能
+展示如何在YS-Quant‌中使用系统优化器的各种功能
 """
 
 from gui.panels.system_optimizer_panel import SystemOptimizerPanel
@@ -24,7 +24,7 @@ class SystemOptimizerExample(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HIkyuu-UI 系统优化器示例")
+        self.setWindowTitle("YS-Quant‌ 系统优化器示例")
         self.setGeometry(100, 100, 1000, 700)
 
         # 创建中央窗口
@@ -139,13 +139,13 @@ class SystemOptimizerExample(QMainWindow):
 
 def main():
     """主函数"""
-    print("HIkyuu-UI 系统优化器示例")
+    print("YS-Quant‌ 系统优化器示例")
     print("=" * 40)
 
     app = QApplication(sys.argv)
 
     # 设置应用程序属性
-    app.setApplicationName("HIkyuu-UI System Optimizer Example")
+    app.setApplicationName("YS-Quant‌ System Optimizer Example")
     app.setApplicationVersion("1.0")
 
     # 创建主窗口

@@ -256,7 +256,7 @@ def test_chart_integration():
 
 def main():
     """主测试函数"""
-    print("🔧 HIkyuu-UI 综合修复测试")
+    print("🔧 YS-Quant‌ 综合修复测试")
     print("=" * 50)
 
     tests = [

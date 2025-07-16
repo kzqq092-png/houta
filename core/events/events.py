@@ -39,13 +39,19 @@ class StockSelectedEvent(BaseEvent):
     stock_code: str = ""
     stock_name: str = ""
     market: str = ""
+    period: str = ""        # 周期：日线、周线、月线等
+    time_range: str = ""    # 时间范围：最近7天、最近30天等
+    chart_type: str = ""    # 图表类型：K线图、分时图等
 
     def __post_init__(self):
         super().__post_init__()
         self.data.update({
             'stock_code': self.stock_code,
             'stock_name': self.stock_name,
-            'market': self.market
+            'market': self.market,
+            'period': self.period,
+            'time_range': self.time_range,
+            'chart_type': self.chart_type
         })
 
 
@@ -215,4 +221,30 @@ class UIDataReadyEvent(BaseEvent):
     当Coordinator准备好所有UI所需的数据时触发。
     这个事件携带了用于更新UI的完整数据包，避免了各个面板的重复加载。
     """
-    pass
+    ui_data: Dict[str, Any] = field(default_factory=dict)
+    stock_code: str = ""
+    stock_name: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'ui_data': self.ui_data,
+            'stock_code': self.stock_code,
+            'stock_name': self.stock_name
+        })
+
+
+@dataclass
+class MultiScreenToggleEvent(BaseEvent):
+    """
+    多屏模式切换事件
+
+    当系统在单屏模式和多屏模式之间切换时触发。
+    """
+    is_multi_screen: bool = False
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'is_multi_screen': self.is_multi_screen
+        })

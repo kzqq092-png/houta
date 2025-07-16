@@ -1,4 +1,4 @@
-# HIkyuu-UI 2.0 功能与UI组件对应检查报告
+# YS-Quant‌ 2.0 功能与UI组件对应检查报告
 
 ## 📋 检查概述
 
@@ -185,7 +185,7 @@ def _launch_optimization_dashboard(self):
 
 ## ✅ 结论
 
-HIkyuu-UI 2.0 系统中，`quick_start.py` 提到的所有主要功能都有对应的UI组件已经实现并正确集成到系统中。主要的UI组件包括：
+YS-Quant‌ 2.0 系统中，`quick_start.py` 提到的所有主要功能都有对应的UI组件已经实现并正确集成到系统中。主要的UI组件包括：
 
 1. **完整的对话框系统** (26个专业对话框)
 2. **优化仪表板** (独立的PyQt5应用)

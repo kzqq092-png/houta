@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HIkyuu-UI 主程序入口
+YS-Quant‌ 主程序入口
 
 使用重构后的架构：
 - 主窗口协调器 (MainWindowCoordinator)
@@ -9,7 +9,7 @@ HIkyuu-UI 主程序入口
 - 模块化UI面板
 
 版本: 2.0 (重构版本)
-作者: HIkyuu-UI Team
+作者: YS-Quant‌ Team
 """
 
 from optimization.chart_renderer import initialize_chart_renderer
@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 class HIkyuuUIApplication:
     """
-    HIkyuu-UI 应用程序主类
+    YS-Quant‌ 应用程序主类
 
     负责：
     1. 应用程序初始化
@@ -86,7 +86,7 @@ class HIkyuuUIApplication:
         """
         try:
             logger.info("=" * 60)
-            logger.info("HIkyuu-UI 2.0 (重构版本) 启动中...")
+            logger.info("YS-Quant‌ 2.0 (重构版本) 启动中...")
             logger.info("=" * 60)
 
             # 1. 创建Qt应用程序
@@ -108,7 +108,7 @@ class HIkyuuUIApplication:
             # 6. 创建主窗口协调器
             self._create_main_window()
 
-            logger.info("✓ HIkyuu-UI 2.0 初始化完成")
+            logger.info("✓ YS-Quant‌ 2.0 初始化完成")
             return True
 
         except Exception as e:
@@ -127,7 +127,7 @@ class HIkyuuUIApplication:
 
         # 创建应用程序实例
         self.app = QApplication(sys.argv)
-        self.app.setApplicationName("HIkyuu-UI")
+        self.app.setApplicationName("YS-Quant‌")
         self.app.setApplicationVersion("2.0")
         self.app.setOrganizationName("HIkyuu Team")
 

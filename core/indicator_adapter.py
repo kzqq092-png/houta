@@ -6,11 +6,13 @@
 用于将旧的指标计算接口适配到新的指标计算服务
 """
 
-from core.indicator_service import (
+from core.unified_indicator_service import (
+    get_unified_service,
     calculate_indicator,
     get_indicator_metadata,
     get_all_indicators_metadata,
-    get_indicators_by_category
+    get_indicators_by_category,
+    INDICATOR_ALIASES
 )
 from core.indicators.library import *
 import os
@@ -36,32 +38,64 @@ if not logger.handlers:
 
 def get_indicator_english_name(name: str) -> str:
     """
-    获取指标英文名称
+    根据中文指标名称获取英文名称
 
-    参数:
-        name: 指标名称（可能是中文或英文）
+    Args:
+        name: 中文指标名称
 
-    返回:
-        str: 指标英文名称
+    Returns:
+        英文指标名称
     """
-    # 获取指标元数据
-    metadata = get_indicator_metadata(name)
-
-    # 如果指标不存在，尝试查找中文名匹配的指标
-    if not metadata:
-        # 获取所有指标元数据
+    try:
         all_metadata = get_all_indicators_metadata()
 
-        # 查找display_name匹配的指标
-        for indicator_name, indicator_metadata in all_metadata.items():
-            if indicator_metadata.get('display_name') == name:
-                return indicator_name
+        # 检查metadata的数据类型
+        if isinstance(all_metadata, list):
+            # 如果是列表格式（来自unified_indicator_service）
+            for indicator_metadata in all_metadata:
+                if indicator_metadata.get('display_name') == name or indicator_metadata.get('name') == name:
+                    return indicator_metadata.get('english_name', name)
+        elif isinstance(all_metadata, dict):
+            # 如果是字典格式（来自indicator_service）
+            for indicator_name, indicator_metadata in all_metadata.items():
+                if indicator_metadata.get('display_name') == name:
+                    return indicator_name
+        else:
+            print(f"警告：unexpected metadata type: {type(all_metadata)}")
 
-        # 如果没有找到匹配的指标，返回原名称
+        # 如果没有找到匹配的指标，尝试直接映射
+        name_mapping = {
+            "移动平均线": "MA",
+            "指数移动平均": "EMA",
+            "布林带": "BBANDS",
+            "相对强弱指标": "RSI",
+            "随机指标": "STOCH",
+            "MACD指标": "MACD",
+            "指数平滑异同移动平均线": "MACD",
+            "威廉指标": "WILLR",
+            "平均方向指数": "ADX",
+            "商品通道指数": "CCI",
+            "动量指标": "MOM",
+            "变动率": "ROC",
+            "平均真实范围": "ATR"
+        }
+
+        if name in name_mapping:
+            return name_mapping[name]
+
+        # 如果仍然没有找到，返回原名称
         return name
 
-    # 返回指标英文名称（即指标ID）
-    return metadata.get('name', name)
+    except Exception as e:
+        print(f"获取指标英文名称失败: {e}")
+        # 使用备用映射
+        backup_mapping = {
+            "移动平均线": "MA",
+            "相对强弱指标": "RSI",
+            "布林带": "BBANDS",
+            "MACD指标": "MACD"
+        }
+        return backup_mapping.get(name, name)
 
 
 def calc_talib_indicator(name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
@@ -313,23 +347,55 @@ def calc_cci(df: pd.DataFrame, n=14) -> pd.Series:
         return pd.Series([float('nan')] * len(df), index=df.index, name=f"CCI{n}")
 
 
-def get_talib_indicator_list() -> list:
+def get_talib_indicator_list() -> List[str]:
     """
-    获取所有支持的指标名称列表，兼容旧的 get_talib_indicator_list 接口
+    获取TA-Lib指标列表
 
     返回:
-        List[str]: 指标名称列表
+        List[str]: TA-Lib指标名称列表
     """
-    # 获取所有指标的元数据
-    all_metadata = get_all_indicators_metadata()
+    try:
+        # 尝试从新的指标系统获取
+        all_metadata = get_all_indicators_metadata()
 
-    # 返回指标名称列表
-    return list(all_metadata.keys())
+        # 检查返回的数据类型
+        if isinstance(all_metadata, list):
+            # 如果是列表格式（来自统一指标服务）
+            # 获取技术指标，排除形态类
+            talib_indicators = []
+            for item in all_metadata:
+                if item.get('is_builtin', True):
+                    # 通过分类判断是否为形态指标
+                    category = item.get('category', item.get('category_name', ''))
+                    if category != '形态类':
+                        indicator_name = item.get('display_name', item.get('name', ''))
+                        if indicator_name:
+                            talib_indicators.append(indicator_name)
+        elif isinstance(all_metadata, dict):
+            # 如果是字典格式（来自旧指标服务）
+            talib_indicators = [name for name, meta in all_metadata.items()
+                                if meta.get('is_builtin', True)]
+        else:
+            talib_indicators = []
+
+        if talib_indicators:
+            return sorted(talib_indicators)
+
+        # 如果没有获取到，返回默认列表
+        logger.warning("未获取到TA-Lib指标，使用默认列表")
+        return [
+            'MA', 'EMA', 'MACD', 'RSI', 'BBANDS', 'KDJ', 'CCI', 'ATR', 'OBV',
+            'STOCH', 'WILLR', 'ROC', 'MOM', 'ADX', 'SAR', 'TRIX', 'MFI'
+        ]
+
+    except Exception as e:
+        logger.error(f"获取TA-Lib指标列表失败: {e}")
+        return ['MA', 'EMA', 'MACD', 'RSI', 'BBANDS']
 
 
-def get_talib_category(name: str) -> str:
+def get_indicator_category_by_name(name: str) -> str:
     """
-    获取指标分类，兼容旧的 get_talib_category 接口
+    根据指标名称获取指标分类
 
     参数:
         name: 指标名称
@@ -360,64 +426,124 @@ def get_talib_category(name: str) -> str:
     return category_map.get(category_id, "其他")
 
 
-def get_talib_chinese_name(name: str) -> str:
+def get_talib_chinese_name(english_name: str) -> str:
     """
-    获取指标中文名称，兼容旧的 get_talib_chinese_name 接口
+    获取TA-Lib指标的中文名称
 
     参数:
-        name: 指标名称
+        english_name: 指标英文名称
 
     返回:
         str: 指标中文名称
     """
     # 获取指标元数据
-    metadata = get_indicator_metadata(name)
+    metadata = get_indicator_metadata(english_name)
 
-    # 如果指标不存在，返回原名称
-    if not metadata:
-        return name
+    if metadata and 'display_name' in metadata:
+        return metadata['display_name']
 
-    return metadata.get('display_name', name)
+    # 如果没有找到，使用默认映射
+    chinese_name_map = {
+        'MA': '移动平均线',
+        'EMA': '指数移动平均',
+        'MACD': 'MACD指标',
+        'RSI': '相对强弱指标',
+        'BBANDS': '布林带',
+        'KDJ': 'KDJ随机指标',
+        'CCI': '商品通道指标',
+        'ATR': '平均真实波幅',
+        'OBV': '能量潮指标',
+        'STOCH': '随机震荡指标',
+        'WILLR': '威廉指标',
+        'ROC': '变动率指标',
+        'MOM': '动量指标',
+        'ADX': '平均方向性指标',
+        'SAR': '抛物线指标',
+        'TRIX': 'TRIX指标',
+        'MFI': '资金流量指标',
+        'BOLL': '布林带',  # 别名
+        'SMA': '简单移动平均',
+        'WMA': '加权移动平均',
+        'DEMA': '双重指数移动平均',
+        'TEMA': '三重指数移动平均'
+    }
+
+    return chinese_name_map.get(english_name.upper(), english_name)
 
 
-def get_indicator_params_config(indicator_name: str) -> dict:
+def get_indicator_params_config(english_name: str) -> Optional[Dict[str, Any]]:
     """
     获取指标参数配置
 
     参数:
-        indicator_name: 指标名称
+        english_name: 指标英文名称
 
     返回:
-        dict: 参数配置字典
+        Dict[str, Any]: 指标参数配置，如果不存在则返回None
     """
-    # 获取指标元数据
-    metadata = get_indicator_metadata(indicator_name)
+    try:
+        # 获取指标元数据
+        metadata = get_indicator_metadata(english_name)
 
-    # 如果指标不存在，返回空配置
-    if not metadata:
-        return {"parameters": {}, "inputs": ["close"]}
+        if not metadata:
+            return None
 
-    # 从元数据中提取参数配置
-    params_config = {}
-    params = metadata.get('parameters', {})
+        # 构建参数配置
+        params_config = {}
+        parameters = metadata.get('parameters', [])
 
-    # 转换为旧格式
-    for param_name, param_info in params.items():
-        params_config[param_name] = {
-            "default": param_info.get('default'),
-            "min": param_info.get('min'),
-            "max": param_info.get('max'),
-            "step": param_info.get('step', 1),
-            "type": param_info.get('type', 'int')
+        for param in parameters:
+            if isinstance(param, dict):
+                param_name = param.get('name', '')
+                params_config[param_name] = {
+                    'desc': param.get('display_name', param_name),
+                    'default': param.get('default_value'),
+                    'min': param.get('min_value'),
+                    'max': param.get('max_value'),
+                    'type': param.get('type', 'int')
+                }
+
+        return {
+            'name': english_name,
+            'display_name': metadata.get('display_name', english_name),
+            'description': metadata.get('description', ''),
+            'params': params_config
         }
 
-    # 获取输入列
-    inputs = metadata.get('inputs', ["close"])
+    except Exception as e:
+        logger.error(f"获取指标 {english_name} 参数配置失败: {e}")
 
-    return {
-        "parameters": params_config,
-        "inputs": inputs
-    }
+        # 返回一些默认的参数配置
+        default_configs = {
+            'MA': {
+                'name': 'MA',
+                'display_name': '移动平均线',
+                'description': '简单移动平均线',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 20, 'min': 1, 'max': 200, 'type': 'int'}
+                }
+            },
+            'MACD': {
+                'name': 'MACD',
+                'display_name': 'MACD指标',
+                'description': '移动平均收敛发散指标',
+                'params': {
+                    'fastperiod': {'desc': '快速周期', 'default': 12, 'min': 1, 'max': 100, 'type': 'int'},
+                    'slowperiod': {'desc': '慢速周期', 'default': 26, 'min': 1, 'max': 100, 'type': 'int'},
+                    'signalperiod': {'desc': '信号周期', 'default': 9, 'min': 1, 'max': 50, 'type': 'int'}
+                }
+            },
+            'RSI': {
+                'name': 'RSI',
+                'display_name': '相对强弱指标',
+                'description': '相对强弱指标',
+                'params': {
+                    'timeperiod': {'desc': '周期', 'default': 14, 'min': 1, 'max': 100, 'type': 'int'}
+                }
+            }
+        }
+
+        return default_configs.get(english_name.upper())
 
 
 def get_indicator_default_params(indicator_name: str) -> dict:
@@ -435,8 +561,9 @@ def get_indicator_default_params(indicator_name: str) -> dict:
 
     # 提取默认值
     default_params = {}
-    for param_name, param_info in config.get("parameters", {}).items():
-        default_params[param_name] = param_info.get("default")
+    if config:
+        for param_name, param_info in config.get("params", {}).items():
+            default_params[param_name] = param_info.get("default")
 
     return default_params
 
@@ -527,3 +654,65 @@ def get_indicator_inputs(indicator_name: str) -> list:
 
     # 默认返回close
     return ['close']
+
+
+def get_all_indicators_by_category(use_chinese: bool = False) -> Dict[str, List[str]]:
+    """
+    获取按分类组织的所有指标列表，兼容旧接口
+
+    参数:
+        use_chinese: 是否使用中文分类名称
+
+    返回:
+        Dict[str, List[str]]: 分类名称到指标名称列表的映射
+    """
+    try:
+        # 使用统一服务
+        service = get_unified_service()
+        categories = service.get_all_categories()
+
+        result = {}
+        for category in categories:
+            category_key = category['display_name'] if use_chinese else category['name']
+            indicators = service.get_indicators_by_category(category['name'])
+            result[category_key] = [indicator['name'] for indicator in indicators]
+
+        # 如果没有获取到指标，返回默认分类
+        if not any(result.values()):
+            logger.warning("未获取到指标数据，使用默认指标分类")
+            if use_chinese:
+                return {
+                    "趋势类": ["MA", "EMA", "BBANDS", "SAR"],
+                    "震荡类": ["RSI", "MACD", "STOCH", "CCI", "WILLR"],
+                    "成交量类": ["OBV", "AD", "ADOSC"],
+                    "波动性类": ["ATR", "NATR", "TRANGE"],
+                    "其他": ["ROC", "MOM", "TRIX"]
+                }
+            else:
+                return {
+                    "trend": ["MA", "EMA", "BBANDS", "SAR"],
+                    "oscillator": ["RSI", "MACD", "STOCH", "CCI", "WILLR"],
+                    "volume": ["OBV", "AD", "ADOSC"],
+                    "volatility": ["ATR", "NATR", "TRANGE"],
+                    "other": ["ROC", "MOM", "TRIX"]
+                }
+
+        return result
+
+    except Exception as e:
+        logger.error(f"获取指标分类失败: {e}")
+        # 返回默认分类
+        if use_chinese:
+            return {
+                "趋势类": ["MA", "EMA", "MACD", "BBANDS"],
+                "震荡类": ["RSI", "KDJ", "CCI"],
+                "成交量类": ["OBV"],
+                "其他": ["ATR", "ROC"]
+            }
+        else:
+            return {
+                "trend": ["MA", "EMA", "MACD", "BBANDS"],
+                "oscillator": ["RSI", "KDJ", "CCI"],
+                "volume": ["OBV"],
+                "other": ["ATR", "ROC"]
+            }

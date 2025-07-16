@@ -27,7 +27,7 @@ class DataUsageTermsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 标题
-        title_label = QLabel("HIkyuu-UI 数据使用条款")
+        title_label = QLabel("YS-Quant‌ 数据使用条款")
         title_label.setStyleSheet("""
             QLabel {
                 font-size: 18px;
@@ -212,7 +212,7 @@ class DataUsageTermsDialog(QDialog):
     def get_default_terms(self) -> str:
         """获取默认使用条款"""
         return """
-        <h1>HIkyuu-UI 数据使用条款</h1>
+        <h1>YS-Quant‌ 数据使用条款</h1>
         
         <h2>数据使用声明</h2>
         
@@ -243,12 +243,12 @@ class DataUsageTermsDialog(QDialog):
         
         <h3>3. 免责声明</h3>
         <ul>
-            <li>HIkyuu-UI不保证所提供数据的准确性、完整性或时效性</li>
-            <li>HIkyuu-UI仅为数据分析工具，不构成投资建议</li>
+            <li>YS-Quant‌不保证所提供数据的准确性、完整性或时效性</li>
+            <li>YS-Quant‌仅为数据分析工具，不构成投资建议</li>
             <li>用户的投资决策应基于自己的判断，并承担相应风险</li>
         </ul>
         
-        <p><strong>重要提醒：</strong>使用HIkyuu-UI即表示您已阅读、理解并同意遵守本使用条款。</p>
+        <p><strong>重要提醒：</strong>使用YS-Quant‌即表示您已阅读、理解并同意遵守本使用条款。</p>
         """
 
     def on_checkbox_toggled(self, checked: bool):

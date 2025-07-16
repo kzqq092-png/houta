@@ -2,6 +2,7 @@
 技术分析标签页 - 增强版
 """
 import time
+import traceback
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
@@ -12,6 +13,11 @@ from .base_tab import BaseAnalysisTab
 from core.indicator_service import (
     calculate_indicator, get_all_indicators_metadata, get_indicator_metadata, get_indicator_categories, get_talib_category
 )
+from core.indicator_adapter import (
+    get_all_indicators_by_category, get_indicator_english_name, get_indicator_params_config,
+    get_talib_indicator_list, get_talib_chinese_name, get_indicator_category_by_name
+)
+from core.unified_indicator_service import UnifiedIndicatorService
 from core.logger import LogLevel
 from datetime import datetime
 import json
@@ -126,20 +132,33 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         control_layout.addWidget(indicator_card, stretch=2)
 
-        # 右侧：动态参数设置 - 根据选择的指标动态变化
+        # 右侧：动态参数设置 - 根据选择的指标动态变化，优化布局
         params_card = QFrame()
         params_card.setFrameStyle(QFrame.StyledPanel)
         params_card.setStyleSheet(
             "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; }")
-        self.params_layout = QVBoxLayout(params_card)
-        self.params_layout.setSpacing(2)  # 减少间距
+
+        # 使用滚动区域来确保所有参数都能显示
+        params_scroll_area = QScrollArea()
+        params_scroll_area.setWidgetResizable(True)
+        params_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        params_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        params_scroll_area.setFrameStyle(QFrame.NoFrame)
+
+        # 参数容器
+        params_container = QWidget()
+        self.params_layout = QVBoxLayout(params_container)
+        self.params_layout.setSpacing(4)  # 适当间距
+        self.params_layout.setContentsMargins(8, 8, 8, 8)
 
         # 参数预设 - 紧凑布局
         preset_layout = QHBoxLayout()
-        preset_layout.setSpacing(2)
+        preset_layout.setSpacing(4)
         preset_layout.addWidget(QLabel("预设:"))
         self.preset_combo = QComboBox()
-        self.preset_combo.setMaximumHeight(28)
+
+        self.preset_combo.setFixedWidth(100)
+        self.preset_combo.setMinimumHeight(28)
         self.preset_combo.addItems(["自定义", "短期交易", "中期投资", "长期投资"])
         self.preset_combo.currentTextChanged.connect(self.apply_preset_params)
         preset_layout.addWidget(self.preset_combo)
@@ -149,8 +168,31 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 动态参数区域
         self.dynamic_params_widget = QWidget()
         self.dynamic_params_layout = QVBoxLayout(self.dynamic_params_widget)
-        self.dynamic_params_layout.setSpacing(2)  # 减少间距
+        self.dynamic_params_layout.setSpacing(4)  # 适当间距
+        self.dynamic_params_layout.setContentsMargins(0, 0, 0, 0)
         self.params_layout.addWidget(self.dynamic_params_widget)
+
+        # 参数信息显示区域
+        info_group = QGroupBox("参数信息")
+        info_group.setMaximumHeight(120)
+        info_layout = QVBoxLayout(info_group)
+
+        self.param_info_label = QLabel("选择指标后显示参数说明")
+        self.param_info_label.setWordWrap(True)
+        self.param_info_label.setStyleSheet(
+            "QLabel { font-size: 11px; color: #6c757d; padding: 4px; background-color: #f8f9fa; border-radius: 4px; }")
+        info_layout.addWidget(self.param_info_label)
+
+        self.params_layout.addWidget(info_group)
+        self.params_layout.addStretch()  # 添加弹性空间
+
+        # 设置滚动区域
+        params_scroll_area.setWidget(params_container)
+
+        # 将滚动区域添加到主卡片
+        params_card_layout = QVBoxLayout(params_card)
+        params_card_layout.setContentsMargins(4, 4, 4, 4)
+        params_card_layout.addWidget(params_scroll_area)
 
         # 参数控件字典
         self.param_controls = {}
@@ -174,20 +216,74 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         results_group = QGroupBox("计算结果")
         results_layout = QVBoxLayout(results_group)
 
-        # 统计信息 - 紧凑布局
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(10)
+        # 统计信息和控制按钮 - 顶部工具栏
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(10)
+
+        # 统计信息
         self.stats_label = QLabel("统计信息: 无数据")
         self.stats_label.setStyleSheet(
             "QLabel { font-weight: bold; color: #495057; }")
-        stats_layout.addWidget(self.stats_label)
+        toolbar_layout.addWidget(self.stats_label)
 
         self.performance_label = QLabel("性能: 无统计")
         self.performance_label.setStyleSheet(
             "QLabel { font-weight: bold; color: #6c757d; }")
-        stats_layout.addWidget(self.performance_label)
-        stats_layout.addStretch()
-        results_layout.addLayout(stats_layout)
+        toolbar_layout.addWidget(self.performance_label)
+
+        toolbar_layout.addStretch()
+
+        # 筛选控制按钮
+        filter_group = QWidget()
+        filter_layout = QHBoxLayout(filter_group)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(5)
+
+        # 高级筛选按钮
+        self.advanced_filter_btn = QPushButton("🔍 高级筛选")
+        self.advanced_filter_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.advanced_filter_btn.clicked.connect(self.show_advanced_filter_dialog)
+        filter_layout.addWidget(self.advanced_filter_btn)
+
+        # 清除筛选按钮
+        self.clear_filter_btn = QPushButton("✖️ 清除筛选")
+        self.clear_filter_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #545b62;
+            }
+        """)
+        self.clear_filter_btn.clicked.connect(self.clear_table_filters)
+        self.clear_filter_btn.setEnabled(False)  # 初始状态禁用
+        filter_layout.addWidget(self.clear_filter_btn)
+
+        # 筛选状态标签
+        self.filter_status_label = QLabel("")
+        self.filter_status_label.setStyleSheet(
+            "QLabel { color: #28a745; font-weight: bold; }")
+        filter_layout.addWidget(self.filter_status_label)
+
+        toolbar_layout.addWidget(filter_group)
+
+        results_layout.addLayout(toolbar_layout)
 
         # 结果表格
         self.technical_table = QTableWidget(0, 8)  # 增加列数
@@ -248,29 +344,86 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         layout.addWidget(results_group)
 
     def populate_indicators(self, category: str):
-        """根据分类填充指标选择框"""
+        """根据分类填充指标选择框 - 增强版，整合形态数据"""
         self.indicator_combo.clear()
 
         try:
+            # 获取统一指标服务实例
+            unified_service = UnifiedIndicatorService()
+
             if category == "全部":
-                # 获取所有指标
+                # 获取所有技术指标
                 indicators = []
-                categories = get_indicator_categories()
-                for cat, inds in categories.items():
-                    indicators.extend(inds)
-                indicators.sort()
+                try:
+                    categories = get_all_indicators_by_category(use_chinese=True)
+                    for cat, inds in categories.items():
+                        if isinstance(inds, list):
+                            indicators.extend(inds)
+
+                    # 添加形态数据
+                    patterns = unified_service.get_all_patterns()
+                    for pattern in patterns:
+                        pattern_name = pattern.get('name', pattern.get('english_name', ''))
+                        if pattern_name and pattern_name not in indicators:
+                            indicators.append(pattern_name)
+
+                    indicators.sort()
+                    self.log_manager.info(f"加载所有指标和形态，共 {len(indicators)} 个")
+                except Exception as e:
+                    self.log_manager.error(f"获取所有指标失败: {e}")
+                    indicators = ["MA", "MACD", "RSI", "KDJ", "BOLL"]
+            elif category == "形态识别" or "形态" in category:
+                # 专门获取形态数据
+                try:
+                    patterns = unified_service.get_all_patterns()
+                    indicators = []
+                    for pattern in patterns:
+                        pattern_name = pattern.get('name', pattern.get('english_name', ''))
+                        if pattern_name:
+                            indicators.append(pattern_name)
+
+                    indicators.sort()
+                    self.log_manager.info(f"加载形态数据，共 {len(indicators)} 个形态")
+
+                    if not indicators:
+                        # 如果没有形态数据，添加一些默认形态提示
+                        indicators = ["锤头线", "十字星", "吞没形态", "三白兵"]
+                        self.log_manager.warning("数据库中没有形态数据，使用默认形态列表")
+                except Exception as e:
+                    self.log_manager.error(f"获取形态数据失败: {e}")
+                    indicators = ["锤头线", "十字星", "吞没形态"]
             else:
-                # 获取特定分类的指标
-                categories = get_indicator_categories()
-                indicators = categories.get(category, [])
-                indicators.sort()
+                # 获取特定分类的技术指标
+                try:
+                    categories = get_all_indicators_by_category(use_chinese=True)
+                    indicators = categories.get(category, [])
+                    if isinstance(indicators, list):
+                        indicators.sort()
+                    else:
+                        indicators = []
 
-            # 添加到下拉框
-            self.indicator_combo.addItems(indicators)
+                    # 检查是否需要添加该分类的形态数据
+                    if category in ["趋势分析", "震荡指标", "成交量指标"]:
+                        try:
+                            patterns = unified_service.get_patterns_by_category(category)
+                            for pattern in patterns:
+                                pattern_name = pattern.get('name', pattern.get('english_name', ''))
+                                if pattern_name:
+                                    indicators.append(pattern_name)
+                        except Exception as e:
+                            self.log_manager.error(f"获取分类 {category} 的形态数据失败: {e}")
 
-            # 如果有指标，选择第一个
-            if self.indicator_combo.count() > 0:
+                    self.log_manager.info(f"加载分类 {category} 的指标，共 {len(indicators)} 个")
+                except Exception as e:
+                    self.log_manager.error(f"获取分类指标失败: {e}")
+                    indicators = []
+
+            # 添加指标到组合框
+            if indicators:
+                self.indicator_combo.addItems(indicators)
                 self.indicator_combo.setCurrentIndex(0)
+            else:
+                self.log_manager.warning(f"分类 {category} 没有可用的指标")
 
         except Exception as e:
             self.log_manager.error(f"填充指标列表失败: {str(e)}")
@@ -298,6 +451,16 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 更新工具提示
         english_name = get_indicator_english_name(indicator_name)
         config = get_indicator_params_config(english_name)
+
+        # 添加空值检查
+        if config is None:
+            # 如果没有配置，创建一个默认的配置
+            config = {
+                "inputs": ["close"],
+                "params": {},
+                "description": f"指标: {indicator_name}"
+            }
+
         inputs = config.get("inputs", ["close"])
 
         tooltip = f"指标: {indicator_name}\n"
@@ -319,7 +482,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.log_manager.error(f"指标变更处理失败: {e}")
 
     def update_parameter_interface(self, indicator_name: str = None):
-        """更新参数设置界面 - 紧凑专业版"""
+        """更新参数设置界面 - 紧凑专业版，带参数信息显示"""
         # 清除现有参数控件
         for i in reversed(range(self.dynamic_params_layout.count())):
             child = self.dynamic_params_layout.itemAt(i).widget()
@@ -332,146 +495,316 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             indicator_name = self.indicator_combo.currentText()
 
         if not indicator_name:
+            # 更新参数信息显示
+            if hasattr(self, 'param_info_label'):
+                self.param_info_label.setText("请选择一个指标查看参数设置")
             return
 
-        # 获取指标的英文名称和参数配置
-        english_name = get_indicator_english_name(indicator_name)
-        config = get_indicator_params_config(english_name)
+        self.log_manager.info(f"更新参数界面: {indicator_name}")
 
-        # 显示指标信息 - 紧凑版
-        info_widget = QWidget()
-        info_layout = QVBoxLayout(info_widget)
-        info_layout.setSpacing(2)
-        info_layout.setContentsMargins(4, 4, 4, 4)
+        try:
+            # 检查是否是形态指标 - 通过数据库查询判断
+            from core.unified_indicator_service import UnifiedIndicatorService
+            unified_service = UnifiedIndicatorService()
+            patterns = unified_service.get_all_patterns()
+            pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
 
-        # 基本信息 - 单行显示
-        basic_info = QLabel(f"指标: {indicator_name} ({english_name})")
-        basic_info.setStyleSheet(
-            "QLabel { color: #495057; font-weight: bold; font-size: 11px; }")
-        info_layout.addWidget(basic_info)
+            if indicator_name in pattern_names:
+                self._setup_pattern_parameters(indicator_name)
+                return
 
-        self.dynamic_params_layout.addWidget(info_widget)
+            # 获取指标的英文名称和配置
+            english_name = get_indicator_english_name(indicator_name)
+            config = get_indicator_params_config(english_name)
 
-        if not config or not config.get("params"):
-            # 如果没有参数，显示简单提示
-            no_params_label = QLabel("无需参数设置")
-            no_params_label.setStyleSheet(
-                "QLabel { color: #6c757d; font-style: italic; text-align: center; font-size: 11px; padding: 10px; }")
-            self.dynamic_params_layout.addWidget(no_params_label)
-            return
+            if not config or not config.get("params"):
+                self.log_manager.warning(f"指标 {indicator_name} 无参数配置")
+                if hasattr(self, 'param_info_label'):
+                    self.param_info_label.setText(f"指标 {indicator_name} 无需设置参数")
+                return
 
-        # 创建参数控件 - 紧凑布局
-        for param_name, param_config in config["params"].items():
+            # 更新参数信息显示
+            info_text = f"指标: {indicator_name} ({english_name})\n"
+            info_text += f"输入数据: {', '.join(config.get('inputs', ['close']))}\n"
+            info_text += f"输出数量: {len(config.get('outputs', []))}"
+
+            if hasattr(self, 'param_info_label'):
+                self.param_info_label.setText(info_text)
+
+            self.log_manager.info(f"指标 {indicator_name} 参数配置: {list(config['params'].keys())}")
+
+            # 创建参数控件 - 紧凑布局
+            for param_name, param_config in config["params"].items():
+                param_widget = QWidget()
+                param_layout = QHBoxLayout(param_widget)
+                param_layout.setSpacing(4)
+                param_layout.setContentsMargins(4, 2, 4, 2)
+
+                # 参数标签 - 紧凑
+                param_label = QLabel(f"{param_config.get('desc', param_name)}:")
+                param_label.setMinimumWidth(80)
+                param_label.setMaximumWidth(120)
+                param_label.setStyleSheet(
+                    "QLabel { font-size: 11px; color: #212529; }")
+                param_layout.addWidget(param_label)
+
+                # 参数控件 - 紧凑
+                if param_name in ["matype", "fastmatype", "slowmatype", "signalmatype", "slowk_matype", "slowd_matype", "fastd_matype"]:
+                    # MA类型选择
+                    control = QComboBox()
+                    control.setMaximumHeight(24)
+                    ma_types = ["SMA", "EMA", "WMA", "DEMA",
+                                "TEMA", "TRIMA", "KAMA", "MAMA", "T3"]
+                    control.addItems(ma_types)
+                    control.setCurrentIndex(param_config.get("default", 0))
+                    control.setStyleSheet(
+                        "QComboBox { font-size: 11px; padding: 2px; }")
+                elif isinstance(param_config.get("default"), float):
+                    # 浮点数参数
+                    control = QDoubleSpinBox()
+                    control.setMaximumHeight(24)
+                    control.setRange(param_config.get("min", 0.0),
+                                     param_config.get("max", 100.0))
+                    control.setValue(param_config.get("default", 1.0))
+                    control.setSingleStep(0.01)
+                    control.setDecimals(3)
+                    control.setStyleSheet(
+                        "QDoubleSpinBox { font-size: 11px; padding: 2px; }")
+                else:
+                    # 整数参数
+                    control = QSpinBox()
+                    control.setMaximumHeight(24)
+                    control.setRange(param_config.get("min", 1),
+                                     param_config.get("max", 1000))
+                    control.setValue(param_config.get("default", 14))
+                    control.setStyleSheet(
+                        "QSpinBox { font-size: 11px; padding: 2px; }")
+
+                # 添加工具提示
+                tooltip = param_config.get("desc", param_name)
+                if param_config.get("range"):
+                    tooltip += f"\n范围: {param_config['range']}"
+                control.setToolTip(tooltip)
+
+                param_layout.addWidget(control)
+
+                # 保存控件引用
+                self.param_controls[param_name] = control
+
+                # 添加到布局
+                self.dynamic_params_layout.addWidget(param_widget)
+
+            self.log_manager.info(f"已创建 {len(self.param_controls)} 个参数控件")
+
+        except Exception as e:
+            self.log_manager.error(f"更新参数界面失败: {str(e)}")
+            if hasattr(self, 'param_info_label'):
+                self.param_info_label.setText(f"参数界面更新失败: {str(e)}")
+
+    def _setup_pattern_parameters(self, pattern_indicator_name: str):
+        """设置形态指标的参数"""
+        try:
+            pattern_name = pattern_indicator_name  # 直接使用指标名称，无需移除前缀
+
+            # 获取统一指标服务实例
+            unified_service = UnifiedIndicatorService()
+
+            # 尝试获取形态配置
+            pattern_config = None
+            patterns = unified_service.get_all_patterns()
+            for pattern in patterns:
+                if pattern.get('name') == pattern_name or pattern.get('english_name') == pattern_name:
+                    pattern_config = pattern
+                    break
+
+            if pattern_config:
+                # 更新参数信息显示
+                info_text = f"形态: {pattern_name}\n"
+                info_text += f"类别: {pattern_config.get('category', '未知')}\n"
+                info_text += f"信号类型: {pattern_config.get('signal_type', '未知')}\n"
+                info_text += f"描述: {pattern_config.get('description', '无描述')}"
+
+                if hasattr(self, 'param_info_label'):
+                    self.param_info_label.setText(info_text)
+
+                # 创建形态参数控件
+                parameters = pattern_config.get('parameters', {})
+                if parameters:
+                    for param_name, param_value in parameters.items():
+                        param_widget = QWidget()
+                        param_layout = QHBoxLayout(param_widget)
+                        param_layout.setSpacing(4)
+                        param_layout.setContentsMargins(4, 2, 4, 2)
+
+                        # 参数标签
+                        param_label = QLabel(f"{param_name}:")
+                        param_label.setMinimumWidth(80)
+                        param_label.setStyleSheet("QLabel { font-size: 11px; color: #212529; }")
+                        param_layout.addWidget(param_label)
+
+                        # 参数控件
+                        if isinstance(param_value, float):
+                            control = QDoubleSpinBox()
+                            control.setMaximumHeight(24)
+                            control.setRange(0.0, 1.0)
+                            control.setValue(param_value)
+                            control.setSingleStep(0.01)
+                            control.setDecimals(3)
+                        else:
+                            control = QSpinBox()
+                            control.setMaximumHeight(24)
+                            control.setRange(1, 100)
+                            control.setValue(int(param_value) if isinstance(param_value, (int, str)) else 14)
+
+                        param_layout.addWidget(control)
+                        self.param_controls[param_name] = control
+                        self.dynamic_params_layout.addWidget(param_widget)
+                else:
+                    # 添加默认的形态参数
+                    self._add_default_pattern_params()
+            else:
+                # 没有找到形态配置，使用默认参数
+                if hasattr(self, 'param_info_label'):
+                    self.param_info_label.setText(f"形态: {pattern_name}\n使用默认参数设置")
+                self._add_default_pattern_params()
+
+        except Exception as e:
+            self.log_manager.error(f"设置形态参数失败: {str(e)}")
+            if hasattr(self, 'param_info_label'):
+                self.param_info_label.setText(f"形态参数设置失败: {str(e)}")
+
+    def _add_default_pattern_params(self):
+        """添加默认的形态参数"""
+        default_params = {
+            "置信度阈值": {"type": "float", "default": 0.6, "min": 0.1, "max": 1.0},
+            "最小周期": {"type": "int", "default": 5, "min": 1, "max": 50},
+            "最大周期": {"type": "int", "default": 30, "min": 5, "max": 100}
+        }
+
+        for param_name, param_config in default_params.items():
             param_widget = QWidget()
             param_layout = QHBoxLayout(param_widget)
             param_layout.setSpacing(4)
             param_layout.setContentsMargins(4, 2, 4, 2)
 
-            # 参数标签 - 紧凑
-            param_label = QLabel(f"{param_config.get('desc', param_name)}:")
+            # 参数标签
+            param_label = QLabel(f"{param_name}:")
             param_label.setMinimumWidth(80)
-            param_label.setMaximumWidth(120)
-            param_label.setStyleSheet(
-                "QLabel { font-size: 11px; color: #212529; }")
+            param_label.setStyleSheet("QLabel { font-size: 11px; color: #212529; }")
             param_layout.addWidget(param_label)
 
-            # 参数控件 - 紧凑
-            if param_name in ["matype", "fastmatype", "slowmatype", "signalmatype", "slowk_matype", "slowd_matype", "fastd_matype"]:
-                # MA类型选择
-                control = QComboBox()
-                control.setMaximumHeight(24)
-                ma_types = ["SMA", "EMA", "WMA", "DEMA",
-                            "TEMA", "TRIMA", "KAMA", "MAMA", "T3"]
-                control.addItems(ma_types)
-                control.setCurrentIndex(param_config.get("default", 0))
-                control.setStyleSheet(
-                    "QComboBox { font-size: 11px; padding: 2px; }")
-            elif isinstance(param_config.get("default"), float):
-                # 浮点数参数
+            # 参数控件
+            if param_config["type"] == "float":
                 control = QDoubleSpinBox()
                 control.setMaximumHeight(24)
-                control.setRange(param_config.get("min", 0.0),
-                                 param_config.get("max", 100.0))
-                control.setValue(param_config.get("default", 1.0))
+                control.setRange(param_config["min"], param_config["max"])
+                control.setValue(param_config["default"])
                 control.setSingleStep(0.01)
                 control.setDecimals(3)
-                control.setStyleSheet(
-                    "QDoubleSpinBox { font-size: 11px; padding: 2px; }")
             else:
-                # 整数参数
                 control = QSpinBox()
                 control.setMaximumHeight(24)
-                control.setRange(param_config.get("min", 1),
-                                 param_config.get("max", 250))
-                control.setValue(param_config.get("default", 20))
-                control.setStyleSheet(
-                    "QSpinBox { font-size: 11px; padding: 2px; }")
-
-            # 设置工具提示
-            tooltip = f"{param_config.get('desc', param_name)}\n"
-            tooltip += f"默认: {param_config.get('default')}\n"
-            tooltip += f"范围: {param_config.get('min', 'N/A')} - {param_config.get('max', 'N/A')}"
-            control.setToolTip(tooltip)
-
-            # 参数值变化时的实时反馈
-            if isinstance(control, QComboBox):
-                control.currentTextChanged.connect(
-                    lambda: self.on_param_changed())
-            else:
-                control.valueChanged.connect(lambda: self.on_param_changed())
+                control.setRange(param_config["min"], param_config["max"])
+                control.setValue(param_config["default"])
 
             param_layout.addWidget(control)
-
-            # 重置按钮 - 小型
-            reset_btn = QPushButton("↺")
-            reset_btn.setMaximumSize(20, 20)
-            reset_btn.setStyleSheet(
-                "QPushButton { background-color: #6c757d; color: white; font-size: 10px; border-radius: 10px; }")
-            reset_btn.setToolTip("重置到默认值")
-            reset_btn.clicked.connect(lambda checked, ctrl=control, default=param_config.get(
-                "default"): self.reset_param(ctrl, default))
-            param_layout.addWidget(reset_btn)
-
-            # 范围信息 - 小字体
-            range_label = QLabel(
-                f"[{param_config.get('min', 'N/A')}-{param_config.get('max', 'N/A')}]")
-            range_label.setStyleSheet(
-                "QLabel { color: #6c757d; font-size: 9px; }")
-            range_label.setMaximumWidth(60)
-            param_layout.addWidget(range_label)
-
             self.param_controls[param_name] = control
             self.dynamic_params_layout.addWidget(param_widget)
 
-        # 参数预览 - 紧凑版
-        preview_widget = QWidget()
-        preview_layout = QVBoxLayout(preview_widget)
-        preview_layout.setSpacing(2)
-        preview_layout.setContentsMargins(4, 4, 4, 4)
-
-        self.param_preview_label = QLabel("无参数")
-        self.param_preview_label.setStyleSheet(
-            "QLabel { color: #495057; font-family: monospace; font-size: 12px; background-color: #f8f9fa; padding: 3px; border-radius: 2px; }")
-        self.param_preview_label.setWordWrap(True)
-        preview_layout.addWidget(self.param_preview_label)
-
-        self.dynamic_params_layout.addWidget(preview_widget)
-
-        # 更新参数预览
-        self.update_param_preview()
-
-        # 添加弹性空间
-        self.dynamic_params_layout.addStretch()
-
     def get_current_params(self) -> dict:
-        """获取当前设置的参数"""
+        """获取当前参数设置 - 修复版，区分形态参数和技术指标参数"""
         params = {}
-        for param_name, control in self.param_controls.items():
-            if isinstance(control, QComboBox):
-                params[param_name] = control.currentIndex()
-            elif isinstance(control, (QSpinBox, QDoubleSpinBox)):
-                params[param_name] = control.value()
-        return params
+        current_indicator = self.indicator_combo.currentText()
+
+        try:
+            # 如果是形态指标，只返回形态相关参数
+            from core.unified_indicator_service import UnifiedIndicatorService
+            unified_service = UnifiedIndicatorService()
+            patterns = unified_service.get_all_patterns()
+            pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
+
+            if current_indicator and current_indicator in pattern_names:
+                for param_name, control in self.param_controls.items():
+                    if param_name in ["置信度阈值", "最小周期", "最大周期"]:
+                        if hasattr(control, 'value'):
+                            params[param_name] = control.value()
+                        elif hasattr(control, 'currentText'):
+                            params[param_name] = control.currentText()
+                        else:
+                            params[param_name] = str(control.text()) if hasattr(control, 'text') else ""
+            else:
+                # 技术指标参数 - 只包含TA-Lib支持的参数
+                valid_talib_params = {
+                    'timeperiod', 'timeperiod1', 'timeperiod2', 'timeperiod3',
+                    'fastperiod', 'slowperiod', 'signalperiod',
+                    'fastk_period', 'slowk_period', 'slowk_matype',
+                    'slowd_period', 'slowd_matype',
+                    'matype', 'fastmatype', 'slowmatype', 'signalmatype',
+                    'nbdevup', 'nbdevdn', 'multiplier', 'acceleration', 'maximum'
+                }
+
+                for param_name, control in self.param_controls.items():
+                    try:
+                        # 转换参数名称到TA-Lib格式
+                        talib_param_name = self._convert_to_talib_param_name(param_name)
+
+                        # 只包含TA-Lib支持的参数
+                        if talib_param_name in valid_talib_params:
+                            if hasattr(control, 'value'):
+                                params[talib_param_name] = control.value()
+                            elif hasattr(control, 'currentText'):
+                                # MA类型参数需要转换为数字
+                                if 'matype' in talib_param_name.lower():
+                                    ma_type_map = {"SMA": 0, "EMA": 1, "WMA": 2, "DEMA": 3,
+                                                   "TEMA": 4, "TRIMA": 5, "KAMA": 6, "MAMA": 7, "T3": 8}
+                                    params[talib_param_name] = ma_type_map.get(control.currentText(), 0)
+                                else:
+                                    params[talib_param_name] = control.currentText()
+                            else:
+                                text_value = str(control.text()) if hasattr(control, 'text') else ""
+                                if text_value.isdigit():
+                                    params[talib_param_name] = int(text_value)
+                                else:
+                                    try:
+                                        params[talib_param_name] = float(text_value)
+                                    except ValueError:
+                                        params[talib_param_name] = text_value
+                    except Exception as e:
+                        self.log_manager.warning(f"处理参数 {param_name} 时出错: {e}")
+                        continue
+
+            self.log_manager.info(f"获取到参数: {params}")
+            return params
+
+        except Exception as e:
+            self.log_manager.error(f"获取参数时出错: {str(e)}")
+            return {}
+
+    def _convert_to_talib_param_name(self, param_name: str) -> str:
+        """将UI参数名称转换为TA-Lib参数名称"""
+        # 参数名称映射
+        param_mapping = {
+            "周期": "timeperiod",
+            "快线周期": "fastperiod",
+            "慢线周期": "slowperiod",
+            "信号线周期": "signalperiod",
+            "K值周期": "fastk_period",
+            "D值周期": "slowd_period",
+            "MA类型": "matype",
+            "快线MA类型": "fastmatype",
+            "慢线MA类型": "slowmatype",
+            "信号MA类型": "signalmatype",
+            "上轨偏差": "nbdevup",
+            "下轨偏差": "nbdevdn",
+            "乘数": "multiplier"
+        }
+
+        # 首先尝试直接映射
+        if param_name in param_mapping:
+            return param_mapping[param_name]
+
+        # 如果没有找到映射，返回原名称（可能已经是TA-Lib格式）
+        return param_name
 
     def apply_preset_params(self, preset: str):
         """应用参数预设"""
@@ -682,24 +1015,56 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
     def populate_indicators_table(self):
         """填充指标表格数据"""
         try:
-            # 获取所有ta-lib指标
-            all_indicators = get_talib_indicator_list()
-            category_map = get_all_indicators_by_category(use_chinese=True)
+            # 获取统一指标服务的所有指标（包括形态类）
+            from core.unified_indicator_service import UnifiedIndicatorService
+            unified_service = UnifiedIndicatorService()
 
-            if not all_indicators:
-                self.show_library_warning("ta-lib", "指标计算")
+            # 获取技术指标
+            all_indicators_data = unified_service.get_all_indicators()
+            # 获取形态数据
+            all_patterns_data = unified_service.get_all_patterns()
+
+            if not all_indicators_data and not all_patterns_data:
+                self.show_library_warning("统一指标系统", "指标计算")
                 return
 
             # 创建指标数据列表
             self.indicator_data = []
 
-            for english_name in all_indicators:
-                chinese_name = get_talib_chinese_name(english_name)
-                category = get_talib_category(english_name)
+            # 处理技术指标
+            for indicator_metadata in all_indicators_data:
+                display_name = indicator_metadata.get('display_name', indicator_metadata.get('name', ''))
+                # 修复英文名称字段映射 - 统一指标服务中英文名称存储在 'name' 字段
+                english_name = indicator_metadata.get('name', indicator_metadata.get('english_name', ''))
+                # 修复分类字段映射 - 优先使用 category_display_name，然后是 category_name
+                category = (indicator_metadata.get('category_display_name') or
+                            indicator_metadata.get('category_name') or
+                            indicator_metadata.get('category', '未分类'))
 
                 self.indicator_data.append({
                     'english_name': english_name,
-                    'chinese_name': chinese_name,
+                    'chinese_name': display_name,
+                    'category': category,
+                    'selected': False
+                })
+
+            # 处理形态数据
+            for pattern_metadata in all_patterns_data:
+                # 形态的显示名称和英文名称
+                display_name = pattern_metadata.get('name', pattern_metadata.get('english_name', ''))
+                english_name = pattern_metadata.get('english_name', pattern_metadata.get('name', ''))
+                # 形态分类处理
+                category = (pattern_metadata.get('category_display_name') or
+                            pattern_metadata.get('category_name') or
+                            pattern_metadata.get('category', '形态类'))
+
+                # 如果分类仍为空，设置默认分类
+                if not category or category == '未分类':
+                    category = '形态类'
+
+                self.indicator_data.append({
+                    'english_name': english_name,
+                    'chinese_name': display_name,  # 移除形态前缀
                     'category': category,
                     'selected': False
                 })
@@ -710,9 +1075,31 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 填充表格
             self.update_indicators_table()
 
+            self.log_manager.info(f"成功加载 {len(all_indicators_data)} 个技术指标和 {len(all_patterns_data)} 个形态")
+
         except Exception as e:
             self.log_manager.error(f"填充指标表格失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"填充指标表格失败: {str(e)}")
+
+            # 如果统一服务失败，回退到TA-Lib指标
+            try:
+                all_indicators = get_talib_indicator_list()
+                if all_indicators:
+                    self.indicator_data = []
+                    for english_name in all_indicators:
+                        chinese_name = get_talib_chinese_name(english_name)
+                        category = get_indicator_category_by_name(english_name)
+                        self.indicator_data.append({
+                            'english_name': english_name,
+                            'chinese_name': chinese_name,
+                            'category': category,
+                            'selected': False
+                        })
+                    self.indicator_data.sort(key=lambda x: x['chinese_name'])
+                    self.update_indicators_table()
+            except Exception as fallback_e:
+                self.log_manager.error(f"回退到TA-Lib也失败: {str(fallback_e)}")
+                QMessageBox.critical(self, "错误", f"无法加载任何指标: {str(fallback_e)}")
 
     def update_indicators_table(self, filtered_data=None):
         """更新指标表格显示"""
@@ -900,6 +1287,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
     def calculate_indicators(self):
         """技术指标分析 - 增强版"""
         try:
+            # 开始计算技术指标
+
             self.log_manager.info("开始计算技术指标...")
 
             # 验证数据 - 使用继承自BaseAnalysisTab的统一验证
@@ -956,7 +1345,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     # 计算单个指标
                     result = self._calculate_single_indicator_with_params(
                         indicator_name)
-                    if result:
+                    if result is not None and (
+                        isinstance(result, dict) and result.get('values') or
+                        hasattr(result, 'empty') and not result.empty
+                    ):
                         self.indicator_results[indicator_name] = result
                         calculated_count += 1
                         self.log_manager.info(f"指标 {indicator_name} 计算成功")
@@ -994,16 +1386,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
             self.hide_loading()
 
-            # 显示结果统计
-            result_message = f"技术指标计算完成！\n"
-            result_message += f"成功计算: {calculated_count} 个指标\n"
-            result_message += f"计算耗时: {calculation_time:.2f} 秒\n"
-            result_message += f"结果表格行数: {self.technical_table.rowCount()}"
+            # 记录计算时间
+            if indicators_to_calculate:
+                # 删除分析时间标签更新
+                pass
 
+            # 记录计算完成信息
+            self.log_manager.info(
+                f"批量计算完成: 成功计算 {calculated_count} 个指标，错误 {error_count} 个")
+
+            # 显示计算结果摘要
+            result_message = f"计算完成！\n成功: {calculated_count} 个指标\n错误: {error_count} 个指标"
             if error_count > 0:
-                result_message += f"\n失败: {error_count} 个指标"
+                result_message += f"\n部分指标计算失败，请检查日志获取详细信息"
 
-            self.log_manager.info(result_message)
+            QMessageBox.information(self, "计算完成", result_message)
 
             if calculated_count > 0:
                 # 发送指标计算完成信号
@@ -1034,37 +1431,99 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
     def _calculate_single_indicator_with_params(self, indicator_name: str) -> Optional[Dict[str, Any]]:
         """计算单个指标，包含参数处理和错误处理"""
         try:
-            if not self.current_kdata is not None or self.current_kdata.empty:
-                self.log_manager.log(
-                    f"无法计算指标 {indicator_name}: 当前K线数据为空", LogLevel.ERROR)
+            if self.current_kdata is None or self.current_kdata.empty:
+                self.log_manager.error(f"无法计算指标 {indicator_name}: 当前K线数据为空")
                 return None
 
             # 获取参数
             params = self.get_current_params()
-            self.log_manager.log(
-                f"计算指标 {indicator_name} 参数: {params}", LogLevel.DEBUG)
+            self.log_manager.info(f"计算指标 {indicator_name}，参数: {params}")
 
             # 统一通过IndicatorService计算
-            result = calculate_indicator(
-                indicator_name, self.current_kdata, params)
+            result_df = calculate_indicator(self.current_kdata, indicator_name, params)
 
-            # 处理结果
-            if result is None:
-                self.log_manager.log(
-                    f"指标 {indicator_name} 计算结果为空", LogLevel.WARNING)
+            # 处理结果 - calculate_indicator返回的是DataFrame
+            if result_df is None or result_df.empty:
+                self.log_manager.warning(f"指标 {indicator_name} 计算结果为空")
                 return None
 
-            # 记录性能
-            self.performance_label.setText(
-                f"性能: {result.get('performance', '未统计')}")
+            # 转换DataFrame结果为字典格式以适配显示逻辑
+            processed_result = self._process_dataframe_result(indicator_name, result_df)
 
-            return result
+            self.log_manager.info(f"指标 {indicator_name} 计算完成，结果列数: {len(processed_result.get('values', {}))}")
+
+            return processed_result
+
         except Exception as e:
             error_msg = f"计算指标 {indicator_name} 失败: {str(e)}"
-            self.log_manager.log(error_msg, LogLevel.ERROR)
-            self.log_manager.log(traceback.format_exc(), LogLevel.DEBUG)
+            self.log_manager.error(error_msg)
+            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
             self.error_occurred.emit(error_msg)
             return None
+
+    def _process_dataframe_result(self, indicator_name: str, result_df: pd.DataFrame) -> Dict[str, Any]:
+        """处理DataFrame结果，转换为统一的字典格式"""
+        try:
+            processed = {
+                "name": indicator_name,
+                "timestamp": datetime.now(),
+                "values": {},
+                "signals": [],
+                "summary": {}
+            }
+
+            # 查找新增的列（排除原始OHLCV列）
+            original_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'datetime'}
+            new_columns = [col for col in result_df.columns if col.lower() not in original_columns]
+
+            self.log_manager.info(f"指标 {indicator_name} 新增列: {new_columns}")
+
+            # 处理新增的列
+            for col in new_columns:
+                if col in result_df.columns:
+                    col_data = result_df[col]
+                    if isinstance(col_data, pd.Series):
+                        # 去除NaN值
+                        valid_data = col_data.dropna()
+                        if len(valid_data) > 0:
+                            processed["values"][col] = col_data
+                            self.log_manager.info(f"添加列 {col}，有效数据点: {len(valid_data)}")
+                        else:
+                            self.log_manager.warning(f"列 {col} 无有效数据")
+
+            # 如果没有找到新增列，尝试查找与指标名称相关的列
+            if not processed["values"]:
+                for col in result_df.columns:
+                    if indicator_name.lower() in col.lower() or col.lower().startswith(indicator_name.lower()):
+                        col_data = result_df[col]
+                        if isinstance(col_data, pd.Series):
+                            valid_data = col_data.dropna()
+                            if len(valid_data) > 0:
+                                processed["values"][col] = col_data
+                                self.log_manager.info(f"通过名称匹配添加列 {col}")
+
+            # 生成简单的统计摘要
+            if processed["values"]:
+                processed["summary"] = {
+                    "columns_count": len(processed["values"]),
+                    "data_points": len(result_df),
+                    "calculation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            else:
+                self.log_manager.warning(f"指标 {indicator_name} 未产生有效结果列")
+
+            return processed
+
+        except Exception as e:
+            self.log_manager.error(f"处理DataFrame结果失败: {str(e)}")
+            return {
+                "name": indicator_name,
+                "timestamp": datetime.now(),
+                "values": {},
+                "signals": [],
+                "summary": {},
+                "error": str(e)
+            }
 
     def _process_indicator_result(self, indicator_name: str, result: Any) -> Dict[str, Any]:
         """处理指标计算结果"""
@@ -1338,9 +1797,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         return summary
 
     def _add_indicator_to_table(self, indicator_name: str, result: Dict[str, Any]):
-        """将指标结果添加到表格"""
+        """将指标结果添加到表格 - 修复版，确保数据正确显示"""
         try:
             self.log_manager.info(f"开始添加指标 {indicator_name} 到表格")
+            self.log_manager.info(f"结果类型: {type(result)}, 结果键: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
 
             # 临时禁用排序，避免添加数据时的显示问题
             sorting_enabled = self.technical_table.isSortingEnabled()
@@ -1355,6 +1815,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.technical_table.setItem(
                     row, 1, QTableWidgetItem(indicator_name))
                 self.technical_table.setItem(row, 2, QTableWidgetItem("计算错误"))
+                self.technical_table.setItem(row, 3, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 4, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 5, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 6, QTableWidgetItem(""))
                 self.technical_table.setItem(
                     row, 7, QTableWidgetItem(result["error"]))
                 self.log_manager.warning(
@@ -1363,231 +1827,396 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.technical_table.setSortingEnabled(sorting_enabled)
                 return
 
-            # 正常结果
+            # 正常结果处理
             values = result.get("values", {})
             signals = result.get("signals", [])
             summary = result.get("summary", {})
 
-            self.log_manager.info(
-                f"指标 {indicator_name} 的值: {list(values.keys())}")
+            self.log_manager.info(f"指标 {indicator_name} 的值数量: {len(values)}")
+            self.log_manager.info(f"值的键: {list(values.keys())}")
+
+            # 处理不同的结果格式
+            if not values:
+                # 如果values为空，尝试从result中直接提取数据
+                if isinstance(result, dict):
+                    # 检查是否有numpy数组或pandas数据
+                    for key, value in result.items():
+                        if key not in ['error', 'performance', 'summary', 'signals']:
+                            if isinstance(value, (np.ndarray, pd.Series, pd.DataFrame)):
+                                values[key] = value
+                            elif isinstance(value, (int, float)) and not np.isnan(value):
+                                values[key] = value
+
+                    self.log_manager.info(f"从结果中提取的值: {list(values.keys())}")
+
+            if not values:
+                # 仍然没有数据，添加一个提示行
+                row = self.technical_table.rowCount()
+                self.technical_table.insertRow(row)
+                self.technical_table.setItem(row, 0, QTableWidgetItem(
+                    datetime.now().strftime("%Y-%m-%d %H:%M")))
+                self.technical_table.setItem(row, 1, QTableWidgetItem(indicator_name))
+                self.technical_table.setItem(row, 2, QTableWidgetItem("无数据"))
+                self.technical_table.setItem(row, 3, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 4, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 5, QTableWidgetItem(""))
+                self.technical_table.setItem(row, 6, QTableWidgetItem("计算完成但无返回值"))
+                self.technical_table.setItem(row, 7, QTableWidgetItem("请检查参数设置"))
+
+                self.log_manager.warning(f"指标 {indicator_name} 计算完成但无有效数据")
+                self.technical_table.setSortingEnabled(sorting_enabled)
+                return
 
             # 为每个输出值创建一行
             rows_added = 0
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+
             for value_name, value_data in values.items():
-                self.log_manager.info(
-                    f"处理值 {value_name}, 数据类型: {type(value_data)}, 长度: {len(value_data) if hasattr(value_data, '__len__') else 'N/A'}")
+                self.log_manager.info(f"处理值 {value_name}, 数据类型: {type(value_data)}")
 
-                # 处理不同类型的数据
-                if isinstance(value_data, np.ndarray):
-                    if len(value_data) > 0:
-                        current_value = value_data[-1] if not np.isnan(
-                            value_data[-1]) else None
-                    else:
-                        current_value = None
-                elif isinstance(value_data, (pd.Series, pd.DataFrame)):
-                    if len(value_data) > 0:
-                        if isinstance(value_data, pd.Series):
-                            current_value = value_data.iloc[-1] if not pd.isna(
-                                value_data.iloc[-1]) else None
-                        else:
-                            current_value = value_data.iloc[-1, 0] if not pd.isna(
-                                value_data.iloc[-1, 0]) else None
-                    else:
-                        current_value = None
-                elif isinstance(value_data, (int, float)):
-                    current_value = value_data if not np.isnan(
-                        value_data) else None
-                else:
-                    self.log_manager.warning(f"未知的数据类型: {type(value_data)}")
-                    current_value = None
+                # 提取当前值和趋势信息
+                current_value = None
+                trend_info = ""
+                signal_info = ""
+                strength_info = ""
 
-                self.log_manager.info(f"当前值: {current_value}")
+                try:
+                    # 处理不同类型的数据
+                    if isinstance(value_data, np.ndarray):
+                        if len(value_data) > 0:
+                            # 检查数据类型 - 只对数值型数据进行处理
+                            if np.issubdtype(value_data.dtype, np.number):
+                                # 获取最后几个有效值来分析趋势
+                                valid_indices = ~np.isnan(value_data)
+                                if np.any(valid_indices):
+                                    valid_data = value_data[valid_indices]
+                                    current_value = valid_data[-1]
+
+                                    # 分析趋势
+                                    if len(valid_data) >= 2:
+                                        if valid_data[-1] > valid_data[-2]:
+                                            trend_info = "上升 ↑"
+                                        elif valid_data[-1] < valid_data[-2]:
+                                            trend_info = "下降 ↓"
+                                        else:
+                                            trend_info = "持平 →"
+
+                                        # 计算强度（变化幅度）
+                                        if valid_data[-2] != 0:
+                                            change_pct = abs((valid_data[-1] - valid_data[-2]) / valid_data[-2] * 100)
+                                            if change_pct > 5:
+                                                strength_info = "强"
+                                            elif change_pct > 2:
+                                                strength_info = "中"
+                                            else:
+                                                strength_info = "弱"
+                            else:
+                                # 对于非数值型数组，只取最后一个值
+                                if len(value_data) > 0:
+                                    current_value = value_data[-1]
+                                    trend_info = "N/A"
+                                    strength_info = "N/A"
+
+                    elif isinstance(value_data, pd.Series):
+                        if len(value_data) > 0:
+                            # 获取最后几个有效值
+                            valid_data = value_data.dropna()
+                            if len(valid_data) > 0:
+                                current_value = valid_data.iloc[-1]
+
+                                # 检查数据类型 - 只对数值型数据进行趋势和强度分析
+                                if pd.api.types.is_numeric_dtype(valid_data):
+                                    # 分析趋势和强度
+                                    if len(valid_data) >= 2:
+                                        prev_value = valid_data.iloc[-2]
+                                        if valid_data.iloc[-1] > prev_value:
+                                            trend_info = "上升 ↑"
+                                        elif valid_data.iloc[-1] < prev_value:
+                                            trend_info = "下降 ↓"
+                                        else:
+                                            trend_info = "持平 →"
+
+                                        # 计算强度（变化幅度）
+                                        if prev_value != 0:
+                                            change_pct = abs((valid_data.iloc[-1] - prev_value) / prev_value * 100)
+                                            if change_pct > 5:
+                                                strength_info = "强"
+                                            elif change_pct > 2:
+                                                strength_info = "中"
+                                            else:
+                                                strength_info = "弱"
+                                else:
+                                    # 对于非数值型数据（如字符串），不进行趋势和强度分析
+                                    trend_info = "N/A"
+                                    strength_info = "N/A"
+
+                    elif isinstance(value_data, pd.DataFrame):
+                        if len(value_data) > 0:
+                            # 取第一列的最后一个有效值
+                            first_col = value_data.iloc[:, 0].dropna()
+                            if len(first_col) > 0:
+                                current_value = first_col.iloc[-1]
+
+                                # 检查数据类型 - 只对数值型数据进行趋势和强度分析
+                                if pd.api.types.is_numeric_dtype(first_col):
+                                    # 分析趋势和强度
+                                    if len(first_col) >= 2:
+                                        prev_value = first_col.iloc[-2]
+                                        if current_value > prev_value:
+                                            trend_info = "上升 ↑"
+                                        elif current_value < prev_value:
+                                            trend_info = "下降 ↓"
+                                        else:
+                                            trend_info = "持平 →"
+
+                                        # 计算强度
+                                        if prev_value != 0:
+                                            change_pct = abs((current_value - prev_value) / prev_value * 100)
+                                            if change_pct > 5:
+                                                strength_info = "强"
+                                            elif change_pct > 2:
+                                                strength_info = "中"
+                                            else:
+                                                strength_info = "弱"
+                                else:
+                                    # 对于非数值型数据，不进行趋势和强度分析
+                                    trend_info = "N/A"
+                                    strength_info = "N/A"
+
+                    elif isinstance(value_data, (int, float)):
+                        if not np.isnan(value_data):
+                            current_value = value_data
+                            # 对于单一数值，设置默认强度
+                            if abs(current_value) > 50:
+                                strength_info = "强"
+                            elif abs(current_value) > 20:
+                                strength_info = "中"
+                            else:
+                                strength_info = "弱"
+
+                    # 生成信号建议
+                    if current_value is not None:
+                        signal_info, advice = self._generate_signal_advice(indicator_name, value_name, current_value, trend_info)
+
+                except Exception as e:
+                    self.log_manager.error(f"处理数据时出错: {str(e)}")
+                    current_value = "错误"
+
+                self.log_manager.info(f"提取的当前值: {current_value}")
 
                 if current_value is not None:
                     row = self.technical_table.rowCount()
                     self.technical_table.insertRow(row)
 
-                    # 日期
-                    date_item = QTableWidgetItem(
-                        datetime.now().strftime("%Y-%m-%d %H:%M"))
-                    self.technical_table.setItem(row, 0, date_item)
+                    # 日期时间
+                    self.technical_table.setItem(row, 0, QTableWidgetItem(current_time))
 
                     # 指标名称 - 改进显示逻辑
-                    if value_name == "main":
-                        display_name = indicator_name
-                    else:
-                        # 为多输出指标提供更专业的名称
-                        if indicator_name == "MACD指标":
-                            name_map = {"MACD_1": "MACD线",
-                                        "MACD_2": "信号线", "MACD_3": "柱状图"}
-                            display_name = f"MACD-{name_map.get(value_name, value_name)}"
-                        elif indicator_name == "布林带":
-                            name_map = {"BBANDS_1": "上轨",
-                                        "BBANDS_2": "中轨", "BBANDS_3": "下轨"}
-                            display_name = f"布林带-{name_map.get(value_name, value_name)}"
-                        elif indicator_name == "随机指标":
-                            name_map = {"STOCH_1": "%K线", "STOCH_2": "%D线"}
-                            display_name = f"KDJ-{name_map.get(value_name, value_name)}"
-                        else:
-                            display_name = f"{indicator_name}-{value_name}"
+                    display_name = self._get_display_name(indicator_name, value_name)
+                    self.technical_table.setItem(row, 1, QTableWidgetItem(display_name))
 
-                    indicator_item = QTableWidgetItem(display_name)
-                    self.technical_table.setItem(row, 1, indicator_item)
-
-                    # 数值
-                    value_item = QTableWidgetItem(f"{current_value:.4f}")
-                    self.technical_table.setItem(row, 2, value_item)
+                    # 数值 - 格式化显示
+                    value_str = self._format_value(current_value)
+                    self.technical_table.setItem(row, 2, QTableWidgetItem(value_str))
 
                     # 信号
-                    signal_text = ""
-                    signal_strength = ""
-                    signal_trend = ""
-                    signal_advice = ""
+                    self.technical_table.setItem(row, 3, QTableWidgetItem(signal_info))
 
-                    if signals:
-                        signal = signals[0]  # 取第一个信号
-                        signal_text = signal.get("type", "")
-                        signal_strength = signal.get("strength", "")
-                        signal_trend = signal.get("reason", "")
+                    # 强度
+                    self.technical_table.setItem(row, 4, QTableWidgetItem(strength_info))
 
-                        if signal_text == "buy":
-                            signal_advice = "买入"
-                        elif signal_text == "sell":
-                            signal_advice = "卖出"
-                        else:
-                            signal_advice = "观望"
+                    # 趋势
+                    self.technical_table.setItem(row, 5, QTableWidgetItem(trend_info))
 
-                    signal_item = QTableWidgetItem(signal_text)
-                    self.technical_table.setItem(row, 3, signal_item)
+                    # 建议
+                    self.technical_table.setItem(row, 6, QTableWidgetItem(advice))
 
-                    strength_item = QTableWidgetItem(signal_strength)
-                    self.technical_table.setItem(row, 4, strength_item)
-
-                    trend_item = QTableWidgetItem(signal_trend)
-                    self.technical_table.setItem(row, 5, trend_item)
-
-                    advice_item = QTableWidgetItem(signal_advice)
-                    self.technical_table.setItem(row, 6, advice_item)
-
-                    # 根据信号类型设置专业颜色
-                    if signal_text == "sell":
-                        # 买入信号 - 绿色系
-                        signal_color = QColor(34, 139, 34)  # 森林绿
-                        advice_color = QColor(0, 128, 0)    # 绿色
-                        if signal_strength == "strong":
-                            signal_color = QColor(0, 100, 0)  # 深绿
-                        elif signal_strength == "medium":
-                            signal_color = QColor(34, 139, 34)  # 森林绿
-                        else:
-                            signal_color = QColor(144, 238, 144)  # 浅绿
-                    elif signal_text == "buy":
-                        # 卖出信号 - 红色系
-                        signal_color = QColor(220, 20, 60)   # 深红
-                        advice_color = QColor(255, 0, 0)     # 红色
-                        if signal_strength == "strong":
-                            signal_color = QColor(139, 0, 0)  # 深红
-                        elif signal_strength == "medium":
-                            signal_color = QColor(220, 20, 60)  # 深红
-                        else:
-                            signal_color = QColor(255, 182, 193)  # 浅红
-                    else:
-                        # 中性信号 - 灰色系
-                        signal_color = QColor(128, 128, 128)  # 灰色
-                        advice_color = QColor(105, 105, 105)  # 暗灰
-                        if signal_strength == "strong":
-                            signal_color = QColor(64, 64, 64)  # 深灰
-                        elif signal_strength == "medium":
-                            signal_color = QColor(128, 128, 128)  # 灰色
-                        else:
-                            signal_color = QColor(192, 192, 192)  # 浅灰
-
-                    # 设置信号列颜色
-                    signal_item.setForeground(signal_color)
-                    signal_item.setFont(self._get_bold_font())
-
-                    # 设置强度列颜色
-                    strength_item.setForeground(signal_color)
-
-                    # 设置趋势列颜色
-                    trend_item.setForeground(signal_color)
-
-                    # 设置建议列颜色和背景
-                    advice_item.setForeground(advice_color)
-                    advice_item.setFont(self._get_bold_font())
-
-                    # 为建议列设置背景色
-                    if signal_text == "sell":
-                        advice_item.setBackground(
-                            QColor(240, 255, 240))  # 浅绿背景
-                    elif signal_text == "buy":
-                        advice_item.setBackground(
-                            QColor(255, 240, 240))  # 浅红背景
-                    else:
-                        advice_item.setBackground(
-                            QColor(248, 248, 248))  # 浅灰背景
-
-                    # 数值列根据涨跌设置颜色
-                    try:
-                        numeric_value = float(current_value)
-                        if numeric_value > 0:
-                            value_item.setForeground(
-                                QColor(220, 20, 60))  # 红色（涨）
-                        elif numeric_value < 0:
-                            value_item.setForeground(
-                                QColor(34, 139, 34))  # 绿色（跌）
-                        else:
-                            value_item.setForeground(
-                                QColor(128, 128, 128))  # 灰色（平）
-                    except:
-                        # 如果不是数值，保持默认颜色
-                        pass
-
-                    # 指标名称根据类型设置颜色
-                    if "MACD" in display_name:
-                        indicator_item.setForeground(QColor(75, 0, 130))  # 靛蓝
-                    elif "布林带" in display_name:
-                        indicator_item.setForeground(QColor(255, 140, 0))  # 橙色
-                    elif "KDJ" in display_name or "随机" in display_name:
-                        indicator_item.setForeground(
-                            QColor(138, 43, 226))  # 紫色
-                    elif "RSI" in display_name or "相对强弱" in display_name:
-                        indicator_item.setForeground(
-                            QColor(30, 144, 255))  # 蓝色
-                    elif "均线" in display_name or "移动平均" in display_name:
-                        indicator_item.setForeground(
-                            QColor(255, 20, 147))  # 深粉
-                    else:
-                        indicator_item.setForeground(QColor(47, 79, 79))  # 深灰绿
-
-                    # 备注 - 显示统计信息
-                    note_text = ""
-                    if value_name in summary:
-                        stats = summary[value_name]
-                        note_text = f"均值:{stats.get('mean', 0):.4f} 标准差:{stats.get('std', 0):.4f}"
-
-                    note_item = QTableWidgetItem(note_text)
-                    self.technical_table.setItem(row, 7, note_item)
+                    # 备注 - 添加更多信息
+                    note = f"周期: {len(value_data) if hasattr(value_data, '__len__') else 'N/A'}"
+                    if summary:
+                        note += f", 均值: {summary.get('mean', 'N/A')}"
+                    self.technical_table.setItem(row, 7, QTableWidgetItem(note))
 
                     rows_added += 1
-                    self.log_manager.info(f"成功添加行 {row} 到表格")
-                else:
-                    self.log_manager.warning(f"值 {value_name} 的当前值为空，跳过添加")
+
+                    # 设置行颜色（基于信号类型）
+                    self._set_row_color(row, signal_info)
 
             # 恢复排序设置
             self.technical_table.setSortingEnabled(sorting_enabled)
 
-            # 强制刷新表格显示
-            self.technical_table.viewport().update()
+            self.log_manager.info(f"成功添加 {rows_added} 行数据到表格")
 
-            self.log_manager.info(
-                f"指标 {indicator_name} 总共添加了 {rows_added} 行到表格")
+            # 自动调整列宽
+            self.technical_table.resizeColumnsToContents()
 
         except Exception as e:
-            # 确保在异常情况下也恢复排序设置
-            if hasattr(self, 'technical_table'):
-                self.technical_table.setSortingEnabled(True)
-            self.log_manager.error(f"添加指标到表格时出错: {str(e)}")
-            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+            self.log_manager.error(f"添加指标到表格失败: {str(e)}")
+            self.log_manager.error(f"详细错误: {traceback.format_exc()}")
+
+            # 恢复排序设置
+            if 'sorting_enabled' in locals():
+                self.technical_table.setSortingEnabled(sorting_enabled)
+
+    def _get_display_name(self, indicator_name: str, value_name: str) -> str:
+        """获取显示名称"""
+        if value_name == "main" or value_name == indicator_name:
+            return indicator_name
+
+        # 为多输出指标提供更专业的名称
+        name_mappings = {
+            "MACD指标": {"MACD_1": "MACD线", "MACD_2": "信号线", "MACD_3": "柱状图"},
+            "布林带": {"BBANDS_1": "上轨", "BBANDS_2": "中轨", "BBANDS_3": "下轨"},
+            "随机指标": {"STOCH_1": "%K线", "STOCH_2": "%D线"},
+            "KDJ指标": {"STOCH_1": "K值", "STOCH_2": "D值", "STOCH_3": "J值"},
+            "威廉指标": {"WILLR_1": "%R值"}
+        }
+
+        if indicator_name in name_mappings and value_name in name_mappings[indicator_name]:
+            return f"{indicator_name}-{name_mappings[indicator_name][value_name]}"
+        else:
+            return f"{indicator_name}-{value_name}"
+
+    def _format_value(self, value) -> str:
+        """格式化数值显示"""
+        try:
+            if isinstance(value, (int, float)):
+                if abs(value) < 0.001:
+                    return f"{value:.6f}"
+                elif abs(value) < 1:
+                    return f"{value:.4f}"
+                elif abs(value) < 100:
+                    return f"{value:.3f}"
+                else:
+                    return f"{value:.2f}"
+            else:
+                return str(value)
+        except:
+            return str(value)
+
+    def _generate_signal_advice(self, indicator_name: str, value_name: str, current_value: float, trend: str) -> tuple:
+        """生成信号和建议"""
+        signal = ""
+        advice = ""
+
+        try:
+            # 基于指标类型生成信号
+            if "RSI" in indicator_name:
+                if current_value > 70:
+                    signal = "超买"
+                    advice = "考虑卖出"
+                elif current_value < 30:
+                    signal = "超卖"
+                    advice = "考虑买入"
+                else:
+                    signal = "中性"
+                    advice = "观望"
+
+            elif "MACD" in indicator_name:
+                if "柱状图" in value_name or "MACD_3" in value_name:
+                    if current_value > 0:
+                        signal = "多头"
+                        advice = "看涨"
+                    else:
+                        signal = "空头"
+                        advice = "看跌"
+                else:
+                    if "上升" in trend:
+                        signal = "看涨"
+                        advice = "持有/买入"
+                    elif "下降" in trend:
+                        signal = "看跌"
+                        advice = "观望/卖出"
+                    else:
+                        signal = "中性"
+                        advice = "观望"
+
+            elif "KDJ" in indicator_name or "随机指标" in indicator_name:
+                if current_value > 80:
+                    signal = "超买"
+                    advice = "考虑卖出"
+                elif current_value < 20:
+                    signal = "超卖"
+                    advice = "考虑买入"
+                else:
+                    signal = "中性"
+                    advice = "观望"
+
+            elif "形态" in indicator_name:
+                signal = "形态信号"
+                advice = "参考形态分析"
+
+            else:
+                # 通用信号生成
+                if "上升" in trend:
+                    signal = "看涨"
+                    advice = "关注买入机会"
+                elif "下降" in trend:
+                    signal = "看跌"
+                    advice = "注意风险"
+                else:
+                    signal = "中性"
+                    advice = "观望"
+
+        except Exception as e:
+            self.log_manager.error(f"生成信号建议时出错: {str(e)}")
+            signal = "未知"
+            advice = "需要分析"
+
+        return signal, advice
+
+    def _set_row_color(self, row: int, signal: str):
+        """根据信号设置行颜色 - 增强版"""
+        try:
+            # 获取趋势信息用于更精确的颜色设置
+            trend_item = self.technical_table.item(row, 5)  # 趋势列
+            trend_info = trend_item.text() if trend_item else ""
+
+            # 获取强度信息
+            strength_item = self.technical_table.item(row, 4)  # 强度列
+            strength_info = strength_item.text() if strength_item else ""
+
+            # 根据信号类型和趋势确定颜色
+            if "超买" in signal or "看跌" in signal or "下降" in trend_info:
+                if "强" in strength_info:
+                    color = QColor(200, 255, 200)  # 深绿色
+                else:
+                    color = QColor(230, 255, 230)  # 浅绿色
+
+            elif "超卖" in signal or "看涨" in signal or "上升" in trend_info:
+                if "强" in strength_info:
+                    color = QColor(255, 200, 200)  # 深红色
+                else:
+                    color = QColor(255, 230, 230)  # 浅红色
+            elif "中性" in signal or "持平" in trend_info:
+                color = QColor(248, 249, 250)  # 浅灰色
+            elif "形态" in signal:
+                color = QColor(255, 248, 220)  # 浅黄色（形态信号）
+            else:
+                return  # 使用默认颜色
+
+            # 应用颜色到整行
+            for col in range(self.technical_table.columnCount()):
+                item = self.technical_table.item(row, col)
+                if item:
+                    item.setBackground(color)
+
+                    # 为特定列设置文字颜色
+                    if col == 3:  # 信号列
+                        if "看涨" in signal or "超卖" in signal:
+                            item.setForeground(QColor(220, 20, 60))  # 红色文字
+                        elif "看跌" in signal or "超买" in signal:
+                            item.setForeground(QColor(0, 128, 0))  # 绿色文字
+
+                    elif col == 5:  # 趋势列
+                        if "上升" in trend_info:
+                            item.setForeground(QColor(220, 20, 60))  # 红色文字
+
+                        elif "下降" in trend_info:
+                            item.setForeground(QColor(0, 128, 0))  # 绿色文字
+
+        except Exception as e:
+            self.log_manager.error(f"设置行颜色失败: {str(e)}")
 
     def clear_cache(self):
         """清除缓存"""
@@ -1823,3 +2452,427 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         export_layout.addStretch()
         return export_group
+
+    def update_analysis(self, analysis_data: Dict[str, Any]):
+        """更新分析数据 - 为与RightPanel兼容而添加的方法
+
+        Args:
+            analysis_data: 包含技术分析数据的字典
+        """
+        try:
+            # 如果分析数据中包含技术指标信息，可以在这里处理
+            technical_indicators = analysis_data.get('technical_indicators', {})
+
+            if technical_indicators:
+                self.log_manager.info("收到分析数据，技术指标数据已更新")
+                # 这里可以根据需要处理预计算的技术指标数据
+                # 例如：显示在状态栏或进行其他处理
+                indicator_count = len(technical_indicators)
+                self.update_status(f"收到 {indicator_count} 个预计算指标")
+            else:
+                self.log_manager.debug("分析数据中未包含技术指标")
+
+        except Exception as e:
+            self.log_manager.error(f"更新分析数据失败: {e}")
+
+    def set_kdata(self, kdata):
+        """重写set_kdata方法，自动更新股票信息"""
+        try:
+            # 调用父类方法
+            super().set_kdata(kdata)
+
+        except Exception as e:
+            self.log_manager.error(f"设置K线数据时出错: {str(e)}")
+
+    def on_data_update(self, stock_data: Dict[str, Any]) -> None:
+        """处理数据更新事件"""
+        try:
+            # 删除更新股票信息的调用
+            if self.auto_calc_checkbox.isChecked():
+                self.calculate_indicators()
+        except Exception as e:
+            self.log_manager.error(f"数据更新处理失败: {e}")
+
+    def show_advanced_filter_dialog(self):
+        """显示高级筛选对话框"""
+        dialog = AdvancedFilterDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            filters = dialog.get_filters()
+            self.apply_table_filters(filters)
+
+    def apply_table_filters(self, filters: Dict[str, Any]):
+        """应用筛选条件到表格"""
+        try:
+            if not hasattr(self, 'technical_table') or self.technical_table.rowCount() == 0:
+                return
+
+            active_filters = []
+            hidden_rows = 0
+
+            # 遍历所有行
+            for row in range(self.technical_table.rowCount()):
+                should_hide = False
+
+                # 检查每个筛选条件
+                for column_name, filter_config in filters.items():
+                    if not filter_config.get('enabled', False):
+                        continue
+
+                    column_index = self._get_column_index_by_name(column_name)
+                    if column_index == -1:
+                        continue
+
+                    item = self.technical_table.item(row, column_index)
+                    if not item:
+                        continue
+
+                    cell_value = item.text()
+                    filter_type = filter_config.get('type', 'text')
+
+                    # 根据筛选类型进行检查
+                    if filter_type == 'text':
+                        pattern = filter_config.get('value', '').lower()
+                        if pattern and pattern not in cell_value.lower():
+                            should_hide = True
+                            break
+                    elif filter_type == 'numeric':
+                        try:
+                            numeric_value = float(cell_value.replace(',', ''))
+                            min_val = filter_config.get('min_value')
+                            max_val = filter_config.get('max_value')
+                            if min_val is not None and numeric_value < min_val:
+                                should_hide = True
+                                break
+                            if max_val is not None and numeric_value > max_val:
+                                should_hide = True
+                                break
+                        except (ValueError, TypeError):
+                            # 非数值数据，如果设置了数值筛选，则隐藏
+                            should_hide = True
+                            break
+                    elif filter_type == 'selection':
+                        selected_values = filter_config.get('selected_values', [])
+                        if selected_values and cell_value not in selected_values:
+                            should_hide = True
+                            break
+                    elif filter_type == 'date':
+                        # 日期筛选逻辑
+                        from datetime import datetime
+                        try:
+                            cell_date = datetime.strptime(cell_value, "%Y-%m-%d %H:%M")
+                            start_date = filter_config.get('start_date')
+                            end_date = filter_config.get('end_date')
+                            if start_date and cell_date < start_date:
+                                should_hide = True
+                                break
+                            if end_date and cell_date > end_date:
+                                should_hide = True
+                                break
+                        except (ValueError, TypeError):
+                            should_hide = True
+                            break
+
+                # 隐藏或显示行
+                self.technical_table.setRowHidden(row, should_hide)
+                if should_hide:
+                    hidden_rows += 1
+
+            # 记录活跃的筛选条件
+            for column_name, filter_config in filters.items():
+                if filter_config.get('enabled', False):
+                    active_filters.append(column_name)
+
+            # 更新UI状态
+            if active_filters:
+                visible_rows = self.technical_table.rowCount() - hidden_rows
+                self.filter_status_label.setText(f"筛选中: {len(active_filters)}个条件, 显示{visible_rows}行")
+                self.clear_filter_btn.setEnabled(True)
+            else:
+                self.filter_status_label.setText("")
+                self.clear_filter_btn.setEnabled(False)
+
+        except Exception as e:
+            self.log_manager.error(f"应用筛选失败: {str(e)}")
+
+    def clear_table_filters(self):
+        """清除所有筛选条件"""
+        try:
+            # 显示所有行
+            for row in range(self.technical_table.rowCount()):
+                self.technical_table.setRowHidden(row, False)
+
+            # 重置UI状态
+            self.filter_status_label.setText("")
+            self.clear_filter_btn.setEnabled(False)
+
+        except Exception as e:
+            self.log_manager.error(f"清除筛选失败: {str(e)}")
+
+    def _get_column_index_by_name(self, column_name: str) -> int:
+        """根据列名获取列索引"""
+        headers = ['日期', '指标', '数值', '信号', '强度', '趋势', '建议', '备注']
+        try:
+            return headers.index(column_name)
+        except ValueError:
+            return -1
+
+
+class AdvancedFilterDialog(QDialog):
+    """高级筛选对话框"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("高级筛选")
+        self.setModal(True)
+        self.resize(600, 500)
+        self.filters = {}
+        self.create_ui()
+
+    def create_ui(self):
+        """创建筛选对话框UI"""
+        layout = QVBoxLayout(self)
+
+        # 说明文字
+        info_label = QLabel("设置多列筛选条件，支持AND逻辑组合。")
+        info_label.setStyleSheet("QLabel { color: #6c757d; font-style: italic; }")
+        layout.addWidget(info_label)
+
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        # 筛选条件容器
+        filter_widget = QWidget()
+        self.filter_layout = QVBoxLayout(filter_widget)
+
+        # 定义列信息
+        self.column_configs = {
+            '日期': {'type': 'date', 'label': '日期时间'},
+            '指标': {'type': 'text', 'label': '指标名称'},
+            '数值': {'type': 'numeric', 'label': '数值'},
+            '信号': {'type': 'selection', 'label': '信号', 'options': ['超买', '超卖', '看涨', '看跌', '中性', '形态信号']},
+            '强度': {'type': 'selection', 'label': '强度', 'options': ['强', '中', '弱', 'N/A']},
+            '趋势': {'type': 'selection', 'label': '趋势', 'options': ['上升 ↑', '下降 ↓', '持平 →', 'N/A']},
+            '建议': {'type': 'text', 'label': '交易建议'},
+            '备注': {'type': 'text', 'label': '备注信息'}
+        }
+
+        # 为每列创建筛选控件
+        for column_name, config in self.column_configs.items():
+            self.create_filter_group(column_name, config)
+
+        scroll.setWidget(filter_widget)
+        layout.addWidget(scroll)
+
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        # 重置按钮
+        reset_btn = QPushButton("重置")
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #545b62;
+            }
+        """)
+        reset_btn.clicked.connect(self.reset_filters)
+        btn_layout.addWidget(reset_btn)
+
+        # 确定按钮
+        ok_btn = QPushButton("应用筛选")
+        ok_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+
+        # 取消按钮
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
+
+    def create_filter_group(self, column_name: str, config: Dict[str, Any]):
+        """为指定列创建筛选组"""
+        group = QGroupBox(config['label'])
+        group.setCheckable(True)
+        group.setChecked(False)
+        group_layout = QVBoxLayout(group)
+
+        filter_type = config['type']
+        filter_controls = {}
+
+        if filter_type == 'text':
+            # 文本筛选
+            text_edit = QLineEdit()
+            text_edit.setPlaceholderText(f"输入{config['label']}关键词...")
+            group_layout.addWidget(text_edit)
+            filter_controls['text_input'] = text_edit
+
+        elif filter_type == 'numeric':
+            # 数值范围筛选
+            range_layout = QHBoxLayout()
+
+            range_layout.addWidget(QLabel("最小值:"))
+            min_input = QLineEdit()
+            min_input.setPlaceholderText("留空表示无限制")
+            range_layout.addWidget(min_input)
+
+            range_layout.addWidget(QLabel("最大值:"))
+            max_input = QLineEdit()
+            max_input.setPlaceholderText("留空表示无限制")
+            range_layout.addWidget(max_input)
+
+            group_layout.addLayout(range_layout)
+            filter_controls['min_input'] = min_input
+            filter_controls['max_input'] = max_input
+
+        elif filter_type == 'selection':
+            # 选择列表筛选
+            options = config.get('options', [])
+            list_widget = QListWidget()
+            list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
+            for option in options:
+                item = QListWidgetItem(option)
+                list_widget.addItem(item)
+            group_layout.addWidget(list_widget)
+            filter_controls['list_widget'] = list_widget
+
+        elif filter_type == 'date':
+            # 日期范围筛选
+            date_layout = QGridLayout()
+
+            date_layout.addWidget(QLabel("开始日期:"), 0, 0)
+            start_date = QDateTimeEdit()
+            start_date.setCalendarPopup(True)
+            start_date.setDateTime(QDateTime.currentDateTime().addDays(-30))
+            date_layout.addWidget(start_date, 0, 1)
+
+            date_layout.addWidget(QLabel("结束日期:"), 1, 0)
+            end_date = QDateTimeEdit()
+            end_date.setCalendarPopup(True)
+            end_date.setDateTime(QDateTime.currentDateTime())
+            date_layout.addWidget(end_date, 1, 1)
+
+            group_layout.addLayout(date_layout)
+            filter_controls['start_date'] = start_date
+            filter_controls['end_date'] = end_date
+
+        # 存储筛选控件
+        self.filters[column_name] = {
+            'group': group,
+            'type': filter_type,
+            'controls': filter_controls
+        }
+
+        self.filter_layout.addWidget(group)
+
+    def get_filters(self) -> Dict[str, Any]:
+        """获取当前的筛选设置"""
+        active_filters = {}
+
+        for column_name, filter_info in self.filters.items():
+            group = filter_info['group']
+            filter_type = filter_info['type']
+            controls = filter_info['controls']
+
+            if not group.isChecked():
+                continue
+
+            filter_config = {
+                'enabled': True,
+                'type': filter_type
+            }
+
+            if filter_type == 'text':
+                text_value = controls['text_input'].text().strip()
+                if text_value:
+                    filter_config['value'] = text_value
+
+            elif filter_type == 'numeric':
+                min_text = controls['min_input'].text().strip()
+                max_text = controls['max_input'].text().strip()
+
+                try:
+                    if min_text:
+                        filter_config['min_value'] = float(min_text)
+                    if max_text:
+                        filter_config['max_value'] = float(max_text)
+                except ValueError:
+                    continue
+
+            elif filter_type == 'selection':
+                list_widget = controls['list_widget']
+                selected_items = []
+                for i in range(list_widget.count()):
+                    item = list_widget.item(i)
+                    if item.isSelected():
+                        selected_items.append(item.text())
+
+                if selected_items:
+                    filter_config['selected_values'] = selected_items
+
+            elif filter_type == 'date':
+                start_date = controls['start_date'].dateTime().toPyDateTime()
+                end_date = controls['end_date'].dateTime().toPyDateTime()
+                filter_config['start_date'] = start_date
+                filter_config['end_date'] = end_date
+
+            # 只有当筛选条件有效时才添加
+            if len(filter_config) > 2:  # enabled和type之外还有其他条件
+                active_filters[column_name] = filter_config
+
+        return active_filters
+
+    def reset_filters(self):
+        """重置所有筛选条件"""
+        for filter_info in self.filters.values():
+            group = filter_info['group']
+            group.setChecked(False)
+
+            filter_type = filter_info['type']
+            controls = filter_info['controls']
+
+            if filter_type == 'text':
+                controls['text_input'].clear()
+            elif filter_type == 'numeric':
+                controls['min_input'].clear()
+                controls['max_input'].clear()
+            elif filter_type == 'selection':
+                list_widget = controls['list_widget']
+                list_widget.clearSelection()
+            elif filter_type == 'date':
+                controls['start_date'].setDateTime(QDateTime.currentDateTime().addDays(-30))
+                controls['end_date'].setDateTime(QDateTime.currentDateTime())

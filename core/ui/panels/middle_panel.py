@@ -63,36 +63,38 @@ class ChartCanvas(QWidget):
 
         # 获取统一图表服务
         try:
+            from core.services.unified_chart_service import get_unified_chart_service
             self.chart_service = get_unified_chart_service()
-        except:
-            logger.warning("统一图表服务不可用")
+        except Exception as e:
+            logger.warning(f"统一图表服务不可用: {e}")
             self.chart_service = None
 
         # 创建图表控件
         try:
+            from core.services.unified_chart_service import create_chart_widget
             self.chart_widget = create_chart_widget(
                 parent=self, chart_id="middle_panel_chart")
-        except:
-            logger.warning("无法创建图表控件")
-            self.chart_widget = None
-        if self.chart_widget:
-            layout.addWidget(self.chart_widget)
 
-            # 连接信号
-            self.chart_widget.request_stat_dialog.connect(
-                self.request_stat_dialog.emit)
-            self.chart_widget.error_occurred.connect(self._on_chart_error)
+            # 检查是否是真正的ChartWidget实例，而不是错误占位符
+            if not isinstance(self.chart_widget, QLabel):
+                layout.addWidget(self.chart_widget)
 
-            # 添加进度信号连接
-            if hasattr(self.chart_widget, 'loading_progress'):
-                self.chart_widget.loading_progress.connect(
-                    self.loading_progress.emit)
-        else:
-            # 创建错误占位符
-            placeholder = QLabel("图表控件创建失败")
-            placeholder.setAlignment(Qt.AlignCenter)
-            placeholder.setStyleSheet("color: #dc3545; font-size: 14px;")
-            layout.addWidget(placeholder)
+                # 连接信号
+                self.chart_widget.request_stat_dialog.connect(
+                    self.request_stat_dialog.emit)
+                self.chart_widget.error_occurred.connect(self._on_chart_error)
+
+                # 添加进度信号连接
+                if hasattr(self.chart_widget, 'loading_progress'):
+                    self.chart_widget.loading_progress.connect(
+                        self.loading_progress.emit)
+            else:
+                # 如果是错误占位符，创建FallbackChartWidget
+                logger.warning("chart_widget是错误占位符，创建FallbackChartWidget")
+                self._create_fallback_chart_widget(layout, self.chart_widget.text())
+        except Exception as e:
+            logger.error(f"创建图表控件失败: {e}")
+            self._create_fallback_chart_widget(layout, f"图表控件创建失败: {e}")
 
         # 数据
         self.stock_data = None
@@ -115,23 +117,23 @@ class ChartCanvas(QWidget):
         # 获取渐进式加载管理器
         try:
             self.progressive_loader = get_progressive_loader()
-        except:
-            logger.warning("渐进式加载管理器不可用")
+        except Exception as e:
+            logger.warning(f"渐进式加载管理器不可用: {e}")
             self.progressive_loader = None
 
         # 获取更新节流器
         try:
             self.update_throttler = get_update_throttler()
-        except:
-            logger.warning("更新节流器不可用")
+        except Exception as e:
+            logger.warning(f"更新节流器不可用: {e}")
             self.update_throttler = None
 
         # 获取性能监控器
         if PERFORMANCE_MONITORING:
             try:
                 self.performance_monitor = get_performance_monitor()
-            except:
-                logger.warning("性能监控器不可用")
+            except Exception as e:
+                logger.warning(f"性能监控器不可用: {e}")
                 self.performance_monitor = None
         else:
             self.performance_monitor = None
@@ -238,6 +240,55 @@ class ChartCanvas(QWidget):
         self.loading_timer.timeout.connect(self._update_loading_time)
         self.loading_time = 0
 
+    def _create_fallback_chart_widget(self, layout, error_message):
+        """创建备用图表控件，确保提供与ChartWidget相同的关键接口"""
+        from PyQt5.QtWidgets import QVBoxLayout, QLabel
+        from PyQt5.QtCore import pyqtSignal, Qt
+
+        class FallbackChartWidget(QWidget):
+            """当ChartWidget创建失败时使用的替代组件"""
+            # 模拟ChartWidget的关键信号
+            request_stat_dialog = pyqtSignal(tuple)
+            error_occurred = pyqtSignal(str)
+            loading_progress = pyqtSignal(int, str)
+
+            def __init__(self, parent=None, error_message="图表控件创建失败"):
+                super().__init__(parent)
+                self.layout = QVBoxLayout(self)
+                self.error_label = QLabel(error_message)
+                self.error_label.setAlignment(Qt.AlignCenter)
+                self.error_label.setStyleSheet("color: #dc3545; font-size: 14px;")
+                self.layout.addWidget(self.error_label)
+
+            def update_chart(self, data=None):
+                """模拟ChartWidget的update_chart方法"""
+                logger.warning(f"FallbackChartWidget.update_chart被调用，但不执行任何操作")
+                pass
+
+            def apply_theme(self):
+                """模拟ChartWidget的apply_theme方法"""
+                pass
+
+            def update_basic_kdata(self, kdata):
+                """模拟ChartWidget的update_basic_kdata方法"""
+                pass
+
+            def update_volume(self, kdata):
+                """模拟ChartWidget的update_volume方法"""
+                pass
+
+            def update_indicators(self, kdata, indicators=None):
+                """模拟ChartWidget的update_indicators方法"""
+                pass
+
+        # 创建并添加FallbackChartWidget
+        fallback_widget = FallbackChartWidget(self, error_message)
+        layout.addWidget(fallback_widget)
+        self.chart_widget = fallback_widget
+
+        # 连接信号
+        self.chart_widget.error_occurred.connect(self._on_chart_error)
+
     def _setup_chart(self):
         """设置图表布局 - 使用统一图表服务"""
         # 图表布局由ChartWidget自动管理
@@ -247,41 +298,77 @@ class ChartCanvas(QWidget):
     def update_chart(self, stock_data: Dict[str, Any]):
         """更新图表数据 - 使用统一图表服务"""
         try:
+            logger.info("开始更新图表数据")
             self.stock_data = stock_data
             self.current_stock = stock_data.get('stock_code', '')
+            logger.info(f"更新图表: {self.current_stock}")
 
             # 获取OHLCV数据 - 支持多种数据格式
             kline_data = stock_data.get(
                 'kline_data', stock_data.get('kdata', []))
+            logger.info(f"获取到K线数据类型: {type(kline_data)}")
 
             # 检查数据是否为空
             import pandas as pd
             if kline_data is None:
+                logger.error("K线数据为None，无法更新图表")
                 self._show_no_data_message()
                 return
 
-            # 处理DataFrame
+            # 处理不同类型的K线数据
             if isinstance(kline_data, pd.DataFrame):
+                # 处理DataFrame
                 if kline_data.empty:
+                    logger.error("K线数据为空DataFrame，无法更新图表")
                     self._show_no_data_message()
                     return
+                logger.info(f"K线数据为DataFrame，形状: {kline_data.shape}, 列: {list(kline_data.columns)}")
                 self.current_kdata = kline_data
-            # 处理列表格式
             elif isinstance(kline_data, list):
+                # 处理列表格式
                 if not kline_data:
+                    logger.error("K线数据为空列表，无法更新图表")
                     self._show_no_data_message()
                     return
+                logger.info(f"K线数据为列表，长度: {len(kline_data)}")
                 self.current_kdata = pd.DataFrame(kline_data)
                 if not self.current_kdata.empty and 'date' in self.current_kdata.columns:
                     self.current_kdata.set_index('date', inplace=True)
+            elif isinstance(kline_data, dict):
+                # 处理字典格式 - 新增支持
+                logger.info(f"K线数据为字典，键: {list(kline_data.keys())}")
+
+                # 尝试从字典中提取DataFrame
+                if 'data' in kline_data:
+                    df_data = kline_data.get('data')
+                    if isinstance(df_data, pd.DataFrame):
+                        self.current_kdata = df_data
+                        logger.info(f"从字典的'data'键中获取DataFrame，形状: {df_data.shape}")
+                    elif isinstance(df_data, list) and df_data:
+                        self.current_kdata = pd.DataFrame(df_data)
+                        logger.info(f"从字典的'data'键中获取列表并转换为DataFrame，长度: {len(df_data)}")
+                    else:
+                        logger.error(f"字典中的'data'键内容无效: {type(df_data)}")
+                        self._show_no_data_message()
+                        return
+                else:
+                    # 尝试将整个字典转换为DataFrame
+                    try:
+                        self.current_kdata = pd.DataFrame([kline_data])
+                        logger.info(f"将整个字典转换为单行DataFrame")
+                    except Exception as e:
+                        logger.error(f"无法将字典转换为DataFrame: {e}")
+                        self._show_no_data_message()
+                        return
             else:
                 logger.warning(
-                    f"Unsupported kline_data type: {type(kline_data)}")
+                    f"不支持的K线数据类型: {type(kline_data)}")
                 self._show_no_data_message()
                 return
 
             # 使用渐进式加载管理器更新图表
             if self.progressive_loader and self.chart_widget:
+                logger.info("使用渐进式加载更新图表")
                 # 转换数据格式为ChartWidget期望的格式
                 chart_data = {
                     'kdata': self.current_kdata,
@@ -305,6 +392,7 @@ class ChartCanvas(QWidget):
                         self._on_loading_progress)
             # 回退到普通更新
             elif self.chart_widget:
+                logger.info("使用普通方式更新图表")
                 # 转换数据格式为ChartWidget期望的格式
                 chart_data = {
                     'kdata': self.current_kdata,
@@ -316,8 +404,10 @@ class ChartCanvas(QWidget):
             else:
                 logger.warning("图表控件不可用，无法更新图表")
 
+            logger.info("图表数据更新完成")
+
         except Exception as e:
-            logger.error(f"Failed to update chart: {e}")
+            logger.error(f"更新图表失败: {e}", exc_info=True)
             self._show_error_message(str(e))
 
     def _update_loading_time(self):
@@ -528,32 +618,35 @@ class ChartCanvas(QWidget):
         """处理图表错误"""
         self._show_error_message(error_msg)
 
-    def mousePressEvent(self, event):
-        """鼠标按下事件"""
-        super().mousePressEvent(event)
-        # 将事件传递给图表控件
-        if hasattr(self, 'chart_widget') and self.chart_widget:
-            self.chart_widget.mousePressEvent(event)
+    # 移除由ChartCanvas接管的鼠标事件，让底层的matplotlib canvas自行处理
+    # def mousePressEvent(self, event):
+    #     if event.button() == Qt.LeftButton and self.chart_widget:
+    #         self.selecting = True
+    #         self.selection_start = event.pos()
+    #         self.chart_widget.start_selection(self.selection_start)
+    #     super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event):
-        """鼠标移动事件"""
-        super().mouseMoveEvent(event)
-        # 将事件传递给图表控件
-        if hasattr(self, 'chart_widget') and self.chart_widget:
-            self.chart_widget.mouseMoveEvent(event)
+    # def mouseMoveEvent(self, event):
+    #     if self.selecting and self.chart_widget:
+    #         # 将事件坐标转换为chart_widget的局部坐标
+    #         local_pos = self.chart_widget.mapFrom(self, event.pos())
+    #
+    #         # 这里需要创建一个新的QMouseEvent，因为原始事件的坐标是相对于ChartCanvas的
+    #         from PyQt5.QtGui import QMouseEvent
+    #         new_event = QMouseEvent(event.type(), local_pos, event.button(), event.buttons(), event.modifiers())
+    #
+    #         # 直接调用chart_widget的事件处理函数
+    #         if hasattr(self.chart_widget, 'mouseMoveEvent'):
+    #             self.chart_widget.mouseMoveEvent(new_event)
+    #
+    # super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event):
-        """鼠标释放事件"""
-        super().mouseReleaseEvent(event)
-        # 将事件传递给图表控件
-        if hasattr(self, 'chart_widget') and self.chart_widget:
-            self.chart_widget.mouseReleaseEvent(event)
-
-    def _get_selection_indices(self):
-        """获取选择区间的索引"""
-        if hasattr(self, 'chart_widget') and self.chart_widget:
-            return self.chart_widget.get_selection_indices()
-        return None
+    # def mouseReleaseEvent(self, event):
+    #     if event.button() == Qt.LeftButton and self.selecting and self.chart_widget:
+    #         self.selecting = False
+    #         self.selection_end = event.pos()
+    #         # ... (省略)
+    #     super().mouseReleaseEvent(event)
 
 
 class MiddlePanel(BasePanel):
@@ -672,16 +765,7 @@ class MiddlePanel(BasePanel):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # 创建分裂器
-        splitter = QSplitter(Qt.Vertical)
-        main_layout.addWidget(splitter)
-
-        # 创建图表画布
-        self.chart_canvas = ChartCanvas(self._root_frame)
-        self.add_widget('chart_canvas', self.chart_canvas)
-        splitter.addWidget(self.chart_canvas)
-
-        # 创建工具栏
+        # 创建工具栏 - 移动到图表上方
         toolbar = QToolBar()
         toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         main_layout.addWidget(toolbar)
@@ -743,23 +827,20 @@ class MiddlePanel(BasePanel):
 
         toolbar.addSeparator()
 
-        # 刷新按钮
-        refresh_action = QAction("刷新", self._root_frame)
-        refresh_action.setStatusTip("刷新图表数据")
-        toolbar.addAction(refresh_action)
-        self.add_widget('refresh_action', refresh_action)
-
-        # 全屏按钮
-        fullscreen_action = QAction("全屏", self._root_frame)
-        fullscreen_action.setStatusTip("全屏显示图表")
-        toolbar.addAction(fullscreen_action)
-        self.add_widget('fullscreen_action', fullscreen_action)
-
         # 多屏切换按钮
         multi_screen_action = QAction("多屏", self._root_frame)
         multi_screen_action.setStatusTip("切换到多屏模式")
         toolbar.addAction(multi_screen_action)
         self.add_widget('multi_screen_action', multi_screen_action)
+
+        # 创建分裂器
+        splitter = QSplitter(Qt.Vertical)
+        main_layout.addWidget(splitter)
+
+        # 创建图表画布
+        self.chart_canvas = ChartCanvas(self._root_frame)
+        self.add_widget('chart_canvas', self.chart_canvas)
+        splitter.addWidget(self.chart_canvas)
 
         # 创建进度条
         progress_bar = QProgressBar()
@@ -804,34 +885,19 @@ class MiddlePanel(BasePanel):
     def _bind_events(self) -> None:
         """绑定事件处理"""
         try:
-            # 周期选择变化
+            # 周期选择变化 - 正确地将currentText作为参数传递
             period_combo = self.get_widget('period_combo')
             period_combo.currentTextChanged.connect(self._on_period_changed)
 
-            # 时间范围选择变化
+            # 时间范围选择变化 - 正确地将currentText作为参数传递
             time_range_combo = self.get_widget('time_range_combo')
-            time_range_combo.currentTextChanged.connect(
-                self._on_time_range_changed)
+            time_range_combo.currentTextChanged.connect(self._on_time_range_changed)
 
-            # 回测区间选择变化
-            start_date_edit = self.get_widget('start_date_edit')
-            start_date_edit.dateChanged.connect(self._on_date_range_changed)
-
-            end_date_edit = self.get_widget('end_date_edit')
-            end_date_edit.dateChanged.connect(self._on_date_range_changed)
-
-            # 图表类型选择变化
+            # 图表类型选择变化 - 正确地将currentText作为参数传递
             chart_type_combo = self.get_widget('chart_type_combo')
-            chart_type_combo.currentTextChanged.connect(
-                self._on_chart_type_changed)
+            chart_type_combo.currentTextChanged.connect(self._on_chart_type_changed)
 
             # 工具栏按钮
-            refresh_action = self.get_widget('refresh_action')
-            refresh_action.triggered.connect(self._refresh_chart)
-
-            fullscreen_action = self.get_widget('fullscreen_action')
-            fullscreen_action.triggered.connect(self._toggle_fullscreen)
-
             multi_screen_action = self.get_widget('multi_screen_action')
             multi_screen_action.triggered.connect(self._toggle_multi_screen)
 
@@ -873,49 +939,68 @@ class MiddlePanel(BasePanel):
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理数据准备就绪事件，更新图表"""
-        data = event.data
-        if not data or data.get('kline') is None:
-            self._update_status("K线数据为空，无法渲染图表")
-            # 可以在这里显示一个空状态或错误信息
-            return
+        """处理UI数据就绪事件，更新图表"""
+        try:
+            logger.info(f"MiddlePanel收到UIDataReadyEvent事件，源: {event.source}")
 
-        self._current_stock_code = data.get('stock_code')
-        self._current_stock_name = data.get('stock_name')
+            # 确保从event.ui_data获取数据
+            data = event.ui_data
+            if not data:
+                logger.error("事件中未包含ui_data")
+                self._update_status("错误：事件数据为空")
+                return
 
-        self._update_status(f"正在渲染 {self._current_stock_name} 的图表...")
+            self.current_stock_code = event.stock_code
+            self.current_stock_name = event.stock_name
 
-        # 准备图表所需的数据包
-        chart_data_package = self._prepare_chart_data(data)
+            # 从数据中提取K线数据
+            kdata = data.get('kline_data')
+            if kdata is None:
+                kdata = data.get('kline')  # 兼容旧的kline键
 
-        self.chart_canvas.update_chart(chart_data_package)
-        self._update_status(f"{self._current_stock_name} 图表渲染完成")
+            if kdata is None:
+                logger.error("K线数据为None")
+                self._update_status("错误：无法解析K线数据")
+                return
+
+            if kdata.empty:
+                logger.warning(
+                    f"K线数据为空，无法更新图表。股票代码: {self.current_stock_code}")
+                # 传递一个空的DataFrame以显示"无数据"
+                self.chart_canvas.update_chart({'kdata': pd.DataFrame()})
+                self._update_status("无可用K线数据")
+                return
+
+            self.current_kdata = kdata
+
+            # 验证数据量是否与时间范围匹配
+            if not self._validate_data_count(kdata, self._current_time_range):
+                logger.warning(f"数据量验证失败，时间范围: {self._current_time_range}, 数据条数: {len(kdata)}")
+                # 继续处理，但在状态栏显示警告
+                self._update_status(f"已加载 {self.current_stock_name} ({len(kdata)} 条数据) - 数据量可能不匹配")
+            else:
+                self._update_status(f"已加载 {self.current_stock_name} ({len(kdata)} 条数据)")
+
+            # 准备并更新图表
+            chart_data = self._prepare_chart_data(data)
+            self.chart_canvas.update_chart(chart_data)
+
+        except Exception as e:
+            logger.error(f"处理UIDataReadyEvent事件失败: {e}", exc_info=True)
+            self._update_status(f"错误: {e}")
 
     def _prepare_chart_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        将从协调器接收到的统一数据模型转换为图表控件所需的数据格式。
-        """
-        # technical_analysis 的原始格式: {'MA': {'5': [...], '10': [...]}, 'MACD': {'DIF': [...], ...}}
-        raw_indicators = data.get('analysis', {}).get('technical_analysis', {})
-
-        # 转换指标数据格式以匹配图表控件的期望
-        # 例如，图表控件可能需要一个更扁平的结构
-        formatted_indicators = {}
-        if 'MA' in raw_indicators:
-            formatted_indicators['MA'] = raw_indicators['MA']
-        if 'MACD' in raw_indicators:
-            formatted_indicators['MACD'] = raw_indicators['MACD']
-        # 可以为其他指标添加更多转换逻辑...
-
-        return {
-            'stock_code': data.get('stock_code'),
-            'kline_data': data.get('kline'),
-            'indicators_data': formatted_indicators
-        }
+        """准备传递给图表控件的数据"""
+        chart_data = data.copy()
+        if hasattr(self, 'current_stock_name'):
+            chart_data['title'] = self.current_stock_name
+        if hasattr(self, 'current_stock_code'):
+            chart_data['stock_code'] = self.current_stock_code
+        return chart_data
 
     def _refresh_chart(self) -> None:
-        """刷新图表"""
-        if self._current_stock_code:
+        """刷新图表，使用当前数据"""
+        try:
             # 触发协调器重新加载数据
             self._update_status("正在刷新数据...")
             self.event_bus.publish(
@@ -924,18 +1009,92 @@ class MiddlePanel(BasePanel):
                     stock_name=self._current_stock_name
                 )
             )
-        else:
-            self._update_status("请先选择股票")
+        except Exception as e:
+            logger.error(f"Failed to refresh chart: {e}")
+            self._update_status(f"刷新失败: {e}")
 
-    def _toggle_fullscreen(self) -> None:
-        """切换全屏显示"""
+    def _load_chart_data(self) -> None:
+        """加载图表数据
+
+        根据当前的股票代码、周期、时间范围和图表类型，创建并发布StockSelectedEvent事件。
+        如果没有选择股票，则仅保存当前的参数设置，不加载数据。
+        """
         try:
-            # 这里可以实现全屏功能
-            # 暂时显示提示信息
-            QMessageBox.information(self._root_frame, "提示", "全屏功能开发中...")
+            # 确保股票代码存在
+            if not self._current_stock_code:
+                # 仅保存参数设置，不发出警告
+                # logger.warning("无法加载图表数据：股票代码为空")
+                return
+
+            logger.info(f"加载图表数据：{self._current_stock_code}, 周期：{self._current_period}, 时间范围：{self._current_time_range}, 图表类型：{self._current_chart_type}")
+
+            # 创建并发布StockSelectedEvent事件
+            event = StockSelectedEvent(
+                stock_code=self._current_stock_code,
+                stock_name=self._current_stock_name,
+                period=self._current_period,
+                time_range=self._current_time_range,
+                chart_type=self._current_chart_type
+            )
+
+            # 发布事件
+            self._update_status(f"正在加载 {self._current_stock_name} 数据...")
+            self.event_bus.publish(event)
 
         except Exception as e:
-            logger.error(f"Failed to toggle fullscreen: {e}")
+            logger.error(f"加载图表数据失败: {e}", exc_info=True)
+            self._update_status(f"加载失败: {e}")
+
+    def _on_stock_selected(self, event: StockSelectedEvent) -> None:
+        """处理股票选择事件
+
+        当用户选择了一只股票时，更新当前的股票代码和名称，然后加载图表数据。
+
+        Args:
+            event: 股票选择事件
+        """
+        try:
+            if not event or not event.stock_code:
+                return
+
+            # 更新当前股票信息
+            self._current_stock_code = event.stock_code
+            self._current_stock_name = event.stock_name
+
+            # 如果事件中包含周期、时间范围和图表类型，则更新当前值
+            # 否则使用已有的默认值
+            if event.period:
+                self._current_period = event.period
+
+            if event.time_range:
+                self._current_time_range = event.time_range
+
+            if event.chart_type:
+                self._current_chart_type = event.chart_type
+
+            # 更新UI组件显示
+            period_combo = self.get_widget('period_combo')
+            if period_combo and self._current_period:
+                index = period_combo.findText(self._current_period)
+                if index >= 0:
+                    period_combo.setCurrentIndex(index)
+
+            time_range_combo = self.get_widget('time_range_combo')
+            if time_range_combo and self._current_time_range:
+                index = time_range_combo.findText(self._current_time_range)
+                if index >= 0:
+                    time_range_combo.setCurrentIndex(index)
+
+            chart_type_combo = self.get_widget('chart_type_combo')
+            if chart_type_combo and self._current_chart_type:
+                index = chart_type_combo.findText(self._current_chart_type)
+                if index >= 0:
+                    chart_type_combo.setCurrentIndex(index)
+
+            logger.info(f"股票选择: {self._current_stock_name} ({self._current_stock_code})")
+
+        except Exception as e:
+            logger.error(f"处理股票选择事件失败: {e}", exc_info=True)
 
     def _toggle_multi_screen(self) -> None:
         """切换多屏显示"""
@@ -961,11 +1120,43 @@ class MiddlePanel(BasePanel):
 
             # 创建多屏面板
             from gui.widgets.multi_chart_panel import MultiChartPanel
-            main_chart_frame = self.get_widget('main_chart_frame')
+            from PyQt5.QtWidgets import QVBoxLayout
 
+            # 检查main_chart_frame是否存在，如果不存在则使用chart_canvas的父窗口
+            main_chart_frame = self.get_widget('main_chart_frame')
+            if main_chart_frame is None:
+                # 使用chart_canvas的父窗口作为容器
+                main_chart_frame = chart_canvas.parent()
+                # 将其添加到widgets中，以便后续可以通过get_widget获取
+                self.add_widget('main_chart_frame', main_chart_frame)
+
+            # 确保main_chart_frame有布局
+            if main_chart_frame.layout() is None:
+                main_chart_layout = QVBoxLayout(main_chart_frame)
+                main_chart_layout.setContentsMargins(0, 0, 0, 0)
+                main_chart_layout.setSpacing(0)
+            else:
+                main_chart_layout = main_chart_frame.layout()
+
+            # 创建多屏面板
             self._multi_screen_panel = MultiChartPanel(main_chart_frame)
-            main_chart_layout = main_chart_frame.layout()
             main_chart_layout.addWidget(self._multi_screen_panel)
+
+            # 设置数据管理器
+            from core.services.unified_data_manager import get_unified_data_manager
+            data_manager = get_unified_data_manager()
+            if data_manager:
+                logger.info("为多屏面板设置数据管理器")
+                self._multi_screen_panel.set_data_manager(data_manager)
+            else:
+                logger.error("无法获取数据管理器")
+
+            # 设置股票列表
+            if hasattr(self.coordinator, 'get_stock_list'):
+                stock_list = self.coordinator.get_stock_list()
+                if stock_list:
+                    logger.info(f"为多屏面板设置股票列表，共 {len(stock_list)} 只股票")
+                    self._multi_screen_panel.set_stock_list(stock_list)
 
             # 更新按钮文本
             multi_screen_action = self.get_widget('multi_screen_action')
@@ -981,6 +1172,10 @@ class MiddlePanel(BasePanel):
                 )
 
             self._update_status("已切换到多屏模式")
+
+            # 发布多屏模式切换事件
+            from core.events.events import MultiScreenToggleEvent
+            self.event_bus.publish(MultiScreenToggleEvent(is_multi_screen=True))
 
         except Exception as e:
             logger.error(f"Failed to switch to multi screen: {e}")
@@ -1006,6 +1201,10 @@ class MiddlePanel(BasePanel):
 
             self._update_status("已切换到单屏模式")
 
+            # 发布多屏模式切换事件
+            from core.events.events import MultiScreenToggleEvent
+            self.event_bus.publish(MultiScreenToggleEvent(is_multi_screen=False))
+
         except Exception as e:
             logger.error(f"Failed to switch to single screen: {e}")
             raise
@@ -1015,64 +1214,172 @@ class MiddlePanel(BasePanel):
         status_label = self.get_widget('status_label')
         status_label.setText(message)
 
-    @pyqtSlot()
-    def _on_period_changed(self) -> None:
-        """周期变化处理"""
+    def _on_period_changed(self, period) -> None:
+        """处理周期变更事件"""
         try:
-            period_combo = self.get_widget('period_combo')
-            self._current_period = period_combo.currentText()
+            logger.info(f"周期变更: {period}")
+            self._current_period = period
 
-            # 如果有选择的股票，重新加载数据
-            if self._current_stock_code:
-                self._load_chart_data()
+            # 加载图表数据
+            self._load_chart_data()
 
         except Exception as e:
-            logger.error(f"Failed to handle period change: {e}")
+            logger.error(f"处理周期变更失败: {e}", exc_info=True)
 
-    @pyqtSlot()
-    def _on_time_range_changed(self) -> None:
-        """时间范围变化处理"""
+    def _on_time_range_changed(self, time_range) -> None:
+        """处理时间范围变更事件"""
         try:
-            time_range_combo = self.get_widget('time_range_combo')
-            self._current_time_range = time_range_combo.currentText()
+            logger.info(f"时间范围变更: {time_range}")
+            self._current_time_range = time_range
 
-            # 如果有选择的股票，重新加载数据
-            if self._current_stock_code:
-                self._load_chart_data()
+            # 自动更新回测区间
+            start_date, end_date = self._parse_time_range_to_dates(time_range)
 
-        except Exception as e:
-            logger.error(f"Failed to handle time range change: {e}")
-
-    @pyqtSlot()
-    def _on_date_range_changed(self) -> None:
-        """回测区间变化处理"""
-        try:
+            # 更新回测区间控件
             start_date_edit = self.get_widget('start_date_edit')
             end_date_edit = self.get_widget('end_date_edit')
 
-            self._start_date = start_date_edit.date()
-            self._end_date = end_date_edit.date()
+            if start_date_edit:
+                start_date_edit.setDate(start_date)
+            if end_date_edit:
+                end_date_edit.setDate(end_date)
 
-            # 如果有选择的股票，重新加载数据
-            if self._current_stock_code:
-                self._load_chart_data()
+            logger.info(f"回测区间已自动更新: {start_date.toString('yyyy-MM-dd')} 至 {end_date.toString('yyyy-MM-dd')}")
+
+            # 验证周期和时间范围的兼容性
+            if not self._validate_period_time_range_compatibility(self._current_period, time_range):
+                self._update_status(f"警告：{self._current_period} 与 {time_range} 可能不兼容")
+
+            # 加载图表数据
+            self._load_chart_data()
 
         except Exception as e:
-            logger.error(f"Failed to handle date range change: {e}")
+            logger.error(f"处理时间范围变更失败: {e}", exc_info=True)
 
-    @pyqtSlot()
-    def _on_chart_type_changed(self) -> None:
-        """图表类型变化处理"""
+    def _parse_time_range_to_dates(self, time_range: str) -> tuple:
+        """将时间范围文本解析为开始和结束日期
+
+        Args:
+            time_range: 时间范围文本，如"最近7天"、"最近1年"等
+
+        Returns:
+            tuple: (开始日期, 结束日期) 的QDate对象
+        """
+        from PyQt5.QtCore import QDate
+
+        end_date = QDate.currentDate()  # 结束日期总是当前日期
+
+        # 时间范围映射（天数）
+        time_range_map = {
+            "最近7天": 7,
+            "最近30天": 30,
+            "最近90天": 90,
+            "最近180天": 180,
+            "最近1年": 365,
+            "最近2年": 365 * 2,
+            "最近3年": 365 * 3,
+            "最近5年": 365 * 5,
+            "全部": 365 * 10  # 对于"全部"，我们假设为10年
+        }
+
+        days = time_range_map.get(time_range, 365)  # 默认1年
+        start_date = end_date.addDays(-days)
+
+        return start_date, end_date
+
+    def _validate_period_time_range_compatibility(self, period: str, time_range: str) -> bool:
+        """验证周期和时间范围的兼容性
+
+        Args:
+            period: 周期，如"日线"、"5分钟"等
+            time_range: 时间范围，如"最近7天"、"最近1年"等
+
+        Returns:
+            bool: 是否兼容
+        """
         try:
-            chart_type_combo = self.get_widget('chart_type_combo')
-            self._current_chart_type = chart_type_combo.currentText()
+            # 对于分钟级别的数据，时间范围不应该太长
+            if period in ['分时', '5分钟', '15分钟', '30分钟', '60分钟']:
+                long_ranges = ['最近2年', '最近3年', '最近5年', '全部']
+                if time_range in long_ranges:
+                    logger.warning(f"分钟级数据 {period} 与长时间范围 {time_range} 可能不兼容，数据量会很大")
+                    return False
 
-            # 如果有选择的股票，重新加载数据
-            if self._current_stock_code:
-                self._load_chart_data()
+            # 对于短时间范围，周线和月线可能数据点太少
+            if period in ['周线', '月线']:
+                short_ranges = ['最近7天', '最近30天']
+                if time_range in short_ranges:
+                    logger.warning(f"长周期数据 {period} 与短时间范围 {time_range} 可能不兼容，数据点太少")
+                    return False
+
+            return True
 
         except Exception as e:
-            logger.error(f"Failed to handle chart type change: {e}")
+            logger.error(f"验证周期和时间范围兼容性失败: {e}")
+            return True  # 出错时默认返回兼容
+
+    def _validate_data_count(self, data, time_range: str) -> bool:
+        """验证数据量是否与时间范围匹配
+
+        Args:
+            data: 数据（DataFrame或list）
+            time_range: 时间范围文本
+
+        Returns:
+            bool: 数据量是否合理
+        """
+        try:
+            if not data:
+                logger.warning("数据为空")
+                return False
+
+            # 获取数据长度
+            data_length = len(data) if hasattr(data, '__len__') else 0
+            if data_length == 0:
+                logger.warning("数据长度为0")
+                return False
+
+            # 时间范围映射（预期交易日数量）
+            time_range_map = {
+                "最近7天": (3, 7),      # 最少3天，最多7天
+                "最近30天": (15, 25),   # 最少15天，最多25天
+                "最近90天": (45, 70),   # 最少45天，最多70天
+                "最近180天": (90, 140),  # 最少90天，最多140天
+                "最近1年": (200, 300),  # 最少200天，最多300天
+                "最近2年": (400, 600),  # 最少400天，最多600天
+                "最近3年": (600, 900),  # 最少600天，最多900天
+                "最近5年": (1000, 1500),  # 最少1000天，最多1500天
+            }
+
+            if time_range in time_range_map:
+                min_expected, max_expected = time_range_map[time_range]
+
+                if data_length < min_expected:
+                    logger.warning(f"数据量可能不足：{time_range} 期望至少{min_expected}条数据，实际获得{data_length}条")
+                    return False
+                elif data_length > max_expected * 2:  # 如果数据量过多也提醒
+                    logger.warning(f"数据量可能过多：{time_range} 期望最多{max_expected}条数据，实际获得{data_length}条")
+                    # 不返回False，因为数据多不是错误
+                else:
+                    logger.info(f"数据量正常：{time_range} 获得{data_length}条数据，在预期范围内")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"验证数据量失败: {e}")
+            return True  # 出错时默认返回正常
+
+    def _on_chart_type_changed(self, chart_type) -> None:
+        """处理图表类型变更事件"""
+        try:
+            logger.info(f"图表类型变更: {chart_type}")
+            self._current_chart_type = chart_type
+
+            # 加载图表数据
+            self._load_chart_data()
+
+        except Exception as e:
+            logger.error(f"处理图表类型变更失败: {e}", exc_info=True)
 
     @pyqtSlot(object)
     def on_indicator_changed(self, event: IndicatorChangedEvent) -> None:
@@ -1082,8 +1389,8 @@ class MiddlePanel(BasePanel):
 
     def on_stock_selected(self, event: StockSelectedEvent) -> None:
         """处理股票选择事件"""
-        # 此方法已废弃，逻辑移至 _on_ui_data_ready
-        pass
+        # 调用内部方法处理股票选择事件
+        self._on_stock_selected(event)
 
     def get_current_stock(self) -> str:
         """获取当前股票代码"""

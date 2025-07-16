@@ -14,6 +14,8 @@ from typing import Tuple, Dict, Optional
 from datetime import datetime, timedelta
 import pandas as pd
 
+from optimization.update_throttler import get_update_throttler
+
 
 class CrosshairMixin:
     """十字光标功能Mixin
@@ -26,18 +28,38 @@ class CrosshairMixin:
         super().__init__()
         # 十字光标相关变量
         # 改为字典管理，键为 'price_v', 'volume_v', 'indicator_v', 'price_h'
-        self._crosshair_lines: Dict[str, object] = {}
+        self._crosshair_lines = {}  # 明确初始化为空字典
         self._crosshair_text = None
         self._crosshair_xtext = None
         self._crosshair_ytext = None
         self._last_crosshair_update_time = 0
         self._crosshair_event_id = None  # 存储事件连接ID，避免重复绑定
+        self._crosshair_initialized = False  # 跟踪十字光标是否已初始化
+
+        # 获取节流器实例
+        self.throttler = get_update_throttler()
 
     def enable_crosshair(self, force_rebind=False):
         """启用十字光标功能"""
         try:
-            if not self.crosshair_enabled:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("启用十字光标功能...")
+
+            if not hasattr(self, 'crosshair_enabled') or not self.crosshair_enabled:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("十字光标功能未启用，跳过。")
                 return
+
+            # 确保_crosshair_lines和_crosshair_event_id属性存在
+            if not hasattr(self, '_crosshair_lines'):
+                self._crosshair_lines = {}
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_lines属性")
+
+            if not hasattr(self, '_crosshair_event_id'):
+                self._crosshair_event_id = None
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_event_id属性")
 
             # 清除现有的十字光标元素
             self._clear_crosshair_elements()
@@ -46,11 +68,49 @@ class CrosshairMixin:
             if self._crosshair_event_id is None or force_rebind:
                 self._create_unified_crosshair_handler()
 
+            # 标记十字光标已初始化
+            self._crosshair_initialized = True
+
             # 限制X轴范围
             self._limit_xlim()
 
         except Exception as e:
-            self.log_manager.error(f"启用十字光标失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"启用十字光标失败: {str(e)}")
+            else:
+                print(f"启用十字光标失败: {str(e)}")
+
+    def reset_crosshair(self):
+        """
+        重置十字光标状态 - 在图表数据更新后调用
+        确保十字光标在图表更新后仍然正常工作
+        """
+        try:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("重置十字光标状态...")
+
+            # 确保_crosshair_lines是字典类型
+            if not isinstance(self._crosshair_lines, dict):
+                self._crosshair_lines = {}
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning("_crosshair_lines不是字典类型，已重置为空字典")
+
+            # 清除现有的十字光标元素
+            self._clear_crosshair_elements()
+
+            # 重置初始化状态
+            self._crosshair_initialized = False
+
+            # 重新启用十字光标
+            if hasattr(self, 'crosshair_enabled') and self.crosshair_enabled:
+                self.enable_crosshair(force_rebind=True)
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("十字光标已重置并启用")
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"重置十字光标失败: {e}")
+            else:
+                print(f"重置十字光标失败: {e}")
 
     def _limit_xlim(self):
         """限制X轴范围，防止越界"""
@@ -163,6 +223,18 @@ class CrosshairMixin:
     def _update_crosshair_lines(self, x_val: float, y_val: float, primary_color: str):
         """更新十字光标线条 - 修复多条线问题"""
         try:
+            # 检查图表是否已更新但十字光标未重新初始化
+            if not self._crosshair_initialized:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("检测到十字光标未初始化，正在重新初始化...")
+                self.enable_crosshair(force_rebind=True)
+
+            # 确保_crosshair_lines是字典类型
+            if not isinstance(self._crosshair_lines, dict):
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning(f"_crosshair_lines类型错误: {type(self._crosshair_lines)}，重置为空字典")
+                self._crosshair_lines = {}
+
             # 定义需要的线条及其对应的子图
             line_configs = [
                 ('price_v', self.price_ax, 'vertical'),
@@ -196,11 +268,20 @@ class CrosshairMixin:
                     line.set_visible(True)
 
         except Exception as e:
-            self.log_manager.error(f"更新十字光标线条失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新十字光标线条失败: {str(e)}")
+            else:
+                print(f"更新十字光标线条失败: {str(e)}")
 
     def _update_crosshair_text(self, event, x_val: float, y_val: float, info: str, text_color: str):
         """更新十字光标信息文本 - 修复悬浮框位置问题，让其跟随鼠标"""
         try:
+            # 确保_crosshair_text属性存在
+            if not hasattr(self, '_crosshair_text'):
+                self._crosshair_text = None
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_text属性")
+
             # 计算悬浮框位置 - 跟随鼠标但避免超出边界
             ax = self.price_ax
             if ax is None:
@@ -255,11 +336,25 @@ class CrosshairMixin:
                 self._crosshair_text.set_visible(True)
 
         except Exception as e:
-            self.log_manager.error(f"更新十字光标文本失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新十字光标文本失败: {str(e)}")
+            else:
+                print(f"更新十字光标文本失败: {str(e)}")
 
     def _update_crosshair_axis_labels(self, row, idx: int, kdata, x_val: float, y_val: float, primary_color: str):
         """更新十字光标轴标签"""
         try:
+            # 确保_crosshair_xtext和_crosshair_ytext属性存在
+            if not hasattr(self, '_crosshair_xtext'):
+                self._crosshair_xtext = None
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_xtext属性")
+
+            if not hasattr(self, '_crosshair_ytext'):
+                self._crosshair_ytext = None
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_ytext属性")
+
             # X轴标签（日期）
             date_str = self._safe_format_date(row, idx, kdata)
             if self.indicator_ax is not None:
@@ -301,11 +396,34 @@ class CrosshairMixin:
                     self._crosshair_ytext.set_visible(True)
 
         except Exception as e:
-            self.log_manager.error(f"更新十字光标轴标签失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"更新十字光标轴标签失败: {str(e)}")
+            else:
+                print(f"更新十字光标轴标签失败: {str(e)}")
 
     def _hide_crosshair_elements(self):
         """隐藏十字光标元素"""
         try:
+            # 确保所有属性存在
+            if not hasattr(self, '_crosshair_lines'):
+                self._crosshair_lines = {}
+
+            if not hasattr(self, '_crosshair_text'):
+                self._crosshair_text = None
+
+            if not hasattr(self, '_crosshair_xtext'):
+                self._crosshair_xtext = None
+
+            if not hasattr(self, '_crosshair_ytext'):
+                self._crosshair_ytext = None
+
+            # 确保_crosshair_lines是字典类型
+            if not isinstance(self._crosshair_lines, dict):
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning(f"_crosshair_lines类型错误: {type(self._crosshair_lines)}，重置为空字典")
+                self._crosshair_lines = {}
+                return
+
             # 隐藏线条
             for line in self._crosshair_lines.values():
                 if line is not None:
@@ -320,11 +438,28 @@ class CrosshairMixin:
                 self._crosshair_ytext.set_visible(False)
 
         except Exception as e:
-            self.log_manager.error(f"隐藏十字光标元素失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"隐藏十字光标元素失败: {str(e)}")
+            else:
+                print(f"隐藏十字光标元素失败: {str(e)}")
 
     def _clear_crosshair_elements(self):
         """清除十字光标元素"""
         try:
+            # 确保_crosshair_lines属性存在
+            if not hasattr(self, '_crosshair_lines'):
+                self._crosshair_lines = {}
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.info("初始化_crosshair_lines属性")
+                return
+
+            # 确保_crosshair_lines是字典类型
+            if not isinstance(self._crosshair_lines, dict):
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning(f"_crosshair_lines类型错误: {type(self._crosshair_lines)}，重置为空字典")
+                self._crosshair_lines = {}
+                return
+
             # 清除线条
             for line in self._crosshair_lines.values():
                 if line is not None:
@@ -335,44 +470,37 @@ class CrosshairMixin:
             self._crosshair_lines.clear()
 
             # 清除文本
-            if self._crosshair_text:
-                try:
-                    self._crosshair_text.remove()
-                except Exception:
-                    pass
-                self._crosshair_text = None
-
-            if self._crosshair_xtext:
-                try:
-                    self._crosshair_xtext.remove()
-                except Exception:
-                    pass
-                self._crosshair_xtext = None
-
-            if self._crosshair_ytext:
-                try:
-                    self._crosshair_ytext.remove()
-                except Exception:
-                    pass
-                self._crosshair_ytext = None
+            for attr in ['_crosshair_text', '_crosshair_xtext', '_crosshair_ytext']:
+                if hasattr(self, attr) and getattr(self, attr) is not None:
+                    try:
+                        getattr(self, attr).remove()
+                    except Exception:
+                        pass
+                    setattr(self, attr, None)
 
         except Exception as e:
-            self.log_manager.error(f"清除十字光标元素失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"清除十字光标元素失败: {str(e)}")
+            else:
+                print(f"清除十字光标元素失败: {str(e)}")
 
     def _create_unified_crosshair_handler(self):
         """创建统一的十字光标处理器 - 避免重复绑定"""
         try:
-            def on_mouse_move(event):
-                # 限制更新频率
-                now = int(time.time() * 1000)
-                if hasattr(self, '_last_crosshair_update_time') and now - self._last_crosshair_update_time < 16:
-                    return
-                self._last_crosshair_update_time = now
+            # 确保canvas属性存在
+            if not hasattr(self, 'canvas') or self.canvas is None:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning("canvas属性不存在或为None，无法创建十字光标处理器")
+                return
+
+            def do_update(event_data):
+                """实际执行更新的函数"""
+                event = event_data['event']
 
                 # 获取主题色
                 primary_color = self._get_primary_color()
 
-                # 检查事件有效性 - 只处理在图表区域内的事件
+                # 检查事件有效性
                 if (not event.inaxes or
                     event.inaxes not in [self.price_ax, self.volume_ax, self.indicator_ax] or
                     self.current_kdata is None or
@@ -393,51 +521,69 @@ class CrosshairMixin:
                 self._update_crosshair_lines(x_val, y_val, primary_color)
 
                 # 创建信息文本
-                info, text_color = self._create_crosshair_info_text(
-                    row, idx, kdata)
+                info, text_color = self._create_crosshair_info_text(row, idx, kdata)
 
                 # 更新信息文本
-                self._update_crosshair_text(
-                    event, x_val, y_val, info, text_color)
+                self._update_crosshair_text(event, x_val, y_val, info, text_color)
 
                 # 更新轴标签
-                self._update_crosshair_axis_labels(
-                    row, idx, kdata, x_val, y_val, primary_color)
+                self._update_crosshair_axis_labels(row, idx, kdata, x_val, y_val, primary_color)
 
                 # 刷新画布
                 self.canvas.draw_idle()
 
+            def on_mouse_move(event):
+                # [最终诊断] 添加日志，检查事件是否被接收
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.debug(f"Crosshair event: x={event.x}, y={event.y}, inaxes={event.inaxes}")
+
+                # 绕过有问题的节流阀，直接调用更新函数
+                do_update({'event': event})
+
             # 断开之前的连接（如果存在）
-            if self._crosshair_event_id is not None:
+            if hasattr(self, '_crosshair_event_id') and self._crosshair_event_id is not None:
                 try:
                     self.canvas.mpl_disconnect(self._crosshair_event_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    if hasattr(self, 'log_manager') and self.log_manager:
+                        self.log_manager.warning(f"断开十字光标事件连接失败: {e}")
 
             # 绑定新的事件处理器
             self._crosshair_event_id = self.canvas.mpl_connect(
                 'motion_notify_event', on_mouse_move)
 
         except Exception as e:
-            self.log_manager.error(f"创建十字光标处理器失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"创建十字光标处理器失败: {str(e)}")
+            else:
+                print(f"创建十字光标处理器失败: {str(e)}")
 
     def disable_crosshair(self):
         """禁用十字光标功能"""
         try:
             # 清除所有十字光标元素
-            self._clear_crosshair_elements()
+            if hasattr(self, '_clear_crosshair_elements'):
+                self._clear_crosshair_elements()
+            else:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning("_clear_crosshair_elements方法不存在，无法清除十字光标元素")
 
             # 断开事件连接
-            if self._crosshair_event_id is not None:
-                try:
-                    self.canvas.mpl_disconnect(self._crosshair_event_id)
-                except Exception:
-                    pass
+            if hasattr(self, '_crosshair_event_id') and self._crosshair_event_id is not None:
+                if hasattr(self, 'canvas') and self.canvas is not None:
+                    try:
+                        self.canvas.mpl_disconnect(self._crosshair_event_id)
+                    except Exception as e:
+                        if hasattr(self, 'log_manager') and self.log_manager:
+                            self.log_manager.warning(f"断开十字光标事件连接失败: {e}")
                 self._crosshair_event_id = None
 
             # 刷新画布
-            if hasattr(self, 'canvas'):
+            if hasattr(self, 'canvas') and self.canvas is not None:
                 self.canvas.draw_idle()
 
         except Exception as e:
-            self.log_manager.error(f"禁用十字光标失败: {str(e)}")
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"禁用十字光标失败: {str(e)}")
+            else:
+                print(f"禁用十字光标失败: {str(e)}")

@@ -459,7 +459,7 @@ class ConfigService(BaseService):
         """设置默认配置"""
         self._default_config = {
             'app': {
-                'name': 'HIkyuu-UI',
+                'name': 'YS-Quant‌',
                 'version': '1.0.0',
                 'language': 'zh_CN',
                 'auto_save': True,

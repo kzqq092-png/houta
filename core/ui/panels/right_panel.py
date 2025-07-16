@@ -23,39 +23,18 @@ from PyQt5.QtGui import QFont, QIcon, QColor, QPalette
 from .base_panel import BasePanel
 from core.events import StockSelectedEvent, AnalysisCompleteEvent, ChartUpdateEvent, UIDataReadyEvent
 
+# 导入完整的技术分析标签页
+try:
+    from gui.widgets.analysis_tabs.technical_tab import TechnicalAnalysisTab
+    TECHNICAL_TAB_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"无法导入TechnicalAnalysisTab: {e}")
+    TECHNICAL_TAB_AVAILABLE = False
+
 if TYPE_CHECKING:
     from core.services import AnalysisService
 
 logger = logging.getLogger(__name__)
-
-
-class AnalysisDataLoader(QThread):
-    """分析数据加载线程"""
-
-    data_loaded = pyqtSignal(dict)
-    error_occurred = pyqtSignal(str)
-
-    def __init__(self, analysis_service, stock_code, analysis_type='comprehensive'):
-        super().__init__()
-        self.analysis_service = analysis_service
-        self.stock_code = stock_code
-        self.analysis_type = analysis_type
-
-    def run(self):
-        """加载分析数据"""
-        try:
-            # 使用asyncio.run()来执行异步函数
-            analysis_data = asyncio.run(self.analysis_service.analyze_stock(
-                self.stock_code,
-                self.analysis_type
-            ))
-            if analysis_data:
-                self.data_loaded.emit(analysis_data)
-            else:
-                self.error_occurred.emit(
-                    f"No analysis data returned for {self.stock_code}")
-        except Exception as e:
-            self.error_occurred.emit(str(e))
 
 
 class RightPanel(BasePanel):
@@ -100,8 +79,8 @@ class RightPanel(BasePanel):
         self._current_stock_name = ''
         self._analysis_type = 'comprehensive'  # 默认使用综合分析
 
-        # 数据加载线程
-        self._loader_thread = None
+        # 数据加载线程 (将被移除)
+        # self._loader_thread = None
 
         # 分析数据
         self._analysis_data = None
@@ -202,21 +181,29 @@ class RightPanel(BasePanel):
         main_layout.addWidget(stock_info_frame)
         self.add_widget('stock_info_frame', stock_info_frame)
 
-        stock_info_layout = QVBoxLayout(stock_info_frame)
+        stock_info_layout = QHBoxLayout(stock_info_frame)
         stock_info_layout.setContentsMargins(10, 10, 10, 10)
+        stock_info_layout.setSpacing(8)
 
         # 股票代码和名称
         stock_label = QLabel("请选择股票")
         stock_label.setStyleSheet(
             "font-size: 14px; font-weight: bold; color: #495057;")
-        stock_label.setAlignment(Qt.AlignCenter)
+        stock_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         stock_info_layout.addWidget(stock_label)
         self.add_widget('stock_label', stock_label)
+
+        # 分隔符
+        separator = QLabel("当前|股票")
+        separator.setStyleSheet(
+            "font-size: 14px; color: #2ee2e6; margin: 0 5px;")
+        separator.setAlignment(Qt.AlignCenter)
+        stock_info_layout.addWidget(separator)
 
         # 分析时间
         analysis_time_label = QLabel("")
         analysis_time_label.setStyleSheet("font-size: 12px; color: #6c757d;")
-        analysis_time_label.setAlignment(Qt.AlignCenter)
+        analysis_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         stock_info_layout.addWidget(analysis_time_label)
         self.add_widget('analysis_time_label', analysis_time_label)
 
@@ -233,7 +220,12 @@ class RightPanel(BasePanel):
         self.add_widget('tab_widget', tab_widget)
 
         # 技术指标标签页
-        self._create_technical_tab(tab_widget)
+        if TECHNICAL_TAB_AVAILABLE:
+            self._technical_tab = TechnicalAnalysisTab(self._root_frame)
+            tab_widget.addTab(self._technical_tab, "技术指标")
+            self.add_widget('technical_tab', self._technical_tab)
+        else:
+            self._create_technical_tab(tab_widget)
 
         # 买卖信号标签页
         self._create_signal_tab(tab_widget)
@@ -652,100 +644,114 @@ class RightPanel(BasePanel):
         layout.addStretch()
 
     def _bind_events(self) -> None:
-        """绑定事件"""
+        """注册事件处理器"""
+        # 注意：现在通过事件总线进行通信，不需要手动连接信号
+        # self.event_bus.subscribe(StockSelectedEvent, self.on_stock_selected)
+        # self.event_bus.subscribe(
+        #     AnalysisCompleteEvent, self.on_analysis_complete)
         self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
-
-        # 绑定按钮点击事件
-        self.get_widget('refresh_btn').clicked.connect(self._refresh_analysis)
-        self.get_widget('export_btn').clicked.connect(self._export_report)
-        self.get_widget('run_backtest_btn').clicked.connect(self._run_backtest)
-        self.get_widget('ai_run_btn').clicked.connect(
-            self._run_ai_stock_selection)
-        self.get_widget('export_ai_btn').clicked.connect(
-            self._export_ai_results)
-        self.get_widget('refresh_industry_btn').clicked.connect(
-            self._refresh_industry_data)
-
-        # 绑定回测参数变化事件
-        self.get_widget('backtest_days_spin').valueChanged.connect(
-            self._on_backtest_params_changed)
+        logger.debug("RightPanel已订阅UIDataReadyEvent事件")
 
     def _initialize_data(self) -> None:
         """初始化数据"""
-        # 初始状态下禁用部分按钮
-        self.get_widget('export_btn').setEnabled(False)
-        self.get_widget('run_backtest_btn').setEnabled(False)
+        # 初始状态下显示提示信息
+        self._update_status("请在左侧选择一只股票以开始分析")
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理数据准备就绪事件"""
-        data = event.data
-        if not data or not data.get('analysis'):
-            self._on_analysis_load_error("分析数据为空")
-            return
+        """处理UI数据就绪事件，直接使用事件中的数据更新面板"""
+        try:
+            logger.info(f"RightPanel收到UIDataReadyEvent，股票: {event.stock_code}")
+            # 更新股票信息
+            self._current_stock_code = event.stock_code
+            self._current_stock_name = event.stock_name
+            self.get_widget('stock_label').setText(
+                f"{self._current_stock_name} ({self._current_stock_code})")
 
-        self._current_stock_code = data.get('stock_code')
-        self._current_stock_name = data.get('stock_name')
+            # 从事件中直接获取分析数据和K线数据
+            analysis_data = event.ui_data.get('analysis')
+            kline_data = event.ui_data.get('kline_data')
 
-        # 更新UI
-        stock_label = self.get_widget('stock_label')
-        stock_label.setText(
-            f"{self._current_stock_name} ({self._current_stock_code})")
+            # 如果有完整的技术分析标签页，传递K线数据
+            if TECHNICAL_TAB_AVAILABLE and hasattr(self, '_technical_tab'):
+                try:
+                    if kline_data is not None and not kline_data.empty:
+                        logger.info(f"传递K线数据到技术分析标签页，数据长度: {len(kline_data)}")
+                        self._technical_tab.set_kdata(kline_data)
+                    else:
+                        logger.warning("K线数据为空，无法传递到技术分析标签页")
+                        self._technical_tab.clear_data()
+                except Exception as e:
+                    logger.error(f"传递K线数据到技术分析标签页失败: {e}")
 
-        analysis_time_label = self.get_widget('analysis_time_label')
-        analysis_time_label.setText(
-            f"分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            if analysis_data:
+                # 直接使用分析数据更新UI
+                self._on_analysis_data_loaded(analysis_data)
+            else:
+                # 如果没有分析数据，只传递了K线数据也是正常的
+                logger.info(f"事件中未包含分析数据，但K线数据已传递到技术分析标签页")
+                self._update_status("K线数据已加载，可开始技术分析")
 
-        self._on_analysis_data_loaded(data['analysis'])
+        except Exception as e:
+            logger.error(f"处理UI数据就绪事件时发生意外错误: {e}", exc_info=True)
+            self._on_analysis_load_error(f"处理事件时发生意外错误: {e}")
 
     def _on_analysis_data_loaded(self, analysis_data: Dict[str, Any]) -> None:
-        """
-        处理加载完成的分析数据
+        """使用分析数据更新UI组件"""
+        try:
+            self._analysis_data = analysis_data
+            self.get_widget('progress_bar').setVisible(False)
+            self.get_widget('analysis_time_label').setText(
+                f"分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        Args:
-            analysis_data: 分析数据
-        """
-        if not analysis_data:
-            self._update_status("分析数据为空")
-            self.get_widget('export_btn').setEnabled(False)
-            self.get_widget('run_backtest_btn').setEnabled(False)
-            return
+            # 更新各个标签页
+            if TECHNICAL_TAB_AVAILABLE:
+                self._technical_tab.update_analysis(analysis_data)
+            else:
+                self._update_technical_analysis(
+                    analysis_data.get('technical_indicators', {}))
+            self._update_signal_analysis(
+                analysis_data.get('trading_signals', {}))
+            self._update_risk_analysis(
+                analysis_data.get('risk_assessment', {}))
+            self._update_backtest_results(
+                analysis_data.get('backtest_results', {}))
 
-        self._analysis_data = analysis_data
+            self._update_status("分析数据已更新")
+            logger.info(f"RightPanel已成功更新 {self._current_stock_code} 的分析数据")
 
-        # 更新各个标签页
-        self._update_technical_analysis(
-            analysis_data.get('technical_analysis', {}))
-        self._update_signal_analysis(analysis_data.get('signal_analysis', {}))
-        self._update_risk_analysis(analysis_data.get('risk_analysis', {}))
-        self._update_backtest_results(
-            analysis_data.get('backtest_results', {}))
-
-        # 更新状态
-        self._update_status("分析完成")
-        self.get_widget('export_btn').setEnabled(True)
-        self.get_widget('run_backtest_btn').setEnabled(True)
+        except Exception as e:
+            logger.error(f"更新分析UI时出错: {e}", exc_info=True)
+            self._on_analysis_load_error(f"更新UI失败: {e}")
 
     def _on_analysis_load_error(self, error_msg: str) -> None:
-        """
-        处理分析数据加载错误
-        """
-        # 隐藏进度条
-        progress_bar = self.get_widget('progress_bar')
-        progress_bar.setVisible(False)
-
-        self._update_status(f"分析失败: {error_msg}")
-        logger.error(f"Analysis data load error: {error_msg}")
-
-    def _on_analysis_thread_finished(self) -> None:
-        """分析线程完成后的处理"""
+        """处理分析数据加载错误"""
+        logger.error(f"分析数据加载错误: {error_msg}")
         self.get_widget('progress_bar').setVisible(False)
-        if self._loader_thread:
-            self._loader_thread.deleteLater()
-            self._loader_thread = None
+        self._update_status(f"错误: {error_msg}")
+        QMessageBox.warning(self, "分析错误", f"加载分析数据时出错:\n{error_msg}")
+
+    def _refresh_analysis(self) -> None:
+        """
+        刷新分析数据 - 此方法现在应通过协调器触发数据重新加载
+        """
+        if not self._current_stock_code:
+            self._update_status("请先选择股票")
+            return
+
+        # 发布一个事件请求主协调器刷新数据
+        # 注意：这里可以定义一个新的事件类型，或者重用StockSelectedEvent
+        logger.info(f"请求刷新 {self._current_stock_code} 的数据...")
+        self.event_bus.publish(
+            StockSelectedEvent(
+                stock_code=self._current_stock_code,
+                stock_name=self._current_stock_name
+            )
+        )
+        self._update_status(f"正在重新加载 {self._current_stock_name} 的数据...")
 
     def _update_technical_analysis(self, technical_data: Dict[str, Any]) -> None:
-        """更新技术指标分析"""
+        """更新技术分析标签页"""
         try:
             # 更新趋势分析表格
             trend_table = self.get_widget('trend_table')
@@ -944,53 +950,23 @@ class RightPanel(BasePanel):
             logger.error(f"Failed to update backtest results: {e}")
 
     def _refresh_analysis(self) -> None:
-        """刷新分析"""
-        try:
-            if self._current_stock_code:
-                self._update_status("正在刷新...")
-                # 这里可以触发协调器重新加载数据
-                # self.coordinator.load_stock_analysis(self._current_stock_code, self._current_stock_name)
-            else:
-                QMessageBox.information(self._root_frame, "提示", "请先选择股票")
+        """
+        刷新分析数据 - 此方法现在应通过协调器触发数据重新加载
+        """
+        if not self._current_stock_code:
+            self._update_status("请先选择股票")
+            return
 
-        except Exception as e:
-            logger.error(f"Failed to refresh analysis: {e}")
-            self._update_status(f"刷新失败: {e}")
-
-    def _export_report(self) -> None:
-        """导出报告"""
-        try:
-            if not self._analysis_data:
-                QMessageBox.information(self._root_frame, "提示", "暂无分析数据可导出")
-                return
-
-            # 这里可以实现报告导出功能
-            # 暂时显示提示信息
-            QMessageBox.information(self._root_frame, "提示", "报告导出功能开发中...")
-
-        except Exception as e:
-            logger.error(f"Failed to export report: {e}")
-            QMessageBox.critical(self._root_frame, "错误", f"导出失败: {e}")
-
-    def _run_backtest(self) -> None:
-        """运行回测"""
-        try:
-            if not self._current_stock_code:
-                QMessageBox.information(self._root_frame, "提示", "请先选择股票")
-                return
-
-            # 获取回测参数
-            backtest_days_spin = self.get_widget('backtest_days_spin')
-            days = backtest_days_spin.value()
-
-            # 这里可以实现回测功能
-            # 暂时显示提示信息
-            QMessageBox.information(
-                self._root_frame, "提示", f"正在运行{days}天回测...")
-
-        except Exception as e:
-            logger.error(f"Failed to run backtest: {e}")
-            QMessageBox.critical(self._root_frame, "错误", f"回测失败: {e}")
+        # 发布一个事件请求主协调器刷新数据
+        # 注意：这里可以定义一个新的事件类型，或者重用StockSelectedEvent
+        logger.info(f"请求刷新 {self._current_stock_code} 的数据...")
+        self.event_bus.publish(
+            StockSelectedEvent(
+                stock_code=self._current_stock_code,
+                stock_name=self._current_stock_name
+            )
+        )
+        self._update_status(f"正在重新加载 {self._current_stock_name} 的数据...")
 
     def _update_status(self, message: str) -> None:
         """更新状态"""
@@ -1177,19 +1153,19 @@ class RightPanel(BasePanel):
         """清理资源"""
         try:
             # 停止加载线程
-            if hasattr(self, '_loader_thread') and self._loader_thread and self._loader_thread.isRunning():
-                logger.info("Stopping analysis data loader thread...")
-                self._loader_thread.quit()
+            # if hasattr(self, '_loader_thread') and self._loader_thread and self._loader_thread.isRunning():
+            #     logger.info("Stopping analysis data loader thread...")
+            #     self._loader_thread.quit()
 
-                # 等待线程正常退出
-                if not self._loader_thread.wait(5000):  # 等待5秒
-                    logger.warning(
-                        "Analysis thread did not quit gracefully, terminating...")
-                    self._loader_thread.terminate()
-                    self._loader_thread.wait()
+            #     # 等待线程正常退出
+            #     if not self._loader_thread.wait(5000):  # 等待5秒
+            #         logger.warning(
+            #             "Analysis thread did not quit gracefully, terminating...")
+            #         self._loader_thread.terminate()
+            #         self._loader_thread.wait()
 
-                self._loader_thread.deleteLater()
-                self._loader_thread = None
+            #     self._loader_thread.deleteLater()
+            #     self._loader_thread = None
 
             # 清理分析数据
             self._analysis_data = None

@@ -148,8 +148,12 @@ class ChartService(CacheableService, ConfigurableService):
         self.retry_manager = RetryManager(max_retries=3)
 
         # 请求管理
-        self.active_requests = {}
+        self.active_requests: Dict[str, asyncio.Task] = {}
         self.request_lock = asyncio.Lock()
+
+        # 显式初始化，确保属性存在
+        if not hasattr(self, 'industry_service'):
+            self.industry_service = None
 
     def _do_initialize(self) -> None:
         """初始化图表服务"""
@@ -559,37 +563,48 @@ class ChartService(CacheableService, ConfigurableService):
             f"处理请求时发生错误。\n详情: {error_info.get('message')}"
         )
 
-    def _preload_related_stocks(self, code: str, freq: str):
+    async def cancel_previous_requests(self):
+        """取消所有先前的图表数据请求"""
+        async with self.request_lock:
+            if not self.active_requests:
+                return
+
+            logger.info(f"正在取消 {len(self.active_requests)} 个活动的图表数据任务...")
+            for task_id, task in list(self.active_requests.items()):
+                if not task.done():
+                    task.cancel()
+                    logger.debug(f"已取消图表任务: {task_id}")
+            self.active_requests.clear()
+            logger.info("所有活动的图表任务均已取消。")
+
+    async def _preload_related_stocks(self, stock_code: str, freq: str):
         """预加载相关股票数据"""
-        # 获取同行业股票
         try:
             industry_service = self._get_industry_service()
             if not industry_service:
                 logger.warning("Industry service not available for preloading")
+                return  # 直接返回，而不是返回None
+
+            related_stocks = await industry_service.get_related_stocks(stock_code)
+            if not related_stocks:
                 return
 
-            industry = industry_service.get_stock_industry(code)
-            if industry:
-                related_stocks = industry_service.get_stocks_by_industry(
-                    industry)
-                # 限制预加载数量
-                related_stocks = related_stocks[:5]  # 最多预加载5只
+            logger.info(f"为 {stock_code} 预加载 {len(related_stocks)} 个相关股票的数据...")
+            preload_tasks = []
+            for related_code, related_name in related_stocks[:5]:  # 最多预加载5个
+                task = self.data_manager.preload_data(
+                    stock_code=related_code,
+                    data_type='kdata',
+                    freq=freq
+                )
+                preload_tasks.append(task)
 
-                # 获取数据管理器
-                data_manager = self._get_data_manager()
-                if not data_manager or not hasattr(data_manager, 'preload_data'):
-                    return
+            if preload_tasks:
+                await asyncio.gather(*preload_tasks)
+                logger.info("相关股票数据预加载完成。")
 
-                # 低优先级预加载
-                for related_code in related_stocks:
-                    if related_code != code:  # 跳过当前股票
-                        data_manager.preload_data(
-                            related_code, freq, priority='low')
-
-                logger.debug(
-                    f"Preloaded {len(related_stocks)} related stocks for {code}")
         except Exception as e:
-            logger.warning(f"Failed to preload related stocks: {e}")
+            logger.error(f"预加载 {stock_code} 的相关股票时出错: {e}", exc_info=True)
 
     def _get_data_manager(self):
         """获取数据管理器"""
@@ -600,11 +615,16 @@ class ChartService(CacheableService, ConfigurableService):
             return None
 
     def _get_industry_service(self):
-        """获取行业服务"""
+        """获取行业服务，处理服务容器可能不存在的情况"""
+        if self.industry_service:
+            return self.industry_service
         try:
-            return self.service_container.resolve('industry_service')
+            # 尝试从容器获取
+            from core.containers import get_service_container
+            self.industry_service = get_service_container().get_service('industry')
+            return self.industry_service
         except Exception as e:
-            logger.error(f"Failed to resolve industry service: {e}")
+            logger.warning(f"无法获取IndustryService: {e}")
             return None
 
     def _get_stock_service(self):

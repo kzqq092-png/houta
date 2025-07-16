@@ -79,7 +79,7 @@ class CloudAPIClient:
         self.config = config
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'HIkyuu-UI/2.0 Cloud Client'
+            'User-Agent': 'YS-Quant‌/2.0 Cloud Client'
         })
 
         # 配置SSL验证

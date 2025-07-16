@@ -31,8 +31,9 @@ def init_qt_types():
 
     for name, type_class in types_to_register.items():
         try:
-            qRegisterMetaType(type_class)
-            logger.debug(f"Successfully registered {name}")
+            # 使用正确的语法注册元类型
+            type_id = qRegisterMetaType(name)
+            logger.debug(f"Successfully registered {name}, type ID: {type_id}")
         except Exception as e:
             logger.error(f"Failed to register {name}: {e}")
 

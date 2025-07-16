@@ -6,8 +6,10 @@
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 import asyncio
+from datetime import datetime
+import pandas as pd
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -15,6 +17,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import pyqtSlot
 
 from .base_coordinator import BaseCoordinator
 from ..events import (
@@ -61,7 +64,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 创建主窗口
         self._main_window = QMainWindow(parent)
-        self._main_window.setWindowTitle("HIkyuu-UI 2.0 股票分析系统")
+        self._main_window.setWindowTitle("YS-Quant‌ 2.0 股票分析系统")
         self._main_window.setGeometry(100, 100, 1400, 900)
         self._main_window.setMinimumSize(1200, 800)
 
@@ -71,7 +74,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 窗口状态
         self._window_state = {
-            'title': 'HIkyuu-UI 2.0 股票分析系统',
+            'title': 'YS-Quant‌ 2.0 股票分析系统',
             'geometry': (100, 100, 1400, 900),
             'min_size': (1200, 800),
             'is_maximized': False
@@ -151,6 +154,12 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 添加永久小部件到右侧
             self._status_bar.addPermanentWidget(QFrame())  # 弹性空间
+
+            # 数据时间标签
+            self._data_time_label = QLabel("")
+            self._data_time_label.setToolTip("当前数据的最新时间")
+            self._data_time_label.setFixedWidth(150)
+            self._status_bar.addPermanentWidget(self._data_time_label)
 
             # 创建日志显示/隐藏按钮
             self._log_toggle_btn = QPushButton("隐藏日志")
@@ -567,6 +576,9 @@ class MainWindowCoordinator(BaseCoordinator):
             # 注册错误事件处理器
             self.event_bus.subscribe(ErrorEvent, self._on_error)
 
+            # 注册UI数据就绪事件处理器
+            self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
+
             # 注册主题变化事件处理器
             self.event_bus.subscribe(ThemeChangedEvent, self._on_theme_changed)
 
@@ -636,65 +648,131 @@ class MainWindowCoordinator(BaseCoordinator):
         if not event or not event.stock_code or self._is_loading:
             return
 
+        # 在开始新任务前，取消之前所有相关的请求
+        try:
+            await self._chart_service.cancel_previous_requests()
+            await self._analysis_service.cancel_previous_requests()
+            logger.info(f"已取消先前为 {self._current_stock_code} 发出的请求。")
+        except Exception as e:
+            logger.error(f"取消先前请求时出错: {e}", exc_info=True)
+
         self._is_loading = True
         self._current_stock_code = event.stock_code
         self.show_message(
             f"正在加载 {event.stock_name} ({event.stock_code}) 的数据...", level='info')
 
         try:
-            # 1. 异步并行获取所有数据
-            kline_data_future = self._data_manager.request_data(
+            # 从事件中提取参数
+            period = event.period if event.period else 'D'  # 默认日线
+            time_range = event.time_range if event.time_range else "最近1年"  # 默认最近1年
+            chart_type = event.chart_type if event.chart_type else "K线图"  # 默认K线图
+
+            logger.info(f"加载数据，股票：{event.stock_code}，周期：{period}，时间范围：{time_range}，图表类型：{chart_type}")
+
+            # 1. 串行获取数据：先获取K线
+            logger.info(f"开始请求K线数据: {event.stock_code}")
+            kline_data_response = await self._data_manager.request_data(
                 stock_code=event.stock_code,
-                data_type='kdata'
-            )
-            analysis_data_future = self._analysis_service.analyze_stock(
-                stock_code=event.stock_code,
-                analysis_type='comprehensive'
+                data_type='kdata',
+                period=period,          # 传递周期
+                time_range=time_range   # 传递时间范围
             )
 
-            kline_data, analysis_data = await asyncio.gather(
-                kline_data_future,
-                analysis_data_future
-            )
+            kline_data = None
+            if isinstance(kline_data_response, dict):
+                kline_data = kline_data_response.get('kline_data')
+            else:
+                kline_data = kline_data_response
 
             # 关键检查点：确认核心数据是否存在
             if kline_data is None or kline_data.empty:
                 logger.warning(f"无法获取 {event.stock_name} 的K线数据。")
                 self.show_message(
                     f"无法获取 {event.stock_name} ({event.stock_code}) 的K线数据，请尝试其他股票。", level='warning')
-                return  # 提前返回，不发布事件
+                return
 
-            # 2. 存储到中央数据状态
+            logger.info(f"K线数据加载完成: {event.stock_code}, 开始请求分析数据...")
+
+            # 2. 再获取分析数据，传入已获取的K线数据
+            analysis_data = await self._analysis_service.analyze_stock(
+                stock_code=event.stock_code,
+                analysis_type='comprehensive',
+                kline_data=kline_data
+            )
+            logger.info(f"分析数据加载完成: {event.stock_code}")
+
+            # 3. 存储到中央数据状态
             self._current_stock_data = {
                 'stock_code': event.stock_code,
                 'stock_name': event.stock_name,
                 'market': event.market,
-                'kline': kline_data,
+                'kline_data': kline_data,
                 'analysis': analysis_data,
+                'period': period,
+                'time_range': time_range,
+                'chart_type': chart_type
             }
+            logger.info(f"数据已存储到中央状态，准备发布UIDataReadyEvent事件: {event.stock_code}")
 
-            # 3. 发布数据准备就绪事件
+            # 4. 发布数据准备就绪事件
             data_ready_event = UIDataReadyEvent(
                 source="MainWindowCoordinator",
-                data=self._current_stock_data
+                stock_code=event.stock_code,
+                stock_name=event.stock_name,
+                ui_data=self._current_stock_data
             )
             self.event_bus.publish(data_ready_event)
+            logger.info(f"已发布UIDataReadyEvent事件: {event.stock_code}")
 
             self.show_message(f"{event.stock_name} 数据加载完成", level='success')
+
+            # 5. 启动相关股票的预加载
+            asyncio.create_task(self._chart_service._preload_related_stocks(
+                event.stock_code, period
+            ))
+            logger.info(f"已启动相关股票预加载: {event.stock_code}")
 
         except Exception as e:
             logger.error(f"加载股票 {event.stock_code} 数据时出错: {e}", exc_info=True)
             self.show_message(
-                f"加载 {event.stock_name} 数据失败: {e}", level='error')
+                f"加载 {event.stock_name} 数据失败", level='error')
+
+            import traceback
             error_event = ErrorEvent(
-                source="MainWindowCoordinator",
-                error=e,
-                message=f"Failed to load data for {event.stock_code}"
+                source='MainWindowCoordinator',
+                error_type=type(e).__name__,
+                error_message=str(e),
+                error_traceback=traceback.format_exc(),
+                severity='high'
             )
             self.event_bus.publish(error_event)
 
         finally:
             self._is_loading = False
+
+    @pyqtSlot(UIDataReadyEvent)
+    def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
+        """处理UI数据就绪事件，更新主窗口状态栏"""
+        try:
+            kdata = event.ui_data.get('kline_data')
+            if kdata is not None and not kdata.empty:
+                # 更新状态标签显示加载数量
+                self._status_label.setText(f"已加载 ({len(kdata)})")
+
+                # 更新数据时间标签
+                latest_date = kdata.index[-1]
+                if isinstance(latest_date, (datetime, pd.Timestamp)):
+                    time_str = latest_date.strftime('%Y-%m-%d')
+                else:
+                    time_str = str(latest_date)
+                self._data_time_label.setText(f"数据时间: {time_str}")
+            else:
+                self._status_label.setText("已加载 (0)")
+                self._data_time_label.setText("数据时间: -")
+        except Exception as e:
+            logger.error(f"更新主窗口状态栏失败: {e}", exc_info=True)
+            self._status_label.setText("状态更新失败")
+            self._data_time_label.setText("数据时间: -")
 
     def _on_chart_updated(self, event: ChartUpdateEvent) -> None:
         """处理图表更新事件"""
@@ -718,39 +796,44 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to handle analysis completion: {e}")
 
-    def _on_data_update(self, event: DataUpdateEvent) -> None:
+    @pyqtSlot(object)
+    def _on_error(self, event: Union[ErrorEvent, dict]):
+        """
+        健壮的错误事件处理器，能同时处理事件对象和字典。
+        """
+        try:
+            error_type = "UnknownError"
+            error_message = "An unknown error occurred."
+            event_id = "N/A"
+
+            if isinstance(event, ErrorEvent):
+                # 标准事件对象
+                error_type = event.data.get('error_type', 'UnknownError')
+                error_message = event.data.get('error_message', 'An unknown error occurred.')
+                event_id = event.event_id
+            elif isinstance(event, dict):
+                # 兼容字典形式的事件
+                error_type = event.get('error_type', 'UnknownError')
+                error_message = event.get('error_message', 'An unknown error occurred.')
+                event_id = event.get('event_id', 'N/A')
+
+            logger.error(f"[ERROR] {error_type}: {error_message}",
+                         extra={'trace_id': event_id})
+
+            self.show_message(f"发生错误: {error_message}", level='error')
+
+        except Exception as e:
+            logger.critical(f"在处理错误事件时发生严重错误: {e}", exc_info=True)
+            self.show_message("发生严重错误，请检查日志", level='critical')
+
+    def _on_data_update(self, event: DataUpdateEvent):
         """处理数据更新事件"""
         try:
-            logger.info(f"Data update: {event.data_type}")
-
-            # 更新状态栏
-            self._status_label.setText(f"数据已更新: {event.data_type}")
-
+            data_type = event.data.get('data_type', 'N/A')
+            logger.info(f"Data update: {data_type}")
+            self.show_message(f"数据已更新: {data_type}", level='info')
         except Exception as e:
-            logger.error(f"Failed to handle data update event: {e}")
-
-    def _on_error(self, event: ErrorEvent) -> None:
-        """处理错误事件"""
-        try:
-            logger.error(
-                f"Error occurred: {event.error_type} - {event.error_message}")
-
-            # 显示错误消息
-            if event.severity == 'error':
-                QMessageBox.critical(
-                    self._main_window, event.error_type, event.error_message)
-            elif event.severity == 'warning':
-                QMessageBox.warning(self._main_window,
-                                    event.error_type, event.error_message)
-            else:
-                QMessageBox.information(
-                    self._main_window, event.error_type, event.error_message)
-
-            # 更新状态栏
-            self._status_label.setText(f"错误: {event.error_message}")
-
-        except Exception as e:
-            logger.error(f"Failed to handle error event: {e}")
+            logger.error(f"Failed to handle data update event: {e}", exc_info=True)
 
     def _on_theme_changed(self, event: ThemeChangedEvent) -> None:
         """处理主题变更事件"""
@@ -1046,7 +1129,7 @@ Ctrl+F12 - 关于
         """关于对话框"""
         from PyQt5.QtWidgets import QMessageBox
         about_text = """
-HIkyuu-UI 2.0 (重构版本)
+YS-Quant‌ 2.0 (重构版本)
 
 基于HIkyuu量化框架的股票分析工具
 
@@ -1060,7 +1143,7 @@ HIkyuu-UI 2.0 (重构版本)
 版本：2.0
 作者：HIkyuu开发团队
         """
-        QMessageBox.about(self._main_window, "关于 HIkyuu-UI",
+        QMessageBox.about(self._main_window, "关于 YS-Quant‌",
                           about_text.strip())
 
     # 高级功能菜单方法（保持原有实现）
@@ -1518,7 +1601,7 @@ HIkyuu-UI 2.0 (重构版本)
             QMessageBox.information(
                 self._main_window,
                 "启动向导",
-                "欢迎使用HIkyuu-UI 2.0！\n\n"
+                "欢迎使用YS-Quant‌ 2.0！\n\n"
                 "主要功能：\n"
                 "1. 股票数据查看和分析\n"
                 "2. 技术指标计算和显示\n"
@@ -1536,7 +1619,10 @@ HIkyuu-UI 2.0 (重构版本)
         try:
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
-            dialog = DatabaseAdminDialog(self._main_window)
+            # 使用系统数据库路径
+            db_path = "db/hikyuu_system.db"  # 使用相对路径
+
+            dialog = DatabaseAdminDialog(db_path, self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
 
@@ -1628,7 +1714,7 @@ HIkyuu-UI 2.0 (重构版本)
                 QMessageBox.warning(
                     self._main_window,
                     "使用条款",
-                    "您必须同意数据使用条款才能使用HIkyuu-UI系统。\n程序将退出。"
+                    "您必须同意数据使用条款才能使用YS-Quant‌系统。\n程序将退出。"
                 )
                 # 延迟退出，让用户看到消息
                 from PyQt5.QtCore import QTimer

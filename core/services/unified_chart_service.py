@@ -339,74 +339,52 @@ class UnifiedChartService(QObject):
         self.data_loader = None
 
         # 活跃的图表控件
-        self._chart_widgets = {}  # chart_id -> ChartWidget
+        self._charts = {}  # chart_id -> ChartWidget
 
         logger.info("统一图表服务初始化完成")
 
     def create_chart_widget(self, parent=None, chart_id=None) -> ChartWidget:
-        """创建图表控件
-
-        Args:
-            parent: 父控件
-            chart_id: 图表ID，用于管理多个图表
-
-        Returns:
-            ChartWidget实例
         """
-        try:
-            # 创建图表控件
-            chart_widget = ChartWidget(
-                parent=parent,
-                config_manager=self.config_manager,
-                theme_manager=self.theme_manager,
-                log_manager=self.log_manager,
-                data_manager=self.data_source
-            )
+        创建并返回一个新的ChartWidget实例。
+        如果提供了chart_id且已存在，则会替换掉旧的实例，确保总是返回一个新的、功能完好的控件。
+        """
+        if chart_id is None:
+            chart_id = f"chart_{int(time.time() * 1000)}"  # 使用时间戳确保唯一性
 
-            # 连接信号
-            chart_widget.error_occurred.connect(self.error_occurred.emit)
-            chart_widget.chart_updated.connect(self._on_chart_updated)
+        # 如果ID已存在，先从字典中移除并妥善处理旧实例
+        if chart_id in self._charts:
+            old_widget = self._charts.pop(chart_id, None)
+            if old_widget:
+                # 将控件的删除推迟到事件循环空闲时执行，是更安全的做法
+                old_widget.deleteLater()
+                self.log_manager.info(f"已移除并计划删除旧的ChartWidget实例: {chart_id}")
 
-            # 注册图表
-            if chart_id:
-                self._chart_widgets[chart_id] = chart_widget
+        # 始终创建并返回一个全新的实例
+        self.log_manager.info(f"创建新的ChartWidget实例: {chart_id}")
+        widget = ChartWidget(
+            parent=parent,
+            config_manager=self.config_manager,
+            theme_manager=self.theme_manager,
+            log_manager=self.log_manager,
+            data_manager=self.data_source,
+            chart_id=chart_id
+        )
 
-            return chart_widget
-
-        except Exception as e:
-            logger.error(f"创建图表控件失败: {e}")
-            self.error_occurred.emit(f"创建图表控件失败: {e}")
-            return None
+        self._charts[chart_id] = widget
+        return widget
 
     def create_simple_chart_container(self, parent=None, chart_id=None) -> QWidget:
-        """创建简单的图表容器
+        """创建一个包含图表和基本控件的容器"""
+        container = QWidget(parent)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        为需要简单图表功能的组件提供便捷接口
+        # 创建图表控件
+        chart_widget = self.create_chart_widget(container, chart_id)
+        if chart_widget:
+            layout.addWidget(chart_widget)
 
-        Args:
-            parent: 父控件
-            chart_id: 图表ID
-
-        Returns:
-            包含ChartWidget的容器控件
-        """
-        try:
-            # 创建容器
-            container = QWidget(parent)
-            layout = QVBoxLayout(container)
-            layout.setContentsMargins(0, 0, 0, 0)
-
-            # 创建图表控件
-            chart_widget = self.create_chart_widget(container, chart_id)
-            if chart_widget:
-                layout.addWidget(chart_widget)
-
-            return container
-
-        except Exception as e:
-            logger.error(f"创建图表容器失败: {e}")
-            self.error_occurred.emit(f"创建图表容器失败: {e}")
-            return None
+        return container
 
     def load_chart_data(self, stock_code: str, period: str = 'D',
                         indicators: List[str] = None, chart_id: str = None) -> None:
@@ -475,8 +453,8 @@ class UnifiedChartService(QObject):
             data: 图表数据
         """
         try:
-            if chart_id in self._chart_widgets:
-                chart_widget = self._chart_widgets[chart_id]
+            if chart_id in self._charts:
+                chart_widget = self._charts[chart_id]
                 chart_widget.update_chart(data)
             else:
                 logger.warning(f"图表 {chart_id} 不存在")
@@ -496,7 +474,7 @@ class UnifiedChartService(QObject):
             self.theme_manager.set_theme(theme_name)
 
             # 更新所有活跃图表
-            for chart_widget in self._chart_widgets.values():
+            for chart_widget in self._charts.values():
                 chart_widget.apply_theme()
 
         except Exception as e:
@@ -512,7 +490,7 @@ class UnifiedChartService(QObject):
         Returns:
             ChartWidget实例或None
         """
-        return self._chart_widgets.get(chart_id)
+        return self._charts.get(chart_id)
 
     def remove_chart(self, chart_id: str) -> None:
         """移除图表
@@ -521,10 +499,10 @@ class UnifiedChartService(QObject):
             chart_id: 图表ID
         """
         try:
-            if chart_id in self._chart_widgets:
-                chart_widget = self._chart_widgets[chart_id]
+            if chart_id in self._charts:
+                chart_widget = self._charts[chart_id]
                 chart_widget.deleteLater()
-                del self._chart_widgets[chart_id]
+                del self._charts[chart_id]
                 logger.debug(f"移除图表: {chart_id}")
 
         except Exception as e:
@@ -606,9 +584,9 @@ class UnifiedChartService(QObject):
             self.chart_updated.emit(stock_code, data)
 
             # 如果指定了图表ID，更新特定图表
-            if chart_id and hasattr(self, '_chart_widgets'):
-                if chart_id in self._chart_widgets:
-                    chart_widget = self._chart_widgets[chart_id]
+            if chart_id and hasattr(self, '_charts'):
+                if chart_id in self._charts:
+                    chart_widget = self._charts[chart_id]
                     if chart_widget:
                         # 确保图表数据包含必要的字段
                         if 'kline_data' not in data or data['kline_data'] is None:
@@ -631,7 +609,7 @@ class UnifiedChartService(QObject):
                         logger.warning(f"图表 {chart_id} 不存在")
                 else:
                     logger.warning(
-                        f"找不到指定的图表ID: {chart_id}，可用图表: {list(self._chart_widgets.keys()) if hasattr(self, '_chart_widgets') else []}")
+                        f"找不到指定的图表ID: {chart_id}，可用图表: {list(self._charts.keys()) if hasattr(self, '_charts') else []}")
 
         except Exception as e:
             logger.error(f"处理图表数据失败: {e}", exc_info=True)
@@ -655,7 +633,7 @@ class UnifiedChartService(QObject):
                 self.data_loader.stop()
 
             # 清理所有图表
-            for chart_id in list(self._chart_widgets.keys()):
+            for chart_id in list(self._charts.keys()):
                 self.remove_chart(chart_id)
 
             # 清空缓存
@@ -686,18 +664,65 @@ def get_unified_chart_service(config_manager=None, theme_manager=None, data_sour
 
 
 def create_chart_widget(parent=None, chart_id=None, **kwargs) -> ChartWidget:
-    """便捷函数：创建图表控件
-
-    Args:
-        parent: 父控件
-        chart_id: 图表ID
-        **kwargs: 其他参数
-
-    Returns:
-        ChartWidget实例
     """
-    service = get_unified_chart_service(**kwargs)
-    return service.create_chart_widget(parent, chart_id)
+    创建一个新的ChartWidget实例。
+    """
+    try:
+        from core.containers import get_service_container
+        from core.services import UnifiedDataManager
+        from core.logger import LogManager
+        from core.events import EventBus
+        from utils.config_manager import ConfigManager  # 修复：从正确路径导入
+        from utils.theme import get_theme_manager
+
+        container = get_service_container()
+
+        # 解析依赖
+        config_manager = container.resolve(ConfigManager)
+        theme_manager = get_theme_manager(config_manager)
+        log_manager = container.resolve(LogManager)
+        event_bus = container.resolve(EventBus)
+        data_manager = container.resolve(UnifiedDataManager)
+
+        # 创建ChartWidget实例
+        chart = ChartWidget(
+            parent=parent,
+            config_manager=config_manager,
+            theme_manager=theme_manager,
+            log_manager=log_manager,
+            data_manager=data_manager,
+            chart_id=chart_id,
+            **kwargs
+        )
+        return chart
+    except Exception as e:
+        logger.error(f"创建ChartWidget实例失败: {e}", exc_info=True)
+
+        # 创建一个替代组件，确保它具有必要的接口
+        from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
+        from PyQt5.QtCore import pyqtSignal
+
+        class FallbackChartWidget(QWidget):
+            """当ChartWidget创建失败时使用的替代组件"""
+            # 确保实现与ChartWidget相同的关键信号
+            request_stat_dialog = pyqtSignal(str)
+
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                layout = QVBoxLayout(self)
+                self.error_label = QLabel(f"图表创建失败:\n{e}")
+                self.error_label.setStyleSheet("color: red;")
+                layout.addWidget(self.error_label)
+
+            def update_chart(self, data=None):
+                """模拟ChartWidget的update_chart方法"""
+                pass
+
+            def apply_theme(self):
+                """模拟ChartWidget的apply_theme方法"""
+                pass
+
+        return FallbackChartWidget(parent)
 
 
 def create_simple_chart(parent=None, chart_id=None, **kwargs) -> QWidget:

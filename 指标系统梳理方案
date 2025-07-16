@@ -1,0 +1,199 @@
+YS-Quant‌ 股票切换功能优化开发计划
+总体目标
+优化股票切换功能，解决UI卡顿问题，提升用户体验，同时消除代码冗余，提高系统可维护性。
+总工时估计
+总计工时：80小时（约2周工作时间）
+详细任务分解
+1. 架构层优化（8小时）
+1.1 调整服务初始化顺序（4小时）
+文件：core/services/service_bootstrap.py
+具体修改点：
+在_register_business_services方法中，将UnifiedDataManager的注册和初始化移到其他服务之前
+确保UnifiedDataManager初始化后立即可用于其他服务
+实施步骤：
+备份当前文件
+重构_register_business_services方法，调整服务注册顺序
+确保所有依赖关系正确
+添加日志记录，跟踪初始化过程
+风险与缓解：
+风险：可能影响其他服务的初始化
+缓解：全面测试所有服务初始化，准备回滚方案
+1.2 移除重复的渐进式加载管理器（4小时）
+文件：
+gui/widgets/chart_widget.py
+其他可能使用重复实现的文件
+具体修改点：
+移除ChartWidget中的ProgressiveLoadingManager类定义
+修改ChartWidget.__init__方法，使用全局的ProgressiveLoadingManager实例
+调整所有引用本地实现的代码，改为使用全局实例
+实施步骤：
+确认全局ProgressiveLoadingManager的功能与本地实现兼容
+修改ChartWidget使用全局实例
+调整所有相关方法的调用
+移除本地实现的类定义
+风险与缓解：
+风险：功能差异可能导致行为变化
+缓解：确保全局实现支持所有需要的功能，进行全面测试
+2. 数据管理优化（16小时）
+2.1 统一使用UnifiedDataManager处理数据请求（8小时）
+文件：
+core/ui/panels/left_panel.py
+core/ui/panels/middle_panel.py
+core/services/chart_service.py
+core/services/analysis_service.py
+具体修改点：
+修改LeftPanel._select_stock方法，使用UnifiedDataManager验证股票
+修改MiddlePanel.load_stock_chart方法，通过UnifiedDataManager加载数据
+修改ChartService._on_stock_selected和AnalysisService._on_stock_selected方法，使用统一的数据请求方式
+实施步骤：
+分析每个组件当前的数据加载逻辑
+设计统一的数据请求接口
+逐个修改组件，替换直接数据加载为UnifiedDataManager请求
+确保回调函数正确处理数据和错误
+风险与缓解：
+风险：数据格式不一致可能导致错误
+缓解：添加数据转换层，确保兼容性
+2.2 实现请求取消机制（8小时）
+文件：
+core/services/chart_service.py
+core/services/analysis_service.py
+core/services/unified_data_manager.py（可能需要扩展）
+具体修改点：
+在ChartService和AnalysisService类中添加请求ID跟踪
+实现_cancel_previous_requests方法
+确保UnifiedDataManager支持请求取消功能
+实施步骤：
+确认UnifiedDataManager的请求取消API
+在服务类中添加请求ID跟踪机制
+实现请求取消方法
+在新请求前调用取消方法
+风险与缓解：
+风险：取消请求可能导致状态不一致
+缓解：确保取消后的状态清理，添加异常处理
+3. UI响应优化（16小时）
+3.1 实现渐进式加载和视觉反馈（8小时）
+文件：
+core/ui/panels/middle_panel.py
+optimization/progressive_loading_manager.py（可能需要扩展）
+具体修改点：
+添加MiddlePanel._update_chart_frame方法，立即显示图表框架
+添加MiddlePanel._show_loading_skeleton和_hide_loading_skeleton方法，提供加载反馈
+优化ProgressiveLoadingManager.load_chart_data_progressive方法，细化加载阶段
+实施步骤：
+设计加载骨架屏UI
+实现显示和隐藏骨架屏的方法
+修改图表加载流程，先显示框架再加载数据
+优化渐进式加载配置
+风险与缓解：
+风险：骨架屏可能导致闪烁
+缓解：使用平滑过渡效果，避免视觉跳跃
+3.2 实现更新节流器（8小时）
+文件：
+optimization/update_throttler.py（新文件）
+gui/widgets/chart_renderer.py
+具体修改点：
+创建UpdateThrottler类，实现节流逻辑
+修改ChartRenderer._update_chart方法使用节流器
+为其他频繁更新的UI组件添加节流
+实施步骤：
+设计并实现UpdateThrottler类
+识别需要节流的UI更新点
+应用节流器到这些更新点
+测试不同更新频率下的效果
+风险与缓解：
+风险：节流可能导致更新延迟
+缓解：调整节流参数，平衡响应性和性能
+4. 性能优化（16小时）
+4.1 实现智能数据预加载（8小时）
+文件：
+core/services/chart_service.py
+core/services/stock_service.py
+core/services/industry_service.py（可能需要查询）
+具体修改点：
+添加ChartService._preload_related_stocks方法
+修改ChartService._on_stock_selected方法调用预加载
+确保预加载使用低优先级，不影响主要操作
+实施步骤：
+实现获取相关股票的逻辑（同行业、相关板块等）
+实现预加载方法，使用低优先级请求
+在适当时机触发预加载
+测试预加载对主要操作的影响
+风险与缓解：
+风险：预加载可能消耗过多资源
+缓解：限制预加载数量，使用最低优先级，添加取消机制
+4.2 实现性能监控和自动调优（8小时）
+文件：
+core/performance_monitor.py（新文件或扩展现有文件）
+main.py
+具体修改点：
+创建或扩展PerformanceMonitor类
+实现资源使用监控和指标收集
+实现参数自动调整逻辑
+在应用启动时初始化监控器
+实施步骤：
+设计性能指标收集机制
+实现资源监控逻辑
+设计自适应参数调整算法
+集成到应用启动流程
+风险与缓解：
+风险：自动调优可能导致不稳定
+缓解：设置参数变化范围限制，添加回退机制
+5. 代码清理（8小时）
+5.1 移除冗余代码（8小时）
+文件：
+所有涉及修改的文件
+具体修改点：
+移除不再使用的方法和类
+清理注释掉的代码
+更新文档字符串
+确保代码风格一致
+实施步骤：
+识别不再使用的代码
+逐个文件进行清理
+运行静态代码分析工具检查
+确保没有引用错误
+风险与缓解：
+风险：可能误删仍在使用的代码
+缓解：使用版本控制，先注释后删除，全面测试
+6. 测试与调优（16小时）
+文件：
+test/test_stock_switching.py（新文件）
+其他测试文件
+具体内容：
+编写单元测试，覆盖所有修改的组件
+编写集成测试，验证整体功能
+进行性能测试，比较优化前后的差异
+进行用户体验测试，收集反馈
+实施步骤：
+设计测试用例
+实现自动化测试
+执行测试并收集结果
+根据测试结果进行调优
+风险与缓解：
+风险：测试可能不全面
+缓解：设计全面的测试矩阵，包括边缘情况
+实施顺序和依赖关系
+架构层优化（1.1 → 1.2）
+数据管理优化（2.1 → 2.2），依赖于1.1
+UI响应优化（3.1和3.2可并行），3.1依赖于2.1
+性能优化（4.1 → 4.2），4.1依赖于2.1
+代码清理，依赖于所有其他任务
+测试与调优，贯穿整个过程，最终集中测试
+风险评估与缓解策略
+风险	可能性	影响	缓解策略
+服务初始化顺序变更导致启动问题	中	高	详细日志记录，准备回滚方案
+数据请求统一导致格式不兼容	高	高	添加数据转换层，增量修改
+渐进式加载影响数据完整性	中	中	确保关键数据优先加载，添加数据验证
+预加载消耗过多资源	中	中	限制预加载数量，使用最低优先级
+自动调优导致系统不稳定	低	高	限制参数变化范围，添加回退机制
+验收标准
+股票切换时UI响应时间不超过100ms
+渐进式加载各阶段完成时间符合预期
+内存使用不超过优化前的90%
+所有自动化测试通过
+代码质量检查无严重问题
+后续维护计划
+监控生产环境性能指标
+收集用户反馈
+定期检查资源使用情况
+根据实际使用情况调整参数

@@ -1,5 +1,5 @@
 """
-HIkyuu-UI 插件市场系统
+YS-Quant‌ 插件市场系统
 
 提供插件发现、下载、安装、评分、更新等完整的插件生态功能。
 """
@@ -127,7 +127,7 @@ class PluginInfo:
 class PluginMarketAPI:
     """插件市场API客户端"""
 
-    def __init__(self, base_url: str = "https://api.hikyuu-ui.com/plugins"):
+    def __init__(self, base_url: str = "https://api.YS-Quant‌.com/plugins"):
         """
         初始化API客户端
 
@@ -137,7 +137,7 @@ class PluginMarketAPI:
         self.base_url = base_url
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'HIkyuu-UI/2.0 Plugin Market Client'
+            'User-Agent': 'YS-Quant‌/2.0 Plugin Market Client'
         })
 
     def search_plugins(self,

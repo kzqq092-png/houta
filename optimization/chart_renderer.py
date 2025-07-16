@@ -24,6 +24,8 @@ from matplotlib.colors import to_rgba
 import warnings
 import matplotlib.dates as mdates
 from utils.performance_monitor import measure_performance
+from optimization.update_throttler import get_update_throttler
+
 
 logger = logging.getLogger(__name__)
 
@@ -50,48 +52,6 @@ class RenderTask:
     def __lt__(self, other):
         """支持优先级队列排序"""
         return self.priority.value < other.priority.value
-
-
-class UpdateThrottler(QObject):
-    """更新节流器，控制更新频率"""
-
-    update_requested = pyqtSignal()
-
-    def __init__(self, min_interval_ms: int = 150):
-        super().__init__()
-        self.min_interval_ms = min_interval_ms
-        self.last_update_time = 0
-        self.pending_update = False
-
-        # 创建定时器
-        self.timer = QTimer()
-        self.timer.timeout.connect(self._process_pending_update)
-        self.timer.setSingleShot(True)
-
-    def request_update(self):
-        """请求更新"""
-        current_time = time.time() * 1000  # 转换为毫秒
-        time_since_last = current_time - self.last_update_time
-
-        if time_since_last >= self.min_interval_ms:
-            # 可以立即更新
-            self._do_update()
-        else:
-            # 需要延迟更新
-            self.pending_update = True
-            remaining_time = int(self.min_interval_ms - time_since_last)
-            self.timer.start(remaining_time)
-
-    def _process_pending_update(self):
-        """处理待更新请求"""
-        if self.pending_update:
-            self._do_update()
-
-    def _do_update(self):
-        """执行更新"""
-        self.last_update_time = time.time() * 1000
-        self.pending_update = False
-        self.update_requested.emit()
 
 
 class ChartRenderer(QObject):
@@ -152,9 +112,7 @@ class ChartRenderer(QObject):
         self._current_render_task = None
 
         # 更新节流器
-        self._update_throttler = UpdateThrottler(min_interval_ms=150)
-        self._update_throttler.update_requested.connect(
-            self._process_throttled_update)
+        self._update_throttler = get_update_throttler()
         self._pending_render_data = None
 
         # 性能监控
@@ -311,8 +269,13 @@ class ChartRenderer(QObject):
         # 保存渲染数据
         self._pending_render_data = (figure, data, indicators)
 
-        # 请求节流更新
-        self._update_throttler.request_update()
+        # 请求节流更新 - 使用新的API
+        self._update_throttler.request_update(
+            'chart-render-throttled',
+            self._process_throttled_update,
+            mode='debounce',  # 使用防抖模式，因为我们只需要最后一次更新
+            delay=150
+        )
 
         # 更新统计
         self._render_stats['throttled_updates'] += 1

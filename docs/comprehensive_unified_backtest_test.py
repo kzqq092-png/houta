@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HIkyuu-UI统一回测引擎全面测试脚本
+YS-Quant‌统一回测引擎全面测试脚本
 测试统一回测引擎的各项功能，确保系统稳定性和性能
 """
 
@@ -106,7 +106,7 @@ class UnifiedBacktestTester:
 
     def run_all_tests(self) -> Dict[str, Any]:
         """运行所有测试"""
-        print("🚀 开始HIkyuu-UI统一回测引擎全面测试")
+        print("🚀 开始YS-Quant‌统一回测引擎全面测试")
         print("=" * 80)
 
         start_time = time.time()
@@ -650,7 +650,7 @@ class UnifiedBacktestTester:
     def generate_test_report(self, total_time: float) -> Dict[str, Any]:
         """生成测试报告"""
         print("\n" + "=" * 80)
-        print("📋 HIkyuu-UI统一回测引擎测试报告")
+        print("📋 YS-Quant‌统一回测引擎测试报告")
         print("=" * 80)
 
         # 统计测试结果

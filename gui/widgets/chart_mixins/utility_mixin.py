@@ -84,24 +84,89 @@ class UtilityMixin:
         try:
             # 转换周期
             period_map = {
+                '分时': 'min',
                 '日线': 'D',
                 '周线': 'W',
                 '月线': 'M',
-                '60分钟': '60',
-                '30分钟': '30',
+                '5分钟': '5',
                 '15分钟': '15',
-                '5分钟': '5'
+                '30分钟': '30',
+                '60分钟': '60'
             }
 
+            # 如果输入的是中文周期名称，转换为代码
             if period in period_map:
                 self.current_period = period_map[period]
-                self.period_changed.emit(self.current_period)
+            else:
+                # 否则直接使用输入的周期
+                self.current_period = period
+
+            # 发出周期变更信号
+            self.period_changed.emit(self.current_period)
+
+            # 如果设置了调试日志
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"周期已变更为: {period} -> {self.current_period}")
 
         except Exception as e:
             error_msg = f"处理周期变更失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
-            self.error_occurred.emit(error_msg)
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(error_msg)
+
+    def on_chart_type_changed(self, chart_type: str):
+        """处理图表类型变更事件
+
+        Args:
+            chart_type: 图表类型名称
+        """
+        try:
+            # 保存当前图表类型
+            self.current_chart_type = chart_type
+
+            # 如果设置了调试日志
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"图表类型已变更为: {chart_type}")
+
+            # 发出图表类型变更信号
+            if hasattr(self, 'chart_type_changed'):
+                self.chart_type_changed.emit(chart_type)
+
+        except Exception as e:
+            error_msg = f"处理图表类型变更失败: {str(e)}"
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(error_msg)
+
+    def on_time_range_changed(self, time_range: str):
+        """处理时间范围变更事件
+
+        Args:
+            time_range: 时间范围名称
+        """
+        try:
+            # 保存当前时间范围
+            self.current_time_range = time_range
+
+            # 如果设置了调试日志
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info(f"时间范围已变更为: {time_range}")
+
+            # 发出时间范围变更信号
+            if hasattr(self, 'time_range_changed'):
+                self.time_range_changed.emit(time_range)
+
+        except Exception as e:
+            error_msg = f"处理时间范围变更失败: {str(e)}"
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(error_msg)
 
     def refresh(self) -> None:
         """
@@ -109,17 +174,27 @@ class UtilityMixin:
         若有数据则重绘K线图，否则显示"无数据"提示。
         """
         try:
-            # 这里假设有self.current_kdata等数据
+            # 调用ChartWidget的refresh方法，它会正确调用update_chart
             if hasattr(self, 'current_kdata') and self.current_kdata is not None:
-                self.update_chart({'kdata': self.current_kdata})
+                # 使用ChartWidget的refresh方法
+                if hasattr(self.__class__, 'refresh') and self.__class__.refresh != UIMixin.refresh:
+                    # 调用ChartWidget的refresh方法
+                    super(UIMixin, self).refresh()
+                else:
+                    # 直接调用update_chart
+                    self.update_chart({'kdata': self.current_kdata})
             else:
                 self.show_no_data("无数据")
         except Exception as e:
             error_msg = f"刷新图表失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
             # 发射异常信号，主窗口可捕获弹窗
-            self.error_occurred.emit(error_msg)
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(error_msg)
+            # 确保错误情况下也显示错误提示
+            self.show_no_data(f"刷新失败: {str(e)}")
 
     def update(self) -> None:
         """
