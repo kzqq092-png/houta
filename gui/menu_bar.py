@@ -328,6 +328,12 @@ class MainMenuBar(QMenuBar):
             self.system_optimizer_action.setStatusTip("打开系统优化器")
             self.tools_menu.addAction(self.system_optimizer_action)
 
+            # WebGPU状态
+            self.webgpu_status_action = QAction("WebGPU状态", self)
+            self.webgpu_status_action.setStatusTip("查看WebGPU硬件加速状态")
+            self.webgpu_status_action.triggered.connect(self.show_webgpu_status)
+            self.tools_menu.addAction(self.webgpu_status_action)
+
             self.tools_menu.addSeparator()
 
             # 设置
@@ -647,6 +653,17 @@ class MainMenuBar(QMenuBar):
             QMessageBox.critical(self.parent(), "错误", f"打开系统优化器失败: {str(e)}")
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"打开系统优化器失败: {str(e)}")
+
+    def show_webgpu_status(self):
+        """Show WebGPU status dialog"""
+        try:
+            from gui.dialogs.webgpu_status_dialog import WebGPUStatusDialog
+            dialog = WebGPUStatusDialog(self.parent())
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(self.parent(), "错误", f"打开WebGPU状态对话框失败: {str(e)}")
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"打开WebGPU状态对话框失败: {str(e)}")
 
     def show_documentation(self):
         """Show documentation"""

@@ -147,6 +147,18 @@ class ServiceBootstrap:
         chart_service.initialize()
         logger.info("✓ 图表服务注册完成")
 
+        # WebGPU图表渲染器
+        try:
+            from optimization.webgpu_chart_renderer import get_webgpu_chart_renderer
+            webgpu_renderer = get_webgpu_chart_renderer()
+            self.service_container.register_instance(
+                'webgpu_chart_renderer', webgpu_renderer)
+            logger.info("✓ WebGPU图表渲染器注册完成")
+        except ImportError as e:
+            logger.warning(f"WebGPU图表渲染器不可用: {e}")
+        except Exception as e:
+            logger.error(f"WebGPU图表渲染器注册失败: {e}")
+
         # 分析服务
         self.service_container.register(
             AnalysisService, scope=ServiceScope.SINGLETON)

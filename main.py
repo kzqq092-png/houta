@@ -7,12 +7,12 @@ YS-Quant‌ 主程序入口
 - 服务容器 (ServiceContainer)
 - 事件总线 (EventBus)
 - 模块化UI面板
+- WebGPU硬件加速渲染
 
 版本: 2.0 (重构版本)
 作者: YS-Quant‌ Team
 """
 
-from optimization.chart_renderer import initialize_chart_renderer
 from utils.exception_handler import setup_exception_handler
 from utils.warning_suppressor import suppress_warnings
 from core.coordinators import MainWindowCoordinator
@@ -41,10 +41,17 @@ except ImportError as e:
     print("请安装PyQt5: pip install PyQt5")
     QEventLoop = None
 
-# 添加图表渲染器初始化
+# WebGPU硬件加速渲染初始化
+try:
+    from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
+    # 初始化WebGPU图表渲染器（包含自动降级功能）
+    initialize_webgpu_chart_renderer(max_workers=10, enable_progressive=True)
+    logging.info("WebGPU硬件加速渲染系统初始化成功")
+except ImportError:
+    logging.warning("WebGPU模块不可用，将使用标准渲染")
+except Exception as e:
+    logging.error(f"WebGPU初始化失败: {e}")
 
-# 初始化图表渲染器
-initialize_chart_renderer(max_workers=4, enable_progressive=True)
 
 # 配置日志
 logging.basicConfig(

@@ -5,12 +5,16 @@
 提高代码的可维护性和可扩展性。
 """
 
-import traceback
-from typing import Optional, List, Dict, Any
-from PyQt5.QtCore import pyqtSignal, QTimer, QMutex, QMutexLocker, Qt
-from PyQt5.QtWidgets import QWidget
-
-# 导入所有Mixin模块
+import numpy as np
+import pandas as pd
+import time
+from core.metrics.app_metrics_service import measure
+from optimization.progressive_loading_manager import load_chart_progressive, get_progressive_loader
+from gui.widgets.async_data_processor import AsyncDataProcessor
+from utils.cache import Cache
+from core.logger import LogManager
+from utils.theme import get_theme_manager
+from utils.config_manager import ConfigManager
 from .chart_mixins import (
     BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
     CrosshairMixin, InteractionMixin, ZoomMixin,
@@ -18,23 +22,21 @@ from .chart_mixins import (
     # 直接从chart_mixins导入ChartRenderer相关组件
     ChartRenderer, RenderPriority
 )
+import traceback
+import logging
+from typing import Optional, List, Dict, Any
+from PyQt5.QtCore import pyqtSignal, QTimer, QMutex, QMutexLocker, Qt
+from PyQt5.QtWidgets import QWidget
+
+logger = logging.getLogger(__name__)
+
+# 导入所有Mixin模块
 
 # 导入依赖
-from utils.config_manager import ConfigManager
-from utils.theme import get_theme_manager
-from core.logger import LogManager
-from utils.cache import Cache
-from gui.widgets.async_data_processor import AsyncDataProcessor
 
 # 导入新的全局加载器
-from optimization.progressive_loading_manager import load_chart_progressive, get_progressive_loader
 
 # 导入指标收集
-from core.metrics.app_metrics_service import measure
-
-import time
-import pandas as pd
-import numpy as np
 
 
 class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
@@ -120,7 +122,31 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self.setAttribute(Qt.WA_NoSystemBackground)
             self.setAutoFillBackground(True)
 
-            self.renderer = ChartRenderer()
+            # 使用统一的WebGPU渲染器（自动包含降级功能）
+            try:
+                from optimization.webgpu_chart_renderer import get_webgpu_chart_renderer
+                self.renderer = get_webgpu_chart_renderer()
+                logger.info("使用WebGPU图表渲染器")
+
+                # 连接WebGPU特有信号
+                if hasattr(self.renderer, 'webgpu_status_changed'):
+                    self.renderer.webgpu_status_changed.connect(self._on_webgpu_status_changed)
+                if hasattr(self.renderer, 'backend_switched'):
+                    self.renderer.backend_switched.connect(self._on_backend_switched)
+
+            except (ImportError, Exception) as e:
+                # 降级到传统渲染器（从优化的全局获取）
+                logger.warning(f"WebGPU渲染器不可用，使用传统渲染器: {e}")
+                try:
+                    from optimization.chart_renderer import get_chart_renderer
+                    self.renderer = get_chart_renderer()
+                except (ImportError, Exception) as fallback_error:
+                    # 最后降级方案：创建基础渲染器
+                    logger.error(f"全局渲染器也不可用，创建基础实例: {fallback_error}")
+                    from optimization.chart_renderer import ChartRenderer
+                    self.renderer = ChartRenderer(max_workers=4, enable_progressive=True)
+
+            # 连接通用信号
             self.renderer.render_progress.connect(self._on_render_progress)
             self.renderer.render_complete.connect(self._on_render_complete)
             self.renderer.render_error.connect(self._on_render_error)
@@ -133,7 +159,7 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
         except Exception as e:
             error_msg = f"初始化失败: {str(e)}"
             if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg, exc_info=True)
+                self.log_manager.error(f"{error_msg}\n{traceback.format_exc()}")
             else:
                 print(f"ChartWidget初始化错误: {error_msg}\n{traceback.format_exc()}")
             if hasattr(self, 'error_occurred'):
@@ -286,6 +312,25 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
         """处理渲染错误"""
         self.error_occurred.emit(error)
         self.close_loading_dialog()
+
+    def _on_webgpu_status_changed(self, status: str, details: dict):
+        """处理WebGPU状态变化"""
+        if hasattr(self, 'log_manager') and self.log_manager:
+            self.log_manager.info(f"WebGPU状态变化: {status}")
+
+        # 可以在这里添加UI状态指示
+        if status == "error":
+            self.error_occurred.emit(f"WebGPU错误: {details.get('error', '未知错误')}")
+        elif status == "fallback":
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.info("WebGPU已降级，继续使用后备渲染")
+
+    def _on_backend_switched(self, old_backend: str, new_backend: str):
+        """处理后端切换"""
+        if hasattr(self, 'log_manager') and self.log_manager:
+            self.log_manager.info(f"渲染后端切换: {old_backend} → {new_backend}")
+
+        # 可以在这里添加UI提示用户后端已切换
 
     def set_kdata(self, kdata, indicators: List[Dict] = None, enable_progressive: bool = None):
         """设置K线数据并触发图表更新

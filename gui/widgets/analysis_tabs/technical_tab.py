@@ -1391,16 +1391,13 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 # 删除分析时间标签更新
                 pass
 
-            # 记录计算完成信息
-            self.log_manager.info(
-                f"批量计算完成: 成功计算 {calculated_count} 个指标，错误 {error_count} 个")
-
             # 显示计算结果摘要
             result_message = f"计算完成！\n成功: {calculated_count} 个指标\n错误: {error_count} 个指标"
             if error_count > 0:
                 result_message += f"\n部分指标计算失败，请检查日志获取详细信息"
 
-            QMessageBox.information(self, "计算完成", result_message)
+            # 记录计算完成信息
+            self.log_manager.info(result_message)
 
             if calculated_count > 0:
                 # 发送指标计算完成信号
