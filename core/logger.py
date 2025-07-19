@@ -101,12 +101,13 @@ class LogManager(BaseLogManager):
             ))
             self.logger.addHandler(console_handler)
 
-        # 日志格式增加trace_id
-        formatter = logging.Formatter(
-            '[%(asctime)s][%(levelname)s][%(trace_id)s] %(name)s: %(message)s')
+        # 添加TraceIdFilter到所有处理器
         for handler in self.logger.handlers:
-            handler.setFormatter(formatter)
             handler.addFilter(TraceIdFilter())
+            # 使用带有trace_id的格式
+            formatter = logging.Formatter(
+                '[%(asctime)s][%(levelname)s][%(trace_id)s] %(name)s: %(message)s')
+            handler.setFormatter(formatter)
 
     def _async_log(self, message: str, level: LogLevel):
         """异步记录日志

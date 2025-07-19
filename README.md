@@ -808,3 +808,7 @@ HIkyuu量化框架将交易系统拆分为多个独立组件：
 
 
 
+Backtrader - 揭示算法交易的威力
+NextTrade - 简化您的算法交易工作流程
+OpenAlgo - 开源算法交易框架
+StockSharp (S#) - 利用算法交易功能

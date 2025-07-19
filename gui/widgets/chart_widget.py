@@ -18,10 +18,20 @@ from utils.config_manager import ConfigManager
 from .chart_mixins import (
     BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
     CrosshairMixin, InteractionMixin, ZoomMixin,
-    SignalMixin, ExportMixin, UtilityMixin,
-    # 直接从chart_mixins导入ChartRenderer相关组件
-    ChartRenderer, RenderPriority
+    SignalMixin, ExportMixin, UtilityMixin
 )
+# 从专门的文件导入ChartRenderer相关组件
+from .chart_renderer import ChartRenderer
+try:
+    from .chart_renderer import RenderPriority
+except ImportError:
+    # 如果没有RenderPriority，创建一个简单的枚举
+    from enum import IntEnum
+
+    class RenderPriority(IntEnum):
+        LOW = 1
+        NORMAL = 2
+        HIGH = 3
 import traceback
 import logging
 from typing import Optional, List, Dict, Any
