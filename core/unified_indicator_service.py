@@ -146,18 +146,19 @@ class UnifiedIndicatorService:
 
     @lru_cache(maxsize=128)
     def get_indicator(self, name: str) -> Optional[Dict[str, Any]]:
-        """获取指标定义"""
+        """获取指标定义 - 支持英文名和中文显示名查找"""
         if name in self._indicators_cache:
             return self._indicators_cache[name]
 
         try:
             cursor = self.conn.cursor()
+            # 支持通过英文名或中文显示名查找
             cursor.execute('''
                 SELECT i.*, c.name as category_name, c.display_name as category_display_name
                 FROM indicator i
                 LEFT JOIN indicator_categories c ON i.category_id = c.id
-                WHERE i.name = ? AND i.is_active = 1
-            ''', (name,))
+                WHERE (i.name = ? OR i.display_name = ?) AND i.is_active = 1
+            ''', (name, name))
 
             row = cursor.fetchone()
             if not row:
@@ -639,10 +640,16 @@ class UnifiedIndicatorService:
             return df
 
         try:
-            talib_func = getattr(talib, impl['function_name'])
+            function_name = impl['function_name']
+
+            # 修复STOCH指标参数
+            if function_name == 'STOCH':
+                params = fix_stoch_parameters(params)
+
+            talib_func = getattr(talib, function_name)
 
             # 准备输入数据
-            inputs = self._prepare_talib_inputs(df, impl['function_name'], params)
+            inputs = self._prepare_talib_inputs(df, function_name, params)
 
             # 调用TA-Lib函数
             # 将参数分为数据参数和设置参数
@@ -694,35 +701,76 @@ class UnifiedIndicatorService:
         """准备TA-Lib函数的输入参数"""
         inputs = {}
 
-        # 根据函数名确定需要的输入列
-        if function_name in ['MA', 'SMA', 'EMA', 'RSI', 'ROC', 'MOM']:
-            inputs['close'] = df['close'].values
+        # 根据函数名确定需要的输入列，确保数据类型为float64
+        if function_name in ['MA', 'SMA', 'EMA', 'RSI', 'ROC', 'MOM', 'TRIX']:
+            inputs['close'] = df['close'].astype(np.float64).values
+        elif function_name in ['WILLR']:
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
         elif function_name in ['MACD']:
-            inputs['close'] = df['close'].values
-        elif function_name in ['BBANDS']:
-            inputs['close'] = df['close'].values
+            inputs['close'] = df['close'].astype(np.float64).values
+        elif function_name in ['BBANDS', 'BOLL']:
+            inputs['close'] = df['close'].astype(np.float64).values
         elif function_name in ['STOCH', 'STOCHF']:
-            inputs['high'] = df['high'].values
-            inputs['low'] = df['low'].values
-            inputs['close'] = df['close'].values
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
         elif function_name in ['ATR', 'CCI']:
-            inputs['high'] = df['high'].values
-            inputs['low'] = df['low'].values
-            inputs['close'] = df['close'].values
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
         elif function_name in ['OBV']:
-            inputs['close'] = df['close'].values
-            inputs['volume'] = df['volume'].values
+            inputs['close'] = df['close'].astype(np.float64).values
+            inputs['volume'] = df['volume'].astype(np.float64).values
         elif function_name in ['ADX']:
-            inputs['high'] = df['high'].values
-            inputs['low'] = df['low'].values
-            inputs['close'] = df['close'].values
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
+        elif function_name in ['SAR']:
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+        elif function_name in ['MFI']:
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
+            inputs['volume'] = df['volume'].astype(np.float64).values
+        elif function_name in ['ADOSC']:
+            inputs['high'] = df['high'].astype(np.float64).values
+            inputs['low'] = df['low'].astype(np.float64).values
+            inputs['close'] = df['close'].astype(np.float64).values
+            inputs['volume'] = df['volume'].astype(np.float64).values
         else:
             # 默认使用close
-            inputs['close'] = df['close'].values
+            inputs['close'] = df['close'].astype(np.float64).values
 
-        # 添加参数
+        # 定义每个指标支持的参数
+        supported_params = {
+            'MA': ['timeperiod'],
+            'SMA': ['timeperiod'],
+            'EMA': ['timeperiod'],
+            'RSI': ['timeperiod'],
+            'ROC': ['timeperiod'],
+            'MOM': ['timeperiod'],
+            'TRIX': ['timeperiod'],
+            'WILLR': ['timeperiod'],
+            'ATR': ['timeperiod'],
+            'CCI': ['timeperiod'],
+            'ADX': ['timeperiod'],
+            'MACD': ['fastperiod', 'slowperiod', 'signalperiod'],
+            'BBANDS': ['timeperiod', 'nbdevup', 'nbdevdn'],
+            'BOLL': ['timeperiod', 'nbdevup', 'nbdevdn'],
+            'STOCH': ['fastk_period', 'slowk_period', 'slowk_matype', 'slowd_period', 'slowd_matype'],
+            'OBV': [],  # OBV不需要参数
+            'SAR': ['acceleration', 'maximum'],
+            'MFI': ['timeperiod'],
+            'ADOSC': ['fastperiod', 'slowperiod']
+        }
+
+        # 只添加支持的参数
+        allowed_params = supported_params.get(function_name, ['timeperiod'])  # 默认支持timeperiod
         for key, value in params.items():
-            if key not in inputs:  # 避免覆盖数据列
+            if key not in inputs and key in allowed_params:  # 避免覆盖数据列，并且只添加支持的参数
                 inputs[key] = value
 
         return inputs
@@ -910,20 +958,45 @@ def get_all_categories() -> List[Dict[str, Any]]:
 # 指标别名映射
 INDICATOR_ALIASES = {
     'SMA': 'MA',
-    'STOCH': 'KDJ',
     'BOLL': 'BBANDS',
     '移动平均线': 'MA',
     '指数移动平均': 'EMA',
-    '随机指标': 'STOCH',
+    '随机指标': 'KDJ',  # 中文名映射到KDJ
     '布林带': 'BBANDS',
     'MACD指标': 'MACD',
     '相对强弱指标': 'RSI'
+    # 注意：移除了 'STOCH': 'KDJ' 映射，因为STOCH和KDJ是不同的指标
 }
 
 
 def resolve_indicator_alias(name: str) -> str:
     """解析指标别名"""
     return INDICATOR_ALIASES.get(name, name)
+
+
+def fix_stoch_parameters(params: Dict) -> Dict:
+    """修复STOCH指标参数，将timeperiod转换为正确的参数"""
+    if not params:
+        return {}
+
+    fixed_params = params.copy()
+
+    # 如果有timeperiod参数，将其转换为STOCH的正确参数
+    if 'timeperiod' in fixed_params:
+        timeperiod = fixed_params.pop('timeperiod', 14)
+        # 设置STOCH的默认参数
+        if 'fastk_period' not in fixed_params:
+            fixed_params['fastk_period'] = max(5, timeperiod // 3)
+        if 'slowk_period' not in fixed_params:
+            fixed_params['slowk_period'] = 3
+        if 'slowd_period' not in fixed_params:
+            fixed_params['slowd_period'] = 3
+        if 'slowk_matype' not in fixed_params:
+            fixed_params['slowk_matype'] = 0
+        if 'slowd_matype' not in fixed_params:
+            fixed_params['slowd_matype'] = 0
+
+    return fixed_params
 
 
 if __name__ == '__main__':

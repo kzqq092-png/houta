@@ -248,3 +248,37 @@ class MultiScreenToggleEvent(BaseEvent):
         self.data.update({
             'is_multi_screen': self.is_multi_screen
         })
+
+
+@dataclass
+class TradeExecutedEvent(BaseEvent):
+    """
+    交易执行事件
+
+    当交易（买入/卖出）执行完成时触发。
+    """
+    trade_record: Any = None  # TradeRecord object
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'trade_record': self.trade_record
+        })
+
+
+@dataclass
+class PositionUpdatedEvent(BaseEvent):
+    """
+    持仓更新事件
+
+    当持仓信息发生变化时触发。
+    """
+    portfolio: Any = None  # Portfolio object
+    updated_positions: list = field(default_factory=list)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'portfolio': self.portfolio,
+            'updated_positions': self.updated_positions
+        })

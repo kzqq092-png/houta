@@ -5,6 +5,7 @@
 """
 
 import logging
+import traceback
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime, timedelta
 import json
@@ -30,6 +31,36 @@ try:
 except ImportError as e:
     logging.warning(f"无法导入TechnicalAnalysisTab: {e}")
     TECHNICAL_TAB_AVAILABLE = False
+
+# 导入其他专业分析标签页
+try:
+    from gui.widgets.analysis_tabs.pattern_tab import PatternAnalysisTab
+    from gui.widgets.analysis_tabs.trend_tab import TrendAnalysisTab
+    from gui.widgets.analysis_tabs.wave_tab import WaveAnalysisTab
+    from gui.widgets.analysis_tabs.sentiment_tab import SentimentAnalysisTab
+    from gui.widgets.analysis_tabs.sector_flow_tab import SectorFlowTab
+    from gui.widgets.analysis_tabs.hotspot_tab import HotspotAnalysisTab
+    from gui.widgets.analysis_tabs.sentiment_report_tab import SentimentReportTab
+    PROFESSIONAL_TABS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"无法导入专业分析标签页: {e}")
+    PROFESSIONAL_TABS_AVAILABLE = False
+
+# 导入AnalysisToolsPanel
+try:
+    from gui.ui_components import AnalysisToolsPanel
+    ANALYSIS_TOOLS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"无法导入AnalysisToolsPanel: {e}")
+    ANALYSIS_TOOLS_AVAILABLE = False
+
+# 导入TradingPanel
+try:
+    from gui.widgets.trading_panel import TradingPanel
+    TRADING_PANEL_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"无法导入TradingPanel: {e}")
+    TRADING_PANEL_AVAILABLE = False
 
 if TYPE_CHECKING:
     from core.services import AnalysisService
@@ -68,10 +99,12 @@ class RightPanel(BasePanel):
         """
         # 通过服务容器获取分析服务
         self.analysis_service = None
-        if coordinator and hasattr(coordinator, 'service_container'):
-            from core.services import AnalysisService
-            self.analysis_service = coordinator.service_container.get_service(
-                AnalysisService)
+        if coordinator and hasattr(coordinator, 'service_container') and coordinator.service_container:
+            try:
+                from core.services import AnalysisService
+                self.analysis_service = coordinator.service_container.resolve(AnalysisService)
+            except Exception as e:
+                logger.warning(f"无法获取AnalysisService: {e}")
         self.width = width
 
         # 当前状态
@@ -219,28 +252,104 @@ class RightPanel(BasePanel):
         main_layout.addWidget(tab_widget)
         self.add_widget('tab_widget', tab_widget)
 
-        # 技术指标标签页
+        # 专业技术分析标签页
         if TECHNICAL_TAB_AVAILABLE:
-            self._technical_tab = TechnicalAnalysisTab(self._root_frame)
-            tab_widget.addTab(self._technical_tab, "技术指标")
+            config_manager = None
+            try:
+                if self.coordinator and hasattr(self.coordinator, 'service_container'):
+                    from utils.config_manager import ConfigManager
+                    config_manager = self.coordinator.service_container.resolve(ConfigManager)
+            except Exception as e:
+                logger.warning(f"无法获取ConfigManager: {e}")
+
+            self._technical_tab = TechnicalAnalysisTab(config_manager)
+            tab_widget.addTab(self._technical_tab, "技术分析")
             self.add_widget('technical_tab', self._technical_tab)
-        else:
-            self._create_technical_tab(tab_widget)
 
-        # 买卖信号标签页
-        self._create_signal_tab(tab_widget)
+        # 专业分析标签页
+        if PROFESSIONAL_TABS_AVAILABLE:
+            # 形态分析
+            self._pattern_tab = PatternAnalysisTab(config_manager)
+            tab_widget.addTab(self._pattern_tab, "形态分析")
+            self.add_widget('pattern_tab', self._pattern_tab)
 
-        # 风险评估标签页
-        self._create_risk_tab(tab_widget)
+            # 趋势分析
+            self._trend_tab = TrendAnalysisTab(config_manager)
+            tab_widget.addTab(self._trend_tab, "趋势分析")
+            self.add_widget('trend_tab', self._trend_tab)
 
-        # 回测结果标签页
-        self._create_backtest_tab(tab_widget)
+            # 波浪分析
+            self._wave_tab = WaveAnalysisTab(config_manager)
+            tab_widget.addTab(self._wave_tab, "波浪分析")
+            self.add_widget('wave_tab', self._wave_tab)
 
-        # AI选股标签页
-        self._create_ai_stock_tab(tab_widget)
+            # 情绪分析
+            self._sentiment_tab = SentimentAnalysisTab(config_manager)
+            tab_widget.addTab(self._sentiment_tab, "情绪分析")
+            self.add_widget('sentiment_tab', self._sentiment_tab)
 
-        # 行业分析标签页
-        self._create_industry_tab(tab_widget)
+            # 板块资金流
+            self._sector_flow_tab = SectorFlowTab(config_manager)
+            tab_widget.addTab(self._sector_flow_tab, "板块资金流")
+            self.add_widget('sector_flow_tab', self._sector_flow_tab)
+
+            # 热点分析
+            self._hotspot_tab = HotspotAnalysisTab(config_manager)
+            tab_widget.addTab(self._hotspot_tab, "热点分析")
+            self.add_widget('hotspot_tab', self._hotspot_tab)
+
+            # 情绪报告
+            self._sentiment_report_tab = SentimentReportTab(config_manager)
+            tab_widget.addTab(self._sentiment_report_tab, "情绪报告")
+            self.add_widget('sentiment_report_tab', self._sentiment_report_tab)
+
+        # 基础功能标签页（如果专业标签页不可用时的后备方案）
+        if not PROFESSIONAL_TABS_AVAILABLE:
+            self._create_signal_tab(tab_widget)
+            self._create_risk_tab(tab_widget)
+            self._create_backtest_tab(tab_widget)
+            self._create_ai_stock_tab(tab_widget)
+            self._create_industry_tab(tab_widget)
+
+            # 批量分析工具标签页
+        if ANALYSIS_TOOLS_AVAILABLE:
+            # 创建一个继承自QWidget的包装器来传递log_manager
+            from PyQt5.QtWidgets import QWidget
+
+            class AnalysisToolsWrapper(QWidget):
+                def __init__(self, parent, logger):
+                    super().__init__(parent)
+                    self.log_manager = logger
+
+            wrapper = AnalysisToolsWrapper(self._root_frame, logger)
+            self._analysis_tools_panel = AnalysisToolsPanel(parent=wrapper)
+            tab_widget.addTab(self._analysis_tools_panel, "批量分析")
+            self.add_widget('analysis_tools_panel', self._analysis_tools_panel)
+
+        # 实盘交易标签页
+        if TRADING_PANEL_AVAILABLE:
+            try:
+                # 从服务容器获取交易服务
+                trading_service = None
+                if self.coordinator and hasattr(self.coordinator, 'service_container'):
+                    from core.services.trading_service import TradingService
+                    trading_service = self.coordinator.service_container.resolve(TradingService)
+
+                if trading_service:
+                    self._trading_panel = TradingPanel(
+                        trading_service=trading_service,
+                        event_bus=self.coordinator.event_bus,
+                        parent=self._root_frame
+                    )
+                    tab_widget.addTab(self._trading_panel, "实盘交易")
+                    self.add_widget('trading_panel', self._trading_panel)
+                    logger.info("✅ 实盘交易标签页创建成功")
+                else:
+                    logger.warning("❌ 无法获取TradingService，跳过实盘交易标签页")
+
+            except Exception as e:
+                logger.error(f"❌ 创建实盘交易标签页失败: {e}")
+                logger.error(traceback.format_exc())
 
         # 控制按钮框架
         button_frame = QFrame()
@@ -385,7 +494,7 @@ class RightPanel(BasePanel):
 
         # 统计文本
         signal_stats_text = QTextEdit()
-        signal_stats_text.setMaximumHeight(80)
+        signal_stats_text.setMaximumHeight(800)
         signal_stats_text.setReadOnly(True)
         signal_stats_layout.addWidget(signal_stats_text)
         self.add_widget('signal_stats_text', signal_stats_text)
@@ -672,17 +781,50 @@ class RightPanel(BasePanel):
             analysis_data = event.ui_data.get('analysis')
             kline_data = event.ui_data.get('kline_data')
 
-            # 如果有完整的技术分析标签页，传递K线数据
-            if TECHNICAL_TAB_AVAILABLE and hasattr(self, '_technical_tab'):
-                try:
-                    if kline_data is not None and not kline_data.empty:
-                        logger.info(f"传递K线数据到技术分析标签页，数据长度: {len(kline_data)}")
+            # 传递K线数据到所有专业分析标签页
+            if kline_data is not None and not kline_data.empty:
+                logger.info(f"传递K线数据到所有专业分析标签页，数据长度: {len(kline_data)}")
+
+                # 技术分析标签页
+                if TECHNICAL_TAB_AVAILABLE and hasattr(self, '_technical_tab'):
+                    try:
                         self._technical_tab.set_kdata(kline_data)
-                    else:
-                        logger.warning("K线数据为空，无法传递到技术分析标签页")
+                        logger.debug("K线数据已传递到技术分析标签页")
+                    except Exception as e:
+                        logger.error(f"传递K线数据到技术分析标签页失败: {e}")
+
+                # 其他专业分析标签页
+                if PROFESSIONAL_TABS_AVAILABLE:
+                    professional_tabs = [
+                        ('_pattern_tab', '形态分析'),
+                        ('_trend_tab', '趋势分析'),
+                        ('_wave_tab', '波浪分析'),
+                        ('_sentiment_tab', '情绪分析'),
+                        ('_sector_flow_tab', '板块资金流'),
+                        ('_hotspot_tab', '热点分析'),
+                        ('_sentiment_report_tab', '情绪报告')
+                    ]
+
+                    for tab_attr, tab_name in professional_tabs:
+                        if hasattr(self, tab_attr):
+                            try:
+                                tab = getattr(self, tab_attr)
+                                if hasattr(tab, 'set_kdata'):
+                                    tab.set_kdata(kline_data)
+                                    logger.debug(f"K线数据已传递到{tab_name}标签页")
+                                elif hasattr(tab, 'update_data'):
+                                    tab.update_data(kline_data)
+                                    logger.debug(f"K线数据通过update_data传递到{tab_name}标签页")
+                            except Exception as e:
+                                logger.error(f"传递K线数据到{tab_name}标签页失败: {e}")
+            else:
+                logger.warning("K线数据为空，无法传递到专业分析标签页")
+                # 清除所有标签页的数据
+                if TECHNICAL_TAB_AVAILABLE and hasattr(self, '_technical_tab'):
+                    try:
                         self._technical_tab.clear_data()
-                except Exception as e:
-                    logger.error(f"传递K线数据到技术分析标签页失败: {e}")
+                    except Exception as e:
+                        logger.error(f"清除技术分析标签页数据失败: {e}")
 
             if analysis_data:
                 # 直接使用分析数据更新UI

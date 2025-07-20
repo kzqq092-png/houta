@@ -255,7 +255,26 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             }
         """)
         self.advanced_filter_btn.clicked.connect(self.show_advanced_filter_dialog)
+
+        # 指标选股
+        self.batch_filter_btn = QPushButton("🔍 指标选股")
+        self.batch_filter_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.batch_filter_btn.clicked.connect(self.show_batch_filter_dialog)
+
         filter_layout.addWidget(self.advanced_filter_btn)
+        filter_layout.addWidget(self.batch_filter_btn)
 
         # 清除筛选按钮
         self.clear_filter_btn = QPushButton("✖️ 清除筛选")
@@ -1992,7 +2011,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                                 strength_info = "弱"
 
                     # 生成信号建议
-                    if current_value is not None:
+                    if current_value is not None and isinstance(current_value, (int, float)):
                         signal_info, advice = self._generate_signal_advice(indicator_name, value_name, current_value, trend_info)
 
                 except Exception as e:
@@ -2097,6 +2116,16 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         advice = ""
 
         try:
+            # 确保current_value是数值类型
+            if not isinstance(current_value, (int, float)):
+                self.log_manager.warning(f"当前值不是数值类型: {type(current_value)}, 值: {current_value}")
+                return "数据类型错误", "无法分析"
+
+            # 检查是否为NaN
+            import numpy as np
+            if np.isnan(current_value):
+                return "数据无效", "无法分析"
+
             # 基于指标类型生成信号
             if "RSI" in indicator_name:
                 if current_value > 70:
@@ -2494,11 +2523,84 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         """显示高级筛选对话框"""
         dialog = AdvancedFilterDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            filters = dialog.get_filters()
-            self.apply_table_filters(filters)
+            filters = dialog.get_activate_filters()
+            if filters:
+                self.apply_table_filters(filters)
+                self.clear_filter_btn.setEnabled(True)
+            else:
+                self.clear_table_filters()
+
+    def show_batch_filter_dialog(self):
+        """显示指标选股高级筛选对话框"""
+        try:
+            from gui.dialogs.batch_filter_dialog import CompactAdvancedFilterDialog
+
+            # 获取当前表格的列配置
+            columns_config = self._get_table_columns_config()
+
+            dialog = CompactAdvancedFilterDialog(self, columns_config)
+            dialog.filters_applied.connect(self.apply_compact_filters)
+
+            if dialog.exec_() == QDialog.Accepted:
+                filters = dialog.get_active_filters()
+                if filters:
+                    self.apply_table_filters(filters)
+                    filter_count = len(filters)
+                    self.filter_status_label.setText(f"已应用 {filter_count} 个筛选条件")
+                    self.clear_filter_btn.setEnabled(True)
+                else:
+                    self.clear_table_filters()
+        except Exception as e:
+            self.log_manager.error(f"显示紧凑型筛选对话框失败: {e}")
+            QMessageBox.warning(self, "错误", f"无法打开高级筛选对话框:\n{str(e)}")
+
+    def _get_table_columns_config(self):
+        """获取当前表格的列配置"""
+        columns = []
+        for i in range(self.technical_table.columnCount()):
+            header_item = self.technical_table.horizontalHeaderItem(i)
+            if header_item:
+                columns.append(header_item.text())
+
+        # 根据列名确定筛选类型
+        config = {}
+        for col in columns:
+            if col == '日期':
+                config[col] = {'type': 'date', 'label': '日期'}
+            elif col in ['数值', '强度']:
+                config[col] = {'type': 'numeric', 'label': col}
+            elif col == '信号':
+                config[col] = {
+                    'type': 'selection',
+                    'label': '信号',
+                    'options': ['超买', '超卖', '看涨', '看跌', '中性', '形态信号']
+                }
+            elif col == '趋势':
+                config[col] = {
+                    'type': 'selection',
+                    'label': '趋势',
+                    'options': ['上升 ↑', '下降 ↓', '持平 →', 'N/A']
+                }
+            else:
+                config[col] = {'type': 'text', 'label': col}
+
+        return config
+
+    def apply_compact_filters(self, filters):
+        """应用指标选股筛选条件"""
+        try:
+            if filters:
+                self.apply_table_filters(filters)
+                filter_count = len(filters)
+                self.filter_status_label.setText(f"已应用 {filter_count} 个筛选条件")
+                self.clear_filter_btn.setEnabled(True)
+            else:
+                self.clear_table_filters()
+        except Exception as e:
+            self.log_manager.error(f"应用筛选条件失败: {e}")
 
     def apply_table_filters(self, filters: Dict[str, Any]):
-        """应用筛选条件到表格"""
+        """应用指标选股筛选条件到表格"""
         try:
             if not hasattr(self, 'technical_table') or self.technical_table.rowCount() == 0:
                 return
@@ -2589,7 +2691,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.clear_filter_btn.setEnabled(False)
 
         except Exception as e:
-            self.log_manager.error(f"应用筛选失败: {str(e)}")
+            self.log_manager.error(f"应用指标选股筛选失败: {str(e)}")
 
     def clear_table_filters(self):
         """清除所有筛选条件"""
@@ -2796,7 +2898,7 @@ class AdvancedFilterDialog(QDialog):
 
         self.filter_layout.addWidget(group)
 
-    def get_filters(self) -> Dict[str, Any]:
+    def get_activate_filters(self) -> Dict[str, Any]:
         """获取当前的筛选设置"""
         active_filters = {}
 

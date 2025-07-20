@@ -50,7 +50,18 @@ class BasePanel(QObject, ABC, metaclass=QObjectMeta):
 
         self.parent = parent
         self.coordinator = coordinator
-        self.event_bus = coordinator.event_bus if coordinator else None
+
+        # 安全获取event_bus
+        self.event_bus = None
+        if coordinator and hasattr(coordinator, 'event_bus'):
+            self.event_bus = coordinator.event_bus
+        elif coordinator is None:
+            # 如果没有协调器，创建一个简单的空事件总线
+            class NullEventBus:
+                def publish(self, event): pass
+                def subscribe(self, event_type, handler): pass
+                def unsubscribe(self, event_type, handler): pass
+            self.event_bus = NullEventBus()
 
         # 面板状态
         self._initialized = False

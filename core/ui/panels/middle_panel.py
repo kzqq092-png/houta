@@ -1329,8 +1329,19 @@ class MiddlePanel(BasePanel):
             bool: 数据量是否合理
         """
         try:
-            if not data:
-                logger.warning("数据为空")
+            # 修复DataFrame验证问题
+            if data is None:
+                logger.warning("数据为None")
+                return False
+
+            # 对于DataFrame，使用.empty检查
+            if hasattr(data, 'empty') and data.empty:
+                logger.warning("数据为空DataFrame")
+                return False
+
+            # 对于list或其他可迭代对象，使用len检查
+            if hasattr(data, '__len__') and len(data) == 0:
+                logger.warning("数据长度为0")
                 return False
 
             # 获取数据长度

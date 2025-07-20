@@ -675,3 +675,19 @@ def initialize_strategy_factory(registry: StrategyRegistry = None) -> StrategyFa
 
         _strategy_factory = StrategyFactory(registry)
         return _strategy_factory
+
+
+# 模块级别的便捷函数，用于向后兼容
+def create_strategy(strategy_name: str, instance_name: str = None, **kwargs) -> Optional[BaseStrategy]:
+    """创建策略实例的便捷函数
+
+    Args:
+        strategy_name: 策略名称
+        instance_name: 实例名称
+        **kwargs: 其他参数
+
+    Returns:
+        策略实例
+    """
+    factory = get_strategy_factory()
+    return factory.create_strategy(strategy_name, instance_name, **kwargs)

@@ -64,10 +64,13 @@ class ServiceBootstrap:
             # 2. 注册业务服务
             self._register_business_services()
 
-            # 3. 注册监控服务
+            # 3. 注册交易服务
+            self._register_trading_service()
+
+            # 4. 注册监控服务
             self._register_monitoring_services()
 
-            # 4. 注册插件服务
+            # 5. 注册插件服务
             self._register_plugin_services()
 
             return True
@@ -209,6 +212,32 @@ class ServiceBootstrap:
             self.service_container.register_instance(
                 'unified_data_manager', MinimalDataManager())
             logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
+
+    def _register_trading_service(self) -> None:
+        """注册交易服务"""
+        logger.info("注册交易服务...")
+
+        try:
+            from .trading_service import TradingService
+
+            self.service_container.register(
+                TradingService,
+                scope=ServiceScope.SINGLETON,
+                factory=lambda: TradingService(
+                    event_bus=self.event_bus,
+                    config={}
+                )
+            )
+
+            # 初始化交易服务
+            trading_service = self.service_container.resolve(TradingService)
+            trading_service.initialize()
+
+            logger.info("✓ 交易服务注册完成")
+
+        except Exception as e:
+            logger.error(f"❌ 交易服务注册失败: {e}")
+            logger.error(traceback.format_exc())
 
     def _register_monitoring_services(self) -> None:
         """注册监控服务"""

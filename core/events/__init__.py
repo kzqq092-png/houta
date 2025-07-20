@@ -17,6 +17,8 @@ from .events import (
     PerformanceUpdateEvent,
     IndicatorChangedEvent,
     UIDataReadyEvent,
+    TradeExecutedEvent,
+    PositionUpdatedEvent,
 )
 from .event_handler import EventHandler, AsyncEventHandler
 
@@ -35,4 +37,6 @@ __all__ = [
     'PerformanceUpdateEvent',
     'IndicatorChangedEvent',
     'UIDataReadyEvent',
+    'TradeExecutedEvent',
+    'PositionUpdatedEvent',
 ]
