@@ -282,3 +282,23 @@ class PositionUpdatedEvent(BaseEvent):
             'portfolio': self.portfolio,
             'updated_positions': self.updated_positions
         })
+
+
+@dataclass
+class PatternSignalsDisplayEvent(BaseEvent):
+    """
+    形态信号显示事件
+
+    当用户在形态分析表中点击某一行时触发，通知图表显示和高亮相关信号。
+    """
+    pattern_name: str = ""
+    all_signal_indices: list = field(default_factory=list)
+    highlighted_signal_index: int = -1
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'pattern_name': self.pattern_name,
+            'all_signal_indices': self.all_signal_indices,
+            'highlighted_signal_index': self.highlighted_signal_index
+        })

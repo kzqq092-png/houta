@@ -77,6 +77,55 @@ class SignalMixin:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"绘制信号失败: {str(e)}")
 
+    def draw_pattern_signals(self, all_indices: List[int], highlighted_index: int, pattern_name: str):
+        """在图表上绘制并高亮形态信号"""
+        try:
+            if not hasattr(self, 'price_ax') or not self.price_ax or self.current_kdata is None:
+                self.log_manager.warning("无法绘制形态信号，因为图表或数据尚未准备好。")
+                return
+
+            # 清除之前绘制的形态信号
+            if hasattr(self, '_pattern_signal_artists'):
+                for artist in self._pattern_signal_artists:
+                    artist.remove()
+            self._pattern_signal_artists = []
+
+            kdata = self.current_kdata
+
+            # 绘制所有同类型的信号
+            for index in all_indices:
+                if 0 <= index < len(kdata):
+                    price = kdata['high'].iloc[index] * 1.02  # 在K线上方绘制标记
+
+                    is_highlighted = (index == highlighted_index)
+
+                    # 根据是否高亮选择不同的标记样式
+                    marker = 'v'
+                    size = 150 if is_highlighted else 80
+                    color = 'red' if is_highlighted else 'orange'
+                    alpha = 1.0 if is_highlighted else 0.7
+                    zorder = 10 if is_highlighted else 5
+
+                    # 使用 scatter 绘制标记
+                    scatter = self.price_ax.scatter(index, price, s=size, c=color, marker=marker,
+                                                    alpha=alpha, edgecolors='white', linewidth=1, zorder=zorder)
+                    self._pattern_signal_artists.append(scatter)
+
+                    # 如果是高亮信号，添加一个文本标签
+                    if is_highlighted:
+                        text = self.price_ax.text(index, price, f'  {pattern_name}',
+                                                  fontsize=9, color=color, va='center', ha='left',
+                                                  fontweight='bold')
+                        self._pattern_signal_artists.append(text)
+
+            self.canvas.draw_idle()
+            self.log_manager.info(f"成功绘制了 {len(all_indices)} 个 '{pattern_name}' 形态信号，并高亮显示了索引 {highlighted_index}。")
+
+        except Exception as e:
+            self.log_manager.error(f"绘制形态信号失败: {e}")
+            import traceback
+            self.log_manager.error(traceback.format_exc())
+
     def _select_important_signals(self, signals, max_count):
         """选择重要信号，基于置信度、类型优先级等"""
         # 按置信度排序，优先显示高置信度信号

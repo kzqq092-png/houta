@@ -10,4 +10,3 @@ from .trends import *
 from .oscillators import *
 from .volumes import *
 from .volatility import *
-from .patterns import *

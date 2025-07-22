@@ -20,6 +20,7 @@ from .chart_mixins import (
     CrosshairMixin, InteractionMixin, ZoomMixin,
     SignalMixin, ExportMixin, UtilityMixin
 )
+from core.events import PatternSignalsDisplayEvent
 # 从专门的文件导入ChartRenderer相关组件
 from .chart_renderer import ChartRenderer
 try:
@@ -70,12 +71,13 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
     progressive_loading_progress = pyqtSignal(int, str)  # 进度, 阶段名称
     progressive_loading_complete = pyqtSignal()  # 加载完成
 
-    def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None,
+    def __init__(self, parent=None, coordinator=None, config_manager: Optional[ConfigManager] = None,
                  theme_manager=None, log_manager=None, data_manager=None, chart_id: str = None):
         """初始化图表控件
 
         Args:
             parent: Parent widget
+            coordinator: The application coordinator
             config_manager: Optional ConfigManager instance to use
             theme_manager: Optional theme manager to use
             log_manager: Optional log manager to use
@@ -88,6 +90,8 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             self.setAcceptDrops(True)  # 确保控件能接收拖拽
 
             # 2. 初始化管理器
+            self.coordinator = coordinator
+            self.event_bus = coordinator.event_bus if coordinator else None
             self.config_manager = config_manager or ConfigManager()
             self.theme_manager = theme_manager or get_theme_manager(self.config_manager)
             self.log_manager = log_manager or LogManager()
@@ -164,6 +168,9 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
             # 7. 应用初始主题
             self._apply_initial_theme()
 
+            # 8. 绑定事件
+            self._bind_events()
+
             self.log_manager.info("图表控件初始化完成")
 
         except Exception as e:
@@ -174,6 +181,35 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 print(f"ChartWidget初始化错误: {error_msg}\n{traceback.format_exc()}")
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)
+
+    def _bind_events(self):
+        """绑定所有事件监听"""
+        if hasattr(self, 'event_bus') and self.event_bus:
+            self.event_bus.subscribe(PatternSignalsDisplayEvent, self._handle_pattern_signals_display)
+            self.log_manager.info("成功订阅 PatternSignalsDisplayEvent")
+        else:
+            self.log_manager.warning("无法订阅 PatternSignalsDisplayEvent，因为 event_bus 不可用。")
+
+    def _handle_pattern_signals_display(self, event: PatternSignalsDisplayEvent):
+        """处理形态信号显示事件"""
+        try:
+            self.log_manager.info(f"收到 PatternSignalsDisplayEvent: {event.pattern_name}, "
+                                  f"高亮索引: {event.highlighted_signal_index}, "
+                                  f"共 {len(event.all_signal_indices)} 个信号")
+
+            # 调用SignalMixin中的方法来绘制信号
+            if hasattr(self, 'draw_pattern_signals'):
+                self.draw_pattern_signals(
+                    event.all_signal_indices,
+                    event.highlighted_signal_index,
+                    event.pattern_name
+                )
+            else:
+                self.log_manager.warning("ChartWidget 中缺少 draw_pattern_signals 方法，无法绘制形态信号。")
+
+        except Exception as e:
+            self.log_manager.error(f"处理 PatternSignalsDisplayEvent 失败: {e}")
+            self.log_manager.error(traceback.format_exc())
 
     # 删除mouseMoveEvent，因为matplotlib的canvas会自动处理事件
     # def mouseMoveEvent(self, event):

@@ -129,6 +129,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         # 快速分析组
         quick_group = QGroupBox("快速分析")
+        quick_group.setFixedHeight(80)
         quick_layout = QHBoxLayout(quick_group)
 
         # 一键趋势分析
@@ -1134,7 +1135,20 @@ class TrendAnalysisTab(BaseAnalysisTab):
         """更新趋势表格"""
         column_keys = ['timeframe', 'direction', 'strength', 'confidence',
                        'duration', 'target_price', 'risk_level', 'recommendation']
-        self.update_table_data(self.trend_table, trend_results, column_keys)
+
+        processed_results = []
+        for result in trend_results:
+            processed_results.append({
+                'timeframe': result.get('timeframe', 'N/A'),
+                'direction': result.get('direction', 'N/A'),
+                'strength': f"{result.get('strength', 0):.2f}%",
+                'confidence': f"{result.get('confidence', 0):.2f}%",
+                'duration': f"{result.get('duration', 0)} bars",
+                'target_price': f"{result.get('target_price', 0):.2f}",
+                'risk_level': result.get('risk_level', 'N/A'),
+                'recommendation': result.get('recommendation', 'N/A')
+            })
+        self.update_table_data(self.trend_table, processed_results, column_keys)
 
     def _update_trend_statistics_display(self, stats):
         """更新趋势统计显示"""
@@ -1152,8 +1166,20 @@ class TrendAnalysisTab(BaseAnalysisTab):
         """更新多时间框架表格"""
         column_keys = ['timeframe', 'direction',
                        'strength', 'consistency', 'weight', 'score']
+
+        processed_results = []
+        for result in multi_tf_results:
+            processed_results.append({
+                'timeframe': result.get('timeframe', 'N/A'),
+                'direction': result.get('direction', 'N/A'),
+                'strength': f"{result.get('strength', 0):.2f}%",
+                'consistency': f"{result.get('consistency', 0):.2f}",
+                'weight': f"{result.get('weight', 0):.2f}",
+                'score': f"{result.get('score', 0):.2f}"
+            })
+
         self.update_table_data(self.multi_tf_table,
-                               multi_tf_results, column_keys)
+                               processed_results, column_keys)
 
     def _update_prediction_display(self, predictions):
         """更新预测显示"""
@@ -1190,7 +1216,18 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _update_support_resistance_table(self, sr_levels):
         """更新支撑阻力表格"""
         column_keys = ['type', 'price', 'strength', 'test_count', 'validity']
-        self.update_table_data(self.sr_table, sr_levels, column_keys)
+
+        processed_levels = []
+        for level in sr_levels:
+            processed_levels.append({
+                'type': level.get('type', 'N/A'),
+                'price': f"{level.get('price', 0):.2f}",
+                'strength': f"{level.get('strength', 0):.2f}",
+                'test_count': level.get('test_count', 0),
+                'validity': level.get('validity', 'N/A')
+            })
+
+        self.update_table_data(self.sr_table, processed_levels, column_keys)
 
     def _update_alerts_display(self, alerts):
         """更新预警显示"""

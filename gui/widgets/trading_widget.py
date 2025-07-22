@@ -8,6 +8,13 @@ from PyQt5.QtGui import QColor
 import traceback
 import time
 from datetime import datetime
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+import threading
+from core.trading_system import TradingSystem
+import pandas as pd
+import plotly.graph_objs as go
+import plotly.io as pio
+
 
 from core.logger import LogManager
 from utils.theme import get_theme_manager
@@ -1498,7 +1505,6 @@ class TradingWidget(QWidget):
                 import dask
 
                 def single_task(code, strategy, params):
-                    from core.trading_system import TradingSystem
                     ts = TradingSystem()
                     ts.set_stock(code)
                     ts.load_kdata()

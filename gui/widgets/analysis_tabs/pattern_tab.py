@@ -12,9 +12,9 @@ from .pattern_tab_pro import PatternAnalysisTabPro
 class PatternAnalysisTab(PatternAnalysisTabPro):
     """形态分析标签页 - 继承专业版功能，保持向后兼容"""
 
-    def __init__(self, config_manager=None):
+    def __init__(self, config_manager=None, event_bus=None):
         """初始化形态分析标签页"""
-        super().__init__(config_manager)
+        super().__init__(config_manager, event_bus=event_bus)
 
         # 保持向后兼容的属性
         self._all_pattern_signals = []
@@ -194,10 +194,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         detail_action = menu.addAction("🔍 查看详情")
         detail_action.triggered.connect(self.show_pattern_detail)
 
-        # 图表标注
-        chart_action = menu.addAction("📊 图表标注")
-        chart_action.triggered.connect(self.annotate_chart)
-
         # 导出选中
         export_action = menu.addAction("📤 导出选中")
         export_action.triggered.connect(self.export_selected_pattern)
@@ -264,11 +260,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             return '可考虑逢低建仓，但需确认突破有效性。'
         else:
             return '密切关注后续走势，等待明确信号。'
-
-    def annotate_chart(self):
-        """图表标注"""
-        # 这里可以实现图表标注功能
-        QMessageBox.information(self, "提示", "图表标注功能开发中...")
 
     def export_selected_pattern(self):
         """导出选中形态"""
@@ -379,6 +370,89 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """更新结果显示 - 重写以支持回测"""
         super()._update_results_display(results)
 
-        # 更新回测结果
+    def _update_predictions_display(self, predictions):
+        """更新预测显示 - 修复版"""
+        try:
+            if not hasattr(self, 'prediction_text'):
+                self.log_manager.warning("对象没有prediction_text属性")
+                return
+
+            from datetime import datetime
+
+            text = f"""
+🤖 AI预测结果
+================
+
+预测方向: {predictions.get('trend_prediction', 'N/A')}
+预测概率: {predictions.get('confidence', 0):.2%}
+目标价格: {predictions.get('target_price', 0):.2f}
+风险级别: {predictions.get('risk_level', '中等')}
+时间范围: {predictions.get('time_horizon', '5-10个交易日')}
+
+支撑位: {predictions.get('support_level', 0):.2f}
+阻力位: {predictions.get('resistance_level', 0):.2f}
+
+生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+
+            self.prediction_text.setText(text)
+
+        except Exception as e:
+            import traceback
+            self.log_manager.error(f"更新预测显示失败: {e}")
+            self.log_manager.error(traceback.format_exc())
+
+    def _update_statistics_display(self, stats):
+        """更新统计显示 - 修复版"""
+        try:
+            if not hasattr(self, 'stats_text'):
+                self.log_manager.warning("对象没有stats_text属性")
+                return
+
+            text = f"""
+📊 统计分析报告
+================
+
+总体统计:
+- 形态总数: {stats.get('total_patterns', 0)} 个
+- 买入信号: {stats.get('buy_patterns', 0)} 个
+- 卖出信号: {stats.get('sell_patterns', 0)} 个
+- 中性信号: {stats.get('neutral_patterns', 0)} 个
+
+置信度分布:
+- 高置信度: {stats.get('confidence_stats', {}).get('high_confidence', 0)} 个
+- 中置信度: {stats.get('confidence_stats', {}).get('medium_confidence', 0)} 个
+- 低置信度: {stats.get('confidence_stats', {}).get('low_confidence', 0)} 个
+
+平均置信度: {stats.get('confidence_stats', {}).get('average', 0):.2%}
+"""
+
+            self.stats_text.setText(text)
+
+        except Exception as e:
+            import traceback
+            self.log_manager.error(f"更新统计显示失败: {e}")
+            self.log_manager.error(traceback.format_exc())
+
+    def _process_alerts(self, alerts):
+        """处理预警 - 最终修复版"""
+        try:
+            # 检查alerts参数
+            if not alerts:
+                return
+
+            # 发送预警信号
+            if hasattr(self, 'pattern_alert'):
+                for alert in alerts:
+                    self.pattern_alert.emit(alert['type'], alert)
+        except Exception as e:
+            import traceback
+            self.log_manager.error(f"处理预警失败: {e}")
+            self.log_manager.error(traceback.format_exc())
+
+            # 此处不再引用results变量
+
+    def _update_backtest_display_safe(self, results):
+        """安全地更新回测显示"""
         if 'backtest' in results:
             self._update_backtest_display(results['backtest'])

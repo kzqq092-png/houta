@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from .base_tab import BaseAnalysisTab
+from core.events.events import PatternSignalsDisplayEvent
 
 
 class AnalysisThread(QThread, QApplication):
@@ -98,7 +99,6 @@ class AnalysisThread(QThread, QApplication):
 
             # 转换为字典格式并进行数据清理
             pattern_dicts = []
-            seen_patterns = {}  # 用于去重，键为形态类型+索引
 
             for pattern in patterns:
                 # 如果是PatternResult对象，转为字典
@@ -110,21 +110,9 @@ class AnalysisThread(QThread, QApplication):
 
                 # 数据校验和清洗
                 self._validate_and_clean_pattern(pattern_dict)
-
-                # 生成唯一键并进行去重
-                pattern_type = pattern_dict.get('pattern_name', pattern_dict.get('type', ''))
-                index = pattern_dict.get('index', -1)
-                unique_key = f"{pattern_type}_{index}"
-
-                # 如果是新形态或者比已有的更高置信度，则添加/替换
-                existing_confidence = seen_patterns.get(unique_key, {}).get('confidence', 0)
-                current_confidence = pattern_dict.get('confidence', 0)
-
-                if unique_key not in seen_patterns or current_confidence > existing_confidence:
-                    seen_patterns[unique_key] = pattern_dict
+                pattern_dicts.append(pattern_dict)
 
             # 转换成列表，并按置信度排序
-            pattern_dicts = list(seen_patterns.values())
             pattern_dicts.sort(key=lambda x: x.get('confidence', 0), reverse=True)
 
             print(f"[AnalysisThread] 形态检测成功，共找到 {len(pattern_dicts)} 个有效形态（去重后）")
@@ -356,40 +344,70 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     pattern_confirmed = pyqtSignal(dict)  # 形态确认信号
     pattern_alert = pyqtSignal(str, dict)  # 形态预警信号
     ml_prediction_ready = pyqtSignal(dict)  # 机器学习预测就绪
-    pattern_selected = pyqtSignal(int)  # 形态选择信号 - 添加此信号用于表格行选择
 
-    def __init__(self, config_manager=None):
+    def __init__(self, config_manager=None, event_bus=None):
         """初始化专业级形态分析"""
         # 初始化K线数据属性
         self.kdata = None
         self.current_kdata = None
 
-        # 形态数据存储 - 新增属性用于保存完整形态列表和分组管理
-        self.all_pattern_results = []  # 存储所有形态结果
-        self.pattern_map = {}  # 按形态名称分组存储形态
-        self.current_pattern_name = None
+        # 专业级形态库
+        self.professional_patterns = {
+            # 经典反转形态
+            'reversal': {
+                '头肩顶': {'success_rate': 0.85, 'risk_level': 'high', 'min_periods': 20},
+                '头肩底': {'success_rate': 0.82, 'risk_level': 'medium', 'min_periods': 20},
+                '双顶': {'success_rate': 0.78, 'risk_level': 'high', 'min_periods': 15},
+                '双底': {'success_rate': 0.80, 'risk_level': 'medium', 'min_periods': 15},
+                '三重顶': {'success_rate': 0.75, 'risk_level': 'high', 'min_periods': 25},
+                '三重底': {'success_rate': 0.77, 'risk_level': 'medium', 'min_periods': 25},
+                '圆弧顶': {'success_rate': 0.70, 'risk_level': 'medium', 'min_periods': 30},
+                '圆弧底': {'success_rate': 0.72, 'risk_level': 'low', 'min_periods': 30},
+            },
+            # 持续形态
+            'continuation': {
+                '上升三角形': {'success_rate': 0.68, 'risk_level': 'low', 'min_periods': 10},
+                '下降三角形': {'success_rate': 0.65, 'risk_level': 'medium', 'min_periods': 10},
+                '对称三角形': {'success_rate': 0.60, 'risk_level': 'medium', 'min_periods': 12},
+                '楔形': {'success_rate': 0.62, 'risk_level': 'medium', 'min_periods': 8},
+                '旗形': {'success_rate': 0.70, 'risk_level': 'low', 'min_periods': 5},
+                '矩形': {'success_rate': 0.58, 'risk_level': 'low', 'min_periods': 15},
+            },
+            # 缺口形态
+            'gap': {
+                '突破缺口': {'success_rate': 0.75, 'risk_level': 'medium', 'min_periods': 1},
+                '持续缺口': {'success_rate': 0.65, 'risk_level': 'low', 'min_periods': 1},
+                '衰竭缺口': {'success_rate': 0.80, 'risk_level': 'high', 'min_periods': 1},
+                '普通缺口': {'success_rate': 0.45, 'risk_level': 'low', 'min_periods': 1},
+            },
+            # K线组合形态
+            'candlestick': {
+                '锤子线': {'success_rate': 0.65, 'risk_level': 'medium', 'min_periods': 1},
+                '上吊线': {'success_rate': 0.70, 'risk_level': 'medium', 'min_periods': 1},
+                '射击之星': {'success_rate': 0.68, 'risk_level': 'medium', 'min_periods': 1},
+                '十字星': {'success_rate': 0.55, 'risk_level': 'low', 'min_periods': 1},
+                '吞没形态': {'success_rate': 0.72, 'risk_level': 'medium', 'min_periods': 2},
+                '乌云盖顶': {'success_rate': 0.75, 'risk_level': 'high', 'min_periods': 2},
+                '曙光初现': {'success_rate': 0.73, 'risk_level': 'medium', 'min_periods': 2},
+            }
+        }
 
-        # 安全初始化基础属性
-        self.progress_bar = None
-        self.status_label = None
-        self.pattern_count_label = None
-        self.render_time_label = None
-        self.patterns_table = None
-        self.prediction_text = None
-        self.stats_text = None
-        self.backtest_text = None
+        # 机器学习模型配置
+        self.ml_config = {
+            'enabled': True,
+            'model_type': 'ensemble',  # ensemble, lstm, transformer
+            'confidence_threshold': 0.7,
+            'prediction_horizon': 5,  # 预测未来5个交易日
+            'feature_window': 20,  # 特征窗口长度
+        }
 
-        # 控制组件属性
-        self.sensitivity_slider = None
-        self.min_confidence = None
-        self.enable_ml_cb = None
-        self.enable_alerts_cb = None
-        self.realtime_cb = None
-        self.group_by_combo = None
-        self.sort_by_combo = None
-        self.filter_combo = None
+        # 专业级缓存
+        self.pattern_cache = {}
+        self.ml_predictions = {}
+        self.pattern_history = []
 
-        # 调用基类初始化方法
+        self.event_bus = event_bus
+
         super().__init__(config_manager)
 
         # 确保kdata属性在父类初始化后再次设置
@@ -527,559 +545,86 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         layout.addWidget(toolbar)
 
     def _create_control_panel(self):
-        """创建控制面板 - 增强版支持更多控制选项"""
-        control_panel = QWidget()
-        control_layout = QHBoxLayout(control_panel)
-        control_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 灵敏度滑块区域
-        sensitivity_widget = QWidget()
-        sensitivity_layout = QHBoxLayout(sensitivity_widget)
-        sensitivity_layout.setContentsMargins(2, 2, 2, 2)
-        sensitivity_layout.setSpacing(5)
-
-        sensitivity_label = QLabel("灵敏度:")
-        sensitivity_layout.addWidget(sensitivity_label)
-
-        self.sensitivity_slider = QSlider(Qt.Horizontal)
-        self.sensitivity_slider.setMinimum(1)
-        self.sensitivity_slider.setMaximum(10)
-        self.sensitivity_slider.setValue(5)
-        self.sensitivity_slider.setFixedWidth(100)
-        sensitivity_layout.addWidget(self.sensitivity_slider)
-
-        self.sensitivity_value_label = QLabel("0.5")
-        sensitivity_layout.addWidget(self.sensitivity_value_label)
-        self.sensitivity_slider.valueChanged.connect(self._on_sensitivity_changed)
-        sensitivity_layout.addStretch(1)
-        control_layout.addWidget(sensitivity_widget)
-
-        # 创建分组控件区域
-        group_widget = QWidget()
-        group_layout = QHBoxLayout(group_widget)
-        group_layout.setContentsMargins(2, 2, 2, 2)
-        group_layout.setSpacing(5)
-
-        # 分组下拉框
-        group_layout.addWidget(QLabel("分组:"))
-        self.group_by_combo = QComboBox()
-        self.group_by_combo.addItems(["无分组", "形态类别", "信号类型", "置信度"])
-        self.group_by_combo.setFixedWidth(100)
-        self.group_by_combo.currentIndexChanged.connect(self._on_group_by_changed)
-        group_layout.addWidget(self.group_by_combo)
-
-        # 排序下拉框
-        group_layout.addWidget(QLabel("排序:"))
-        self.sort_by_combo = QComboBox()
-        self.sort_by_combo.addItems(["置信度↓", "置信度↑", "日期↓", "日期↑", "字母顺序"])
-        self.sort_by_combo.setFixedWidth(100)
-        self.sort_by_combo.currentIndexChanged.connect(self._on_sort_by_changed)
-        group_layout.addWidget(self.sort_by_combo)
-
-        # 过滤下拉框
-        group_layout.addWidget(QLabel("过滤:"))
-        self.filter_combo = QComboBox()
-        self.filter_combo.addItems(["全部", "买入信号", "卖出信号", "中性信号", "高置信度", "中置信度", "低置信度"])
-        self.filter_combo.setFixedWidth(100)
-        self.filter_combo.currentIndexChanged.connect(self._on_filter_changed)
-        group_layout.addWidget(self.filter_combo)
-
-        group_layout.addStretch(1)
-        control_layout.addWidget(group_widget)
-
-        # 检查框区域
-        checkboxes_widget = QWidget()
-        checkboxes_layout = QHBoxLayout(checkboxes_widget)
-        checkboxes_layout.setContentsMargins(2, 2, 2, 2)
-        checkboxes_layout.setSpacing(5)
-
-        self.ml_cb = QCheckBox("智能预测")
-        self.ml_cb.setChecked(True)
-        checkboxes_layout.addWidget(self.ml_cb)
-
-        self.realtime_cb = QCheckBox("实时分析")
-        checkboxes_layout.addWidget(self.realtime_cb)
-
-        self.alert_cb = QCheckBox("预警提醒")
-        self.alert_cb.setChecked(True)
-        checkboxes_layout.addWidget(self.alert_cb)
-
-        checkboxes_layout.addStretch(1)
-        control_layout.addWidget(checkboxes_widget)
-
-        # 按钮区域
-        buttons_widget = QWidget()
-        buttons_layout = QHBoxLayout(buttons_widget)
-        buttons_layout.setContentsMargins(2, 2, 2, 2)
-        buttons_layout.setSpacing(5)
-
-        # 清空按钮 - 专业版风格
-        self.clear_btn = QPushButton(self.tr("清空"))
-        self.clear_btn.setToolTip(self.tr("清空当前分析结果"))
-        self.clear_btn.clicked.connect(self._clear_results)
-        buttons_layout.addWidget(self.clear_btn)
-
-        # 分析按钮
-        self.analysis_btn = QPushButton(self.tr("一键分析"))
-        self.analysis_btn.setToolTip(self.tr("进行形态识别分析"))
-        self.analysis_btn.clicked.connect(self.one_click_analysis)
-        buttons_layout.addWidget(self.analysis_btn)
-
-        control_layout.addWidget(buttons_widget)
-
-        # 记录数量标签
-        self.record_count_label = QLabel("0 条记录")
-        self.record_count_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        control_layout.addWidget(self.record_count_label)
-
-        return control_panel
-
-    def _on_group_by_changed(self, index):
-        """处理分组方式变化"""
-        group_by = self.group_by_combo.currentText()
-        if not hasattr(self, 'all_pattern_results') or not self.all_pattern_results:
-            return
-
-        if hasattr(self, 'log_manager'):
-            self.log_manager.info(f"形态分组方式变化: {group_by}")
-
-        # 重新绘制表格，应用新的分组方式
-        self._update_patterns_table_with_grouping(self.all_pattern_results)
-
-    def _on_sort_by_changed(self, index):
-        """处理排序方式变化"""
-        sort_by = self.sort_by_combo.currentText()
-        if not hasattr(self, 'all_pattern_results') or not self.all_pattern_results:
-            return
-
-        if hasattr(self, 'log_manager'):
-            self.log_manager.info(f"形态排序方式变化: {sort_by}")
-
-        # 重新绘制表格，应用新的排序方式
-        self._update_patterns_table_with_grouping(self.all_pattern_results)
-
-    def _on_filter_changed(self, index):
-        """处理过滤条件变化"""
-        filter_by = self.filter_combo.currentText()
-        if not hasattr(self, 'all_pattern_results') or not self.all_pattern_results:
-            return
-
-        if hasattr(self, 'log_manager'):
-            self.log_manager.info(f"形态过滤条件变化: {filter_by}")
-
-        # 重新绘制表格，应用新的过滤条件
-        self._update_patterns_table_with_grouping(self.all_pattern_results)
-
-    def _update_patterns_table_with_grouping(self, patterns):
-        """更新形态表格 - 支持分组、排序和过滤"""
-        # 清空表格
-        self.clear_table(self.patterns_table)
-
-        # 检查模式列表有效性
-        if not patterns or not isinstance(patterns, list) or not patterns:
-            self.log_manager.info("无形态数据，清空表格")
-            self.record_count_label.setText("0 条记录")
-            return
-
-        # 保存所有形态结果
-        self.all_pattern_results = patterns.copy() if isinstance(patterns, list) else []
-
-        # 性能优化：限制最大形态数量
-        MAX_TOTAL_PATTERNS = 1000  # 最大处理形态数量
-        if len(self.all_pattern_results) > MAX_TOTAL_PATTERNS:
-            self.log_manager.warning(f"形态总数({len(self.all_pattern_results)})超过限制({MAX_TOTAL_PATTERNS})，进行筛选")
-            # 按置信度排序，只处理最高的N个
-            self.all_pattern_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-            self.all_pattern_results = self.all_pattern_results[:MAX_TOTAL_PATTERNS]
-            self.log_manager.info(f"形态数据已限制为前{MAX_TOTAL_PATTERNS}个高置信度形态")
-
-        # 获取当前设置
-        group_by = self.group_by_combo.currentText()
-        sort_by = self.sort_by_combo.currentText()
-        filter_by = self.filter_combo.currentText()
-
-        # 应用过滤条件
-        filtered_patterns = self._filter_patterns(self.all_pattern_results, filter_by)
-        if not filtered_patterns:
-            self.log_manager.warning(f"过滤后无数据: {filter_by}")
-            self.record_count_label.setText("0 条记录")
-            return
-
-        # 应用排序
-        sorted_patterns = self._sort_patterns(filtered_patterns, sort_by)
-
-        # 如果不进行分组，直接按排序后的结果填充表格
-        if group_by == "无分组":
-            # 创建一个无分组的基本表格
-            self._update_simple_table(sorted_patterns)
-            return
-
-        # 按指定条件进行分组处理
-        grouped_patterns = self._group_patterns(sorted_patterns, group_by)
-        if not grouped_patterns:
-            self.log_manager.warning(f"分组后无数据: {group_by}")
-            self.record_count_label.setText("0 条记录")
-            return
-
-        # 分组显示表格
-        self._update_grouped_table(grouped_patterns, group_by)
-
-    def _filter_patterns(self, patterns, filter_by):
-        """根据条件过滤形态"""
-        if filter_by == "全部":
-            return patterns
-
-        filtered = []
-        for pat in patterns:
-            # 处理信号类型过滤
-            if filter_by == "买入信号" and pat.get('signal', '').lower() == 'buy':
-                filtered.append(pat)
-            elif filter_by == "卖出信号" and pat.get('signal', '').lower() == 'sell':
-                filtered.append(pat)
-            elif filter_by == "中性信号" and pat.get('signal', '').lower() == 'neutral':
-                filtered.append(pat)
-            # 处理置信度过滤
-            elif filter_by == "高置信度" and pat.get('confidence', 0) >= 0.8:
-                filtered.append(pat)
-            elif filter_by == "中置信度" and 0.6 <= pat.get('confidence', 0) < 0.8:
-                filtered.append(pat)
-            elif filter_by == "低置信度" and pat.get('confidence', 0) < 0.6:
-                filtered.append(pat)
-
-        return filtered
-
-    def _sort_patterns(self, patterns, sort_by):
-        """对形态进行排序"""
-        if sort_by == "置信度↓":
-            return sorted(patterns, key=lambda x: x.get('confidence', 0), reverse=True)
-        elif sort_by == "置信度↑":
-            return sorted(patterns, key=lambda x: x.get('confidence', 0), reverse=False)
-        elif sort_by == "日期↓":
-            return sorted(patterns, key=lambda x: x.get('datetime', ''), reverse=True)
-        elif sort_by == "日期↑":
-            return sorted(patterns, key=lambda x: x.get('datetime', ''), reverse=False)
-        elif sort_by == "字母顺序":
-            return sorted(patterns, key=lambda x: x.get('pattern_name', x.get('name', x.get('type', '未知形态'))))
-        else:
-            return patterns
-
-    def _group_patterns(self, patterns, group_by):
-        """对形态进行分组"""
-        grouped = {}
-
-        if group_by == "形态类别":
-            # 按形态类别分组
-            for pat in patterns:
-                category = pat.get('pattern_category', pat.get('category', '未分类'))
-                if category not in grouped:
-                    grouped[category] = []
-                grouped[category].append(pat)
-
-        elif group_by == "信号类型":
-            # 按信号类型分组
-            for pat in patterns:
-                signal = pat.get('signal', '').lower()
-                signal_cn = {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, '未知')
-                if signal_cn not in grouped:
-                    grouped[signal_cn] = []
-                grouped[signal_cn].append(pat)
-
-        elif group_by == "置信度":
-            # 按置信度分组
-            for pat in patterns:
-                confidence = pat.get('confidence', 0)
-                if confidence >= 0.8:
-                    level = '高置信度 (≥0.8)'
-                elif confidence >= 0.6:
-                    level = '中置信度 (0.6-0.8)'
-                else:
-                    level = '低置信度 (<0.6)'
-
-                if level not in grouped:
-                    grouped[level] = []
-                grouped[level].append(pat)
-        else:
-            # 默认不分组，直接返回原列表
-            return {'全部': patterns}
-
-        return grouped
-
-    def _update_simple_table(self, patterns):
-        """更新为简单表格（无分组）"""
-        # 设置表格列数和列标题
-        self.patterns_table.setColumnCount(7)
-        self.patterns_table.setHorizontalHeaderLabels(['形态名称', '类型', '信号', '置信度', '日期', '价格', '详情'])
-
-        # 按形态名称分组
-        self.pattern_map = {}
-        for pattern in patterns:
-            if not isinstance(pattern, dict):
-                continue
-
-            pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-            if pattern_name not in self.pattern_map:
-                self.pattern_map[pattern_name] = []
-            self.pattern_map[pattern_name].append(pattern)
-
-        # 记录表格填充开始时间
-        start_time = time.time()
-
-        # 优化表格性能
-        self.patterns_table.setRowCount(len(patterns))
-
-        # 填充表格数据
-        for row, pattern in enumerate(patterns):
-            if not isinstance(pattern, dict):
-                continue
-
-            # 1. 形态名称 - 列0
-            pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-            name_item = QTableWidgetItem(str(pattern_name))
-            # 存储完整形态数据和同名形态数量
-            same_name_count = len(self.pattern_map.get(pattern_name, []))
-            name_item.setData(Qt.UserRole, pattern)  # 存储整个形态字典
-            name_item.setData(Qt.UserRole+1, pattern_name)  # 存储形态名称
-            name_item.setData(Qt.UserRole+2, same_name_count)  # 存储同名形态数量
-            # 如果同名形态有多个，显示数量
-            if same_name_count > 1:
-                name_item.setText(f"{pattern_name} ({same_name_count})")
-            self.patterns_table.setItem(row, 0, name_item)
-
-            # 2. 形态类型/类别 - 列1
-            pattern_category = pattern.get('pattern_category', pattern.get('category', '未分类'))
-            category_item = QTableWidgetItem(str(pattern_category))
-            self.patterns_table.setItem(row, 1, category_item)
-
-            # 3. 信号类型 - 列2
-            signal = pattern.get('signal', 'neutral').lower()
-            signal_cn = {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, signal)
-            signal_item = QTableWidgetItem(str(signal_cn))
-            if signal == 'buy':
-                signal_item.setForeground(QBrush(QColor('#FF2D2D')))
-            elif signal == 'sell':
-                signal_item.setForeground(QBrush(QColor('#00BB00')))
-            else:
-                signal_item.setForeground(QBrush(QColor('#FF9900')))
-            self.patterns_table.setItem(row, 2, signal_item)
-
-            # 4. 置信度 - 列3
-            confidence = pattern.get('confidence', 0)
-            confidence_text = f"{confidence:.2f}"
-            confidence_item = QTableWidgetItem(confidence_text)
-            confidence_item.setData(Qt.UserRole, confidence)  # 存储数值用于排序
-            # 置信度颜色区分
-            if confidence >= 0.8:
-                confidence_item.setForeground(QBrush(QColor('#FF2D2D')))  # 高置信度红色
-            elif confidence >= 0.6:
-                confidence_item.setForeground(QBrush(QColor('#FF9900')))  # 中置信度橙色
-            self.patterns_table.setItem(row, 3, confidence_item)
-
-            # 5. 日期 - 列4
-            datetime_val = pattern.get('datetime', '')
-            datetime_item = QTableWidgetItem(str(datetime_val))
-            self.patterns_table.setItem(row, 4, datetime_item)
-
-            # 6. 价格 - 列5
-            price = pattern.get('price', 0)
-            price_item = QTableWidgetItem(f"{price:.2f}")
-            self.patterns_table.setItem(row, 5, price_item)
-
-            # 7. 详情按钮 - 列6 (放在最后一列)
-            details_btn = QPushButton()
-            details_btn.setIcon(QIcon.fromTheme("document-properties",
-                                                QIcon(QApplication.style().standardIcon(QStyle.SP_FileDialogInfoView))))
-            details_btn.setToolTip("查看形态详情")
-            details_btn.clicked.connect(lambda checked=False, idx=row: self.show_pattern_detail(idx))
-            self.patterns_table.setCellWidget(row, 6, details_btn)
-
-        # 调整列宽度以适应内容
-        self.patterns_table.resizeColumnsToContents()
-
-        # 启用排序
-        self.patterns_table.setSortingEnabled(True)
-
-        # 计算并显示表格填充耗时
-        end_time = time.time()
-        self.log_manager.info(f"成功更新形态表格，共 {len(patterns)} 条记录，耗时: {(end_time-start_time)*1000:.0f}ms")
-        self.record_count_label.setText(f"{len(patterns)} 条记录")
-
-    def _update_grouped_table(self, grouped_patterns, group_by):
-        """更新为分组表格"""
-        # 设置表格列数和列标题
-        self.patterns_table.setColumnCount(7)
-        self.patterns_table.setHorizontalHeaderLabels(['形态名称', '类型', '信号', '置信度', '日期', '价格', '详情'])
-
-        # 准备分组和展开/折叠状态数据结构
-        if not hasattr(self, '_group_expanded_state'):
-            self._group_expanded_state = {}  # 用于记录每个分组的展开/折叠状态
-
-        # 合并所有模式用于模式映射
-        all_patterns = []
-        for group_patterns in grouped_patterns.values():
-            all_patterns.extend(group_patterns)
-
-        # 按形态名称分组
-        self.pattern_map = {}
-        for pattern in all_patterns:
-            if not isinstance(pattern, dict):
-                continue
-
-            pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-            if pattern_name not in self.pattern_map:
-                self.pattern_map[pattern_name] = []
-            self.pattern_map[pattern_name].append(pattern)
-
-        # 记录表格填充开始时间
-        start_time = time.time()
-
-        # 计算总行数（分组标题行 + 每个分组的子项数量）
-        total_rows = 0
-        for group_name, group_items in grouped_patterns.items():
-            # 如果分组展开或未设置状态（默认展开），则添加组内项目的数量
-            is_expanded = self._group_expanded_state.get(group_name, True)
-            total_rows += 1  # 分组标题行
-            if is_expanded:
-                total_rows += len(group_items)
-
-        # 设置表格行数
-        self.patterns_table.setRowCount(total_rows)
-
-        # 填充表格数据
-        row_idx = 0
-        for group_name, group_items in sorted(grouped_patterns.items()):
-            # 添加分组标题行
-            group_item = QTableWidgetItem(f"{group_name} ({len(group_items)})")
-            group_item.setBackground(QBrush(QColor('#E0E0E0')))  # 浅灰色背景
-            group_item.setFont(QFont("Arial", weight=QFont.Bold))  # 粗体
-            # 标记为分组标题
-            group_item.setData(Qt.UserRole, "GROUP_HEADER")
-            group_item.setData(Qt.UserRole+1, group_name)  # 存储分组名称
-
-            # 设置分组图标（展开/折叠）
-            is_expanded = self._group_expanded_state.get(group_name, True)
-            if is_expanded:
-                group_item.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowDown))
-            else:
-                group_item.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowRight))
-
-            self.patterns_table.setItem(row_idx, 0, group_item)
-
-            # 合并分组标题行的所有单元格
-            self.patterns_table.setSpan(row_idx, 0, 1, 7)
-
-            row_idx += 1
-
-            # 如果分组展开，添加子项
-            if is_expanded:
-                for pattern in group_items:
-                    if not isinstance(pattern, dict):
-                        continue
-
-                    # 1. 形态名称 - 列0
-                    pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                    name_item = QTableWidgetItem("    " + str(pattern_name))  # 缩进表示层级关系
-                    # 存储完整形态数据和同名形态数量
-                    same_name_count = len(self.pattern_map.get(pattern_name, []))
-                    name_item.setData(Qt.UserRole, pattern)  # 存储整个形态字典
-                    name_item.setData(Qt.UserRole+1, pattern_name)  # 存储形态名称
-                    name_item.setData(Qt.UserRole+2, same_name_count)  # 存储同名形态数量
-                    # 如果同名形态有多个，显示数量
-                    if same_name_count > 1:
-                        name_item.setText(f"    {pattern_name} ({same_name_count})")
-                    self.patterns_table.setItem(row_idx, 0, name_item)
-
-                    # 2. 形态类型/类别 - 列1
-                    pattern_category = pattern.get('pattern_category', pattern.get('category', '未分类'))
-                    category_item = QTableWidgetItem(str(pattern_category))
-                    self.patterns_table.setItem(row_idx, 1, category_item)
-
-                    # 3. 信号类型 - 列2
-                    signal = pattern.get('signal', 'neutral').lower()
-                    signal_cn = {'buy': '买入', 'sell': '卖出', 'neutral': '中性'}.get(signal, signal)
-                    signal_item = QTableWidgetItem(str(signal_cn))
-                    if signal == 'buy':
-                        signal_item.setForeground(QBrush(QColor('#FF2D2D')))
-                    elif signal == 'sell':
-                        signal_item.setForeground(QBrush(QColor('#00BB00')))
-                    else:
-                        signal_item.setForeground(QBrush(QColor('#FF9900')))
-                    self.patterns_table.setItem(row_idx, 2, signal_item)
-
-                    # 4. 置信度 - 列3
-                    confidence = pattern.get('confidence', 0)
-                    confidence_text = f"{confidence:.2f}"
-                    confidence_item = QTableWidgetItem(confidence_text)
-                    confidence_item.setData(Qt.UserRole, confidence)  # 存储数值用于排序
-                    # 置信度颜色区分
-                    if confidence >= 0.8:
-                        confidence_item.setForeground(QBrush(QColor('#FF2D2D')))  # 高置信度红色
-                    elif confidence >= 0.6:
-                        confidence_item.setForeground(QBrush(QColor('#FF9900')))  # 中置信度橙色
-                    self.patterns_table.setItem(row_idx, 3, confidence_item)
-
-                    # 5. 日期 - 列4
-                    datetime_val = pattern.get('datetime', '')
-                    datetime_item = QTableWidgetItem(str(datetime_val))
-                    self.patterns_table.setItem(row_idx, 4, datetime_item)
-
-                    # 6. 价格 - 列5
-                    price = pattern.get('price', 0)
-                    price_item = QTableWidgetItem(f"{price:.2f}")
-                    self.patterns_table.setItem(row_idx, 5, price_item)
-
-                    # 7. 详情按钮 - 列6 (放在最后一列)
-                    details_btn = QPushButton()
-                    details_btn.setIcon(QIcon.fromTheme("document-properties",
-                                                        QIcon(QApplication.style().standardIcon(QStyle.SP_FileDialogInfoView))))
-                    details_btn.setToolTip("查看形态详情")
-                    details_btn.clicked.connect(lambda checked=False, idx=row_idx: self.show_pattern_detail(idx))
-                    self.patterns_table.setCellWidget(row_idx, 6, details_btn)
-
-                    row_idx += 1
-
-        # 禁用排序（分组表格不适合排序）
-        self.patterns_table.setSortingEnabled(False)
-
-        # 调整列宽度以适应内容
-        self.patterns_table.resizeColumnsToContents()
-
-        # 连接单元格点击事件，用于处理分组的展开/折叠
-        self.patterns_table.cellClicked.connect(self._on_cell_clicked)
-
-        # 计算并显示表格填充耗时
-        end_time = time.time()
-        total_patterns = sum(len(group_items) for group_items in grouped_patterns.values())
-        self.log_manager.info(f"成功更新分组形态表格，共 {total_patterns} 条记录，{len(grouped_patterns)}个分组，耗时: {(end_time-start_time)*1000:.0f}ms")
-        self.record_count_label.setText(f"{total_patterns} 条记录")
-
-    def _on_cell_clicked(self, row, column):
-        """处理单元格点击事件，用于展开/折叠分组"""
-        item = self.patterns_table.item(row, 0)
-        if not item:
-            return
-
-        # 检查是否是分组标题
-        is_group_header = item.data(Qt.UserRole) == "GROUP_HEADER"
-        if is_group_header:
-            group_name = item.data(Qt.UserRole+1)
-            if not group_name:
-                return
-
-            # 切换展开/折叠状态
-            current_state = self._group_expanded_state.get(group_name, True)
-            self._group_expanded_state[group_name] = not current_state
-
-            # 重新绘制表格
-            if hasattr(self, 'all_pattern_results') and self.all_pattern_results:
-                self._update_patterns_table_with_grouping(self.all_pattern_results)
-        else:
-            # 普通单元格点击，调用表格行选择变更处理函数
-            self._on_pattern_table_selection_changed()
-
-    def _update_patterns_table(self, patterns):
-        """更新形态表格（原方法，现在作为_update_patterns_table_with_grouping的包装函数）"""
-        # 直接调用带分组功能的表格更新方法
-        self._update_patterns_table_with_grouping(patterns)
+        """创建控制面板"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+
+        # 形态类型选择
+        type_layout = QVBoxLayout()
+
+        self.pattern_tree = QTreeWidget()
+        self.pattern_tree.setMaximumHeight(1200)
+        self.pattern_tree.setMinimumHeight(500)
+        self.pattern_tree.setHeaderLabel("形态分类")
+        self._populate_pattern_tree()
+        type_layout.addWidget(self.pattern_tree)
+
+        layout.addLayout(type_layout)
+
+        # 筛选条件
+        filter_group = QGroupBox("筛选条件")
+        filter_layout = QFormLayout(filter_group)
+
+        # 置信度范围
+        confidence_layout = QHBoxLayout()
+        self.min_confidence = QDoubleSpinBox()
+        self.min_confidence.setRange(0.0, 1.0)
+        self.min_confidence.setSingleStep(0.1)
+        self.min_confidence.setValue(0.6)
+
+        self.max_confidence = QDoubleSpinBox()
+        self.max_confidence.setRange(0.0, 1.0)
+        self.max_confidence.setSingleStep(0.1)
+        self.max_confidence.setValue(1.0)
+
+        confidence_layout.addWidget(self.min_confidence)
+        confidence_layout.addWidget(QLabel("至"))
+        confidence_layout.addWidget(self.max_confidence)
+        filter_layout.addRow("置信度:", confidence_layout)
+
+        # 成功率范围
+        success_layout = QHBoxLayout()
+        self.min_success = QDoubleSpinBox()
+        self.min_success.setRange(0.0, 1.0)
+        self.min_success.setSingleStep(0.1)
+        self.min_success.setValue(0.5)
+
+        self.max_success = QDoubleSpinBox()
+        self.max_success.setRange(0.0, 1.0)
+        self.max_success.setSingleStep(0.1)
+        self.max_success.setValue(1.0)
+
+        success_layout.addWidget(self.min_success)
+        success_layout.addWidget(QLabel("至"))
+        success_layout.addWidget(self.max_success)
+        filter_layout.addRow("成功率:", success_layout)
+
+        # 风险等级
+        self.risk_combo = QComboBox()
+        self.risk_combo.addItems(["全部", "低风险", "中风险", "高风险"])
+        filter_layout.addRow("风险等级:", self.risk_combo)
+
+        layout.addWidget(filter_group)
+
+        # 高级选项
+        advanced_group = QGroupBox("高级选项")
+        advanced_layout = QVBoxLayout(advanced_group)
+
+        self.enable_ml_cb = QCheckBox("启用机器学习预测")
+        self.enable_ml_cb.setChecked(True)
+        advanced_layout.addWidget(self.enable_ml_cb)
+
+        self.enable_alerts_cb = QCheckBox("启用形态预警")
+        self.enable_alerts_cb.setChecked(True)
+        advanced_layout.addWidget(self.enable_alerts_cb)
+
+        self.historical_analysis_cb = QCheckBox("包含历史分析")
+        advanced_layout.addWidget(self.historical_analysis_cb)
+
+        layout.addWidget(advanced_group)
+        layout.addStretch()
+
+        return panel
 
     def _create_results_panel(self):
         """创建结果展示面板"""
@@ -1109,361 +654,71 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         return panel
 
     def _create_patterns_tab(self):
-        """创建形态识别标签页"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
+        """创建形态识别标签页 - 完全重写版"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
 
-        # 创建表格
-        self.patterns_table = QTableWidget()
-        self.patterns_table.setColumnCount(7)  # 扩展到7列以显示更多信息
-        self.patterns_table.setHorizontalHeaderLabels(["形态名称", "类型", "信号", "置信度", "日期", "价格", "详情"])
-        self.patterns_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.patterns_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.patterns_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # 创建更高效的表格
+        self.patterns_table = QTableWidget(0, 10)
         self.patterns_table.setAlternatingRowColors(True)
+        self.patterns_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.patterns_table.setEditTriggers(QTableWidget.NoEditTriggers)  # 设置为只读
+        self.patterns_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.patterns_table.setSortingEnabled(True)
         self.patterns_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.patterns_table.customContextMenuRequested.connect(self.show_pattern_context_menu)
+        self.patterns_table.cellClicked.connect(self._on_pattern_cell_clicked)
 
-        # 优化表格性能设置
-        self.patterns_table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.patterns_table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.patterns_table.setTextElideMode(Qt.ElideRight)
-        self.patterns_table.setWordWrap(False)  # 禁用自动换行提高性能
+        # 设置列标题
+        column_headers = ["形态名称", "类型", "置信度", "成功率", "信号", "位置", "区间", "价格", "目标价", "建议"]
+        self.patterns_table.setHorizontalHeaderLabels(column_headers)
 
         # 设置列宽
-        self.patterns_table.setColumnWidth(0, 150)  # 形态名称
-        self.patterns_table.setColumnWidth(1, 80)   # 类型
-        self.patterns_table.setColumnWidth(2, 60)   # 信号
-        self.patterns_table.setColumnWidth(3, 80)   # 置信度
-        self.patterns_table.setColumnWidth(4, 100)  # 日期
-        self.patterns_table.setColumnWidth(5, 60)   # 价格
-        self.patterns_table.setColumnWidth(6, 80)   # 详情
+        header = self.patterns_table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.Interactive)
 
-        # 连接表格选择变化信号
-        self.patterns_table.itemSelectionChanged.connect(self._on_pattern_table_selection_changed)
+        # 设置固定列宽
+        column_widths = [120, 80, 70, 70, 60, 90, 70, 60, 60, 70]
+        for i, width in enumerate(column_widths):
+            self.patterns_table.setColumnWidth(i, width)
 
-        # 创建搜索框
-        search_layout = QHBoxLayout()
-        self.pattern_search = QLineEdit()
-        self.pattern_search.setPlaceholderText("搜索形态...")
-        self.pattern_search.textChanged.connect(self._filter_patterns)
-        search_layout.addWidget(QLabel("搜索:"))
-        search_layout.addWidget(self.pattern_search)
+        # 添加表格到布局
+        layout.addWidget(self.patterns_table, 1)
 
-        # 创建排序选项
-        sort_layout = QHBoxLayout()
-        sort_layout.addWidget(QLabel("排序:"))
-        self.sort_combo = QComboBox()
-        self.sort_combo.addItems(["置信度 ↓", "名称 ↑", "类型 ↑", "日期 ↑", "价格 ↑", "置信度 ↑", "名称 ↓", "类型 ↓", "日期 ↓", "价格 ↓"])
-        self.sort_combo.setCurrentIndex(0)  # 默认按置信度降序
-        self.sort_combo.currentIndexChanged.connect(self._sort_patterns)
-        sort_layout.addWidget(self.sort_combo)
+        # 操作按钮区域
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 5, 0, 0)
+        buttons_layout.setSpacing(10)
 
-        # 创建过滤选项
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("过滤:"))
-        self.filter_combo = QComboBox()
-        self.filter_combo.addItems(["全部", "买入信号", "卖出信号", "高置信度", "中置信度", "低置信度"])
-        self.filter_combo.currentIndexChanged.connect(self._filter_patterns)
-        filter_layout.addWidget(self.filter_combo)
-
-        # 组合搜索和排序控件
-        controls_layout = QHBoxLayout()
-        controls_layout.addLayout(search_layout, 3)
-        controls_layout.addLayout(sort_layout, 1)
-        controls_layout.addLayout(filter_layout, 1)
-
-        # 添加控件到布局
-        layout.addLayout(controls_layout)
-        layout.addWidget(self.patterns_table)
-
-        # 创建状态栏
-        status_layout = QHBoxLayout()
-        self.pattern_count_label = QLabel("形态: 0")
-        status_layout.addWidget(self.pattern_count_label)
-        status_layout.addStretch()
-        self.render_time_label = QLabel("渲染时间: 0ms")
-        status_layout.addWidget(self.render_time_label)
-        layout.addLayout(status_layout)
-
-        # 添加按钮
-        button_layout = QHBoxLayout()
-
-        # 创建按钮工具函数
+        # 按钮创建函数
         def create_button(text, icon_code=None, tooltip=None, callback=None):
             btn = QPushButton(text)
+            btn.setCursor(Qt.PointingHandCursor)
             if icon_code:
                 btn.setText(f"{icon_code} {text}")
-                btn.setFont(QFont("Font Awesome 5 Free Solid", 10))
             if tooltip:
                 btn.setToolTip(tooltip)
             if callback:
                 btn.clicked.connect(callback)
+            btn.setMinimumWidth(100)
             return btn
 
         # 创建操作按钮
-        export_btn = create_button("导出", "\uf56e", "导出形态识别结果", self.export_patterns)
-        details_btn = create_button("详情", "\uf05a", "查看形态详细信息", self.show_pattern_detail)
-        annotate_btn = create_button("标注", "\uf044", "在图表上添加标注", self.annotate_chart)
+        export_btn = create_button("导出结果", "📤", "导出分析结果到文件", self.export_patterns)
+        detail_btn = create_button("查看详情", "🔍", "查看选中形态的详细信息", self.show_pattern_detail)
+        chart_btn = create_button("图表标注", "📊", "在图表上标注形态", self.annotate_chart)
 
-        button_layout.addWidget(export_btn)
-        button_layout.addWidget(details_btn)
-        button_layout.addWidget(annotate_btn)
-        button_layout.addStretch()
+        buttons_layout.addWidget(export_btn)
+        buttons_layout.addWidget(detail_btn)
+        buttons_layout.addWidget(chart_btn)
+        buttons_layout.addStretch()
 
-        layout.addLayout(button_layout)
+        layout.addLayout(buttons_layout)
 
-        return tab
-
-    def _filter_patterns(self):
-        """根据搜索和过滤条件筛选形态表格内容"""
-        if not hasattr(self, 'patterns_table') or not hasattr(self, 'all_pattern_results'):
-            return
-
-        search_text = self.pattern_search.text().lower()
-        filter_option = self.filter_combo.currentText()
-
-        # 先隐藏所有行
-        for row in range(self.patterns_table.rowCount()):
-            self.patterns_table.setRowHidden(row, True)
-
-        # 应用筛选
-        shown_rows = 0
-        for row in range(self.patterns_table.rowCount()):
-            show_row = True
-
-            # 获取形态名称项
-            name_item = self.patterns_table.item(row, 0)
-            if not name_item:
-                continue
-
-            # 检查搜索文本
-            if search_text:
-                pattern_text = name_item.text().lower()
-                if search_text not in pattern_text:
-                    show_row = False
-
-            # 检查过滤选项
-            if show_row and filter_option != "全部":
-                # 获取保存在单元格中的形态数据
-                pattern = name_item.data(Qt.UserRole)
-                if not pattern:
-                    continue
-
-                if filter_option == "买入信号" and pattern.get('signal', '').lower() != 'buy':
-                    show_row = False
-                elif filter_option == "卖出信号" and pattern.get('signal', '').lower() != 'sell':
-                    show_row = False
-                elif filter_option == "高置信度" and pattern.get('confidence_level', '') != '高':
-                    show_row = False
-                elif filter_option == "中置信度" and pattern.get('confidence_level', '') != '中':
-                    show_row = False
-                elif filter_option == "低置信度" and pattern.get('confidence_level', '') != '低':
-                    show_row = False
-
-            # 设置行显示状态
-            self.patterns_table.setRowHidden(row, not show_row)
-            if show_row:
-                shown_rows += 1
-
-        # 更新状态栏信息
-        total_rows = self.patterns_table.rowCount()
-        self.pattern_count_label.setText(f"形态: {shown_rows}/{total_rows}")
-
-    def _sort_patterns(self):
-        """根据选择的排序方式对表格进行排序"""
-        if not hasattr(self, 'patterns_table'):
-            return
-
-        sort_option = self.sort_combo.currentText()
-
-        # 确定排序列和排序顺序
-        column = 0  # 默认按名称列排序
-        order = Qt.AscendingOrder
-
-        if "置信度" in sort_option:
-            column = 3
-            order = Qt.DescendingOrder if "↓" in sort_option else Qt.AscendingOrder
-        elif "名称" in sort_option:
-            column = 0
-            order = Qt.DescendingOrder if "↓" in sort_option else Qt.AscendingOrder
-        elif "类型" in sort_option:
-            column = 1
-            order = Qt.DescendingOrder if "↓" in sort_option else Qt.AscendingOrder
-        elif "日期" in sort_option:
-            column = 4
-            order = Qt.DescendingOrder if "↓" in sort_option else Qt.AscendingOrder
-        elif "价格" in sort_option:
-            column = 5
-            order = Qt.DescendingOrder if "↓" in sort_option else Qt.AscendingOrder
-
-        # 执行排序
-        self.patterns_table.sortItems(column, order)
-
-    def _update_patterns_table(self, patterns):
-        """更新形态表格 - 增强版支持同名形态分组显示"""
-        try:
-            import time
-            start_time = time.time()
-
-            # 清空表格
-            self.clear_table(self.patterns_table)
-
-            # 检查模式列表有效性
-            if not patterns or not isinstance(patterns, list) or not patterns:
-                self.log_manager.info("无形态数据，清空表格")
-                self.pattern_count_label.setText("形态: 0")
-                return
-
-            # 保存所有形态结果
-            self.all_pattern_results = patterns.copy() if isinstance(patterns, list) else []
-
-            # 性能优化：限制最大形态数量
-            MAX_TOTAL_PATTERNS = 1000  # 最大处理形态数量
-            if len(self.all_pattern_results) > MAX_TOTAL_PATTERNS:
-                self.log_manager.warning(f"形态总数({len(self.all_pattern_results)})超过限制({MAX_TOTAL_PATTERNS})，进行筛选")
-                # 按置信度排序，只处理最高的N个
-                self.all_pattern_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-                self.all_pattern_results = self.all_pattern_results[:MAX_TOTAL_PATTERNS]
-                self.log_manager.info(f"形态数据已限制为前{MAX_TOTAL_PATTERNS}个高置信度形态")
-
-            # 按形态名称分组
-            self.pattern_map = {}
-            for pattern in self.all_pattern_results:
-                if not isinstance(pattern, dict):
-                    continue
-
-                pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                if pattern_name not in self.pattern_map:
-                    self.pattern_map[pattern_name] = []
-                self.pattern_map[pattern_name].append(pattern)
-
-            # 记录分组信息
-            pattern_counts = {name: len(patterns) for name, patterns in self.pattern_map.items()}
-            self.log_manager.info(f"形态分组统计: {pattern_counts}")
-
-            # 表格显示准备
-            # 用于去重显示的临时字典 - 每种形态只显示一个（置信度最高的）
-            display_patterns = {}
-            for pattern in self.all_pattern_results:
-                if not isinstance(pattern, dict):
-                    continue
-
-                pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                confidence = pattern.get('confidence', 0)
-
-                if pattern_name not in display_patterns or confidence > display_patterns[pattern_name].get('confidence', 0):
-                    display_patterns[pattern_name] = pattern
-
-            # 转换为表格数据格式
-            valid_patterns = list(display_patterns.values())
-
-            # 按置信度排序
-            valid_patterns.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-
-            self.log_manager.info(f"表格显示: {len(valid_patterns)}个形态（每种形态的最高置信度版本）")
-
-            # 性能优化：禁用屏幕更新
-            self.patterns_table.setUpdatesEnabled(False)
-            self.patterns_table.setSortingEnabled(False)
-
-            # 填充表格
-            self.patterns_table.setRowCount(len(valid_patterns))
-
-            # 批量创建表格项
-            for row, pattern in enumerate(valid_patterns):
-                # 1. 形态名称 - 列0
-                pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                name_item = QTableWidgetItem(str(pattern_name))
-                # 存储完整形态数据和同名形态数量
-                same_name_count = len(self.pattern_map.get(pattern_name, []))
-                name_item.setData(Qt.UserRole, pattern)  # 存储整个形态字典
-                name_item.setData(Qt.UserRole+1, pattern_name)  # 存储形态名称
-                name_item.setData(Qt.UserRole+2, same_name_count)  # 存储同名形态数量
-                # 如果同名形态有多个，显示数量
-                if same_name_count > 1:
-                    name_item.setText(f"{pattern_name} ({same_name_count})")
-                self.patterns_table.setItem(row, 0, name_item)
-
-                # 设置单元格对齐方式
-                name_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-                # 根据信号类型设置颜色
-                signal = pattern.get('signal', '').lower()
-                if signal == 'buy':
-                    name_item.setForeground(QBrush(QColor(255, 0, 0)))  # 红色表示买入信号
-                elif signal == 'sell':
-                    name_item.setForeground(QBrush(QColor(0, 128, 0)))  # 绿色表示卖出信号
-
-                # 2. 类型 - 列1
-                category = pattern.get('pattern_category', pattern.get('category', '未知'))
-                type_item = QTableWidgetItem(str(category))
-                self.patterns_table.setItem(row, 1, type_item)
-
-                # 3. 信号方向 - 列2
-                signal_item = QTableWidgetItem(pattern.get('signal', ''))
-                # 设置信号颜色
-                if signal == 'buy':
-                    signal_item.setForeground(QBrush(QColor(255, 0, 0)))  # 红色表示买入信号
-                elif signal == 'sell':
-                    signal_item.setForeground(QBrush(QColor(0, 128, 0)))  # 绿色表示卖出信号
-                self.patterns_table.setItem(row, 2, signal_item)
-
-                # 4. 置信度 - 列3
-                confidence = pattern.get('confidence', 0)
-                confidence_str = f"{confidence:.0%}" if confidence else "N/A"
-                # 也可以使用形态中已有的置信度级别
-                confidence_level = pattern.get('confidence_level', '')
-                if confidence_level:
-                    confidence_str = f"{confidence_str} ({confidence_level})"
-                confidence_item = QTableWidgetItem(confidence_str)
-                self.patterns_table.setItem(row, 3, confidence_item)
-
-                # 5. 日期时间 - 列4
-                datetime_val = pattern.get('datetime', '')
-                if datetime_val and isinstance(datetime_val, str):
-                    # 如果包含时间，只显示日期部分
-                    if len(datetime_val) > 10 and ' ' in datetime_val:
-                        datetime_val = datetime_val.split(' ')[0]
-                date_item = QTableWidgetItem(datetime_val)
-                self.patterns_table.setItem(row, 4, date_item)
-
-                # 6. 价格 - 列5
-                price = pattern.get('price', 0)
-                price_item = QTableWidgetItem(f"{price:.2f}" if price else "")
-                self.patterns_table.setItem(row, 5, price_item)
-
-                # 7. 详情按钮 - 列6
-                detail_item = QTableWidgetItem("详情")
-                detail_item.setTextAlignment(Qt.AlignCenter)
-                self.patterns_table.setItem(row, 6, detail_item)
-
-            # 重新启用屏幕更新
-            self.patterns_table.setUpdatesEnabled(True)
-            self.patterns_table.setSortingEnabled(True)
-
-            # 应用当前排序设置
-            self._sort_patterns()
-
-            # 应用当前过滤设置
-            self._filter_patterns()
-
-            # 更新状态栏信息
-            total_rows = self.patterns_table.rowCount()
-            shown_rows = sum(1 for row in range(total_rows) if not self.patterns_table.isRowHidden(row))
-            self.pattern_count_label.setText(f"形态: {shown_rows}/{total_rows}")
-
-            # 计算渲染时间
-            end_time = time.time()
-            render_time_ms = int((end_time - start_time) * 1000)
-            self.render_time_label.setText(f"渲染时间: {render_time_ms}ms")
-
-            self.log_manager.info(f"成功更新形态表格，共 {len(valid_patterns)} 条记录，耗时: {render_time_ms}ms")
-
-        except Exception as e:
-            self.log_manager.error(f"更新形态表格失败: {e}")
-            import traceback
-            self.log_manager.error(traceback.format_exc())
+        return widget
 
     def _create_prediction_tab(self):
         """创建AI预测标签页"""
@@ -1976,169 +1231,235 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             self.log_manager.error(f"更新结果显示失败: {e}")
             self.log_manager.error(traceback.format_exc())
 
-    def _update_patterns_table(self, patterns):
-        """更新形态表格 - 增强版支持同名形态分组显示"""
+    @pyqtSlot(list)
+    def _update_patterns_table(self, patterns: List[Dict]):
+        """使用识别出的形态数据更新表格"""
+        # 新增日志，记录到达UI更新函数的形态数量
+        self.log_manager.info(f"_update_patterns_table received {len(patterns)} patterns to display.")
+
+        if not hasattr(self, 'patterns_table'):
+            self.log_manager.error("形态表格尚未创建，无法更新。")
+            return
+
+        self.patterns_table.setSortingEnabled(False)  # 关键修复：填充数据前禁用排序
+        self.patterns_table.setUpdatesEnabled(False)  # 禁用UI更新以提高性能
+
         try:
-            import time
-            start_time = time.time()
-
             # 清空表格
-            self.clear_table(self.patterns_table)
+            self.patterns_table.setRowCount(0)
+            self.patterns_table.clearContents()
 
-            # 检查模式列表有效性
-            if not patterns or not isinstance(patterns, list) or not patterns:
-                self.log_manager.info("无形态数据，清空表格")
-                self.pattern_count_label.setText("形态: 0")
+            # 如果没有形态，显示提示信息
+            if not patterns:
+                self.log_manager.warning("没有检测到形态")
+                self.patterns_table.setRowCount(1)
+                self.patterns_table.setItem(0, 0, QTableWidgetItem("未检测到形态"))
+                # 填充其他单元格
+                for col in range(1, self.patterns_table.columnCount()):
+                    self.patterns_table.setItem(0, col, QTableWidgetItem(""))
                 return
 
-            # 保存所有形态结果
-            self.all_pattern_results = patterns.copy() if isinstance(patterns, list) else []
+            # 输出详细的调试信息
+            self.log_manager.info(f"收到 {len(patterns)} 个形态数据")
+            if patterns:
+                pattern_keys = list(patterns[0].keys() if isinstance(patterns[0], dict) else [])
+                self.log_manager.info(f"第一个形态数据的键: {pattern_keys}")
+                self.log_manager.info(f"第一个形态数据的值: {patterns[0]}")
 
-            # 性能优化：限制最大形态数量
-            MAX_TOTAL_PATTERNS = 1000  # 最大处理形态数量
-            if len(self.all_pattern_results) > MAX_TOTAL_PATTERNS:
-                self.log_manager.warning(f"形态总数({len(self.all_pattern_results)})超过限制({MAX_TOTAL_PATTERNS})，进行筛选")
-                # 按置信度排序，只处理最高的N个
-                self.all_pattern_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-                self.all_pattern_results = self.all_pattern_results[:MAX_TOTAL_PATTERNS]
-                self.log_manager.info(f"形态数据已限制为前{MAX_TOTAL_PATTERNS}个高置信度形态")
-
-            # 按形态名称分组
-            self.pattern_map = {}
-            for pattern in self.all_pattern_results:
+            # 预处理：过滤无效数据
+            valid_patterns = []
+            for pattern in patterns:
                 if not isinstance(pattern, dict):
                     continue
 
-                pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                if pattern_name not in self.pattern_map:
-                    self.pattern_map[pattern_name] = []
-                self.pattern_map[pattern_name].append(pattern)
-
-            # 记录分组信息
-            pattern_counts = {name: len(patterns) for name, patterns in self.pattern_map.items()}
-            self.log_manager.info(f"形态分组统计: {pattern_counts}")
-
-            # 表格显示准备
-            # 用于去重显示的临时字典 - 每种形态只显示一个（置信度最高的）
-            display_patterns = {}
-            for pattern in self.all_pattern_results:
-                if not isinstance(pattern, dict):
+                # 确保必要字段存在
+                if 'pattern_name' not in pattern and 'type' not in pattern:
                     continue
 
-                pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
-                confidence = pattern.get('confidence', 0)
+                valid_patterns.append(pattern)
 
-                if pattern_name not in display_patterns or confidence > display_patterns[pattern_name].get('confidence', 0):
-                    display_patterns[pattern_name] = pattern
-
-            # 转换为表格数据格式
-            valid_patterns = list(display_patterns.values())
-
-            # 按置信度排序
+            # 按置信度降序排序
             valid_patterns.sort(key=lambda x: x.get('confidence', 0), reverse=True)
 
-            self.log_manager.info(f"表格显示: {len(valid_patterns)}个形态（每种形态的最高置信度版本）")
+            self.log_manager.info(f"有效形态数: {len(valid_patterns)}（去重后）")
 
-            # 性能优化：禁用屏幕更新
-            self.patterns_table.setUpdatesEnabled(False)
-            self.patterns_table.setSortingEnabled(False)
-
-            # 填充表格
+            # 设置表格行数
             self.patterns_table.setRowCount(len(valid_patterns))
 
-            # 批量创建表格项
+            # 填充表格数据
             for row, pattern in enumerate(valid_patterns):
                 # 1. 形态名称 - 列0
                 pattern_name = pattern.get('pattern_name', pattern.get('name', pattern.get('type', '未知形态')))
                 name_item = QTableWidgetItem(str(pattern_name))
-                # 存储完整形态数据和同名形态数量
-                same_name_count = len(self.pattern_map.get(pattern_name, []))
-                name_item.setData(Qt.UserRole, pattern)  # 存储整个形态字典
-                name_item.setData(Qt.UserRole+1, pattern_name)  # 存储形态名称
-                name_item.setData(Qt.UserRole+2, same_name_count)  # 存储同名形态数量
-                # 如果同名形态有多个，显示数量
-                if same_name_count > 1:
-                    name_item.setText(f"{pattern_name} ({same_name_count})")
                 self.patterns_table.setItem(row, 0, name_item)
 
-                # 设置单元格对齐方式
-                name_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-                # 根据信号类型设置颜色
-                signal = pattern.get('signal', '').lower()
-                if signal == 'buy':
-                    name_item.setForeground(QBrush(QColor(255, 0, 0)))  # 红色表示买入信号
-                elif signal == 'sell':
-                    name_item.setForeground(QBrush(QColor(0, 128, 0)))  # 绿色表示卖出信号
-
                 # 2. 类型 - 列1
-                category = pattern.get('pattern_category', pattern.get('category', '未知'))
-                type_item = QTableWidgetItem(str(category))
-                self.patterns_table.setItem(row, 1, type_item)
+                category = pattern.get('pattern_category', pattern.get('category', '未分类'))
+                if hasattr(category, 'value'):  # 如果是枚举
+                    category = category.value
+                category_item = QTableWidgetItem(str(category))
+                self.patterns_table.setItem(row, 1, category_item)
 
-                # 3. 信号方向 - 列2
-                signal_item = QTableWidgetItem(pattern.get('signal', ''))
-                # 设置信号颜色
-                if signal == 'buy':
-                    signal_item.setForeground(QBrush(QColor(255, 0, 0)))  # 红色表示买入信号
-                elif signal == 'sell':
-                    signal_item.setForeground(QBrush(QColor(0, 128, 0)))  # 绿色表示卖出信号
-                self.patterns_table.setItem(row, 2, signal_item)
-
-                # 4. 置信度 - 列3
-                confidence = pattern.get('confidence', 0)
-                confidence_str = f"{confidence:.0%}" if confidence else "N/A"
-                # 也可以使用形态中已有的置信度级别
-                confidence_level = pattern.get('confidence_level', '')
-                if confidence_level:
-                    confidence_str = f"{confidence_str} ({confidence_level})"
+                # 3. 置信度 - 列2
+                confidence = pattern.get('confidence', pattern.get('confidence_level', 0.5))
+                if isinstance(confidence, (int, float)) and not isinstance(confidence, str):
+                    confidence_str = f"{confidence:.2%}"
+                else:
+                    confidence_str = str(confidence)
                 confidence_item = QTableWidgetItem(confidence_str)
-                self.patterns_table.setItem(row, 3, confidence_item)
+                # 根据置信度设置颜色
+                if confidence >= 0.8:
+                    confidence_item.setForeground(QBrush(QColor(255, 0, 0)))  # 高置信度红色
+                elif confidence >= 0.5:
+                    confidence_item.setForeground(QBrush(QColor(0, 0, 255)))  # 中置信度蓝色
+                self.patterns_table.setItem(row, 2, confidence_item)
 
-                # 5. 日期时间 - 列4
-                datetime_val = pattern.get('datetime', '')
-                if datetime_val and isinstance(datetime_val, str):
-                    # 如果包含时间，只显示日期部分
-                    if len(datetime_val) > 10 and ' ' in datetime_val:
-                        datetime_val = datetime_val.split(' ')[0]
-                date_item = QTableWidgetItem(datetime_val)
-                self.patterns_table.setItem(row, 4, date_item)
+                # 4. 成功率 - 列3
+                success_rate = pattern.get('success_rate', 0.7)
+                if isinstance(success_rate, (int, float)) and not isinstance(success_rate, str):
+                    success_rate_str = f"{success_rate:.2%}" if success_rate <= 1 else f"{success_rate}%"
+                else:
+                    success_rate_str = str(success_rate)
+                self.patterns_table.setItem(row, 3, QTableWidgetItem(success_rate_str))
 
-                # 6. 价格 - 列5
-                price = pattern.get('price', 0)
-                price_item = QTableWidgetItem(f"{price:.2f}" if price else "")
-                self.patterns_table.setItem(row, 5, price_item)
+                # 5. 信号 - 列4
+                signal = pattern.get('signal', '')
+                signal_str = "买入" if signal == "buy" else "卖出" if signal == "sell" else "中性"
+                signal_item = QTableWidgetItem(signal_str)
+                if signal == "buy":
+                    signal_item.setForeground(QBrush(QColor(255, 0, 0)))  # 红色买入
+                elif signal == "sell":
+                    signal_item.setForeground(QBrush(QColor(0, 128, 0)))  # 绿色卖出
+                self.patterns_table.setItem(row, 4, signal_item)
 
-                # 7. 详情按钮 - 列6
-                detail_item = QTableWidgetItem("详情")
-                detail_item.setTextAlignment(Qt.AlignCenter)
-                self.patterns_table.setItem(row, 6, detail_item)
+                # 6. 位置 - 列5
+                index = pattern.get('index')
+                datetime_val = pattern.get('datetime')
+                if datetime_val:
+                    position_str = str(datetime_val)[:10]  # 只显示日期部分
+                elif index is not None:
+                    position_str = f"K线#{index}"
+                else:
+                    position_str = "未知位置"  # 确保没有空位置
+                self.patterns_table.setItem(row, 5, QTableWidgetItem(position_str))
 
-            # 重新启用屏幕更新
-            self.patterns_table.setUpdatesEnabled(True)
+                # 7. 区间 - 列6
+                start_index = pattern.get('start_index')
+                end_index = pattern.get('end_index')
+                if start_index is not None and end_index is not None:
+                    range_str = f"{start_index}-{end_index}"
+                else:
+                    range_str = "单点"  # 默认值不为空
+                self.patterns_table.setItem(row, 6, QTableWidgetItem(range_str))
+
+                # 8. 价格 - 列7
+                price = pattern.get('price')
+                if price is not None and isinstance(price, (int, float)):
+                    price_str = f"{price:.2f}"
+                else:
+                    price_str = "0.00"  # 确保不为空
+                self.patterns_table.setItem(row, 7, QTableWidgetItem(price_str))
+
+                # 9. 目标价 - 列8
+                target_price = pattern.get('target_price')
+                if target_price is None and price is not None and isinstance(price, (int, float)):
+                    # 简单估算目标价
+                    if signal == "buy":
+                        target_price = price * 1.05  # 假设上涨5%
+                    elif signal == "sell":
+                        target_price = price * 0.95  # 假设下跌5%
+                    else:
+                        target_price = price  # 中性信号
+
+                if target_price is not None and isinstance(target_price, (int, float)):
+                    target_price_str = f"{target_price:.2f}"
+                else:
+                    target_price_str = "0.00"  # 确保不为空
+                self.patterns_table.setItem(row, 8, QTableWidgetItem(target_price_str))
+
+                # 10. 建议 - 列9
+                if signal == "buy":
+                    recommendation = "建议买入"
+                elif signal == "sell":
+                    recommendation = "建议卖出"
+                else:
+                    recommendation = "观望"
+                self.patterns_table.setItem(row, 9, QTableWidgetItem(recommendation))
+
+            # 添加表头提示
+            header = self.patterns_table.horizontalHeader()
+            header.setToolTip("点击表头可排序")
+
+            # 启用排序功能
             self.patterns_table.setSortingEnabled(True)
 
-            # 应用当前排序设置
-            self._sort_patterns()
+            # 自适应列宽
+            self.patterns_table.resizeColumnsToContents()
 
-            # 应用当前过滤设置
-            self._filter_patterns()
+            # 确保表格为只读
+            self.patterns_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
-            # 更新状态栏信息
-            total_rows = self.patterns_table.rowCount()
-            shown_rows = sum(1 for row in range(total_rows) if not self.patterns_table.isRowHidden(row))
-            self.pattern_count_label.setText(f"形态: {shown_rows}/{total_rows}")
+            self.log_manager.info(f"成功更新形态表格，共 {len(valid_patterns)} 条记录")
 
-            # 计算渲染时间
-            end_time = time.time()
-            render_time_ms = int((end_time - start_time) * 1000)
-            self.render_time_label.setText(f"渲染时间: {render_time_ms}ms")
+        finally:
+            self.patterns_table.setUpdatesEnabled(True)  # 完成后重新启用UI更新
+            self.patterns_table.setSortingEnabled(True)  # 完成后重新启用排序
 
-            self.log_manager.info(f"成功更新形态表格，共 {len(valid_patterns)} 条记录，耗时: {render_time_ms}ms")
+    def _on_pattern_cell_clicked(self, row, column):
+        """处理形态表格点击事件"""
+        try:
+            # 确保点击的是有效行
+            if row < 0 or row >= self.patterns_table.rowCount():
+                return
+
+            # 获取被点击行的形态名称
+            pattern_name_item = self.patterns_table.item(row, 0)
+            if not pattern_name_item:
+                return
+
+            clicked_pattern_name = pattern_name_item.text()
+
+            # 获取当前行形态的索引
+            index_item = self.patterns_table.item(row, 5)  # 位置列
+            if not index_item:
+                return
+
+            # 从位置字符串中解析出索引 (例如 "K线#123" -> 123)
+            try:
+                clicked_index = int(index_item.text().split('#')[-1])
+            except (ValueError, IndexError):
+                # 如果无法解析，则使用行号作为后备
+                clicked_index = row
+
+            # 筛选出所有同名的形态信号
+            all_patterns = []
+            for r in range(self.patterns_table.rowCount()):
+                name_item = self.patterns_table.item(r, 0)
+                if name_item and name_item.text() == clicked_pattern_name:
+                    idx_item = self.patterns_table.item(r, 5)
+                    if idx_item:
+                        try:
+                            idx = int(idx_item.text().split('#')[-1])
+                            all_patterns.append(idx)
+                        except (ValueError, IndexError):
+                            pass
+
+            self.log_manager.info(f"点击了形态: {clicked_pattern_name}, 索引: {clicked_index}。共找到 {len(all_patterns)} 个同类信号。")
+
+            # 发布事件，通知主图表更新
+            if hasattr(self, 'event_bus') and self.event_bus:
+                display_event = PatternSignalsDisplayEvent(
+                    pattern_name=clicked_pattern_name,
+                    all_signal_indices=all_patterns,
+                    highlighted_signal_index=clicked_index
+                )
+                self.event_bus.publish(display_event)
+                self.log_manager.info(f"发布了 PatternSignalsDisplayEvent 事件: {display_event}")
+            else:
+                self.log_manager.warning("未能发布 PatternSignalsDisplayEvent 事件，因为 event_bus 不可用。")
 
         except Exception as e:
-            self.log_manager.error(f"更新形态表格失败: {e}")
-            import traceback
+            self.log_manager.error(f"处理表格点击事件失败: {e}")
             self.log_manager.error(traceback.format_exc())
 
     def _update_statistics_display(self, stats):
@@ -2208,163 +1529,3 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             'current_sensitivity': getattr(self, 'sensitivity_slider', {}).value() if hasattr(self, 'sensitivity_slider') else 0.5,
             'realtime_enabled': getattr(self, 'realtime_cb', {}).isChecked() if hasattr(self, 'realtime_cb') else False
         }
-
-    def _on_pattern_table_selection_changed(self):
-        """形态表格选择变化 - 增强版支持同名形态显示和高亮"""
-        try:
-            current_row = self.patterns_table.currentRow()
-            if current_row < 0:
-                self.log_manager.debug("未选择任何形态行")
-                return
-
-            # 获取选中行的第一列项目
-            name_item = self.patterns_table.item(current_row, 0)
-            if not name_item:
-                self.log_manager.warning("选中行的形态名称项为空")
-                return
-
-            # 从表格项获取形态名称和完整形态数据
-            pattern_name = name_item.data(Qt.UserRole+1)
-            if not pattern_name:
-                # 尝试从文本中获取
-                pattern_name = name_item.text()
-                if '(' in pattern_name:
-                    # 如果格式是"形态名称 (数量)"，提取形态名称部分
-                    pattern_name = pattern_name.split('(')[0].strip()
-
-            # 从存储中获取所有同名形态
-            same_name_patterns = self.pattern_map.get(pattern_name, [])
-
-            # 如果没有找到同名形态，可能是存储方式不同，尝试模糊匹配
-            if not same_name_patterns:
-                self.log_manager.warning(f"未在pattern_map中找到形态: {pattern_name}，尝试模糊匹配")
-                for key, patterns in self.pattern_map.items():
-                    if pattern_name in key or key in pattern_name:
-                        same_name_patterns = patterns
-                        pattern_name = key
-                        self.log_manager.info(f"通过模糊匹配找到形态: {key}")
-                        break
-
-            # 获取选中形态的完整信息（用于高亮）
-            selected_pattern = name_item.data(Qt.UserRole)
-            selected_index = None
-            if selected_pattern and isinstance(selected_pattern, dict):
-                selected_index = selected_pattern.get('index')
-
-            # 输出调试信息
-            self.log_manager.info(f"选中形态: {pattern_name}, 共有{len(same_name_patterns)}个同名形态")
-            if selected_index is not None:
-                self.log_manager.info(f"选中形态索引: {selected_index}")
-
-            # 性能优化：限制显示的最大形态数量
-            MAX_DISPLAY_PATTERNS = 50
-            if len(same_name_patterns) > MAX_DISPLAY_PATTERNS:
-                self.log_manager.warning(f"形态数量超过限制({MAX_DISPLAY_PATTERNS})，进行筛选")
-                # 按置信度排序，只显示最高的N个
-                same_name_patterns.sort(key=lambda x: x.get('confidence', 0), reverse=True)
-                same_name_patterns = same_name_patterns[:MAX_DISPLAY_PATTERNS]
-                self.log_manager.warning(f"显示形态数量已限制为{MAX_DISPLAY_PATTERNS}个")
-
-            # 在图表上显示所有同名形态，并高亮选中的形态
-            if hasattr(self, 'chart_widget') and self.chart_widget:
-                self.log_manager.info(f"在图表上显示{len(same_name_patterns)}个'{pattern_name}'形态，高亮索引: {selected_index}")
-                self.chart_widget.plot_patterns(same_name_patterns, highlight_index=selected_index)
-            else:
-                # 尝试获取主图对象
-                main_window = self.window()
-                chart_widget = None
-
-                # 尝试从各种可能的路径找到chart_widget
-                if hasattr(main_window, 'chart_widget'):
-                    chart_widget = main_window.chart_widget
-                elif hasattr(main_window, 'central_widget') and hasattr(main_window.central_widget, 'chart_widget'):
-                    chart_widget = main_window.central_widget.chart_widget
-                elif hasattr(main_window, 'main_panel') and hasattr(main_window.main_panel, 'chart_widget'):
-                    chart_widget = main_window.main_panel.chart_widget
-
-                if chart_widget:
-                    self.log_manager.info(f"找到主图，显示{len(same_name_patterns)}个'{pattern_name}'形态")
-                    chart_widget.plot_patterns(same_name_patterns, highlight_index=selected_index)
-                else:
-                    self.log_manager.warning("无法找到主图，无法显示形态")
-
-            # 记录当前选中的形态名称
-            self.current_pattern_name = pattern_name
-
-            # 发送选中信号（保持向后兼容）
-            self.pattern_selected.emit(current_row)
-
-        except Exception as e:
-            self.log_manager.error(f"处理形态表格选择变化失败: {e}")
-            import traceback
-            self.log_manager.error(traceback.format_exc())
-
-    def _on_sensitivity_changed(self, value):
-        """处理灵敏度滑块值变化事件
-
-        Args:
-            value: 滑块当前值
-        """
-        try:
-            # 更新灵敏度值标签显示
-            if hasattr(self, 'sensitivity_value_label'):
-                # 将滑块值(1-10)转换为灵敏度值(0.1-1.0)
-                sensitivity_value = value / 10.0
-                self.sensitivity_value_label.setText(f"{sensitivity_value:.1f}")
-
-            # 如果启用了实时分析，则重新执行分析
-            if hasattr(self, 'realtime_cb') and self.realtime_cb.isChecked():
-                # 使用定时器延迟执行，避免频繁更新
-                if hasattr(self, 'sensitivity_timer'):
-                    self.sensitivity_timer.stop()
-                else:
-                    self.sensitivity_timer = QTimer()
-                    self.sensitivity_timer.setSingleShot(True)
-                    self.sensitivity_timer.timeout.connect(self.one_click_analysis)
-
-                self.sensitivity_timer.start(500)  # 500ms延迟
-
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"处理灵敏度变化失败: {e}")
-
-    def _clear_results(self):
-        """清空所有结果内容"""
-        try:
-            # 清空表格
-            if hasattr(self, 'patterns_table'):
-                self.clear_table(self.patterns_table)
-
-            # 清空预测文本
-            if hasattr(self, 'prediction_text'):
-                self.prediction_text.clear()
-
-            # 清空统计文本
-            if hasattr(self, 'stats_text'):
-                self.stats_text.clear()
-
-            # 清空回测文本
-            if hasattr(self, 'backtest_text'):
-                self.backtest_text.clear()
-
-            # 清空数据缓存
-            self.all_pattern_results = []
-            self.pattern_map = {}
-
-            # 更新状态
-            if hasattr(self, 'status_label'):
-                self.status_label.setText("已清空结果")
-
-            # 更新计数标签
-            if hasattr(self, 'pattern_count_label'):
-                self.pattern_count_label.setText("形态: 0")
-
-            # 记录日志
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("已清空所有分析结果")
-
-        except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"清空结果失败: {e}")
-                import traceback
-                self.log_manager.error(traceback.format_exc())

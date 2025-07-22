@@ -116,6 +116,9 @@ class EnhancedPatternRecognizer:
                 # 获取所有形态配置
                 pattern_configs = pattern_manager.get_all_patterns()
 
+                if self.debug_mode:
+                    print(f"[EnhancedPatternRecognizer] 获取到 {len(pattern_configs)} 个形态配置")
+
                 for config in pattern_configs:
                     if not config.is_active:
                         continue
@@ -140,6 +143,30 @@ class EnhancedPatternRecognizer:
                         # 转换为字典格式
                         for result in filtered_results:
                             result_dict = result.to_dict()
+
+                            # 确保必要的字段都被正确设置
+                            if 'pattern_name' not in result_dict:
+                                result_dict['pattern_name'] = config.name
+
+                            if 'pattern_type' not in result_dict or not result_dict['pattern_type']:
+                                result_dict['pattern_type'] = config.english_name
+
+                            if 'type' not in result_dict:
+                                result_dict['type'] = config.english_name
+
+                            # 添加形态的分类信息
+                            result_dict['category'] = config.category
+
+                            # 确保有明确的索引信息
+                            if 'index' not in result_dict or result_dict['index'] is None:
+                                result_dict['index'] = len(kdata) - 1  # 默认使用最后一根K线
+
+                            # 添加成功率信息
+                            result_dict['success_rate'] = config.success_rate if hasattr(config, 'success_rate') and config.success_rate is not None else 0.7
+
+                            # 添加风险级别信息
+                            result_dict['risk_level'] = config.risk_level if hasattr(config, 'risk_level') else 'medium'  # 默认为中等风险
+
                             all_results.append(result_dict)
 
                     except Exception as e:
@@ -175,7 +202,19 @@ class EnhancedPatternRecognizer:
                             result for result in results
                             if result.get('confidence', 0) >= confidence_threshold
                         ]
-                        all_results.extend(filtered_results)
+
+                        # 对每个结果应用去重
+                        for result in filtered_results:
+                            # 确保有pattern_name字段
+                            if 'pattern_name' not in result:
+                                result['pattern_name'] = pattern_name
+
+                            # 确保有type字段
+                            if 'type' not in result:
+                                result['type'] = pattern_name
+
+                            all_results.append(result)
+
                     except Exception as e:
                         if self.debug_mode:
                             print(
@@ -305,6 +344,8 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
         def execute_with_timeout():
             """在线程中执行算法代码"""
             try:
+                # 将kdata也添加到全局环境中，以兼容可能不规范的算法代码
+                safe_globals['kdata'] = safe_locals.get('kdata')
                 exec(algorithm_code.strip(), safe_globals, safe_locals)
             except Exception as e:
                 safe_locals['_execution_error'] = e
@@ -385,6 +426,78 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                 f"[DatabaseAlgorithmRecognizer] 算法执行异常 {self.config.english_name}: {e}")
             return []
 
+    @staticmethod
+    def safe_calculate_volatility(prices, period=20):
+        """安全的波动率计算函数"""
+        if len(prices) < period:
+            return 0.0
+
+        recent_prices = prices[-period:]
+        if len(recent_prices) < 2:
+            return 0.0
+
+        try:
+            returns = np.diff(recent_prices) / recent_prices[:-1]
+            return np.std(returns) if len(returns) > 0 else 0.0
+        except:
+            return 0.0
+
+    @staticmethod
+    def safe_calculate_momentum(prices, period=10):
+        """安全的动量计算函数"""
+        if len(prices) < period + 1:
+            return 0.0
+
+        try:
+            current_price = prices[-1]
+            past_price = prices[-period-1]
+            return (current_price - past_price) / past_price if past_price > 0 else 0.0
+        except:
+            return 0.0
+
+    @staticmethod
+    def safe_calculate_rsi(prices, period=14):
+        """安全的RSI计算函数"""
+        if len(prices) < period + 1:
+            return 50.0
+
+        try:
+            deltas = np.diff(prices)
+            gains = np.where(deltas > 0, deltas, 0)
+            losses = np.where(deltas < 0, -deltas, 0)
+
+            avg_gain = np.mean(gains[-period:])
+            avg_loss = np.mean(losses[-period:])
+
+            if avg_loss == 0:
+                return 100.0
+
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+            return rsi
+        except:
+            return 50.0
+
+    @staticmethod
+    def safe_calculate_trend_strength(prices, period=20):
+        """安全的趋势强度计算函数"""
+        if len(prices) < period:
+            return 0.0
+
+        recent_prices = prices[-period:]
+        if len(recent_prices) < 2:
+            return 0.0
+
+        # 计算线性回归斜率作为趋势强度
+        x = np.arange(len(recent_prices))
+        y = np.array(recent_prices)
+
+        try:
+            slope = np.polyfit(x, y, 1)[0]
+            return slope / np.mean(y) if np.mean(y) > 0 else 0.0
+        except:
+            return 0.0
+
     def _create_enhanced_safe_globals(self) -> Dict[str, Any]:
         """创建增强的安全执行环境 - 性能优化版"""
 
@@ -417,74 +530,6 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                     minima.append(i)
 
             return maxima, minima
-
-        def safe_calculate_trend_strength(prices, period=20):
-            """安全的趋势强度计算函数"""
-            if len(prices) < period:
-                return 0.0
-
-            recent_prices = prices[-period:]
-            if len(recent_prices) < 2:
-                return 0.0
-
-            # 计算线性回归斜率作为趋势强度
-            x = np.arange(len(recent_prices))
-            y = np.array(recent_prices)
-
-            try:
-                slope = np.polyfit(x, y, 1)[0]
-                return slope / np.mean(y) if np.mean(y) > 0 else 0.0
-            except:
-                return 0.0
-
-        def safe_calculate_volatility(prices, period=20):
-            """安全的波动率计算函数"""
-            if len(prices) < period:
-                return 0.0
-
-            recent_prices = prices[-period:]
-            if len(recent_prices) < 2:
-                return 0.0
-
-            try:
-                returns = np.diff(recent_prices) / recent_prices[:-1]
-                return np.std(returns) if len(returns) > 0 else 0.0
-            except:
-                return 0.0
-
-        def safe_calculate_momentum(prices, period=10):
-            """安全的动量计算函数"""
-            if len(prices) < period + 1:
-                return 0.0
-
-            try:
-                current_price = prices[-1]
-                past_price = prices[-period-1]
-                return (current_price - past_price) / past_price if past_price > 0 else 0.0
-            except:
-                return 0.0
-
-        def safe_calculate_rsi(prices, period=14):
-            """安全的RSI计算函数"""
-            if len(prices) < period + 1:
-                return 50.0
-
-            try:
-                deltas = np.diff(prices)
-                gains = np.where(deltas > 0, deltas, 0)
-                losses = np.where(deltas < 0, -deltas, 0)
-
-                avg_gain = np.mean(gains[-period:])
-                avg_loss = np.mean(losses[-period:])
-
-                if avg_loss == 0:
-                    return 100.0
-
-                rs = avg_gain / avg_loss
-                rsi = 100 - (100 / (1 + rs))
-                return rsi
-            except:
-                return 50.0
 
         def safe_calculate_body_ratio(open_price, high_price, low_price, close_price):
             """安全的实体比例计算函数"""
@@ -547,10 +592,10 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             'is_bullish_candle': safe_is_bullish_candle,
             'is_bearish_candle': safe_is_bearish_candle,
             'find_local_extremes': safe_find_local_extremes,
-            'calculate_trend_strength': safe_calculate_trend_strength,
-            'calculate_volatility': safe_calculate_volatility,
-            'calculate_momentum': safe_calculate_momentum,
-            'calculate_rsi': safe_calculate_rsi,
+            'calculate_trend_strength': self.safe_calculate_trend_strength,
+            'calculate_volatility': self.safe_calculate_volatility,
+            'calculate_momentum': self.safe_calculate_momentum,
+            'calculate_rsi': self.safe_calculate_rsi,
         }
 
     def _create_enhanced_safe_locals(self, kdata: pd.DataFrame) -> Dict[str, Any]:
@@ -599,10 +644,10 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                 'ema_26': self._calculate_ema(closes, 26),
 
                 # 波动率和动量
-                'volatility': calculate_volatility(closes, 20),
-                'momentum_10': calculate_momentum(closes, 10),
-                'rsi_14': calculate_rsi(closes, 14),
-                'trend_strength': calculate_trend_strength(closes, 20),
+                'volatility': self.safe_calculate_volatility(closes, 20),
+                'momentum_10': self.safe_calculate_momentum(closes, 10),
+                'rsi_14': self.safe_calculate_rsi(closes, 14),
+                'trend_strength': self.safe_calculate_trend_strength(closes, 20),
 
                 # 价格范围
                 'price_range': highs - lows,
@@ -697,10 +742,24 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                     confidence = 0.5
                 confidence = max(0.0, min(1.0, float(confidence)))
 
+                # 确保有pattern_type字段
+                pattern_type = raw_result.get('pattern_type', self.config.english_name)
+                if not pattern_type:
+                    pattern_type = self.config.english_name
+
+                # 确保有价格信息
+                price = raw_result.get('price', 0.0)
+                if not isinstance(price, (int, float)) or price <= 0:
+                    # 尝试从K线数据中获取
+                    index = raw_result.get('index', -1)
+                    if hasattr(self, 'kdata') and self.kdata is not None and index >= 0 and index < len(self.kdata):
+                        price = float(self.kdata.iloc[index]['close'])
+                    else:
+                        price = 0.0
+
                 # 创建结果对象
                 result = PatternResult(
-                    pattern_type=raw_result.get(
-                        'pattern_type', self.config.english_name),
+                    pattern_type=pattern_type,
                     pattern_name=self.config.name,
                     pattern_category=self.config.category.value,
                     signal_type=signal_type,
@@ -709,7 +768,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                         confidence),
                     index=int(raw_result.get('index', 0)),
                     datetime_val=raw_result.get('datetime_val'),
-                    price=float(raw_result.get('price', 0.0)),
+                    price=float(price),
                     start_index=int(raw_result.get('start_index')) if raw_result.get(
                         'start_index') is not None else None,
                     end_index=int(raw_result.get('end_index')) if raw_result.get(

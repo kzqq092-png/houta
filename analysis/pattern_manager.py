@@ -54,6 +54,18 @@ class PatternManager:
         except sqlite3.OperationalError:
             pass
 
+        try:
+            cursor.execute(
+                'ALTER TABLE pattern_types ADD COLUMN success_rate REAL DEFAULT 0.7')
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute(
+                'ALTER TABLE pattern_types ADD COLUMN risk_level TEXT DEFAULT "medium"')
+        except sqlite3.OperationalError:
+            pass
+
         # 创建形态历史表（用于效果统计）
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS pattern_history (
@@ -159,7 +171,11 @@ class PatternManager:
                 # 修复：algorithm_code是第12个字段（索引12）
                 algorithm_code=row[12] if len(row) > 12 else "",
                 parameters=parameters,
-                is_active=bool(row[9])
+                is_active=bool(row[9]),
+                # 添加成功率字段，如果数据库中有则使用，否则使用默认值0.7
+                success_rate=row[14] if len(row) > 14 and row[14] is not None else 0.7,
+                # 添加风险级别字段，如果数据库中有则使用，否则使用默认值'medium'
+                risk_level=row[15] if len(row) > 15 and row[15] is not None else 'medium'
             ))
 
         return patterns
@@ -218,47 +234,53 @@ class PatternManager:
             识别到的形态列表
         """
         if kdata is None or len(kdata) == 0:
+            print("[PatternManager] 错误: K线数据为空")
             return []
 
         # 数据格式检查和预处理
+        try:
+            # 如果是DataFrame，确保包含必要字段
+            if isinstance(kdata, pd.DataFrame):
+                required_columns = ['open', 'high', 'low', 'close']
+                missing_columns = [
+                    col for col in required_columns if col not in kdata.columns]
+                if missing_columns:
+                    print(f"[PatternManager] DataFrame缺少必要列: {missing_columns}")
+                    return []
 
-        # 如果是DataFrame，确保包含必要字段
-        if isinstance(kdata, pd.DataFrame):
-            required_columns = ['open', 'high', 'low', 'close']
-            missing_columns = [
-                col for col in required_columns if col not in kdata.columns]
-            if missing_columns:
-                print(f"DataFrame缺少必要列: {missing_columns}")
-                return []
-
-            # 增强的datetime处理逻辑
-            if 'datetime' not in kdata.columns:
-                if isinstance(kdata.index, pd.DatetimeIndex):
-                    kdata = kdata.copy()
-                    kdata['datetime'] = kdata.index
-                    print("[PatternManager] 使用DatetimeIndex作为datetime字段")
+                # 增强的datetime处理逻辑
+                if 'datetime' not in kdata.columns:
+                    if isinstance(kdata.index, pd.DatetimeIndex):
+                        kdata = kdata.copy()
+                        kdata['datetime'] = kdata.index
+                        print("[PatternManager] 使用DatetimeIndex作为datetime字段")
+                    else:
+                        # 如果没有datetime信息，生成序列
+                        print("[PatternManager] K线数据缺少datetime字段，自动补全")
+                        kdata = kdata.copy()
+                        kdata['datetime'] = pd.date_range(
+                            start='2023-01-01', periods=len(kdata), freq='D')
                 else:
-                    # 如果没有datetime信息，生成序列
-                    print("[PatternManager] K线数据缺少datetime字段，自动补全")
-                    kdata = kdata.copy()
-                    kdata['datetime'] = pd.date_range(
-                        start='2023-01-01', periods=len(kdata), freq='D')
+                    # 确保datetime列是正确的时间格式
+                    try:
+                        kdata['datetime'] = pd.to_datetime(kdata['datetime'])
+                    except Exception as e:
+                        print(f"[PatternManager] datetime字段转换失败: {e}")
+                        kdata['datetime'] = pd.date_range(
+                            start='2023-01-01', periods=len(kdata), freq='D')
             else:
-                # 确保datetime列是正确的时间格式
+                # 如果是其他格式，尝试转换为DataFrame
                 try:
-                    kdata['datetime'] = pd.to_datetime(kdata['datetime'])
+                    from core.data_manager import data_manager
+                    kdata = data_manager.kdata_to_df(kdata)
                 except Exception as e:
-                    print(f"[PatternManager] datetime字段转换失败: {e}")
-                    kdata['datetime'] = pd.date_range(
-                        start='2023-01-01', periods=len(kdata), freq='D')
-        else:
-            # 如果是其他格式，尝试转换为DataFrame
-            try:
-                from core.data_manager import data_manager
-                kdata = data_manager.kdata_to_df(kdata)
-            except Exception as e:
-                print(f"[PatternManager] 数据转换失败: {e}")
-                return []
+                    print(f"[PatternManager] 数据转换失败: {e}")
+                    return []
+        except Exception as e:
+            print(f"[PatternManager] 数据预处理失败: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return []
 
         # 获取要识别的形态配置
         all_configs = self.get_pattern_configs()
@@ -267,6 +289,10 @@ class PatternManager:
                 c for c in all_configs if c.english_name in selected_patterns]
         else:
             configs = all_configs
+
+        if not configs:
+            print("[PatternManager] 警告: 没有可用的形态配置")
+            return []
 
         all_results = []
 
@@ -294,9 +320,54 @@ class PatternManager:
                     if r.confidence >= effective_threshold
                 ]
 
+                print(f"[PatternManager] 形态'{config.name}'识别到{len(filtered_results)}个结果")
+
                 # 转换为字典格式
                 for result in filtered_results:
-                    all_results.append(result.to_dict())
+                    try:
+                        result_dict = result.to_dict()
+
+                        # 确保结果包含必要的字段
+                        pattern_name = config.name
+                        english_name = config.english_name
+
+                        # 确保有正确的pattern_name
+                        if 'pattern_name' not in result_dict:
+                            result_dict['pattern_name'] = pattern_name
+
+                        # 确保有形态类型
+                        if 'type' not in result_dict or not result_dict['type']:
+                            result_dict['type'] = english_name
+
+                        # 添加英文名
+                        if 'english_name' not in result_dict:
+                            result_dict['english_name'] = english_name
+
+                        # 添加成功率
+                        if 'success_rate' not in result_dict:
+                            result_dict['success_rate'] = config.success_rate
+
+                        # 添加风险级别
+                        if 'risk_level' not in result_dict:
+                            result_dict['risk_level'] = config.risk_level
+
+                        # 确保有正确的索引值
+                        if 'index' not in result_dict or result_dict['index'] is None:
+                            result_dict['index'] = len(kdata) - 1  # 默认使用最后一个位置
+
+                        # 确保有日期信息
+                        if ('datetime' not in result_dict or not result_dict['datetime']) and 'index' in result_dict:
+                            try:
+                                idx = result_dict['index']
+                                if 0 <= idx < len(kdata) and 'datetime' in kdata.columns:
+                                    result_dict['datetime'] = str(kdata.iloc[idx]['datetime'])
+                            except Exception:
+                                pass
+
+                        all_results.append(result_dict)
+                    except Exception as e:
+                        print(f"[PatternManager] 处理形态结果失败: {e}")
+                        continue
 
             except Exception as e:
                 print(f"[PatternManager] 形态识别失败 {config.english_name}: {e}")
@@ -304,6 +375,8 @@ class PatternManager:
 
         # 按置信度排序
         all_results.sort(key=lambda x: x.get('confidence', 0), reverse=True)
+
+        print(f"[PatternManager] 共识别到{len(all_results)}个有效形态(去重后)")
 
         return all_results
 

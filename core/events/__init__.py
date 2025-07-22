@@ -17,16 +17,17 @@ from .events import (
     PerformanceUpdateEvent,
     IndicatorChangedEvent,
     UIDataReadyEvent,
+    MultiScreenToggleEvent,
     TradeExecutedEvent,
     PositionUpdatedEvent,
+    PatternSignalsDisplayEvent,
 )
 from .event_handler import EventHandler, AsyncEventHandler
 
 __all__ = [
-    'BaseEvent',
     'EventBus',
-    'EventHandler',
-    'AsyncEventHandler',
+    'BaseEventHandler',
+    'BaseEvent',
     'StockSelectedEvent',
     'ChartUpdateEvent',
     'AnalysisCompleteEvent',
@@ -37,6 +38,8 @@ __all__ = [
     'PerformanceUpdateEvent',
     'IndicatorChangedEvent',
     'UIDataReadyEvent',
+    'MultiScreenToggleEvent',
     'TradeExecutedEvent',
     'PositionUpdatedEvent',
+    'PatternSignalsDisplayEvent',
 ]

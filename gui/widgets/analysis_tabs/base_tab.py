@@ -92,6 +92,7 @@ class BaseAnalysisTab(QWidget):
 
             # 更新数据
             self.current_kdata = kdata
+            self.kdata = kdata  # 为兼容性设置kdata属性
             self.data_hash = new_hash
             self.last_update_time = datetime.now()
 
@@ -119,7 +120,14 @@ class BaseAnalysisTab(QWidget):
             # 如果统一模块不可用，使用简化验证
             return self._validate_kdata_fallback(kdata)
         except Exception as e:
-            self.log_manager.error(f"数据验证失败: {e}")
+            # 安全的日志记录，避免LogManager被删除的问题
+            try:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.error(f"数据验证失败: {e}")
+                else:
+                    print(f"[{self.__class__.__name__}] 数据验证失败: {e}")
+            except:
+                print(f"[{self.__class__.__name__}] 数据验证失败: {e}")
             return False
 
     def _validate_kdata_fallback(self, kdata) -> bool:

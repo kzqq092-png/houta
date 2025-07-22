@@ -78,6 +78,8 @@ class PatternConfig:
     algorithm_code: str
     parameters: Dict[str, Any]
     is_active: bool
+    success_rate: float = 0.7  # 默认成功率
+    risk_level: str = 'medium'  # 默认风险级别
 
 
 class BasePatternRecognizer(ABC):

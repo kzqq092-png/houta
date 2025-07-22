@@ -125,6 +125,9 @@ class MainWindowCoordinator(BaseCoordinator):
             # 加载配置
             self._load_window_config()
 
+            # 设置所有表格为只读
+            # self._set_all_tables_readonly()
+
             # 检查数据使用条款
             self._check_data_usage_terms()
 
@@ -1747,62 +1750,40 @@ YS-Quant‌ 2.0 (重构版本)
             self._performance_dock.setVisible(checked)
 
     def _toggle_log_panel(self):
-        """显示或隐藏日志面板"""
+        """切换日志面板的显示/隐藏状态"""
+        bottom_panel = self._panels.get('bottom')
+        if bottom_panel:
+            if hasattr(bottom_panel, '_toggle_panel'):
+                bottom_panel._toggle_panel()
+            elif hasattr(bottom_panel, '_root_frame'):
+                is_visible = bottom_panel._root_frame.isVisible()
+                bottom_panel._root_frame.setVisible(not is_visible)
+                self._log_toggle_btn.setText("显示日志" if is_visible else "隐藏日志")
+
+    def _set_all_tables_readonly(self):
+        """设置所有表格为只读"""
         try:
-            # 获取底部面板
-            bottom_panel = self._panels.get('bottom')
-            if not bottom_panel:
-                return
+            logger.info("设置所有表格为只读模式...")
 
-            # 获取当前可见状态
-            is_visible = bottom_panel._root_frame.isVisible(
-            ) and bottom_panel._root_frame.height() > 10
+            # 递归查找所有 QTableWidget 和 QTableView
+            def set_tables_readonly(widget):
+                from PyQt5.QtWidgets import QTableWidget, QTableView
 
-            # 切换状态
-            if is_visible:
-                # 隐藏面板
-                if hasattr(bottom_panel, '_hide_panel'):
-                    bottom_panel._hide_panel()
-                else:
-                    bottom_panel._root_frame.setVisible(False)
+                # 如果是表格控件，设置为只读
+                if isinstance(widget, QTableWidget):
+                    widget.setEditTriggers(QTableWidget.NoEditTriggers)
+                    logger.debug(f"设置 QTableWidget 为只读: {widget.objectName()}")
+                elif isinstance(widget, QTableView):
+                    widget.setEditTriggers(QTableView.NoEditTriggers)
+                    logger.debug(f"设置 QTableView 为只读: {widget.objectName()}")
 
-                # 更新按钮文本
-                self._log_toggle_btn.setText("显示日志")
-                self._log_toggle_btn.setToolTip("显示日志面板")
-            else:
-                # 显示面板
-                bottom_panel._root_frame.setVisible(True)  # 确保面板可见
+                # 递归处理子控件
+                for child in widget.findChildren(QWidget):
+                    set_tables_readonly(child)
 
-                if hasattr(bottom_panel, '_show_panel'):
-                    bottom_panel._show_panel()
-
-                # 更新按钮文本
-                self._log_toggle_btn.setText("隐藏日志")
-                self._log_toggle_btn.setToolTip("隐藏日志面板")
-
-                # 获取垂直分割器
-                central_widget = self._main_window.centralWidget()
-                if central_widget:
-                    # 查找垂直分割器
-                    vertical_splitter = None
-                    for child in central_widget.children():
-                        if isinstance(child, QSplitter) and child.orientation() == Qt.Vertical:
-                            vertical_splitter = child
-                            break
-
-                    if vertical_splitter:
-                        # 调整分割器大小，恢复底部面板
-                        sizes = vertical_splitter.sizes()
-                        if len(sizes) >= 2:
-                            # 分配一部分空间给底部面板
-                            total_height = sum(sizes)
-                            new_sizes = [int(total_height * 0.8),
-                                         int(total_height * 0.2)]
-                            vertical_splitter.setSizes(new_sizes)
-                            logger.debug(f"调整垂直分割器大小: {sizes} -> {new_sizes}")
-
-            # 更新菜单项
-            self._update_bottom_panel_menu_item(not is_visible)
+            # 从主窗口开始递归设置
+            set_tables_readonly(self._main_window)
+            logger.info("所有表格已设置为只读模式")
 
         except Exception as e:
-            logger.error(f"显示或隐藏日志面板失败: {e}")
+            logger.error(f"设置表格只读模式失败: {e}")

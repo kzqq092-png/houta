@@ -512,37 +512,33 @@ class UnifiedIndicatorService:
     def _calculate_pattern_indicator(self, name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]], pattern: Dict[str, Any]) -> pd.DataFrame:
         """计算形态指标"""
         try:
+            from analysis.pattern_recognition import EnhancedPatternRecognizer
+
             result = df.copy()
 
-            # 使用默认参数
-            if params is None:
-                params = {}
+            # 使用 EnhancedPatternRecognizer 进行识别
+            recognizer = EnhancedPatternRecognizer()
 
-            # 设置形态指标的默认参数
-            default_pattern_params = {
-                '置信度阈值': pattern.get('confidence_threshold', 0.7),
-                '最小周期': pattern.get('min_periods', 5),
-                '最大周期': pattern.get('max_periods', 20)
-            }
+            # 获取置信度阈值
+            confidence_threshold = params.get('置信度阈值', pattern.get('confidence_threshold', 0.7))
 
-            for key, value in default_pattern_params.items():
-                if key not in params:
-                    params[key] = value
+            # 识别特定形态
+            pattern_results = recognizer.identify_patterns(df,
+                                                           confidence_threshold=confidence_threshold,
+                                                           pattern_types=[pattern['english_name']])
 
-            # 执行形态识别算法
-            pattern_result = self._execute_pattern_algorithm(name, df, params, pattern)
+            # 创建一个信号Series
+            signal = pd.Series(0, index=df.index)
 
-            # 将结果添加到DataFrame
-            if isinstance(pattern_result, pd.Series):
-                result[name] = pattern_result
-            elif isinstance(pattern_result, dict):
-                for key, value in pattern_result.items():
-                    result[f"{name}_{key}"] = value
-            else:
-                # 创建一个简单的形态信号
-                result[name] = pd.Series(0, index=df.index)  # 默认无信号
-                logger.warning(f"形态 {name} 计算结果格式不正确，使用默认值")
+            for presult in pattern_results:
+                # 根据信号类型设置值
+                signal_type = presult.get('signal_type', 'neutral')
+                if signal_type == 'buy':
+                    signal.iloc[presult['index']] = 1
+                elif signal_type == 'sell':
+                    signal.iloc[presult['index']] = -1
 
+            result[name] = signal
             return result
 
         except Exception as e:

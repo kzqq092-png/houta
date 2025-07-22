@@ -250,6 +250,34 @@ class RenderingMixin:
                 ax.title.set_fontsize(8)
                 ax.xaxis.label.set_fontsize(8)
                 ax.yaxis.label.set_fontsize(8)
+
+            # 右下角显示数据时间
+            if hasattr(self, '_data_time_text') and self._data_time_text:
+                try:
+                    if self._data_time_text in self.price_ax.texts:
+                        self._data_time_text.remove()
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"移除数据时间文本失败: {str(e)}")
+                self._data_time_text = None
+
+            # 获取数据时间
+            import datetime
+            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            data_time_str = f"当前时间: {now}"
+
+            # 右下角显示数据时间
+            self._data_time_text = self.price_ax.text(
+                0.99, 0.01, data_time_str,
+                transform=self.price_ax.transAxes,
+                va='bottom', ha='right',
+                fontsize=8,
+                color=text_color,
+                bbox=dict(facecolor=bg_color, alpha=0.7,
+                          edgecolor='none', boxstyle='round,pad=0.2'),
+                zorder=200
+            )
+
             self._optimize_display()
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:

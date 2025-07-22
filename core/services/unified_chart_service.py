@@ -663,7 +663,7 @@ def get_unified_chart_service(config_manager=None, theme_manager=None, data_sour
     return _chart_service_instance
 
 
-def create_chart_widget(parent=None, chart_id=None, **kwargs) -> ChartWidget:
+def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) -> ChartWidget:
     """
     创建一个新的ChartWidget实例。
     """
@@ -692,6 +692,7 @@ def create_chart_widget(parent=None, chart_id=None, **kwargs) -> ChartWidget:
             log_manager=log_manager,
             data_manager=data_manager,
             chart_id=chart_id,
+            coordinator=coordinator,  # 传递 coordinator
             **kwargs
         )
         return chart

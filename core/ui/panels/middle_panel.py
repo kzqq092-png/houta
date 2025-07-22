@@ -54,7 +54,7 @@ class ChartCanvas(QWidget):
     loading_error = pyqtSignal(str)  # (error_message)
     loading_progress = pyqtSignal(int, str)  # (progress_percent, stage_name)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, coordinator=None):
         super().__init__(parent)
 
         # 创建布局
@@ -73,7 +73,7 @@ class ChartCanvas(QWidget):
         try:
             from core.services.unified_chart_service import create_chart_widget
             self.chart_widget = create_chart_widget(
-                parent=self, chart_id="middle_panel_chart")
+                parent=self, chart_id="middle_panel_chart", coordinator=coordinator)
 
             # 检查是否是真正的ChartWidget实例，而不是错误占位符
             if not isinstance(self.chart_widget, QLabel):
@@ -838,7 +838,7 @@ class MiddlePanel(BasePanel):
         main_layout.addWidget(splitter)
 
         # 创建图表画布
-        self.chart_canvas = ChartCanvas(self._root_frame)
+        self.chart_canvas = ChartCanvas(self._root_frame, coordinator=self.coordinator)
         self.add_widget('chart_canvas', self.chart_canvas)
         splitter.addWidget(self.chart_canvas)
 
@@ -873,10 +873,7 @@ class MiddlePanel(BasePanel):
 
         status_layout.addStretch()
 
-        # 数据时间标签
-        data_time_label = QLabel("数据时间:")
-        status_layout.addWidget(data_time_label)
-        self.add_widget('data_time_label', data_time_label)
+        # 数据时间标签已移至右下角
 
     def _create_chart_controls(self, parent: QWidget) -> None:
         """创建图表控制栏"""

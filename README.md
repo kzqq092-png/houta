@@ -1,4 +1,4 @@
-# Hikyuu 量化交易系统
+# YS-Quant‌ 量化交易系统
 #注意：后续有新功能涉及多线程/定时器/UI更新，务必继续采用"信号/槽+主线程UI更新"模式：使用 pyqtSignal 和 pyqtSlot
    所有QWidget及其子类（如QTableWidgetItem）必须在主线程创建和操作。
    子线程只做数据计算，结果通过信号发回主线程，由主线程更新UI。

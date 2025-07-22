@@ -14,7 +14,8 @@ from core.unified_indicator_service import (
     get_indicators_by_category,
     INDICATOR_ALIASES
 )
-from core.indicators.library import *
+from core.indicators.library.trends import calculate_ma
+from core.indicators.library.oscillators import calculate_macd, calculate_rsi
 import os
 import sys
 import logging
@@ -132,7 +133,6 @@ def calc_ma(close: pd.Series, n: int) -> pd.Series:
     df = pd.DataFrame({'close': close})
 
     # 直接使用新的指标算法库
-    from core.indicators.library.trends import calculate_ma
     result = calculate_ma(df, timeperiod=n)
 
     # 返回MA序列
@@ -159,7 +159,6 @@ def calc_macd(close: pd.Series, fast=12, slow=26, signal=9) -> Tuple[pd.Series, 
     df = pd.DataFrame({'close': close})
 
     # 直接使用新的指标算法库
-    from core.indicators.library.oscillators import calculate_macd
     result = calculate_macd(df, fastperiod=fast,
                             slowperiod=slow, signalperiod=signal)
 
@@ -197,7 +196,6 @@ def calc_rsi(close: pd.Series, n=14) -> pd.Series:
     df = pd.DataFrame({'close': close})
 
     # 直接使用新的指标算法库
-    from core.indicators.library.oscillators import calculate_rsi
     result = calculate_rsi(df, timeperiod=n)
 
     # 返回RSI序列
