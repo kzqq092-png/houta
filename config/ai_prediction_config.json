@@ -1,0 +1,39 @@
+{
+    "model_config": {
+        "enabled": true,
+        "model_type": "ensemble",
+        "confidence_threshold": 0.7,
+        "prediction_horizon": 5,
+        "feature_window": 20,
+        "cache_size": 1000,
+        "model_update_interval": 24
+    },
+    "validation": {
+        "min_data_points": 10,
+        "max_prediction_horizon": 30,
+        "max_data_rows": 10000,
+        "required_columns": ["open", "high", "low", "close"]
+    },
+    "feature_config": {
+        "technical_indicators": true,
+        "pattern_features": true,
+        "volume_features": true,
+        "price_features": true,
+        "volatility_features": true
+    },
+    "fallback_config": {
+        "enable_fallback": true,
+        "fallback_confidence": 0.5,
+        "fallback_type": "rule_based"
+    },
+    "cache_config": {
+        "enable_cache": true,
+        "cache_ttl": 300,
+        "max_cache_size": 1000
+    },
+    "logging": {
+        "log_predictions": true,
+        "log_level": "INFO",
+        "detailed_errors": true
+    }
+} 

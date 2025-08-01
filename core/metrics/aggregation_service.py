@@ -299,10 +299,11 @@ class MetricsAggregationService:
 
         if alerts and self.event_bus:
             try:
-                self.event_bus.publish("ResourceAlert", {
-                    "alerts": alerts,
-                    "timestamp": time.time()
-                })
+                # 修复：使用关键字参数而不是位置参数传递字典
+                self.event_bus.publish("ResourceAlert",
+                                       alerts=alerts,
+                                       timestamp=time.time()
+                                       )
             except Exception as e:
                 logger.error(f"发布资源告警事件失败: {e}")
 
@@ -334,11 +335,12 @@ class MetricsAggregationService:
 
         if alerts and self.event_bus:
             try:
-                self.event_bus.publish("ApplicationAlert", {
-                    "alerts": alerts,
-                    "operation": event.operation_name,
-                    "timestamp": time.time()
-                })
+                # 修复：使用关键字参数而不是位置参数传递字典
+                self.event_bus.publish("ApplicationAlert",
+                                       alerts=alerts,
+                                       operation=event.operation_name,
+                                       timestamp=time.time()
+                                       )
             except Exception as e:
                 logger.error(f"发布应用告警事件失败: {e}")
 

@@ -381,7 +381,7 @@ class MainWindowCoordinator(BaseCoordinator):
             )
             right_panel._root_frame.setMinimumWidth(
                 self._layout_config['right_panel_width'])
-            right_panel._root_frame.setMaximumWidth(850)
+            right_panel._root_frame.setMaximumWidth(1500)
             horizontal_splitter.addWidget(right_panel._root_frame)
             self._panels['right'] = right_panel
 

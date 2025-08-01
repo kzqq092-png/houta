@@ -2466,6 +2466,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 导出格式选择
         export_layout.addWidget(QLabel("导出格式:"))
         self.export_format_combo = QComboBox()
+        self.export_format_combo.setFixedWidth(60)
         self.export_format_combo.addItems(["Excel", "CSV", "JSON"])
         export_layout.addWidget(self.export_format_combo)
 

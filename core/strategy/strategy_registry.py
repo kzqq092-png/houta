@@ -19,6 +19,22 @@ from .base_strategy import BaseStrategy, StrategyType
 from .strategy_database import get_strategy_database_manager
 
 
+class StrategyInfo:
+    """策略信息类，用于封装策略基本信息"""
+
+    def __init__(self, strategy_id: str, name: str, description: str = "",
+                 category: str = "", author: str = "", version: str = "1.0.0"):
+        self.strategy_id = strategy_id
+        self.name = name
+        self.description = description
+        self.category = category
+        self.author = author
+        self.version = version
+
+    def __repr__(self):
+        return f"StrategyInfo(id={self.strategy_id}, name={self.name})"
+
+
 class StrategyRegistry:
     """策略注册器"""
 
@@ -280,6 +296,38 @@ class StrategyRegistry:
                 continue
 
         return sorted(matched_strategies)
+
+    def get_all_strategies(self) -> List[StrategyInfo]:
+        """
+        获取所有策略信息
+
+        Returns:
+            策略信息对象列表
+        """
+        strategies = []
+
+        try:
+            # 获取所有策略的元数据
+            all_metadata = self.get_all_metadata()
+
+            for strategy_name, metadata in all_metadata.items():
+                # 创建策略信息对象
+                strategy_info = StrategyInfo(
+                    strategy_id=metadata.get('database_id', strategy_name),
+                    name=metadata.get('name', strategy_name),
+                    description=metadata.get('description', ''),
+                    category=metadata.get('category', ''),
+                    author=metadata.get('author', ''),
+                    version=metadata.get('version', '1.0.0')
+                )
+                strategies.append(strategy_info)
+
+            self.logger.debug(f"获取到 {len(strategies)} 个策略信息")
+            return strategies
+
+        except Exception as e:
+            self.logger.error(f"获取策略信息列表失败: {e}")
+            return []
 
     def add_listener(self, listener: Callable[[str, str, Dict[str, Any]], None]):
         """

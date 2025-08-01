@@ -11,22 +11,34 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
+# 将别名列表定义为模块级别的常量，以避免与Enum的元编程冲突
+_CANDLESTICK_ALIASES = [
+    'k线形态', 'candle', 'candlesticks',
+    'rising_three_methods', 'falling_three_methods'
+]
+
+_COMPLEX_ALIASES = ['复杂形态', 'complex', 'chart_pattern', 'chart pattern']
+_TREND_ALIASES = ['趋势形态', 'trend']
+_VOLUME_ALIASES = ['价量形态', 'volume']
+_GAPS_ALIASES = ['缺口形态', 'gap']
+_CONTINUATION_ALIASES = ['持续形态', 'continuation', 'continuation_pattern']
+
 
 class SignalType(Enum):
-    """信号类型枚举"""
+    """信号类型"""
     BUY = "buy"
     SELL = "sell"
     NEUTRAL = "neutral"
 
-
-class PatternCategory(Enum):
-    """形态类别枚举"""
-    SINGLE_CANDLE = "单根K线"
-    DOUBLE_CANDLE = "双根K线"
-    TRIPLE_CANDLE = "三根K线"
-    REVERSAL = "反转形态"
-    CONTINUATION = "整理形态"
-    COMPLEX = "复合形态"
+    @classmethod
+    def from_string(cls, s: str) -> 'SignalType':
+        if s is None:
+            return cls.NEUTRAL
+        s_lower = s.lower()
+        for member in cls:
+            if member.value == s_lower:
+                return member
+        return cls.NEUTRAL
 
 
 @dataclass
@@ -69,7 +81,7 @@ class PatternConfig:
     id: int
     name: str
     english_name: str
-    category: PatternCategory
+    category: str
     signal_type: SignalType
     description: str
     min_periods: int
@@ -85,9 +97,11 @@ class PatternConfig:
 class BasePatternRecognizer(ABC):
     """形态识别器基类"""
 
-    def __init__(self, config: PatternConfig):
+    def __init__(self, config: 'PatternConfig'):
+        if not isinstance(config, PatternConfig):
+            raise TypeError("config必须是PatternConfig的实例")
         self.config = config
-        self.parameters = config.parameters
+        self.parameters = config.parameters or {}
 
     @abstractmethod
     def recognize(self, kdata: pd.DataFrame) -> List[PatternResult]:
@@ -143,7 +157,7 @@ class BasePatternRecognizer(ABC):
         return PatternResult(
             pattern_type=pattern_type,
             pattern_name=self.config.name,
-            pattern_category=self.config.category.value,
+            pattern_category=self.config.category,
             signal_type=signal_type,
             confidence=confidence,
             confidence_level=self.calculate_confidence_level(confidence),
@@ -159,31 +173,28 @@ class BasePatternRecognizer(ABC):
 class PatternAlgorithmFactory:
     """形态算法工厂 - 优化版，统一使用DatabaseAlgorithmRecognizer"""
 
-    _algorithms = {}
+    _recognizers = {}
 
     @classmethod
-    def register(cls, pattern_type: str, algorithm_class):
+    def register(cls, recognizer_type: str, recognizer_class):
         """注册算法"""
-        cls._algorithms[pattern_type] = algorithm_class
+        cls._recognizers[recognizer_type] = recognizer_class
 
     @classmethod
-    def create(cls, config: PatternConfig) -> BasePatternRecognizer:
-        """创建算法实例 - 优化版，统一使用DatabaseAlgorithmRecognizer"""
-        algorithm_class = cls._algorithms.get(config.english_name)
-        if algorithm_class is None:
-            # 统一使用DatabaseAlgorithmRecognizer作为默认实现
-            try:
-                from analysis.pattern_recognition import DatabaseAlgorithmRecognizer
-                algorithm_class = DatabaseAlgorithmRecognizer
-            except ImportError:
-                raise ImportError(f"无法找到形态算法实现: {config.english_name}")
+    def create(cls, config: 'PatternConfig') -> 'BasePatternRecognizer':
+        # 如果config有recognizer_type属性，使用指定的识别器，否则使用默认识别器
+        recognizer_type = getattr(config, 'recognizer_type', 'default')
+        recognizer_class = cls._recognizers.get(recognizer_type, cls._recognizers.get('default'))
 
-        return algorithm_class(config)
+        if recognizer_class is None:
+            raise ValueError(f"找不到识别器类型 '{recognizer_type}'，且没有默认识别器")
+
+        return recognizer_class(config)
 
     @classmethod
     def get_available_algorithms(cls) -> List[str]:
         """获取可用算法列表"""
-        return list(cls._algorithms.keys())
+        return list(cls._recognizers.keys())
 
 
 def register_pattern_algorithm(pattern_type: str):

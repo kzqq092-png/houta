@@ -16,7 +16,7 @@ import talib
 
 # 导入自定义模块
 from core.data_validator import ProfessionalDataValidator, ValidationLevel
-from core.performance_optimizer import optimize_stock_analysis, performance_monitor
+from core.performance_optimizer import ProfessionalPerformanceOptimizer
 from analysis.pattern_recognition import EnhancedPatternRecognizer
 from analysis.technical_analysis import TechnicalAnalyzer
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
@@ -122,6 +122,7 @@ class ProfessionalStockAnalyzer:
             ValidationLevel.PROFESSIONAL)
         self.pattern_recognizer = EnhancedPatternRecognizer(debug_mode=False)
         self.technical_analyzer = TechnicalAnalyzer()
+        self.performance_optimizer = ProfessionalPerformanceOptimizer()  # 实例化性能优化器
 
         # 分析配置
         self.config = {
@@ -131,7 +132,6 @@ class ProfessionalStockAnalyzer:
             'support_resistance_window': 100,  # 支撑阻力计算窗口
         }
 
-    @optimize_stock_analysis
     def analyze_stock(self, kdata: pd.DataFrame, stock_code: str,
                       stock_name: str = None, market_data: Dict = None) -> StockAnalysisResult:
         """
@@ -146,119 +146,125 @@ class ProfessionalStockAnalyzer:
         Returns:
             StockAnalysisResult: 分析结果
         """
-        with performance_monitor(f"股票分析_{stock_code}"):
-            try:
-                # 1. 数据验证
-                validation_result = self.data_validator.validate_kdata(
-                    kdata, stock_code)
-                if not validation_result.is_valid:
-                    raise ValueError(f"数据验证失败: {validation_result.errors}")
+        self.performance_optimizer.start_monitoring()  # 开始监控
+        try:
+            # 1. 数据验证
+            validation_result = self.data_validator.validate_kdata(
+                kdata, stock_code)
+            if not validation_result.is_valid:
+                raise ValueError(f"数据验证失败: {validation_result.errors}")
 
-                # 2. 数据预处理
-                processed_data = self._preprocess_data(kdata)
+            # 2. 数据预处理
+            processed_data = self._preprocess_data(kdata)
 
-                # 3. 基础信息提取
-                basic_info = self._extract_basic_info(
-                    processed_data, stock_code, stock_name)
+            # 3. 基础信息提取
+            basic_info = self._extract_basic_info(
+                processed_data, stock_code, stock_name)
 
-                # 4. 技术分析
-                technical_analysis = self._perform_technical_analysis(
-                    processed_data)
+            # 4. 技术分析
+            technical_analysis = self._perform_technical_analysis(
+                processed_data)
 
-                # 5. 形态识别
-                pattern_analysis = self._perform_pattern_analysis(
-                    processed_data)
+            # 5. 形态识别
+            pattern_analysis = self._perform_pattern_analysis(
+                processed_data)
 
-                # 6. 基本面分析（如果有数据）
-                fundamental_analysis = self._perform_fundamental_analysis(
-                    processed_data, stock_code, market_data
-                )
+            # 6. 基本面分析（如果有数据）
+            fundamental_analysis = self._perform_fundamental_analysis(
+                processed_data, stock_code, market_data
+            )
 
-                # 7. 风险评估
-                risk_assessment = self._assess_risk(
-                    processed_data, market_data)
+            # 7. 风险评估
+            risk_assessment = self._assess_risk(
+                processed_data, market_data)
 
-                # 8. 投资建议生成
-                investment_recommendation = self._generate_investment_recommendation(
-                    technical_analysis, pattern_analysis, fundamental_analysis, risk_assessment
-                )
+            # 8. 投资建议生成
+            investment_recommendation = self._generate_investment_recommendation(
+                technical_analysis, pattern_analysis, fundamental_analysis, risk_assessment
+            )
 
-                # 9. 综合评分
-                overall_evaluation = self._calculate_overall_score(
-                    technical_analysis, pattern_analysis, fundamental_analysis, risk_assessment
-                )
+            # 9. 综合评分
+            overall_evaluation = self._calculate_overall_score(
+                technical_analysis, pattern_analysis, fundamental_analysis, risk_assessment
+            )
 
-                # 10. 构建分析结果
-                result = StockAnalysisResult(
-                    stock_code=stock_code,
-                    stock_name=stock_name or stock_code,
-                    analysis_date=datetime.now(),
-                    analysis_depth=self.analysis_depth,
+            # 10. 构建分析结果
+            result = StockAnalysisResult(
+                stock_code=stock_code,
+                stock_name=stock_name or stock_code,
+                analysis_date=datetime.now(),
+                analysis_depth=self.analysis_depth,
 
-                    # 基础信息
-                    current_price=basic_info['current_price'],
-                    price_change=basic_info['price_change'],
-                    price_change_percent=basic_info['price_change_percent'],
-                    volume=basic_info['volume'],
-                    market_cap=basic_info.get('market_cap', 0),
+                # 基础信息
+                current_price=basic_info['current_price'],
+                price_change=basic_info['price_change'],
+                price_change_percent=basic_info['price_change_percent'],
+                volume=basic_info['volume'],
+                market_cap=basic_info.get('market_cap', 0),
 
-                    # 技术分析
-                    technical_score=technical_analysis['score'],
-                    technical_signals=technical_analysis['signals'],
-                    support_levels=technical_analysis['support_levels'],
-                    resistance_levels=technical_analysis['resistance_levels'],
-                    trend_direction=technical_analysis['trend_direction'],
-                    trend_strength=technical_analysis['trend_strength'],
+                # 技术分析
+                technical_score=technical_analysis['score'],
+                technical_signals=technical_analysis['signals'],
+                support_levels=technical_analysis['support_levels'],
+                resistance_levels=technical_analysis['resistance_levels'],
+                trend_direction=technical_analysis['trend_direction'],
+                trend_strength=technical_analysis['trend_strength'],
 
-                    # 形态识别
-                    patterns=pattern_analysis['patterns'],
-                    pattern_score=pattern_analysis['score'],
+                # 形态识别
+                patterns=pattern_analysis['patterns'],
+                pattern_score=pattern_analysis['score'],
 
-                    # 基本面分析
-                    fundamental_score=fundamental_analysis['score'],
-                    pe_ratio=fundamental_analysis.get('pe_ratio'),
-                    pb_ratio=fundamental_analysis.get('pb_ratio'),
-                    roe=fundamental_analysis.get('roe'),
-                    debt_ratio=fundamental_analysis.get('debt_ratio'),
+                # 基本面分析
+                fundamental_score=fundamental_analysis['score'],
+                pe_ratio=fundamental_analysis.get('pe_ratio'),
+                pb_ratio=fundamental_analysis.get('pb_ratio'),
+                roe=fundamental_analysis.get('roe'),
+                debt_ratio=fundamental_analysis.get('debt_ratio'),
 
-                    # 风险评估
-                    risk_level=risk_assessment['risk_level'],
-                    volatility=risk_assessment['volatility'],
-                    beta=risk_assessment.get('beta'),
-                    max_drawdown=risk_assessment['max_drawdown'],
-                    var_95=risk_assessment['var_95'],
+                # 风险评估
+                risk_level=risk_assessment['risk_level'],
+                volatility=risk_assessment['volatility'],
+                beta=risk_assessment.get('beta'),
+                max_drawdown=risk_assessment['max_drawdown'],
+                var_95=risk_assessment['var_95'],
 
-                    # 投资建议
-                    recommendation=investment_recommendation['action'],
-                    confidence=investment_recommendation['confidence'],
-                    target_price=investment_recommendation.get('target_price'),
-                    stop_loss=investment_recommendation.get('stop_loss'),
-                    investment_horizon=investment_recommendation['horizon'],
+                # 投资建议
+                recommendation=investment_recommendation['action'],
+                confidence=investment_recommendation['confidence'],
+                target_price=investment_recommendation.get('target_price'),
+                stop_loss=investment_recommendation.get('stop_loss'),
+                investment_horizon=investment_recommendation['horizon'],
 
-                    # 综合评分
-                    overall_score=overall_evaluation['score'],
-                    quality_rating=overall_evaluation['rating'],
+                # 综合评分
+                overall_score=overall_evaluation['score'],
+                quality_rating=overall_evaluation['rating'],
 
-                    # 详细分析
-                    detailed_analysis={
-                        'technical': technical_analysis,
-                        'pattern': pattern_analysis,
-                        'fundamental': fundamental_analysis,
-                        'risk': risk_assessment,
-                        'validation': validation_result.statistics
-                    },
-                    warnings=validation_result.warnings + self._generate_analysis_warnings(
-                        technical_analysis, pattern_analysis, risk_assessment
-                    ),
-                    suggestions=validation_result.suggestions +
-                    investment_recommendation.get('suggestions', [])
-                )
+                # 详细分析
+                detailed_analysis={
+                    'technical': technical_analysis,
+                    'pattern': pattern_analysis,
+                    'fundamental': fundamental_analysis,
+                    'risk': risk_assessment,
+                    'validation': validation_result.statistics
+                },
+                warnings=validation_result.warnings + self._generate_analysis_warnings(
+                    technical_analysis, pattern_analysis, risk_assessment
+                ),
+                suggestions=validation_result.suggestions +
+                investment_recommendation.get('suggestions', [])
+            )
 
-                return result
+            return result
 
-            except Exception as e:
-                self.logger.error(f"股票分析失败 {stock_code}: {e}")
-                raise
+        except Exception as e:
+            self.logger.error(f"股票分析失败 {stock_code}: {e}")
+            raise
+        finally:
+            metrics = self.performance_optimizer.stop_monitoring()  # 结束监控
+            self.logger.info(
+                f"股票分析_{stock_code} 执行完成 - 耗时: {metrics.execution_time:.3f}s, "
+                f"内存: {metrics.memory_usage:.1f}%, CPU: {metrics.cpu_usage:.1f}%"
+            )
 
     def _preprocess_data(self, kdata: pd.DataFrame) -> pd.DataFrame:
         """数据预处理"""
@@ -318,28 +324,12 @@ class ProfessionalStockAnalyzer:
     def _perform_technical_analysis(self, data: pd.DataFrame) -> Dict[str, Any]:
         """执行技术分析"""
         try:
-            analysis = {
-                'score': 0.0,
-                'signals': [],
-                'support_levels': [],
-                'resistance_levels': [],
-                'trend_direction': 'NEUTRAL',
-                'trend_strength': 0.0,
-                'indicators': {}
-            }
-
-            # 趋势分析
-            trend_analysis = self._analyze_trend(data)
-            analysis.update(trend_analysis)
-
-            # 支撑阻力位分析
-            support_resistance = self._find_support_resistance(data)
-            analysis['support_levels'] = support_resistance['support']
-            analysis['resistance_levels'] = support_resistance['resistance']
+            # 完全依赖TechnicalAnalyzer进行分析
+            analysis = self.technical_analyzer.analyze(data)
 
             # 技术指标信号
             indicator_signals = self._analyze_technical_indicators(data)
-            analysis['signals'].extend(indicator_signals)
+            analysis['signals'] = indicator_signals
 
             # 计算技术分析综合得分
             analysis['score'] = self._calculate_technical_score(analysis)
@@ -350,88 +340,6 @@ class ProfessionalStockAnalyzer:
             self.logger.error(f"技术分析失败: {e}")
             return {'score': 0.0, 'signals': [], 'support_levels': [],
                     'resistance_levels': [], 'trend_direction': 'NEUTRAL', 'trend_strength': 0.0}
-
-    def _analyze_trend(self, data: pd.DataFrame) -> Dict[str, Any]:
-        """分析趋势"""
-        try:
-            # 使用多个移动平均线判断趋势
-            ma_short = data['close'].rolling(20).mean()
-            ma_medium = data['close'].rolling(50).mean()
-            ma_long = data['close'].rolling(200).mean()
-
-            current_price = data['close'].iloc[-1]
-
-            # 趋势方向判断
-            if current_price > ma_short.iloc[-1] > ma_medium.iloc[-1] > ma_long.iloc[-1]:
-                trend_direction = 'STRONG_UPTREND'
-                trend_strength = 0.8
-            elif current_price > ma_short.iloc[-1] > ma_medium.iloc[-1]:
-                trend_direction = 'UPTREND'
-                trend_strength = 0.6
-            elif current_price < ma_short.iloc[-1] < ma_medium.iloc[-1] < ma_long.iloc[-1]:
-                trend_direction = 'STRONG_DOWNTREND'
-                trend_strength = -0.8
-            elif current_price < ma_short.iloc[-1] < ma_medium.iloc[-1]:
-                trend_direction = 'DOWNTREND'
-                trend_strength = -0.6
-            else:
-                trend_direction = 'SIDEWAYS'
-                trend_strength = 0.0
-
-            # ADX趋势强度
-            if 'adx' in data.columns:
-                adx_value = data['adx'].iloc[-1]
-                if adx_value > 25:
-                    trend_strength *= (adx_value / 50)  # 标准化到0-1
-
-            return {
-                'trend_direction': trend_direction,
-                'trend_strength': trend_strength,
-                'ma_alignment': {
-                    'ma20': ma_short.iloc[-1],
-                    'ma50': ma_medium.iloc[-1],
-                    'ma200': ma_long.iloc[-1]
-                }
-            }
-
-        except Exception as e:
-            self.logger.error(f"趋势分析失败: {e}")
-            return {'trend_direction': 'NEUTRAL', 'trend_strength': 0.0}
-
-    def _find_support_resistance(self, data: pd.DataFrame,
-                                 window: int = 20) -> Dict[str, List[float]]:
-        """寻找支撑阻力位"""
-        try:
-            support_levels = []
-            resistance_levels = []
-
-            # 使用局部极值寻找支撑阻力
-            highs = data['high'].rolling(window, center=True).max()
-            lows = data['low'].rolling(window, center=True).min()
-
-            # 寻找阻力位（局部高点）
-            for i in range(window, len(data) - window):
-                if data['high'].iloc[i] == highs.iloc[i]:
-                    resistance_levels.append(data['high'].iloc[i])
-
-            # 寻找支撑位（局部低点）
-            for i in range(window, len(data) - window):
-                if data['low'].iloc[i] == lows.iloc[i]:
-                    support_levels.append(data['low'].iloc[i])
-
-            # 去重并排序
-            support_levels = sorted(list(set(support_levels)))[-5:]  # 取最近5个
-            resistance_levels = sorted(list(set(resistance_levels)), reverse=True)[
-                :5]  # 取最近5个
-
-            return {
-                'support': support_levels,
-                'resistance': resistance_levels
-            }
-
-        except Exception as e:
-            self.logger.error(f"支撑阻力分析失败: {e}")
-            return {'support': [], 'resistance': []}
 
     def _analyze_technical_indicators(self, data: pd.DataFrame) -> List[Dict[str, Any]]:
         """分析技术指标信号"""

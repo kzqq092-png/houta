@@ -1,0 +1,10 @@
+{
+  "model_type": "sentiment",
+  "training_date": "2025-08-01T14:48:36.473303",
+  "test_accuracy": 0.9829999804496765,
+  "test_loss": 0.03987109661102295,
+  "epochs": 50,
+  "sample_size": 5000,
+  "input_features": 12,
+  "quick_mode": false
+}

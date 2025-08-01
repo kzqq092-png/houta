@@ -366,7 +366,7 @@ class AnalysisWidget(QWidget):
         self.tab_widget.addTab(self.sentiment_report_tab, "📊 情绪报告")
 
     def _connect_tab_signals(self):
-        """连接标签页信号"""
+        """连接标签页信号 - 修复版"""
         try:
             # 连接技术分析信号
             if hasattr(self.technical_tab, 'analysis_completed'):
@@ -375,7 +375,7 @@ class AnalysisWidget(QWidget):
             if hasattr(self.technical_tab, 'error_occurred'):
                 self.technical_tab.error_occurred.connect(self.error_occurred)
 
-            # 连接形态分析信号
+            # 连接形态分析信号 - 双向连接
             if hasattr(self.pattern_tab, 'analysis_completed'):
                 self.pattern_tab.analysis_completed.connect(
                     self.analysis_completed)
@@ -384,6 +384,17 @@ class AnalysisWidget(QWidget):
             if hasattr(self.pattern_tab, 'pattern_selected'):
                 self.pattern_tab.pattern_selected.connect(
                     self.pattern_selected)
+            
+            # 【修复】设置pattern_tab的parent_widget并建立反向连接
+            if hasattr(self.pattern_tab, 'set_parent_widget'):
+                self.pattern_tab.set_parent_widget(self)
+                self.log_manager.info("✅ 已设置pattern_tab的parent_widget")
+            elif hasattr(self.pattern_tab, 'parent_widget'):
+                self.pattern_tab.parent_widget = self
+                # 手动连接信号
+                if hasattr(self.pattern_tab, '_connect_parent_signals'):
+                    self.pattern_tab._connect_parent_signals()
+                self.log_manager.info("✅ 已设置pattern_tab的parent_widget（手动方式）")
 
         except Exception as e:
             self.log_manager.error(f"连接标签页信号失败: {e}")

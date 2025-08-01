@@ -1,0 +1,347 @@
+[
+    {
+        "name": "双顶",
+        "english_name": "double_top",
+        "algorithm_code": "# 1. 使用工具函数寻找波峰和波谷\n# 我们需要相对显著的峰谷来构成主要形态\npeaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.03, width=5)\n\nif len(peaks) < 2 or len(troughs) < 1:\n    continue # 数据不足以形成双顶\n\n# 2. 遍历所有可能的“双顶”组合\nfor i in range(len(peaks) - 1):\n    p1 = peaks.iloc[i]\n    p2 = peaks.iloc[i+1]\n\n    # 寻找两个顶之间的那个谷（颈线点）\n    neckline_trough = troughs[(troughs.index > p1.name) & (troughs.index < p2.name)]\n    if neckline_trough.empty:\n        continue\n\n    t1 = neckline_trough.iloc[0] # 取第一个谷作为颈线点\n\n    # 3. 应用双顶形态的判断规则\n    # 规则a: 两个顶点的高度在一定容差范围内 (e.g., 3%)\n    height_diff_ratio = abs(p1['price'] - p2['price']) / max(p1['price'], p2['price'])\n    if height_diff_ratio > 0.03:\n        continue\n\n    # 规则b: 颈线点必须显著低于两个顶点\n    if not (t1['price'] < p1['price'] * 0.97 and t1['price'] < p2['price'] * 0.97):\n        continue\n\n    # 规则c: 形态确认需要价格跌破颈线水平\n    # 我们寻找颈线之后的第一个K线，看其是否收盘于颈线之下\n    breakdown_candle_index = t1.name + pd.Timedelta(days=1)\n    if breakdown_candle_index in kdata.index and kdata.loc[breakdown_candle_index, 'close'] < t1['price']:\n        confidence = 0.8 - height_diff_ratio * 10\n        datetime_val = str(breakdown_candle_index)\n        result = create_result(\n            pattern_type='double_top', signal_type=SignalType.SELL, confidence=confidence,\n            index=kdata.index.get_loc(breakdown_candle_index), price=kdata.loc[breakdown_candle_index, 'close'], \n            datetime_val=datetime_val, start_index=kdata.index.get_loc(p1.name), end_index=kdata.index.get_loc(breakdown_candle_index)\n        )\n        results.append(result)"
+    },
+    {
+        "name": "头肩顶",
+        "english_name": "head_and_shoulders_top",
+        "algorithm_code": "# 使用在白盒测试中找到的“黄金参数”\npeaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.01, width=1)\nif len(peaks) < 3 or len(troughs) < 2: continue\n\nfor i in range(len(peaks) - 2):\n    p_left, p_head, p_right = peaks.iloc[i], peaks.iloc[i+1], peaks.iloc[i+2]\n\n    if not (p_head['price'] > p_left['price'] and p_head['price'] > p_right['price']): continue\n    if abs(p_left['price'] - p_right['price']) / max(p_left['price'], p_right['price']) > 0.05: continue\n\n    t_left_candidates = troughs[troughs.index < p_head.name]\n    t_right_candidates = troughs[(troughs.index > p_head.name) & (troughs.index < p_right.name)]\n    if t_left_candidates.empty or t_right_candidates.empty: continue\n\n    t_left = t_left_candidates.iloc[-1]\n    t_right = t_right_candidates.iloc[0]\n\n    neckline_price = min(t_left['price'], t_right['price'])\n\n    # 修正后的“向后扫描”跌破逻辑\n    data_after_right_shoulder = kdata[kdata.index > p_right.name]\n    for breakdown_candle_index, row in data_after_right_shoulder.iterrows():\n        if row['close'] < neckline_price:\n            confidence = 0.9\n            datetime_val = str(breakdown_candle_index)\n            result = create_result(\n                pattern_type='head_and_shoulders_top', signal_type=SignalType.SELL, confidence=confidence,\n                index=kdata.index.get_loc(breakdown_candle_index), price=row['close'],\n                datetime_val=datetime_val, start_index=kdata.index.get_loc(p_left.name), end_index=kdata.index.get_loc(breakdown_candle_index)\n            )\n            results.append(result)\n            break # 找到第一个就停止"
+    },
+    {
+        "name": "三重顶",
+        "english_name": "triple_top",
+        "algorithm_code": null
+    },
+    {
+        "name": "圆弧顶",
+        "english_name": "rounding_top",
+        "algorithm_code": null
+    },
+    {
+        "name": "岛形反转顶",
+        "english_name": "island_reversal_top",
+        "algorithm_code": null
+    },
+    {
+        "name": "双底",
+        "english_name": "double_bottom",
+        "algorithm_code": "# 1. 寻找波峰和波谷\npeaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.03, width=5)\n\nif len(troughs) < 2 or len(peaks) < 1:\n    continue\n\n# 2. 遍历所有可能的“双底”组合\nfor i in range(len(troughs) - 1):\n    t1 = troughs.iloc[i]\n    t2 = troughs.iloc[i+1]\n\n    # 寻找两个底之间的那个峰（颈线点）\n    neckline_peak = peaks[(peaks.index > t1.name) & (peaks.index < t2.name)]\n    if neckline_peak.empty:\n        continue\n\n    p1 = neckline_peak.iloc[0]\n\n    # 3. 应用双底形态的判断规则\n    # 规则a: 两个谷底的深度在一定容差范围内\n    depth_diff_ratio = abs(t1['price'] - t2['price']) / min(t1['price'], t2['price'])\n    if depth_diff_ratio > 0.03:\n        continue\n\n    # 规则b: 颈线点必须显著高于两个谷底\n    if not (p1['price'] > t1['price'] * 1.03 and p1['price'] > t2['price'] * 1.03):\n        continue\n\n    # 规则c: 形态确认需要价格突破颈线水平\n    breakout_candle_index = p1.name + pd.Timedelta(days=1)\n    if breakout_candle_index in kdata.index and kdata.loc[breakout_candle_index, 'close'] > p1['price']:\n        confidence = 0.8 - depth_diff_ratio * 10\n        datetime_val = str(breakout_candle_index)\n        result = create_result(\n            pattern_type='double_bottom', signal_type=SignalType.BUY, confidence=confidence,\n            index=kdata.index.get_loc(breakout_candle_index), price=kdata.loc[breakout_candle_index, 'close'],\n            datetime_val=datetime_val, start_index=kdata.index.get_loc(t1.name), end_index=kdata.index.get_loc(breakout_candle_index)\n        )\n        results.append(result)"
+    },
+    {
+        "name": "头肩底",
+        "english_name": "head_and_shoulders_bottom",
+        "algorithm_code": "peaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.03, width=5)\nif len(troughs) < 3 or len(peaks) < 2: continue\n\nfor i in range(len(troughs) - 2):\n    t_left, t_head, t_right = troughs.iloc[i], troughs.iloc[i+1], troughs.iloc[i+2]\n\n    if not (t_head['price'] < t_left['price'] and t_head['price'] < t_right['price']): continue\n    if abs(t_left['price'] - t_right['price']) / min(t_left['price'], t_right['price']) > 0.05: continue\n\n    p_left = peaks[peaks.index < t_head.name].iloc[-1]\n    p_right = peaks[(peaks.index > t_head.name) & (peaks.index < t_right.name)]\n    if p_right.empty: continue\n    p_right = p_right.iloc[0]\n\n    neckline_price = max(p_left['price'], p_right['price'])\n\n    breakout_candle_index = t_right.name + pd.Timedelta(days=1)\n    if breakout_candle_index in kdata.index and kdata.loc[breakout_candle_index, 'close'] > neckline_price:\n        confidence = 0.9\n        datetime_val = str(breakout_candle_index)\n        result = create_result(\n            pattern_type='head_and_shoulders_bottom', signal_type=SignalType.BUY, confidence=confidence,\n            index=kdata.index.get_loc(breakout_candle_index), price=kdata.loc[breakout_candle_index, 'close'],\n            datetime_val=datetime_val, start_index=kdata.index.get_loc(t_left.name), end_index=kdata.index.get_loc(breakout_candle_index)\n        )\n        results.append(result)"
+    },
+    {
+        "name": "三重底",
+        "english_name": "triple_bottom",
+        "algorithm_code": null
+    },
+    {
+        "name": "圆弧底",
+        "english_name": "rounding_bottom",
+        "algorithm_code": null
+    },
+    {
+        "name": "岛形反转底",
+        "english_name": "island_reversal_bottom",
+        "algorithm_code": null
+    },
+    {
+        "name": "潜在双底",
+        "english_name": "potential_double_bottom",
+        "algorithm_code": null
+    },
+    {
+        "name": "上升三角形",
+        "english_name": "ascending_triangle",
+        "algorithm_code": "peaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.02, width=5)\nif len(peaks) < 2 or len(troughs) < 2: continue\n\n# 使用线性回归来判断趋势线斜率\nfrom scipy.stats import linregress\n# 转换时间为数值进行回归\npeak_indices = [p.name.toordinal() for p in peaks.itertuples()]\ntrough_indices = [t.name.toordinal() for t in troughs.itertuples()]\n\npeak_slope, _, _, _, _ = linregress(peak_indices, peaks['price'])\ntrough_slope, _, _, _, _ = linregress(trough_indices, troughs['price'])\n\n# 上升三角形：顶部水平（斜率接近0），底部上升（斜率 > 0）\nif abs(peak_slope) < 0.01 and trough_slope > 0.01:\n    # 确认突破水平阻力线\n    resistance_level = peaks['price'].mean()\n    last_peak = peaks.iloc[-1]\n    breakout_candle_index = last_peak.name + pd.Timedelta(days=1)\n    if breakout_candle_index in kdata.index and kdata.loc[breakout_candle_index, 'close'] > resistance_level:\n        confidence = 0.85\n        datetime_val = str(breakout_candle_index)\n        result = create_result(\n            pattern_type='ascending_triangle', signal_type=SignalType.BUY, confidence=confidence,\n            index=kdata.index.get_loc(breakout_candle_index), price=kdata.loc[breakout_candle_index, 'close'],\n            datetime_val=datetime_val, start_index=kdata.index.get_loc(troughs.index[0]), end_index=kdata.index.get_loc(breakout_candle_index)\n        )\n        results.append(result)"
+    },
+    {
+        "name": "下降三角形",
+        "english_name": "descending_triangle",
+        "algorithm_code": "peaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.02, width=5)\nif len(peaks) < 2 or len(troughs) < 2: continue\n\nfrom scipy.stats import linregress\npeak_indices = [p.name.toordinal() for p in peaks.itertuples()]\ntrough_indices = [t.name.toordinal() for t in troughs.itertuples()]\n\npeak_slope, _, _, _, _ = linregress(peak_indices, peaks['price'])\ntrough_slope, _, _, _, _ = linregress(trough_indices, troughs['price'])\n\n# 下降三角形：顶部下降（斜率 < 0），底部水平（斜率接近0）\nif peak_slope < -0.01 and abs(trough_slope) < 0.01:\n    support_level = troughs['price'].mean()\n    last_trough = troughs.iloc[-1]\n    breakdown_candle_index = last_trough.name + pd.Timedelta(days=1)\n    if breakdown_candle_index in kdata.index and kdata.loc[breakdown_candle_index, 'close'] < support_level:\n        confidence = 0.85\n        datetime_val = str(breakdown_candle_index)\n        result = create_result(\n            pattern_type='descending_triangle', signal_type=SignalType.SELL, confidence=confidence,\n            index=kdata.index.get_loc(breakdown_candle_index), price=kdata.loc[breakdown_candle_index, 'close'],\n            datetime_val=datetime_val, start_index=kdata.index.get_loc(peaks.index[0]), end_index=kdata.index.get_loc(breakdown_candle_index)\n        )\n        results.append(result)"
+    },
+    {
+        "name": "对称三角形",
+        "english_name": "symmetrical_triangle",
+        "algorithm_code": "peaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.02, width=5)\nif len(peaks) < 2 or len(troughs) < 2: continue\n\nfrom scipy.stats import linregress\npeak_indices = [p.name.toordinal() for p in peaks.itertuples()]\ntrough_indices = [t.name.toordinal() for t in troughs.itertuples()]\n\npeak_slope, _, _, _, _ = linregress(peak_indices, peaks['price'])\ntrough_slope, _, _, _, _ = linregress(trough_indices, troughs['price'])\n\n# 对称三角形：顶部下降，底部上升，且斜率绝对值接近\nif peak_slope < -0.01 and trough_slope > 0.01 and abs(abs(peak_slope) - trough_slope) < 0.01:\n    # 这是一个中性形态，突破方向决定信号\n    last_peak = peaks.iloc[-1]\n    last_trough = troughs.iloc[-1]\n\n    # 判断向上突破\n    breakout_candle_index = last_peak.name + pd.Timedelta(days=1)\n    if breakout_candle_index in kdata.index and kdata.loc[breakout_candle_index, 'close'] > last_peak['price']:\n        signal_type = SignalType.BUY\n        confidence = 0.75\n        price = kdata.loc[breakout_candle_index, 'close']\n    # 判断向下突破\n    elif breakdown_candle_index in kdata.index and kdata.loc[breakdown_candle_index, 'close'] < last_trough['price']:\n        signal_type = SignalType.SELL\n        confidence = 0.75\n        price = kdata.loc[breakdown_candle_index, 'close']\n    else:\n        continue\n\n    datetime_val = str(breakout_candle_index)\n    result = create_result(\n        pattern_type='symmetrical_triangle', signal_type=signal_type, confidence=confidence,\n        index=kdata.index.get_loc(breakout_candle_index), price=price,\n        datetime_val=datetime_val, start_index=kdata.index.get_loc(troughs.index[0]), end_index=kdata.index.get_loc(breakout_candle_index)\n    )\n    results.append(result)"
+    },
+    {
+        "name": "扩散三角形",
+        "english_name": "expanding_triangle",
+        "algorithm_code": null
+    },
+    {
+        "name": "矩形整理",
+        "english_name": "rectangle",
+        "algorithm_code": "peaks, troughs = find_peaks_and_troughs(kdata['close'], prominence=0.02, width=5)\nif len(peaks) < 2 or len(troughs) < 2: continue\n\nfrom scipy.stats import linregress\npeak_indices = [p.name.toordinal() for p in peaks.itertuples()]\ntrough_indices = [t.name.toordinal() for t in troughs.itertuples()]\n\npeak_slope, _, _, _, _ = linregress(peak_indices, peaks['price'])\ntrough_slope, _, _, _, _ = linregress(trough_indices, troughs['price'])\n\n# 矩形：顶部和底部都接近水平\nif abs(peak_slope) < 0.01 and abs(trough_slope) < 0.01:\n    resistance = peaks['price'].mean()\n    support = troughs['price'].mean()\n\n    last_candle_index = kdata.index[-1]\n    last_close = kdata['close'].iloc[-1]\n\n    # 向上突破\n    if last_close > resistance:\n        signal_type = SignalType.BUY\n    # 向下突破\n    elif last_close < support:\n        signal_type = SignalType.SELL\n    else:\n        continue\n\n    confidence = 0.8\n    datetime_val = str(last_candle_index)\n    result = create_result(\n        pattern_type='rectangle', signal_type=signal_type, confidence=confidence,\n        index=len(kdata)-1, price=last_close,\n        datetime_val=datetime_val, start_index=kdata.index.get_loc(troughs.index[0]), end_index=len(kdata)-1\n    )\n    results.append(result)"
+    },
+    {
+        "name": "楔形上升",
+        "english_name": "rising_wedge",
+        "algorithm_code": null
+    },
+    {
+        "name": "楔形下降",
+        "english_name": "falling_wedge",
+        "algorithm_code": null
+    },
+    {
+        "name": "旗形",
+        "english_name": "flag",
+        "algorithm_code": null
+    },
+    {
+        "name": "三角旗形",
+        "english_name": "pennant",
+        "algorithm_code": null
+    },
+    {
+        "name": "锤头线",
+        "english_name": "hammer",
+        "algorithm_code": "# 至少需要4根K线来判断短期趋势\nif i < 3:\n    continue\n\n# 趋势判断：要求前面3根K线至少有2根是收盘价下跌的\ntrend_check = (kdata['close'][i-3] > kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] > kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\nupper_shadow = k['high'] - max(k['open'], k['close'])\nlower_shadow = min(k['open'], k['close']) - k['low']\ntotal_range = k['high'] - k['low']\n\nif total_range == 0:\n    continue\n\nbody_ratio = body_size / total_range\nupper_ratio = upper_shadow / total_range\nlower_ratio = lower_shadow / total_range\n\nif (body_ratio < 0.3 and upper_ratio < 0.1 and lower_ratio > 0.6):\n    confidence = min(0.9, lower_ratio * 0.8 + (0.3 - body_ratio) * 0.5 + (0.1 - upper_ratio) * 0.3)\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='hammer', signal_type=SignalType.BUY, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val,\n        extra_data={'body_ratio': body_ratio, 'upper_ratio': upper_ratio, 'lower_ratio': lower_ratio}\n    )"
+    },
+    {
+        "name": "上吊线",
+        "english_name": "hanging_man",
+        "algorithm_code": "if i < 3:\n    continue\n# 趋势判断：上涨趋势\ntrend_check = (kdata['close'][i-3] < kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] < kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\nupper_shadow = k['high'] - max(k['open'], k['close'])\nlower_shadow = min(k['open'], k['close']) - k['low']\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n\nbody_ratio = body_size / total_range\nupper_ratio = upper_shadow / total_range\nlower_ratio = lower_shadow / total_range\n\n# 形态判断：小实体，长下影线，短上影线\nif (body_ratio < 0.3 and upper_ratio < 0.1 and lower_ratio > 0.6):\n    confidence = min(0.9, lower_ratio * 0.7 + (0.3 - body_ratio) * 0.4 + (0.1 - upper_ratio) * 0.2)\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='hanging_man', signal_type=SignalType.SELL, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val,\n        extra_data={'body_ratio': body_ratio, 'upper_ratio': upper_ratio, 'lower_ratio': lower_ratio}\n    )\n    results.append(result)"
+    },
+    {
+        "name": "倒锤头",
+        "english_name": "inverted_hammer",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] > kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] > kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\nupper_shadow = k['high'] - max(k['open'], k['close'])\nlower_shadow = min(k['open'], k['close']) - k['low']\ntotal_range = k['high'] - k['low']\n\nif total_range == 0:\n    continue\n\nbody_ratio = body_size / total_range\nupper_ratio = upper_shadow / total_range\nlower_ratio = lower_shadow / total_range\n\nif (body_ratio < 0.3 and upper_ratio > 0.6 and lower_ratio < 0.1):\n    confidence = min(0.9, upper_ratio * 0.8 + (0.3 - body_ratio) * 0.5)\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='inverted_hammer', signal_type=SignalType.BUY, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val,\n        extra_data={'body_ratio': body_ratio, 'upper_ratio': upper_ratio, 'lower_ratio': lower_ratio}\n    )"
+    },
+    {
+        "name": "流星线",
+        "english_name": "shooting_star",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] < kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] < kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\nupper_shadow = k['high'] - max(k['open'], k['close'])\nlower_shadow = min(k['open'], k['close']) - k['low']\ntotal_range = k['high'] - k['low']\n\nif total_range == 0:\n    continue\n\nbody_ratio = body_size / total_range\nupper_ratio = upper_shadow / total_range\nlower_ratio = lower_shadow / total_range\n\nif (body_ratio < 0.3 and upper_ratio > 0.6 and lower_ratio < 0.1):\n    confidence = min(0.9, upper_ratio * 0.8 + (0.3 - body_ratio) * 0.5 + (0.1 - lower_ratio) * 0.3)\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='shooting_star', signal_type=SignalType.SELL, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val,\n        extra_data={'body_ratio': body_ratio, 'upper_ratio': upper_ratio, 'lower_ratio': lower_ratio}\n    )\n    results.append(result)"
+    },
+    {
+        "name": "十字星",
+        "english_name": "doji",
+        "algorithm_code": "\n# 十字星识别算法\nfor i in range(len(kdata)):\n    k = kdata.iloc[i]\n    \n    body_size = abs(k['close'] - k['open'])\n    total_range = k['high'] - k['low']\n    \n    if total_range == 0:\n        continue\n    \n    body_ratio = body_size / total_range\n    \n    # 实体占比小于10%认为是十字星\n    if body_ratio < 0.1:\n        confidence = min(0.9, (0.1 - body_ratio) / 0.1 * 0.9 + 0.5)\n        \n        datetime_val = str(kdata.iloc[i]['datetime']) if 'datetime' in kdata.columns else None\n        \n        result = create_result(\n            pattern_type='doji',\n            signal_type=SignalType.NEUTRAL,\n            confidence=confidence,\n            index=i,\n            price=(k['open'] + k['close']) / 2,\n            datetime_val=datetime_val,\n            extra_data={\n                'body_ratio': body_ratio,\n                'upper_shadow': k['high'] - max(k['open'], k['close']),\n                'lower_shadow': min(k['open'], k['close']) - k['low']\n            }\n        )\n        results.append(result)\n"
+    },
+    {
+        "name": "长十字星",
+        "english_name": "long_legged_doji",
+        "algorithm_code": "k = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n# 实体极小，且影线很长\nif body_size / total_range < 0.05 and total_range > kdata['close'].rolling(20).mean().iloc[i-1] * 0.03:\n    confidence = 0.7\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='long_legged_doji', signal_type=SignalType.NEUTRAL, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val\n    )\n    results.append(result)"
+    },
+    {
+        "name": "蜻蜓十字星",
+        "english_name": "dragonfly_doji",
+        "algorithm_code": "if i < 3:\n    continue\n# 趋势判断：下跌趋势\ntrend_check = (kdata['close'][i-3] > kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] > kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n\n# 十字星判断：实体极小\nif body_size / total_range < 0.05:\n    # 蜻蜓特征：几乎没有上影线\n    upper_shadow = k['high'] - max(k['open'], k['close'])\n    if upper_shadow / total_range < 0.1:\n        confidence = 0.8\n        datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n        result = create_result(\n            pattern_type='dragonfly_doji', signal_type=SignalType.BUY, confidence=confidence,\n            index=i, price=k['close'], datetime_val=datetime_val\n        )\n        results.append(result)"
+    },
+    {
+        "name": "墓碑十字星",
+        "english_name": "gravestone_doji",
+        "algorithm_code": "if i < 3:\n    continue\n# 趋势判断：上涨趋势\ntrend_check = (kdata['close'][i-3] < kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] < kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk = kdata.iloc[i]\nbody_size = abs(k['close'] - k['open'])\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n\n# 十字星判断：实体极小\nif body_size / total_range < 0.05:\n    # 墓碑特征：几乎没有下影线\n    lower_shadow = min(k['open'], k['close']) - k['low']\n    if lower_shadow / total_range < 0.1:\n        confidence = 0.8\n        datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n        result = create_result(\n            pattern_type='gravestone_doji', signal_type=SignalType.SELL, confidence=confidence,\n            index=i, price=k['close'], datetime_val=datetime_val\n        )\n        results.append(result)"
+    },
+    {
+        "name": "光头光脚阳线",
+        "english_name": "marubozu_bullish",
+        "algorithm_code": "k = kdata.iloc[i]\nbody_size = k['close'] - k['open']\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n# 实体必须是阳线且占据几乎全部范围\nif body_size > 0 and body_size / total_range > 0.95:\n    confidence = 0.9\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='marubozu_bullish', signal_type=SignalType.BUY, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val\n    )\n    results.append(result)"
+    },
+    {
+        "name": "光头光脚阴线",
+        "english_name": "marubozu_bearish",
+        "algorithm_code": "k = kdata.iloc[i]\nbody_size = k['open'] - k['close']\ntotal_range = k['high'] - k['low']\nif total_range == 0: continue\n# 实体必须是阴线且占据几乎全部范围\nif body_size > 0 and body_size / total_range > 0.95:\n    confidence = 0.9\n    datetime_val = str(k['datetime']) if 'datetime' in k.index else str(k.name)\n    result = create_result(\n        pattern_type='marubozu_bearish', signal_type=SignalType.SELL, confidence=confidence,\n        index=i, price=k['close'], datetime_val=datetime_val\n    )\n    results.append(result)"
+    },
+    {
+        "name": "纺锤线",
+        "english_name": "spinning_top",
+        "algorithm_code": "\n# 纺锤线识别算法\nfor i in range(len(kdata)):\n    k = kdata.iloc[i]\n    \n    body_size = abs(k['close'] - k['open'])\n    upper_shadow = k['high'] - max(k['open'], k['close'])\n    lower_shadow = min(k['open'], k['close']) - k['low']\n    total_range = k['high'] - k['low']\n    \n    if total_range == 0:\n        continue\n    \n    body_ratio = body_size / total_range\n    upper_ratio = upper_shadow / total_range\n    lower_ratio = lower_shadow / total_range\n    \n    # 纺锤线特征：小实体，上下影线都较长\n    if (body_ratio < 0.3 and upper_ratio > 0.2 and lower_ratio > 0.2):\n        confidence = min(0.8, (0.3 - body_ratio) * 1.5 + min(upper_ratio, lower_ratio) * 0.5)\n        \n        datetime_val = str(kdata.iloc[i]['datetime']) if 'datetime' in kdata.columns else None\n        \n        result = create_result(\n            pattern_type='spinning_top',\n            signal_type=SignalType.NEUTRAL,\n            confidence=confidence,\n            index=i,\n            price=(k['open'] + k['close']) / 2,\n            datetime_val=datetime_val,\n            extra_data={\n                'body_ratio': body_ratio,\n                'upper_ratio': upper_ratio,\n                'lower_ratio': lower_ratio\n            }\n        )\n        results.append(result)\n"
+    },
+    {
+        "name": "看涨吞没",
+        "english_name": "bullish_engulfing",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] > kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] > kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif k1['close'] < k1['open'] and k2['close'] > k2['open']:\n    if k2['open'] < k1['close'] and k2['close'] > k1['open']:\n        engulf_ratio = (k2['close'] - k2['open']) / (k1['open'] - k1['close'])\n        confidence = min(0.9, 0.6 + engulf_ratio * 0.3)\n        datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n        result = create_result(\n            pattern_type='bullish_engulfing', signal_type=SignalType.BUY, confidence=confidence,\n            index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i,\n            extra_data={'engulf_ratio': engulf_ratio}\n        )\n        results.append(result)"
+    },
+    {
+        "name": "看跌吞没",
+        "english_name": "bearish_engulfing",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] < kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] < kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif k1['close'] > k1['open'] and k2['close'] < k2['open']:\n    if k2['open'] > k1['close'] and k2['close'] < k1['open']:\n        engulf_ratio = (k2['open'] - k2['close']) / (k1['close'] - k1['open'])\n        confidence = min(0.9, 0.6 + engulf_ratio * 0.3)\n        datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n        result = create_result(\n            pattern_type='bearish_engulfing', signal_type=SignalType.SELL, confidence=confidence,\n            index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i,\n            extra_data={'engulf_ratio': engulf_ratio}\n        )\n        results.append(result)"
+    },
+    {
+        "name": "刺透形态",
+        "english_name": "piercing_pattern",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] > kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] > kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif k1['close'] < k1['open'] and k2['close'] > k2['open']:\n    k1_mid = (k1['open'] + k1['close']) / 2\n    if k2['open'] < k1['low'] and k2['close'] > k1_mid: # 修正：开盘价低于最低价\n        pierce_ratio = (k2['close'] - k1['close']) / (k1['open'] - k1['close'])\n        confidence = min(0.8, 0.5 + pierce_ratio * 0.3)\n        datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n        result = create_result(\n            pattern_type='piercing_pattern', signal_type=SignalType.BUY, confidence=confidence,\n            index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i,\n            extra_data={'pierce_ratio': pierce_ratio}\n        )\n        results.append(result)"
+    },
+    {
+        "name": "乌云盖顶",
+        "english_name": "dark_cloud_cover",
+        "algorithm_code": "if i < 3:\n    continue\n\ntrend_check = (kdata['close'][i-3] < kdata['close'][i-2]) + \\\n              (kdata['close'][i-2] < kdata['close'][i-1])\nif trend_check < 2:\n    continue\n\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif k1['close'] > k1['open'] and k2['close'] < k2['open']:\n    k1_mid = (k1['open'] + k1['close']) / 2\n    if k2['open'] > k1['high'] and k2['close'] < k1_mid: # 修正：开盘价高于最高价\n        cover_ratio = (k1['close'] - k2['close']) / (k1['close'] - k1['open'])\n        confidence = min(0.8, 0.5 + cover_ratio * 0.3)\n        datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n        result = create_result(\n            pattern_type='dark_cloud_cover', signal_type=SignalType.SELL, confidence=confidence,\n            index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i,\n            extra_data={'cover_ratio': cover_ratio}\n        )\n        results.append(result)"
+    },
+    {
+        "name": "孕线形态",
+        "english_name": "harami",
+        "algorithm_code": "if i < 3:\n    continue\n\nk1 = kdata.iloc[i-1] # 母线\nk2 = kdata.iloc[i]   # 孕线\n\nk1_body_size = abs(k1['open'] - k1['close'])\nk1_range = k1['high'] - k1['low']\nif k1_range == 0: continue\n\n# 母线实体必须较大\nif k1_body_size / k1_range < 0.6:\n    continue\n\n# 孕线实体必须被母线实体完全包含\nif max(k2['open'], k2['close']) < max(k1['open'], k1['close']) and \\\n   min(k2['open'], k2['close']) > min(k1['open'], k1['close']):\n\n    # 判断是上涨孕线还是下跌孕线\n    # 下跌趋势中的孕线是看涨信号\n    is_downtrend = (kdata['close'][i-3] > kdata['close'][i-2]) and (kdata['close'][i-2] > k1['close'])\n    # 上涨趋势中的孕线是看跌信号\n    is_uptrend = (kdata['close'][i-3] < kdata['close'][i-2]) and (kdata['close'][i-2] < k1['close'])\n\n    if is_downtrend and k2['close'] > k2['open']: # 看涨孕线\n        signal_type = SignalType.BUY\n        confidence = 0.7\n    elif is_uptrend and k2['close'] < k2['open']: # 看跌孕线\n        signal_type = SignalType.SELL\n        confidence = 0.7\n    else:\n        continue\n\n    datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n    result = create_result(\n        pattern_type='harami', signal_type=signal_type, confidence=confidence,\n        index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i\n    )\n    results.append(result)"
+    },
+    {
+        "name": "十字孕线",
+        "english_name": "harami_cross",
+        "algorithm_code": "if i < 3:\n    continue\n\nk1 = kdata.iloc[i-1] # 母线\nk2 = kdata.iloc[i]   # 十字星\n\nk1_body_size = abs(k1['open'] - k1['close'])\nk1_range = k1['high'] - k1['low']\nif k1_range == 0: continue\n\nk2_body_size = abs(k2['open'] - k2['close'])\nk2_range = k2['high'] - k2['low']\nif k2_range == 0: continue\n\n# 母线实体较大, 孕线是十字星\nif k1_body_size / k1_range < 0.6 or k2_body_size / k2_range >= 0.1:\n    continue\n\n# 孕线实体被母线实体完全包含\nif max(k2['open'], k2['close']) < max(k1['open'], k1['close']) and \\\n   min(k2['open'], k2['close']) > min(k1['open'], k1['close']):\n\n    is_downtrend = (kdata['close'][i-3] > kdata['close'][i-2]) and (kdata['close'][i-2] > k1['close'])\n    is_uptrend = (kdata['close'][i-3] < kdata['close'][i-2]) and (kdata['close'][i-2] < k1['close'])\n\n    if is_downtrend:\n        signal_type = SignalType.BUY\n        confidence = 0.85 # 十字孕线信号更强\n    elif is_uptrend:\n        signal_type = SignalType.SELL\n        confidence = 0.85\n    else:\n        continue\n\n    datetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\n    result = create_result(\n        pattern_type='harami_cross', signal_type=signal_type, confidence=confidence,\n        index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-1, end_index=i\n    )\n    results.append(result)"
+    },
+    {
+        "name": "早晨之星",
+        "english_name": "morning_star",
+        "algorithm_code": "if i < 4: # 需要至少4根前期K线来判断趋势\n    continue\n\n# 趋势判断：要求前面3根K线至少有2根是收盘价下跌的\ntrend_check = (kdata['close'][i-4] > kdata['close'][i-3]) + \\\n              (kdata['close'][i-3] > kdata['close'][i-2])\nif trend_check < 2:\n    continue\n\nk0 = kdata.iloc[i-2] # 第一根长阴线\nk1 = kdata.iloc[i-1] # 第二根星线\nk2 = kdata.iloc[i]   # 第三根长阳线\n\n# 1. 第一根是长阴线, 第三根是长阳线\nis_long_bearish = k0['close'] < k0['open'] and (k0['open'] - k0['close']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nis_long_bullish = k2['close'] > k2['open'] and (k2['close'] - k2['open']) / (k2['high'] - k2['low'] if k2['high'] > k2['low'] else 1) > 0.6\nif not (is_long_bearish and is_long_bullish):\n    continue\n\n# 2. 第二根是小实体（星线）\nstar_body_ratio = abs(k1['close'] - k1['open']) / (k1['high'] - k1['low'] if k1['high'] > k1['low'] else 1)\nif star_body_ratio >= 0.3: # 修正：正确的逻辑判断\n    continue\n\n# 3. 检查跳空：星线实体与第一根和第三根实体不重叠\ngap1_down = max(k1['open'], k1['close']) < k0['close']\ngap2_up = min(k1['open'], k1['close']) < k2['open'] # 经典定义是星线与阳线有缺口\nif not (gap1_down and gap2_up):\n    continue\n\n# 4. 第三根阳线收盘价深入第一根阴线实体一半以上\npenetration = (k2['close'] - k0['close']) / (k0['open'] - k0['close'])\nif penetration <= 0.5: # 修正：正确的逻辑判断\n    continue\n\nconfidence = min(0.95, 0.7 + (0.3 - star_body_ratio) * 0.5 + (penetration - 0.5) * 0.5)\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='morning_star', signal_type=SignalType.BUY, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i,\n    extra_data={'star_body_ratio': star_body_ratio, 'penetration': penetration}\n)\nresults.append(result)"
+    },
+    {
+        "name": "黄昏之星",
+        "english_name": "evening_star",
+        "algorithm_code": "if i < 4: # 需要至少4根前期K线来判断趋势\n    continue\n\n# 趋势判断：要求前面3根K线至少有2根是收盘价上涨的\ntrend_check = (kdata['close'][i-4] < kdata['close'][i-3]) + \\\n              (kdata['close'][i-3] < kdata['close'][i-2])\nif trend_check < 2:\n    continue\n\nk0 = kdata.iloc[i-2] # 第一根长阳线\nk1 = kdata.iloc[i-1] # 第二根星线\nk2 = kdata.iloc[i]   # 第三根长阴线\n\n# 1. 第一根是长阳线, 第三根是长阴线\nis_long_bullish = k0['close'] > k0['open'] and (k0['close'] - k0['open']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nis_long_bearish = k2['close'] < k2['open'] and (k2['open'] - k2['close']) / (k2['high'] - k2['low'] if k2['high'] > k2['low'] else 1) > 0.6\nif not (is_long_bullish and is_long_bearish):\n    continue\n\n# 2. 第二根是小实体（星线）\nstar_body_ratio = abs(k1['close'] - k1['open']) / (k1['high'] - k1['low'] if k1['high'] > k1['low'] else 1)\nif star_body_ratio >= 0.3: # 修正：正确的逻辑判断\n    continue\n\n# 3. 检查跳空：星线实体与第一根和第三根实体不重叠\ngap1_up = min(k1['open'], k1['close']) > k0['close']\ngap2_down = max(k1['open'], k1['close']) > k2['open'] # 经典定义是星线与阴线有缺口\nif not (gap1_up and gap2_down):\n    continue\n\n# 4. 第三根阴线收盘价深入第一根阳线实体一半以上\npenetration = (k0['close'] - k2['close']) / (k0['close'] - k0['open'])\nif penetration <= 0.5: # 修正：正确的逻辑判断\n    continue\n\nconfidence = min(0.95, 0.7 + (0.3 - star_body_ratio) * 0.5 + (penetration - 0.5) * 0.5)\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='evening_star', signal_type=SignalType.SELL, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i,\n    extra_data={'star_body_ratio': star_body_ratio, 'penetration': penetration}\n)\nresults.append(result)"
+    },
+    {
+        "name": "早晨十字星",
+        "english_name": "morning_doji_star",
+        "algorithm_code": "if i < 3: continue\nk0, k1, k2 = kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 趋势判断：下跌\nif not ((kdata['close'][i-3] > k0['open']) and (k0['open'] > k1['high'])): continue\n\n# 核心逻辑：长阴线 + 十字星 + 长阳线\nis_long_bearish = k0['close'] < k0['open'] and (k0['open'] - k0['close']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nis_doji = abs(k1['open'] - k1['close']) / (k1['high'] - k1['low'] if k1['high'] > k1['low'] else 1) < 0.1\nis_long_bullish = k2['close'] > k2['open'] and (k2['close'] - k2['open']) / (k2['high'] - k2['low'] if k2['high'] > k2['low'] else 1) > 0.6\nif not (is_long_bearish and is_doji and is_long_bullish): continue\n\n# 跳空判断\ngap1_down = k1['high'] < k0['close']\ngap2_up = k2['open'] > k1['high']\nif not (gap1_down and gap2_up): continue\n\n# 阳线深入阴线实体过半\nif k2['close'] <= (k0['open'] + k0['close']) / 2: continue\n\nconfidence = 0.9\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='morning_doji_star', signal_type=SignalType.BUY, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i\n)\nresults.append(result)"
+    },
+    {
+        "name": "黄昏十字星",
+        "english_name": "evening_doji_star",
+        "algorithm_code": "if i < 3: continue\nk0, k1, k2 = kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 趋势判断：上涨\nif not ((kdata['close'][i-3] < k0['open']) and (k0['open'] < k1['low'])): continue\n\n# 核心逻辑：长阳线 + 十字星 + 长阴线\nis_long_bullish = k0['close'] > k0['open'] and (k0['close'] - k0['open']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nis_doji = abs(k1['open'] - k1['close']) / (k1['high'] - k1['low'] if k1['high'] > k1['low'] else 1) < 0.1\nis_long_bearish = k2['close'] < k2['open'] and (k2['open'] - k2['close']) / (k2['high'] - k2['low'] if k2['high'] > k2['low'] else 1) > 0.6\nif not (is_long_bullish and is_doji and is_long_bearish): continue\n\n# 跳空判断\ngap1_up = k1['low'] > k0['close']\ngap2_down = k2['open'] < k1['low']\nif not (gap1_up and gap2_down): continue\n\n# 阴线深入阳线实体过半\nif k2['close'] >= (k0['open'] + k0['close']) / 2: continue\n\nconfidence = 0.9\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='evening_doji_star', signal_type=SignalType.SELL, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i\n)\nresults.append(result)"
+    },
+    {
+        "name": "三白兵",
+        "english_name": "three_white_soldiers",
+        "algorithm_code": "if i < 4: # 需要至少4根前期K线来判断趋势\n    continue\n\n# 趋势判断：要求前面3根K线至少有2根是收盘价下跌的\ntrend_check = (kdata['close'][i-4] > kdata['close'][i-3]) + \\\n              (kdata['close'][i-3] > kdata['close'][i-2])\nif trend_check < 2:\n    continue\n\nk0 = kdata.iloc[i-2]\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif not (k0['close'] > k0['open'] and k1['close'] > k1['open'] and k2['close'] > k2['open']):\n    continue\n\nif not (k2['close'] > k1['close'] > k0['close']):\n    continue\n\n# 优化：开盘价在前一根实体内，且不能是“墓碑”\nif not (k1['open'] > k0['open'] and k1['open'] < k0['close'] and \\\n          k2['open'] > k1['open'] and k2['open'] < k1['close']):\n    continue\n\nbody_0 = k0['close'] - k0['open']\nbody_1 = k1['close'] - k1['open']\nbody_2 = k2['close'] - k2['open']\n\nif not (body_1 > body_0 * 0.8 and body_2 > body_1 * 0.8): # 实体不能过度萎缩\n    continue\n\n# 上影线不能太长\nupper_shadow_0 = k0['high'] - k0['close']\nupper_shadow_1 = k1['high'] - k1['close']\nupper_shadow_2 = k2['high'] - k2['close']\n\nif (upper_shadow_1 > body_1 * 0.5 or upper_shadow_2 > body_2 * 0.5):\n     continue\n\nconfidence = 0.85\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='three_white_soldiers', signal_type=SignalType.BUY, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i,\n    extra_data={'body_sizes': [body_0, body_1, body_2]}\n)\nresults.append(result)"
+    },
+    {
+        "name": "三只乌鸦",
+        "english_name": "three_black_crows",
+        "algorithm_code": "if i < 4: # 需要至少4根前期K线来判断趋势\n    continue\n\n# 趋势判断：要求前面3根K线至少有2根是收盘价上涨的\ntrend_check = (kdata['close'][i-4] < kdata['close'][i-3]) + \\\n              (kdata['close'][i-3] < kdata['close'][i-2])\nif trend_check < 2:\n    continue\n\nk0 = kdata.iloc[i-2]\nk1 = kdata.iloc[i-1]\nk2 = kdata.iloc[i]\n\nif not (k0['close'] < k0['open'] and k1['close'] < k1['open'] and k2['close'] < k2['open']):\n    continue\n\nif not (k2['close'] < k1['close'] < k0['close']):\n    continue\n\n# 优化：开盘价在前一根实体内\nif not (k1['open'] < k0['open'] and k1['open'] > k0['close'] and \\\n          k2['open'] < k1['open'] and k2['open'] > k1['close']):\n    continue\n\nbody_0 = k0['open'] - k0['close']\nbody_1 = k1['open'] - k1['close']\nbody_2 = k2['open'] - k2['close']\n\nif not (body_1 > body_0 * 0.8 and body_2 > body_1 * 0.8): # 实体不能过度萎缩\n    continue\n\n# 下影线不能太长\nlower_shadow_0 = k0['close'] - k0['low']\nlower_shadow_1 = k1['close'] - k1['low']\nlower_shadow_2 = k2['close'] - k2['low']\n\nif (lower_shadow_1 > body_1 * 0.5 or lower_shadow_2 > body_2 * 0.5):\n    continue\n\nconfidence = 0.85\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='three_black_crows', signal_type=SignalType.SELL, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i,\n    extra_data={'body_sizes': [body_0, body_1, body_2]}\n)\nresults.append(result)"
+    },
+    {
+        "name": "红三兵",
+        "english_name": "three_advancing_soldiers",
+        "algorithm_code": null
+    },
+    {
+        "name": "三个内部上升",
+        "english_name": "three_inside_up",
+        "algorithm_code": "if i < 3: continue\nk0, k1, k2 = kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 趋势判断：下跌\nif not (kdata['close'][i-3] > k0['open']): continue\n\n# 核心逻辑：看涨孕线 + 一根确认阳线\nis_bearish_k0 = k0['close'] < k0['open']\nis_bullish_k1 = k1['close'] > k1['open']\nis_bullish_k2 = k2['close'] > k2['open']\nif not (is_bearish_k0 and is_bullish_k1 and is_bullish_k2): continue\n\n# 孕线关系\nis_harami = max(k1['open'], k1['close']) < k0['open'] and min(k1['open'], k1['close']) > k0['close']\nif not is_harami: continue\n\n# 确认阳线收盘价更高\nif k2['close'] <= k0['open']: continue\n\nconfidence = 0.85\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='three_inside_up', signal_type=SignalType.BUY, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i\n)\nresults.append(result)"
+    },
+    {
+        "name": "三个内部下降",
+        "english_name": "three_inside_down",
+        "algorithm_code": "if i < 3: continue\nk0, k1, k2 = kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 趋势判断：上涨\nif not (kdata['close'][i-3] < k0['open']): continue\n\n# 核心逻辑：看跌孕线 + 一根确认阴线\nis_bullish_k0 = k0['close'] > k0['open']\nis_bearish_k1 = k1['close'] < k1['open']\nis_bearish_k2 = k2['close'] < k2['open']\nif not (is_bullish_k0 and is_bearish_k1 and is_bearish_k2): continue\n\n# 孕线关系\nis_harami = max(k1['open'], k1['close']) < k0['close'] and min(k1['open'], k1['close']) > k0['open']\nif not is_harami: continue\n\n# 确认阴线收盘价更低\nif k2['close'] >= k0['open']: continue\n\nconfidence = 0.85\ndatetime_val = str(k2['datetime']) if 'datetime' in k2.index else str(k2.name)\nresult = create_result(\n    pattern_type='three_inside_down', signal_type=SignalType.SELL, confidence=confidence,\n    index=i, price=k2['close'], datetime_val=datetime_val, start_index=i-2, end_index=i\n)\nresults.append(result)"
+    },
+    {
+        "name": "弃婴形态",
+        "english_name": "abandoned_baby",
+        "algorithm_code": null
+    },
+    {
+        "name": "塔形顶",
+        "english_name": "tower_top",
+        "algorithm_code": null
+    },
+    {
+        "name": "塔形底",
+        "english_name": "tower_bottom",
+        "algorithm_code": null
+    },
+    {
+        "name": "上升通道",
+        "english_name": "rising_channel",
+        "algorithm_code": null
+    },
+    {
+        "name": "下降通道",
+        "english_name": "falling_channel",
+        "algorithm_code": null
+    },
+    {
+        "name": "喇叭形",
+        "english_name": "megaphone",
+        "algorithm_code": null
+    },
+    {
+        "name": "钻石形",
+        "english_name": "diamond",
+        "algorithm_code": null
+    },
+    {
+        "name": "杯柄形态",
+        "english_name": "cup_and_handle",
+        "algorithm_code": null
+    },
+    {
+        "name": "碟形整理",
+        "english_name": "saucer",
+        "algorithm_code": null
+    },
+    {
+        "name": "向上跳空",
+        "english_name": "gap_up",
+        "algorithm_code": null
+    },
+    {
+        "name": "向下跳空",
+        "english_name": "gap_down",
+        "algorithm_code": null
+    },
+    {
+        "name": "突破缺口",
+        "english_name": "breakaway_gap",
+        "algorithm_code": null
+    },
+    {
+        "name": "中继缺口",
+        "english_name": "runaway_gap",
+        "algorithm_code": null
+    },
+    {
+        "name": "衰竭缺口",
+        "english_name": "exhaustion_gap",
+        "algorithm_code": null
+    },
+    {
+        "name": "普通缺口",
+        "english_name": "common_gap",
+        "algorithm_code": null
+    },
+    {
+        "name": "价涨量增",
+        "english_name": "price_up_volume_up",
+        "algorithm_code": null
+    },
+    {
+        "name": "价跌量增",
+        "english_name": "price_down_volume_up",
+        "algorithm_code": null
+    },
+    {
+        "name": "价涨量缩",
+        "english_name": "price_up_volume_down",
+        "algorithm_code": null
+    },
+    {
+        "name": "价跌量缩",
+        "english_name": "price_down_volume_down",
+        "algorithm_code": null
+    },
+    {
+        "name": "地量地价",
+        "english_name": "low_volume_low_price",
+        "algorithm_code": null
+    },
+    {
+        "name": "天量天价",
+        "english_name": "high_volume_high_price",
+        "algorithm_code": null
+    },
+    {
+        "name": "上升三法",
+        "english_name": "rising_three_methods",
+        "algorithm_code": "if i < 5: continue\nk0, k1, k2, k3, k4 = kdata.iloc[i-4], kdata.iloc[i-3], kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 1. 第一根是长阳线\nis_long_bullish_k0 = k0['close'] > k0['open'] and (k0['close'] - k0['open']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nif not is_long_bullish_k0: continue\n\n# 2. 中间三根是小阴线，且未跌破第一根阳线的最低价\nis_small_bearish_k1 = k1['close'] < k1['open'] and k1['high'] < k0['high'] and k1['low'] > k0['low']\nis_small_bearish_k2 = k2['close'] < k2['open'] and k2['high'] < k0['high'] and k2['low'] > k0['low']\nis_small_bearish_k3 = k3['close'] < k3['open'] and k3['high'] < k0['high'] and k3['low'] > k0['low']\nif not (is_small_bearish_k1 and is_small_bearish_k2 and is_small_bearish_k3): continue\n\n# 3. 最后一根是长阳线，且收盘价创出新高\nis_long_bullish_k4 = k4['close'] > k4['open'] and k4['close'] > k0['high']\nif not is_long_bullish_k4: continue\n\nconfidence = 0.9\ndatetime_val = str(k4['datetime']) if 'datetime' in k4.index else str(k4.name)\nresult = create_result(\n    pattern_type='rising_three_methods', signal_type=SignalType.BUY, confidence=confidence,\n    index=i, price=k4['close'], datetime_val=datetime_val, start_index=i-4, end_index=i\n)\nresults.append(result)"
+    },
+    {
+        "name": "下降三法",
+        "english_name": "falling_three_methods",
+        "algorithm_code": "if i < 5: continue\nk0, k1, k2, k3, k4 = kdata.iloc[i-4], kdata.iloc[i-3], kdata.iloc[i-2], kdata.iloc[i-1], kdata.iloc[i]\n\n# 1. 第一根是长阴线\nis_long_bearish_k0 = k0['close'] < k0['open'] and (k0['open'] - k0['close']) / (k0['high'] - k0['low'] if k0['high'] > k0['low'] else 1) > 0.6\nif not is_long_bearish_k0: continue\n\n# 2. 中间三根是小阳线，且未突破第一根阴线的最高价\nis_small_bullish_k1 = k1['close'] > k1['open'] and k1['high'] < k0['high'] and k1['low'] > k0['low']\nis_small_bullish_k2 = k2['close'] > k2['open'] and k2['high'] < k0['high'] and k2['low'] > k0['low']\nis_small_bullish_k3 = k3['close'] > k3['open'] and k3['high'] < k0['high'] and k3['low'] > k0['low']\nif not (is_small_bullish_k1 and is_small_bullish_k2 and is_small_bullish_k3): continue\n\n# 3. 最后一根是长阴线，且收盘价创出新低\nis_long_bearish_k4 = k4['close'] < k4['open'] and k4['close'] < k0['low']\nif not is_long_bearish_k4: continue\n\nconfidence = 0.9\ndatetime_val = str(k4['datetime']) if 'datetime' in k4.index else str(k4.name)\nresult = create_result(\n    pattern_type='falling_three_methods', signal_type=SignalType.SELL, confidence=confidence,\n    index=i, price=k4['close'], datetime_val=datetime_val, start_index=i-4, end_index=i\n)\nresults.append(result)"
+    }
+]

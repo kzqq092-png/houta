@@ -14,7 +14,7 @@ import time
 # 导入新的统一框架
 from analysis.pattern_base import (
     BasePatternRecognizer, PatternResult, PatternConfig,
-    SignalType, PatternCategory, PatternAlgorithmFactory,
+    PatternAlgorithmFactory, SignalType,
     calculate_body_ratio, calculate_shadow_ratios,
     is_bullish_candle, is_bearish_candle
 )
@@ -105,121 +105,94 @@ class EnhancedPatternRecognizer:
 
             monitor.record_cache_miss()
 
-            # 执行形态识别
             all_results = []
+            from analysis.pattern_manager import PatternManager
+            pattern_manager = PatternManager()
 
-            # 使用PatternManager进行识别
-            try:
-                from analysis.pattern_manager import PatternManager
-                pattern_manager = PatternManager()
-
-                # 获取所有形态配置
-                pattern_configs = pattern_manager.get_all_patterns()
-
+            # 重构核心逻辑：明确处理两种情况
+            target_configs: List[PatternConfig] = []
+            if pattern_types:
+                # 情况A：用户指定了要识别的形态类型
                 if self.debug_mode:
-                    print(f"[EnhancedPatternRecognizer] 获取到 {len(pattern_configs)} 个形态配置")
-
-                for config in pattern_configs:
-                    if not config.is_active:
-                        continue
-
-                    # 如果指定了形态类型，只识别指定类型
-                    if pattern_types and config.english_name not in pattern_types:
-                        continue
-
-                    try:
-                        # 使用工厂创建识别器
-                        recognizer = PatternAlgorithmFactory.create(config)
-
-                        # 执行识别
-                        pattern_results = recognizer.recognize(kdata)
-
-                        # 过滤低置信度结果
-                        filtered_results = [
-                            result for result in pattern_results
-                            if result.confidence >= confidence_threshold
-                        ]
-
-                        # 转换为字典格式
-                        for result in filtered_results:
-                            result_dict = result.to_dict()
-
-                            # 确保必要的字段都被正确设置
-                            if 'pattern_name' not in result_dict:
-                                result_dict['pattern_name'] = config.name
-
-                            if 'pattern_type' not in result_dict or not result_dict['pattern_type']:
-                                result_dict['pattern_type'] = config.english_name
-
-                            if 'type' not in result_dict:
-                                result_dict['type'] = config.english_name
-
-                            # 添加形态的分类信息
-                            result_dict['category'] = config.category
-
-                            # 确保有明确的索引信息
-                            if 'index' not in result_dict or result_dict['index'] is None:
-                                result_dict['index'] = len(kdata) - 1  # 默认使用最后一根K线
-
-                            # 添加成功率信息
-                            result_dict['success_rate'] = config.success_rate if hasattr(config, 'success_rate') and config.success_rate is not None else 0.7
-
-                            # 添加风险级别信息
-                            result_dict['risk_level'] = config.risk_level if hasattr(config, 'risk_level') else 'medium'  # 默认为中等风险
-
-                            all_results.append(result_dict)
-
-                    except Exception as e:
-                        if self.debug_mode:
-                            print(
-                                f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 失败: {e}")
-                        continue
-
-            except ImportError:
-                # 如果PatternManager不可用，使用内置方法
+                    print(f"[EnhancedPatternRecognizer] 模式A：识别指定的 {len(pattern_types)} 个形态: {pattern_types}")
+                for p_type in pattern_types:
+                    config = pattern_manager.get_pattern_config(p_type)
+                    if config and config.is_active:
+                        target_configs.append(config)
+                    elif self.debug_mode:
+                        print(f"[EnhancedPatternRecognizer] 警告：无法找到或形态 '{p_type}' 未激活，已跳过。")
+            else:
+                # 情况B：用户未指定，识别所有激活的形态
                 if self.debug_mode:
-                    print("[EnhancedPatternRecognizer] PatternManager不可用，使用内置方法")
+                    print("[EnhancedPatternRecognizer] 模式B：识别所有已激活的形态。")
+                all_configs = pattern_manager.get_all_patterns()
+                target_configs = [config for config in all_configs if config.is_active]
 
-                # 使用内置的形态识别方法
-                pattern_methods = [
-                    ('hammer', self.find_hammer),
-                    ('doji', self.find_doji),
-                    ('shooting_star', self.find_shooting_star),
-                    ('engulfing', self.find_engulfing),
-                    ('morning_star', self.find_morning_star),
-                    ('evening_star', self.find_evening_star),
-                    ('three_white_soldiers', self.find_three_white_soldiers),
-                ]
+            if self.debug_mode:
+                print(f"[EnhancedPatternRecognizer] 最终确定要执行识别的形态数量: {len(target_configs)}")
 
-                for pattern_name, method in pattern_methods:
-                    if pattern_types and pattern_name not in pattern_types:
-                        continue
+            if not target_configs:
+                print("[EnhancedPatternRecognizer] 警告：没有找到任何可以执行的形态配置。")
+                monitor.end_recognition(success=False, pattern_count=0)
+                return []
 
-                    try:
-                        results = method(kdata)
-                        # 过滤低置信度结果
-                        filtered_results = [
-                            result for result in results
-                            if result.get('confidence', 0) >= confidence_threshold
-                        ]
+            # 统一的执行循环
+            for config in target_configs:
+                try:
+                    # 使用工厂创建识别器
+                    recognizer = PatternAlgorithmFactory.create(config)
 
-                        # 对每个结果应用去重
-                        for result in filtered_results:
-                            # 确保有pattern_name字段
-                            if 'pattern_name' not in result:
-                                result['pattern_name'] = pattern_name
+                    # 执行识别
+                    pattern_results = recognizer.recognize(kdata)
 
-                            # 确保有type字段
-                            if 'type' not in result:
-                                result['type'] = pattern_name
+                    if self.debug_mode:
+                        print(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 识别到 {len(pattern_results)} 个原始结果")
 
-                            all_results.append(result)
+                    # 过滤低置信度结果
+                    filtered_results = [
+                        result for result in pattern_results
+                        if result.confidence >= confidence_threshold
+                    ]
 
-                    except Exception as e:
-                        if self.debug_mode:
-                            print(
-                                f"[EnhancedPatternRecognizer] 内置方法 {pattern_name} 失败: {e}")
-                        continue
+                    if self.debug_mode:
+                        print(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 筛选后剩余 {len(filtered_results)} 个结果 (置信度 > {confidence_threshold})")
+
+                    # 转换为字典格式
+                    for result in filtered_results:
+                        result_dict = result.to_dict()
+
+                        # 确保必要的字段都被正确设置
+                        if 'pattern_name' not in result_dict:
+                            result_dict['pattern_name'] = config.name
+
+                        if 'pattern_type' not in result_dict or not result_dict['pattern_type']:
+                            result_dict['pattern_type'] = config.english_name
+
+                        if 'type' not in result_dict:
+                            result_dict['type'] = config.english_name
+
+                        # 添加形态的分类信息
+                        result_dict['category'] = config.category
+
+                        # 确保有明确的索引信息
+                        if 'index' not in result_dict or result_dict['index'] is None:
+                            result_dict['index'] = len(kdata) - 1  # 默认使用最后一根K线
+
+                        # 添加成功率信息
+                        success_rate = config.success_rate if hasattr(config, 'success_rate') and config.success_rate is not None else 0.7
+                        if success_rate > 1.0:
+                            success_rate = success_rate / 100.0  # 归一化
+                        result_dict['success_rate'] = success_rate
+
+                        # 添加风险级别信息
+                        result_dict['risk_level'] = config.risk_level if hasattr(config, 'risk_level') else 'medium'  # 默认为中等风险
+
+                        all_results.append(result_dict)
+
+                except Exception as e:
+                    if self.debug_mode:
+                        print(f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 时发生内部错误: {e}\n{traceback.format_exc()}")
+                    continue
 
             # 缓存结果
             cache.put(kdata, cache_config, all_results)
@@ -255,35 +228,6 @@ class EnhancedPatternRecognizer:
             形态信号列表
         """
         return self.identify_patterns(kdata, confidence_threshold, pattern_types)
-
-    # 保持向后兼容的方法，但移除硬编码
-    def find_hammer(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找锤头线形态"""
-        return self.identify_patterns(kdata, pattern_types=['锤头线'])
-
-    def find_doji(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找十字星形态"""
-        return self.identify_patterns(kdata, pattern_types=['十字星'])
-
-    def find_shooting_star(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找流星线形态"""
-        return self.identify_patterns(kdata, pattern_types=['流星线'])
-
-    def find_engulfing(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找吞没形态"""
-        return self.identify_patterns(kdata, pattern_types=['看涨吞没', '看跌吞没'])
-
-    def find_morning_star(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找早晨之星形态"""
-        return self.identify_patterns(kdata, pattern_types=['早晨之星'])
-
-    def find_evening_star(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找黄昏之星形态"""
-        return self.identify_patterns(kdata, pattern_types=['黄昏之星'])
-
-    def find_three_white_soldiers(self, kdata: pd.DataFrame) -> List[Dict]:
-        """查找三白兵形态"""
-        return self.identify_patterns(kdata, pattern_types=['三白兵'])
 
 
 # 专门的算法识别器类，用于数据库算法的执行
@@ -584,7 +528,6 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             # 形态识别相关类型
             'SignalType': SignalType,
             'PatternResult': PatternResult,
-            'PatternCategory': PatternCategory,
 
             # 安全的工具函数
             'calculate_body_ratio': safe_calculate_body_ratio,
@@ -761,7 +704,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                 result = PatternResult(
                     pattern_type=pattern_type,
                     pattern_name=self.config.name,
-                    pattern_category=self.config.category.value,
+                    pattern_category=self.config.category,
                     signal_type=signal_type,
                     confidence=confidence,
                     confidence_level=self.calculate_confidence_level(

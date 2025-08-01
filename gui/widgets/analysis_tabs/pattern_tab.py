@@ -370,37 +370,8 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """更新结果显示 - 重写以支持回测"""
         super()._update_results_display(results)
 
-    def _update_predictions_display(self, predictions):
-        """更新预测显示 - 修复版"""
-        try:
-            if not hasattr(self, 'prediction_text'):
-                self.log_manager.warning("对象没有prediction_text属性")
-                return
-
-            from datetime import datetime
-
-            text = f"""
-🤖 AI预测结果
-================
-
-预测方向: {predictions.get('trend_prediction', 'N/A')}
-预测概率: {predictions.get('confidence', 0):.2%}
-目标价格: {predictions.get('target_price', 0):.2f}
-风险级别: {predictions.get('risk_level', '中等')}
-时间范围: {predictions.get('time_horizon', '5-10个交易日')}
-
-支撑位: {predictions.get('support_level', 0):.2f}
-阻力位: {predictions.get('resistance_level', 0):.2f}
-
-生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-
-            self.prediction_text.setText(text)
-
-        except Exception as e:
-            import traceback
-            self.log_manager.error(f"更新预测显示失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+    # 使用父类PatternAnalysisTabPro的优化版本_update_predictions_display方法
+    # 不再重写此方法，确保使用最新的优化版本
 
     def _update_statistics_display(self, stats):
         """更新统计显示 - 修复版"""

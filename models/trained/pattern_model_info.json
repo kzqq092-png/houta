@@ -1,0 +1,10 @@
+{
+  "model_type": "pattern",
+  "training_date": "2025-08-01T14:48:14.533672",
+  "test_accuracy": 0.35600000619888306,
+  "test_loss": 1.1696009635925293,
+  "epochs": 50,
+  "sample_size": 5000,
+  "input_features": 15,
+  "quick_mode": false
+}

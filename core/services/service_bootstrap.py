@@ -20,6 +20,7 @@ from core.services.stock_service import StockService
 from core.services.chart_service import ChartService
 from core.services.analysis_service import AnalysisService
 from core.services.industry_service import IndustryService
+from core.services.ai_prediction_service import AIPredictionService
 from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
 from core.logger import LogManager
@@ -178,6 +179,16 @@ class ServiceBootstrap:
             logger.info("✓ 行业服务注册完成")
         except Exception as e:
             logger.error(f"❌ 行业服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # AI预测服务
+        try:
+            self.service_container.register(
+                AIPredictionService, scope=ServiceScope.SINGLETON)
+            ai_prediction_service = self.service_container.resolve(AIPredictionService)
+            logger.info("✓ AI预测服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ AI预测服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _check_dependencies(self):

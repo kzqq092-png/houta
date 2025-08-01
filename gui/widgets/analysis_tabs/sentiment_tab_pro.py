@@ -604,17 +604,97 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def _generate_ai_prediction(self):
         """生成AI预测"""
-        model = self.ai_model_combo.currentText()
-        horizon = self.prediction_horizon_combo.currentText()
+        try:
+            # 尝试使用统一的AI预测服务
+            try:
+                from core.containers import get_service_container
+                from core.services.ai_prediction_service import AIPredictionService
 
-        prediction = f"""
-# AI情绪预测报告
+                service_container = get_service_container()
+                ai_service = service_container.resolve(AIPredictionService)
+
+                if ai_service and self.current_kdata is not None:
+                    # 使用AI服务进行情绪预测
+                    sentiment_prediction = ai_service.predict_sentiment(self.current_kdata)
+                    trend_prediction = ai_service.predict_trend(self.current_kdata)
+                    risk_assessment = ai_service.assess_risk(self.current_kdata)
+
+                    model = self.ai_model_combo.currentText()
+                    horizon = self.prediction_horizon_combo.currentText()
+
+                    # 基于AI预测结果生成报告
+                    direction = sentiment_prediction.get('direction', '中性')
+                    confidence = sentiment_prediction.get('confidence', 0.5)
+                    trend_dir = trend_prediction.get('direction', '震荡')
+                    risk_level = risk_assessment.get('risk_level', '中风险')
+
+                    # 转换置信度为情绪指数
+                    sentiment_index = int(confidence * 100)
+                    panic_index = max(10, int((1 - confidence) * 50))
+                    greed_index = min(90, int(confidence * 80))
+
+                    prediction = f"""
+# AI情绪预测报告 (智能分析)
 预测时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 使用模型: {self.ai_config['sentiment_models'][model]['description']}
 预测周期: {horizon}
+AI模型置信度: {confidence:.1%}
 
 ## 情绪预测结果
-基于{model}模型分析，预计未来{horizon}市场情绪将：
+基于深度学习模型分析，预计未来{horizon}市场情绪将：
+
+### 短期预测（1-3天）
+- 综合情绪指数: {sentiment_index} ({direction})
+- 恐慌指数: {panic_index} ({'低恐慌' if panic_index < 30 else '中等恐慌' if panic_index < 60 else '高恐慌'})
+- 贪婪指数: {greed_index} ({'低贪婪' if greed_index < 40 else '中等贪婪' if greed_index < 70 else '高贪婪'})
+- 趋势方向: {trend_dir}
+
+### 关键信号
+- AI模型显示情绪{direction}
+- 技术面趋势为{trend_dir}
+- 风险等级: {risk_level}
+- 模型置信度: {confidence:.1%}
+
+### 投资建议
+"""
+
+                    # 基于AI预测生成建议
+                    if confidence > 0.7:
+                        if direction == '乐观':
+                            prediction += "- ✅ AI模型高置信度显示乐观情绪，可考虑适度增仓\n"
+                        elif direction == '悲观':
+                            prediction += "- ⚠️ AI模型高置信度显示悲观情绪，建议减仓避险\n"
+                        else:
+                            prediction += "- 📊 AI模型显示中性情绪，建议保持现有仓位\n"
+                    else:
+                        prediction += "- ⚠️ AI模型置信度较低，建议谨慎操作\n"
+
+                    prediction += f"- 🎯 建议关注{risk_assessment.get('risk_factors', ['市场变化'])[0]}\n"
+
+                    prediction += f"""
+### 风险提示
+- 当前风险等级: {risk_level}
+- AI预测仅供参考，实际投资需结合多方面因素
+- 建议设置止损位，控制风险
+"""
+
+                    return prediction
+
+            except Exception as ai_error:
+                logger.warning(f"AI预测服务失败，使用传统方法: {ai_error}")
+
+            # 后备预测方案（原始实现）
+            model = self.ai_model_combo.currentText() if hasattr(self, 'ai_model_combo') else 'ensemble'
+            horizon = self.prediction_horizon_combo.currentText() if hasattr(self, 'prediction_horizon_combo') else '短期'
+
+            prediction = f"""
+# AI情绪预测报告 (传统模式)
+预测时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+使用模型: {self.ai_config.get('sentiment_models', {}).get(model, {}).get('description', '传统模型')}
+预测周期: {horizon}
+
+## 情绪预测结果
+基于传统模型分析，预计未来{horizon}市场情绪将：
 
 ### 短期预测（1-3天）
 - 综合情绪指数: 55-65 (乐观区间)
@@ -630,9 +710,13 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 建议保持适度乐观，关注市场变化。
 
 ### 风险提示
-AI预测仅供参考，实际投资需结合多方面因素。
+传统预测仅供参考，实际投资需结合多方面因素。
 """
-        return prediction
+            return prediction
+
+        except Exception as e:
+            logger.error(f"情绪预测失败: {e}")
+            return f"预测生成失败: {str(e)}"
 
     def comprehensive_sentiment_analysis(self):
         """综合情绪分析"""

@@ -131,6 +131,8 @@ class HIkyuuUIApplication:
         # 设置Qt应用程序属性
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
         QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+        # 设置OpenGL上下文共享，解决QtWebEngineWidgets问题
+        QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
 
         # 创建应用程序实例
         self.app = QApplication(sys.argv)

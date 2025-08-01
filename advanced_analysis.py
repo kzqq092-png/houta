@@ -50,7 +50,7 @@ class AdvancedAnalyzer:
                 ma_periods = [5, 10, 20, 60, 120]
                 mas = {f'MA{p}': calc_ma(kdata['close'], p)
                        for p in ma_periods}
-                macd, _, _ = calc_macd(kdata['close'], fast=, slow=, signal=)
+                macd, _, _ = calc_macd(kdata['close'], fast=12, slow=26, signal=9)
             else:
                 from hikyuu.indicator import MA, MACD
                 close_ind = CLOSE(kdata)
