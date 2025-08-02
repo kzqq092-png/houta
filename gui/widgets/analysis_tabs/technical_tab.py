@@ -168,7 +168,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 动态参数区域
         self.dynamic_params_widget = QWidget()
         self.dynamic_params_layout = QVBoxLayout(self.dynamic_params_widget)
-        self.dynamic_params_layout.setSpacing(4)  # 适当间距
+        self.dynamic_params_layout.setSpacing(1)  # 适当间距
         self.dynamic_params_layout.setContentsMargins(0, 0, 0, 0)
         self.params_layout.addWidget(self.dynamic_params_widget)
 

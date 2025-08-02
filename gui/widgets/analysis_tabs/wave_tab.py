@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QKeySequence
 from .wave_tab_pro import WaveAnalysisTabPro
+import datetime
 
 
 class WaveAnalysisTab(WaveAnalysisTabPro):

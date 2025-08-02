@@ -1,0 +1,7 @@
+{
+  "trend_reversal": true,
+  "high_confidence": true,
+  "breakout": false,
+  "confidence_threshold": 0.5,
+  "strength_threshold": 67.0
+}

@@ -23,8 +23,13 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
 
     def __init__(self, config_manager=None):
         """初始化专业级情绪分析"""
-        # 专业级情绪指标配置
-        self.sentiment_indicators = {
+        # 配置数据库管理
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent.parent.parent
+        self.db_path = project_root / "db" / "hikyuu_system.db"
+
+        # 默认情绪指标配置（仅作为fallback）
+        self.default_sentiment_indicators = {
             '技术指标': {
                 'VIX': {'name': '恐慌指数', 'range': [0, 100], 'threshold': {'low': 20, 'high': 30}},
                 'PCR': {'name': '看跌看涨比', 'range': [0, 3], 'threshold': {'low': 0.7, 'high': 1.3}},
@@ -51,6 +56,9 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
                 'FORUM_SENTIMENT': {'name': '论坛情绪', 'range': [-100, 100], 'threshold': {'low': -20, 'high': 20}}
             }
         }
+
+        # 从数据库加载配置，如果不存在则使用默认配置并保存到数据库
+        self.sentiment_indicators = self._load_sentiment_config_from_db()
 
         # AI模型配置
         self.ai_config = {
@@ -81,6 +89,143 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         self.alert_records = []
 
         super().__init__(config_manager)
+
+    def _load_sentiment_config_from_db(self):
+        """从数据库加载情感分析配置"""
+        try:
+            import sqlite3
+            import json
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 确保表存在
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS sentiment_config (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        config_key TEXT NOT NULL,
+                        config_value TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # 加载配置
+                cursor.execute("""
+                    SELECT config_value FROM sentiment_config 
+                    WHERE config_key = 'sentiment_indicators' AND is_active = 1
+                """)
+                result = cursor.fetchone()
+
+                if result:
+                    return json.loads(result[0])
+                else:
+                    # 第一次使用，保存默认配置到数据库
+                    self._save_sentiment_config_to_db(self.default_sentiment_indicators)
+                    return self.default_sentiment_indicators.copy()
+
+        except Exception as e:
+            print(f"从数据库加载情感分析配置失败: {e}")
+            return self.default_sentiment_indicators.copy()
+
+    def _save_sentiment_config_to_db(self, config):
+        """保存情感分析配置到数据库"""
+        try:
+            import sqlite3
+            import json
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 确保表存在
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS sentiment_config (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        config_key TEXT NOT NULL,
+                        config_value TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # 保存配置
+                config_json = json.dumps(config, ensure_ascii=False, indent=2)
+                cursor.execute("""
+                    REPLACE INTO sentiment_config (config_key, config_value, is_active, created_at, updated_at)
+                    VALUES (?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, ('sentiment_indicators', config_json))
+
+                conn.commit()
+                print("✅ 情感分析配置已保存到数据库")
+                return True
+
+        except Exception as e:
+            print(f"❌ 保存情感分析配置到数据库失败: {e}")
+            return False
+
+    def get_indicator_threshold(self, category, indicator_name):
+        """获取指标阈值（从数据库配置中获取）"""
+        try:
+            if category in self.sentiment_indicators and indicator_name in self.sentiment_indicators[category]:
+                return self.sentiment_indicators[category][indicator_name]['threshold']
+            else:
+                # 如果配置中没有，返回默认值
+                if category in self.default_sentiment_indicators and indicator_name in self.default_sentiment_indicators[category]:
+                    return self.default_sentiment_indicators[category][indicator_name]['threshold']
+                else:
+                    return {'low': 0, 'high': 100}  # 通用默认值
+        except Exception as e:
+            print(f"获取指标阈值失败: {e}")
+            return {'low': 0, 'high': 100}
+
+    def update_indicator_threshold(self, category, indicator_name, threshold):
+        """更新指标阈值并保存到数据库"""
+        try:
+            if category not in self.sentiment_indicators:
+                self.sentiment_indicators[category] = {}
+
+            if indicator_name not in self.sentiment_indicators[category]:
+                # 如果指标不存在，从默认配置复制基本信息
+                if (category in self.default_sentiment_indicators and
+                        indicator_name in self.default_sentiment_indicators[category]):
+                    self.sentiment_indicators[category][indicator_name] = \
+                        self.default_sentiment_indicators[category][indicator_name].copy()
+                else:
+                    self.sentiment_indicators[category][indicator_name] = {
+                        'name': indicator_name,
+                        'range': [0, 100]
+                    }
+
+            # 更新阈值
+            self.sentiment_indicators[category][indicator_name]['threshold'] = threshold
+
+            # 保存到数据库
+            if self._save_sentiment_config_to_db(self.sentiment_indicators):
+                print(f"✅ 已更新{category}-{indicator_name}的阈值: {threshold}")
+                return True
+            else:
+                print(f"❌ 更新{category}-{indicator_name}的阈值失败")
+                return False
+
+        except Exception as e:
+            print(f"更新指标阈值失败: {e}")
+            return False
+
+    def reset_to_default_config(self):
+        """重置为默认配置"""
+        try:
+            self.sentiment_indicators = self.default_sentiment_indicators.copy()
+            if self._save_sentiment_config_to_db(self.sentiment_indicators):
+                print("✅ 已重置为默认配置")
+                return True
+            else:
+                print("❌ 重置配置失败")
+                return False
+        except Exception as e:
+            print(f"重置配置失败: {e}")
+            return False
 
     def create_ui(self):
         """创建专业级用户界面"""
@@ -163,6 +308,24 @@ class SentimentAnalysisTabPro(BaseAnalysisTab):
         ai_layout.addWidget(prediction_btn)
         ai_layout.addWidget(comprehensive_btn)
         toolbar_layout.addWidget(ai_group)
+
+        # 配置管理组
+        config_group = QGroupBox("配置管理")
+        config_layout = QHBoxLayout(config_group)
+
+        # 阈值配置
+        threshold_config_btn = QPushButton("⚙️ 阈值配置")
+        threshold_config_btn.setStyleSheet(self._get_button_style('#fd7e14'))
+        threshold_config_btn.clicked.connect(self.open_threshold_config)
+
+        # 重置配置
+        reset_config_btn = QPushButton("🔄 重置配置")
+        reset_config_btn.setStyleSheet(self._get_button_style('#6c757d'))
+        reset_config_btn.clicked.connect(self.reset_to_default_config)
+
+        config_layout.addWidget(threshold_config_btn)
+        config_layout.addWidget(reset_config_btn)
+        toolbar_layout.addWidget(config_group)
 
         toolbar_layout.addStretch()
         layout.addWidget(toolbar)
@@ -817,3 +980,206 @@ AI模型置信度: {confidence:.1%}
             'ai_predictions': self.ai_predictions,
             'alert_records': self.alert_records
         }
+
+    def open_threshold_config(self):
+        """打开阈值配置对话框"""
+        try:
+            dialog = ThresholdConfigDialog(self.sentiment_indicators, self)
+            if dialog.exec_() == QDialog.Accepted:
+                # 获取修改后的配置
+                new_config = dialog.get_config()
+
+                # 更新配置并保存到数据库
+                self.sentiment_indicators = new_config
+                if self._save_sentiment_config_to_db(self.sentiment_indicators):
+                    QMessageBox.information(self, "成功", "阈值配置已保存到数据库")
+
+                    # 重新创建指标选择标签页以反映新配置
+                    self._refresh_indicator_tabs()
+                else:
+                    QMessageBox.warning(self, "警告", "保存配置失败")
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"打开配置对话框失败: {str(e)}")
+
+    def _refresh_indicator_tabs(self):
+        """刷新指标选择标签页"""
+        try:
+            # 清除现有标签页
+            self.indicators_tabs.clear()
+
+            # 重新创建标签页
+            for category, indicators in self.sentiment_indicators.items():
+                tab = self._create_indicator_selection_tab(category, indicators)
+                self.indicators_tabs.addTab(tab, category)
+
+            print("✅ 指标标签页已刷新")
+        except Exception as e:
+            print(f"❌ 刷新指标标签页失败: {e}")
+
+
+class ThresholdConfigDialog(QDialog):
+    """阈值配置对话框"""
+
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+        self.config = config.copy()  # 复制配置以便修改
+        self.threshold_controls = {}
+
+        self.setWindowTitle("情感分析阈值配置")
+        self.setModal(True)
+        self.resize(800, 600)
+
+        self._create_ui()
+
+    def _create_ui(self):
+        """创建配置界面"""
+        layout = QVBoxLayout(self)
+
+        # 标题
+        title_label = QLabel("情感分析指标阈值配置")
+        title_font = QFont()
+        title_font.setPointSize(14)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+
+        # 分类标签页
+        self.tabs = QTabWidget()
+
+        for category, indicators in self.config.items():
+            tab = self._create_category_tab(category, indicators)
+            self.tabs.addTab(tab, category)
+
+        layout.addWidget(self.tabs)
+
+        # 按钮组
+        buttons_layout = QHBoxLayout()
+
+        # 重置为默认值按钮
+        reset_btn = QPushButton("重置为默认值")
+        reset_btn.clicked.connect(self._reset_to_default)
+        buttons_layout.addWidget(reset_btn)
+
+        buttons_layout.addStretch()
+
+        # 确定和取消按钮
+        ok_btn = QPushButton("确定")
+        ok_btn.clicked.connect(self.accept)
+        ok_btn.setDefault(True)
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(self.reject)
+
+        buttons_layout.addWidget(ok_btn)
+        buttons_layout.addWidget(cancel_btn)
+
+        layout.addLayout(buttons_layout)
+
+    def _create_category_tab(self, category, indicators):
+        """创建分类标签页"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+
+        self.threshold_controls[category] = {}
+
+        for indicator_name, indicator_config in indicators.items():
+            group = self._create_indicator_group(category, indicator_name, indicator_config)
+            scroll_layout.addWidget(group)
+
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_widget)
+        scroll.setWidgetResizable(True)
+        layout.addWidget(scroll)
+
+        return widget
+
+    def _create_indicator_group(self, category, indicator_name, config):
+        """创建单个指标的配置组"""
+        group = QGroupBox(f"{config.get('name', indicator_name)}")
+        layout = QFormLayout(group)
+
+        threshold = config.get('threshold', {'low': 0, 'high': 100})
+        range_val = config.get('range', [0, 100])
+
+        # 低阈值
+        low_spin = QDoubleSpinBox()
+        low_spin.setRange(range_val[0], range_val[1])
+        low_spin.setValue(threshold.get('low', 0))
+        low_spin.setDecimals(2)
+        low_spin.setSingleStep(0.1)
+
+        # 高阈值
+        high_spin = QDoubleSpinBox()
+        high_spin.setRange(range_val[0], range_val[1])
+        high_spin.setValue(threshold.get('high', 100))
+        high_spin.setDecimals(2)
+        high_spin.setSingleStep(0.1)
+
+        layout.addRow("低阈值:", low_spin)
+        layout.addRow("高阈值:", high_spin)
+
+        # 添加说明
+        range_label = QLabel(f"范围: {range_val[0]} - {range_val[1]}")
+        range_label.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addRow("", range_label)
+
+        # 保存控件引用
+        if category not in self.threshold_controls:
+            self.threshold_controls[category] = {}
+        self.threshold_controls[category][indicator_name] = {
+            'low': low_spin,
+            'high': high_spin
+        }
+
+        return group
+
+    def _reset_to_default(self):
+        """重置为默认值"""
+        reply = QMessageBox.question(self, "确认重置",
+                                     "确定要重置所有阈值为默认值吗？",
+                                     QMessageBox.Yes | QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            # 这里需要从父窗口获取默认配置
+            if hasattr(self.parent(), 'default_sentiment_indicators'):
+                default_config = self.parent().default_sentiment_indicators
+                self._apply_config_to_controls(default_config)
+                QMessageBox.information(self, "完成", "已重置为默认值")
+
+    def _apply_config_to_controls(self, config):
+        """将配置应用到控件"""
+        for category, indicators in config.items():
+            if category in self.threshold_controls:
+                for indicator_name, indicator_config in indicators.items():
+                    if indicator_name in self.threshold_controls[category]:
+                        threshold = indicator_config.get('threshold', {'low': 0, 'high': 100})
+                        controls = self.threshold_controls[category][indicator_name]
+                        controls['low'].setValue(threshold.get('low', 0))
+                        controls['high'].setValue(threshold.get('high', 100))
+
+    def get_config(self):
+        """获取当前配置"""
+        new_config = self.config.copy()
+
+        for category, indicators in self.threshold_controls.items():
+            if category not in new_config:
+                new_config[category] = {}
+
+            for indicator_name, controls in indicators.items():
+                if indicator_name not in new_config[category]:
+                    new_config[category][indicator_name] = self.config[category][indicator_name].copy()
+
+                # 更新阈值
+                new_config[category][indicator_name]['threshold'] = {
+                    'low': controls['low'].value(),
+                    'high': controls['high'].value()
+                }
+
+        return new_config

@@ -476,7 +476,7 @@ class BaseAnalysisTab(QWidget):
         return table
 
     def update_table_data(self, table: QTableWidget, data: list, column_keys: list = None):
-        """统一更新表格数据
+        """统一更新表格数据 - 增强版（过滤空值）
 
         Args:
             table: 要更新的表格
@@ -487,23 +487,83 @@ class BaseAnalysisTab(QWidget):
             table.setRowCount(0)
             return
 
-        table.setRowCount(len(data))
+        # 过滤掉完全为空的数据行
+        valid_data = []
+        for item in data:
+            if isinstance(item, dict):
+                # 检查字典是否有有效值
+                has_valid_data = False
+                for key, value in item.items():
+                    if value is not None and str(value).strip() != '' and str(value) != 'N/A':
+                        has_valid_data = True
+                        break
+                if has_valid_data:
+                    valid_data.append(item)
+            elif isinstance(item, (list, tuple)):
+                # 检查列表是否有有效值
+                has_valid_data = any(
+                    value is not None and str(value).strip() != '' and str(value) != 'N/A' 
+                    for value in item
+                )
+                if has_valid_data:
+                    valid_data.append(item)
 
-        for row, item in enumerate(data):
+        if not valid_data:
+            table.setRowCount(0)
+            return
+
+        table.setRowCount(len(valid_data))
+
+        for row, item in enumerate(valid_data):
             if isinstance(item, dict):
                 # 字典数据
                 if column_keys:
                     for col, key in enumerate(column_keys):
                         value = item.get(key, '')
-                        if isinstance(value, (int, float)):
+                        
+                        # 处理空值和None值
+                        if value is None or str(value).strip() == '':
+                            text = "--"
+                        elif isinstance(value, (int, float)):
                             if isinstance(value, float):
                                 text = f"{value:.2f}" if abs(
                                     value) < 1000 else f"{value:.0f}"
                             else:
                                 text = str(value)
                         else:
-                            text = str(value)
+                            text = str(value) if str(value) != 'N/A' else "--"
+                        
                         table.setItem(row, col, QTableWidgetItem(text))
+                else:
+                    # 使用字典的值顺序
+                    for col, value in enumerate(item.values()):
+                        if col >= table.columnCount():
+                            break
+                        
+                        # 处理空值
+                        if value is None or str(value).strip() == '':
+                            text = "--"
+                        elif isinstance(value, (int, float)):
+                            text = f"{value:.2f}" if isinstance(value, float) else str(value)
+                        else:
+                            text = str(value) if str(value) != 'N/A' else "--"
+                        
+                        table.setItem(row, col, QTableWidgetItem(text))
+            elif isinstance(item, (list, tuple)):
+                # 列表数据
+                for col, value in enumerate(item):
+                    if col >= table.columnCount():
+                        break
+                    
+                    # 处理空值
+                    if value is None or str(value).strip() == '':
+                        text = "--"
+                    elif isinstance(value, (int, float)):
+                        text = f"{value:.2f}" if isinstance(value, float) else str(value)
+                    else:
+                        text = str(value) if str(value) != 'N/A' else "--"
+                    
+                    table.setItem(row, col, QTableWidgetItem(text))
                 else:
                     # 使用字典的值顺序
                     for col, value in enumerate(item.values()):

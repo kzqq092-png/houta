@@ -290,6 +290,26 @@ def init_db():
         patterns_data
     )
 
+    # 20. 趋势预警配置表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS trend_alert_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT DEFAULT 'default',
+        config_name TEXT DEFAULT 'default',
+        enable_price_alerts INTEGER DEFAULT 1,
+        enable_trend_alerts INTEGER DEFAULT 1,
+        enable_volume_alerts INTEGER DEFAULT 0,
+        enable_technical_alerts INTEGER DEFAULT 1,
+        price_change_threshold REAL DEFAULT 5.0,
+        volume_change_threshold REAL DEFAULT 50.0,
+        trend_strength_threshold REAL DEFAULT 0.7,
+        alert_frequency TEXT DEFAULT 'immediate',
+        notification_methods TEXT DEFAULT 'popup',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, config_name)
+    )''')
+
     conn.commit()
     conn.close()
 

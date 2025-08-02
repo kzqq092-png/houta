@@ -384,7 +384,7 @@ class AnalysisWidget(QWidget):
             if hasattr(self.pattern_tab, 'pattern_selected'):
                 self.pattern_tab.pattern_selected.connect(
                     self.pattern_selected)
-            
+
             # 【修复】设置pattern_tab的parent_widget并建立反向连接
             if hasattr(self.pattern_tab, 'set_parent_widget'):
                 self.pattern_tab.set_parent_widget(self)

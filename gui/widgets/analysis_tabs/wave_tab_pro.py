@@ -111,14 +111,15 @@ class WaveAnalysisTabPro(BaseAnalysisTab):
     def _create_professional_toolbar(self, layout):
         """创建专业工具栏"""
         toolbar = QFrame()
+        toolbar.setMaximumHeight(200)
         toolbar.setFrameStyle(QFrame.StyledPanel)
         toolbar.setStyleSheet("""
             QFrame { 
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
                     stop:0 #f8f9fa, stop:1 #e9ecef);
                 border: 1px solid #dee2e6;
-                border-radius: 8px;
-                padding: 8px;
+                border-radius: 4px;
+                padding: 4px;
             }
         """)
         toolbar_layout = QVBoxLayout(toolbar)
