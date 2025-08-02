@@ -61,6 +61,7 @@ class MainMenuBar(QMenuBar):
         self.strategy_menu = self.addMenu("策略(&S)")
         self.data_menu = self.addMenu("数据(&D)")
         self.tools_menu = self.addMenu("工具(&T)")
+        self.advanced_menu = self.addMenu("高级功能(&X)")
         self.debug_menu = self.addMenu("调试(&G)")
         self.help_menu = self.addMenu("帮助(&H)")
         self.init_file_menu()
@@ -70,6 +71,7 @@ class MainMenuBar(QMenuBar):
         self.init_strategy_menu()
         self.init_data_menu()
         self.init_tools_menu()
+        self.init_advanced_menu()
         self.init_debug_menu()
         self.init_help_menu()
 
@@ -342,27 +344,39 @@ class MainMenuBar(QMenuBar):
             self.settings_action.setStatusTip("打开设置")
             self.tools_menu.addAction(self.settings_action)
 
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
+
+    def init_advanced_menu(self):
+        """初始化高级功能菜单"""
+        try:
+            # 插件管理
+            self.plugin_manager_action = QAction("插件管理", self)
+            self.plugin_manager_action.setStatusTip("管理和配置插件")
+            self.advanced_menu.addAction(self.plugin_manager_action)
+
             # 插件市场
             self.plugin_market_action = QAction("插件市场", self)
             self.plugin_market_action.setStatusTip("浏览和管理插件")
-            self.tools_menu.addAction(self.plugin_market_action)
+            self.advanced_menu.addAction(self.plugin_market_action)
 
-            self.tools_menu.addSeparator()
+            self.advanced_menu.addSeparator()
 
             # 分布式/云API/指标市场/批量分析
             self.node_manager_action = QAction("分布式节点管理", self)
             self.cloud_api_action = QAction("云API管理", self)
             self.indicator_market_action = QAction("指标市场", self)
             self.batch_analysis_action = QAction("批量分析", self)
-            self.tools_menu.addAction(self.node_manager_action)
-            self.tools_menu.addAction(self.cloud_api_action)
-            self.tools_menu.addAction(self.indicator_market_action)
-            self.tools_menu.addAction(self.batch_analysis_action)
+            self.advanced_menu.addAction(self.node_manager_action)
+            self.advanced_menu.addAction(self.cloud_api_action)
+            self.advanced_menu.addAction(self.indicator_market_action)
+            self.advanced_menu.addAction(self.batch_analysis_action)
 
-            self.tools_menu.addSeparator()
+            self.advanced_menu.addSeparator()
 
             # 形态识别算法优化系统
-            self.optimization_menu = self.tools_menu.addMenu("形态识别优化")
+            self.optimization_menu = self.advanced_menu.addMenu("形态识别优化")
 
             # 优化仪表板
             self.optimization_dashboard_action = QAction("优化仪表板", self)
@@ -400,7 +414,7 @@ class MainMenuBar(QMenuBar):
 
         except Exception as e:
             if self.log_manager:
-                self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
+                self.log_manager.error(f"初始化高级功能菜单失败: {str(e)}")
 
     def init_debug_menu(self):
         """初始化调试菜单，添加显示/隐藏日志菜单项"""

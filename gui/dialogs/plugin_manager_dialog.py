@@ -109,18 +109,33 @@ class PluginStatusWidget(QWidget):
 
     def enable_plugin(self):
         """启用插件"""
-        # 发送启用信号
-        self.parent().parent().enable_plugin(self.plugin_info.name)
+        # 查找PluginManagerDialog实例
+        dialog = self._find_plugin_manager_dialog()
+        if dialog:
+            dialog.enable_plugin(self.plugin_info.name)
 
     def disable_plugin(self):
         """禁用插件"""
-        # 发送禁用信号
-        self.parent().parent().disable_plugin(self.plugin_info.name)
+        # 查找PluginManagerDialog实例
+        dialog = self._find_plugin_manager_dialog()
+        if dialog:
+            dialog.disable_plugin(self.plugin_info.name)
 
     def configure_plugin(self):
         """配置插件"""
-        # 发送配置信号
-        self.parent().parent().configure_plugin(self.plugin_info.name)
+        # 查找PluginManagerDialog实例
+        dialog = self._find_plugin_manager_dialog()
+        if dialog:
+            dialog.configure_plugin(self.plugin_info.name)
+
+    def _find_plugin_manager_dialog(self):
+        """查找PluginManagerDialog实例"""
+        parent = self.parent()
+        while parent:
+            if isinstance(parent, PluginManagerDialog):
+                return parent
+            parent = parent.parent()
+        return None
 
 
 class PluginConfigDialog(QDialog):

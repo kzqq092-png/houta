@@ -111,6 +111,10 @@ class MarketSentimentWidget(BaseAnalysisTab):
         self._sentiment_cache = {}
         self._sentiment_cache_time = {}
 
+        # 初始化情绪数据服务
+        self._sentiment_service = None
+        self._initialize_sentiment_service()
+
         self.init_ui()
 
         # 示例：增加情绪阈值参数输入
@@ -138,15 +142,57 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 self._on_thread_error(f"初始化拉取市场情绪数据失败: {str(e)}")
 
     def _fetch_market_sentiment_data(self) -> dict:
-        """获取市场情绪数据 - 统一的数据获取方法"""
-        if hasattr(self.data_manager, 'get_market_sentiment'):
-            return self.data_manager.get_market_sentiment()
-        else:
-            # 模拟数据
+        """获取市场情绪数据 - 使用真实插件数据源"""
+        try:
+            # 尝试使用情绪数据服务获取真实数据
+            if hasattr(self, '_sentiment_service') and self._sentiment_service:
+                response = self._sentiment_service.get_sentiment_data()
+                if response.success and response.data:
+                    # 转换为组件期望的格式
+                    sentiment_index = (response.composite_score + 1) / 2  # 转换到0-1范围
+                    market_heat = sentiment_index * 100  # 转换为0-100范围
+
+                    result = {
+                        'sentiment_index': sentiment_index,
+                        'market_heat': market_heat,
+                        'timestamp': response.update_time,
+                        'data_quality': response.data_quality,
+                        'source': 'plugin',
+                        'raw_data': response.data  # 保留原始数据
+                    }
+
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.info(f"✅ 市场情绪组件使用真实插件数据，情绪指数: {sentiment_index:.3f}")
+
+                    return result
+
+                elif hasattr(self, 'log_manager'):
+                    self.log_manager.warning(f"⚠️ 情绪数据服务返回错误: {response.error_message}")
+
+            # 检查原数据管理器
+            if hasattr(self.data_manager, 'get_market_sentiment'):
+                return self.data_manager.get_market_sentiment()
+
+            # 最后回退到模拟数据（明确标识）
             return {
                 'sentiment_index': 0.65,
                 'market_heat': 75,
-                'timestamp': datetime.now()
+                'timestamp': datetime.now(),
+                'source': 'simulated',
+                'note': '使用模拟数据 - 请配置真实数据源'
+            }
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"❌ 获取市场情绪数据失败: {e}")
+
+            # 错误时返回安全的回退数据
+            return {
+                'sentiment_index': 0.5,
+                'market_heat': 50,
+                'timestamp': datetime.now(),
+                'source': 'error_fallback',
+                'error': str(e)
             }
 
     def init_ui(self):
@@ -163,9 +209,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
         score_layout.addWidget(self.sentiment_score_label)
         score_layout.addStretch()
         self.main_layout.addLayout(score_layout)
-        import akshare as ak
-        df = ak.index_news_sentiment_scope()
-        print(df)
+        # 移除了直接的akshare调用，现在通过插件系统获取数据
         # 只保留情绪指数走势图表
         self.create_sentiment_chart(self.main_layout)
 
@@ -1003,3 +1047,64 @@ class MarketSentimentWidget(BaseAnalysisTab):
             if min_idx is not None:
                 self.sentiment_table.item(
                     min_idx, j).setBackground(QColor("#ffcdd2"))
+
+    def _initialize_sentiment_service(self):
+        """初始化情绪数据服务"""
+        try:
+            # 尝试获取服务容器和情绪数据服务
+            from core.containers.service_container import get_service_container
+            from core.services.sentiment_data_service import SentimentDataService
+
+            container = get_service_container()
+            if container:
+                try:
+                    self._sentiment_service = container.resolve(SentimentDataService)
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.info("✅ 市场情绪组件：情绪数据服务初始化成功")
+                except Exception as resolve_error:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"⚠️ 无法从服务容器获取情绪数据服务: {resolve_error}")
+
+                    # 尝试手动创建服务
+                    self._try_manual_service_creation()
+            else:
+                self._try_manual_service_creation()
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"❌ 市场情绪组件：初始化情绪数据服务失败: {e}")
+            self._sentiment_service = None
+
+    def _try_manual_service_creation(self):
+        """尝试手动创建情绪数据服务"""
+        try:
+            from core.services.sentiment_data_service import SentimentDataService, SentimentDataServiceConfig
+            from plugins.sentiment_data_sources.akshare_sentiment_plugin import AkShareSentimentPlugin
+
+            # 创建服务配置
+            config = SentimentDataServiceConfig(
+                cache_duration_minutes=5,
+                auto_refresh_interval_minutes=10,
+                enable_auto_refresh=False  # 在UI中手动控制刷新
+            )
+
+            # 创建服务
+            self._sentiment_service = SentimentDataService(config=config, log_manager=getattr(self, 'log_manager', None))
+
+            # 注册AkShare插件
+            akshare_plugin = AkShareSentimentPlugin()
+            self._sentiment_service.register_plugin('akshare', akshare_plugin, priority=10, weight=1.0)
+
+            # 初始化服务
+            if self._sentiment_service.initialize():
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.info("✅ 市场情绪组件：手动创建情绪数据服务成功")
+            else:
+                if hasattr(self, 'log_manager'):
+                    self.log_manager.error("❌ 市场情绪组件：情绪数据服务初始化失败")
+                self._sentiment_service = None
+
+        except Exception as e:
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"❌ 市场情绪组件：手动创建情绪数据服务失败: {e}")
+            self._sentiment_service = None
