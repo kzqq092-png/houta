@@ -260,10 +260,46 @@ class WebGPUEnvironment:
 
     def _detect_webgpu_capabilities(self):
         """检测WebGPU能力"""
-        # 模拟WebGPU能力检测
-        self._gpu_capabilities.adapter_name = "WebGPU Adapter"
-        self._gpu_capabilities.vendor = "Unknown"
-        self._gpu_capabilities.memory_mb = 1024  # 默认假设1GB
+        try:
+            # 尝试使用增强的GPU检测
+            from .enhanced_gpu_detection import get_gpu_detector, PowerPreference
+
+            detector = get_gpu_detector()
+            adapters = detector.detect_all_adapters()
+
+            if adapters:
+                # 选择最佳适配器（优先独立显卡）
+                best_adapter = detector.select_best_adapter(
+                    power_preference=PowerPreference.HIGH_PERFORMANCE,
+                    require_discrete=False
+                )
+
+                if best_adapter:
+                    self._gpu_capabilities.adapter_name = best_adapter.name
+                    self._gpu_capabilities.vendor = best_adapter.vendor
+                    self._gpu_capabilities.memory_mb = best_adapter.memory_mb
+                    logger.info(f"✅ 检测到GPU: {best_adapter.name} ({best_adapter.vendor})")
+                    logger.info(f"✅ GPU类型: {best_adapter.gpu_type.value}")
+                    logger.info(f"✅ 显存大小: {best_adapter.memory_mb}MB")
+
+                    # 记录所有检测到的适配器
+                    logger.info(f"📊 检测到 {len(adapters)} 个GPU适配器:")
+                    for i, adapter in enumerate(adapters):
+                        logger.info(f"  {i+1}. {adapter.name} ({adapter.vendor}) - {adapter.memory_mb}MB")
+
+                else:
+                    raise Exception("未找到可用的GPU适配器")
+            else:
+                raise Exception("GPU检测失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 增强GPU检测失败: {e}，使用默认设置")
+            # 回退到默认设置
+            self._gpu_capabilities.adapter_name = "WebGPU Adapter"
+            self._gpu_capabilities.vendor = "Unknown"
+            self._gpu_capabilities.memory_mb = 1024  # 默认假设1GB
+
+        # 设置WebGPU特性
         self._gpu_capabilities.max_texture_size = 8192
         self._gpu_capabilities.supports_compute = True
         self._gpu_capabilities.webgpu_features = [

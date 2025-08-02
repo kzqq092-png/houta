@@ -102,6 +102,18 @@ class HIkyuuUIApplication:
             # 2. 抑制警告
             suppress_warnings()
 
+            # 抑制TensorFlow/Keras警告
+            import os
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+            try:
+                import tensorflow as tf
+                tf.get_logger().setLevel('ERROR')
+                import warnings
+                warnings.filterwarnings('ignore', message='Compiled the loaded model*')
+                logger.info("✅ TensorFlow警告已抑制")
+            except ImportError:
+                pass
+
             # 3. 设置异常处理器
             setup_exception_handler(self.app)
 

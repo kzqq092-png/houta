@@ -28,9 +28,11 @@ class AnalysisThread(QThread, QApplication):
     error_occurred = pyqtSignal(str)         # 错误发生信号
 
     def __init__(self, kdata, sensitivity=0.7, enable_ml=True, enable_alerts=True,
-                 enable_historical=False, config_manager=None, filters=None, selected_patterns=None):
+                 enable_historical=False, config_manager=None, filters=None, selected_patterns=None,
+                 ai_prediction_service=None, prediction_days=5):
         super().__init__()
         self.kdata = kdata
+        self.current_kdata = kdata  # 添加current_kdata别名
         self.sensitivity = sensitivity
         self.enable_ml = enable_ml
         self.enable_alerts = enable_alerts
@@ -38,6 +40,8 @@ class AnalysisThread(QThread, QApplication):
         self.config_manager = config_manager
         self.filters = filters if filters is not None else {}
         self.selected_patterns = selected_patterns if selected_patterns is not None else []
+        self.ai_prediction_service = ai_prediction_service  # 添加AI预测服务
+        self.prediction_days = prediction_days  # 添加预测天数
         print(f"[AnalysisThread-INIT] 探针: 线程已初始化，接收到 {len(self.selected_patterns)} 个待识别形态: {self.selected_patterns}")
 
         # 连接主图信号
@@ -162,7 +166,7 @@ class AnalysisThread(QThread, QApplication):
         return filtered_list
 
     def _detect_patterns(self) -> List[Dict]:
-        """检测形态 - 高性能版本"""
+        """检测形态 - 一键分析版本（快速扫描）"""
         try:
             # 导入形态识别器
             from analysis.pattern_recognition import EnhancedPatternRecognizer
@@ -170,11 +174,21 @@ class AnalysisThread(QThread, QApplication):
             # 使用增强的形态识别器
             recognizer = EnhancedPatternRecognizer(debug_mode=True)
 
-            print(f"[AnalysisThread-DETECT] 探针: 即将调用identify_patterns，识别列表: {self.selected_patterns}")
+            print(f"[AnalysisThread-DETECT] 一键分析模式：即将调用identify_patterns，识别列表: {self.selected_patterns}")
+
+            # 🔄 一键分析特点：
+            # 1. 只识别用户选择的形态类型
+            # 2. 使用较高的置信度阈值，确保结果质量
+            # 3. 数据采样优化，提升分析速度
+
+            # 数据采样：一键分析使用最近的数据进行快速识别
+            kdata_sample = self.kdata.tail(min(len(self.kdata), 200))  # 最近200个交易日
+            print(f"[一键分析] 使用最近 {len(kdata_sample)} 个交易日的数据进行快速分析")
+
             # 执行形态识别
             patterns = recognizer.identify_patterns(
-                self.kdata,
-                confidence_threshold=self.sensitivity * 0.5,  # 根据灵敏度调整阈值
+                kdata_sample,
+                confidence_threshold=max(0.6, self.sensitivity * 0.7),  # 一键分析使用较高阈值
                 pattern_types=self.selected_patterns  # 使用从UI传递过来的列表
             )
 
@@ -189,6 +203,10 @@ class AnalysisThread(QThread, QApplication):
                     # 已经是字典，直接使用
                     pattern_dict = pattern
 
+                # 添加一键分析标识
+                pattern_dict['analysis_type'] = 'one_click'
+                pattern_dict['scan_mode'] = 'quick'
+
                 # 数据校验和清洗
                 self._validate_and_clean_pattern(pattern_dict)
                 pattern_dicts.append(pattern_dict)
@@ -196,13 +214,13 @@ class AnalysisThread(QThread, QApplication):
             # 转换成列表，并按置信度排序
             pattern_dicts.sort(key=lambda x: x.get('confidence', 0), reverse=True)
 
-            print(f"[AnalysisThread] 形态检测成功，共找到 {len(pattern_dicts)} 个有效形态（去重后）")
+            print(f"[一键分析] 快速扫描完成，检测到 {len(pattern_dicts)} 个形态")
             return pattern_dicts
 
         except Exception as e:
-            print(f"[AnalysisThread] 形态检测失败: {e}")
+            print(f"[AnalysisThread] 形态识别出错: {e}")
             import traceback
-            print(traceback.format_exc())
+            print(f"[AnalysisThread] 错误详情: {traceback.format_exc()}")
             return []
 
     def _validate_and_clean_pattern(self, pattern: Dict) -> None:
@@ -255,153 +273,113 @@ class AnalysisThread(QThread, QApplication):
         return valid_patterns
 
     def _generate_ml_predictions(self, patterns: List[Dict]) -> Dict:
-        """生成机器学习预测"""
+        """生成机器学习预测（AnalysisThread版本）"""
         try:
             # 检查AI预测服务是否可用
-            if self.ai_prediction_service and self.current_kdata is not None:
-                # 获取形态识别结果用于预测
-                patterns = []
-                if hasattr(self, 'last_analysis_results') and self.last_analysis_results:
-                    patterns = self.last_analysis_results.get('patterns', [])
+            if hasattr(self, 'ai_prediction_service') and self.ai_prediction_service and self.current_kdata is not None:
+                logger.info(f"AnalysisThread: 正在使用 {len(patterns)} 个形态进行AI预测")
 
                 # 使用AI预测服务进行形态预测
                 pattern_prediction = self.ai_prediction_service.predict_patterns(
                     self.current_kdata, patterns
                 )
 
+                # 获取预测天数
+                prediction_days = getattr(self, 'prediction_days', 5)
+
                 # 获取趋势预测
                 trend_prediction = self.ai_prediction_service.predict_trend(
-                    self.current_kdata, self.prediction_days.value()
+                    self.current_kdata, prediction_days
                 )
 
                 # 获取价格预测
                 price_prediction = self.ai_prediction_service.predict_price(
-                    self.current_kdata, self.prediction_days.value()
+                    self.current_kdata, prediction_days
                 )
 
                 # 合并预测结果
                 predictions = {
-                    'model_type': self.model_combo.currentText(),
-                    'prediction_horizon': self.prediction_days.value(),
-                    'confidence': pattern_prediction.get('confidence', 0.5),
-                    'direction': pattern_prediction.get('direction', '震荡'),
-                    'probability': pattern_prediction.get('confidence', 0.5),
-                    'target_range': {
-                        'low': price_prediction.get('target_low', 0),
-                        'high': price_prediction.get('target_high', 0)
-                    },
+                    'direction': pattern_prediction.get('direction', 'N/A'),
+                    'confidence': pattern_prediction.get('confidence', 0),
+                    'model_type': pattern_prediction.get('model_type', 'N/A'),
+                    'model_path': pattern_prediction.get('model_path', 'N/A'),
+                    'prediction_horizon': prediction_days,
                     'pattern_prediction': pattern_prediction,
                     'trend_prediction': trend_prediction,
                     'price_prediction': price_prediction,
-                    'ai_model_used': True
+                    'ai_model_used': True,
+                    'timestamp': datetime.now().isoformat()
                 }
 
-                logger.info(f"AI预测完成: {predictions['direction']}, 置信度: {predictions['confidence']:.2f}")
+                # 导入并使用中文显示名称
+                try:
+                    from core.services.ai_prediction_service import get_model_display_name
+                    model_display_name = get_model_display_name(predictions['model_type'])
+                    predictions['model_display_name'] = model_display_name
+                except ImportError:
+                    predictions['model_display_name'] = predictions['model_type']
+
+                logger.info(f"AnalysisThread: AI预测完成: {predictions['direction']}, 置信度: {predictions['confidence']:.2f}")
                 return predictions
+
             else:
                 # 后备预测方案
-                logger.warning("AI预测服务不可用，使用后备预测方案")
-                return self._generate_fallback_predictions()
+                logger.warning("AnalysisThread: AI预测服务不可用，使用后备预测方案")
+                return self._generate_fallback_predictions(patterns)
 
         except Exception as e:
-            logger.error(f"AI预测失败: {e}")
-            return self._generate_fallback_predictions()
+            logger.error(f"AnalysisThread: AI预测失败: {e}")
+            return self._generate_fallback_predictions(patterns)
 
-    def _generate_fallback_predictions(self):
-        """生成后备预测结果"""
+    def _generate_fallback_predictions(self, patterns: List[Dict]) -> Dict:
+        """后备预测方案（AnalysisThread版本）"""
         try:
-            # 基于简单技术分析的后备预测
-            if self.current_kdata is None or len(self.current_kdata) < 10:
+            # 简单的基于形态的预测
+            if not patterns:
                 return {
-                    'model_type': '规则模型',
-                    'prediction_horizon': self.prediction_days.value() if hasattr(self, 'prediction_days') else 5,
-                    'confidence': 0.5,
                     'direction': '震荡',
-                    'probability': 0.5,
-                    'target_range': {'low': 0, 'high': 0},
-                    'pattern_prediction': {'direction': '震荡', 'confidence': 0.5},
-                    'trend_prediction': {'direction': '震荡', 'confidence': 0.5},
-                    'price_prediction': {'direction': '震荡', 'confidence': 0.5, 'current_price': 0},
+                    'confidence': 0.5,
+                    'model_type': 'fallback',
+                    'model_display_name': '后备模型',
                     'ai_model_used': False,
-                    'fallback_reason': 'K线数据不足'
+                    'fallback_reason': '无形态数据'
                 }
 
-            # 简单的技术分析预测
-            close_prices = self.current_kdata['close'].values
-            current_price = close_prices[-1]
+            # 分析形态信号
+            bullish_count = sum(1 for p in patterns if p.get('signal_type') == 'bullish')
+            bearish_count = sum(1 for p in patterns if p.get('signal_type') == 'bearish')
+            total_count = len(patterns)
 
-            # 计算移动平均线
-            ma5 = np.mean(close_prices[-5:]) if len(close_prices) >= 5 else current_price
-            ma10 = np.mean(close_prices[-10:]) if len(close_prices) >= 10 else current_price
-
-            # 基于均线判断趋势
-            if current_price > ma5 > ma10:
+            if bullish_count > bearish_count:
                 direction = '上涨'
-                confidence = 0.65
-                target_low = current_price * 1.01
-                target_high = current_price * 1.05
-            elif current_price < ma5 < ma10:
+                confidence = min(0.6 + (bullish_count / total_count) * 0.3, 0.85)
+            elif bearish_count > bullish_count:
                 direction = '下跌'
-                confidence = 0.65
-                target_low = current_price * 0.95
-                target_high = current_price * 0.99
+                confidence = min(0.6 + (bearish_count / total_count) * 0.3, 0.85)
             else:
                 direction = '震荡'
-                confidence = 0.5
-                target_low = current_price * 0.98
-                target_high = current_price * 1.02
+                confidence = 0.55
 
-            # 构造后备预测结果
-            predictions = {
-                'model_type': self.model_combo.currentText() + ' (后备模式)' if hasattr(self, 'model_combo') else '规则模型',
-                'prediction_horizon': self.prediction_days.value() if hasattr(self, 'prediction_days') else 5,
-                'confidence': confidence,
+            return {
                 'direction': direction,
-                'probability': confidence,
-                'target_range': {
-                    'low': target_low,
-                    'high': target_high
-                },
-                'pattern_prediction': {
-                    'direction': direction,
-                    'confidence': confidence,
-                    'model_type': 'rule_based'
-                },
-                'trend_prediction': {
-                    'direction': direction,
-                    'confidence': confidence,
-                    'model_type': 'rule_based'
-                },
-                'price_prediction': {
-                    'direction': direction,
-                    'confidence': confidence,
-                    'current_price': current_price,
-                    'target_low': target_low,
-                    'target_high': target_high,
-                    'model_type': 'rule_based'
-                },
+                'confidence': confidence,
+                'model_type': 'pattern_analysis',
+                'model_display_name': '形态分析',
                 'ai_model_used': False,
-                'fallback_reason': 'AI服务不可用，使用技术分析规则'
+                'pattern_count': total_count,
+                'bullish_signals': bullish_count,
+                'bearish_signals': bearish_count
             }
 
-            logger.info(f"后备预测完成: {direction}, 置信度: {confidence:.2f}")
-            return predictions
-
         except Exception as e:
-            logger.error(f"后备预测失败: {e}")
-            # 最基本的后备结果
+            logger.error(f"AnalysisThread: 后备预测失败: {e}")
             return {
-                'model_type': '基础模型',
-                'prediction_horizon': 5,
+                'direction': '未知',
                 'confidence': 0.5,
-                'direction': '震荡',
-                'probability': 0.5,
-                'target_range': {'low': 0, 'high': 0},
-                'pattern_prediction': {'direction': '震荡', 'confidence': 0.5},
-                'trend_prediction': {'direction': '震荡', 'confidence': 0.5},
-                'price_prediction': {'direction': '震荡', 'confidence': 0.5},
+                'model_type': 'error',
+                'model_display_name': '错误',
                 'ai_model_used': False,
-                'fallback_reason': '预测生成失败'
+                'error': str(e)
             }
 
     def _calculate_statistics(self, patterns: List[Dict]) -> Dict:
@@ -1332,27 +1310,149 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def _on_model_type_changed(self, display_name):
         """模型类型变更处理"""
+        # === 详细调试日志 ===
+        logger.info("="*80)
+        logger.info("🔄 UI模型切换 - _on_model_type_changed 开始")
+        logger.info(f"📝 显示名称: {display_name}")
+        logger.info("="*80)
+        # === 调试日志结束 ===
+
         try:
             # 获取实际的英文值
             model_type = self.model_combo.currentData()
             if not model_type:
+                logger.warning("⚠️ 模型类型为空，退出处理")
                 return
+
+            logger.info(f"🧠 获取到模型类型: {model_type}")
 
             from db.models.ai_config_models import get_ai_config_manager
             config_manager = get_ai_config_manager()
 
             # 更新数据库中的配置
             model_config = config_manager.get_config('model_config') or {}
+            logger.info(f"📋 当前数据库配置: {model_config}")
+
             model_config['model_type'] = model_type
             config_manager.update_config('model_config', model_config, 'UI调整')
+            logger.info(f"💾 配置已更新到数据库: model_type = {model_type}")
 
             # 重新初始化AI服务
+            logger.info("🔄 开始重新初始化AI服务...")
             self._initialize_ai_service()
 
-            logger.info(f"模型类型已更新为: {model_type} (显示名称: {display_name})")
+            # 清除预测缓存，确保使用新模型
+            if self.ai_prediction_service:
+                logger.info("🗑️ 清除AI预测缓存...")
+                self.ai_prediction_service.clear_cache()
+                logger.info("✅ 缓存已清除")
+            else:
+                logger.warning("⚠️ AI预测服务不可用，无法清除缓存")
+
+            # 不再自动触发预测，只更新配置
+            logger.info("💡 模型配置已更新，用户需手动点击预测按钮")
+
+            logger.info(f"✅ 模型类型已更新为: {model_type} (显示名称: {display_name})")
 
         except Exception as e:
-            logger.error(f"更新模型类型配置失败: {e}")
+            logger.error(f"❌ 更新模型类型配置失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _auto_trigger_prediction_on_model_change(self):
+        """在模型改变时自动触发预测"""
+        logger.info("🎯 === _auto_trigger_prediction_on_model_change 开始 ===")
+
+        try:
+            # 检查是否满足自动预测的条件
+            has_kdata = hasattr(self, 'current_kdata') and self.current_kdata is not None
+            has_ai_service = hasattr(self, 'ai_prediction_service') and self.ai_prediction_service is not None
+
+            logger.info(f"🔍 自动预测条件检查:")
+            logger.info(f"   📊 has_kdata: {has_kdata}")
+            logger.info(f"   🤖 has_ai_service: {has_ai_service}")
+
+            if has_kdata:
+                logger.info(f"   📈 K线数据长度: {len(self.current_kdata)}")
+
+            if has_ai_service:
+                logger.info(f"   🧠 AI服务实例: {type(self.ai_prediction_service).__name__}")
+
+            if has_kdata and has_ai_service:
+                logger.info("✅ 条件满足，模型类型已改变，自动触发新预测...")
+
+                # 异步执行预测，避免阻塞UI
+                from PyQt5.QtCore import QTimer
+                logger.info("⏰ 设置100ms后执行自动预测...")
+                QTimer.singleShot(100, self._execute_auto_prediction)
+            else:
+                logger.warning("❌ 无法自动触发预测：缺少必要条件")
+
+        except Exception as e:
+            logger.error(f"❌ 自动触发预测失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _execute_auto_prediction(self):
+        """执行自动预测"""
+        logger.info("🚀 === _execute_auto_prediction 开始执行 ===")
+
+        try:
+            logger.info("📋 开始执行自动预测...")
+
+            # 检查当前状态
+            logger.info(f"🔍 当前状态检查:")
+            logger.info(f"   📊 current_kdata存在: {hasattr(self, 'current_kdata') and self.current_kdata is not None}")
+            logger.info(f"   🤖 ai_prediction_service存在: {hasattr(self, 'ai_prediction_service') and self.ai_prediction_service is not None}")
+            logger.info(f"   📈 last_analysis_results存在: {hasattr(self, 'last_analysis_results') and self.last_analysis_results is not None}")
+
+            # 直接调用现有的AI预测方法，它会处理所有必要的检查和异步执行
+            logger.info("🎯 调用 self.ai_prediction()...")
+            self.ai_prediction()
+
+            logger.info("✅ 自动预测已触发")
+
+        except Exception as e:
+            logger.error(f"❌ 执行自动预测失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    def _initialize_ai_service(self):
+        """初始化AI预测服务"""
+        logger.info("🔄 === _initialize_ai_service 开始 ===")
+
+        try:
+            from core.containers import get_service_container
+            from core.services.ai_prediction_service import AIPredictionService
+
+            service_container = get_service_container()
+            logger.info(f"📦 获取到服务容器: {type(service_container).__name__}")
+
+            # 重新获取AI预测服务（会重新加载配置）
+            logger.info("🤖 正在解析AI预测服务...")
+            self.ai_prediction_service = service_container.resolve(AIPredictionService)
+
+            logger.info(f"🔍 AI服务实例信息:")
+            logger.info(f"   📋 实例ID: {id(self.ai_prediction_service)}")
+            logger.info(f"   🧠 当前模型配置: {self.ai_prediction_service.model_config if self.ai_prediction_service else 'N/A'}")
+
+            if self.ai_prediction_service:
+                # 强制重新加载配置
+                logger.info("🔄 强制重新加载AI服务配置...")
+                self.ai_prediction_service.reload_config()
+                logger.info("✅ AI预测服务已重新初始化")
+
+                # 验证配置是否更新
+                current_model_type = self.ai_prediction_service.model_config.get('model_type', 'N/A')
+                logger.info(f"🎯 AI服务中的模型类型: {current_model_type}")
+            else:
+                logger.warning("⚠️ AI预测服务初始化失败")
+
+        except Exception as e:
+            logger.error(f"❌ 初始化AI预测服务失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.ai_prediction_service = None
 
     def _on_confidence_threshold_changed(self, value):
         """置信度阈值变更处理"""
@@ -1369,26 +1469,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"更新置信度阈值配置失败: {e}")
-
-    def _initialize_ai_service(self):
-        """初始化AI预测服务"""
-        try:
-            from core.containers import get_service_container
-            from core.services.ai_prediction_service import AIPredictionService
-
-            service_container = get_service_container()
-
-            # 重新获取AI预测服务（会重新加载配置）
-            self.ai_prediction_service = service_container.resolve(AIPredictionService)
-
-            if self.ai_prediction_service:
-                logger.info("AI预测服务已重新初始化")
-            else:
-                logger.warning("AI预测服务初始化失败")
-
-        except Exception as e:
-            logger.error(f"初始化AI预测服务失败: {e}")
-            self.ai_prediction_service = None
 
     def start_backtest(self):
         """开始回测 - 增强版"""
@@ -1880,7 +1960,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 enable_historical=enable_historical,
                 config_manager=self.config_manager,
                 filters=filters,
-                selected_patterns=selected_patterns  # 将选择的形态列表传递给线程
+                selected_patterns=selected_patterns,  # 将选择的形态列表传递给线程
+                ai_prediction_service=self.ai_prediction_service,
+                prediction_days=self.prediction_days.value()
             )
 
             # 连接信号
@@ -1909,6 +1991,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         self.analysis_results = results if isinstance(results, dict) else {'patterns': []}
         if 'patterns' not in self.analysis_results:
             self.analysis_results['patterns'] = []
+
+        # 同时保存到last_analysis_results供AI预测使用
+        self.last_analysis_results = self.analysis_results
 
         logger.info(f"✅ 已保存分析结果，形态数量: {len(self.analysis_results.get('patterns', []))}")
         try:
@@ -2027,7 +2112,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             return self._generate_simulated_patterns_as_fallback()
 
     def _detect_patterns_with_real_algorithm(self):
-        """使用真实的形态识别算法"""
+        """使用真实的形态识别算法 - 专业扫描版本（深度扫描）"""
         try:
             from analysis.pattern_recognition import EnhancedPatternRecognizer
 
@@ -2036,22 +2121,25 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 获取灵敏度参数
             sensitivity = self.sensitivity_slider.value() / 100.0 if hasattr(self, 'sensitivity_slider') else 0.7
-            confidence_threshold = max(0.1, sensitivity * 0.5)
+            confidence_threshold = max(0.1, sensitivity * 0.3)  # 专业扫描使用更低阈值，检测更多形态
 
-            logger.info(f"📊 执行真实形态识别，置信度阈值: {confidence_threshold}")
+            logger.info(f"📊 专业扫描模式：执行深度形态识别，置信度阈值: {confidence_threshold}")
 
-            # 执行真实的形态识别 - 完整数据版
-            logger.info("🔍 开始执行完整形态识别...")
+            # 🔍 专业扫描特点：
+            # 1. 使用全部历史数据，不限制范围
+            # 2. 识别所有形态类型，不受用户选择限制
+            # 3. 使用较低的置信度阈值，发现更多潜在形态
+            # 4. 多轮扫描，确保不遗漏任何重要形态
 
             # 使用全部数据进行完整分析
             kdata_sample = self.current_kdata
-            logger.info(f"📊 使用全部 {len(kdata_sample)} 根K线进行完整分析")
+            logger.info(f"📊 专业扫描：使用全部 {len(kdata_sample)} 根K线进行深度分析")
 
             # 完整形态识别，不限制类型
             raw_patterns = recognizer.identify_patterns(
                 kdata_sample,
                 confidence_threshold=confidence_threshold,
-                pattern_types=None  # 识别所有类型
+                pattern_types=None  # 专业扫描识别所有类型，不受用户选择限制
             )
 
             logger.info(f"📈 完整分析：处理 {len(kdata_sample)} 根K线，检测所有形态类型")
@@ -2077,7 +2165,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     'price_change': self._calculate_price_change(),
                     'target_price': self._calculate_target_price(pattern_dict.get('pattern_name', '')),
                     'recommendation': self._get_recommendation(pattern_dict.get('pattern_name', ''), pattern_dict.get('confidence', 0.5)),
-                    'real_data': True  # 标记为真实数据
+                    'real_data': True,  # 标记为真实数据
+                    'analysis_type': 'professional',  # 专业扫描标识
+                    'scan_mode': 'deep'  # 深度扫描模式
                 }
                 processed_patterns.append(processed_pattern)
 
@@ -2085,7 +2175,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             processed_patterns.sort(key=lambda x: x['confidence'], reverse=True)
 
             # 返回所有处理后的形态，保持数据完整性
-            logger.info(f"🎯 真实算法处理完成，返回 {len(processed_patterns)} 个形态（完整数据）")
+            logger.info(f"🎯 专业扫描算法处理完成，返回 {len(processed_patterns)} 个形态（深度扫描结果）")
             return processed_patterns
 
         except ImportError as e:
@@ -2151,58 +2241,104 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         return min(final_confidence, 1.0)
 
-    def _generate_ml_predictions(self):
+    def _generate_ml_predictions(self, patterns: List[Dict] = None) -> Dict:
         """生成机器学习预测"""
+        logger.info("🧠 === _generate_ml_predictions 开始 ===")
+
         try:
             # 检查AI预测服务是否可用
             if self.ai_prediction_service and self.current_kdata is not None:
-                # 获取形态识别结果用于预测
-                patterns = []
-                if hasattr(self, 'last_analysis_results') and self.last_analysis_results:
-                    patterns = self.last_analysis_results.get('patterns', [])
+                # 如果没有传入patterns参数，则从last_analysis_results获取
+                if not patterns:
+                    if hasattr(self, 'last_analysis_results') and self.last_analysis_results:
+                        patterns = self.last_analysis_results.get('patterns', [])
+                        logger.info(f"📊 从 last_analysis_results 获取到 {len(patterns)} 个形态")
+                    else:
+                        patterns = []
+                        logger.info("📊 没有 last_analysis_results，使用空形态列表")
+
+                logger.info(f"🔍 正在使用 {len(patterns)} 个形态进行AI预测")
+                logger.info(f"📈 K线数据长度: {len(self.current_kdata)}")
+                logger.info(f"🧠 AI服务实例ID: {id(self.ai_prediction_service)}")
 
                 # 使用AI预测服务进行形态预测
+                logger.info("🎯 调用 AI服务的 predict_patterns 方法...")
                 pattern_prediction = self.ai_prediction_service.predict_patterns(
                     self.current_kdata, patterns
                 )
+                logger.info(f"📊 形态预测结果: {pattern_prediction}")
 
                 # 获取趋势预测
+                logger.info("📈 调用 AI服务的 predict_trend 方法...")
                 trend_prediction = self.ai_prediction_service.predict_trend(
                     self.current_kdata, self.prediction_days.value()
                 )
+                logger.info(f"📈 趋势预测结果: {trend_prediction}")
 
                 # 获取价格预测
+                logger.info("💰 调用 AI服务的 predict_price 方法...")
                 price_prediction = self.ai_prediction_service.predict_price(
                     self.current_kdata, self.prediction_days.value()
                 )
+                logger.info(f"💰 价格预测结果: {price_prediction}")
 
                 # 合并预测结果
                 predictions = {
-                    'model_type': self.model_combo.currentText(),
+                    'direction': pattern_prediction.get('direction', 'N/A'),
+                    'confidence': pattern_prediction.get('confidence', 0),
+                    'model_type': pattern_prediction.get('model_type', 'N/A'),
+                    'model_path': pattern_prediction.get('model_path', 'N/A'),
                     'prediction_horizon': self.prediction_days.value(),
-                    'confidence': pattern_prediction.get('confidence', 0.5),
-                    'direction': pattern_prediction.get('direction', '震荡'),
-                    'probability': pattern_prediction.get('confidence', 0.5),
-                    'target_range': {
-                        'low': price_prediction.get('target_low', 0),
-                        'high': price_prediction.get('target_high', 0)
-                    },
                     'pattern_prediction': pattern_prediction,
                     'trend_prediction': trend_prediction,
                     'price_prediction': price_prediction,
-                    'ai_model_used': True
+                    'ai_model_used': True,
+                    'timestamp': datetime.now().isoformat()
                 }
 
-                logger.info(f"AI预测完成: {predictions['direction']}, 置信度: {predictions['confidence']:.2f}")
+                # 导入并使用中文显示名称
+                try:
+                    from core.services.ai_prediction_service import get_model_display_name
+                    model_display_name = get_model_display_name(predictions['model_type'])
+                    predictions['model_display_name'] = model_display_name
+                except ImportError:
+                    predictions['model_display_name'] = predictions['model_type']
+
+                logger.info(f"✅ ML预测合并完成:")
+                logger.info(f"   📈 最终方向: {predictions['direction']}")
+                logger.info(f"   🎯 最终置信度: {predictions['confidence']}")
+                logger.info(f"   🧠 使用模型: {predictions.get('model_display_name', predictions['model_type'])}")
+                logger.info(f"   🛣️ 模型路径: {predictions['model_path']}")
+
                 return predictions
+
             else:
-                # 后备预测方案
-                logger.warning("AI预测服务不可用，使用后备预测方案")
-                return self._generate_fallback_predictions()
+                error_msg = []
+                if not self.ai_prediction_service:
+                    error_msg.append("AI预测服务不可用")
+                if self.current_kdata is None:
+                    error_msg.append("当前K线数据为空")
+
+                logger.error(f"❌ AI预测条件不满足: {', '.join(error_msg)}")
+                return {
+                    'direction': '数据不足',
+                    'confidence': 0,
+                    'model_type': 'error',
+                    'ai_model_used': False,
+                    'error': ', '.join(error_msg)
+                }
 
         except Exception as e:
-            logger.error(f"AI预测失败: {e}")
-            return self._generate_fallback_predictions()
+            logger.error(f"❌ 生成ML预测失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                'direction': '预测失败',
+                'confidence': 0,
+                'model_type': 'error',
+                'ai_model_used': False,
+                'error': str(e)
+            }
 
     def _generate_fallback_predictions(self):
         """生成后备预测结果"""
@@ -2555,18 +2691,35 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def ai_prediction(self):
         """AI预测"""
+        logger.info("🤖 === ai_prediction UI方法开始 ===")
+
         if not self.validate_kdata_with_warning():
+            logger.warning("⚠️ K线数据验证失败，退出AI预测")
             return
 
+        logger.info("📊 K线数据验证通过，开始AI预测...")
+        logger.info(f"🧠 当前AI服务状态: {self.ai_prediction_service is not None}")
+
+        if self.ai_prediction_service:
+            logger.info(f"🎯 AI服务中的模型类型: {self.ai_prediction_service.model_config.get('model_type', 'N/A')}")
+
         self.show_loading("AI正在分析预测...")
+        logger.info("🔄 启动异步分析线程...")
         self.run_analysis_async(self._ai_prediction_async)
 
     def _ai_prediction_async(self):
         """异步AI预测"""
+        logger.info("🔄 === _ai_prediction_async 异步方法开始 ===")
+
         try:
+            logger.info("📈 调用 _generate_ml_predictions...")
             predictions = self._generate_ml_predictions()
+            logger.info(f"📊 预测生成完成，结果: {predictions}")
             return {'predictions': predictions}
         except Exception as e:
+            logger.error(f"❌ 异步AI预测失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {'error': str(e)}
 
     def professional_scan(self):
@@ -3271,6 +3424,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             confidence = predictions.get('confidence', base_confidence)
             model_type = predictions.get('model_type', 'N/A')
+
+            # 获取中文模型名称
+            try:
+                from core.services.ai_prediction_service import get_model_display_name
+                model_display_name = get_model_display_name(model_type)
+            except ImportError:
+                model_display_name = model_type
+
             prediction_horizon = predictions.get('prediction_horizon', 5)
 
             # 获取详细预测信息
@@ -3335,7 +3496,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 ┌─────────────────────────────────────────────┐
 │  预测方向: {direction:<15} 置信度: {confidence*100:.1f}% 
 │  风险等级: {risk_color} {risk_level:<12} 预测周期: {prediction_horizon}天 
-│  使用模型: {model_type:<20} 
+│  使用模型: {model_display_name:<20} 
 └─────────────────────────────────────────────┘
 
 💰 价格分析
