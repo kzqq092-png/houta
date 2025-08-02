@@ -18,24 +18,18 @@ from utils.log_util import log_structured
 class MainMenuBar(QMenuBar):
     """主菜单栏"""
 
-    def __init__(self, coordinator=None, parent=None):
+    def __init__(self, parent=None):
         """初始化菜单栏
 
         Args:
-            coordinator: 主窗口协调器实例
             parent: 父窗口
         """
         try:
             super().__init__(parent)
 
-            # 保存coordinator引用
-            self.coordinator = coordinator
-
             # 初始化日志管理器
             if hasattr(parent, 'log_manager'):
                 self.log_manager = parent.log_manager
-            elif coordinator and hasattr(coordinator, 'log_manager'):
-                self.log_manager = coordinator.log_manager
             else:
                 from core.logger import LogManager
                 self.log_manager = LogManager()
@@ -115,17 +109,6 @@ class MainMenuBar(QMenuBar):
             self.exit_action.setStatusTip("退出程序")
             self.file_menu.addAction(self.exit_action)
 
-            # 连接文件菜单信号到coordinator
-            if self.coordinator:
-                self.new_action.triggered.connect(
-                    lambda: self.coordinator._on_new_file() if hasattr(self.coordinator, '_on_new_file') else None)
-                self.open_action.triggered.connect(
-                    lambda: self.coordinator._on_open_file() if hasattr(self.coordinator, '_on_open_file') else None)
-                self.save_action.triggered.connect(
-                    lambda: self.coordinator._on_save_file() if hasattr(self.coordinator, '_on_save_file') else None)
-                self.exit_action.triggered.connect(
-                    lambda: self.coordinator._on_exit() if hasattr(self.coordinator, '_on_exit') else None)
-
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化文件菜单失败: {str(e)}")
@@ -155,17 +138,6 @@ class MainMenuBar(QMenuBar):
             self.paste_action.setShortcut("Ctrl+V")
             self.edit_menu.addAction(self.paste_action)
 
-            # 连接编辑菜单信号到coordinator
-            if self.coordinator:
-                self.undo_action.triggered.connect(
-                    lambda: self.coordinator._on_undo() if hasattr(self.coordinator, '_on_undo') else None)
-                self.redo_action.triggered.connect(
-                    lambda: self.coordinator._on_redo() if hasattr(self.coordinator, '_on_redo') else None)
-                self.copy_action.triggered.connect(
-                    lambda: self.coordinator._on_copy() if hasattr(self.coordinator, '_on_copy') else None)
-                self.paste_action.triggered.connect(
-                    lambda: self.coordinator._on_paste() if hasattr(self.coordinator, '_on_paste') else None)
-
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化编辑菜单失败: {str(e)}")
@@ -187,41 +159,17 @@ class MainMenuBar(QMenuBar):
 
             self.view_menu.addSeparator()
 
-            # 刷新
-            self.refresh_action = QAction("刷新", self)
-            self.refresh_action.setStatusTip("刷新当前数据")
-            self.view_menu.addAction(self.refresh_action)
-
-            self.view_menu.addSeparator()
-
-            # 主题切换子菜单
-            self.theme_menu = self.view_menu.addMenu("主题")
-            self.default_theme_action = QAction("默认主题", self)
-            self.light_theme_action = QAction("浅色主题", self)
-            self.dark_theme_action = QAction("深色主题", self)
-            self.theme_menu.addAction(self.default_theme_action)
-            self.theme_menu.addAction(self.light_theme_action)
-            self.theme_menu.addAction(self.dark_theme_action)
-
-            # 性能仪表板
-            self.performance_panel_action = QAction("性能仪表板", self)
-            self.performance_panel_action.setCheckable(True)
-            self.performance_panel_action.setChecked(False)
-            self.performance_panel_action.setStatusTip("显示/隐藏性能仪表板")
-            self.view_menu.addAction(self.performance_panel_action)
-
-            # 连接信号到coordinator
-            if self.coordinator:
-                self.refresh_action.triggered.connect(
-                    lambda: self.coordinator._on_refresh() if hasattr(self.coordinator, '_on_refresh') else None)
-                self.default_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('default') if hasattr(self.coordinator, '_on_theme_changed') else None)
-                self.light_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('light') if hasattr(self.coordinator, '_on_theme_changed') else None)
-                self.dark_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('dark') if hasattr(self.coordinator, '_on_theme_changed') else None)
-                self.performance_panel_action.triggered.connect(
-                    lambda: self.coordinator._toggle_performance_panel() if hasattr(self.coordinator, '_toggle_performance_panel') else None)
+            # 移除主题切换子菜单，合并到设置
+            # self.theme_menu = self.view_menu.addMenu("主题")
+            # self.light_theme_action = QAction("浅色", self)
+            # self.dark_theme_action = QAction("深色", self)
+            # self.gradient_theme_action = QAction("渐变", self)
+            # self.theme_menu.addAction(self.light_theme_action)
+            # self.theme_menu.addAction(self.dark_theme_action)
+            # self.theme_menu.addAction(self.gradient_theme_action)
+            # self.light_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('light'))
+            # self.dark_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('dark'))
+            # self.gradient_theme_action.triggered.connect(lambda: self.parent.set_theme_by_menu('gradient'))
 
         except Exception as e:
             if self.log_manager:
@@ -390,49 +338,11 @@ class MainMenuBar(QMenuBar):
 
             self.tools_menu.addSeparator()
 
-            self.tools_menu.addSeparator()
-
-            # 高级搜索
-            self.advanced_search_action = QAction("高级搜索", self)
-            self.advanced_search_action.setStatusTip("打开高级搜索功能")
-            self.tools_menu.addAction(self.advanced_search_action)
-
-            # 数据导出
-            self.data_export_action = QAction("数据导出", self)
-            self.data_export_action.setStatusTip("导出数据")
-            self.tools_menu.addAction(self.data_export_action)
-
-            # 缓存管理子菜单
-            self.cache_menu = self.tools_menu.addMenu("缓存管理")
-            self.clear_data_cache_action = QAction("清理数据缓存", self)
-            self.clear_negative_cache_action = QAction("清理负缓存", self)
-            self.clear_all_cache_action = QAction("清理所有缓存", self)
-            self.cache_menu.addAction(self.clear_data_cache_action)
-            self.cache_menu.addAction(self.clear_negative_cache_action)
-            self.cache_menu.addAction(self.clear_all_cache_action)
-
-            self.tools_menu.addSeparator()
-
             # 设置
             self.settings_action = QAction("设置", self)
             self.settings_action.setShortcut("Ctrl+,")
             self.settings_action.setStatusTip("打开设置")
             self.tools_menu.addAction(self.settings_action)
-
-            # 连接工具菜单信号到coordinator
-            if self.coordinator:
-                self.advanced_search_action.triggered.connect(
-                    lambda: self.coordinator._on_advanced_search() if hasattr(self.coordinator, '_on_advanced_search') else None)
-                self.data_export_action.triggered.connect(
-                    lambda: self.coordinator._on_export_data() if hasattr(self.coordinator, '_on_export_data') else None)
-                self.clear_data_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_data_cache() if hasattr(self.coordinator, '_on_clear_data_cache') else None)
-                self.clear_negative_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_negative_cache() if hasattr(self.coordinator, '_on_clear_negative_cache') else None)
-                self.clear_all_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_all_cache() if hasattr(self.coordinator, '_on_clear_all_cache') else None)
-                self.settings_action.triggered.connect(
-                    lambda: self.coordinator._on_settings() if hasattr(self.coordinator, '_on_settings') else None)
 
         except Exception as e:
             if self.log_manager:
@@ -502,35 +412,6 @@ class MainMenuBar(QMenuBar):
             self.optimization_status_action.setStatusTip("查看优化系统状态")
             self.optimization_menu.addAction(self.optimization_status_action)
 
-            # 连接高级功能菜单信号到coordinator
-            if self.coordinator:
-                self.plugin_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_plugin_manager() if hasattr(self.coordinator, '_on_plugin_manager') else None)
-                self.plugin_market_action.triggered.connect(
-                    lambda: self.coordinator._on_plugin_market() if hasattr(self.coordinator, '_on_plugin_market') else None)
-                self.node_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_node_management() if hasattr(self.coordinator, '_on_node_management') else None)
-                self.cloud_api_action.triggered.connect(
-                    lambda: self.coordinator._on_cloud_api() if hasattr(self.coordinator, '_on_cloud_api') else None)
-                self.indicator_market_action.triggered.connect(
-                    lambda: self.coordinator._on_indicator_market() if hasattr(self.coordinator, '_on_indicator_market') else None)
-                self.batch_analysis_action.triggered.connect(
-                    lambda: self.coordinator._on_batch_analysis() if hasattr(self.coordinator, '_on_batch_analysis') else None)
-
-                # 优化系统菜单连接
-                self.optimization_dashboard_action.triggered.connect(
-                    lambda: self.coordinator._on_optimization_dashboard() if hasattr(self.coordinator, '_on_optimization_dashboard') else None)
-                self.one_click_optimize_action.triggered.connect(
-                    lambda: self.coordinator._on_one_click_optimization() if hasattr(self.coordinator, '_on_one_click_optimization') else None)
-                self.smart_optimize_action.triggered.connect(
-                    lambda: self.coordinator._on_intelligent_optimization() if hasattr(self.coordinator, '_on_intelligent_optimization') else None)
-                self.performance_evaluation_action.triggered.connect(
-                    lambda: self.coordinator._on_performance_evaluation() if hasattr(self.coordinator, '_on_performance_evaluation') else None)
-                self.version_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_version_management() if hasattr(self.coordinator, '_on_version_management') else None)
-                self.optimization_status_action.triggered.connect(
-                    lambda: self.coordinator._on_optimization_status() if hasattr(self.coordinator, '_on_optimization_status') else None)
-
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化高级功能菜单失败: {str(e)}")
@@ -540,13 +421,8 @@ class MainMenuBar(QMenuBar):
         try:
             self.toggle_log_action = QAction("显示/隐藏日志", self)
             self.toggle_log_action.setStatusTip("显示或隐藏日志输出区")
-            if self.coordinator and hasattr(self.coordinator, 'toggle_log_panel'):
-                self.toggle_log_action.triggered.connect(
-                    lambda: self.coordinator.toggle_log_panel())
-            else:
-                # 保持向后兼容
-                self.toggle_log_action.triggered.connect(
-                    lambda: self.parent.toggle_log_panel() if hasattr(self.parent, 'toggle_log_panel') else None)
+            self.toggle_log_action.triggered.connect(
+                lambda: self.parent.toggle_log_panel())
             self.debug_menu.addAction(self.toggle_log_action)
         except Exception as e:
             if self.log_manager:
@@ -567,18 +443,6 @@ class MainMenuBar(QMenuBar):
             self.help_action.setStatusTip("打开帮助文档")
             self.help_menu.addAction(self.help_action)
 
-            # 用户手册
-            self.user_manual_action = QAction("用户手册", self)
-            self.user_manual_action.setStatusTip("打开用户手册")
-            self.help_menu.addAction(self.user_manual_action)
-
-            # 快捷键
-            self.shortcuts_action = QAction("快捷键", self)
-            self.shortcuts_action.setStatusTip("查看快捷键列表")
-            self.help_menu.addAction(self.shortcuts_action)
-
-            self.help_menu.addSeparator()
-
             # 检查更新
             self.update_action = QAction("检查更新", self)
             self.update_action.setStatusTip("检查新版本")
@@ -586,32 +450,10 @@ class MainMenuBar(QMenuBar):
 
             self.help_menu.addSeparator()
 
-            # 数据使用条款
-            self.data_usage_terms_action = QAction("数据使用条款", self)
-            self.data_usage_terms_action.setStatusTip("查看数据使用条款")
-            self.help_menu.addAction(self.data_usage_terms_action)
-
-            self.help_menu.addSeparator()
-
             # 关于
             self.about_action = QAction("关于", self)
             self.about_action.setStatusTip("关于本程序")
             self.help_menu.addAction(self.about_action)
-
-            # 连接帮助菜单信号到coordinator
-            if self.coordinator:
-                self.startup_guides_action.triggered.connect(
-                    lambda: self.coordinator._on_startup_guides() if hasattr(self.coordinator, '_on_startup_guides') else None)
-                self.help_action.triggered.connect(
-                    lambda: self.coordinator._on_help() if hasattr(self.coordinator, '_on_help') else None)
-                self.user_manual_action.triggered.connect(
-                    lambda: self.coordinator._on_help() if hasattr(self.coordinator, '_on_help') else None)
-                self.shortcuts_action.triggered.connect(
-                    lambda: self.coordinator._on_shortcuts() if hasattr(self.coordinator, '_on_shortcuts') else None)
-                self.data_usage_terms_action.triggered.connect(
-                    lambda: self.coordinator._on_show_data_usage_terms() if hasattr(self.coordinator, '_on_show_data_usage_terms') else None)
-                self.about_action.triggered.connect(
-                    lambda: self.coordinator._on_about() if hasattr(self.coordinator, '_on_about') else None)
 
         except Exception as e:
             if self.log_manager:
