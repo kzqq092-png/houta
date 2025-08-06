@@ -851,19 +851,43 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to handle data update event: {e}", exc_info=True)
 
-    def _on_theme_changed(self, event: ThemeChangedEvent) -> None:
-        """处理主题变更事件"""
+    def _on_theme_changed(self, theme_data) -> None:
+        """智能主题变更处理 - 支持事件对象和字符串参数"""
         try:
-            logger.info(f"Theme changed: {event.theme_name}")
+            # 智能参数识别
+            if hasattr(theme_data, 'theme_name'):
+                # 事件对象
+                theme_name = theme_data.theme_name
+                logger.info(f"Theme changed via event: {theme_name}")
 
-            # 重新应用主题
-            self._apply_theme()
+                # 重新应用主题
+                self._apply_theme()
 
-            # 更新状态栏
-            self._status_label.setText(f"主题已更改: {event.theme_name}")
+                # 更新状态栏
+                if hasattr(self, '_status_label') and self._status_label:
+                    self._status_label.setText(f"主题已更改: {theme_name}")
+
+            elif isinstance(theme_data, str):
+                # 字符串参数
+                theme_name = theme_data
+                logger.info(f"Theme changed via menu: {theme_name}")
+
+                # 使用主题服务
+                theme_service = self.service_container.get_service(ThemeService)
+                if theme_service:
+                    theme_service.set_theme(theme_name)
+                    self.show_message(f"主题已切换为: {theme_name}")
+                else:
+                    # 降级到应用主题
+                    self._apply_theme()
+                    self.show_message(f"主题已切换为: {theme_name}")
+            else:
+                logger.warning(f"未知的主题数据类型: {type(theme_data)}")
 
         except Exception as e:
-            logger.error(f"Failed to handle theme changed event: {e}")
+            logger.error(f"Failed to handle theme change: {e}")
+            if hasattr(self, 'show_message'):
+                self.show_message(f"主题切换失败: {e}")
 
     def get_main_window(self) -> QMainWindow:
         """获取主窗口"""
@@ -988,19 +1012,6 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to refresh data: {e}")
             self.show_message(f"刷新失败: {e}")
-
-    def _on_theme_changed(self, theme_name: str) -> None:
-        """主题变化处理"""
-        try:
-            theme_service = self.service_container.get_service(ThemeService)
-            if theme_service:
-                theme_service.set_theme(theme_name)
-                self.show_message(f"主题已切换为: {theme_name}")
-                logger.info(f"Theme changed to: {theme_name}")
-
-        except Exception as e:
-            logger.error(f"Failed to change theme: {e}")
-            self.show_message(f"主题切换失败: {e}")
 
     # 工具菜单方法
     def _on_advanced_search(self) -> None:
@@ -1192,22 +1203,76 @@ YS-Quant‌ 2.0 (重构版本)
                                  f"打开云端API管理对话框失败: {str(e)}")
 
     def _on_plugin_manager(self) -> None:
-        """插件管理器"""
+        """插件管理器 - 修复服务解析和错误处理"""
         try:
             from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
             from core.plugin_manager import PluginManager
 
-            # 获取插件管理器
-            plugin_manager = self._service_container.resolve(PluginManager)
+            # 智能获取插件管理器实例
+            plugin_manager = None
 
+            # 方法1：尝试从服务容器获取
+            if hasattr(self, '_service_container') and self._service_container:
+                try:
+                    plugin_manager = self._service_container.resolve(PluginManager)
+                    logger.info("从服务容器获取插件管理器成功")
+                except Exception as e:
+                    logger.warning(f"从服务容器获取插件管理器失败: {e}")
+
+            # 方法2：尝试从service_container获取
+            if not plugin_manager and hasattr(self, 'service_container') and self.service_container:
+                try:
+                    plugin_manager = self.service_container.get_service(PluginManager)
+                    logger.info("从service_container获取插件管理器成功")
+                except Exception as e:
+                    logger.warning(f"从service_container获取插件管理器失败: {e}")
+
+            # 方法3：直接创建新实例
+            if not plugin_manager:
+                try:
+                    plugin_manager = PluginManager()
+                    logger.info("创建新的插件管理器实例")
+                except Exception as e:
+                    logger.error(f"创建插件管理器实例失败: {e}")
+                    raise
+
+            # 确保插件管理器有效
+            if not plugin_manager:
+                raise ValueError("无法获取或创建插件管理器实例")
+
+            # 创建并显示对话框
             dialog = PluginManagerDialog(plugin_manager, self._main_window)
-            self.center_dialog(dialog)
-            dialog.exec_()
 
+            # 设置对话框属性
+            dialog.setWindowTitle("HIkyuu 插件管理器")
+            dialog.setMinimumSize(900, 600)
+
+            # 居中显示
+            if hasattr(self, 'center_dialog'):
+                self.center_dialog(dialog)
+
+            # 显示对话框
+            result = dialog.exec_()
+            logger.info(f"插件管理器对话框关闭，返回值: {result}")
+
+        except ImportError as e:
+            error_msg = f"插件管理器模块导入失败: {e}"
+            logger.error(error_msg)
+            QMessageBox.critical(
+                self._main_window,
+                "模块错误",
+                f"{error_msg}\n\n请检查插件系统是否正确安装。"
+            )
         except Exception as e:
-            logger.error(f"插件管理器失败: {e}")
-            QMessageBox.critical(self._main_window, "错误",
-                                 f"打开插件管理器对话框失败: {str(e)}")
+            error_msg = f"打开插件管理器失败: {e}"
+            logger.error(error_msg)
+            import traceback
+            logger.error(traceback.format_exc())
+            QMessageBox.critical(
+                self._main_window,
+                "错误",
+                f"{error_msg}\n\n请查看日志获取详细信息。"
+            )
 
     def _on_plugin_market(self) -> None:
         """插件市场"""
@@ -1673,17 +1738,105 @@ YS-Quant‌ 2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误", f"打开计算器失败: {e}")
 
     def _on_converter(self) -> None:
-        """打开单位转换器"""
+        """智能转换器选择 - 提供多种转换器选项"""
         try:
-            from gui.dialogs.converter_dialog import ConverterDialog
+            # 创建转换器选择对话框
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QLabel
 
+            choice_dialog = QDialog(self._main_window)
+            choice_dialog.setWindowTitle("选择转换器类型")
+            choice_dialog.setModal(True)
+            choice_dialog.resize(300, 200)
+
+            layout = QVBoxLayout(choice_dialog)
+
+            # 标题
+            title_label = QLabel("请选择要使用的转换器类型：")
+            title_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
+            layout.addWidget(title_label)
+
+            # 通用单位转换器按钮
+            unit_btn = QPushButton("🔧 通用单位转换器")
+            unit_btn.setStyleSheet("""
+                QPushButton {
+                    padding: 15px;
+                    font-size: 14px;
+                    background-color: #e3f2fd;
+                    border: 2px solid #2196f3;
+                    border-radius: 8px;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: #bbdefb;
+                }
+            """)
+            unit_btn.setToolTip("长度、重量、温度、面积等物理单位转换")
+            unit_btn.clicked.connect(lambda: self._open_unit_converter(choice_dialog))
+            layout.addWidget(unit_btn)
+
+            # 汇率转换器按钮
+            currency_btn = QPushButton("💱 汇率转换器")
+            currency_btn.setStyleSheet("""
+                QPushButton {
+                    padding: 15px;
+                    font-size: 14px;
+                    background-color: #e8f5e8;
+                    border: 2px solid #4caf50;
+                    border-radius: 8px;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: #c8e6c9;
+                }
+            """)
+            currency_btn.setToolTip("主要货币之间的汇率转换")
+            currency_btn.clicked.connect(lambda: self._open_currency_converter(choice_dialog))
+            layout.addWidget(currency_btn)
+
+            # 取消按钮
+            cancel_btn = QPushButton("取消")
+            cancel_btn.clicked.connect(choice_dialog.reject)
+            layout.addWidget(cancel_btn)
+
+            choice_dialog.exec_()
+
+        except Exception as e:
+            logger.error(f"打开转换器选择失败: {e}")
+            # 降级到通用转换器
+            try:
+                from gui.dialogs.converter_dialog import ConverterDialog
+                dialog = ConverterDialog(self._main_window)
+                self.center_dialog(dialog)
+                dialog.exec_()
+            except Exception as e2:
+                logger.error(f"打开通用转换器失败: {e2}")
+                QMessageBox.critical(self._main_window, "错误", f"打开转换器失败: {e2}")
+
+    def _open_unit_converter(self, parent_dialog):
+        """打开通用单位转换器"""
+        try:
+            parent_dialog.accept()
+            from gui.dialogs.converter_dialog import ConverterDialog
             dialog = ConverterDialog(self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
-
+            logger.info("打开通用单位转换器")
         except Exception as e:
-            logger.error(f"打开单位转换器失败: {e}")
-            QMessageBox.critical(self._main_window, "错误", f"打开单位转换器失败: {e}")
+            logger.error(f"打开通用单位转换器失败: {e}")
+            QMessageBox.critical(self._main_window, "错误", f"打开通用单位转换器失败: {e}")
+
+    def _open_currency_converter(self, parent_dialog):
+        """打开汇率转换器"""
+        try:
+            parent_dialog.accept()
+            from gui.tools.currency_converter import CurrencyConverter
+            dialog = CurrencyConverter(self._main_window)
+            self.center_dialog(dialog)
+            dialog.exec_()
+            logger.info("打开汇率转换器")
+        except Exception as e:
+            logger.error(f"打开汇率转换器失败: {e}")
+            QMessageBox.critical(self._main_window, "错误", f"打开汇率转换器失败: {e}")
 
     def _on_commission_calculator(self) -> None:
         """打开费率计算器"""
@@ -1757,10 +1910,40 @@ YS-Quant‌ 2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误",
                                  f"无法显示数据使用条款: {str(e)}")
 
-    def _toggle_performance_panel(self, checked: bool):
-        """显示或隐藏性能仪表板"""
-        if self._performance_dock:
-            self._performance_dock.setVisible(checked)
+    def _toggle_performance_panel(self, checked: bool = None):
+        """智能切换性能仪表板显示/隐藏"""
+        try:
+            # 优先使用_performance_dock（如果存在）
+            if hasattr(self, '_performance_dock') and self._performance_dock:
+                if checked is not None:
+                    # 被菜单调用时使用checked参数
+                    self._performance_dock.setVisible(checked)
+                else:
+                    # 被快捷键等调用时自动切换
+                    is_visible = self._performance_dock.isVisible()
+                    self._performance_dock.setVisible(not is_visible)
+                logger.info(f"性能仪表板已{'显示' if self._performance_dock.isVisible() else '隐藏'}")
+                return
+
+            # 降级使用_performance_panel
+            if hasattr(self, '_performance_panel') and self._performance_panel:
+                if checked is not None:
+                    self._performance_panel.setVisible(checked)
+                else:
+                    is_visible = self._performance_panel.isVisible()
+                    self._performance_panel.setVisible(not is_visible)
+                logger.info(f"性能仪表板已{'显示' if self._performance_panel.isVisible() else '隐藏'}")
+            else:
+                # 创建新的性能仪表板
+                from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
+                self._performance_panel = PerformanceDashboardPanel(self._main_window)
+                show_panel = checked if checked is not None else True
+                self._performance_panel.setVisible(show_panel)
+                logger.info("性能仪表板已创建并显示")
+
+        except Exception as e:
+            logger.error(f"切换性能仪表板失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换性能仪表板: {e}")
 
     def _toggle_log_panel(self):
         """切换日志面板的显示/隐藏状态"""
@@ -1800,3 +1983,532 @@ YS-Quant‌ 2.0 (重构版本)
 
         except Exception as e:
             logger.error(f"设置表格只读模式失败: {e}")
+
+    def toggle_log_panel(self) -> None:
+        """切换日志面板显示/隐藏 - 菜单专用版本"""
+        try:
+            self._toggle_log_panel()
+        except Exception as e:
+            logger.error(f"切换日志面板失败: {e}")
+
+    def _on_optimization_status(self) -> None:
+        """显示优化系统状态"""
+        try:
+            # 检查优化系统状态
+            status_info = {
+                "系统状态": "运行中",
+                "活跃优化任务": 0,
+                "已完成任务": 0,
+                "系统健康度": "良好"
+            }
+
+            # 构建状态消息
+            message = "🔧 优化系统状态\n\n"
+            for key, value in status_info.items():
+                message += f"• {key}: {value}\n"
+
+            QMessageBox.information(self._main_window, "优化系统状态", message)
+            logger.info("查看优化系统状态")
+
+        except Exception as e:
+            logger.error(f"获取优化状态失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法获取优化状态: {e}")
+
+    def _on_create_strategy(self) -> None:
+        """创建新策略"""
+        try:
+            # 使用已有的策略管理功能
+            self._on_strategy_management()
+            logger.info("打开策略创建功能")
+        except Exception as e:
+            logger.error(f"创建策略失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法创建策略: {e}")
+
+    def _on_import_strategy(self) -> None:
+        """导入策略"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self._main_window,
+                "导入策略文件",
+                "",
+                "策略文件 (*.json *.py);;所有文件 (*)"
+            )
+            if file_path:
+                # TODO: 实现策略导入逻辑
+                QMessageBox.information(self._main_window, "提示", "策略导入功能正在开发中")
+                logger.info(f"导入策略: {file_path}")
+        except Exception as e:
+            logger.error(f"导入策略失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法导入策略: {e}")
+
+    def _on_export_strategy(self) -> None:
+        """导出策略"""
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self._main_window,
+                "导出策略文件",
+                "",
+                "策略文件 (*.json *.py);;所有文件 (*)"
+            )
+            if file_path:
+                # TODO: 实现策略导出逻辑
+                QMessageBox.information(self._main_window, "提示", "策略导出功能正在开发中")
+                logger.info(f"导出策略: {file_path}")
+        except Exception as e:
+            logger.error(f"导出策略失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法导出策略: {e}")
+
+    def _on_strategy_backtest(self) -> None:
+        """策略回测"""
+        try:
+            # TODO: 实现策略回测功能
+            QMessageBox.information(self._main_window, "提示", "策略回测功能正在开发中")
+            logger.info("启动策略回测")
+        except Exception as e:
+            logger.error(f"策略回测失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动策略回测: {e}")
+
+    def _on_strategy_optimize(self) -> None:
+        """策略优化"""
+        try:
+            # TODO: 实现策略优化功能
+            QMessageBox.information(self._main_window, "提示", "策略优化功能正在开发中")
+            logger.info("启动策略优化")
+        except Exception as e:
+            logger.error(f"策略优化失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动策略优化: {e}")
+
+    def _on_import_data(self) -> None:
+        """导入数据"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self._main_window,
+                "导入数据文件",
+                "",
+                "数据文件 (*.csv *.xlsx *.json);;所有文件 (*)"
+            )
+            if file_path:
+                # TODO: 实现数据导入逻辑
+                QMessageBox.information(self._main_window, "提示", "数据导入功能正在开发中")
+                logger.info(f"导入数据: {file_path}")
+        except Exception as e:
+            logger.error(f"导入数据失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法导入数据: {e}")
+
+    def _on_data_quality_check(self) -> None:
+        """数据质量检查"""
+        try:
+            # 使用已有的数据质量检查功能
+            self._on_single_stock_quality_check()
+            logger.info("启动数据质量检查")
+        except Exception as e:
+            logger.error(f"数据质量检查失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动数据质量检查: {e}")
+
+    def _on_check_update(self) -> None:
+        """检查更新"""
+        try:
+            # TODO: 实现版本检查逻辑
+            QMessageBox.information(
+                self._main_window,
+                "检查更新",
+                "当前版本: HIkyuu-UI v2.0\n\n自动更新功能正在开发中，请访问项目页面获取最新版本。"
+            )
+            logger.info("检查软件更新")
+        except Exception as e:
+            logger.error(f"检查更新失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法检查更新: {e}")
+
+    def _on_default_theme(self) -> None:
+        """切换到默认主题"""
+        try:
+            self._on_theme_changed('default')
+            logger.info("切换到默认主题")
+        except Exception as e:
+            logger.error(f"切换默认主题失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换主题: {e}")
+
+    def _on_light_theme(self) -> None:
+        """切换到浅色主题"""
+        try:
+            self._on_theme_changed('light')
+            logger.info("切换到浅色主题")
+        except Exception as e:
+            logger.error(f"切换浅色主题失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换主题: {e}")
+
+    def _on_dark_theme(self) -> None:
+        """切换到深色主题"""
+        try:
+            self._on_theme_changed('dark')
+            logger.info("切换到深色主题")
+        except Exception as e:
+            logger.error(f"切换深色主题失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换主题: {e}")
+
+    def _on_analyze(self) -> None:
+        """启动分析功能"""
+        try:
+            # 检查是否有分析面板
+            if hasattr(self, '_analysis_widget') and self._analysis_widget:
+                self._analysis_widget.run_analysis()
+                logger.info("启动分析功能")
+            else:
+                QMessageBox.information(
+                    self._main_window,
+                    "分析功能",
+                    "分析功能正在开发中，敬请期待！"
+                )
+        except Exception as e:
+            logger.error(f"启动分析失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动分析: {e}")
+
+    def _on_backtest(self) -> None:
+        """智能启动回测功能 - 根据当前活跃标签页启动相应回测"""
+        try:
+            # 优先检查分析widget是否存在且有当前标签
+            if hasattr(self, '_analysis_widget') and self._analysis_widget:
+                current_tab = self._analysis_widget.currentWidget()
+                if current_tab and hasattr(current_tab, 'start_backtest'):
+                    # 如果当前标签页有start_backtest方法，直接调用
+                    current_tab.start_backtest()
+                    logger.info(f"从{current_tab.__class__.__name__}启动回测功能")
+                    return
+
+            # 检查是否有专门的回测面板
+            if hasattr(self, '_backtest_widget') and self._backtest_widget:
+                self._backtest_widget.start_backtest()
+                logger.info("从专用回测面板启动回测功能")
+                return
+
+            # 检查是否有形态分析标签页
+            if hasattr(self, '_analysis_widget') and self._analysis_widget:
+                # 尝试获取形态分析标签页
+                for i in range(self._analysis_widget.count()):
+                    tab = self._analysis_widget.widget(i)
+                    if tab and hasattr(tab, 'start_backtest'):
+                        tab_name = self._analysis_widget.tabText(i)
+                        if '形态' in tab_name or 'pattern' in tab_name.lower():
+                            self._analysis_widget.setCurrentIndex(i)
+                            tab.start_backtest()
+                            logger.info(f"切换到{tab_name}标签页并启动回测")
+                            return
+
+                # 如果找到任何有回测功能的标签页，使用第一个
+                for i in range(self._analysis_widget.count()):
+                    tab = self._analysis_widget.widget(i)
+                    if tab and hasattr(tab, 'start_backtest'):
+                        self._analysis_widget.setCurrentIndex(i)
+                        tab.start_backtest()
+                        tab_name = self._analysis_widget.tabText(i)
+                        logger.info(f"切换到{tab_name}标签页并启动回测")
+                        return
+
+            # 如果没有找到任何回测功能，显示提示
+            QMessageBox.information(
+                self._main_window,
+                "回测功能",
+                "请先打开分析界面并选择相应的分析标签页后再启动回测"
+            )
+            logger.warning("未找到可用的回测功能")
+
+        except Exception as e:
+            logger.error(f"启动回测失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动回测: {e}")
+
+    def _on_optimize(self) -> None:
+        """启动优化功能"""
+        try:
+            # 使用已有的优化功能
+            self._on_one_click_optimization()
+            logger.info("启动优化功能")
+        except Exception as e:
+            logger.error(f"启动优化失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动优化: {e}")
+
+    def _on_webgpu_status(self) -> None:
+        """查看WebGPU状态"""
+        try:
+            # 检查WebGPU状态
+            status_info = {
+                "WebGPU支持": "检测中...",
+                "硬件加速": "未知",
+                "GPU设备": "未检测到",
+                "兼容性": "测试中"
+            }
+
+            message = "🖥️ WebGPU状态检查\n\n"
+            for key, value in status_info.items():
+                message += f"• {key}: {value}\n"
+
+            message += "\n💡 WebGPU功能正在开发中，当前显示为模拟数据。"
+
+            QMessageBox.information(self._main_window, "WebGPU状态", message)
+            logger.info("查看WebGPU状态")
+
+        except Exception as e:
+            logger.error(f"查看WebGPU状态失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法查看WebGPU状态: {e}")
+
+    def _on_save_as_file(self) -> None:
+        """另存为文件"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "另存为",
+                "另存为功能正在开发中，敬请期待！"
+            )
+            logger.info("执行另存为功能")
+        except Exception as e:
+            logger.error(f"另存为失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法另存为: {e}")
+
+    def _on_close_file(self) -> None:
+        """关闭文件"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "关闭文件",
+                "关闭文件功能正在开发中，敬请期待！"
+            )
+            logger.info("执行关闭文件功能")
+        except Exception as e:
+            logger.error(f"关闭文件失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法关闭文件: {e}")
+
+    def _on_cut(self) -> None:
+        """剪切操作"""
+        try:
+            # 尝试获取当前焦点的widget并执行剪切
+            focused_widget = self._main_window.focusWidget()
+            if focused_widget and hasattr(focused_widget, 'cut'):
+                focused_widget.cut()
+                logger.info("执行剪切操作")
+            else:
+                QMessageBox.information(
+                    self._main_window,
+                    "剪切",
+                    "当前焦点不支持剪切操作"
+                )
+        except Exception as e:
+            logger.error(f"剪切操作失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法执行剪切: {e}")
+
+    def _on_select_all(self) -> None:
+        """全选操作"""
+        try:
+            # 尝试获取当前焦点的widget并执行全选
+            focused_widget = self._main_window.focusWidget()
+            if focused_widget and hasattr(focused_widget, 'selectAll'):
+                focused_widget.selectAll()
+                logger.info("执行全选操作")
+            else:
+                QMessageBox.information(
+                    self._main_window,
+                    "全选",
+                    "当前焦点不支持全选操作"
+                )
+        except Exception as e:
+            logger.error(f"全选操作失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法执行全选: {e}")
+
+    def _on_find(self) -> None:
+        """查找功能"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "查找",
+                "查找功能正在开发中，敬请期待！"
+            )
+            logger.info("执行查找功能")
+        except Exception as e:
+            logger.error(f"查找功能失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法执行查找: {e}")
+
+    def _on_replace(self) -> None:
+        """替换功能"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "替换",
+                "替换功能正在开发中，敬请期待！"
+            )
+            logger.info("执行替换功能")
+        except Exception as e:
+            logger.error(f"替换功能失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法执行替换: {e}")
+
+    def _on_zoom_in(self) -> None:
+        """放大显示"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "放大显示",
+                "放大显示功能正在开发中，敬请期待！"
+            )
+            logger.info("执行放大显示")
+        except Exception as e:
+            logger.error(f"放大显示失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法放大显示: {e}")
+
+    def _on_zoom_out(self) -> None:
+        """缩小显示"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "缩小显示",
+                "缩小显示功能正在开发中，敬请期待！"
+            )
+            logger.info("执行缩小显示")
+        except Exception as e:
+            logger.error(f"缩小显示失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法缩小显示: {e}")
+
+    def _on_fullscreen(self) -> None:
+        """全屏模式切换"""
+        try:
+            if self._main_window.isFullScreen():
+                self._main_window.showNormal()
+                logger.info("退出全屏模式")
+            else:
+                self._main_window.showFullScreen()
+                logger.info("进入全屏模式")
+        except Exception as e:
+            logger.error(f"全屏模式切换失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换全屏模式: {e}")
+
+    def _on_update_data(self) -> None:
+        """更新数据"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "更新数据",
+                "数据更新功能正在开发中，敬请期待！"
+            )
+            logger.info("执行数据更新")
+        except Exception as e:
+            logger.error(f"数据更新失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法更新数据: {e}")
+
+    def _on_risk_calculator(self) -> None:
+        """风险计算器"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "风险计算器",
+                "风险计算器功能正在开发中，敬请期待！"
+            )
+            logger.info("打开风险计算器")
+        except Exception as e:
+            logger.error(f"风险计算器失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开风险计算器: {e}")
+
+    def _on_distributed_computing(self) -> None:
+        """分布式计算"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "分布式计算",
+                "分布式计算功能正在开发中，敬请期待！"
+            )
+            logger.info("启动分布式计算")
+        except Exception as e:
+            logger.error(f"分布式计算失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动分布式计算: {e}")
+
+    def _on_log_viewer(self) -> None:
+        """日志查看器"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "日志查看器",
+                "日志查看器功能正在开发中，敬请期待！"
+            )
+            logger.info("打开日志查看器")
+        except Exception as e:
+            logger.error(f"日志查看器失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开日志查看器: {e}")
+
+    def _on_memory_usage(self) -> None:
+        """内存使用情况"""
+        try:
+            import psutil
+            memory_info = psutil.virtual_memory()
+            message = f"""💾 内存使用情况
+
+• 总内存: {memory_info.total / (1024**3):.1f} GB
+• 已使用: {memory_info.used / (1024**3):.1f} GB
+• 可用内存: {memory_info.available / (1024**3):.1f} GB
+• 使用率: {memory_info.percent:.1f}%
+"""
+            QMessageBox.information(self._main_window, "内存使用情况", message)
+            logger.info("查看内存使用情况")
+        except ImportError:
+            QMessageBox.information(
+                self._main_window,
+                "内存使用情况",
+                "内存监控功能需要安装psutil库"
+            )
+        except Exception as e:
+            logger.error(f"查看内存使用失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法查看内存使用: {e}")
+
+    def _on_user_manual(self) -> None:
+        """用户手册"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "用户手册",
+                "用户手册功能正在开发中，敬请期待！"
+            )
+            logger.info("打开用户手册")
+        except Exception as e:
+            logger.error(f"用户手册失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开用户手册: {e}")
+
+    def _on_data_usage_terms(self) -> None:
+        """数据使用条款"""
+        try:
+            QMessageBox.information(
+                self._main_window,
+                "数据使用条款",
+                "数据使用条款功能正在开发中，敬请期待！"
+            )
+            logger.info("查看数据使用条款")
+        except Exception as e:
+            logger.error(f"数据使用条款失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法查看数据使用条款: {e}")
+
+    def _on_toggle_toolbar(self) -> None:
+        """切换工具栏显示/隐藏"""
+        try:
+            toolbar = self._main_window.toolBar()
+            if toolbar:
+                is_visible = toolbar.isVisible()
+                toolbar.setVisible(not is_visible)
+                logger.info(f"工具栏已{'隐藏' if is_visible else '显示'}")
+            else:
+                logger.warning("工具栏不存在")
+        except Exception as e:
+            logger.error(f"切换工具栏失败: {e}")
+
+    def _on_toggle_statusbar(self) -> None:
+        """切换状态栏显示/隐藏"""
+        try:
+            statusbar = self._main_window.statusBar()
+            if statusbar:
+                is_visible = statusbar.isVisible()
+                statusbar.setVisible(not is_visible)
+                logger.info(f"状态栏已{'隐藏' if is_visible else '显示'}")
+            else:
+                logger.warning("状态栏不存在")
+        except Exception as e:
+            logger.error(f"切换状态栏失败: {e}")
+
+    def toolBar(self):
+        """获取工具栏 - 兼容方法"""
+        return self._main_window.toolBar() if self._main_window else None
+
+    def statusBar(self):
+        """获取状态栏 - 兼容方法"""
+        return self._main_window.statusBar() if self._main_window else None

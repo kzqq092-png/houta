@@ -53,58 +53,6 @@ class AnalysisManager:
         self.data_access = data_access
         self._analysis_cache = {}  # 分析结果缓存
 
-    def analyze_stock(self, stock_code: str, analysis_type: str = 'technical') -> Optional[AnalysisResult]:
-        """
-        分析股票
-
-        Args:
-            stock_code: 股票代码
-            analysis_type: 分析类型 ('technical', 'fundamental', 'combined')
-
-        Returns:
-            分析结果
-        """
-        try:
-            # 检查缓存
-            cache_key = f"{stock_code}_{analysis_type}"
-            if cache_key in self._analysis_cache:
-                cached_result = self._analysis_cache[cache_key]
-                # 如果缓存时间不超过1小时，直接返回
-                if cached_result.analysis_time and (datetime.now() - cached_result.analysis_time).seconds < 3600:
-                    return cached_result
-
-            # 获取股票信息
-            stock_info = self.data_access.get_stock_info(stock_code)
-            if not stock_info:
-                self.logger.error(f"Stock {stock_code} not found")
-                return None
-
-            # 根据分析类型进行分析
-            if analysis_type == 'technical':
-                result = self._technical_analysis(stock_code, stock_info)
-            elif analysis_type == 'fundamental':
-                result = self._fundamental_analysis(stock_code, stock_info)
-            elif analysis_type == 'combined':
-                tech_result = self._technical_analysis(stock_code, stock_info)
-                fund_result = self._fundamental_analysis(
-                    stock_code, stock_info)
-                result = self._combine_analysis(tech_result, fund_result)
-            else:
-                self.logger.error(
-                    f"Unsupported analysis type: {analysis_type}")
-                return None
-
-            # 缓存结果
-            if result:
-                result.analysis_time = datetime.now()
-                self._analysis_cache[cache_key] = result
-
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Failed to analyze stock {stock_code}: {e}")
-            return None
-
     def _technical_analysis(self, stock_code: str, stock_info: StockInfo) -> Optional[AnalysisResult]:
         """技术分析"""
         try:

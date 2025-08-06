@@ -641,7 +641,6 @@ class EnhancedPluginManagerDialog(QDialog):
             }
             QFrame:hover {
                 border-color: #007bff;
-                box-shadow: 0 2px 8px rgba(0,123,255,0.15);
             }
         """)
 

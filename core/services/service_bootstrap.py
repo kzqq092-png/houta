@@ -191,6 +191,35 @@ class ServiceBootstrap:
             logger.error(f"❌ AI预测服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
+            # 注意：情绪数据服务需要在插件管理器注册后才能初始化
+        # 这里只注册服务，不立即初始化
+        try:
+            from .sentiment_data_service import SentimentDataService, SentimentDataServiceConfig
+
+            # 创建配置
+            sentiment_config = SentimentDataServiceConfig(
+                cache_duration_minutes=5,
+                auto_refresh_interval_minutes=10,
+                enable_auto_refresh=True
+            )
+
+            # 注册服务工厂（延迟初始化）
+            self.service_container.register_factory(
+                SentimentDataService,
+                lambda: SentimentDataService(
+                    plugin_manager=self.service_container.resolve(PluginManager) if self.service_container.is_registered(PluginManager) else None,
+                    config=sentiment_config,
+                    log_manager=logger
+                ),
+                scope=ServiceScope.SINGLETON
+            )
+
+            logger.info("✓ 情绪数据服务注册完成（延迟初始化）")
+
+        except Exception as e:
+            logger.error(f"❌ 情绪数据服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
     def _check_dependencies(self):
         """检查UnifiedDataManager的依赖项"""
         dependencies = ['config_service']
@@ -299,11 +328,42 @@ class ServiceBootstrap:
         logger.info("注册插件服务...")
 
         try:
-            self.service_container.register(
-                PluginManager, scope=ServiceScope.SINGLETON)
+            # 注册插件管理器，传递必要的依赖项
+            from utils.config_manager import ConfigManager
+
+            # 获取或创建ConfigManager
+            config_manager = None
+            if self.service_container.is_registered(ConfigManager):
+                config_manager = self.service_container.resolve(ConfigManager)
+            else:
+                config_manager = ConfigManager()
+
+            self.service_container.register_factory(
+                PluginManager,
+                lambda: PluginManager(
+                    plugin_dir="plugins",
+                    main_window=None,  # 稍后在主窗口创建时设置
+                    data_manager=None,  # 稍后设置
+                    config_manager=config_manager,
+                    log_manager=logger
+                ),
+                scope=ServiceScope.SINGLETON
+            )
+
             plugin_manager = self.service_container.resolve(PluginManager)
             plugin_manager.initialize()
             logger.info("✓ 插件管理器服务注册完成")
+
+            # 现在插件管理器可用，初始化情绪数据服务
+            try:
+                from .sentiment_data_service import SentimentDataService
+                if self.service_container.is_registered(SentimentDataService):
+                    sentiment_service = self.service_container.resolve(SentimentDataService)
+                    sentiment_service.initialize()
+                    logger.info("✓ 情绪数据服务初始化完成")
+            except Exception as sentiment_error:
+                logger.error(f"❌ 情绪数据服务初始化失败: {sentiment_error}")
+
         except Exception as e:
             logger.error(f"❌ 插件管理器服务注册失败: {e}")
             logger.error(traceback.format_exc())

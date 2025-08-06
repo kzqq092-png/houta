@@ -27,8 +27,8 @@ from plugins.plugin_interface import (
     plugin_type=PluginType.INDICATOR,
     category=PluginCategory.CORE,
     dependencies=["numpy", "pandas"],
-    min_ys_quant_version="2.0.0",
-    max_ys_quant_version="3.0.0",
+    min_hikyuu_version="1.0.0",
+    max_hikyuu_version="2.0.0",
     tags=["技术指标", "趋势分析", "MACD"],
     icon_path="icons/macd.png"
 )

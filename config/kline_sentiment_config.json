@@ -1,0 +1,65 @@
+{
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "TSLA",
+    "NVDA",
+    "META",
+    "NFLX",
+    "BABA",
+    "JD",
+    "PDD",
+    "BIDU",
+    "NIO",
+    "XPEV",
+    "LI",
+    "SPY",
+    "QQQ",
+    "IWM",
+    "VTI",
+    "COIN",
+    "MSTR"
+  ],
+  "update_interval": 30,
+  "chart_timeframes": [
+    "1m",
+    "5m",
+    "15m",
+    "1h",
+    "1d"
+  ],
+  "technical_indicators": [
+    "RSI",
+    "MACD",
+    "BB",
+    "SMA",
+    "EMA",
+    "VWAP",
+    "STOCH",
+    "ADX",
+    "CCI",
+    "MFI"
+  ],
+  "sentiment_sources": [
+    "technical",
+    "volume",
+    "volatility",
+    "momentum"
+  ],
+  "risk_levels": {
+    "low": {
+      "color": "#2ecc71",
+      "threshold": 0.3
+    },
+    "medium": {
+      "color": "#f39c12",
+      "threshold": 0.6
+    },
+    "high": {
+      "color": "#e74c3c",
+      "threshold": 1.0
+    }
+  }
+}

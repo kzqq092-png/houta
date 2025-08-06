@@ -18,3 +18,9 @@ __pycache__
 reports/*
 logs/*
 **/metrics.db
+*cursor*
+.cursorrules
+.cursour
+.cursor
+.cursorignore
+.cursorignore

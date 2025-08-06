@@ -146,6 +146,9 @@ class MarketSentimentWidget(BaseAnalysisTab):
         try:
             # 尝试使用情绪数据服务获取真实数据
             if hasattr(self, '_sentiment_service') and self._sentiment_service:
+                # 确保使用所有可用插件（清空选中插件列表）
+                self._sentiment_service.clear_selected_plugins()
+
                 response = self._sentiment_service.get_sentiment_data()
                 if response.success and response.data:
                     # 转换为组件期望的格式
@@ -451,7 +454,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
             self._skeleton_label = QLabel("加载中...", self)
             self._skeleton_label.setAlignment(Qt.AlignCenter)
             self._skeleton_label.setStyleSheet(
-                "font-size: 22px; color: #cccccc; background: #f7f9fa; border-radius: 12px; padding: 32px 0; border: 2px dashed #90caf9; box-shadow: 0 4px 24px rgba(33,150,243,0.10);")
+                "font-size: 22px; color: #cccccc; background: #f7f9fa; border-radius: 12px; padding: 32px 0; border: 2px dashed #90caf9;")
             try:
                 self._movie = QMovie("resources/images/loading.gif")
                 if self._movie.isValid():
@@ -1079,7 +1082,10 @@ class MarketSentimentWidget(BaseAnalysisTab):
         """尝试手动创建情绪数据服务"""
         try:
             from core.services.sentiment_data_service import SentimentDataService, SentimentDataServiceConfig
-            from plugins.sentiment_data_sources.akshare_sentiment_plugin import AkShareSentimentPlugin
+            from plugins.sentiment_data_sources import (
+                FMPSentimentPlugin, ExordeSentimentPlugin, NewsSentimentPlugin,
+                VIXSentimentPlugin, CryptoSentimentPlugin, AVAILABLE_PLUGINS
+            )
 
             # 创建服务配置
             config = SentimentDataServiceConfig(
@@ -1091,14 +1097,32 @@ class MarketSentimentWidget(BaseAnalysisTab):
             # 创建服务
             self._sentiment_service = SentimentDataService(config=config, log_manager=getattr(self, 'log_manager', None))
 
-            # 注册AkShare插件
-            akshare_plugin = AkShareSentimentPlugin()
-            self._sentiment_service.register_plugin('akshare', akshare_plugin, priority=10, weight=1.0)
+            # 注册真实数据源插件（排除模拟数据插件）
+            plugin_configs = [
+                # 只注册有真实API的插件
+                # ('fmp_sentiment', FMPSentimentPlugin, 10, 0.25),  # 需要API Key
+                # ('exorde_sentiment', ExordeSentimentPlugin, 20, 0.20),  # 需要API Key
+                # ('news_sentiment', NewsSentimentPlugin, 30, 0.15),  # 基于模拟数据，已禁用
+                ('vix_sentiment', VIXSentimentPlugin, 40, 0.50),  # 有真实数据源（Yahoo Finance）
+                # ('crypto_sentiment', CryptoSentimentPlugin, 50, 0.15),  # 需要API Key
+            ]
+
+            registered_count = 0
+            for plugin_name, plugin_class, priority, weight in plugin_configs:
+                try:
+                    plugin_instance = plugin_class()
+                    if self._sentiment_service.register_plugin(plugin_name, plugin_instance, priority=priority, weight=weight):
+                        registered_count += 1
+                        if hasattr(self, 'log_manager'):
+                            self.log_manager.info(f"✅ 市场情绪组件：注册插件: {plugin_name}")
+                except Exception as e:
+                    if hasattr(self, 'log_manager'):
+                        self.log_manager.warning(f"⚠️ 市场情绪组件：注册插件 {plugin_name} 失败: {e}")
 
             # 初始化服务
             if self._sentiment_service.initialize():
                 if hasattr(self, 'log_manager'):
-                    self.log_manager.info("✅ 市场情绪组件：手动创建情绪数据服务成功")
+                    self.log_manager.info(f"✅ 市场情绪组件：手动创建情绪数据服务成功，已注册 {registered_count} 个插件")
             else:
                 if hasattr(self, 'log_manager'):
                     self.log_manager.error("❌ 市场情绪组件：情绪数据服务初始化失败")

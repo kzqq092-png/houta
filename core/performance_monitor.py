@@ -13,6 +13,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import statistics
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,10 @@ class PerformanceMonitor:
         self.fast_threshold = 0.1  # 0.1秒
 
         logger.info("Performance monitor initialized")
+
+    def measure_time(self, name: str = None):
+        """测量时间上下文管理器"""
+        return TimingContext(self, name or "operation")
 
     def start_metric(self, name: str, metadata: Dict[str, Any] = None) -> str:
         """
@@ -363,3 +368,22 @@ def measure_data_load_performance(data_type: str, stock_code: str = None):
         stock_code: 股票代码
     """
     return get_performance_monitor().measure_data_load(data_type, stock_code)
+
+
+class TimingContext:
+    """时间测量上下文管理器"""
+
+    def __init__(self, monitor: PerformanceMonitor, name: str):
+        self.monitor = monitor
+        self.name = name
+        self.start_time = None
+        self.metric_id = None
+
+    def __enter__(self):
+        self.start_time = time.time()
+        self.metric_id = self.monitor.start_metric(self.name)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.metric_id:
+            self.monitor.end_metric(self.metric_id)

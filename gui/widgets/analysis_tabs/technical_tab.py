@@ -42,51 +42,52 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         super().__init__(config_manager)
 
     def create_ui(self):
-        """创建用户界面 - 增强版"""
+        """创建用户界面 - 修复版，解决UI重叠问题"""
         layout = QVBoxLayout(self)
+        layout.setSpacing(8)  # 设置合适的间距
 
-        # 指标选择和控制区域 - 调整高度和布局
+        # 指标选择和控制区域 - 使用更灵活的高度设置
         control_group = QGroupBox("指标控制")
-        control_group.setMaximumHeight(220)  # 限制最大高度
+        control_group.setMinimumHeight(180)  # 设置最小高度而不是最大高度
+        control_group.setMaximumHeight(250)  # 适当增加最大高度
         control_layout = QHBoxLayout(control_group)
+        control_layout.setSpacing(8)
 
         # 左侧：指标选择 - 更紧凑的布局
         indicator_card = QFrame()
         indicator_card.setFrameStyle(QFrame.StyledPanel)
         indicator_card.setStyleSheet(
-            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; }")
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 6px; }")
         indicator_layout = QVBoxLayout(indicator_card)
-        indicator_layout.setSpacing(2)  # 减少间距
-        indicator_layout.setContentsMargins(8, 8, 8, 8)  # 减少边距
+        indicator_layout.setSpacing(4)
+        indicator_layout.setContentsMargins(6, 6, 6, 6)
 
         # 指标分类选择 - 紧凑布局
         category_layout = QHBoxLayout()
         category_layout.setSpacing(4)
         category_layout.addWidget(QLabel("分类:"))
         self.category_combo = QComboBox()
-        self.category_combo.setMaximumHeight(28)  # 限制高度
+        self.category_combo.setMaximumHeight(28)
         category_indicators = get_all_indicators_by_category(use_chinese=True)
         categories = ["全部"] + list(category_indicators.keys())
         self.category_combo.addItems(categories)
-        self.category_combo.currentTextChanged.connect(
-            self.on_category_changed)
+        self.category_combo.currentTextChanged.connect(self.on_category_changed)
         category_layout.addWidget(self.category_combo)
         indicator_layout.addLayout(category_layout)
 
         # 指标选择组合框 - 显示所有ta-lib指标
         self.indicator_combo = QComboBox()
-        self.indicator_combo.setMaximumHeight(28)  # 限制高度
-        self.indicator_combo.setEditable(True)  # 允许搜索
+        self.indicator_combo.setMaximumHeight(28)
+        self.indicator_combo.setEditable(True)
         self.indicator_combo.setInsertPolicy(QComboBox.NoInsert)
-        self.populate_indicators("全部")  # 初始显示所有指标
-        self.indicator_combo.currentTextChanged.connect(
-            self.on_indicator_changed)
+        self.populate_indicators("全部")
+        self.indicator_combo.currentTextChanged.connect(self.on_indicator_changed)
         self.indicator_combo.setToolTip("选择要计算的技术指标，支持搜索")
         indicator_layout.addWidget(self.indicator_combo)
 
         # 批量选择 - 水平紧凑布局
         batch_layout = QHBoxLayout()
-        batch_layout.setSpacing(8)
+        batch_layout.setSpacing(6)
         self.batch_checkbox = QCheckBox("批量计算")
         self.batch_checkbox.setToolTip("选择多个指标进行批量计算")
         self.batch_checkbox.stateChanged.connect(self.toggle_batch_mode)
@@ -94,8 +95,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.auto_calc_checkbox = QCheckBox("自动计算")
         self.auto_calc_checkbox.setChecked(True)
         self.auto_calc_checkbox.setToolTip("数据更新时自动重新计算指标")
-        self.auto_calc_checkbox.stateChanged.connect(
-            self.toggle_auto_calculate)
+        self.auto_calc_checkbox.stateChanged.connect(self.toggle_auto_calculate)
 
         batch_layout.addWidget(self.batch_checkbox)
         batch_layout.addWidget(self.auto_calc_checkbox)
@@ -106,13 +106,15 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         button_layout = QHBoxLayout()
         button_layout.setSpacing(4)
 
-        self.calc_btn = QPushButton("计算指标")  # 保存引用
+        self.calc_btn = QPushButton("计算指标")
+        self.calc_btn.setMaximumHeight(30)  # 限制按钮高度
         self.calc_btn.setStyleSheet(
             "QPushButton { background-color: #007bff; color: white; font-weight: bold; padding: 4px 8px; }")
         self.calc_btn.clicked.connect(self.calculate_indicators)
         self.calc_btn.setToolTip("根据当前设置计算选定的技术指标\n快捷键：Ctrl+Enter")
 
         clear_indicators_btn = QPushButton("清除")
+        clear_indicators_btn.setMaximumHeight(30)
         clear_indicators_btn.setStyleSheet(
             "QPushButton { background-color: #6c757d; color: white; font-weight: bold; padding: 4px 8px; }")
         clear_indicators_btn.clicked.connect(self.clear_indicators)
@@ -120,6 +122,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 新增：缓存管理按钮
         cache_btn = QPushButton("清缓存")
+        cache_btn.setMaximumHeight(30)
         cache_btn.setStyleSheet(
             "QPushButton { background-color: #ffc107; color: black; font-weight: bold; padding: 4px 8px; }")
         cache_btn.clicked.connect(self.clear_cache)
@@ -132,11 +135,13 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         control_layout.addWidget(indicator_card, stretch=2)
 
-        # 右侧：动态参数设置 - 根据选择的指标动态变化，优化布局
+        # 右侧：动态参数设置 - 优化布局以防止重叠
         params_card = QFrame()
         params_card.setFrameStyle(QFrame.StyledPanel)
         params_card.setStyleSheet(
-            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; }")
+            "QFrame { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 6px; }")
+        params_card.setMinimumHeight(180)  # 设置最小高度
+        params_card.setMaximumHeight(250)  # 设置最大高度以防重叠
 
         # 使用滚动区域来确保所有参数都能显示
         params_scroll_area = QScrollArea()
@@ -144,21 +149,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         params_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         params_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         params_scroll_area.setFrameStyle(QFrame.NoFrame)
+        params_scroll_area.setMaximumHeight(240)  # 限制滚动区域高度
 
         # 参数容器
         params_container = QWidget()
         self.params_layout = QVBoxLayout(params_container)
-        self.params_layout.setSpacing(4)  # 适当间距
-        self.params_layout.setContentsMargins(8, 8, 8, 8)
+        self.params_layout.setSpacing(3)
+        self.params_layout.setContentsMargins(6, 6, 6, 6)
 
         # 参数预设 - 紧凑布局
         preset_layout = QHBoxLayout()
         preset_layout.setSpacing(4)
         preset_layout.addWidget(QLabel("预设:"))
         self.preset_combo = QComboBox()
-
         self.preset_combo.setFixedWidth(100)
-        self.preset_combo.setMinimumHeight(28)
+        self.preset_combo.setMaximumHeight(28)
         self.preset_combo.addItems(["自定义", "短期交易", "中期投资", "长期投资"])
         self.preset_combo.currentTextChanged.connect(self.apply_preset_params)
         preset_layout.addWidget(self.preset_combo)
@@ -168,41 +173,40 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 动态参数区域
         self.dynamic_params_widget = QWidget()
         self.dynamic_params_layout = QVBoxLayout(self.dynamic_params_widget)
-        self.dynamic_params_layout.setSpacing(1)  # 适当间距
+        self.dynamic_params_layout.setSpacing(2)
         self.dynamic_params_layout.setContentsMargins(0, 0, 0, 0)
         self.params_layout.addWidget(self.dynamic_params_widget)
 
-        # 参数信息显示区域
+        # 参数信息显示区域 - 限制高度
         info_group = QGroupBox("参数信息")
-        info_group.setMaximumHeight(120)
+        info_group.setMaximumHeight(80)  # 减少高度以防重叠
         info_layout = QVBoxLayout(info_group)
+        info_layout.setContentsMargins(4, 4, 4, 4)
 
         self.param_info_label = QLabel("选择指标后显示参数说明")
         self.param_info_label.setWordWrap(True)
         self.param_info_label.setStyleSheet(
-            "QLabel { font-size: 11px; color: #6c757d; padding: 4px; background-color: #f8f9fa; border-radius: 4px; }")
+            "QLabel { font-size: 10px; color: #6c757d; padding: 2px; background-color: #f8f9fa; border-radius: 4px; }")
         info_layout.addWidget(self.param_info_label)
 
         self.params_layout.addWidget(info_group)
-        self.params_layout.addStretch()  # 添加弹性空间
+        self.params_layout.addStretch()
 
         # 设置滚动区域
         params_scroll_area.setWidget(params_container)
 
         # 将滚动区域添加到主卡片
         params_card_layout = QVBoxLayout(params_card)
-        params_card_layout.setContentsMargins(4, 4, 4, 4)
+        params_card_layout.setContentsMargins(2, 2, 2, 2)
         params_card_layout.addWidget(params_scroll_area)
 
         # 参数控件字典
         self.param_controls = {}
 
-        # 初始化参数界面 - 确保有默认指标
+        # 初始化参数界面
         if self.indicator_combo.count() > 0:
-            # 如果没有选中任何指标，选择第一个
             if not self.indicator_combo.currentText():
                 self.indicator_combo.setCurrentIndex(0)
-            # 手动触发参数界面更新
             current_indicator = self.indicator_combo.currentText()
             if current_indicator:
                 self.update_parameter_interface(current_indicator)
@@ -212,100 +216,78 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         control_layout.addWidget(params_card, stretch=3)
         layout.addWidget(control_group)
 
-        # 结果显示区域
+        # 结果显示区域 - 使用伸缩布局
         results_group = QGroupBox("计算结果")
         results_layout = QVBoxLayout(results_group)
+        results_layout.setSpacing(6)
 
         # 统计信息和控制按钮 - 顶部工具栏
         toolbar_layout = QHBoxLayout()
-        toolbar_layout.setSpacing(10)
+        toolbar_layout.setSpacing(8)
 
         # 统计信息
         self.stats_label = QLabel("统计信息: 无数据")
-        self.stats_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #495057; }")
+        self.stats_label.setStyleSheet("QLabel { font-weight: bold; color: #495057; }")
         toolbar_layout.addWidget(self.stats_label)
 
         self.performance_label = QLabel("性能: 无统计")
-        self.performance_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #6c757d; }")
+        self.performance_label.setStyleSheet("QLabel { font-weight: bold; color: #6c757d; }")
         toolbar_layout.addWidget(self.performance_label)
 
         toolbar_layout.addStretch()
 
-        # 筛选控制按钮
+        # 筛选控制按钮 - 减少按钮数量以节省空间
         filter_group = QWidget()
         filter_layout = QHBoxLayout(filter_group)
         filter_layout.setContentsMargins(0, 0, 0, 0)
-        filter_layout.setSpacing(5)
+        filter_layout.setSpacing(4)
 
         # 高级筛选按钮
-        self.advanced_filter_btn = QPushButton("🔍 高级筛选")
+        self.advanced_filter_btn = QPushButton("🔍 筛选")
+        self.advanced_filter_btn.setMaximumHeight(28)
         self.advanced_filter_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
                 color: white;
                 border: none;
-                padding: 6px 12px;
+                padding: 4px 8px;
                 border-radius: 4px;
-                font-weight: bold;
+                font-size: 11px;
             }
-            QPushButton:hover {
-                background-color: #0056b3;
-            }
+            QPushButton:hover { background-color: #0056b3; }
         """)
         self.advanced_filter_btn.clicked.connect(self.show_advanced_filter_dialog)
 
-        # 指标选股
-        self.batch_filter_btn = QPushButton("🔍 指标选股")
-        self.batch_filter_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0056b3;
-            }
-        """)
-        self.batch_filter_btn.clicked.connect(self.show_batch_filter_dialog)
-
-        filter_layout.addWidget(self.advanced_filter_btn)
-        filter_layout.addWidget(self.batch_filter_btn)
-
         # 清除筛选按钮
-        self.clear_filter_btn = QPushButton("✖️ 清除筛选")
+        self.clear_filter_btn = QPushButton("✖️ 清除")
+        self.clear_filter_btn.setMaximumHeight(28)
         self.clear_filter_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;
                 color: white;
                 border: none;
-                padding: 6px 12px;
+                padding: 4px 8px;
                 border-radius: 4px;
+                font-size: 11px;
             }
-            QPushButton:hover {
-                background-color: #545b62;
-            }
+            QPushButton:hover { background-color: #545b62; }
         """)
         self.clear_filter_btn.clicked.connect(self.clear_table_filters)
-        self.clear_filter_btn.setEnabled(False)  # 初始状态禁用
+        self.clear_filter_btn.setEnabled(False)
+
+        filter_layout.addWidget(self.advanced_filter_btn)
         filter_layout.addWidget(self.clear_filter_btn)
 
         # 筛选状态标签
         self.filter_status_label = QLabel("")
-        self.filter_status_label.setStyleSheet(
-            "QLabel { color: #28a745; font-weight: bold; }")
+        self.filter_status_label.setStyleSheet("QLabel { color: #28a745; font-weight: bold; font-size: 11px; }")
         filter_layout.addWidget(self.filter_status_label)
 
         toolbar_layout.addWidget(filter_group)
-
         results_layout.addLayout(toolbar_layout)
 
-        # 结果表格
-        self.technical_table = QTableWidget(0, 8)  # 增加列数
+        # 结果表格 - 使用伸缩布局，让表格占用剩余空间
+        self.technical_table = QTableWidget(0, 8)
         self.technical_table.setHorizontalHeaderLabels([
             '日期', '指标', '数值', '信号', '强度', '趋势', '建议', '备注'
         ])
@@ -322,11 +304,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 alternate-background-color: #f8f9fa;
                 selection-background-color: #e3f2fd;
                 font-family: 'Microsoft YaHei', Arial, sans-serif;
-                font-size: 12px;
-                height: 15px;
+                font-size: 11px;
             }
             QTableWidget::item {
-                padding: 8px;
+                padding: 6px;
                 border-bottom: 1px solid #e0e0e0;
             }
             QTableWidget::item:selected {
@@ -336,31 +317,32 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             QHeaderView::section {
                 background-color: #37474f;
                 color: white;
-                padding: 10px;
+                padding: 8px;
                 border: none;
                 font-weight: bold;
-                font-size: 12px;
-                height: 15px;
+                font-size: 11px;
             }
             QHeaderView::section:hover {
                 background-color: #455a64;
             }
         """)
 
-        # 设置列宽 - 修复显示问题
+        # 设置列宽
         header = self.technical_table.horizontalHeader()
         header.setStretchLastSection(True)
 
         # 设置行高
-        self.technical_table.verticalHeader().setDefaultSectionSize(35)
-        self.technical_table.verticalHeader().setVisible(False)  # 隐藏行号
+        self.technical_table.verticalHeader().setDefaultSectionSize(30)  # 减少行高
+        self.technical_table.verticalHeader().setVisible(False)
 
-        results_layout.addWidget(self.technical_table)
+        results_layout.addWidget(self.technical_table, stretch=1)  # 表格占用剩余空间
 
-        # 导出按钮
+        # 导出按钮 - 简化
         export_group = self.create_export_section()
+        export_group.setMaximumHeight(60)  # 限制导出区域高度
         results_layout.addWidget(export_group)
-        layout.addWidget(results_group)
+
+        layout.addWidget(results_group, stretch=1)  # 结果区域占用剩余空间
 
     def populate_indicators(self, category: str):
         """根据分类填充指标选择框 - 增强版，整合形态数据"""

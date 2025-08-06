@@ -81,6 +81,9 @@ class MainMenuBar(QMenuBar):
         self.init_debug_menu()
         self.init_help_menu()
 
+        # 所有菜单创建完成后，统一连接信号
+        self.connect_signals()
+
     def init_file_menu(self):
         """初始化文件菜单"""
         try:
@@ -115,16 +118,7 @@ class MainMenuBar(QMenuBar):
             self.exit_action.setStatusTip("退出程序")
             self.file_menu.addAction(self.exit_action)
 
-            # 连接文件菜单信号到coordinator
-            if self.coordinator:
-                self.new_action.triggered.connect(
-                    lambda: self.coordinator._on_new_file() if hasattr(self.coordinator, '_on_new_file') else None)
-                self.open_action.triggered.connect(
-                    lambda: self.coordinator._on_open_file() if hasattr(self.coordinator, '_on_open_file') else None)
-                self.save_action.triggered.connect(
-                    lambda: self.coordinator._on_save_file() if hasattr(self.coordinator, '_on_save_file') else None)
-                self.exit_action.triggered.connect(
-                    lambda: self.coordinator._on_exit() if hasattr(self.coordinator, '_on_exit') else None)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
             if self.log_manager:
@@ -155,16 +149,7 @@ class MainMenuBar(QMenuBar):
             self.paste_action.setShortcut("Ctrl+V")
             self.edit_menu.addAction(self.paste_action)
 
-            # 连接编辑菜单信号到coordinator
-            if self.coordinator:
-                self.undo_action.triggered.connect(
-                    lambda: self.coordinator._on_undo() if hasattr(self.coordinator, '_on_undo') else None)
-                self.redo_action.triggered.connect(
-                    lambda: self.coordinator._on_redo() if hasattr(self.coordinator, '_on_redo') else None)
-                self.copy_action.triggered.connect(
-                    lambda: self.coordinator._on_copy() if hasattr(self.coordinator, '_on_copy') else None)
-                self.paste_action.triggered.connect(
-                    lambda: self.coordinator._on_paste() if hasattr(self.coordinator, '_on_paste') else None)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
             if self.log_manager:
@@ -212,14 +197,25 @@ class MainMenuBar(QMenuBar):
 
             # 连接信号到coordinator
             if self.coordinator:
+                # 工具栏和状态栏切换
+                self.toolbar_action.triggered.connect(
+                    lambda checked: self.coordinator._main_window.toolBar().setVisible(checked))
+                self.statusbar_action.triggered.connect(
+                    lambda checked: self.coordinator._main_window.statusBar().setVisible(checked))
+
+                # 刷新功能
                 self.refresh_action.triggered.connect(
                     lambda: self.coordinator._on_refresh() if hasattr(self.coordinator, '_on_refresh') else None)
+
+                # 主题切换
                 self.default_theme_action.triggered.connect(
                     lambda: self.coordinator._on_theme_changed('default') if hasattr(self.coordinator, '_on_theme_changed') else None)
                 self.light_theme_action.triggered.connect(
                     lambda: self.coordinator._on_theme_changed('light') if hasattr(self.coordinator, '_on_theme_changed') else None)
                 self.dark_theme_action.triggered.connect(
                     lambda: self.coordinator._on_theme_changed('dark') if hasattr(self.coordinator, '_on_theme_changed') else None)
+
+                # 性能仪表板
                 self.performance_panel_action.triggered.connect(
                     lambda: self.coordinator._toggle_performance_panel() if hasattr(self.coordinator, '_toggle_performance_panel') else None)
 
@@ -297,25 +293,7 @@ class MainMenuBar(QMenuBar):
             self.strategy_optimize_action.setStatusTip("优化策略参数")
             self.strategy_menu.addAction(self.strategy_optimize_action)
 
-            # 连接信号
-            if hasattr(self.parent, 'show_strategy_manager'):
-                self.strategy_manager_action.triggered.connect(
-                    self.parent.show_strategy_manager)
-            if hasattr(self.parent, 'create_new_strategy'):
-                self.create_strategy_action.triggered.connect(
-                    self.parent.create_new_strategy)
-            if hasattr(self.parent, 'import_strategy'):
-                self.import_strategy_action.triggered.connect(
-                    self.parent.import_strategy)
-            if hasattr(self.parent, 'export_strategy'):
-                self.export_strategy_action.triggered.connect(
-                    self.parent.export_strategy)
-            if hasattr(self.parent, 'backtest_strategy'):
-                self.strategy_backtest_action.triggered.connect(
-                    self.parent.backtest_strategy)
-            if hasattr(self.parent, 'optimize_strategy'):
-                self.strategy_optimize_action.triggered.connect(
-                    self.parent.optimize_strategy)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
             if self.log_manager:
@@ -357,6 +335,17 @@ class MainMenuBar(QMenuBar):
             self.data_quality_action = QAction("数据质量检查", self)
             self.data_quality_action.setStatusTip("检查数据质量")
             self.data_menu.addAction(self.data_quality_action)
+
+            # 连接信号到coordinator
+            if self.coordinator:
+                self.import_data_action.triggered.connect(
+                    lambda: self.coordinator._on_import_data() if hasattr(self.coordinator, '_on_import_data') else None)
+                self.export_data_action.triggered.connect(
+                    lambda: self.coordinator._on_export_data() if hasattr(self.coordinator, '_on_export_data') else None)
+                self.database_admin_action.triggered.connect(
+                    lambda: self.coordinator._on_database_admin() if hasattr(self.coordinator, '_on_database_admin') else None)
+                self.data_quality_action.triggered.connect(
+                    lambda: self.coordinator._on_data_quality_check() if hasattr(self.coordinator, '_on_data_quality_check') else None)
 
         except Exception as e:
             if self.log_manager:
@@ -419,20 +408,7 @@ class MainMenuBar(QMenuBar):
             self.settings_action.setStatusTip("打开设置")
             self.tools_menu.addAction(self.settings_action)
 
-            # 连接工具菜单信号到coordinator
-            if self.coordinator:
-                self.advanced_search_action.triggered.connect(
-                    lambda: self.coordinator._on_advanced_search() if hasattr(self.coordinator, '_on_advanced_search') else None)
-                self.data_export_action.triggered.connect(
-                    lambda: self.coordinator._on_export_data() if hasattr(self.coordinator, '_on_export_data') else None)
-                self.clear_data_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_data_cache() if hasattr(self.coordinator, '_on_clear_data_cache') else None)
-                self.clear_negative_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_negative_cache() if hasattr(self.coordinator, '_on_clear_negative_cache') else None)
-                self.clear_all_cache_action.triggered.connect(
-                    lambda: self.coordinator._on_clear_all_cache() if hasattr(self.coordinator, '_on_clear_all_cache') else None)
-                self.settings_action.triggered.connect(
-                    lambda: self.coordinator._on_settings() if hasattr(self.coordinator, '_on_settings') else None)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
             if self.log_manager:
@@ -502,34 +478,9 @@ class MainMenuBar(QMenuBar):
             self.optimization_status_action.setStatusTip("查看优化系统状态")
             self.optimization_menu.addAction(self.optimization_status_action)
 
-            # 连接高级功能菜单信号到coordinator
-            if self.coordinator:
-                self.plugin_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_plugin_manager() if hasattr(self.coordinator, '_on_plugin_manager') else None)
-                self.plugin_market_action.triggered.connect(
-                    lambda: self.coordinator._on_plugin_market() if hasattr(self.coordinator, '_on_plugin_market') else None)
-                self.node_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_node_management() if hasattr(self.coordinator, '_on_node_management') else None)
-                self.cloud_api_action.triggered.connect(
-                    lambda: self.coordinator._on_cloud_api() if hasattr(self.coordinator, '_on_cloud_api') else None)
-                self.indicator_market_action.triggered.connect(
-                    lambda: self.coordinator._on_indicator_market() if hasattr(self.coordinator, '_on_indicator_market') else None)
-                self.batch_analysis_action.triggered.connect(
-                    lambda: self.coordinator._on_batch_analysis() if hasattr(self.coordinator, '_on_batch_analysis') else None)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
-                # 优化系统菜单连接
-                self.optimization_dashboard_action.triggered.connect(
-                    lambda: self.coordinator._on_optimization_dashboard() if hasattr(self.coordinator, '_on_optimization_dashboard') else None)
-                self.one_click_optimize_action.triggered.connect(
-                    lambda: self.coordinator._on_one_click_optimization() if hasattr(self.coordinator, '_on_one_click_optimization') else None)
-                self.smart_optimize_action.triggered.connect(
-                    lambda: self.coordinator._on_intelligent_optimization() if hasattr(self.coordinator, '_on_intelligent_optimization') else None)
-                self.performance_evaluation_action.triggered.connect(
-                    lambda: self.coordinator._on_performance_evaluation() if hasattr(self.coordinator, '_on_performance_evaluation') else None)
-                self.version_manager_action.triggered.connect(
-                    lambda: self.coordinator._on_version_management() if hasattr(self.coordinator, '_on_version_management') else None)
-                self.optimization_status_action.triggered.connect(
-                    lambda: self.coordinator._on_optimization_status() if hasattr(self.coordinator, '_on_optimization_status') else None)
+            # 注意：优化系统菜单的信号连接已在connect_signals方法中统一处理
 
         except Exception as e:
             if self.log_manager:
@@ -598,20 +549,7 @@ class MainMenuBar(QMenuBar):
             self.about_action.setStatusTip("关于本程序")
             self.help_menu.addAction(self.about_action)
 
-            # 连接帮助菜单信号到coordinator
-            if self.coordinator:
-                self.startup_guides_action.triggered.connect(
-                    lambda: self.coordinator._on_startup_guides() if hasattr(self.coordinator, '_on_startup_guides') else None)
-                self.help_action.triggered.connect(
-                    lambda: self.coordinator._on_help() if hasattr(self.coordinator, '_on_help') else None)
-                self.user_manual_action.triggered.connect(
-                    lambda: self.coordinator._on_help() if hasattr(self.coordinator, '_on_help') else None)
-                self.shortcuts_action.triggered.connect(
-                    lambda: self.coordinator._on_shortcuts() if hasattr(self.coordinator, '_on_shortcuts') else None)
-                self.data_usage_terms_action.triggered.connect(
-                    lambda: self.coordinator._on_show_data_usage_terms() if hasattr(self.coordinator, '_on_show_data_usage_terms') else None)
-                self.about_action.triggered.connect(
-                    lambda: self.coordinator._on_about() if hasattr(self.coordinator, '_on_about') else None)
+            # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
             if self.log_manager:
@@ -886,3 +824,98 @@ class MainMenuBar(QMenuBar):
                 color: #888;
             }}
         ''')
+
+    def connect_signals(self):
+        """统一连接所有菜单的信号到coordinator"""
+        if not self.coordinator:
+            return
+
+        try:
+            # 连接所有已创建的action的信号
+            actions_to_connect = [
+                # 文件菜单
+                ('new_action', '_on_new_file'),
+                ('open_action', '_on_open_file'),
+                ('save_action', '_on_save_file'),
+                ('exit_action', '_on_exit'),
+
+                # 编辑菜单
+                ('undo_action', '_on_undo'),
+                ('redo_action', '_on_redo'),
+                ('copy_action', '_on_copy'),
+                ('paste_action', '_on_paste'),
+
+                # 视图菜单
+                ('toolbar_action', '_on_toggle_toolbar'),
+                ('statusbar_action', '_on_toggle_statusbar'),
+                ('refresh_action', '_on_refresh'),
+                ('performance_panel_action', '_toggle_performance_panel'),
+
+                # 主题相关
+                ('default_theme_action', '_on_default_theme'),
+                ('light_theme_action', '_on_light_theme'),
+                ('dark_theme_action', '_on_dark_theme'),
+
+                # 分析相关
+                ('analyze_action', '_on_analyze'),
+                ('backtest_action', '_on_backtest'),
+                ('optimize_action', '_on_optimize'),
+                ('batch_analysis_action', '_on_batch_analysis'),
+
+                # 策略相关
+                ('strategy_manager_action', '_on_strategy_management'),
+                ('create_strategy_action', '_on_create_strategy'),
+                ('import_strategy_action', '_on_import_strategy'),
+                ('export_strategy_action', '_on_export_strategy'),
+                ('strategy_backtest_action', '_on_strategy_backtest'),
+                ('strategy_optimize_action', '_on_strategy_optimize'),
+
+                # 数据相关
+                ('import_data_action', '_on_import_data'),
+                ('export_data_action', '_on_export_data'),
+                ('database_admin_action', '_on_database_admin'),
+                ('data_quality_action', '_on_data_quality_check'),
+
+                # 工具相关
+                ('calculator_action', '_on_calculator'),
+                ('converter_action', '_on_converter'),
+                ('system_optimizer_action', '_on_system_optimizer'),
+                ('webgpu_status_action', '_on_webgpu_status'),
+                ('advanced_search_action', '_on_advanced_search'),
+                ('settings_action', '_on_settings'),
+
+                # 高级功能
+                ('plugin_manager_action', '_on_plugin_manager'),
+                ('plugin_market_action', '_on_plugin_market'),
+                ('optimization_dashboard_action', '_on_optimization_dashboard'),
+                ('one_click_optimize_action', '_on_one_click_optimize'),
+                ('smart_optimize_action', '_on_smart_optimize'),
+                ('version_manager_action', '_on_version_manager'),
+                ('performance_evaluation_action', '_on_performance_evaluation'),
+
+                # 调试功能
+                ('toggle_log_action', '_on_toggle_log'),
+
+                # 帮助菜单
+                ('help_action', '_on_help'),
+                ('user_manual_action', '_on_user_manual'),
+                ('shortcuts_action', '_on_shortcuts'),
+                ('update_action', '_on_check_update'),
+                ('data_usage_terms_action', '_on_data_usage_terms'),
+                ('about_action', '_on_about'),
+            ]
+
+            for action_name, coordinator_method in actions_to_connect:
+                if hasattr(self, action_name):
+                    action = getattr(self, action_name)
+                    if hasattr(self.coordinator, coordinator_method):
+                        action.triggered.connect(getattr(self.coordinator, coordinator_method))
+                    else:
+                        # 如果coordinator没有对应方法，连接到一个默认的空方法
+                        action.triggered.connect(lambda: None)
+
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"连接菜单信号失败: {str(e)}")
+            else:
+                print(f"连接菜单信号失败: {str(e)}")

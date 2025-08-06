@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
-from ..base_logger import LogManager
+from ..logger import LogManager
 from plugins.sentiment_data_source_interface import (
     ISentimentDataSource,
     SentimentData,
@@ -57,11 +57,6 @@ class SentimentDataService(QObject):
                  log_manager: Optional[LogManager] = None):
         """
         初始化情绪数据服务
-
-        Args:
-            plugin_manager: 插件管理器
-            config: 服务配置
-            log_manager: 日志管理器
         """
         super().__init__()
 
@@ -69,35 +64,42 @@ class SentimentDataService(QObject):
         self.config = config or SentimentDataServiceConfig()
         self.log_manager = log_manager or logging.getLogger(__name__)
 
-        # 注册的情绪数据源插件
         self._registered_plugins: Dict[str, ISentimentDataSource] = {}
-        self._plugin_priorities: Dict[str, int] = {}  # 插件优先级
-        self._plugin_weights: Dict[str, float] = {}  # 插件权重
+        self._plugin_priorities: Dict[str, int] = {}
+        self._plugin_weights: Dict[str, float] = {}
 
-        # 数据缓存
+        # 添加选中插件列表管理
+        self._selected_plugins: List[str] = []
+
         self._cached_response: Optional[SentimentResponse] = None
         self._cache_timestamp: Optional[datetime] = None
 
-        # 异步执行器
         self._executor = ThreadPoolExecutor(max_workers=self.config.max_concurrent_fetches)
 
-        # 自动刷新定时器
         self._refresh_timer = QTimer()
         self._refresh_timer.timeout.connect(self._auto_refresh)
 
-        # 服务状态
         self._is_initialized = False
         self._is_running = False
+
+        # 手动导入并注册核心插件
+        self._manual_register_core_plugins()
+
+    def _manual_register_core_plugins(self):
+        """手动导入并注册核心的情绪数据插件，确保关键数据源可用"""
+        try:
+            from plugins.sentiment_data_sources.akshare_sentiment_plugin import AkShareSentimentPlugin
+            akshare_plugin = AkShareSentimentPlugin()
+            self.register_plugin('akshare_sentiment', akshare_plugin, priority=10, weight=1.0)
+        except ImportError:
+            self.log_manager.warning("未能导入AkShare情绪插件，相关功能将不可用。")
+        except Exception as e:
+            self.log_manager.error(f"注册AkShare情绪插件失败: {e}")
 
     def initialize(self) -> bool:
         """初始化情绪数据服务"""
         try:
             self.log_manager.info("🚀 初始化情绪数据服务...")
-
-            # 发现并注册情绪数据源插件
-            self._discover_sentiment_plugins()
-
-            # 启动自动刷新（如果启用）
             if self.config.enable_auto_refresh:
                 self._start_auto_refresh()
 
@@ -163,9 +165,21 @@ class SentimentDataService(QObject):
 
             # 初始化插件
             if hasattr(plugin, 'initialize'):
-                if not plugin.initialize():
-                    self.log_manager.error(f"❌ 插件 {name} 初始化失败")
-                    return False
+                # 创建一个简单的context或传递None（插件应该能处理None context）
+                try:
+                    # 尝试传递None，BaseSentimentPlugin已经修改为能处理None context
+                    if not plugin.initialize(None):
+                        self.log_manager.error(f"❌ 插件 {name} 初始化失败")
+                        return False
+                except TypeError:
+                    # 如果插件不需要context参数，尝试无参数调用
+                    try:
+                        if not plugin.initialize():
+                            self.log_manager.error(f"❌ 插件 {name} 初始化失败")
+                            return False
+                    except Exception as e:
+                        self.log_manager.error(f"❌ 插件 {name} 初始化失败: {e}")
+                        return False
 
             self._registered_plugins[name] = plugin
             self._plugin_priorities[name] = priority
@@ -211,43 +225,31 @@ class SentimentDataService(QObject):
             return False
 
     def get_sentiment_data(self, force_refresh: bool = False) -> SentimentResponse:
-        """
-        获取聚合的情绪数据
-
-        Args:
-            force_refresh: 是否强制刷新（忽略缓存）
-
-        Returns:
-            SentimentResponse: 聚合的情绪数据响应
-        """
+        """获取聚合的情绪数据"""
         try:
-            # 检查缓存
             if not force_refresh and self._is_cache_valid():
                 self.log_manager.info("📋 使用缓存的情绪数据")
-                cached_response = self._cached_response
-                cached_response.cache_used = True
-                return cached_response
+                return self._cached_response
 
             self.log_manager.info("🔄 开始获取最新情绪数据...")
 
-            # 并发获取各插件数据
-            plugin_responses = self._fetch_from_all_plugins()
+            if not self._registered_plugins:
+                self.log_manager.warning("没有注册任何情绪数据插件，无法获取数据。")
+                return SentimentResponse(success=False, error_message="没有可用的数据源插件。")
 
-            # 聚合数据
+            plugin_responses = self._fetch_from_all_plugins()
             aggregated_response = self._aggregate_responses(plugin_responses)
 
-            # 更新缓存
             self._cached_response = aggregated_response
             self._cache_timestamp = datetime.now()
 
-            # 发送数据更新信号
             self.data_updated.emit(aggregated_response)
 
             self.log_manager.info(f"✅ 情绪数据获取完成，共 {len(aggregated_response.data)} 个指标")
             return aggregated_response
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取情绪数据失败: {e}")
+            self.log_manager.error(f"❌ 获取情绪数据失败: {e}", exc_info=True)
             return SentimentResponse(
                 success=False,
                 error_message=f"获取情绪数据失败: {str(e)}",
@@ -280,41 +282,64 @@ class SentimentDataService(QObject):
             "available_indicators": plugin.get_available_indicators() if hasattr(plugin, 'get_available_indicators') else []
         }
 
-    def _discover_sentiment_plugins(self) -> None:
-        """发现并注册情绪数据源插件"""
-        try:
-            if not self.plugin_manager:
-                self.log_manager.warning("⚠️ 插件管理器未设置，跳过自动发现")
-                return
+    def set_selected_plugins(self, selected_plugins: List[str]) -> None:
+        """
+        设置要使用的插件列表
 
-            # 从插件管理器获取情绪数据源插件
-            from plugins.plugin_interface import PluginType
+        Args:
+            selected_plugins: 选中的插件名称列表
+        """
+        # 验证插件是否已注册
+        valid_plugins = []
+        for plugin_name in selected_plugins:
+            if plugin_name in self._registered_plugins:
+                valid_plugins.append(plugin_name)
+            else:
+                self.log_manager.warning(f"⚠️ 插件 {plugin_name} 未注册，跳过")
 
-            sentiment_plugins = self.plugin_manager.get_plugins_by_type(PluginType.DATA_SOURCE)
+        self._selected_plugins = valid_plugins
+        self.log_manager.info(f"📝 设置选中插件: {self._selected_plugins}")
 
-            for plugin_name, plugin_instance in sentiment_plugins.items():
-                if isinstance(plugin_instance, ISentimentDataSource):
-                    # 设置默认优先级和权重
-                    priority = 100
-                    weight = 1.0
+    def get_selected_plugins(self) -> List[str]:
+        """
+        获取当前选中的插件列表
 
-                    # 为特定插件设置特殊权重
-                    if 'akshare' in plugin_name.lower():
-                        priority = 10  # 高优先级
-                        weight = 1.0
+        Returns:
+            List[str]: 选中的插件名称列表
+        """
+        return self._selected_plugins.copy()
 
-                    self.register_plugin(plugin_name, plugin_instance, priority, weight)
-
-        except Exception as e:
-            self.log_manager.error(f"❌ 发现情绪数据源插件失败: {e}")
+    def clear_selected_plugins(self) -> None:
+        """清空选中的插件列表"""
+        self._selected_plugins = []
+        self.log_manager.info("🗑️ 已清空选中插件列表")
 
     def _fetch_from_all_plugins(self) -> Dict[str, SentimentResponse]:
-        """并发从所有插件获取数据"""
+        """并发从被勾选插件获取数据"""
         plugin_responses = {}
+
+        # 确定要使用的插件列表
+        plugins_to_use = {}
+        if self._selected_plugins:
+            # 使用被选中的插件
+            for plugin_name in self._selected_plugins:
+                if plugin_name in self._registered_plugins:
+                    plugins_to_use[plugin_name] = self._registered_plugins[plugin_name]
+                else:
+                    self.log_manager.warning(f"⚠️ 选中的插件 {plugin_name} 未注册")
+            self.log_manager.info(f"🎯 使用选中的插件: {list(plugins_to_use.keys())}")
+        else:
+            # 如果没有设置选中插件，使用所有已注册的插件
+            plugins_to_use = self._registered_plugins
+            self.log_manager.info(f"📋 未设置选中插件，使用所有已注册插件: {list(plugins_to_use.keys())}")
+
+        if not plugins_to_use:
+            self.log_manager.warning("⚠️ 没有可用的插件进行数据获取")
+            return plugin_responses
 
         # 按优先级排序插件
         sorted_plugins = sorted(
-            self._registered_plugins.items(),
+            plugins_to_use.items(),
             key=lambda x: self._plugin_priorities.get(x[0], 100)
         )
 

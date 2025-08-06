@@ -275,6 +275,25 @@ class PluginManager(QObject):
                     if self.load_plugin(plugin_name, plugin_path):
                         loaded_count += 1
 
+            # 加载sentiment_data_sources目录中的情绪数据源插件
+            sentiment_dir = self.plugin_dir / "sentiment_data_sources"
+            if sentiment_dir.exists():
+                # 确保sentiment_data_sources目录是一个包
+                init_file = sentiment_dir / "__init__.py"
+                if not init_file.exists():
+                    with open(init_file, 'w') as f:
+                        f.write('"""情绪数据源插件包"""')
+                    logger.info(f"创建sentiment_data_sources包的__init__.py文件")
+
+                for plugin_path in sentiment_dir.glob("*.py"):
+                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        continue
+
+                    plugin_name = f"sentiment_data_sources.{plugin_path.stem}"
+                    if self.load_plugin(plugin_name, plugin_path):
+                        loaded_count += 1
+
             logger.info(
                 f"已加载 {loaded_count} 个插件 [core.plugin_manager::load_all_plugins]")
 
@@ -602,12 +621,53 @@ class PluginManager(QObject):
             插件元数据
         """
         try:
+            # 首先尝试从_plugin_metadata属性获取完整元数据
+            if hasattr(plugin_class, '_plugin_metadata'):
+                metadata_obj = plugin_class._plugin_metadata
+
+                # 将PluginMetadata对象转换为字典
+                metadata = {
+                    'name': metadata_obj.name,
+                    'version': metadata_obj.version,
+                    'description': metadata_obj.description,
+                    'author': metadata_obj.author,
+                    'email': getattr(metadata_obj, 'email', ''),
+                    'website': getattr(metadata_obj, 'website', ''),
+                    'license': getattr(metadata_obj, 'license', ''),
+                    'plugin_type': metadata_obj.plugin_type.value if hasattr(metadata_obj.plugin_type, 'value') else str(metadata_obj.plugin_type),
+                    'category': metadata_obj.category.value if hasattr(metadata_obj.category, 'value') else str(metadata_obj.category),
+                    'dependencies': metadata_obj.dependencies,
+                    'min_hikyuu_version': getattr(metadata_obj, 'min_hikyuu_version', '1.0.0'),
+                    'max_hikyuu_version': getattr(metadata_obj, 'max_hikyuu_version', '2.0.0'),
+                    'tags': getattr(metadata_obj, 'tags', []),
+                    'icon_path': getattr(metadata_obj, 'icon_path', None),
+                    'documentation_url': getattr(metadata_obj, 'documentation_url', None),
+                    'support_url': getattr(metadata_obj, 'support_url', None),
+                    'changelog_url': getattr(metadata_obj, 'changelog_url', None),
+                    'class_name': plugin_class.__name__
+                }
+
+                return metadata
+
+            # 如果没有_plugin_metadata属性，则使用基本信息（向后兼容）
             metadata = {
                 'name': getattr(plugin_class, 'name', plugin_class.__name__),
                 'version': getattr(plugin_class, 'version', '1.0.0'),
                 'description': getattr(plugin_class, 'description', ''),
                 'author': getattr(plugin_class, 'author', ''),
+                'email': '',
+                'website': '',
+                'license': '',
+                'plugin_type': 'unknown',  # 默认为unknown
+                'category': 'unknown',
                 'dependencies': getattr(plugin_class, 'dependencies', []),
+                'min_hikyuu_version': '1.0.0',
+                'max_hikyuu_version': '2.0.0',
+                'tags': [],
+                'icon_path': None,
+                'documentation_url': None,
+                'support_url': None,
+                'changelog_url': None,
                 'class_name': plugin_class.__name__
             }
 
@@ -615,7 +675,18 @@ class PluginManager(QObject):
 
         except Exception as e:
             logger.error(f"获取插件元数据失败: {e}")
-            return {}
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                'name': plugin_class.__name__,
+                'version': '1.0.0',
+                'description': '',
+                'author': '',
+                'plugin_type': 'unknown',
+                'category': 'unknown',
+                'dependencies': [],
+                'class_name': plugin_class.__name__
+            }
 
     def call_plugin_method(self, plugin_name: str, method_name: str, *args, **kwargs) -> Any:
         """

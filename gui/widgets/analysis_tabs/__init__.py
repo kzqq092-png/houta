@@ -1,25 +1,34 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Analysis tabs package
+分析标签页模块
 """
 
 from .base_tab import BaseAnalysisTab
+from .professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
+from .enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
 from .technical_tab import TechnicalAnalysisTab
-from .pattern_tab import PatternAnalysisTab
 from .trend_tab import TrendAnalysisTab
-from .sector_flow_tab import SectorFlowTab
 from .wave_tab import WaveAnalysisTab
-from .sentiment_tab import SentimentAnalysisTab
+from .wave_tab_pro import WaveAnalysisTabPro
+from .sector_flow_tab import SectorFlowTab
+from .sector_flow_tab_pro import SectorFlowTabPro
+from .pattern_tab import PatternAnalysisTab
+from .pattern_tab_pro import PatternAnalysisTabPro
 from .hotspot_tab import HotspotAnalysisTab
-from .sentiment_report_tab import SentimentReportTab
 
 __all__ = [
     'BaseAnalysisTab',
+    'ProfessionalSentimentTab',
+    'SentimentAnalysisTab',  # 向后兼容别名
+    'EnhancedKLineSentimentTab',
     'TechnicalAnalysisTab',
-    'PatternAnalysisTab',
     'TrendAnalysisTab',
-    'SectorFlowTab',
     'WaveAnalysisTab',
-    'SentimentAnalysisTab',
+    'WaveAnalysisTabPro',
+    'SectorFlowTab',
+    'SectorFlowTabPro',
+    'PatternAnalysisTab',
+    'PatternAnalysisTabPro',
     'HotspotAnalysisTab',
-    'SentimentReportTab'
 ]

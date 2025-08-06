@@ -17,17 +17,20 @@ from core.stock_screener import DataManager, StockScreener
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
 from gui.ui_components import BaseAnalysisPanel
-from components.template_manager import TemplateManager
+from utils.template_manager import TemplateManager
 from utils.config_manager import ConfigManager
-from utils.log_manager import LogManager
+from core.logger import LogManager
 from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
 
-# 设置matplotlib中文字体
-mpl.rcParams["font.sans-serif"] = [
-    "SimHei"        # 黑体
-]
-mpl.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-mpl.rcParams["font.size"] = 12
+# 使用统一的matplotlib中文字体配置
+try:
+    from utils.matplotlib_font_config import configure_matplotlib_chinese_font
+    configure_matplotlib_chinese_font(font_size=12)
+except ImportError:
+    # 后备配置
+    mpl.rcParams["font.sans-serif"] = ["SimHei"]
+    mpl.rcParams["axes.unicode_minus"] = False
+    mpl.rcParams["font.size"] = 12
 
 # 设置Qt全局字体
 QApplication.setFont(QFont("Microsoft YaHei", 10))

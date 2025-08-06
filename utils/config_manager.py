@@ -115,3 +115,49 @@ class ConfigManager(QObject):
         data = self.get('data', {})
         data['auto_save'] = auto
         self.set('data', data)
+
+    def get_plugin_config(self, plugin_name: str, default: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        获取插件配置
+
+        Args:
+            plugin_name: 插件名称
+            default: 默认配置
+
+        Returns:
+            插件配置字典
+        """
+        if default is None:
+            default = {}
+
+        # 插件配置存储在plugins.{plugin_name}键下
+        plugin_key = f"plugins.{plugin_name}"
+        return self.get(plugin_key, default)
+
+    def save_plugin_config(self, plugin_name: str, config: Dict[str, Any]) -> None:
+        """
+        保存插件配置
+
+        Args:
+            plugin_name: 插件名称
+            config: 配置数据
+        """
+        plugin_key = f"plugins.{plugin_name}"
+        self.set(plugin_key, config)
+
+    def get_all_plugin_configs(self) -> Dict[str, Dict[str, Any]]:
+        """
+        获取所有插件配置
+
+        Returns:
+            所有插件配置的字典
+        """
+        all_configs = self.get_all()
+        plugin_configs = {}
+
+        for key, value in all_configs.items():
+            if key.startswith("plugins."):
+                plugin_name = key[8:]  # 移除"plugins."前缀
+                plugin_configs[plugin_name] = value
+
+        return plugin_configs

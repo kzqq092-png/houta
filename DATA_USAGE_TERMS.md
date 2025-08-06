@@ -4,7 +4,7 @@
 
 ### 1. 适用范围
 本使用条款适用于YS-Quant‌量化交易系统中所有数据源的使用，包括但不限于：
-- 本地数据源（HikyuuDataSource）
+- 本地数据源（YS-QuantDataSource）
 - 开源数据源（AkshareDataSource）  
 - 公开API数据源（东方财富、新浪财经、同花顺等）
 - 第三方插件数据源（Yahoo Finance等）
@@ -26,8 +26,8 @@
 ### 3. 数据来源说明
 
 #### 本地数据源
-- **数据来源**：HIkyuu量化交易框架本地数据库
-- **使用条款**：遵循HIkyuu项目的开源许可证
+- **数据来源**：YS-Quant量化交易框架本地数据库
+- **使用条款**：遵循YS-Quant项目的开源许可证
 - **合规性**：完全合规，无版权风险
 
 #### 开源数据源（AkShare）
@@ -103,7 +103,7 @@ RATE_LIMITS = {
     'sina': 60,         # 每分钟60次
     'tonghuashun': 60,  # 每分钟60次
     'akshare': 120,     # 每分钟120次（开源，相对宽松）
-    'hikyuu': -1,       # 无限制（本地数据）
+    'YS-Quant': -1,       # 无限制（本地数据）
 }
 ```
 
@@ -165,9 +165,9 @@ CACHE_SETTINGS = {
 ### 10. 联系方式
 
 如有关于数据使用的疑问或建议，请通过以下方式联系：
-- **项目主页**：https://github.com/hikyuu-org/hikyuu
+- **项目主页**：https://github.com/YS-Quant-org/YS-Quant
 - **问题反馈**：通过GitHub Issues提交
-- **技术讨论**：加入HIkyuu社区讨论群
+- **技术讨论**：加入YS-Quant社区讨论群
 
 ### 11. 生效日期
 

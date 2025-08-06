@@ -906,7 +906,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _create_professional_toolbar(self, layout):
         """创建专业工具栏"""
         toolbar = QFrame()
-        toolbar.setFixedHeight(190)
+        toolbar.setFixedHeight(160)  # 减少固定高度以防重叠
         toolbar.setFrameStyle(QFrame.StyledPanel)
         toolbar.setStyleSheet("""
             QFrame {
@@ -919,10 +919,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             }
         """)
         toolbar_layout = QVBoxLayout(toolbar)
+        toolbar_layout.setSpacing(4)
+        toolbar_layout.setContentsMargins(4, 4, 4, 4)
 
         # 快速分析组
         quick_group = QGroupBox("快速分析")
-        quick_group.setFixedHeight(80)
 
         quick_layout = QHBoxLayout(quick_group)
 

@@ -18,8 +18,7 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 from enum import Enum
-
-from .plugin_interface import IPlugin, PluginType, PluginCategory
+from plugins.plugin_interface import IPlugin, PluginType, PluginCategory
 
 
 class SentimentStatus(Enum):

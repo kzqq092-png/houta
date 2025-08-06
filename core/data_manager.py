@@ -6,9 +6,19 @@
 
 import pandas as pd
 from typing import Dict, Any, Optional, List, Set
-import hikyuu as hku
-from hikyuu.interactive import *
 from core.base_logger import BaseLogManager
+
+# 安全导入hikyuu模块
+try:
+    import hikyuu as hku
+    from hikyuu.interactive import *
+    HIKYUU_AVAILABLE = True
+    print("✅ HIkyuu模块导入成功")
+except ImportError as e:
+    print(f"⚠️ HIkyuu模块导入失败: {e}")
+    print("将使用模拟数据模式运行")
+    hku = None
+    HIKYUU_AVAILABLE = False
 import traceback
 from datetime import datetime, timedelta
 from core.eastmoney_source import EastMoneyDataSource
@@ -38,8 +48,19 @@ class DataManager:
         self.conn = sqlite3.connect(DB_PATH)
         self.log_manager = log_manager
         self.cache_manager = Cache()  # 兼容原有缓存机制
-        self._current_source = 'hikyuu'  # 默认数据源，兼容原有逻辑
-        self.sm = sm  # hikyuu的StockManager实例
+        self._current_source = 'hikyuu' if HIKYUU_AVAILABLE else 'mock'  # 默认数据源，兼容原有逻辑
+
+        # 安全初始化hikyuu StockManager
+        if HIKYUU_AVAILABLE:
+            try:
+                self.sm = sm  # hikyuu的StockManager实例
+            except NameError:
+                print("⚠️ hikyuu StockManager不可用，将使用模拟模式")
+                self.sm = None
+                self._current_source = 'mock'
+        else:
+            self.sm = None
+
         self._data_sources = {}  # 兼容多数据源逻辑
         self.industry_manager = IndustryManager(
             log_manager=self.log_manager)  # 行业管理器

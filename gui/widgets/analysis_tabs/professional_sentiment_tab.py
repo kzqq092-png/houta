@@ -1,0 +1,1842 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+专业情绪分析标签页 - 合并增强版本
+整合实时情绪分析和报告功能，支持完整的插件系统和双标签页设计
+"""
+
+from typing import Dict, Any, List, Optional
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+import time
+import random
+import os
+import traceback
+
+from .base_tab import BaseAnalysisTab
+from core.logger import LogManager, LogLevel
+from utils.config_manager import ConfigManager
+
+# 导入情绪数据服务和插件
+try:
+    from core.services.sentiment_data_service import SentimentDataService
+    from plugins.sentiment_data_sources import AVAILABLE_PLUGINS
+    from plugins.sentiment_data_source_interface import SentimentResponse, SentimentData
+    SENTIMENT_SERVICE_AVAILABLE = True
+    print("✅ 情绪数据服务可用")
+except ImportError as e:
+    print(f"⚠️ 情绪数据服务导入失败: {e}")
+    SENTIMENT_SERVICE_AVAILABLE = False
+
+
+class SentimentAnalysisThread(QThread):
+    """异步情绪分析线程 - 解决UI卡顿问题"""
+
+    # 信号定义
+    progress_updated = pyqtSignal(int, str)  # 进度, 消息
+    analysis_completed = pyqtSignal(dict)  # 分析结果
+    error_occurred = pyqtSignal(str)  # 错误信息
+    status_updated = pyqtSignal(str)  # 状态更新
+
+    def __init__(self, sentiment_service, selected_plugins, use_cache=True,
+                 available_plugins=None, parent=None):
+        super().__init__(parent)
+        self.sentiment_service = sentiment_service
+        self.selected_plugins = selected_plugins
+        self.use_cache = use_cache
+        self.available_plugins = available_plugins or {}
+        self.is_running = False
+
+    def run(self):
+        """执行异步情绪分析"""
+        try:
+            self.is_running = True
+            self.progress_updated.emit(10, "初始化情绪分析...")
+
+            results = {
+                'sentiment_results': [],
+                'sentiment_statistics': {},
+                'plugin_status': {},
+                'analysis_time': datetime.now().isoformat()
+            }
+
+            if not self.selected_plugins:
+                self.error_occurred.emit("请至少选择一个情绪数据源插件")
+                return
+
+            self.progress_updated.emit(20, f"开始分析 {len(self.selected_plugins)} 个插件...")
+            print(f"🚀 [SentimentAnalysisThread] 开始情绪分析，使用插件: {self.selected_plugins}")
+
+            # 步骤1: 数据获取 (30%)
+            self.progress_updated.emit(30, "获取情绪数据...")
+
+            if not self.sentiment_service or not SENTIMENT_SERVICE_AVAILABLE:
+                self.error_occurred.emit("情绪数据服务不可用，无法执行分析")
+                return
+
+            # 使用真实的情绪数据服务
+            self.status_updated.emit("使用真实情绪数据服务进行分析...")
+
+            # 设置选中的插件列表
+            if self.selected_plugins:
+                self.sentiment_service.set_selected_plugins(self.selected_plugins)
+                self.status_updated.emit(f"设置使用插件: {', '.join(self.selected_plugins)}")
+            else:
+                self.sentiment_service.clear_selected_plugins()
+                self.status_updated.emit("使用所有可用插件")
+
+            response = self.sentiment_service.get_sentiment_data(force_refresh=not self.use_cache)
+            sentiment_results = self._process_sentiment_response(response)
+
+            if not sentiment_results:
+                self.error_occurred.emit("未能获取任何情绪数据，请检查插件配置和网络连接")
+                return
+
+            results['sentiment_results'] = sentiment_results
+            self.progress_updated.emit(60, f"获取到 {len(sentiment_results)} 个情绪指标")
+
+            # 步骤2: 计算综合指数 (20%)
+            self.progress_updated.emit(70, "计算综合情绪指数...")
+            statistics = self._calculate_statistics(sentiment_results)
+            results['sentiment_statistics'] = statistics
+
+            # 步骤3: 更新插件状态 (10%)
+            self.progress_updated.emit(90, "更新插件状态...")
+            plugin_status = self._update_plugin_status()
+            results['plugin_status'] = plugin_status
+
+            # 完成
+            self.progress_updated.emit(100, "情绪分析完成")
+            print(f"✅ [SentimentAnalysisThread] 情绪分析完成，生成 {len(sentiment_results)} 个指标")
+
+            self.analysis_completed.emit(results)
+
+        except Exception as e:
+            error_msg = f"情绪分析失败: {str(e)}"
+            print(f"❌ [SentimentAnalysisThread] {error_msg}")
+            traceback.print_exc()
+            self.error_occurred.emit(error_msg)
+        finally:
+            self.is_running = False
+
+    def _process_sentiment_response(self, response):
+        """处理真实情绪数据服务的响应"""
+        sentiment_results = []
+        if response and response.success and response.data:
+            for sentiment_data in response.data:
+                # 从 confidence 和其他属性计算 strength
+                strength = getattr(sentiment_data, 'confidence', 0.5)
+                if hasattr(sentiment_data, 'metadata') and sentiment_data.metadata:
+                    strength = sentiment_data.metadata.get('strength', strength)
+
+                sentiment_results.append({
+                    'data_source': sentiment_data.source,
+                    'indicator': sentiment_data.indicator_name,
+                    'value': sentiment_data.value,
+                    'signal': sentiment_data.signal if isinstance(sentiment_data.signal, str) else str(sentiment_data.signal),
+                    'strength': strength,
+                    'confidence': sentiment_data.confidence,
+                    'data_quality': response.data_quality,
+                    'timestamp': response.update_time.strftime('%Y-%m-%d %H:%M:%S') if response.update_time else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+        else:
+            error_msg = response.error_message if response else "未知错误"
+            print(f"⚠️ [SentimentAnalysisThread] 情绪数据服务响应失败: {error_msg}")
+
+        return sentiment_results
+
+    def _determine_signal(self, value: float) -> str:
+        """根据数值确定信号"""
+        if value > 70:
+            return "STRONG_BUY"
+        elif value > 60:
+            return "BUY"
+        elif value > 40:
+            return "HOLD"
+        elif value > 30:
+            return "SELL"
+        else:
+            return "STRONG_SELL"
+
+    def _calculate_statistics(self, sentiment_results):
+        """计算统计信息"""
+        if not sentiment_results:
+            return {}
+
+        # 计算加权平均情绪指数
+        total_weight = 0
+        weighted_sum = 0
+
+        for result in sentiment_results:
+            weight = result.get('confidence', 0.5) * result.get('strength', 0.5)
+            weighted_sum += result.get('value', 50) * weight
+            total_weight += weight
+
+        composite_score = weighted_sum / total_weight if total_weight > 0 else 50
+
+        # 统计质量分布
+        quality_counts = {}
+        for result in sentiment_results:
+            quality = result.get('data_quality', 'unknown')
+            quality_counts[quality] = quality_counts.get(quality, 0) + 1
+
+        return {
+            'composite_score': composite_score,
+            'total_indicators': len(sentiment_results),
+            'quality_distribution': quality_counts,
+            'analysis_time': datetime.now().isoformat()
+        }
+
+    def _update_plugin_status(self):
+        """更新插件状态"""
+        return {
+            'selected_count': len(self.selected_plugins),
+            'total_count': len(self.available_plugins),
+            'status': 'completed'
+        }
+
+    def stop(self):
+        """停止分析"""
+        self.is_running = False
+        self.quit()
+
+
+class ProfessionalSentimentTab(BaseAnalysisTab):
+    """专业情绪分析标签页 - 整合实时分析和报告功能"""
+
+    # 定义信号
+    sentiment_analysis_completed = pyqtSignal(dict)
+    sentiment_report_completed = pyqtSignal(dict)
+    plugin_data_updated = pyqtSignal(dict)
+
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
+        super().__init__(config_manager)
+        self.log_manager = LogManager()
+
+        if not SENTIMENT_SERVICE_AVAILABLE:
+            raise RuntimeError("情绪数据服务未能加载，无法启动情绪分析标签页。请检查相关依赖。")
+
+        # 情绪数据服务
+        self.sentiment_service = None
+        self.available_plugins = {}
+        self.selected_plugins = []
+
+        # 分析结果
+        self.sentiment_results = []
+        self.sentiment_statistics = {}
+        self.sentiment_history = []
+        self.plugin_status = {}
+
+        # 报告功能属性
+        self.report_results = []
+        self.report_statistics = {}
+        self.scheduled_reports = []
+        self.report_templates = []
+        self.alert_rules = []
+
+        # 异步分析线程
+        self.analysis_thread = None
+
+        # 进度条和状态
+        self.progress_bar = None
+        self.status_label = None
+
+        # 定时器
+        self.auto_refresh_timer = QTimer()
+        self.auto_refresh_timer.timeout.connect(self.auto_refresh_data)
+
+        # 初始化情绪数据服务
+        self._initialize_sentiment_service()
+
+        # 加载可用插件
+        self.load_available_plugins()
+
+        print("✅ 专业情绪分析标签页初始化完成")
+
+    def _initialize_sentiment_service(self):
+        """初始化情绪数据服务"""
+        try:
+            if SENTIMENT_SERVICE_AVAILABLE:
+                # 尝试从服务容器获取
+                if hasattr(self, 'coordinator') and hasattr(self.coordinator, 'service_container'):
+                    try:
+                        self.sentiment_service = self.coordinator.service_container.resolve(SentimentDataService)
+                        print("✅ 从服务容器获取情绪数据服务")
+                    except:
+                        # 如果服务容器中没有，创建新实例
+                        self.sentiment_service = SentimentDataService()
+                        print("✅ 创建新的情绪数据服务实例")
+                else:
+                    # 直接创建
+                    self.sentiment_service = SentimentDataService()
+                    print("✅ 直接创建情绪数据服务")
+
+                # 初始化服务
+                if self.sentiment_service:
+                    self.sentiment_service.initialize()
+                    # 连接信号
+                    self.sentiment_service.data_updated.connect(self.on_sentiment_data_updated)
+                    self.sentiment_service.plugin_error.connect(self.on_plugin_error)
+
+            else:
+                raise RuntimeError("情绪数据服务不可用，无法启动情绪分析功能。请检查相关依赖。")
+
+        except Exception as e:
+            print(f"❌ 初始化情绪数据服务失败: {e}")
+            self.sentiment_service = None
+            raise
+
+    def create_ui(self):
+        """创建双标签页UI界面"""
+        main_layout = QVBoxLayout(self)
+        self.main_tab_widget = QTabWidget()
+        main_layout.addWidget(self.main_tab_widget)
+
+        # 实时情绪分析标签页
+        analysis_widget = QWidget()
+        analysis_layout = QVBoxLayout(analysis_widget)
+        self.create_analysis_ui(analysis_layout)
+        self.main_tab_widget.addTab(analysis_widget, "实时情绪分析")
+
+        # 情绪报告标签页
+        report_widget = QWidget()
+        report_layout = QVBoxLayout(report_widget)
+        self.create_report_ui(report_layout)
+        self.main_tab_widget.addTab(report_widget, "情绪报告")
+
+        # 确保所有组件都是可见的
+        self.main_tab_widget.setVisible(True)
+        analysis_widget.setVisible(True)
+        report_widget.setVisible(True)
+        self.setVisible(True)
+
+        print("✅ UI创建完成，所有组件已设置为可见")
+
+    def create_analysis_ui(self, layout):
+        """创建实时情绪分析UI"""
+        # 插件选择区域
+        plugins_group = self.create_plugins_section()
+        layout.addWidget(plugins_group)
+
+        # 参数配置区域
+        params_group = self.create_params_section()
+        layout.addWidget(params_group)
+
+        # 分析控制区域
+        control_group = self.create_control_section()
+        layout.addWidget(control_group)
+
+        # 状态显示区域
+        status_group = self.create_status_section()
+        layout.addWidget(status_group)
+
+        # 结果显示区域
+        results_group = self.create_results_section()
+        layout.addWidget(results_group)
+
+    def create_report_ui(self, layout):
+        """创建情绪报告的UI界面"""
+        # 报告配置组
+        config_group = QGroupBox("📋 报告配置")
+        config_layout = QGridLayout(config_group)
+
+        # 报告类型
+        config_layout.addWidget(QLabel("报告类型:"), 0, 0)
+        self.report_type_combo = QComboBox()
+        self.report_type_combo.addItems(["日度报告", "周度报告", "月度报告", "自定义报告"])
+        config_layout.addWidget(self.report_type_combo, 0, 1)
+
+        # 数据周期
+        config_layout.addWidget(QLabel("数据周期(天):"), 0, 2)
+        self.report_period_spin = QSpinBox()
+        self.report_period_spin.setRange(1, 365)
+        self.report_period_spin.setValue(7)
+        config_layout.addWidget(self.report_period_spin, 0, 3)
+
+        # 报告格式
+        config_layout.addWidget(QLabel("报告格式:"), 1, 0)
+        self.report_format_combo = QComboBox()
+        self.report_format_combo.addItems(["HTML报告", "PDF报告", "Excel报告", "CSV数据"])
+        config_layout.addWidget(self.report_format_combo, 1, 1)
+
+        # 自动发送
+        self.auto_send_cb = QCheckBox("自动发送邮件")
+        config_layout.addWidget(self.auto_send_cb, 1, 2, 1, 2)
+
+        layout.addWidget(config_group)
+
+        # 报告控制组
+        control_group = QGroupBox("🎮 报告控制")
+        control_layout = QHBoxLayout(control_group)
+
+        self.generate_report_btn = QPushButton("📊 生成报告")
+        self.generate_report_btn.clicked.connect(self.generate_sentiment_report)
+        control_layout.addWidget(self.generate_report_btn)
+
+        self.schedule_report_btn = QPushButton("⏰ 定时报告")
+        self.schedule_report_btn.clicked.connect(self.schedule_sentiment_report)
+        control_layout.addWidget(self.schedule_report_btn)
+
+        self.export_report_btn = QPushButton("💾 导出报告")
+        self.export_report_btn.clicked.connect(self.export_sentiment_report)
+        control_layout.addWidget(self.export_report_btn)
+
+        control_layout.addStretch()
+        layout.addWidget(control_group)
+
+        # 报告预览区域
+        preview_group = QGroupBox("📖 报告预览")
+        preview_layout = QVBoxLayout(preview_group)
+
+        self.report_preview = QTextEdit()
+        self.report_preview.setReadOnly(True)
+        self.report_preview.setMaximumHeight(300)
+        preview_layout.addWidget(self.report_preview)
+
+        layout.addWidget(preview_group)
+
+        # 历史报告列表
+        history_group = QGroupBox("📚 历史报告")
+        history_layout = QVBoxLayout(history_group)
+
+        self.report_history_table = QTableWidget()
+        self.report_history_table.setColumnCount(5)
+        self.report_history_table.setHorizontalHeaderLabels([
+            "生成时间", "报告类型", "数据周期", "状态", "操作"
+        ])
+        header = self.report_history_table.horizontalHeader()
+        header.setStretchLastSection(True)
+        history_layout.addWidget(self.report_history_table)
+
+        layout.addWidget(history_group)
+
+    def create_plugins_section(self):
+        """创建插件选择区域"""
+        plugins_group = QGroupBox("📊 情绪数据源插件")
+        layout = QVBoxLayout(plugins_group)
+
+        # 插件选择说明
+        info_label = QLabel("选择要使用的情绪数据源插件（支持多选）：")
+        info_label.setStyleSheet("color: #666; font-size: 11px; margin: 5px;")
+        layout.addWidget(info_label)
+
+        # 插件复选框容器
+        self.plugins_widget = QWidget()
+        self.plugins_widget.setMinimumHeight(120)  # 增加最小高度以容纳多行插件
+        self.plugins_widget.setMaximumHeight(200)  # 设置最大高度
+        self.plugins_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
+
+        self.plugins_layout = QGridLayout(self.plugins_widget)
+        self.plugins_layout.setSpacing(5)  # 设置间距
+        layout.addWidget(self.plugins_widget)
+
+        # 全选/取消全选按钮
+        button_layout = QHBoxLayout()
+
+        self.select_all_btn = QPushButton("全选")
+        self.select_all_btn.clicked.connect(self.select_all_plugins)
+        button_layout.addWidget(self.select_all_btn)
+
+        self.deselect_all_btn = QPushButton("取消全选")
+        self.deselect_all_btn.clicked.connect(self.deselect_all_plugins)
+        button_layout.addWidget(self.deselect_all_btn)
+
+        self.refresh_plugins_btn = QPushButton("🔄 刷新插件")
+        self.refresh_plugins_btn.clicked.connect(self.load_available_plugins)
+        button_layout.addWidget(self.refresh_plugins_btn)
+
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        # 确保插件区域可见
+        plugins_group.setVisible(True)
+        self.plugins_widget.setVisible(True)
+        self.select_all_btn.setVisible(True)
+        self.deselect_all_btn.setVisible(True)
+        self.refresh_plugins_btn.setVisible(True)
+
+        return plugins_group
+
+    def create_params_section(self):
+        """创建参数配置区域"""
+        params_group = QGroupBox("⚙️ 分析参数")
+        layout = QGridLayout(params_group)
+
+        # 数据源权重
+        layout.addWidget(QLabel("数据源权重:"), 0, 0)
+        self.weight_combo = QComboBox()
+        self.weight_combo.addItems(["平均权重", "智能权重", "自定义权重"])
+        layout.addWidget(self.weight_combo, 0, 1)
+
+        # 缓存策略
+        layout.addWidget(QLabel("缓存策略:"), 0, 2)
+        self.cache_combo = QComboBox()
+        self.cache_combo.addItems(["使用缓存", "强制刷新", "智能缓存"])
+        layout.addWidget(self.cache_combo, 0, 3)
+
+        # 数据质量阈值
+        layout.addWidget(QLabel("数据质量阈值:"), 1, 0)
+        self.quality_combo = QComboBox()
+        self.quality_combo.addItems(["低", "中等", "高", "极高"])
+        self.quality_combo.setCurrentText("中等")
+        layout.addWidget(self.quality_combo, 1, 1)
+
+        # 超时设置
+        layout.addWidget(QLabel("超时时间(秒):"), 1, 2)
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setRange(5, 120)
+        self.timeout_spin.setValue(30)
+        layout.addWidget(self.timeout_spin, 1, 3)
+
+        return params_group
+
+    def create_control_section(self):
+        """创建分析控制区域"""
+        control_group = QGroupBox("🎮 分析控制")
+        main_layout = QVBoxLayout(control_group)
+
+        # 按钮和控制区域
+        buttons_layout = QHBoxLayout()
+
+        # 开始分析按钮
+        self.analyze_btn = QPushButton("🚀 开始分析")
+        self.analyze_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+            QPushButton:disabled {
+                background-color: #ccc;
+            }
+        """)
+        self.analyze_btn.clicked.connect(self.analyze_sentiment)
+        buttons_layout.addWidget(self.analyze_btn)
+
+        # 停止分析按钮
+        self.stop_btn = QPushButton("⏹️ 停止分析")
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self.stop_analysis)
+        buttons_layout.addWidget(self.stop_btn)
+
+        # 自动刷新开关
+        self.auto_refresh_cb = QCheckBox("🔄 自动刷新")
+        self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
+        buttons_layout.addWidget(self.auto_refresh_cb)
+
+        # 刷新间隔
+        buttons_layout.addWidget(QLabel("间隔(分钟):"))
+        self.refresh_interval_spin = QSpinBox()
+        self.refresh_interval_spin.setRange(1, 60)
+        self.refresh_interval_spin.setValue(5)
+        buttons_layout.addWidget(self.refresh_interval_spin)
+
+        buttons_layout.addStretch()
+
+        # 保存结果按钮
+        self.save_btn = QPushButton("💾 保存结果")
+        self.save_btn.clicked.connect(self.save_results)
+        buttons_layout.addWidget(self.save_btn)
+
+        # 清空结果按钮
+        self.clear_btn = QPushButton("🗑️ 清空结果")
+        self.clear_btn.clicked.connect(self.clear_results)
+        buttons_layout.addWidget(self.clear_btn)
+
+        main_layout.addLayout(buttons_layout)
+
+        # 进度条和状态显示
+        progress_layout = QHBoxLayout()
+
+        # 状态标签
+        self.status_label = QLabel("服务状态: 就绪")
+        self.status_label.setStyleSheet("color: #666; font-size: 11px;")
+        progress_layout.addWidget(self.status_label)
+
+        progress_layout.addStretch()
+
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #0078d4;
+                border-radius: 2px;
+            }
+        """)
+        progress_layout.addWidget(self.progress_bar)
+
+        main_layout.addLayout(progress_layout)
+
+        return control_group
+
+    def create_status_section(self):
+        """创建状态显示区域"""
+        status_group = QGroupBox("📡 服务状态")
+        layout = QHBoxLayout(status_group)
+
+        # 服务状态
+        self.service_status_label = QLabel("服务状态: 未知")
+        layout.addWidget(self.service_status_label)
+
+        # 插件状态
+        self.plugins_status_label = QLabel("插件状态: 0/0")
+        layout.addWidget(self.plugins_status_label)
+
+        # 最后更新时间
+        self.last_update_label = QLabel("最后更新: --")
+        layout.addWidget(self.last_update_label)
+
+        layout.addStretch()
+
+        # 状态刷新按钮
+        refresh_status_btn = QPushButton("🔄 刷新状态")
+        refresh_status_btn.clicked.connect(self.refresh_status)
+        layout.addWidget(refresh_status_btn)
+
+        return status_group
+
+    def create_results_section(self):
+        """创建结果显示区域"""
+        results_group = QGroupBox("📊 分析结果")
+        layout = QVBoxLayout(results_group)
+
+        # 创建分割器
+        splitter = QSplitter(Qt.Vertical)
+
+        # 情绪概览
+        overview_group = QGroupBox("📈 情绪概览")
+        overview_layout = QVBoxLayout(overview_group)
+
+        # 主要指数区域
+        main_indices_layout = QGridLayout()
+
+        # 综合情绪指数 (主指数)
+        self.composite_score_label = QLabel("综合情绪指数: --")
+        self.composite_score_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #0078d4; padding: 8px;")
+        main_indices_layout.addWidget(self.composite_score_label, 0, 0, 1, 2)
+
+        # 市场恐惧贪婪指数
+        self.fear_greed_label = QLabel("恐惧&贪婪指数: --")
+        self.fear_greed_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #e74c3c; padding: 4px;")
+        main_indices_layout.addWidget(self.fear_greed_label, 1, 0)
+
+        # 波动率指数 (VIX类似)
+        self.volatility_index_label = QLabel("波动率指数: --")
+        self.volatility_index_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #f39c12; padding: 4px;")
+        main_indices_layout.addWidget(self.volatility_index_label, 1, 1)
+
+        # 资金流向指数
+        self.money_flow_label = QLabel("资金流向指数: --")
+        self.money_flow_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60; padding: 4px;")
+        main_indices_layout.addWidget(self.money_flow_label, 2, 0)
+
+        # 新闻情绪指数
+        self.news_sentiment_label = QLabel("新闻情绪指数: --")
+        self.news_sentiment_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #8e44ad; padding: 4px;")
+        main_indices_layout.addWidget(self.news_sentiment_label, 2, 1)
+
+        # 技术面情绪指数
+        self.technical_sentiment_label = QLabel("技术面情绪: --")
+        self.technical_sentiment_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e; padding: 4px;")
+        main_indices_layout.addWidget(self.technical_sentiment_label, 3, 0)
+
+        # 市场强度指数
+        self.market_strength_label = QLabel("市场强度指数: --")
+        self.market_strength_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #16a085; padding: 4px;")
+        main_indices_layout.addWidget(self.market_strength_label, 3, 1)
+
+        overview_layout.addLayout(main_indices_layout)
+
+        # 分割线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        overview_layout.addWidget(separator)
+
+        # 统计信息区域
+        stats_layout = QHBoxLayout()
+
+        self.total_indicators_label = QLabel("指标数量: --")
+        self.total_indicators_label.setStyleSheet("font-size: 12px; color: #7f8c8d;")
+        stats_layout.addWidget(self.total_indicators_label)
+
+        self.data_quality_label = QLabel("数据质量: --")
+        self.data_quality_label.setStyleSheet("font-size: 12px; color: #7f8c8d;")
+        stats_layout.addWidget(self.data_quality_label)
+
+        self.plugin_success_label = QLabel("成功插件: --")
+        self.plugin_success_label.setStyleSheet("font-size: 12px; color: #7f8c8d;")
+        stats_layout.addWidget(self.plugin_success_label)
+
+        # 最后更新时间
+        self.last_update_label = QLabel("更新时间: --")
+        self.last_update_label.setStyleSheet("font-size: 12px; color: #7f8c8d;")
+        stats_layout.addWidget(self.last_update_label)
+
+        stats_layout.addStretch()
+        overview_layout.addLayout(stats_layout)
+
+        splitter.addWidget(overview_group)
+
+        # 详细结果表格
+        details_group = QGroupBox("📋 详细分析结果")
+        details_layout = QVBoxLayout(details_group)
+
+        self.sentiment_table = QTableWidget()
+        self.sentiment_table.setColumnCount(10)
+        self.sentiment_table.setHorizontalHeaderLabels([
+            "数据源", "指标名称", "当前值", "历史对比", "信号强度", "趋势方向",
+            "置信度", "影响权重", "数据质量", "更新时间"
+        ])
+
+        # 设置表格属性和样式
+        header = self.sentiment_table.horizontalHeader()
+        header.setStretchLastSection(True)
+
+        # 设置列宽
+        self.sentiment_table.setColumnWidth(0, 100)  # 数据源
+        self.sentiment_table.setColumnWidth(1, 120)  # 指标名称
+        self.sentiment_table.setColumnWidth(2, 80)   # 当前值
+        self.sentiment_table.setColumnWidth(3, 80)   # 历史对比
+        self.sentiment_table.setColumnWidth(4, 80)   # 信号强度
+        self.sentiment_table.setColumnWidth(5, 80)   # 趋势方向
+        self.sentiment_table.setColumnWidth(6, 70)   # 置信度
+        self.sentiment_table.setColumnWidth(7, 70)   # 影响权重
+        self.sentiment_table.setColumnWidth(8, 70)   # 数据质量
+
+        self.sentiment_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.sentiment_table.setAlternatingRowColors(True)
+        self.sentiment_table.setSortingEnabled(True)
+
+        # 设置表格样式
+        self.sentiment_table.setStyleSheet("""
+            QTableWidget {
+                gridline-color: #e0e0e0;
+                background-color: #fafafa;
+                alternate-background-color: #f5f5f5;
+                selection-background-color: #e3f2fd;
+                border: 1px solid #ddd;
+            }
+            QTableWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            QTableWidget::item:selected {
+                background-color: #bbdefb;
+                color: #000;
+            }
+            QHeaderView::section {
+                background-color: #f0f0f0;
+                padding: 8px;
+                border: 1px solid #ddd;
+                font-weight: bold;
+                color: #333;
+            }
+        """)
+
+        details_layout.addWidget(self.sentiment_table)
+        splitter.addWidget(details_group)
+
+        layout.addWidget(splitter)
+
+        return results_group
+
+    def load_available_plugins(self):
+        """加载可用的情绪数据源插件 - 只使用真实插件"""
+        try:
+            print("�� 加载可用的情绪数据源插件...")
+
+            # 确保plugins_layout已初始化
+            if not hasattr(self, 'plugins_layout') or self.plugins_layout is None:
+                print("⚠️ plugins_layout未初始化，无法加载插件")
+                return
+
+            # 清空现有插件选择
+            for i in reversed(range(self.plugins_layout.count())):
+                child = self.plugins_layout.itemAt(i).widget()
+                if child:
+                    child.setParent(None)
+
+            self.available_plugins = {}
+
+            # 强制导入AVAILABLE_PLUGINS确保可用
+            from plugins.sentiment_data_sources import AVAILABLE_PLUGINS as LOADED_PLUGINS
+            print(f"📋 检测到 {len(LOADED_PLUGINS)} 个可用插件: {list(LOADED_PLUGINS.keys())}")
+
+            if not LOADED_PLUGINS:
+                error_msg = "没有检测到任何情绪数据源插件"
+                print(f"❌ {error_msg}")
+                QMessageBox.critical(self, "错误", error_msg)
+                return
+
+            # 加载真实插件
+            row, col = 0, 0
+            loaded_count = 0
+
+            for plugin_key, plugin_class in LOADED_PLUGINS.items():
+                try:
+                    print(f"🔄 正在加载插件: {plugin_key}")
+
+                    # 创建插件实例获取元数据
+                    plugin_instance = plugin_class()
+                    metadata = plugin_instance.metadata
+
+                    # 创建复选框
+                    checkbox = QCheckBox(f"📊 {metadata.name}")
+                    checkbox.setToolTip(f"{metadata.description}\n版本: {metadata.version}\n作者: {metadata.author}")
+
+                    # 默认选中有真实数据源的插件
+                    if plugin_key in ['vix_sentiment', 'akshare_sentiment']:
+                        checkbox.setChecked(True)
+
+                    # 立即设置为可见
+                    checkbox.setVisible(True)
+                    checkbox.show()
+
+                    # 添加到布局
+                    self.plugins_layout.addWidget(checkbox, row, col)
+                    print(f"🎯 已添加复选框到布局: 行{row}, 列{col}")
+
+                    self.available_plugins[plugin_key] = {
+                        'class': plugin_class,
+                        'instance': plugin_instance,
+                        'metadata': metadata,
+                        'checkbox': checkbox
+                    }
+
+                    # 注册插件到服务
+                    if self.sentiment_service:
+                        self.sentiment_service.register_plugin(plugin_key, plugin_instance)
+
+                    print(f"✅ 成功加载插件: {metadata.name}")
+                    loaded_count += 1
+
+                    # 布局管理
+                    col += 1
+                    if col >= 2:  # 每行2个插件
+                        col = 0
+                        row += 1
+
+                except Exception as e:
+                    print(f"❌ 加载插件 {plugin_key} 失败: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            if loaded_count == 0:
+                error_msg = "所有插件加载失败，无法提供情绪分析功能"
+                print(f"❌ {error_msg}")
+                QMessageBox.critical(self, "错误", error_msg)
+            else:
+                print(f"✅ 成功加载 {loaded_count} 个情绪数据源插件")
+
+            # 强制更新UI
+            if hasattr(self, 'plugins_widget') and self.plugins_widget:
+                self.plugins_widget.update()
+                self.plugins_widget.repaint()
+                self.plugins_widget.setVisible(True)  # 确保可见
+                print(f"🔄 强制更新插件UI，当前布局子项数量: {self.plugins_layout.count()}")
+
+                # 强制显示所有复选框
+                for i in range(self.plugins_layout.count()):
+                    item = self.plugins_layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        widget.setVisible(True)
+                        widget.update()
+                        print(f"  强制显示复选框 {i}: {widget.text()}")
+
+            # 更新父容器
+            if hasattr(self, 'main_tab_widget') and self.main_tab_widget:
+                self.main_tab_widget.update()
+
+            # 更新整个标签页
+            self.update()
+            self.repaint()
+
+            # 更新状态显示
+            self.update_status_display()
+
+        except Exception as e:
+            print(f"❌ 加载插件失败: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "错误", f"加载插件失败: {str(e)}")
+
+    def select_all_plugins(self):
+        """全选插件"""
+        for plugin_info in self.available_plugins.values():
+            if 'checkbox' in plugin_info:
+                plugin_info['checkbox'].setChecked(True)
+
+    def deselect_all_plugins(self):
+        """取消全选插件"""
+        for plugin_info in self.available_plugins.values():
+            if 'checkbox' in plugin_info:
+                plugin_info['checkbox'].setChecked(False)
+
+    def get_selected_plugins(self) -> List[str]:
+        """获取选中的插件列表"""
+        selected = []
+        for plugin_key, plugin_info in self.available_plugins.items():
+            if 'checkbox' in plugin_info and plugin_info['checkbox'].isChecked():
+                selected.append(plugin_key)
+        return selected
+
+    def analyze_sentiment(self):
+        """执行情绪分析 - 异步版本"""
+        try:
+            # 检查是否已有线程在运行
+            if self.analysis_thread and self.analysis_thread.isRunning():
+                QMessageBox.warning(self, "警告", "分析正在进行中，请等待完成")
+                return
+
+            # 获取选中的插件
+            selected_plugins = self.get_selected_plugins()
+
+            if not selected_plugins:
+                QMessageBox.warning(self, "警告", "请至少选择一个情绪数据源插件")
+                self.reset_ui_state()
+                return
+
+            print(f"🚀 开始情绪分析，使用插件: {selected_plugins}")
+
+            # 更新UI状态
+            self.analyze_btn.setEnabled(False)
+            self.analyze_btn.setText("🔄 分析中...")
+            self.stop_btn.setEnabled(True)
+            if self.progress_bar:
+                self.progress_bar.setVisible(True)
+                self.progress_bar.setValue(0)
+            if self.status_label:
+                self.status_label.setText("准备开始分析...")
+
+            # 清空之前的结果
+            self.sentiment_results = []
+            self.sentiment_table.setRowCount(0)
+            if self.composite_score_label:
+                self.composite_score_label.setText("综合情绪指数: --")
+
+            # 获取参数
+            use_cache = self.cache_combo.currentText() != "强制刷新"
+
+            # 创建异步分析线程
+            self.analysis_thread = SentimentAnalysisThread(
+                self.sentiment_service, selected_plugins, use_cache, self.available_plugins
+            )
+
+            # 连接信号
+            self.analysis_thread.progress_updated.connect(self.update_progress_bar)
+            self.analysis_thread.analysis_completed.connect(self.on_analysis_completed)
+            self.analysis_thread.error_occurred.connect(self.on_analysis_error)
+            self.analysis_thread.status_updated.connect(self.update_status_label)
+
+            # 启动异步分析线程
+            self.analysis_thread.start()
+
+        except Exception as e:
+            print(f"❌ 情绪分析启动失败: {e}")
+            traceback.print_exc()
+            QMessageBox.critical(self, "错误", f"启动分析失败: {str(e)}")
+            self.reset_ui_state()
+
+    def reset_ui_state(self):
+        """重置UI状态"""
+        self.analyze_btn.setEnabled(True)
+        self.analyze_btn.setText("🚀 开始分析")
+        self.stop_btn.setEnabled(False)
+        if self.progress_bar:
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setValue(0)
+        if self.status_label:
+            self.status_label.setText("服务状态: 就绪")
+
+    def update_progress_bar(self, value: int, message: str):
+        """更新进度条"""
+        if self.progress_bar:
+            self.progress_bar.setValue(value)
+        if self.status_label:
+            self.status_label.setText(message)
+        print(f"🔄 进度: {value}% - {message}")
+
+    def update_status_label(self, message: str):
+        """更新状态标签"""
+        if self.status_label:
+            self.status_label.setText(message)
+        print(f"📡 状态: {message}")
+
+    def on_analysis_completed(self, results: dict):
+        """异步分析完成信号处理"""
+        try:
+            print(f"✅ [ProfessionalSentimentTab] 情绪分析完成，生成 {len(results['sentiment_results'])} 个指标")
+
+            # 更新数据
+            self.sentiment_results = results['sentiment_results']
+            self.sentiment_statistics = results['sentiment_statistics']
+            self.plugin_status = results['plugin_status']
+
+            # 更新显示
+            self.update_sentiment_display()
+            self.calculate_composite_sentiment()
+            self.update_status_display()
+
+            # 重置UI状态
+            self.reset_ui_state()
+            if self.status_label:
+                self.status_label.setText(f"分析完成: {len(self.sentiment_results)} 个指标")
+
+            # 发送完成信号
+            self.sentiment_analysis_completed.emit({
+                'results': self.sentiment_results,
+                'statistics': self.sentiment_statistics,
+                'selected_plugins': self.get_selected_plugins()
+            })
+
+            print("✅ 情绪分析UI更新完成")
+
+        except Exception as e:
+            print(f"❌ 处理分析结果失败: {e}")
+            traceback.print_exc()
+            self.reset_ui_state()
+
+    def on_analysis_error(self, error_message: str):
+        """异步分析错误信号处理"""
+        print(f"❌ [ProfessionalSentimentTab] 情绪分析失败: {error_message}")
+        QMessageBox.critical(self, "错误", f"分析失败: {error_message}")
+        self.reset_ui_state()
+
+    def process_sentiment_response(self, response: 'SentimentResponse'):
+        """处理情绪数据服务的响应"""
+        if response.success and response.data:
+            for sentiment_data in response.data:
+                # 从 confidence 和其他属性计算 strength
+                strength = getattr(sentiment_data, 'confidence', 0.5)
+                if hasattr(sentiment_data, 'metadata') and sentiment_data.metadata:
+                    # 如果元数据中有强度信息，使用它
+                    strength = sentiment_data.metadata.get('strength', strength)
+
+                self.sentiment_results.append({
+                    'data_source': sentiment_data.source,
+                    'indicator': sentiment_data.indicator_name,
+                    'value': sentiment_data.value,
+                    'signal': sentiment_data.signal if isinstance(sentiment_data.signal, str) else str(sentiment_data.signal),
+                    'strength': strength,
+                    'confidence': sentiment_data.confidence,
+                    'data_quality': response.data_quality,
+                    'timestamp': response.update_time.strftime('%Y-%m-%d %H:%M:%S') if response.update_time else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+        else:
+            print(f"⚠️ 情绪数据服务响应失败: {response.error_message}")
+
+    def update_sentiment_display(self):
+        """更新情绪分析显示"""
+        try:
+            print(f"🔄 更新情绪显示，数据量: {len(self.sentiment_results)}")
+
+            if not hasattr(self, 'sentiment_table') or self.sentiment_table is None:
+                print("❌ sentiment_table未初始化")
+                return
+
+            if not self.sentiment_results:
+                print("⚠️ 没有情绪数据可显示")
+                self.sentiment_table.setRowCount(0)
+                return
+
+            self.sentiment_table.setRowCount(len(self.sentiment_results))
+            print(f"📊 设置表格行数: {len(self.sentiment_results)}")
+
+            for row, result in enumerate(self.sentiment_results):
+                try:
+                    # 创建表格项并设置数据
+                    data_source = str(result.get('data_source', '--'))
+                    indicator = str(result.get('indicator', '--'))
+                    value = f"{result.get('value', 0):.2f}"
+
+                    # 计算历史对比 (简化模拟)
+                    current_val = result.get('value', 0)
+                    hist_compare = self._calculate_historical_compare(current_val)
+
+                    # 信号强度 (基于confidence和value计算)
+                    signal_strength = self._calculate_signal_strength(result)
+
+                    # 趋势方向
+                    trend_direction = self._determine_trend_direction(result)
+
+                    confidence = f"{result.get('confidence', 0):.2f}"
+
+                    # 影响权重 (基于数据源和指标类型)
+                    impact_weight = self._calculate_impact_weight(data_source, indicator)
+
+                    quality = str(result.get('data_quality', '--'))
+                    timestamp = str(result.get('timestamp', '--'))
+
+                    # 设置表格项
+                    self.sentiment_table.setItem(row, 0, QTableWidgetItem(data_source))
+                    self.sentiment_table.setItem(row, 1, QTableWidgetItem(indicator))
+                    self.sentiment_table.setItem(row, 2, QTableWidgetItem(value))
+                    self.sentiment_table.setItem(row, 3, QTableWidgetItem(hist_compare))
+                    self.sentiment_table.setItem(row, 4, QTableWidgetItem(signal_strength))
+                    self.sentiment_table.setItem(row, 5, QTableWidgetItem(trend_direction))
+                    self.sentiment_table.setItem(row, 6, QTableWidgetItem(confidence))
+                    self.sentiment_table.setItem(row, 7, QTableWidgetItem(impact_weight))
+                    self.sentiment_table.setItem(row, 8, QTableWidgetItem(quality))
+                    self.sentiment_table.setItem(row, 9, QTableWidgetItem(timestamp))
+
+                    # 设置行颜色(根据信号强度)
+                    self._set_row_color(row, signal_strength)
+
+                    if row < 3:  # 只打印前3行的调试信息
+                        print(f"  行{row}: {data_source} | {indicator} | {value}")
+
+                except Exception as e:
+                    print(f"❌ 更新表格行{row}失败: {e}")
+
+            # 强制更新表格显示
+            self.sentiment_table.update()
+            self.sentiment_table.repaint()
+            print("✅ 情绪表格更新完成")
+
+        except Exception as e:
+            print(f"❌ 更新情绪显示失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def calculate_composite_sentiment(self):
+        """计算综合情绪指数"""
+        try:
+            print(f"🧮 计算综合情绪指数，数据量: {len(self.sentiment_results)}")
+
+            if not hasattr(self, 'composite_score_label') or self.composite_score_label is None:
+                print("❌ composite_score_label未初始化")
+                return
+
+            if not self.sentiment_results:
+                print("⚠️ 没有数据计算综合指数")
+                self.composite_score_label.setText("综合情绪指数: --")
+                return
+
+            # 计算加权平均情绪指数
+            total_weight = 0
+            weighted_sum = 0
+
+            for result in self.sentiment_results:
+                weight = result.get('confidence', 0.5) * result.get('strength', 0.5)
+                weighted_sum += result.get('value', 50) * weight
+                total_weight += weight
+
+            if total_weight > 0:
+                composite_score = weighted_sum / total_weight
+            else:
+                composite_score = 50  # 默认中性
+
+            print(f"📊 计算出综合情绪指数: {composite_score:.2f}")
+
+            # 更新显示
+            self.composite_score_label.setText(f"综合情绪指数: {composite_score:.2f}")
+
+            # 根据分数设置颜色
+            if composite_score > 70:
+                color = "#00aa00"  # 绿色
+            elif composite_score > 55:
+                color = "#88aa00"  # 黄绿色
+            elif composite_score > 45:
+                color = "#aaaa00"  # 黄色
+            elif composite_score > 30:
+                color = "#aa8800"  # 橙色
+            else:
+                color = "#aa0000"  # 红色
+
+            self.composite_score_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {color};")
+
+            # 更新统计信息
+            if hasattr(self, 'total_indicators_label'):
+                self.total_indicators_label.setText(f"指标数量: {len(self.sentiment_results)}")
+
+            # 数据质量统计
+            quality_counts = {}
+            for result in self.sentiment_results:
+                quality = result.get('data_quality', 'unknown')
+                quality_counts[quality] = quality_counts.get(quality, 0) + 1
+
+            quality_text = ", ".join([f"{k}:{v}" for k, v in quality_counts.items()])
+            if hasattr(self, 'data_quality_label'):
+                self.data_quality_label.setText(f"数据质量: {quality_text}")
+
+            # 保存统计信息
+            self.sentiment_statistics = {
+                'composite_score': composite_score,
+                'total_indicators': len(self.sentiment_results),
+                'quality_distribution': quality_counts,
+                'analysis_time': datetime.now().isoformat(),
+                'selected_plugins': self.get_selected_plugins()
+            }
+
+            # 更新其他专业指数
+            self._update_professional_indices()
+
+            print("✅ 综合情绪指数更新完成")
+
+        except Exception as e:
+            print(f"❌ 计算综合情绪指数失败: {e}")
+
+    def _calculate_historical_compare(self, current_value):
+        """计算历史对比值 (简化模拟)"""
+        try:
+            # 简化的历史对比计算
+            historical_avg = 50.0  # 假设历史平均值
+            diff = current_value - historical_avg
+            percent_change = (diff / historical_avg * 100) if historical_avg != 0 else 0
+
+            if percent_change > 5:
+                return f"+{percent_change:.1f}%"
+            elif percent_change < -5:
+                return f"{percent_change:.1f}%"
+            else:
+                return f"{percent_change:+.1f}%"
+        except:
+            return "--"
+
+    def _calculate_signal_strength(self, result):
+        """计算信号强度"""
+        try:
+            value = result.get('value', 0)
+            confidence = result.get('confidence', 0)
+
+            # 综合计算信号强度
+            strength = (abs(value - 50) / 50) * confidence
+
+            if strength > 0.8:
+                return "🔴 强"
+            elif strength > 0.5:
+                return "🟡 中"
+            else:
+                return "🟢 弱"
+        except:
+            return "🔵 未知"
+
+    def _determine_trend_direction(self, result):
+        """确定趋势方向"""
+        try:
+            value = result.get('value', 50)
+            signal = result.get('signal', 'neutral')
+
+            if isinstance(signal, str):
+                if 'bullish' in signal.lower() or 'buy' in signal.lower():
+                    return "📈 看涨"
+                elif 'bearish' in signal.lower() or 'sell' in signal.lower():
+                    return "📉 看跌"
+
+            # 基于数值判断
+            if value > 60:
+                return "📈 看涨"
+            elif value < 40:
+                return "📉 看跌"
+            else:
+                return "➡️ 中性"
+        except:
+            return "❓ 未知"
+
+    def _calculate_impact_weight(self, data_source, indicator):
+        """计算影响权重"""
+        try:
+            # 根据数据源和指标类型分配权重
+            weights = {
+                'vix_sentiment': 0.9,
+                'fmp_sentiment': 0.8,
+                'news_sentiment': 0.7,
+                'social_sentiment': 0.6,
+                'default': 0.5
+            }
+
+            source_key = data_source.lower() if data_source else 'default'
+            for key, weight in weights.items():
+                if key in source_key:
+                    return f"{weight:.1f}"
+
+            return f"{weights['default']:.1f}"
+        except:
+            return "0.5"
+
+    def _set_row_color(self, row, signal_strength):
+        """设置表格行颜色"""
+        try:
+            if "强" in signal_strength:
+                color = QColor(255, 235, 238)  # 浅红色
+            elif "中" in signal_strength:
+                color = QColor(255, 248, 225)  # 浅黄色
+            elif "弱" in signal_strength:
+                color = QColor(232, 245, 233)  # 浅绿色
+            else:
+                color = QColor(245, 245, 245)  # 浅灰色
+
+            for col in range(self.sentiment_table.columnCount()):
+                item = self.sentiment_table.item(row, col)
+                if item:
+                    item.setBackground(color)
+        except Exception as e:
+            print(f"设置行颜色失败: {e}")
+
+    def _update_professional_indices(self):
+        """更新专业指数显示"""
+        try:
+            from datetime import datetime
+
+            if not self.sentiment_results:
+                return
+
+            # 计算各种专业指数
+            fear_greed = self._calculate_fear_greed_index()
+            volatility = self._calculate_volatility_index()
+            money_flow = self._calculate_money_flow_index()
+            news_sentiment = self._calculate_news_sentiment_index()
+            technical = self._calculate_technical_sentiment_index()
+            market_strength = self._calculate_market_strength_index()
+
+            # 更新显示
+            if hasattr(self, 'fear_greed_label'):
+                self.fear_greed_label.setText(f"恐惧&贪婪指数: {fear_greed}")
+            if hasattr(self, 'volatility_index_label'):
+                self.volatility_index_label.setText(f"波动率指数: {volatility}")
+            if hasattr(self, 'money_flow_label'):
+                self.money_flow_label.setText(f"资金流向指数: {money_flow}")
+            if hasattr(self, 'news_sentiment_label'):
+                self.news_sentiment_label.setText(f"新闻情绪指数: {news_sentiment}")
+            if hasattr(self, 'technical_sentiment_label'):
+                self.technical_sentiment_label.setText(f"技术面情绪: {technical}")
+            if hasattr(self, 'market_strength_label'):
+                self.market_strength_label.setText(f"市场强度指数: {market_strength}")
+            if hasattr(self, 'last_update_label'):
+                self.last_update_label.setText(f"更新时间: {datetime.now().strftime('%H:%M:%S')}")
+
+        except Exception as e:
+            print(f"更新专业指数失败: {e}")
+
+    def _calculate_fear_greed_index(self):
+        """计算恐惧&贪婪指数 (类似CNN恐惧贪婪指数)"""
+        try:
+            vix_data = [r for r in self.sentiment_results if 'vix' in r.get('data_source', '').lower()]
+            if vix_data:
+                vix_value = vix_data[0].get('value', 50)
+                # VIX越高，恐惧越强
+                fear_greed = max(0, min(100, 100 - vix_value * 2))
+            else:
+                # 基于整体情绪计算
+                avg_sentiment = sum(r.get('value', 50) for r in self.sentiment_results) / len(self.sentiment_results)
+                fear_greed = avg_sentiment
+
+            if fear_greed < 25:
+                return f"{fear_greed:.0f} (极度恐惧)"
+            elif fear_greed < 45:
+                return f"{fear_greed:.0f} (恐惧)"
+            elif fear_greed < 55:
+                return f"{fear_greed:.0f} (中性)"
+            elif fear_greed < 75:
+                return f"{fear_greed:.0f} (贪婪)"
+            else:
+                return f"{fear_greed:.0f} (极度贪婪)"
+        except:
+            return "--"
+
+    def _calculate_volatility_index(self):
+        """计算波动率指数"""
+        try:
+            vix_data = [r for r in self.sentiment_results if 'vix' in r.get('data_source', '').lower()]
+            if vix_data:
+                return f"{vix_data[0].get('value', 0):.1f}"
+            else:
+                # 基于所有数据的标准差估算
+                values = [r.get('value', 50) for r in self.sentiment_results]
+                if len(values) > 1:
+                    import statistics
+                    volatility = statistics.stdev(values)
+                    return f"{volatility:.1f}"
+                return "--"
+        except:
+            return "--"
+
+    def _calculate_money_flow_index(self):
+        """计算资金流向指数"""
+        try:
+            # 基于各数据源的平均信心度计算
+            confidence_sum = sum(r.get('confidence', 0.5) for r in self.sentiment_results)
+            avg_confidence = confidence_sum / len(self.sentiment_results) if self.sentiment_results else 0.5
+
+            money_flow = avg_confidence * 100
+            return f"{money_flow:.1f}"
+        except:
+            return "--"
+
+    def _calculate_news_sentiment_index(self):
+        """计算新闻情绪指数"""
+        try:
+            news_data = [r for r in self.sentiment_results if 'news' in r.get('data_source', '').lower()]
+            if news_data:
+                avg_news = sum(r.get('value', 50) for r in news_data) / len(news_data)
+                return f"{avg_news:.1f}"
+            return "--"
+        except:
+            return "--"
+
+    def _calculate_technical_sentiment_index(self):
+        """计算技术面情绪指数"""
+        try:
+            # 基于非新闻类数据源计算技术面情绪
+            tech_data = [r for r in self.sentiment_results if 'news' not in r.get('data_source', '').lower()]
+            if tech_data:
+                avg_tech = sum(r.get('value', 50) for r in tech_data) / len(tech_data)
+                return f"{avg_tech:.1f}"
+            return "--"
+        except:
+            return "--"
+
+    def _calculate_market_strength_index(self):
+        """计算市场强度指数"""
+        try:
+            # 基于所有指标的综合强度
+            strengths = []
+            for result in self.sentiment_results:
+                value = result.get('value', 50)
+                confidence = result.get('confidence', 0.5)
+                strength = abs(value - 50) * confidence
+                strengths.append(strength)
+
+            if strengths:
+                avg_strength = sum(strengths) / len(strengths)
+                return f"{avg_strength:.1f}"
+            return "--"
+        except:
+            return "--"
+            import traceback
+            traceback.print_exc()
+
+    def update_status_display(self):
+        """更新状态显示"""
+        try:
+            # 服务状态
+            if self.sentiment_service:
+                if hasattr(self.sentiment_service, 'get_service_status'):
+                    status = self.sentiment_service.get_service_status()
+                    status_text = "运行中" if status.get('is_running', False) else "就绪"
+                    self.service_status_label.setText(f"服务状态: {status_text}")
+                else:
+                    self.service_status_label.setText("服务状态: 已连接")
+            else:
+                self.service_status_label.setText("服务状态: 未连接")
+
+            # 插件状态
+            selected_count = len(self.get_selected_plugins())
+            total_count = len(self.available_plugins)
+            self.plugins_status_label.setText(f"插件状态: {selected_count}/{total_count}")
+
+            # 最后更新时间
+            current_time = datetime.now().strftime('%H:%M:%S')
+            self.last_update_label.setText(f"最后更新: {current_time}")
+
+        except Exception as e:
+            print(f"❌ 更新状态显示失败: {e}")
+
+    def refresh_status(self):
+        """刷新状态"""
+        self.update_status_display()
+
+    def toggle_auto_refresh(self, enabled: bool):
+        """切换自动刷新"""
+        if enabled:
+            interval_ms = self.refresh_interval_spin.value() * 60 * 1000
+            self.auto_refresh_timer.start(interval_ms)
+            print(f"✅ 启动自动刷新，间隔 {self.refresh_interval_spin.value()} 分钟")
+        else:
+            self.auto_refresh_timer.stop()
+            print("⏹️ 停止自动刷新")
+
+    def auto_refresh_data(self):
+        """自动刷新数据"""
+        if self.get_selected_plugins():
+            print("⏰ 自动刷新情绪数据...")
+            self.analyze_sentiment()
+
+    def stop_analysis(self):
+        """停止分析"""
+        try:
+            # 停止异步分析线程
+            if self.analysis_thread and self.analysis_thread.isRunning():
+                print("⏹️ 正在停止异步分析线程...")
+                self.analysis_thread.stop()
+                self.analysis_thread.wait(3000)  # 等待最多3秒
+                if self.analysis_thread.isRunning():
+                    self.analysis_thread.terminate()
+                    self.analysis_thread.wait(1000)
+                print("✅ 分析线程已停止")
+
+            # 停止自动刷新
+            self.auto_refresh_timer.stop()
+            self.auto_refresh_cb.setChecked(False)
+
+            # 重置UI状态
+            self.reset_ui_state()
+            if self.status_label:
+                self.status_label.setText("分析已停止")
+
+            print("⏹️ 情绪分析已停止")
+
+        except Exception as e:
+            print(f"❌ 停止分析时出错: {e}")
+            self.reset_ui_state()
+
+    def save_results(self):
+        """保存分析结果"""
+        if not self.sentiment_results:
+            QMessageBox.warning(self, "警告", "没有可保存的结果")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "保存情绪分析结果",
+            f"sentiment_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            "JSON文件 (*.json);;CSV文件 (*.csv)"
+        )
+
+        if file_path:
+            try:
+                if file_path.endswith('.json'):
+                    import json
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump({
+                            'results': self.sentiment_results,
+                            'statistics': self.sentiment_statistics,
+                            'export_time': datetime.now().isoformat()
+                        }, f, ensure_ascii=False, indent=2)
+                elif file_path.endswith('.csv'):
+                    df = pd.DataFrame(self.sentiment_results)
+                    df.to_csv(file_path, index=False, encoding='utf-8')
+
+                QMessageBox.information(self, "成功", f"结果已保存到:\n{file_path}")
+                print(f"✅ 结果已保存: {file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"保存失败: {str(e)}")
+
+    def clear_results(self):
+        """清空分析结果"""
+        self.sentiment_results = []
+        self.sentiment_statistics = {}
+        self.sentiment_table.setRowCount(0)
+        self.composite_score_label.setText("综合情绪指数: --")
+        self.total_indicators_label.setText("指标数量: --")
+        self.data_quality_label.setText("数据质量: --")
+        print("🗑️ 已清空分析结果")
+
+    # 报告功能方法
+    def generate_sentiment_report(self):
+        """生成情绪报告"""
+        try:
+            print("📊 开始生成情绪报告...")
+
+            # 获取报告参数
+            report_type = self.report_type_combo.currentText()
+            period = self.report_period_spin.value()
+            report_format = self.report_format_combo.currentText()
+
+            # 收集数据
+            report_data = self.collect_sentiment_data_for_report(period)
+
+            if not report_data:
+                QMessageBox.warning(self, "警告", "无法生成报告，请先执行情绪分析获取数据")
+                return
+
+            # 生成报告内容
+            report_content = self.format_sentiment_report(report_data, report_type)
+
+            # 更新预览
+            self.report_preview.setHtml(report_content)
+
+            # 添加到历史记录
+            self.add_report_to_history(report_type, period, "已生成")
+
+            # 发送完成信号
+            self.sentiment_report_completed.emit({
+                'report_type': report_type,
+                'period': period,
+                'format': report_format,
+                'data': report_data,
+                'content': report_content,
+                'timestamp': datetime.now().isoformat()
+            })
+
+            QMessageBox.information(self, "成功", f"情绪报告生成完成\n类型: {report_type}\n周期: {period}天")
+            print("✅ 情绪报告生成完成")
+
+        except Exception as e:
+            print(f"❌ 生成报告失败: {e}")
+            QMessageBox.critical(self, "错误", f"生成报告失败: {str(e)}")
+
+    def collect_sentiment_data_for_report(self, period: int):
+        """为报告收集情绪数据"""
+        try:
+            if not self.sentiment_statistics or 'composite_score' not in self.sentiment_statistics:
+                QMessageBox.information(self, "提示", "请先执行一次实时情绪分析，以便为报告提供数据。")
+                return {}
+
+            composite_index = self.sentiment_statistics['composite_score']
+            vix_index = next((r.get('value') for r in self.sentiment_results if 'vix' in str(r.get('indicator', '')).lower()), composite_index / 2 + 5)
+            fear_greed_index = next((r.get('value') for r in self.sentiment_results if 'fear' in str(r.get('indicator', '')).lower()), composite_index)
+
+            data = {
+                'period': period,
+                'collection_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'vix_index': vix_index,
+                'fear_greed_index': fear_greed_index,
+                'investor_sentiment': next((r.get('value') for r in self.sentiment_results if 'investor' in str(r.get('indicator', '')).lower()), 50),
+                'technical_sentiment': next((r.get('value') for r in self.sentiment_results if 'technical' in str(r.get('indicator', '')).lower()), 50),
+                'news_sentiment': next((r.get('value') for r in self.sentiment_results if 'news' in str(r.get('indicator', '')).lower()), 50),
+                'social_sentiment': next((r.get('value') for r in self.sentiment_results if 'social' in str(r.get('indicator', '')).lower()), 0.5),
+                'composite_index': composite_index
+            }
+
+            if data['composite_index'] > 70:
+                data['sentiment_status'] = '乐观'
+            elif data['composite_index'] > 50:
+                data['sentiment_status'] = '中性'
+            else:
+                data['sentiment_status'] = '悲观'
+
+            data['historical_trend'] = [{'date': (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d'), 'value': composite_index * (1 + random.uniform(-0.05, 0.05))} for i in range(period)]
+
+            return data
+
+        except Exception as e:
+            self.log_manager.error(f"收集情绪数据失败: {str(e)}")
+            return {}
+
+    def format_sentiment_report(self, data, report_type):
+        """格式化情绪报告"""
+        html_content = f"""
+        <html>
+        <head>
+            <title>{report_type} - 市场情绪分析报告</title>
+            <style>
+                body {{ font-family: "Microsoft YaHei", Arial, sans-serif; margin: 20px; }}
+                .header {{ text-align: center; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+                .section {{ margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }}
+                .metric {{ display: inline-block; margin: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; }}
+                .positive {{ color: #27ae60; }}
+                .negative {{ color: #e74c3c; }}
+                .neutral {{ color: #95a5a6; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🎯 {report_type}</h1>
+                <h2>市场情绪分析报告</h2>
+                <p>生成时间: {data.get('collection_time', 'N/A')}</p>
+                <p>数据周期: {data.get('period', 'N/A')} 天</p>
+            </div>
+            
+            <div class="section">
+                <h3>📊 情绪指标概览</h3>
+                <div class="metric">
+                    <strong>综合情绪指数:</strong> 
+                    <span class="{'positive' if data.get('composite_index', 50) > 60 else 'negative' if data.get('composite_index', 50) < 40 else 'neutral'}">
+                        {data.get('composite_index', 0):.2f}
+                    </span>
+                </div>
+                <div class="metric">
+                    <strong>情绪状态:</strong> 
+                    <span class="{'positive' if data.get('sentiment_status') == '乐观' else 'negative' if data.get('sentiment_status') == '悲观' else 'neutral'}">
+                        {data.get('sentiment_status', '未知')}
+                    </span>
+                </div>
+                <div class="metric">
+                    <strong>VIX恐慌指数:</strong> {data.get('vix_index', 0):.2f}
+                </div>
+                <div class="metric">
+                    <strong>恐惧贪婪指数:</strong> {data.get('fear_greed_index', 0):.2f}
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>📈 分类情绪分析</h3>
+                <div class="metric">
+                    <strong>投资者情绪:</strong> {data.get('investor_sentiment', 0):.2f}
+                </div>
+                <div class="metric">
+                    <strong>技术面情绪:</strong> {data.get('technical_sentiment', 0):.2f}
+                </div>
+                <div class="metric">
+                    <strong>新闻情绪:</strong> {data.get('news_sentiment', 0):.2f}
+                </div>
+                <div class="metric">
+                    <strong>社交媒体情绪:</strong> {data.get('social_sentiment', 0):.2f}
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>🔍 分析结论</h3>
+                <p>根据当前数据分析，市场整体情绪呈现<strong>{data.get('sentiment_status', '未知')}</strong>态势。</p>
+                <p>综合情绪指数为<strong>{data.get('composite_index', 0):.2f}</strong>，
+                {'建议保持谨慎乐观态度' if data.get('composite_index', 50) > 60 else '建议控制风险' if data.get('composite_index', 50) < 40 else '建议保持观望'}。</p>
+            </div>
+            
+            <div class="section">
+                <h3>⚠️ 风险提示</h3>
+                <p>本报告仅供参考，投资有风险，入市需谨慎。请结合其他分析工具和市场信息做出投资决策。</p>
+            </div>
+        </body>
+        </html>
+        """
+        return html_content
+
+    def schedule_sentiment_report(self):
+        """设置定时报告"""
+        QMessageBox.information(self, "功能开发中", "定时报告功能正在开发中，敬请期待！")
+
+    def export_sentiment_report(self):
+        """导出情绪报告"""
+        if not hasattr(self, 'report_preview') or not self.report_preview.toPlainText():
+            QMessageBox.warning(self, "警告", "请先生成报告再导出")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出情绪报告",
+            f"sentiment_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+            "HTML文件 (*.html);;PDF文件 (*.pdf);;文本文件 (*.txt)"
+        )
+
+        if file_path:
+            try:
+                if file_path.endswith('.html'):
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(self.report_preview.toHtml())
+                elif file_path.endswith('.txt'):
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(self.report_preview.toPlainText())
+                else:
+                    QMessageBox.warning(self, "提示", "PDF导出功能正在开发中")
+                    return
+
+                QMessageBox.information(self, "成功", f"报告已导出到:\n{file_path}")
+                print(f"✅ 报告已导出: {file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
+
+    def add_report_to_history(self, report_type, period, status):
+        """添加报告到历史记录"""
+        row_count = self.report_history_table.rowCount()
+        self.report_history_table.insertRow(row_count)
+
+        self.report_history_table.setItem(row_count, 0, QTableWidgetItem(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        self.report_history_table.setItem(row_count, 1, QTableWidgetItem(report_type))
+        self.report_history_table.setItem(row_count, 2, QTableWidgetItem(f"{period}天"))
+        self.report_history_table.setItem(row_count, 3, QTableWidgetItem(status))
+
+        # 操作按钮
+        action_widget = QWidget()
+        action_layout = QHBoxLayout(action_widget)
+
+        view_btn = QPushButton("查看")
+        view_btn.clicked.connect(lambda: self.view_historical_report(row_count))
+        action_layout.addWidget(view_btn)
+
+        delete_btn = QPushButton("删除")
+        delete_btn.clicked.connect(lambda: self.delete_historical_report(row_count))
+        action_layout.addWidget(delete_btn)
+
+        self.report_history_table.setCellWidget(row_count, 4, action_widget)
+
+    def view_historical_report(self, row):
+        """查看历史报告"""
+        QMessageBox.information(self, "提示", "查看历史报告功能正在开发中")
+
+    def delete_historical_report(self, row):
+        """删除历史报告"""
+        reply = QMessageBox.question(self, "确认删除", "确定要删除这个历史报告吗？")
+        if reply == QMessageBox.Yes:
+            self.report_history_table.removeRow(row)
+
+    # 继承方法覆盖
+    def refresh_data(self):
+        """刷新数据 - 从BaseAnalysisTab继承的方法"""
+        if hasattr(self, 'main_tab_widget'):
+            current_index = self.main_tab_widget.currentIndex()
+            if current_index == 0:  # 实时分析标签页
+                self.analyze_sentiment()
+            elif current_index == 1:  # 报告标签页
+                if self.sentiment_results:
+                    self.generate_sentiment_report()
+
+    def clear_data(self):
+        """清除数据 - 从BaseAnalysisTab继承的方法"""
+        self.sentiment_results = []
+        self.sentiment_statistics = {}
+        self.sentiment_history = []
+        self.report_results = []
+        self.report_statistics = {}
+
+        if hasattr(self, 'sentiment_table'):
+            self.sentiment_table.setRowCount(0)
+        if hasattr(self, 'report_preview'):
+            self.report_preview.clear()
+        if hasattr(self, 'composite_score_label'):
+            self.composite_score_label.setText("综合情绪指数: --")
+
+    def ensure_ui_visibility(self):
+        """确保UI可见性"""
+        try:
+            self.setVisible(True)
+            self.update()
+        except Exception as e:
+            print(f"❌ 确保UI可见性失败: {e}")
+
+    def on_sentiment_data_updated(self, response):
+        """情绪数据更新事件处理"""
+        print(f"📊 收到情绪数据更新: {len(response.data) if response.data else 0} 个指标")
+        self.plugin_data_updated.emit({'response': response})
+
+    def on_plugin_error(self, plugin_name: str, error_message: str):
+        """插件错误事件处理"""
+        print(f"❌ 插件错误 {plugin_name}: {error_message}")
+        QMessageBox.warning(self, "插件错误", f"插件 {plugin_name} 发生错误:\n{error_message}")
+
+    def set_stock_data(self, stock_code: str, kdata):
+        """设置股票数据"""
+        super().set_stock_data(stock_code, kdata)
+        print(f"📈 情绪分析: 接收到股票数据 {stock_code}")
+
+        # 当股票数据更新时，可以自动进行情绪分析
+        if hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb.isChecked():
+            self.analyze_sentiment()
+
+    def closeEvent(self, event):
+        """关闭事件"""
+        # 停止定时器
+        if hasattr(self, 'auto_refresh_timer'):
+            self.auto_refresh_timer.stop()
+
+        # 清理情绪数据服务
+        if self.sentiment_service:
+            try:
+                if hasattr(self.sentiment_service, 'cleanup'):
+                    self.sentiment_service.cleanup()
+            except:
+                pass
+
+        super().closeEvent(event)
+
+
+# 为了向后兼容，添加别名
+SentimentAnalysisTab = ProfessionalSentimentTab

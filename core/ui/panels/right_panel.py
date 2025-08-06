@@ -40,14 +40,32 @@ try:
     from gui.widgets.analysis_tabs.pattern_tab import PatternAnalysisTab
     from gui.widgets.analysis_tabs.trend_tab import TrendAnalysisTab
     from gui.widgets.analysis_tabs.wave_tab import WaveAnalysisTab
-    from gui.widgets.analysis_tabs.sentiment_tab import SentimentAnalysisTab
     from gui.widgets.analysis_tabs.sector_flow_tab import SectorFlowTab
     from gui.widgets.analysis_tabs.hotspot_tab import HotspotAnalysisTab
-    from gui.widgets.analysis_tabs.sentiment_report_tab import SentimentReportTab
     PROFESSIONAL_TABS_AVAILABLE = True
+    ENHANCED_SENTIMENT_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"无法导入专业分析标签页: {e}")
     PROFESSIONAL_TABS_AVAILABLE = False
+    ENHANCED_SENTIMENT_AVAILABLE = False
+
+# 导入合并后的专业情绪分析标签页（包含实时分析和报告功能）
+try:
+    from gui.widgets.analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
+    PROFESSIONAL_SENTIMENT_AVAILABLE = True
+    # 向后兼容，EnhancedSentimentAnalysisTab 现在指向 ProfessionalSentimentTab
+    EnhancedSentimentAnalysisTab = ProfessionalSentimentTab
+except ImportError as e:
+    logging.warning(f"无法导入专业版情绪分析标签页: {e}")
+    PROFESSIONAL_SENTIMENT_AVAILABLE = False
+
+# 导入K线情绪分析标签页
+try:
+    from gui.widgets.analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
+    KLINE_SENTIMENT_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"无法导入K线情绪分析标签页: {e}")
+    KLINE_SENTIMENT_AVAILABLE = False
 
 # 导入AnalysisToolsPanel
 try:
@@ -291,11 +309,45 @@ class RightPanel(BasePanel):
             self.add_widget('wave_tab', self._wave_tab)
             self._professional_tabs.append(self._wave_tab)
 
-            # 情绪分析
-            self._sentiment_tab = SentimentAnalysisTab(config_manager)
-            tab_widget.addTab(self._sentiment_tab, "情绪分析")
-            self.add_widget('sentiment_tab', self._sentiment_tab)
-            self._professional_tabs.append(self._sentiment_tab)
+            # 情绪分析 - 优先使用专业版
+            try:
+                if PROFESSIONAL_SENTIMENT_AVAILABLE:
+                    self._sentiment_tab = ProfessionalSentimentTab(config_manager)
+                    tab_widget.addTab(self._sentiment_tab, "📊 情绪分析")
+                    self.add_widget('sentiment_tab', self._sentiment_tab)
+                    self._professional_tabs.append(self._sentiment_tab)
+                    logger.info("✅ 使用合并后的专业版情绪分析标签页（包含实时分析和报告功能）")
+                else:
+                    # 如果都失败了，创建一个简单的占位符
+                    placeholder_tab = QWidget()
+                    placeholder_layout = QVBoxLayout(placeholder_tab)
+                    placeholder_label = QLabel("情绪分析功能暂时不可用")
+                    placeholder_label.setAlignment(Qt.AlignCenter)
+                    placeholder_layout.addWidget(placeholder_label)
+                    tab_widget.addTab(placeholder_tab, "📊 情绪分析")
+                    logger.warning("⚠️ 情绪分析功能不可用，使用占位符")
+
+            except Exception as sentiment_error:
+                logger.error(f"❌ 情绪分析标签页创建失败: {sentiment_error}")
+                # 如果都失败了，创建一个简单的占位符
+                placeholder_tab = QWidget()
+                placeholder_layout = QVBoxLayout(placeholder_tab)
+                placeholder_label = QLabel("情绪分析功能暂时不可用")
+                placeholder_label.setAlignment(Qt.AlignCenter)
+                placeholder_layout.addWidget(placeholder_label)
+                tab_widget.addTab(placeholder_tab, "📊 情绪分析")
+
+            # K线情绪分析 - 新增标签页
+            if KLINE_SENTIMENT_AVAILABLE:
+                try:
+                    self._kline_sentiment_tab = EnhancedKLineSentimentTab(config_manager)
+                    tab_widget.addTab(self._kline_sentiment_tab, "📈 K线情绪")
+                    self.add_widget('kline_sentiment_tab', self._kline_sentiment_tab)
+                    self._professional_tabs.append(self._kline_sentiment_tab)
+                    logger.info("✅ K线情绪分析标签页创建成功")
+                except Exception as kline_error:
+                    logger.error(f"❌ K线情绪分析标签页创建失败: {kline_error}")
+                    logger.error(traceback.format_exc())
 
             # 板块资金流
             self._sector_flow_tab = SectorFlowTab(config_manager)
@@ -309,11 +361,9 @@ class RightPanel(BasePanel):
             self.add_widget('hotspot_tab', self._hotspot_tab)
             self._professional_tabs.append(self._hotspot_tab)
 
-            # 情绪报告
-            self._sentiment_report_tab = SentimentReportTab(config_manager)
-            tab_widget.addTab(self._sentiment_report_tab, "情绪报告")
-            self.add_widget('sentiment_report_tab', self._sentiment_report_tab)
-            self._professional_tabs.append(self._sentiment_report_tab)
+            # 情绪报告功能现在已经整合到专业版情绪分析标签页中（双标签页设计）
+            # 不再需要单独的情绪报告标签页
+            logger.info("✅ 情绪报告功能已整合到专业版情绪分析标签页的第二个标签页中")
 
         # 基础功能标签页（如果专业标签页不可用时的后备方案，或者总是创建）
         # 修复：总是创建基础标签页，但只有在需要时才显示

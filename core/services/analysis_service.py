@@ -232,206 +232,161 @@ class AnalysisService(CacheableService, ConfigurableService):
             logger.error(f"Failed to analyze support/resistance for {stock_code}: {e}")
             return None
 
-    async def run_strategy_analysis(self, stock_code: str, strategy_name: str,
-                                    parameters: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+    async def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive', kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
-        异步运行策略分析
+        对指定股票进行全面异步分析。
 
         Args:
-            stock_code: 股票代码
-            strategy_name: 策略名称
-            parameters: 策略参数
+            stock_code (str): 股票代码.
+            analysis_type (str, optional): 分析类型. Defaults to 'comprehensive'.
+            kline_data (pd.DataFrame, optional): 预先加载的K线数据. Defaults to None.
 
         Returns:
-            策略分析结果
+            Optional[Dict[str, Any]]: 分析结果字典.
         """
         self._ensure_initialized()
 
-        if strategy_name not in self._strategies:
-            logger.error(f"Strategy not found: {strategy_name}")
-            return None
+        request_id = f"analyze_{stock_code}_{analysis_type}_{int(time.time())}"
 
-        # 这是一个示例，实际策略可能需要不同的数据
-        time_range = parameters.get('time_range', 365)
+        # 使用asyncio.create_task来创建任务，以便我们可以跟踪它
+        task = asyncio.create_task(self._perform_comprehensive_analysis(stock_code, kline_data=kline_data))
 
-        # 异步获取数据
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            logger.warning(
-                f"No data for {stock_code} to run strategy {strategy_name}")
-            return None
+        async with self.request_lock:
+            self.active_requests[request_id] = task
 
-        stock_data = kdata.get('kline_data')
-        if stock_data is None or stock_data.empty:
-            logger.warning(
-                f"No data for {stock_code} to run strategy {strategy_name} from package")
-            return None
-
-        # 运行策略
         try:
-            strategy_func = self._strategies[strategy_name]
-            # 策略函数现在是异步的
-            result = await strategy_func(stock_code, parameters or {})
-
-            if result:
-                # 缓存结果
-                cache_key = f"strategy_{strategy_name}_{stock_code}_{hash(str(parameters))}"
-                self.put_to_cache(cache_key, result)
-
-                # 发布分析完成事件
-                event = AnalysisCompleteEvent(
-                    analysis_type='strategy',
-                    stock_code=stock_code
-                )
-                event.data.update({
-                    'strategy_name': strategy_name,
-                    'result': result
-                })
-                self.event_bus.publish(event)
-
+            # 等待任务完成并获取结果
+            result = await task
             return result
+        except asyncio.CancelledError:
+            logger.info(f"分析任务 {request_id} 已被取消。")
+            return None
+        except Exception as e:
+            logger.error(f"执行股票分析任务 {request_id} 时发生错误: {e}", exc_info=True)
+            return None
+        finally:
+            # 任务完成后，从活动字典中移除
+            async with self.request_lock:
+                self.active_requests.pop(request_id, None)
+
+    async def _perform_comprehensive_analysis(self, stock_code: str, kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
+        """执行实际的全面分析"""
+        cache_key = f"analysis_{stock_code}_comprehensive"
+        cached_result = self.get_from_cache(cache_key)
+        if cached_result is not None:
+            logger.info(f"从缓存中加载 {stock_code} 的分析数据")
+            return cached_result
+
+        try:
+            if kline_data is None:
+                kdata_response = await self.data_manager.request_data(stock_code=stock_code, data_type='kdata')
+
+                if isinstance(kdata_response, dict):
+                    kline_data = kdata_response.get('kline_data')
+                else:
+                    kline_data = kdata_response
+
+            if kline_data is None or kline_data.empty:
+                logger.warning(f"无法为 {stock_code} 获取K线数据，分析中止。")
+                return {"error": "无法获取K线数据"}
+
+            tasks = {
+                "technical_analysis": self.calculate_technical_indicators(stock_code, kline_data=kline_data),
+                "trend_analysis": self.analyze_trend(stock_code, kline_data=kline_data),
+                "support_resistance": self.analyze_support_resistance(stock_code, kline_data=kline_data),
+            }
+
+            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+            final_result = {}
+            for task_name, result in zip(tasks.keys(), results):
+                if isinstance(result, Exception):
+                    logger.error(f"分析任务 '{task_name}' for {stock_code} 失败: {result}", exc_info=True)
+                    final_result[task_name] = {"error": str(result)}
+                else:
+                    final_result[task_name] = result
+
+            self.put_to_cache(cache_key, final_result)
+            return final_result
 
         except Exception as e:
-            logger.error(
-                f"Failed to run strategy {strategy_name} for {stock_code}: {e}")
+            logger.error(f"为 {stock_code} 执行全面分析时发生意外错误: {e}", exc_info=True)
+            return {"error": str(e)}
+
+    def calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
+        """计算移动平均线"""
+        return self._calculate_ma(data, period)
+
+    def calculate_macd(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
+        return self._calculate_macd(data)
+
+    def calculate_bollinger_bands(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
+        return self._calculate_bollinger_bands(data)
+
+    def calculate_rsi(self, data: pd.DataFrame, period: int = 14) -> pd.Series:
+        return self._calculate_rsi(data, period)
+
+    def calculate_kdj(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
+        return self._calculate_kdj(data)
+
+    def calculate_indicator(self, data: pd.DataFrame, indicator_name: str) -> Optional[Union[Dict[str, Any], pd.Series, List]]:
+        """通用指标计算方法"""
+        try:
+            indicator_name = indicator_name.upper()
+            method_name = f"_calculate_{indicator_name.lower()}"
+            if hasattr(self, method_name):
+                return getattr(self, method_name)(data)
+
+            if indicator_name.startswith('MA') and len(indicator_name) > 2:
+                try:
+                    period = int(indicator_name[2:])
+                    return self.calculate_ma(data, period)
+                except ValueError:
+                    logger.warning(f"无法从指标名称解析周期: {indicator_name}")
+
+            indicator_map = {'BOLL': '_calculate_bollinger_bands'}
+            if indicator_name in indicator_map and hasattr(self, indicator_map[indicator_name]):
+                return getattr(self, indicator_map[indicator_name])(data)
+
+            logger.warning(f"找不到指标计算方法: {indicator_name}")
             return None
 
-    def get_available_strategies(self) -> List[str]:
-        """
-        获取可用的策略列表
-
-        Returns:
-            策略名称列表
-        """
-        return list(self._strategies.keys())
-
-    def get_analysis_history(self, stock_code: str = None,
-                             analysis_type: str = None) -> List[Dict[str, Any]]:
-        """
-        获取分析历史
-
-        Args:
-            stock_code: 股票代码（可选）
-            analysis_type: 分析类型（可选）
-
-        Returns:
-            分析历史列表
-        """
-        results = []
-
-        for key, value in self._analysis_results.items():
-            if stock_code and stock_code not in key:
-                continue
-            if analysis_type and analysis_type not in key:
-                continue
-
-            results.append({
-                'key': key,
-                'result': value,
-                'timestamp': getattr(value, 'analysis_time', None)
-            })
-
-        # 按时间排序
-        results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-
-        return results
-
-    def _on_analysis_data_received(self, data, error=None):
-        """
-        异步数据接收回调
-        """
-        try:
-            if error:
-                logger.error(f"Analysis data request failed: {error}")
-                return
-
-            if data is not None:
-                # 发布分析完成事件
-                from ..events import AnalysisCompleteEvent
-                event = AnalysisCompleteEvent(
-                    stock_code=self._current_stock_code,
-                    analysis_type='comprehensive'
-                )
-                event.data.update(data)
-                self.event_bus.publish(event)
-
-                logger.debug(
-                    f"Analysis data received and published for {self._current_stock_code}")
-            else:
-                logger.warning(
-                    f"No analysis data received for {self._current_stock_code}")
-
         except Exception as e:
-            logger.error(f"Error processing analysis data: {e}")
-
-    async def _fallback_analysis(self, stock_code: str):
-        """降级分析，直接请求数据并运行"""
-        try:
-            # 异步请求分析数据，优先级设为中等
-            await self.data_manager.request_data(
-                stock_code=stock_code,
-                data_type='analysis',
-                priority='medium'
-            )
-            logger.info(f"Fallback analysis requested for {stock_code}")
-        except Exception as e:
-            logger.error(f"Fallback analysis failed for {stock_code}: {e}")
-
-    def _run_auto_analysis_async(self, stock_code: str) -> None:
-        """异步运行自动分析"""
-        try:
-            # 使用QTimer延迟执行，避免阻塞UI
-            from PyQt5.QtCore import QTimer
-            timer = QTimer()
-            timer.timeout.connect(lambda: self._run_auto_analysis(stock_code))
-            timer.setSingleShot(True)
-            timer.start(100)  # 100ms后执行
-
-        except Exception as e:
-            logger.error(f"Failed to schedule auto analysis: {e}")
-
-    def _run_auto_analysis(self, stock_code: str) -> None:
-        """自动执行一系列分析"""
-        async def analysis_coroutine():
-            try:
-                logger.info(f"开始为 {stock_code} 自动执行异步分析...")
-                # 并发执行所有分析任务
-                tasks = [
-                    self.calculate_technical_indicators(stock_code),
-                    self.analyze_trend(stock_code),
-                    self.analyze_support_resistance(stock_code)
-                ]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # 处理结果
-                final_result = {'stock_code': stock_code}
-                for res in results:
-                    if isinstance(res, dict):
-                        final_result.update(res)
-                    elif isinstance(res, Exception):
-                        logger.error(f"分析任务失败: {res}")
-
-                self._on_analysis_data_received(final_result)
-                logger.info(f"为 {stock_code} 完成自动异步分析。")
-
-            except Exception as e:
-                logger.error(f"自动分析协程失败: {e}", exc_info=True)
-                self._on_analysis_data_received(None, error=str(e))
-
-        asyncio.create_task(analysis_coroutine())
+            logger.error(f"计算指标 {indicator_name} 时出错: {e}", exc_info=True)
+            return None
 
     def _get_stock_service(self):
-        raise NotImplementedError(
-            "_get_stock_service is deprecated. Use self.data_manager instead.")
+        raise NotImplementedError("此方法已废弃，请使用 self.data_manager")
 
     def _get_stock_data(self, stock_code: str, period: str, time_range: int) -> Optional[pd.DataFrame]:
-        raise NotImplementedError(
-            "_get_stock_data is deprecated. Use self.data_manager instead.")
+        raise NotImplementedError("此方法已废弃，请使用 self.data_manager")
+
+    def start_technical_analysis(self, stock_code: str = None) -> bool:
+        raise NotImplementedError("此方法已废弃，请直接调用 analyze_stock")
+
+    def _run_auto_analysis(self, stock_code: str) -> None:
+        raise NotImplementedError("此方法已废弃")
+
+    def _run_auto_analysis_async(self, stock_code: str) -> None:
+        raise NotImplementedError("此方法已废弃")
+
+    def _fallback_analysis(self, stock_code: str):
+        raise NotImplementedError("此方法已废弃")
+
+    def _on_analysis_data_received(self, data, error=None):
+        raise NotImplementedError("此方法已废弃")
+
+    def get_analysis_history(self, stock_code: str = None, analysis_type: str = None) -> List[Dict[str, Any]]:
+        raise NotImplementedError("此方法已废弃")
+
+    def get_available_strategies(self) -> List[str]:
+        raise NotImplementedError("此方法已废弃")
+
+    def run_strategy_analysis(self, stock_code: str, strategy_name: str, parameters: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+        raise NotImplementedError("此方法已废弃")
+
+    def _load_analysis_strategies(self) -> None:
+        self._strategies = {}
 
     def _calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
         """计算移动平均线"""
@@ -628,353 +583,3 @@ class AnalysisService(CacheableService, ConfigurableService):
             'support_distance': (current_price - nearest_support) / current_price * 100 if nearest_support else None,
             'resistance_distance': (nearest_resistance - current_price) / current_price * 100 if nearest_resistance else None
         }
-
-    def _load_analysis_strategies(self) -> None:
-        """加载分析策略"""
-        self._strategies = {
-            'golden_cross': self._golden_cross_strategy,
-            'death_cross': self._death_cross_strategy,
-            'rsi_oversold': self._rsi_oversold_strategy,
-            'rsi_overbought': self._rsi_overbought_strategy,
-            'bollinger_squeeze': self._bollinger_squeeze_strategy
-        }
-
-    async def _golden_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """金叉策略"""
-        short_ma = parameters.get('short_ma', 5)
-        long_ma = parameters.get('long_ma', 20)
-
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            return None
-
-        ma_short = self._calculate_ma(kdata, short_ma)
-        ma_long = self._calculate_ma(kdata, long_ma)
-
-        if ma_short.iloc[-2] < ma_long.iloc[-2] and ma_short.iloc[-1] > ma_long.iloc[-1]:
-            return {'signal': 'buy', 'desc': f'金叉: MA{short_ma}上穿MA{long_ma}'}
-        return None
-
-    async def _death_cross_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """死叉策略"""
-        short_ma = parameters.get('short_ma', 5)
-        long_ma = parameters.get('long_ma', 20)
-
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            return None
-
-        ma_short = self._calculate_ma(kdata, short_ma)
-        ma_long = self._calculate_ma(kdata, long_ma)
-
-        if ma_short.iloc[-2] > ma_long.iloc[-2] and ma_short.iloc[-1] < ma_long.iloc[-1]:
-            return {'signal': 'sell', 'desc': f'死叉: MA{short_ma}下穿MA{long_ma}'}
-        return None
-
-    async def _rsi_oversold_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """RSI超卖策略"""
-        period = parameters.get('period', 14)
-        threshold = parameters.get('threshold', 30)
-
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            return None
-
-        rsi = self._calculate_rsi(kdata, period)
-        if rsi.iloc[-1] < threshold:
-            return {'signal': 'buy', 'desc': f'RSI({period})进入超卖区: {rsi.iloc[-1]:.2f}'}
-        return None
-
-    async def _rsi_overbought_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """RSI超买策略"""
-        period = parameters.get('period', 14)
-        threshold = parameters.get('threshold', 70)
-
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            return None
-
-        rsi = self._calculate_rsi(kdata, period)
-        if rsi.iloc[-1] > threshold:
-            return {'signal': 'sell', 'desc': f'RSI({period})进入超买区: {rsi.iloc[-1]:.2f}'}
-        return None
-
-    async def _bollinger_squeeze_strategy(self, stock_code: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """布林带挤压策略"""
-        period = parameters.get('period', 20)
-
-        kdata = await self.data_manager.request_data(
-            data_type='kdata',
-            stock_code=stock_code,
-            period='D',
-            parameters={'indicators': ()}
-        )
-        if kdata is None or kdata.empty:
-            return None
-
-        boll = self._calculate_bollinger_bands(kdata)
-        band_width = (boll['Upper'] - boll['Lower']) / boll['Middle']
-
-        if band_width.iloc[-1] < 0.1:  # 示例阈值
-            return {'signal': 'observe', 'desc': f'布林带收窄，可能预示变盘'}
-        return None
-
-    async def start_technical_analysis(self, stock_code: str = None) -> bool:
-        """
-        异步启动技术分析
-
-        Args:
-            stock_code: 股票代码，如果为None则使用当前选择的股票
-
-        Returns:
-            是否成功启动分析
-        """
-        # 确定要分析的股票代码
-        target_stock_code = stock_code or self._current_stock_code
-        if not target_stock_code:
-            logger.warning("No stock selected for technical analysis")
-            return False
-
-        logger.info(f"开始技术分析: {target_stock_code}")
-
-        # 运行完整的技术分析
-        analysis_results = {}
-
-        # 1. 计算技术指标
-        indicators_result = await self.calculate_technical_indicators(
-            target_stock_code,
-            indicators=['MA', 'MACD', 'RSI', 'KDJ', 'BOLL']
-        )
-        if indicators_result:
-            analysis_results['technical_indicators'] = indicators_result
-
-        # 2. 趋势分析
-        trend_result = await self.analyze_trend(target_stock_code)
-        if trend_result:
-            analysis_results['trend_analysis'] = trend_result
-
-        # 3. 支撑阻力分析
-        support_resistance_result = await self.analyze_support_resistance(target_stock_code)
-        if support_resistance_result:
-            analysis_results['support_resistance'] = support_resistance_result
-
-        # 4. 运行策略分析
-        strategy_results = {}
-        for strategy_name in self.get_available_strategies():
-            strategy_result = await self.run_strategy_analysis(target_stock_code, strategy_name)
-            if strategy_result:
-                strategy_results[strategy_name] = strategy_result
-
-        if strategy_results:
-            analysis_results['strategy_analysis'] = strategy_results
-
-        # 发布分析完成事件
-        if analysis_results:
-            event = AnalysisCompleteEvent(
-                analysis_type='technical',
-                stock_code=target_stock_code
-            )
-            event.data.update({
-                'comprehensive_analysis': True,
-                'results': analysis_results,
-                'analysis_time': datetime.now().isoformat()
-            })
-            self.event_bus.publish(event)
-
-            logger.info(f"技术分析完成: {target_stock_code}")
-            return True
-        else:
-            logger.warning(f"技术分析未产生结果: {target_stock_code}")
-            return False
-
-    def _do_dispose(self) -> None:
-        """清理资源"""
-        self._current_stock_code = None
-        self._analysis_results.clear()
-        self._strategies.clear()
-        # 确保在退出时也取消所有任务
-        try:
-            # 不能在非异步方法中直接await，所以我们创建一个临时任务来运行它
-            asyncio.run(self.cancel_previous_requests())
-        except RuntimeError:
-            # 如果没有正在运行的事件循环，则可能无需清理
-            pass
-        super()._do_dispose()
-
-    async def analyze_stock(self, stock_code: str, analysis_type: str = 'comprehensive', kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
-        """
-        对指定股票进行全面异步分析。
-
-        Args:
-            stock_code (str): 股票代码.
-            analysis_type (str, optional): 分析类型. Defaults to 'comprehensive'.
-            kline_data (pd.DataFrame, optional): 预先加载的K线数据. Defaults to None.
-
-        Returns:
-            Optional[Dict[str, Any]]: 分析结果字典.
-        """
-        self._ensure_initialized()
-
-        request_id = f"analyze_{stock_code}_{analysis_type}_{int(time.time())}"
-
-        # 使用asyncio.create_task来创建任务，以便我们可以跟踪它
-        task = asyncio.create_task(self._perform_comprehensive_analysis(stock_code, kline_data=kline_data))
-
-        async with self.request_lock:
-            self.active_requests[request_id] = task
-
-        try:
-            # 等待任务完成并获取结果
-            result = await task
-            return result
-        except asyncio.CancelledError:
-            logger.info(f"分析任务 {request_id} 已被取消。")
-            return None
-        except Exception as e:
-            logger.error(f"执行股票分析任务 {request_id} 时发生错误: {e}", exc_info=True)
-            return None
-        finally:
-            # 任务完成后，从活动字典中移除
-            async with self.request_lock:
-                self.active_requests.pop(request_id, None)
-
-    async def _perform_comprehensive_analysis(self, stock_code: str, kline_data: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
-        """执行实际的全面分析"""
-        cache_key = f"analysis_{stock_code}_comprehensive"
-        cached_result = self.get_from_cache(cache_key)
-        if cached_result is not None:
-            return cached_result
-
-        try:
-            # 如果没有提供K线数据，则通过数据管理器获取
-            if kline_data is None:
-                kdata_response = await self.data_manager.request_data(stock_code=stock_code, data_type='kdata')
-
-                # 处理数据结构
-                if isinstance(kdata_response, dict):
-                    kline_data = kdata_response.get('kline_data')
-                else:
-                    kline_data = kdata_response
-
-            # 检查数据有效性
-            if kline_data is None or kline_data.empty:
-                logger.warning(f"无法为 {stock_code} 获取K线数据，分析中止。")
-                return None
-
-            # 并行执行所有分析任务
-            tasks = {
-                "technical_analysis": self.calculate_technical_indicators(stock_code, kline_data=kline_data),
-                "trend_analysis": self.analyze_trend(stock_code, kline_data=kline_data),
-                "support_resistance": self.analyze_support_resistance(stock_code, kline_data=kline_data),
-            }
-
-            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-
-            final_result = {}
-            for task_name, result in zip(tasks.keys(), results):
-                if isinstance(result, Exception):
-                    logger.error(f"分析任务 '{task_name}' for {stock_code} 失败: {result}")
-                    final_result[task_name] = {"error": str(result)}
-                else:
-                    final_result[task_name] = result
-
-            self.put_to_cache(cache_key, final_result)
-            return final_result
-
-        except Exception as e:
-            logger.error(f"为 {stock_code} 执行全面分析时发生意外错误: {e}", exc_info=True)
-            return {"error": str(e)}
-
-    def calculate_ma(self, data: pd.DataFrame, period: int) -> pd.Series:
-        """计算移动平均线"""
-        return self._calculate_ma(data, period)
-
-    def calculate_macd(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """计算MACD的公共接口"""
-        return self._calculate_macd(data)
-
-    def calculate_bollinger_bands(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """计算布林带的公共接口"""
-        return self._calculate_bollinger_bands(data)
-
-    def calculate_rsi(self, data: pd.DataFrame, period: int = 14) -> pd.Series:
-        """计算RSI的公共接口"""
-        return self._calculate_rsi(data, period)
-
-    def calculate_boll(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """计算布林带的公共接口 (别名)"""
-        return self._calculate_bollinger_bands(data)
-
-    def calculate_kdj(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """计算KDJ指标的公共接口"""
-        return self._calculate_kdj(data)
-
-    def calculate_indicator(self, data: pd.DataFrame, indicator_name: str) -> Optional[Union[Dict[str, Any], pd.Series, List]]:
-        """
-        通用指标计算方法，根据指标名称动态调用相应的计算函数
-
-        Args:
-            data: 股票数据
-            indicator_name: 指标名称
-
-        Returns:
-            指标计算结果，可能是字典、Series或列表，如果指标不存在则返回None
-        """
-        try:
-            indicator_name = indicator_name.upper()
-
-            # 检查是否有直接匹配的计算方法
-            method_name = f"calculate_{indicator_name.lower()}"
-            if hasattr(self, method_name):
-                method = getattr(self, method_name)
-                return method(data)
-
-            # 检查是否为MA类型指标
-            if indicator_name.startswith('MA') and len(indicator_name) > 2:
-                try:
-                    period = int(indicator_name[2:])
-                    return self.calculate_ma(data, period)
-                except ValueError:
-                    logger.warning(f"无法从指标名称解析周期: {indicator_name}")
-
-            # 其他常见指标的映射
-            indicator_map = {
-                'BOLL': 'calculate_bollinger_bands',
-                'RSI': 'calculate_rsi',
-                'KDJ': 'calculate_kdj',
-                'MACD': 'calculate_macd'
-            }
-
-            if indicator_name in indicator_map and hasattr(self, indicator_map[indicator_name]):
-                method = getattr(self, indicator_map[indicator_name])
-                return method(data)
-
-            # 记录找不到的指标
-            logger.warning(f"找不到指标计算方法: {indicator_name}")
-            return None
-
-        except Exception as e:
-            logger.error(f"计算指标 {indicator_name} 时出错: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return None

@@ -156,7 +156,7 @@ class CrosshairMixin:
                 f"开盘: {row['open']:.3f}  收盘: {row['close']:.3f}\n"
                 f"最高: {row['high']:.3f}  最低: {row['low']:.3f}\n"
                 f"涨跌: {change_str}\n"
-                f"成交量: {row['volume']:.0f}"
+                f"成家量: {row['volume']:.0f}"
             )
 
             # 检查是否有信号提示信息需要添加

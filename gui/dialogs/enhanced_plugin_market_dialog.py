@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QHeaderView, QAbstractItemView, QFrame, QScrollArea
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QPixmap, QIcon, QFont
+from PyQt5.QtGui import QPixmap, QIcon, QFont, QColor
 
 from plugins.plugin_market import PluginMarket, PluginInfo as MarketPluginInfo
 from plugins.plugin_interface import PluginType, PluginCategory
@@ -505,6 +505,9 @@ class EnhancedPluginMarketDialog(QDialog):
     def refresh_installed_plugins(self):
         """刷新已安装插件"""
         try:
+            # 导入插件显示工具
+            from utils.plugin_utils import PluginDisplayUtils
+
             # 获取已安装插件
             plugins = self.plugin_manager.get_all_plugins()
 
@@ -514,19 +517,31 @@ class EnhancedPluginMarketDialog(QDialog):
                 # 获取插件元数据
                 metadata = self.plugin_manager.get_plugin_metadata(name) or {}
 
+                # 使用显示工具格式化插件信息
+                formatted_info = PluginDisplayUtils.format_plugin_info(metadata)
+
                 # 填充表格
                 self.installed_table.setItem(row, 0, QTableWidgetItem(name))
                 self.installed_table.setItem(
-                    row, 1, QTableWidgetItem(metadata.get('version', '1.0.0')))
+                    row, 1, QTableWidgetItem(formatted_info.get('version', '1.0.0')))
+
+                # 使用中文显示的插件类型
+                type_display = formatted_info.get('type_display', '未知类型')
+                type_icon = formatted_info.get('type_icon', '❓')
                 self.installed_table.setItem(
-                    row, 2, QTableWidgetItem(metadata.get('plugin_type', '未知')))
+                    row, 2, QTableWidgetItem(f"{type_icon} {type_display}"))
 
                 # 状态
                 status = "已启用" if instance else "已禁用"
-                self.installed_table.setItem(row, 3, QTableWidgetItem(status))
+                status_item = QTableWidgetItem(status)
+                if instance:
+                    status_item.setForeground(QColor("#28a745"))  # 绿色
+                else:
+                    status_item.setForeground(QColor("#dc3545"))  # 红色
+                self.installed_table.setItem(row, 3, status_item)
 
                 self.installed_table.setItem(
-                    row, 4, QTableWidgetItem(metadata.get('author', '未知')))
+                    row, 4, QTableWidgetItem(formatted_info.get('author', '未知')))
 
                 # 操作按钮
                 btn_widget = QWidget()
@@ -535,10 +550,15 @@ class EnhancedPluginMarketDialog(QDialog):
 
                 enable_btn = QPushButton("启用" if not instance else "禁用")
                 enable_btn.setMaximumWidth(60)
+                if instance:
+                    enable_btn.setStyleSheet("background-color: #ffc107; color: #000;")
+                else:
+                    enable_btn.setStyleSheet("background-color: #28a745; color: #fff;")
                 btn_layout.addWidget(enable_btn)
 
                 remove_btn = QPushButton("卸载")
                 remove_btn.setMaximumWidth(60)
+                remove_btn.setStyleSheet("background-color: #dc3545; color: #fff;")
                 btn_layout.addWidget(remove_btn)
 
                 self.installed_table.setCellWidget(row, 5, btn_widget)
@@ -547,6 +567,8 @@ class EnhancedPluginMarketDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "错误", f"刷新已安装插件时发生错误:\n{e}")
+            import traceback
+            print(f"刷新插件错误详情: {traceback.format_exc()}")
 
     def install_local_plugin(self):
         """安装本地插件"""

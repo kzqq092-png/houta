@@ -7,6 +7,14 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'hikyuu_system.db')
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
+    # 初始化插件数据库表
+    try:
+        from db.models.plugin_models import PluginDatabaseManager
+        plugin_db = PluginDatabaseManager(DB_PATH)
+        print("插件数据库表初始化完成")
+    except Exception as e:
+        print(f"插件数据库表初始化失败: {e}")
     # 1. 系统配置表
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS config (

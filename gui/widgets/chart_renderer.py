@@ -11,6 +11,13 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 import warnings
 
+# 配置中文字体
+try:
+    from utils.matplotlib_font_config import configure_matplotlib_chinese_font
+    configure_matplotlib_chinese_font()
+except ImportError:
+    print("⚠️ 无法导入字体配置工具，使用默认配置")
+
 
 class ChartRenderer(QObject):
     """高性能图表渲染器，优化大数据渲染性能"""

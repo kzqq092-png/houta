@@ -10,8 +10,7 @@ from .analysis_tabs import (
     SectorFlowTab,
     WaveAnalysisTab,
     SentimentAnalysisTab,
-    HotspotAnalysisTab,
-    SentimentReportTab
+    HotspotAnalysisTab
 )
 from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 from PyQt5.QtWidgets import QWidget
@@ -30,6 +29,13 @@ from .matplot_lib_widget import *
 import akshare as ak
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+# 配置中文字体
+try:
+    from utils.matplotlib_font_config import configure_matplotlib_chinese_font
+    configure_matplotlib_chinese_font()
+except ImportError:
+    print("⚠️ 无法导入字体配置工具，使用默认配置")
 import importlib
 import traceback
 import os
@@ -261,10 +267,23 @@ class AnalysisWidget(QWidget):
             self.wave_tab.parent_widget = self
             self.tab_components['wave'] = self.wave_tab
 
-            # 情绪分析标签页
-            self.sentiment_tab = SentimentAnalysisTab(self.config_manager)
-            self.sentiment_tab.parent_widget = self
-            self.tab_components['sentiment'] = self.sentiment_tab
+            # 情绪分析标签页 - 使用合并后的专业版（包含实时分析和报告功能）
+            try:
+                from .analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab
+                self.sentiment_tab = ProfessionalSentimentTab(self.config_manager)
+                self.sentiment_tab.parent_widget = self
+                self.tab_components['sentiment'] = self.sentiment_tab
+
+                # 情绪报告标签页 - 现在使用同一个类，因为已经包含报告功能
+                self.sentiment_report_tab = self.sentiment_tab  # 共享同一个实例
+                self.tab_components['sentiment_report'] = self.sentiment_report_tab
+            except ImportError as e:
+                print(f"⚠️ 专业情绪分析标签页导入失败: {e}")
+                # 使用占位符
+                self.sentiment_tab = QLabel("情绪分析功能暂不可用")
+                self.sentiment_report_tab = QLabel("情绪报告功能暂不可用")
+                self.tab_components['sentiment'] = self.sentiment_tab
+                self.tab_components['sentiment_report'] = self.sentiment_report_tab
 
             # 板块资金流标签页
             self.sector_flow_tab = SectorFlowTab(self.config_manager)
@@ -276,10 +295,15 @@ class AnalysisWidget(QWidget):
             self.hotspot_tab.parent_widget = self
             self.tab_components['hotspot'] = self.hotspot_tab
 
-            # 情绪报告标签页
-            self.sentiment_report_tab = SentimentReportTab(self.config_manager)
-            self.sentiment_report_tab.parent_widget = self
-            self.tab_components['sentiment_report'] = self.sentiment_report_tab
+            # K线情绪分析标签页 - 新增
+            try:
+                from .analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
+                self.kline_sentiment_tab = EnhancedKLineSentimentTab(self.config_manager)
+                self.kline_sentiment_tab.parent_widget = self
+                self.tab_components['kline_sentiment'] = self.kline_sentiment_tab
+            except ImportError as e:
+                print(f"K线情绪分析标签页导入失败: {e}")
+                self.kline_sentiment_tab = None
 
             # 连接信号
             self._connect_tab_signals()
@@ -364,6 +388,10 @@ class AnalysisWidget(QWidget):
 
         # 情绪报告
         self.tab_widget.addTab(self.sentiment_report_tab, "📊 情绪报告")
+
+        # K线情绪分析 - 新增
+        if hasattr(self, 'kline_sentiment_tab') and self.kline_sentiment_tab:
+            self.tab_widget.addTab(self.kline_sentiment_tab, "📈 K线情绪")
 
     def _connect_tab_signals(self):
         """连接标签页信号 - 修复版"""

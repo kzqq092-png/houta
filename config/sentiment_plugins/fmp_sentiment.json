@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "api_key": "",
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "GOOGL"
+  ],
+  "max_symbols": 3,
+  "data_weight": 0.25,
+  "request_timeout": 10,
+  "retry_times": 3,
+  "use_free_tier": true,
+  "bullish_threshold": 70.0,
+  "bearish_threshold": 30.0,
+  "_last_updated": "2025-08-06T20:09:39.967867"
+}

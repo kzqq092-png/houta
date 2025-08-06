@@ -5,7 +5,12 @@ from typing import Any, Dict, Optional, Union
 import threading
 
 # 本地缓存（多进程多线程安全）
-import diskcache
+try:
+    import diskcache
+    DISKCACHE_AVAILABLE = True
+except ImportError:
+    diskcache = None
+    DISKCACHE_AVAILABLE = False
 
 # 分布式缓存（同步/异步均官方支持）
 try:
@@ -32,9 +37,17 @@ class Cache:
         self._backend = backend
         self._async_mode = async_mode
         self._lock = threading.Lock()
+        self._memory_cache = False
         if backend == "diskcache":
-            # diskcache官方文档：多进程多线程安全，推荐本地缓存首选
-            self.cache = diskcache.Cache(cache_dir, size_limit=size_limit)
+            if not DISKCACHE_AVAILABLE:
+                # 使用内存缓存作为回退
+                print("⚠️ diskcache 不可用，使用内存缓存")
+                self.cache = {}
+                self._memory_cache = True
+            else:
+                # diskcache官方文档：多进程多线程安全，推荐本地缓存首选
+                self.cache = diskcache.Cache(cache_dir, size_limit=size_limit)
+                self._memory_cache = False
         elif backend == "redis" and redis:
             if async_mode and aioredis:
                 self.cache = aioredis.from_url(redis_url)
@@ -45,7 +58,10 @@ class Cache:
 
     def get(self, key: str) -> Optional[Any]:
         if self._backend == "diskcache":
-            return self.cache.get(key, default=None)
+            if self._memory_cache:
+                return self.cache.get(key)
+            else:
+                return self.cache.get(key, default=None)
         elif self._backend == "redis":
             if self._async_mode and aioredis:
                 raise RuntimeError(
@@ -64,7 +80,10 @@ class Cache:
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
         expire = ttl if ttl is not None else self._default_ttl
         if self._backend == "diskcache":
-            self.cache.set(key, value, expire=expire)
+            if self._memory_cache:
+                self.cache[key] = value  # 简单内存缓存，忽略TTL
+            else:
+                self.cache.set(key, value, expire=expire)
         elif self._backend == "redis":
             if self._async_mode and aioredis:
                 raise RuntimeError(
@@ -82,32 +101,51 @@ class Cache:
 
     def delete(self, key: str):
         if self._backend == "diskcache":
-            self.cache.pop(key, None)
+            if self._memory_cache:
+                self.cache.pop(key, None)
+            else:
+                self.cache.pop(key, None)
         elif self._backend == "redis":
             self.cache.delete(key)
 
     def clear(self):
         if self._backend == "diskcache":
-            self.cache.clear()
+            if self._memory_cache:
+                self.cache.clear()
+            else:
+                self.cache.clear()
         elif self._backend == "redis":
             self.cache.flushdb()
 
     def get_stats(self) -> Dict[str, Any]:
         if self._backend == "diskcache":
-            stats = self.cache.stats()
-            return {
-                'size': len(self.cache),
-                'hits': stats.get('hits', 0),
-                'misses': stats.get('misses', 0),
-                'volume': self.cache.volume(),
-            }
+            if self._memory_cache:
+                return {
+                    'size': len(self.cache),
+                    'hits': 0,
+                    'misses': 0,
+                    'volume': 0,
+                    'backend': 'memory'
+                }
+            else:
+                stats = self.cache.stats()
+                return {
+                    'size': len(self.cache),
+                    'hits': stats.get('hits', 0),
+                    'misses': stats.get('misses', 0),
+                    'volume': self.cache.volume(),
+                    'backend': 'diskcache'
+                }
         elif self._backend == "redis":
             return self.cache.info()
         return {}
 
     def get_keys(self):
         if self._backend == "diskcache":
-            return list(self.cache.iterkeys())
+            if self._memory_cache:
+                return list(self.cache.keys())
+            else:
+                return list(self.cache.iterkeys())
         elif self._backend == "redis":
             return self.cache.keys()
         return []
@@ -130,5 +168,5 @@ class Cache:
         self._default_ttl = ttl
 
     def set_size_limit(self, size_limit: int):
-        if self._backend == "diskcache":
+        if self._backend == "diskcache" and not self._memory_cache:
             self.cache.size_limit = size_limit

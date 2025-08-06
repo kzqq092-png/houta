@@ -423,6 +423,18 @@ class ManagerFactory:
             def data(self):
                 return self.get('data', {})
 
+            def get_plugin_config(self, plugin_name: str, default=None):
+                """获取插件配置"""
+                if default is None:
+                    default = {}
+                plugin_key = f"plugins.{plugin_name}"
+                return self.get(plugin_key, default)
+
+            def save_plugin_config(self, plugin_name: str, config):
+                """保存插件配置"""
+                plugin_key = f"plugins.{plugin_name}"
+                self.set(plugin_key, config)
+
         return SimpleConfigManager()
 
     def _create_simple_log_manager(self):

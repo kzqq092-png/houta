@@ -423,7 +423,7 @@ class KlineRepository(BaseRepository):
             kline_df = self.data_manager.get_kdata(
                 params.stock_code,
                 params.period,
-                params.count or 365
+                count=params.count or 365
             )
 
             if kline_df is None or kline_df.empty:

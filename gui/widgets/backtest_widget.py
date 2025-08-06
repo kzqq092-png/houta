@@ -26,6 +26,13 @@ import matplotlib.dates as mdates
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
 
+# 配置中文字体
+try:
+    from utils.matplotlib_font_config import configure_matplotlib_chinese_font
+    configure_matplotlib_chinese_font()
+except ImportError:
+    print("⚠️ 无法导入字体配置工具，使用默认配置")
+
 # 导入回测相关模块
 try:
     from backtest.unified_backtest_engine import (
