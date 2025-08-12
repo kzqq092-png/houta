@@ -750,6 +750,9 @@ class DatabaseAdminDialog(QDialog):
         vbox.addWidget(type_btn)
         vbox.addWidget(comment_btn)
 
+        drop_table_btn = QPushButton("删除整表")
+        vbox.addWidget(drop_table_btn)
+
         def add_field():
             name, ok = QInputDialog.getText(dlg, "新增字段", "字段名：")
             if not ok or not name:
@@ -781,11 +784,30 @@ class DatabaseAdminDialog(QDialog):
                 return
             name = item.text().split('  #')[0]
             ftype, ok = QInputDialog.getText(
-                dlg, "修改类型", "新类型(如 TEXT, INTEGER, REAL)：")
+                dlg, "修改类型", f"字段 {name} 新类型：")
             if not ok or not ftype:
                 return
-            QMessageBox.information(
-                dlg, "提示", f"SQLite不支持直接修改字段类型，请用导出-重建表-导入数据方式实现。")
+            QMessageBox.information(dlg, "提示", "SQLite不支持直接修改字段类型，请用导出-重建表-导入数据方式实现。")
+
+        def drop_table():
+            reply = QMessageBox.question(
+                dlg, "确认删除",
+                f"确定要删除整张表 {table} 吗？该操作不可恢复！",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+            try:
+                # 关闭可能的外键约束影响
+                self.db.exec("PRAGMA foreign_keys = OFF;")
+                self.db.exec(f"DROP TABLE IF EXISTS {table};")
+                self.db.exec("PRAGMA foreign_keys = ON;")
+                QMessageBox.information(dlg, "成功", f"已删除表 {table}")
+                self.refresh_table()
+                dlg.accept()
+            except Exception as e:
+                QMessageBox.critical(dlg, "删除失败", str(e))
 
         def edit_comment():
             item = field_list.currentItem()
@@ -810,6 +832,8 @@ class DatabaseAdminDialog(QDialog):
         del_btn.clicked.connect(del_field)
         type_btn.clicked.connect(change_type)
         comment_btn.clicked.connect(edit_comment)
+        drop_table_btn.clicked.connect(drop_table)
+
         dlg.exec_()
 
     def show_table_stats(self):

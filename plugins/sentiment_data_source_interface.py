@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 from enum import Enum
-from plugins.plugin_interface import IPlugin, PluginType, PluginCategory
+from core.plugin_types import PluginType, PluginCategory
 
 
 class SentimentStatus(Enum):
@@ -69,7 +69,7 @@ class SentimentResponse:
     cache_used: bool = False  # 是否使用了缓存
 
 
-class ISentimentDataSource(IPlugin, ABC):
+class ISentimentDataSource(ABC):
     """情绪数据源插件接口"""
 
     @abstractmethod

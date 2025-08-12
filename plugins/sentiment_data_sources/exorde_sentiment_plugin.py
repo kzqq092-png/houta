@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import json  # Added for json.JSONDecodeError
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_api_key, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
@@ -35,23 +35,23 @@ class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         ]
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="Exorde情绪光谱插件",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://developers.exorde.io",
-            license="MIT",
-            description="基于Exorde API获取27种情绪分析数据，提供全面的市场情绪光谱分析",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=["requests>=2.25.0"],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="https://developers.exorde.io",
-            tags=["sentiment", "exorde", "emotion", "27emotions", "api"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "Exorde情绪光谱插件",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://developers.exorde.io",
+            "license": "MIT",
+            "description": "基于Exorde API获取27种情绪分析数据，提供全面的市场情绪光谱分析",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": ["requests>=2.25.0"],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "https://developers.exorde.io",
+            "tags": ["sentiment", "exorde", "emotion", "27emotions", "api"]
+        }
 
     def get_config_schema(self) -> List[PluginConfigField]:
         """获取配置模式定义"""
@@ -313,7 +313,7 @@ class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
                 }
 
                 headers = {
-                    'User-Agent': 'HIkyuu-UI/1.0',
+                    'User-Agent': 'FactorWeave-Quant /1.0',
                     'Accept': 'application/json',
                     'Authorization': f'Bearer {api_key}'
                 }

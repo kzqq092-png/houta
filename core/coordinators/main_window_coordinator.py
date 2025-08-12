@@ -65,7 +65,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 创建主窗口
         self._main_window = QMainWindow(parent)
-        self._main_window.setWindowTitle("YS-Quant‌ 2.0 股票分析系统")
+        self._main_window.setWindowTitle("FactorWeave-Quant ‌ 2.0 股票分析系统")
         self._main_window.setGeometry(100, 100, 1400, 900)
         self._main_window.setMinimumSize(1200, 800)
 
@@ -75,7 +75,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 窗口状态
         self._window_state = {
-            'title': 'YS-Quant‌ 2.0 股票分析系统',
+            'title': 'FactorWeave-Quant ‌ 2.0 股票分析系统',
             'geometry': (100, 100, 1400, 900),
             'min_size': (1200, 800),
             'is_maximized': False
@@ -1154,9 +1154,8 @@ Ctrl+F12 - 关于
 
     def _on_about(self) -> None:
         """关于对话框"""
-        from PyQt5.QtWidgets import QMessageBox
         about_text = """
-YS-Quant‌ 2.0 (重构版本)
+FactorWeave-Quant ‌ 2.0 (重构版本)
 
 基于HIkyuu量化框架的股票分析工具
 
@@ -1170,7 +1169,7 @@ YS-Quant‌ 2.0 (重构版本)
 版本：2.0
 作者：HIkyuu开发团队
         """
-        QMessageBox.about(self._main_window, "关于 YS-Quant‌",
+        QMessageBox.about(self._main_window, "关于 FactorWeave-Quant ‌",
                           about_text.strip())
 
     # 高级功能菜单方法（保持原有实现）
@@ -1203,49 +1202,108 @@ YS-Quant‌ 2.0 (重构版本)
                                  f"打开云端API管理对话框失败: {str(e)}")
 
     def _on_plugin_manager(self) -> None:
-        """插件管理器 - 修复服务解析和错误处理"""
+        """增强版插件管理器 - 统一的插件管理界面"""
         try:
-            from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
+            from gui.dialogs.enhanced_plugin_manager_dialog import EnhancedPluginManagerDialog
             from core.plugin_manager import PluginManager
+            from core.services.sentiment_data_service import SentimentDataService
 
             # 智能获取插件管理器实例
             plugin_manager = None
 
-            # 方法1：尝试从服务容器获取
-            if hasattr(self, '_service_container') and self._service_container:
-                try:
-                    plugin_manager = self._service_container.resolve(PluginManager)
-                    logger.info("从服务容器获取插件管理器成功")
-                except Exception as e:
-                    logger.warning(f"从服务容器获取插件管理器失败: {e}")
+            # 确保从正确的service_container获取
+            service_container = self._service_container
+            if not service_container:
+                # 如果没有，尝试从全局获取
+                from core.containers import get_service_container
+                service_container = get_service_container()
 
-            # 方法2：尝试从service_container获取
-            if not plugin_manager and hasattr(self, 'service_container') and self.service_container:
+            # 方法1：尝试从服务容器获取（主要方法）
+            if service_container and service_container.is_registered(PluginManager):
                 try:
-                    plugin_manager = self.service_container.get_service(PluginManager)
-                    logger.info("从service_container获取插件管理器成功")
-                except Exception as e:
-                    logger.warning(f"从service_container获取插件管理器失败: {e}")
+                    plugin_manager = service_container.resolve(PluginManager)
+                    logger.info("✅ 从服务容器获取插件管理器成功")
 
-            # 方法3：直接创建新实例
+                    # 验证插件管理器是否已初始化
+                    if plugin_manager and hasattr(plugin_manager, 'enhanced_plugins'):
+                        all_plugins = plugin_manager.get_all_plugins()
+                        logger.info(f"✅ 插件管理器已初始化，包含 {len(all_plugins)} 个插件")
+                    else:
+                        logger.warning("⚠️ 插件管理器未完全初始化，尝试重新初始化")
+                        if plugin_manager and hasattr(plugin_manager, 'initialize'):
+                            plugin_manager.initialize()
+
+                except Exception as e:
+                    logger.error(f"❌ 从服务容器获取插件管理器失败: {e}")
+                    logger.error(traceback.format_exc())
+                    plugin_manager = None
+            else:
+                logger.warning("⚠️ PluginManager未在服务容器中注册")
+
+            # 方法2：如果方法1失败，尝试创建并初始化新实例
             if not plugin_manager:
                 try:
-                    plugin_manager = PluginManager()
-                    logger.info("创建新的插件管理器实例")
+                    logger.info("🔄 创建新的插件管理器实例...")
+
+                    # 获取必要的依赖
+                    from utils.config_manager import ConfigManager
+                    config_manager = None
+
+                    if service_container and service_container.is_registered(ConfigManager):
+                        config_manager = service_container.resolve(ConfigManager)
+                    else:
+                        config_manager = ConfigManager()
+
+                    # 创建并初始化插件管理器
+                    plugin_manager = PluginManager(
+                        plugin_dir="plugins",
+                        main_window=self._main_window,
+                        data_manager=None,
+                        config_manager=config_manager,
+                        log_manager=logger
+                    )
+
+                    # 初始化插件管理器
+                    plugin_manager.initialize()
+                    logger.info("✅ 插件管理器实例创建并初始化成功")
+
+                    # 将新实例注册到服务容器（如果可能）
+                    if service_container:
+                        try:
+                            service_container.register_instance(PluginManager, plugin_manager)
+                            logger.info("✅ 新插件管理器实例已注册到服务容器")
+                        except Exception as reg_e:
+                            logger.warning(f"⚠️ 注册新插件管理器实例失败: {reg_e}")
+
                 except Exception as e:
-                    logger.error(f"创建插件管理器实例失败: {e}")
-                    raise
+                    logger.error(f"❌ 创建插件管理器实例失败: {e}")
+                    logger.error(traceback.format_exc())
+                    # 继续执行，允许dialog处理空的plugin_manager
 
-            # 确保插件管理器有效
-            if not plugin_manager:
-                raise ValueError("无法获取或创建插件管理器实例")
+            # 获取情绪数据服务
+            sentiment_service = None
+            if service_container and service_container.is_registered(SentimentDataService):
+                try:
+                    sentiment_service = service_container.resolve(SentimentDataService)
+                    logger.info("✅ 获取情绪数据服务成功")
+                except Exception as e:
+                    logger.warning(f"⚠️ 获取情绪数据服务失败: {e}")
 
-            # 创建并显示对话框
-            dialog = PluginManagerDialog(plugin_manager, self._main_window)
+            # 显示插件管理器状态
+            plugin_status = "可用" if plugin_manager else "不可用"
+            sentiment_status = "可用" if sentiment_service else "不可用"
+            logger.info(f"📋 插件管理器状态: {plugin_status}, 情绪数据服务: {sentiment_status}")
+
+            # 创建并显示增强版对话框
+            dialog = EnhancedPluginManagerDialog(
+                plugin_manager=plugin_manager,
+                sentiment_service=sentiment_service,
+                parent=self._main_window
+            )
 
             # 设置对话框属性
             dialog.setWindowTitle("HIkyuu 插件管理器")
-            dialog.setMinimumSize(900, 600)
+            dialog.setMinimumSize(1000, 700)
 
             # 居中显示
             if hasattr(self, 'center_dialog'):
@@ -1266,7 +1324,6 @@ YS-Quant‌ 2.0 (重构版本)
         except Exception as e:
             error_msg = f"打开插件管理器失败: {e}"
             logger.error(error_msg)
-            import traceback
             logger.error(traceback.format_exc())
             QMessageBox.critical(
                 self._main_window,
@@ -1278,7 +1335,6 @@ YS-Quant‌ 2.0 (重构版本)
         """插件市场"""
         try:
             from gui.dialogs.enhanced_plugin_market_dialog import EnhancedPluginMarketDialog
-            from core.plugin_manager import PluginManager
 
             # 获取插件管理器
             plugin_manager = self._service_container.resolve(PluginManager)
@@ -1427,8 +1483,6 @@ YS-Quant‌ 2.0 (重构版本)
         """智能优化"""
         try:
             from PyQt5.QtWidgets import QInputDialog, QProgressDialog
-            from optimization.auto_tuner import AutoTuner
-            from PyQt5.QtCore import QThread, pyqtSignal
 
             # 获取优化参数
             performance_threshold, ok1 = QInputDialog.getDouble(
@@ -1541,7 +1595,6 @@ YS-Quant‌ 2.0 (重构版本)
             # 使用备用的策略性能评估器
             try:
                 from core.strategy.performance_evaluator import PerformanceEvaluator
-                from gui.dialogs.performance_evaluation_dialog import PerformanceEvaluationDialog
 
                 evaluator = PerformanceEvaluator()
                 dialog = PerformanceEvaluationDialog(self._main_window)
@@ -1594,7 +1647,6 @@ YS-Quant‌ 2.0 (重构版本)
     def _on_batch_quality_check(self) -> None:
         """批量质量检查"""
         try:
-            from gui.dialogs.data_quality_dialog import DataQualityDialog
 
             dialog = DataQualityDialog(self._main_window, mode='batch')
             self.center_dialog(dialog)
@@ -1682,7 +1734,7 @@ YS-Quant‌ 2.0 (重构版本)
             QMessageBox.information(
                 self._main_window,
                 "启动向导",
-                "欢迎使用YS-Quant‌ 2.0！\n\n"
+                "欢迎使用FactorWeave-Quant ‌ 2.0！\n\n"
                 "主要功能：\n"
                 "1. 股票数据查看和分析\n"
                 "2. 技术指标计算和显示\n"
@@ -1816,7 +1868,6 @@ YS-Quant‌ 2.0 (重构版本)
         """打开通用单位转换器"""
         try:
             parent_dialog.accept()
-            from gui.dialogs.converter_dialog import ConverterDialog
             dialog = ConverterDialog(self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
@@ -1852,7 +1903,6 @@ YS-Quant‌ 2.0 (重构版本)
     def _on_currency_converter(self) -> None:
         """打开汇率转换器"""
         try:
-            from gui.tools.currency_converter import CurrencyConverter
 
             CurrencyConverter.show_converter(self._main_window)
 
@@ -1883,7 +1933,7 @@ YS-Quant‌ 2.0 (重构版本)
                 QMessageBox.warning(
                     self._main_window,
                     "使用条款",
-                    "您必须同意数据使用条款才能使用YS-Quant‌系统。\n程序将退出。"
+                    "您必须同意数据使用条款才能使用FactorWeave-Quant ‌系统。\n程序将退出。"
                 )
                 # 延迟退出，让用户看到消息
                 from PyQt5.QtCore import QTimer
@@ -1903,7 +1953,6 @@ YS-Quant‌ 2.0 (重构版本)
     def _on_show_data_usage_terms(self) -> None:
         """显示数据使用条款"""
         try:
-            from gui.dialogs import DataUsageTermsDialog
             DataUsageTermsDialog.show_terms(self._main_window)
         except Exception as e:
             logger.error(f"Failed to show data usage terms: {e}")
@@ -1935,7 +1984,6 @@ YS-Quant‌ 2.0 (重构版本)
                 logger.info(f"性能仪表板已{'显示' if self._performance_panel.isVisible() else '隐藏'}")
             else:
                 # 创建新的性能仪表板
-                from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
                 self._performance_panel = PerformanceDashboardPanel(self._main_window)
                 show_panel = checked if checked is not None else True
                 self._performance_panel.setVisible(show_panel)
@@ -2112,7 +2160,7 @@ YS-Quant‌ 2.0 (重构版本)
             QMessageBox.information(
                 self._main_window,
                 "检查更新",
-                "当前版本: HIkyuu-UI v2.0\n\n自动更新功能正在开发中，请访问项目页面获取最新版本。"
+                "当前版本: FactorWeave-Quant  v2.0\n\n自动更新功能正在开发中，请访问项目页面获取最新版本。"
             )
             logger.info("检查软件更新")
         except Exception as e:

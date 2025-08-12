@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YS-Quant‌ 主程序入口
+FactorWeave-Quant ‌ 主程序入口
 
 使用重构后的架构：
 - 主窗口协调器 (MainWindowCoordinator)
@@ -10,7 +10,7 @@ YS-Quant‌ 主程序入口
 - WebGPU硬件加速渲染
 
 版本: 2.0 (重构版本)
-作者: YS-Quant‌ Team
+作者: FactorWeave-Quant ‌ Team
 """
 
 from utils.exception_handler import setup_exception_handler
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 class HIkyuuUIApplication:
     """
-    YS-Quant‌ 应用程序主类
+    FactorWeave-Quant ‌ 应用程序主类
 
     负责：
     1. 应用程序初始化
@@ -93,7 +93,7 @@ class HIkyuuUIApplication:
         """
         try:
             logger.info("=" * 60)
-            logger.info("YS-Quant‌ 2.0 (重构版本) 启动中...")
+            logger.info("FactorWeave-Quant ‌ 2.0 (重构版本) 启动中...")
             logger.info("=" * 60)
 
             # 1. 创建Qt应用程序
@@ -127,7 +127,7 @@ class HIkyuuUIApplication:
             # 6. 创建主窗口协调器
             self._create_main_window()
 
-            logger.info("✓ YS-Quant‌ 2.0 初始化完成")
+            logger.info("✓ FactorWeave-Quant ‌ 2.0 初始化完成")
             return True
 
         except Exception as e:
@@ -148,9 +148,9 @@ class HIkyuuUIApplication:
 
         # 创建应用程序实例
         self.app = QApplication(sys.argv)
-        self.app.setApplicationName("YS-Quant‌")
+        self.app.setApplicationName("FactorWeave-Quant ‌")
         self.app.setApplicationVersion("2.0")
-        self.app.setOrganizationName("HIkyuu Team")
+        self.app.setOrganizationName("FactorWeave 团队")
 
         # 设置应用程序图标
         icon_path = project_root / "icons" / "logo.png"
@@ -302,7 +302,6 @@ class HIkyuuUIApplication:
             logger.info("✓ 主窗口协调器创建完成")
         except Exception as e:
             logger.error(f"❌ 主窗口协调器创建失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             raise
 

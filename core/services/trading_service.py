@@ -338,7 +338,6 @@ class TradingService(BaseService):
             await asyncio.sleep(0.1)
 
             # 模拟成功率（95%）
-            import random
             success = random.random() > 0.05
 
             if success:

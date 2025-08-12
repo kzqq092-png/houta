@@ -18,7 +18,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QIcon, QFont, QColor
 
 from plugins.plugin_market import PluginMarket, PluginInfo as MarketPluginInfo
-from plugins.plugin_interface import PluginType, PluginCategory
+from core.plugin_types import PluginType, PluginCategory
 from plugins.development.plugin_sdk import PluginSDK
 from core.plugin_manager import PluginManager, PluginInfo
 
@@ -193,7 +193,7 @@ class EnhancedPluginMarketDialog(QDialog):
 
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("YS-Quant‌ 插件市场")
+        self.setWindowTitle("FactorWeave-Quant ‌ 插件市场")
         self.setMinimumSize(1000, 700)
 
         layout = QVBoxLayout(self)

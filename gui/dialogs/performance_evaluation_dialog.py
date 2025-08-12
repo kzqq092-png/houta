@@ -860,7 +860,6 @@ class PerformanceEvaluationDialog(QDialog):
     def export_data(self):
         """导出数据"""
         try:
-            from PyQt5.QtWidgets import QFileDialog
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出评估数据", f"evaluation_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
@@ -881,7 +880,6 @@ class PerformanceEvaluationDialog(QDialog):
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
-    import sys
 
     app = QApplication(sys.argv)
 

@@ -122,7 +122,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 result = cursor.fetchone()
 
                 if result:
-                    import json
                     return json.loads(result[0])
                 else:
                     # 返回默认设置
@@ -148,8 +147,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _save_alert_settings_to_db(self, settings):
         """保存预警设置到数据库"""
         try:
-            import sqlite3
-            import json
 
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -186,7 +183,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _load_advanced_options_from_db(self):
         """从数据库加载高级选项设置"""
         try:
-            import sqlite3
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -196,7 +192,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 result = cursor.fetchone()
 
                 if result:
-                    import json
                     return json.loads(result[0])
                 else:
                     # 返回默认设置
@@ -218,8 +213,6 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _save_advanced_options_to_db(self, options):
         """保存高级选项设置到数据库"""
         try:
-            import sqlite3
-            import json
 
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()

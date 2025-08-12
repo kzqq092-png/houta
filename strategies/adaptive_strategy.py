@@ -19,7 +19,7 @@ from core.take_profit import AdaptiveTakeProfit
 
 @register_strategy("AdaptiveHikyuu", metadata={
     "description": "基于HIkyuu框架的自适应止损止盈策略",
-    "author": "HIkyuu Team",
+    "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "adaptive"
 })

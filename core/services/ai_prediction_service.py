@@ -330,7 +330,6 @@ class AIPredictionService(BaseService):
                     else:
                         # 如果没有TensorFlow，检查是否是简化模型
                         try:
-                            import json
                             with open(model_path, 'r', encoding='utf-8') as f:
                                 model_data = json.load(f)
                                 if model_data.get('model_type') == 'simplified':
@@ -345,7 +344,6 @@ class AIPredictionService(BaseService):
                 except Exception as e:
                     # 回退：尝试加载为简化模型
                     try:
-                        import json
                         with open(model_path, 'r', encoding='utf-8') as f:
                             model_data = json.load(f)
                             if model_data.get('model_type') == 'simplified':
@@ -442,7 +440,6 @@ class AIPredictionService(BaseService):
 
         except Exception as e:
             logger.error(f"形态预测失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return self._get_fallback_pattern_prediction()
 

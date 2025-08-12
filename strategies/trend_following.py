@@ -34,7 +34,7 @@ class TrendDirection(Enum):
 
 @register_strategy("MovingAverageTrend", metadata={
     "description": "基于移动平均线的趋势跟踪策略",
-    "author": "HIkyuu Team",
+    "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "trend_following"
 })
@@ -140,7 +140,7 @@ class MovingAverageTrendStrategy(BaseStrategy):
 
 @register_strategy("Breakout", metadata={
     "description": "基于价格突破的趋势策略",
-    "author": "HIkyuu Team",
+    "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "trend_following"
 })
@@ -240,7 +240,7 @@ class BreakoutStrategy(BaseStrategy):
 
 @register_strategy("Momentum", metadata={
     "description": "基于动量指标的趋势策略",
-    "author": "HIkyuu Team",
+    "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "momentum"
 })
@@ -340,7 +340,7 @@ class MomentumStrategy(BaseStrategy):
 
 @register_strategy("AdaptiveTrend", metadata={
     "description": "自适应趋势跟踪策略",
-    "author": "HIkyuu Team",
+    "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "trend_following"
 })

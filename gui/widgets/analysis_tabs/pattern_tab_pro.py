@@ -219,7 +219,6 @@ class AnalysisThread(QThread, QApplication):
 
         except Exception as e:
             print(f"[AnalysisThread] 形态识别出错: {e}")
-            import traceback
             print(f"[AnalysisThread] 错误详情: {traceback.format_exc()}")
             return []
 
@@ -639,14 +638,12 @@ class ProfessionalScanThread(QThread):
 
         except Exception as e:
             self.log_manager.error(f"❌ 专业扫描线程执行失败: {e}")
-            import traceback
             self.log_manager.error(traceback.format_exc())
             self.error_occurred.emit(f"专业扫描失败: {str(e)}")
 
     def _execute_pattern_recognition(self):
         """执行真实的形态识别"""
         try:
-            from analysis.pattern_recognition import EnhancedPatternRecognizer
 
             # 创建识别器
             recognizer = EnhancedPatternRecognizer(debug_mode=True)
@@ -1296,7 +1293,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _on_prediction_days_changed(self, value):
         """预测天数变更处理"""
         try:
-            from db.models.ai_config_models import get_ai_config_manager
             config_manager = get_ai_config_manager()
 
             # 更新数据库中的配置
@@ -1327,7 +1323,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             logger.info(f"🧠 获取到模型类型: {model_type}")
 
-            from db.models.ai_config_models import get_ai_config_manager
             config_manager = get_ai_config_manager()
 
             # 更新数据库中的配置
@@ -1357,7 +1352,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 更新模型类型配置失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
     def _auto_trigger_prediction_on_model_change(self):
@@ -1391,7 +1385,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 自动触发预测失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
     def _execute_auto_prediction(self):
@@ -1415,7 +1408,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 执行自动预测失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
     def _initialize_ai_service(self):
@@ -1423,6 +1415,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         logger.info("🔄 === _initialize_ai_service 开始 ===")
 
         try:
+            # ✅ 正确导入并获取服务容器
             from core.containers import get_service_container
             from core.services.ai_prediction_service import AIPredictionService
 
@@ -1451,14 +1444,12 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 初始化AI预测服务失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             self.ai_prediction_service = None
 
     def _on_confidence_threshold_changed(self, value):
         """置信度阈值变更处理"""
         try:
-            from db.models.ai_config_models import get_ai_config_manager
             config_manager = get_ai_config_manager()
 
             # 更新数据库中的配置
@@ -1525,53 +1516,79 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             logger.info(f"开始形态回测，周期: {backtest_period}天，形态数量: {len(patterns)}")
 
-            # 第五步：尝试使用专业回测引擎
+            # 第五步：尝试使用专业回测引擎 - 异步执行
             try:
                 from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
+                from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QMutexLocker
+                from concurrent.futures import ThreadPoolExecutor
 
-                # 创建回测引擎
-                engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+                # 创建异步回测工作线程
+                class BacktestWorker(QThread):
+                    """异步回测工作线程"""
+                    backtest_completed = pyqtSignal(dict)
+                    backtest_progress = pyqtSignal(int, str)
+                    backtest_error = pyqtSignal(str)
 
-                # 基于形态生成交易信号
-                backtest_data = self._generate_pattern_signals(patterns, backtest_period)
+                    def __init__(self, patterns, backtest_period, parent=None):
+                        super().__init__(parent)
+                        self.patterns = patterns
+                        self.backtest_period = backtest_period
+                        self._mutex = QMutex()
 
-                if backtest_data is None or backtest_data.empty:
-                    raise ValueError("无法生成有效的回测数据")
+                    def run(self):
+                        """运行异步回测"""
+                        try:
+                            with QMutexLocker(self._mutex):
+                                self.backtest_progress.emit(10, "正在初始化回测引擎...")
+
+                                # 创建回测引擎
+                                engine = UnifiedBacktestEngine(backtest_level=BacktestLevel.PROFESSIONAL)
+
+                                self.backtest_progress.emit(20, "正在生成交易信号...")
+
+                                # 基于形态生成交易信号
+                                backtest_data = self.parent()._generate_pattern_signals(self.patterns, self.backtest_period)
+
+                                if backtest_data is None or backtest_data.empty:
+                                    raise ValueError("无法生成有效的回测数据")
+
+                                self.backtest_progress.emit(50, "正在执行回测计算...")
+
+                                # 运行回测
+                                backtest_results = engine.run_backtest(
+                                    data=backtest_data,
+                                    signal_col='signal',
+                                    price_col='close',
+                                    initial_capital=100000,  # 10万初始资金
+                                    position_size=0.8,      # 80%仓位
+                                    commission_pct=0.0003,  # 万三手续费
+                                    slippage_pct=0.001      # 0.1%滑点
+                                )
+
+                                self.backtest_progress.emit(90, "正在生成回测报告...")
+
+                                # 发送结果
+                                self.backtest_completed.emit(backtest_results)
+
+                        except Exception as e:
+                            self.backtest_error.emit(str(e))
+
+                # 创建并启动工作线程
+                self._backtest_worker = BacktestWorker(patterns, backtest_period, self)
+                self._backtest_worker.backtest_completed.connect(self._on_backtest_completed)
+                self._backtest_worker.backtest_progress.connect(self._on_backtest_progress)
+                self._backtest_worker.backtest_error.connect(self._on_backtest_error)
 
                 # 更新进度
                 if hasattr(self, 'progress_bar'):
-                    self.progress_bar.setValue(30)
+                    self.progress_bar.setValue(5)
+                    self.progress_bar.setVisible(True)
                 if hasattr(self, 'status_label'):
-                    self.status_label.setText("正在执行回测...")
+                    self.status_label.setText("正在启动异步回测...")
 
-                # 运行回测
-                backtest_results = engine.run_backtest(
-                    data=backtest_data,
-                    signal_col='signal',
-                    price_col='close',
-                    initial_capital=100000,  # 10万初始资金
-                    position_size=0.8,      # 80%仓位
-                    commission_pct=0.0003,  # 万三手续费
-                    slippage_pct=0.001      # 0.1%滑点
-                )
-
-                # 更新进度
-                if hasattr(self, 'progress_bar'):
-                    self.progress_bar.setValue(80)
-                if hasattr(self, 'status_label'):
-                    self.status_label.setText("正在生成回测报告...")
-
-                # 显示回测结果
-                self._display_backtest_results(backtest_results)
-
-                # 完成
-                if hasattr(self, 'progress_bar'):
-                    self.progress_bar.setValue(100)
-                    self.progress_bar.setVisible(False)
-                if hasattr(self, 'status_label'):
-                    self.status_label.setText("回测完成")
-
-                logger.info("✅ 专业回测完成")
+                # 启动异步回测
+                self._backtest_worker.start()
+                logger.info("🚀 异步回测已启动")
 
             except ImportError as e:
                 logger.warning(f"专业回测引擎不可用，使用简化回测: {e}")
@@ -1646,9 +1663,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def _generate_mock_data(self, period_days):
         """生成模拟数据用于演示回测"""
-        import numpy as np
-        import pandas as pd
-        from datetime import datetime, timedelta
 
         try:
             # 生成日期序列
@@ -2041,10 +2055,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 处理分析结果失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "错误", f"处理分析结果失败: {e}")
 
     def on_analysis_error(self, error_message):
@@ -2115,7 +2127,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _detect_patterns_with_real_algorithm(self):
         """使用真实的形态识别算法 - 专业扫描版本（深度扫描）"""
         try:
-            from analysis.pattern_recognition import EnhancedPatternRecognizer
 
             # 创建真实的形态识别器
             recognizer = EnhancedPatternRecognizer(debug_mode=True)
@@ -2184,7 +2195,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             return []
         except Exception as e:
             logger.error(f"❌ 真实形态识别失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return []
 
@@ -2299,7 +2309,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                 # 导入并使用中文显示名称
                 try:
-                    from core.services.ai_prediction_service import get_model_display_name
                     model_display_name = get_model_display_name(predictions['model_type'])
                     predictions['model_display_name'] = model_display_name
                 except ImportError:
@@ -2331,7 +2340,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 生成ML预测失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return {
                 'direction': '预测失败',
@@ -2719,7 +2727,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             return {'predictions': predictions}
         except Exception as e:
             logger.error(f"❌ 异步AI预测失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return {'error': str(e)}
 
@@ -2761,7 +2768,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 专业扫描启动失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
             # 隐藏进度条
@@ -2769,7 +2775,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 self.progress_bar.setVisible(False)
 
             # 显示错误消息
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "错误", f"专业扫描启动失败: {e}")
 
     def _professional_scan_async(self):
@@ -2819,7 +2824,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"❌ 专业扫描执行失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return {'error': str(e)}
 
@@ -2860,7 +2864,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     self.log_manager.warning("对象没有_process_alerts方法")
 
         except Exception as e:
-            import traceback
             self.log_manager.error(f"更新结果显示失败: {e}")
             self.log_manager.error(traceback.format_exc())
 
@@ -2884,7 +2887,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def _update_table_in_batches(self, patterns: List[Dict]):
         """异步分批更新表格，避免UI卡顿"""
-        from PyQt5.QtCore import QTimer
 
         self.patterns_table.setSortingEnabled(False)
         self.patterns_table.setUpdatesEnabled(False)
@@ -2950,7 +2952,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 self.status_label.setText(f"加载进度: {progress:.1f}% ({self.total_loaded}/{len(self.pattern_batches) * 50})")
 
             # 强制更新UI显示
-            from PyQt5.QtWidgets import QApplication
             QApplication.processEvents()
 
         except Exception as e:
@@ -3346,7 +3347,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if info_alerts:
                     display_messages.extend(["=== 信息提示 ==="] + info_alerts)
 
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.information(self, "形态预警", "\n".join(display_messages))
                 logger.info(f"显示了 {len(alert_messages)} 个预警: {len(high_alerts)}高级, {len(medium_alerts)}中级, {len(warning_alerts)}警告, {len(info_alerts)}信息")
 
@@ -3428,7 +3428,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 获取中文模型名称
             try:
-                from core.services.ai_prediction_service import get_model_display_name
                 model_display_name = get_model_display_name(model_type)
             except ImportError:
                 model_display_name = model_type
@@ -3538,7 +3537,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"更新AI预测显示失败: {e}")
-            import traceback
             logger.error(traceback.format_exc())
 
             # 显示错误信息
@@ -3603,7 +3601,6 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         except Exception as e:
             logger.error(f"打开AI配置对话框失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "错误", f"无法打开AI配置对话框: {e}")
 
     def _on_ai_config_changed(self, config_key: str, config_value: dict):
@@ -3786,3 +3783,109 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         except Exception as e:
             logger.error(f"快速形态分析失败: {e}")
             return []
+
+    def set_kdata(self, kdata):
+        """设置K线数据 - 优化版本，避免立即触发形态扫描"""
+        try:
+            # 先设置数据，不立即刷新
+            if kdata is not None:
+                self.kdata = kdata
+                self.current_kdata = kdata
+
+                # 更新状态显示
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText(f"数据已更新: {len(kdata)} 条记录")
+
+                logger.info(f"形态分析: 设置K线数据成功，数据长度: {len(kdata)}")
+
+                # 只有在标签页可见时才自动进行分析
+                if hasattr(self, 'isVisible') and self.isVisible():
+                    # 延迟执行形态识别，避免阻塞UI
+                    if not hasattr(self, '_pattern_analysis_timer'):
+                        self._pattern_analysis_timer = QTimer()
+                        self._pattern_analysis_timer.setSingleShot(True)
+                        self._pattern_analysis_timer.timeout.connect(self._delayed_pattern_analysis)
+
+                    self._pattern_analysis_timer.start(300)  # 300ms后执行
+            else:
+                self.kdata = None
+                self.current_kdata = None
+                logger.warning("形态分析: 设置K线数据为空")
+
+        except Exception as e:
+            logger.error(f"形态分析: 设置K线数据失败: {e}")
+            self.kdata = None
+            self.current_kdata = None
+
+    def _delayed_pattern_analysis(self):
+        """延迟执行形态分析"""
+        try:
+            # 检查是否启用了自动分析
+            if (hasattr(self, 'auto_scan_checkbox') and
+                self.auto_scan_checkbox.isChecked() and
+                    self.validate_kdata_with_warning()):
+
+                logger.info("自动开始形态识别...")
+                self.identify_patterns()
+            else:
+                logger.debug("跳过自动形态分析")
+
+        except Exception as e:
+            logger.error(f"延迟形态分析失败: {e}")
+
+    def _on_backtest_completed(self, backtest_results: dict):
+        """处理异步回测完成"""
+        try:
+            logger.info("✅ 异步回测完成，正在处理结果...")
+
+            # 显示回测结果
+            self._display_backtest_results(backtest_results)
+
+            # 完成
+            if hasattr(self, 'progress_bar'):
+                self.progress_bar.setValue(100)
+                QTimer.singleShot(1000, lambda: self.progress_bar.setVisible(False))
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("回测完成")
+
+            # 恢复界面状态
+            self.hide_loading()
+
+            logger.info("✅ 回测结果处理完成")
+
+        except Exception as e:
+            logger.error(f"处理回测结果失败: {str(e)}")
+            self._on_backtest_error(f"处理回测结果失败: {str(e)}")
+
+    def _on_backtest_progress(self, progress: int, message: str):
+        """处理异步回测进度"""
+        try:
+            if hasattr(self, 'progress_bar'):
+                self.progress_bar.setValue(progress)
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(message)
+
+            logger.debug(f"回测进度: {progress}% - {message}")
+
+        except Exception as e:
+            logger.error(f"更新回测进度失败: {str(e)}")
+
+    def _on_backtest_error(self, error_message: str):
+        """处理异步回测错误"""
+        try:
+            logger.error(f"异步回测失败: {error_message}")
+
+            # 隐藏进度条
+            if hasattr(self, 'progress_bar'):
+                self.progress_bar.setVisible(False)
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("回测失败")
+
+            # 恢复界面状态
+            self.hide_loading()
+
+            # 显示错误信息
+            QMessageBox.critical(self, "回测错误", f"异步回测失败:\n{error_message}")
+
+        except Exception as e:
+            logger.error(f"处理回测错误失败: {str(e)}")

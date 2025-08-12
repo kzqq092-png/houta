@@ -359,7 +359,6 @@ class NodeManagerDialog(QDialog):
         # 模拟刷新过程
         for node_id, node_data in self.nodes.items():
             if node_data['status'] == 'connected':
-                import random
                 node_data['cpu_usage'] = random.randint(10, 80)
                 node_data['memory_usage'] = random.randint(20, 90)
                 node_data['task_count'] = random.randint(0, 10)

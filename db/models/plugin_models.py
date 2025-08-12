@@ -39,6 +39,7 @@ class PluginType(Enum):
     INDICATOR = "indicator"
     STRATEGY = "strategy"
     DATA_SOURCE = "data_source"
+    SENTIMENT = "sentiment"  # 新增情绪分析插件类型
     ANALYSIS = "analysis"
     UI_COMPONENT = "ui_component"
     EXPORT = "export"
@@ -121,19 +122,8 @@ class PluginDatabaseManager:
                 priority INTEGER DEFAULT 100  -- 加载优先级
             )''')
 
-            # 2. 插件状态历史表 - 状态变更记录
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS plugin_status_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                plugin_id INTEGER NOT NULL,
-                old_status TEXT,
-                new_status TEXT NOT NULL,
-                reason TEXT DEFAULT '',  -- 状态变更原因
-                error_message TEXT DEFAULT '',  -- 错误信息
-                changed_by TEXT DEFAULT 'system',  -- 操作者
-                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (plugin_id) REFERENCES plugins (id) ON DELETE CASCADE
-            )''')
+            # 2. 迁移调整：删除插件状态历史表（合并入 plugins 表的 status 字段）
+            cursor.execute('DROP TABLE IF EXISTS plugin_status_history')
 
             # 3. 插件配置表 - 动态配置存储
             cursor.execute('''
@@ -247,33 +237,63 @@ class PluginDatabaseManager:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            cursor.execute('''
-                INSERT OR REPLACE INTO plugins (
-                    name, display_name, version, plugin_type, status, description,
-                    author, email, homepage, repository, license, tags,
-                    install_path, entry_point, config_schema, dependencies,
-                    compatibility, install_size, checksum, remote_url,
-                    auto_update, priority, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                plugin_record.name, plugin_record.display_name, plugin_record.version,
-                plugin_record.plugin_type, plugin_record.status, plugin_record.description,
-                plugin_record.author, plugin_record.email, plugin_record.homepage,
-                plugin_record.repository, plugin_record.license, plugin_record.tags,
-                plugin_record.install_path, plugin_record.entry_point,
-                plugin_record.config_schema, plugin_record.dependencies,
-                plugin_record.compatibility, plugin_record.install_size,
-                plugin_record.checksum, plugin_record.remote_url,
-                plugin_record.auto_update, plugin_record.priority,
-                datetime.now().isoformat()
-            ))
+            # 检查是否已存在记录
+            cursor.execute('SELECT id, status FROM plugins WHERE name = ?', (plugin_record.name,))
+            row = cursor.fetchone()
 
-            plugin_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
-
-            logger.info(f"插件注册成功: {plugin_record.name} (ID: {plugin_id})")
-            return plugin_id
+            if row:
+                # 已存在：仅更新元信息，保留原有状态不覆盖
+                plugin_id, existing_status = row
+                cursor.execute('''
+                    UPDATE plugins
+                    SET display_name = ?, version = ?, plugin_type = ?, description = ?,
+                        author = ?, email = ?, homepage = ?, repository = ?, license = ?, tags = ?,
+                        install_path = ?, entry_point = ?, config_schema = ?, dependencies = ?,
+                        compatibility = ?, install_size = ?, checksum = ?, remote_url = ?,
+                        auto_update = ?, priority = ?, updated_at = ?
+                    WHERE name = ?
+                ''', (
+                    plugin_record.display_name, plugin_record.version, plugin_record.plugin_type,
+                    plugin_record.description, plugin_record.author, plugin_record.email,
+                    plugin_record.homepage, plugin_record.repository, plugin_record.license,
+                    plugin_record.tags, plugin_record.install_path, plugin_record.entry_point,
+                    plugin_record.config_schema, plugin_record.dependencies,
+                    plugin_record.compatibility, plugin_record.install_size,
+                    plugin_record.checksum, plugin_record.remote_url,
+                    plugin_record.auto_update, plugin_record.priority,
+                    datetime.now().isoformat(), plugin_record.name
+                ))
+                conn.commit()
+                conn.close()
+                logger.info(f"插件已存在，更新元信息并保留状态 {existing_status}: {plugin_record.name} (ID: {plugin_id})")
+                return plugin_id
+            else:
+                # 不存在：插入新记录，使用传入的状态
+                cursor.execute('''
+                    INSERT INTO plugins (
+                        name, display_name, version, plugin_type, status, description,
+                        author, email, homepage, repository, license, tags,
+                        install_path, entry_point, config_schema, dependencies,
+                        compatibility, install_size, checksum, remote_url,
+                        auto_update, priority, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    plugin_record.name, plugin_record.display_name, plugin_record.version,
+                    plugin_record.plugin_type, plugin_record.status, plugin_record.description,
+                    plugin_record.author, plugin_record.email, plugin_record.homepage,
+                    plugin_record.repository, plugin_record.license, plugin_record.tags,
+                    plugin_record.install_path, plugin_record.entry_point,
+                    plugin_record.config_schema, plugin_record.dependencies,
+                    plugin_record.compatibility, plugin_record.install_size,
+                    plugin_record.checksum, plugin_record.remote_url,
+                    plugin_record.auto_update, plugin_record.priority,
+                    datetime.now().isoformat()
+                ))
+                plugin_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
+                logger.info(f"插件注册成功: {plugin_record.name} (ID: {plugin_id})")
+                return plugin_id
 
         except Exception as e:
             logger.error(f"注册插件失败: {e}")
@@ -311,12 +331,7 @@ class PluginDatabaseManager:
                 WHERE name = ?
             ''', update_values + [plugin_name])
 
-            # 记录状态变更历史
-            cursor.execute('''
-                INSERT INTO plugin_status_history (
-                    plugin_id, old_status, new_status, reason, error_message
-                ) VALUES (?, ?, ?, ?, ?)
-            ''', (plugin_id, old_status, new_status_str, reason, error_message))
+            # 已移除状态历史记录写入（状态仅保存在 plugins.status）
 
             # 记录事件日志
             cursor.execute('''
@@ -519,9 +534,8 @@ class PluginDatabaseManager:
             cursor.execute('DELETE FROM plugin_events WHERE plugin_id = ?', (plugin_id,))
             events_deleted = cursor.rowcount
 
-            # 删除插件状态历史
-            cursor.execute('DELETE FROM plugin_status_history WHERE plugin_id = ?', (plugin_id,))
-            history_deleted = cursor.rowcount
+            # 删除插件状态历史（已不再使用，此处兼容清理）
+            history_deleted = 0
 
             # 最后删除插件记录
             cursor.execute('DELETE FROM plugins WHERE id = ?', (plugin_id,))
@@ -576,3 +590,286 @@ class PluginDatabaseManager:
         except Exception as e:
             logger.error(f"清理旧记录失败: {e}")
             return False
+
+    def get_or_create_plugin_id(self, plugin_name: str) -> Optional[int]:
+        """根据插件名称获取ID，不存在则返回None。"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT id FROM plugins WHERE name = ?', (plugin_name,))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row else None
+        except Exception as e:
+            logger.error(f"查询插件ID失败: {plugin_name}, 错误: {e}")
+            return None
+
+    def save_unified_plugin_config(self, plugin_name: str, config: Dict[str, Any],
+                                   config_type: str = 'user', description: str = '') -> bool:
+        """
+        保存插件统一配置JSON（单条记录，key 固定为 'config'）。
+        若记录已存在则替换。
+        """
+        try:
+            plugin_id = self.get_or_create_plugin_id(plugin_name)
+            if plugin_id is None:
+                logger.warning(f"保存配置前未找到插件: {plugin_name}")
+                return False
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                config_json = json.dumps(config, ensure_ascii=False)
+                current_time = datetime.now().isoformat()
+
+                cursor.execute('''
+                INSERT OR REPLACE INTO plugin_configs (
+                    id, plugin_id, config_key, config_value, config_type, version, description, updated_at
+                )
+                VALUES (
+                    COALESCE((SELECT id FROM plugin_configs WHERE plugin_id = ? AND config_key = 'config' AND config_type = ?), NULL),
+                    ?, 'config', ?, ?,
+                    COALESCE((SELECT version FROM plugin_configs WHERE plugin_id = ? AND config_key = 'config' AND config_type = ?) + 1, 1),
+                    ?, ?
+                )
+                ''', (
+                    plugin_id, config_type,  # for COALESCE id
+                    plugin_id, config_json, config_type,  # insert values
+                    plugin_id, config_type,  # for version increment
+                    description, current_time
+                ))
+
+                conn.commit()
+                logger.info(f"插件配置已保存: {plugin_name}")
+                return True
+        except Exception as e:
+            logger.error(f"保存插件配置失败 {plugin_name}: {e}")
+            return False
+
+    def load_unified_plugin_config(self, plugin_name: str, config_type: str = 'user') -> Optional[Dict[str, Any]]:
+        """读取插件统一配置JSON，按 version 最大取最新。不存在返回 None。"""
+        try:
+            plugin_id = self.get_or_create_plugin_id(plugin_name)
+            if plugin_id is None:
+                return None
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                SELECT config_value FROM plugin_configs
+                WHERE plugin_id = ? AND config_key = 'config' AND config_type = ?
+                ORDER BY version DESC LIMIT 1
+                ''', (plugin_id, config_type))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return json.loads(row[0])
+        except Exception as e:
+            logger.error(f"读取插件配置失败 {plugin_name}: {e}")
+            return None
+
+
+class DataSourcePluginConfigManager:
+    """数据源插件配置管理器"""
+
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self._init_data_source_tables()
+
+    def _init_data_source_tables(self):
+        """初始化数据源插件相关数据库表"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 数据源插件配置表
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS data_source_plugin_configs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plugin_id TEXT NOT NULL,
+                    config_data TEXT NOT NULL,  -- JSON配置数据
+                    priority INTEGER DEFAULT 50,
+                    weight REAL DEFAULT 1.0,
+                    enabled BOOLEAN DEFAULT 1,
+                    health_check_interval INTEGER DEFAULT 30,
+                    timeout_seconds INTEGER DEFAULT 30,
+                    retry_count INTEGER DEFAULT 3,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(plugin_id)
+                )''')
+
+                # 数据源路由配置表
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS data_source_routing_configs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    asset_type TEXT NOT NULL,
+                    plugin_priorities TEXT NOT NULL,  -- JSON数组，存储插件优先级顺序
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(asset_type)
+                )''')
+
+                conn.commit()
+
+        except Exception as e:
+            logger.error(f"初始化数据源插件配置表失败: {e}")
+
+    def save_plugin_config(self, plugin_id: str, config_data: dict,
+                           priority: int = 50, weight: float = 1.0,
+                           enabled: bool = True) -> bool:
+        """保存数据源插件配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                config_json = json.dumps(config_data, ensure_ascii=False)
+                current_time = datetime.now().isoformat()
+
+                cursor.execute('''
+                INSERT OR REPLACE INTO data_source_plugin_configs 
+                (plugin_id, config_data, priority, weight, enabled, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''', (plugin_id, config_json, priority, weight, enabled, current_time))
+
+                conn.commit()
+                logger.info(f"数据源插件配置已保存: {plugin_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"保存数据源插件配置失败 {plugin_id}: {e}")
+            return False
+
+    def get_plugin_config(self, plugin_id: str) -> Optional[dict]:
+        """获取数据源插件配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                SELECT config_data, priority, weight, enabled 
+                FROM data_source_plugin_configs 
+                WHERE plugin_id = ?
+                ''', (plugin_id,))
+
+                row = cursor.fetchone()
+                if row:
+                    config_data, priority, weight, enabled = row
+                    return {
+                        'config_data': json.loads(config_data),
+                        'priority': priority,
+                        'weight': weight,
+                        'enabled': enabled
+                    }
+
+        except Exception as e:
+            logger.error(f"获取数据源插件配置失败 {plugin_id}: {e}")
+
+        return None
+
+    def get_all_plugin_configs(self) -> dict:
+        """获取所有数据源插件配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                SELECT plugin_id, config_data, priority, weight, enabled 
+                FROM data_source_plugin_configs 
+                WHERE enabled = 1
+                ORDER BY priority ASC
+                ''')
+
+                configs = {}
+                for row in cursor.fetchall():
+                    plugin_id, config_data, priority, weight, enabled = row
+                    configs[plugin_id] = {
+                        'config_data': json.loads(config_data),
+                        'priority': priority,
+                        'weight': weight,
+                        'enabled': enabled
+                    }
+
+                return configs
+
+        except Exception as e:
+            logger.error(f"获取所有数据源插件配置失败: {e}")
+            return {}
+
+    def save_routing_config(self, asset_type: str, plugin_priorities: list) -> bool:
+        """保存数据源路由配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                priorities_json = json.dumps(plugin_priorities, ensure_ascii=False)
+                current_time = datetime.now().isoformat()
+
+                cursor.execute('''
+                INSERT OR REPLACE INTO data_source_routing_configs 
+                (asset_type, plugin_priorities, updated_at)
+                VALUES (?, ?, ?)
+                ''', (asset_type, priorities_json, current_time))
+
+                conn.commit()
+                logger.info(f"数据源路由配置已保存: {asset_type} -> {plugin_priorities}")
+                return True
+
+        except Exception as e:
+            logger.error(f"保存数据源路由配置失败 {asset_type}: {e}")
+            return False
+
+    def get_routing_config(self, asset_type: str) -> Optional[list]:
+        """获取数据源路由配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                SELECT plugin_priorities 
+                FROM data_source_routing_configs 
+                WHERE asset_type = ?
+                ''', (asset_type,))
+
+                row = cursor.fetchone()
+                if row:
+                    return json.loads(row[0])
+
+        except Exception as e:
+            logger.error(f"获取数据源路由配置失败 {asset_type}: {e}")
+
+        return None
+
+    def get_all_routing_configs(self) -> dict:
+        """获取所有数据源路由配置"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                SELECT asset_type, plugin_priorities 
+                FROM data_source_routing_configs
+                ''')
+
+                configs = {}
+                for row in cursor.fetchall():
+                    asset_type, priorities_json = row
+                    configs[asset_type] = json.loads(priorities_json)
+
+                return configs
+
+        except Exception as e:
+            logger.error(f"获取所有数据源路由配置失败: {e}")
+            return {}
+
+
+# 全局配置管理器实例
+_data_source_config_manager = None
+
+
+def get_data_source_config_manager(db_path: str = "db/hikyuu_system.db") -> DataSourcePluginConfigManager:
+    """获取数据源插件配置管理器实例"""
+    global _data_source_config_manager
+    if _data_source_config_manager is None:
+        _data_source_config_manager = DataSourcePluginConfigManager(db_path)
+    return _data_source_config_manager

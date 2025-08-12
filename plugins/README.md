@@ -1,6 +1,6 @@
-# YS-Quant‌ 插件系统
+# FactorWeave-Quant ‌ 插件系统
 
-YS-Quant‌ 2.0 提供了完整的插件生态系统，支持多种类型的插件开发和管理。
+FactorWeave-Quant ‌ 2.0 提供了完整的插件生态系统，支持多种类型的插件开发和管理。
 
 ## 🚀 快速开始
 
@@ -55,7 +55,7 @@ print(f"测试结果: {test_result}")
 
 ## 📦 插件类型
 
-YS-Quant‌ 支持8种插件类型：
+FactorWeave-Quant ‌ 支持8种插件类型：
 
 ### 1. 技术指标插件 (Indicator)
 
@@ -502,7 +502,7 @@ def calculate(self, data: pd.DataFrame, **params) -> Dict[str, pd.Series]:
 
 ## 🤝 贡献指南
 
-欢迎为YS-Quant‌插件生态系统做出贡献：
+欢迎为FactorWeave-Quant ‌插件生态系统做出贡献：
 
 1. Fork项目仓库
 2. 创建功能分支
@@ -518,5 +518,5 @@ def calculate(self, data: pd.DataFrame, **params) -> Dict[str, pd.Series]:
 
 - 官方网站: https://hikyuu.org
 - 技术论坛: https://forum.hikyuu.org
-- 问题反馈: https://github.com/hikyuu/YS-Quant‌/issues
+- 问题反馈: https://github.com/hikyuu/FactorWeave-Quant ‌/issues
 - 邮箱支持: support@hikyuu.org 

@@ -185,7 +185,6 @@ class WebGPURenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"WebGPU渲染成交量: {len(data)}个数据点")
@@ -205,7 +204,6 @@ class WebGPURenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"WebGPU渲染线图: {len(data)}个数据点")
@@ -258,7 +256,6 @@ class OpenGLRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"OpenGL渲染K线图: {len(data)}个数据点")
@@ -280,7 +277,6 @@ class OpenGLRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"OpenGL渲染成交量: {len(data)}个数据点")
@@ -300,7 +296,6 @@ class OpenGLRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"OpenGL渲染线图: {len(data)}个数据点")
@@ -349,7 +344,6 @@ class Canvas2DRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Canvas 2D渲染K线图: {len(data)}个数据点")
@@ -371,7 +365,6 @@ class Canvas2DRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Canvas 2D渲染成交量: {len(data)}个数据点")
@@ -391,7 +384,6 @@ class Canvas2DRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Canvas 2D渲染线图: {len(data)}个数据点")
@@ -448,7 +440,6 @@ class MatplotlibRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Matplotlib渲染K线图: {len(data)}个数据点")
@@ -479,7 +470,6 @@ class MatplotlibRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Matplotlib渲染成交量: {len(data)}个数据点")
@@ -504,7 +494,6 @@ class MatplotlibRenderer(BaseRenderer):
             return False
 
         try:
-            import time
             start_time = time.time()
 
             logger.debug(f"Matplotlib渲染线图: {len(data)}个数据点")

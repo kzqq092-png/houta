@@ -325,7 +325,6 @@ class GPUMonitor:
 
         try:
             # 尝试使用nvidia-smi获取NVIDIA GPU信息
-            import subprocess
             result = subprocess.run([
                 'nvidia-smi',
                 '--query-gpu=utilization.gpu,temperature.gpu',

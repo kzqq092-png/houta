@@ -61,3 +61,122 @@ class AkshareDataSource(DataSource):
         except Exception as e:
             self.logger.error(f"Akshare获取实时行情失败: {str(e)}")
             return pd.DataFrame()
+
+    def get_stock_sector_fund_flow_rank(self, indicator: str = "今日") -> pd.DataFrame:
+        """获取股票板块资金流排行
+
+        Args:
+            indicator: 时间周期，支持 "今日", "3日", "5日", "10日", "20日"
+
+        Returns:
+            pd.DataFrame: 板块资金流排行数据
+        """
+        try:
+            df = ak.stock_sector_fund_flow_rank(indicator=indicator)
+            self.logger.info(f"获取板块资金流排行成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取板块资金流排行失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_sector_fund_flow_summary(self, symbol: str, indicator: str = "今日") -> pd.DataFrame:
+        """获取股票板块资金流汇总
+
+        Args:
+            symbol: 板块名称
+            indicator: 时间周期，支持 "今日", "3日", "5日", "10日", "20日"
+
+        Returns:
+            pd.DataFrame: 板块资金流汇总数据
+        """
+        try:
+            df = ak.stock_sector_fund_flow_summary(symbol=symbol, indicator=indicator)
+            self.logger.info(f"获取板块资金流汇总成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取板块资金流汇总失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_sector_fund_flow_hist(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
+        """获取股票板块历史资金流数据
+
+        Args:
+            symbol: 板块名称
+            period: 时间周期，支持 "近6月", "近1年", "近2年", "近3年"
+
+        Returns:
+            pd.DataFrame: 板块历史资金流数据
+        """
+        try:
+            df = ak.stock_sector_fund_flow_hist(symbol=symbol, period=period)
+            self.logger.info(f"获取板块历史资金流成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取板块历史资金流失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_individual_fund_flow_rank(self, indicator: str = "今日") -> pd.DataFrame:
+        """获取个股资金流排行
+
+        Args:
+            indicator: 时间周期，支持 "今日", "3日", "5日", "10日", "20日"
+
+        Returns:
+            pd.DataFrame: 个股资金流排行数据
+        """
+        try:
+            df = ak.stock_individual_fund_flow_rank(indicator=indicator)
+            self.logger.info(f"获取个股资金流排行成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取个股资金流排行失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_market_fund_flow(self) -> pd.DataFrame:
+        """获取大盘资金流数据
+
+        Returns:
+            pd.DataFrame: 大盘资金流数据
+        """
+        try:
+            df = ak.stock_market_fund_flow()
+            self.logger.info(f"获取大盘资金流成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取大盘资金流失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_main_fund_flow(self, indicator: str = "今日") -> pd.DataFrame:
+        """获取主力资金流入排行
+
+        Args:
+            indicator: 时间周期，支持 "今日", "3日", "5日", "10日", "20日"
+
+        Returns:
+            pd.DataFrame: 主力资金流入排行数据
+        """
+        try:
+            df = ak.stock_main_fund_flow(indicator=indicator)
+            self.logger.info(f"获取主力资金流入排行成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取主力资金流入排行失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_stock_concept_fund_flow_hist(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
+        """获取概念历史资金流数据
+
+        Args:
+            symbol: 概念名称
+            period: 时间周期，支持 "近6月", "近1年", "近2年", "近3年"
+
+        Returns:
+            pd.DataFrame: 概念历史资金流数据
+        """
+        try:
+            df = ak.stock_concept_fund_flow_hist(symbol=symbol, period=period)
+            self.logger.info(f"获取概念历史资金流成功，数据条数: {len(df)}")
+            return df
+        except Exception as e:
+            self.logger.error(f"获取概念历史资金流失败: {str(e)}")
+            return pd.DataFrame()

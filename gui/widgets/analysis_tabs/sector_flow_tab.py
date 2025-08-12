@@ -13,8 +13,9 @@ from .sector_flow_tab_pro import SectorFlowTabPro
 class SectorFlowTab(SectorFlowTabPro):
     """板块资金流分析标签页 - 继承专业版功能，保持向后兼容"""
 
-    def __init__(self, config_manager=None):
+    def __init__(self, config_manager=None, service_container=None):
         """初始化板块资金流分析标签页"""
+        self.service_container = service_container
         super().__init__(config_manager)
 
         # 保持向后兼容的属性

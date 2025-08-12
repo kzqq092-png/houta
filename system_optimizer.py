@@ -1009,7 +1009,7 @@ def set_system_optimizer_service(service: SystemOptimizerService) -> None:
 
 async def main():
     """主函数"""
-    print("YS-Quant系统优化器服务")
+    print("FactorWeave-Quant 系统优化器服务")
     print("====================")
 
     # 创建并初始化优化器服务

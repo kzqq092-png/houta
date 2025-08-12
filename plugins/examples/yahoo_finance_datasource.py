@@ -1,7 +1,9 @@
 """
-Yahoo Finance数据源插件示例
+Yahoo Finance数据源插件示例（V2 对齐）
 
-展示如何创建外部数据源插件，从Yahoo Finance获取股票数据。
+- 采用 core.data_source_extensions.IDataSourcePlugin 接口
+- 移除旧装饰器与旧接口依赖
+- 配置通过 initialize(config) 注入
 """
 
 import pandas as pd
@@ -10,105 +12,119 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QFormLayout, QPushButton, QTextEdit
 
-# 修改导入方式，使用绝对导入
-from plugins.plugin_interface import (
-    IDataSourcePlugin, PluginMetadata, PluginType, PluginCategory,
-    plugin_metadata, register_plugin, PluginContext
-)
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo
+from core.plugin_types import AssetType, DataType, PluginType
+from core.data_source_data_models import HealthCheckResult
 
 
-@plugin_metadata(
-    name="Yahoo Finance数据源",
-    version="1.0.0",
-    description="从Yahoo Finance获取股票数据的数据源插件",
-    author="HIkyuu团队",
-    email="support@hikyuu.org",
-    website="https://hikyuu.org",
-    license="MIT",
-    plugin_type=PluginType.DATA_SOURCE,
-    category=PluginCategory.CORE,
-    dependencies=["pandas", "numpy", "requests"],
-    min_hikyuu_version="2.0.0",
-    max_hikyuu_version="3.0.0",
-    tags=["数据源", "Yahoo Finance", "股票数据"],
-    icon_path="icons/yahoo_finance.png"
-)
-@register_plugin(PluginType.DATA_SOURCE)
 class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
     """Yahoo Finance数据源插件"""
 
     def __init__(self):
-        """初始化插件"""
-        self._context: Optional[PluginContext] = None
-        self._config = {
+        self.initialized = False
+
+        # 默认配置
+        default_config = {
             'api_timeout': 30,
             'retry_count': 3,
             'cache_enabled': True,
-            'cache_duration': 300  # 5分钟缓存
+            'cache_duration': 300,  # 5分钟
+            'rate_limit': 100
         }
+
+        self.config = default_config.copy()
+        self._config = default_config.copy()
+        self.session = None
+        self.base_url = "https://query1.finance.yahoo.com"
+        self.request_count = 0
+        self.last_error = None
+
+        # 初始化缓存
         self._cache = {}
+        self._cache_timestamps = {}
 
-    @property
-    def metadata(self) -> PluginMetadata:
-        """获取插件元数据"""
-        return self._plugin_metadata
+        # 插件类型标识（确保被识别为数据源插件）
+        self.plugin_type = PluginType.DATA_SOURCE_STOCK
 
-    def initialize(self, context: PluginContext = None) -> bool:
+    def get_plugin_info(self) -> PluginInfo:
+        return PluginInfo(
+            id="datasource.yahoo_finance",
+            name="Yahoo Finance数据源",
+            version="1.0.0",
+            description="从Yahoo Finance获取股票数据（历史/实时）",
+            author="FactorWeave 团队",
+            supported_asset_types=[AssetType.STOCK],
+            supported_data_types=[]
+        )
+
+    def initialize(self, config: Dict[str, Any]) -> bool:
         """
-        初始化插件
-
-        Args:
-            context: 插件上下文
-
-        Returns:
-            bool: 初始化是否成功
+        初始化插件（新接口：使用配置字典）
         """
         try:
-            self._context = context
+            # 合并配置
+            merged = self._config.copy()
+            merged.update(config or {})
+            self.config = merged
+            self._config = merged.copy()
 
-            # 如果上下文不为空，加载配置和注册事件
-            if context:
-                # 加载配置
-                config = context.get_plugin_config(self.metadata.name)
-                if config:
-                    self._config.update(config)
+            # 创建会话
+            import requests
+            self.session = requests.Session()
+            self.session.headers.update({
+                "User-Agent": "HIkyuu-YahooFinance/1.0",
+                "Accept": "application/json"
+            })
 
-                # 注册事件处理器
-                context.register_event_handler(
-                    "market_close", self._on_market_close)
-
-                context.log_manager.info(f"Yahoo Finance数据源插件初始化成功")
-            else:
-                print("Yahoo Finance数据源插件初始化成功（无上下文）")
-
+            self.initialized = True
             return True
-
         except Exception as e:
-            if context:
-                context.log_manager.error(f"Yahoo Finance数据源插件初始化失败: {e}")
-            else:
-                print(f"Yahoo Finance数据源插件初始化失败: {e}")
+            print(f"Yahoo Finance数据源插件初始化失败: {e}")
+            self.last_error = str(e)
             return False
 
     def cleanup(self) -> None:
         """清理插件资源"""
-        if self._context:
-            self._context.log_manager.info("Yahoo Finance数据源插件清理完成")
+        pass
+
+    def shutdown(self) -> None:
+        """关闭插件，释放资源（新接口要求）"""
+        try:
+            if self.session:
+                self.session.close()
+        except Exception:
+            pass
+
+    def health_check(self) -> HealthCheckResult:
+        """健康检查"""
+        try:
+            # 轻量探测：获取服务器时间或简单行情
+            url = f"{self.base_url}/v1/finance/trending/US"
+            response = requests.get(url, timeout=self.config.get('api_timeout', 30))
+            if response.status_code == 200:
+                return HealthCheckResult(is_healthy=True, message="ok", response_time=0.0)
+            return HealthCheckResult(is_healthy=False, message=f"status {response.status_code}", response_time=0.0)
+        except Exception as e:
+            return HealthCheckResult(is_healthy=False, message=str(e), response_time=0.0)
+
+    def get_supported_asset_types(self) -> List[AssetType]:
+        return [AssetType.STOCK]
+
+    def get_supported_data_types(self) -> List[DataType]:
+        return [DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE]
 
     def get_data_source_name(self) -> str:
-        """获取数据源名称"""
+        """获取数据源名称（兼容旧接口）"""
         return "Yahoo Finance"
 
-    def get_supported_data_types(self) -> List[str]:
-        """获取支持的数据类型"""
-        return [
-            "stock_daily",      # 日线数据
-            "stock_intraday",   # 分钟线数据
-            "stock_info",       # 股票基本信息
-            "market_summary"    # 市场摘要
-        ]
+    # 兼容旧接口的方法保留（不在新路由中直接使用）
+    def get_supported_data_types_legacy(self) -> List[str]:
+        return ["stock_daily", "stock_intraday", "stock_info", "market_summary"]
 
-    def fetch_data(self, symbol: str, data_type: str, **params) -> pd.DataFrame:
+    def fetch_data(self, symbol: str, data_type: str,
+                   start_date: Optional[datetime] = None,
+                   end_date: Optional[datetime] = None,
+                   **params) -> pd.DataFrame:
         """
         获取数据
 
@@ -131,7 +147,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                     return cached_data
 
             # 根据数据类型获取数据
-            if data_type == "stock_daily":
+            if data_type in ("stock_daily", DataType.HISTORICAL_KLINE.value):
                 data = self._fetch_daily_data(symbol, **params)
             elif data_type == "stock_intraday":
                 data = self._fetch_intraday_data(symbol, **params)
@@ -157,6 +173,27 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                 self._context.log_manager.error(
                     f"获取数据失败: {symbol} ({data_type}) - {e}")
             raise
+
+    def get_real_time_data(self, symbols: List[str]) -> Dict[str, Any]:
+        """简单的实时数据实现（返回最近收盘价模拟）"""
+        try:
+            result: Dict[str, Any] = {}
+            for sym in symbols:
+                # 这里用日线最后一条作为模拟实时
+                df = self._fetch_daily_data(sym)
+                last = df.iloc[-1]
+                result[sym] = {
+                    'symbol': sym,
+                    'price': float(last['close']),
+                    'open': float(last['open']),
+                    'high': float(last['high']),
+                    'low': float(last['low']),
+                    'volume': float(last['volume']),
+                    'timestamp': datetime.now().isoformat()
+                }
+            return result
+        except Exception:
+            return {}
 
     def _fetch_daily_data(self, symbol: str, **params) -> pd.DataFrame:
         """

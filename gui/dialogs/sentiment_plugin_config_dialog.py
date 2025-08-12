@@ -565,7 +565,6 @@ class SentimentPluginConfigDialog(QDialog):
 
         if filename:
             try:
-                import json
                 with open(filename, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
 

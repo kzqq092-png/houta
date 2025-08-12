@@ -1,8 +1,8 @@
-# YS-Quant‌ 2.0 开发使用文档
+# FactorWeave-Quant ‌ 2.0 开发使用文档
 
 ## 项目概述
 
-YS-Quant‌ 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用现代化的模块化架构设计，提供完整的股票分析、形态识别、策略回测、优化系统等功能。
+FactorWeave-Quant ‌ 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用现代化的模块化架构设计，提供完整的股票分析、形态识别、策略回测、优化系统等功能。
 
 ### 核心特性
 
@@ -18,7 +18,7 @@ YS-Quant‌ 2.0 是一个基于 Python 3.11 的专业股票分析系统，采用
 ### 目录结构
 
 ```
-YS-Quant‌/
+FactorWeave-Quant ‌/
 ├── core/                    # 核心模块
 │   ├── services/           # 服务层
 │   ├── coordinators/       # 协调器
@@ -328,7 +328,7 @@ from core.services.cloud_api_service import CloudAPIService, CloudConfig
 
 # 配置云端服务
 config = CloudConfig(
-    api_url='https://api.YS-Quant‌.com',
+    api_url='https://api.FactorWeave-Quant ‌.com',
     api_key='your_api_key',
     secret_key='your_secret_key'
 )
@@ -716,8 +716,8 @@ pip install -r requirements.txt
 
 1. **克隆项目**:
 ```bash
-git clone https://github.com/your-repo/YS-Quant‌.git
-cd YS-Quant‌
+git clone https://github.com/your-repo/FactorWeave-Quant ‌.git
+cd FactorWeave-Quant ‌
 ```
 
 2. **安装依赖**:
@@ -801,7 +801,7 @@ def calculate_indicators(self, kdata: pd.DataFrame, indicators: List[str]) -> Di
 **使用自定义异常**:
 ```python
 class HIkyuuUIException(Exception):
-    """YS-Quant‌基础异常"""
+    """FactorWeave-Quant ‌基础异常"""
     pass
 
 class DataValidationError(HIkyuuUIException):
@@ -1025,10 +1025,10 @@ A:
 
 ## 联系方式
 
-- **项目主页**: https://github.com/your-repo/YS-Quant‌
-- **文档网站**: https://docs.YS-Quant‌.com
-- **问题反馈**: https://github.com/your-repo/YS-Quant‌/issues
-- **讨论社区**: https://community.YS-Quant‌.com
+- **项目主页**: https://github.com/your-repo/FactorWeave-Quant ‌
+- **文档网站**: https://docs.FactorWeave-Quant ‌.com
+- **问题反馈**: https://github.com/your-repo/FactorWeave-Quant ‌/issues
+- **讨论社区**: https://community.FactorWeave-Quant ‌.com
 
 ---
 

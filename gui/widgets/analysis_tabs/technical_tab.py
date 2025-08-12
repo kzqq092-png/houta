@@ -505,7 +505,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         try:
             # 检查是否是形态指标 - 通过数据库查询判断
-            from core.unified_indicator_service import UnifiedIndicatorService
             unified_service = UnifiedIndicatorService()
             patterns = unified_service.get_all_patterns()
             pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
@@ -719,7 +718,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         try:
             # 如果是形态指标，只返回形态相关参数
-            from core.unified_indicator_service import UnifiedIndicatorService
             unified_service = UnifiedIndicatorService()
             patterns = unified_service.get_all_patterns()
             pattern_names = [p.get('name', p.get('english_name', '')) for p in patterns]
@@ -1017,7 +1015,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         """填充指标表格数据"""
         try:
             # 获取统一指标服务的所有指标（包括形态类）
-            from core.unified_indicator_service import UnifiedIndicatorService
             unified_service = UnifiedIndicatorService()
 
             # 获取技术指标
@@ -1366,7 +1363,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     error_count += 1
                     self.log_manager.error(
                         f"计算指标 {indicator_name} 时出错: {str(e)}")
-                    import traceback
                     self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
                     continue
 
@@ -2104,7 +2100,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 return "数据类型错误", "无法分析"
 
             # 检查是否为NaN
-            import numpy as np
             if np.isnan(current_value):
                 return "数据无效", "无法分析"
 
@@ -2454,6 +2449,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 导出按钮
         export_btn = QPushButton("导出技术分析结果")
+        export_btn.setFixedHeight(20)
         export_btn.setStyleSheet(
             "QPushButton { background-color: #17a2b8; color: white; }")
         export_btn.clicked.connect(self.export_technical_data)
@@ -2639,7 +2635,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             break
                     elif filter_type == 'date':
                         # 日期筛选逻辑
-                        from datetime import datetime
                         try:
                             cell_date = datetime.strptime(cell_value, "%Y-%m-%d %H:%M")
                             start_date = filter_config.get('start_date')

@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
@@ -26,23 +26,23 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         self._config_file = create_config_file_path("vix_sentiment")
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="VIX恐慌指数插件",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://github.com/hikyuu/hikyuu-ui",
-            license="MIT",
-            description="基于VIX波动率指数分析市场恐慌情绪，提供市场风险偏好度量",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=[],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="",
-            tags=["sentiment", "vix", "volatility", "fear", "market"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "VIX恐慌指数插件",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://github.com/hikyuu/FactorWeave-Quant ",
+            "license": "MIT",
+            "description": "基于VIX波动率指数分析市场恐慌情绪，提供市场风险偏好度量",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": [],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "",
+            "tags": ["sentiment", "vix", "volatility", "fear", "market"]
+        }
 
     def get_config_schema(self) -> List[PluginConfigField]:
         """获取配置模式定义"""
@@ -580,7 +580,6 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
                     elif 'Note' in data:
                         self._safe_log("warning", f"AlphaVantage API限制: {data['Note']}")
                         if attempt < retry_times:
-                            import time
                             time.sleep(10)  # API限制等待更长时间
                             continue
                         break

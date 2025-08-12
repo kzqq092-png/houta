@@ -637,7 +637,6 @@ class ChartService(CacheableService, ConfigurableService):
                 # 通过事件总线获取服务容器
                 try:
                     from ..containers import get_service_container
-                    from .stock_service import StockService
                     container = get_service_container()
                     return container.try_resolve(StockService)
                 except ImportError:

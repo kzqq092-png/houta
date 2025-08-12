@@ -147,7 +147,6 @@ class ExportWorker(QThread):
             file_path = self.export_params.get('file_path', '')
 
             # 模拟批量导出
-            import pandas as pd
 
             all_data = []
             for i, stock in enumerate(stocks):

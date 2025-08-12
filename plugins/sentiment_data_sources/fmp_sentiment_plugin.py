@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_api_key, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
@@ -25,23 +25,23 @@ class FMPSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         self._config_file = create_config_file_path("fmp_sentiment")
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="FMP社交情绪插件",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://financialmodelingprep.com",
-            license="MIT",
-            description="基于Financial Modeling Prep API获取社交情绪、新闻情绪和股票趋势数据",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=["requests>=2.25.0"],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="https://site.financialmodelingprep.com/developer/docs",
-            tags=["sentiment", "fmp", "social", "news", "api"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "FMP社交情绪插件",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://financialmodelingprep.com",
+            "license": "MIT",
+            "description": "基于Financial Modeling Prep API获取社交情绪、新闻情绪和股票趋势数据",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": ["requests>=2.25.0"],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "https://site.financialmodelingprep.com/developer/docs",
+            "tags": ["sentiment", "fmp", "social", "news", "api"]
+        }
 
     def get_config_schema(self) -> List[PluginConfigField]:
         """获取配置模式定义"""

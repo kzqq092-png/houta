@@ -188,7 +188,6 @@ class EnhancedGPUDetector:
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if result.returncode == 0:
-                import json
                 gpu_data = json.loads(result.stdout)
 
                 # 处理单个GPU的情况

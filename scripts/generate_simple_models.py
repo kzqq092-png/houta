@@ -58,7 +58,7 @@ def create_dummy_h5_file(file_path, model_info):
 def generate_simplified_models():
     """生成简化版AI模型"""
 
-    print("HIkyuu-UI 简化AI模型生成器")
+    print("FactorWeave-Quant  简化AI模型生成器")
     print("=" * 60)
     print("注意：这是简化版本，建议安装TensorFlow以获得完整功能")
     print("pip install tensorflow")
@@ -148,7 +148,7 @@ def generate_simplified_models():
         print("2. 建议安装TensorFlow以获得完整AI预测功能:")
         print("   pip install tensorflow")
         print("3. 安装TensorFlow后，运行 python scripts/generate_ai_models.py --quick")
-        print("4. 现在可以重新启动HIkyuu-UI应用程序")
+        print("4. 现在可以重新启动FactorWeave-Quant 应用程序")
 
         return True
     else:

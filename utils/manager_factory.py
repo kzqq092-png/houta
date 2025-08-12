@@ -54,7 +54,6 @@ class ManagerFactory:
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    from utils.config_manager import ConfigManager
                     self._instances[cache_key] = ConfigManager()
                 except ImportError as e:
                     warnings.warn(f"无法导入ConfigManager: {e}")
@@ -84,7 +83,6 @@ class ManagerFactory:
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    from core.logger import LogManager
                     self._instances[cache_key] = LogManager(config)
                 except ImportError:
                     try:
@@ -118,7 +116,6 @@ class ManagerFactory:
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    from utils.theme import ThemeManager
                     if config_manager is None:
                         config_manager = self.get_config_manager()
                     self._instances[cache_key] = ThemeManager(config_manager)
@@ -149,7 +146,6 @@ class ManagerFactory:
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    from core.data_manager import DataManager
                     if log_manager is None:
                         log_manager = self.get_log_manager()
                     self._instances[cache_key] = DataManager(log_manager)
@@ -195,7 +191,6 @@ class ManagerFactory:
                     # 记录开始创建实例
                     log_manager.info(f"开始创建行业管理器实例 - 缓存键: {cache_key}")
 
-                    from core.industry_manager import IndustryManager
 
                     # 确保使用统一的日志管理器
                     if log_manager is None:

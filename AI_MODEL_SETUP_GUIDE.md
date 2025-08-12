@@ -1,8 +1,8 @@
-# HIkyuu-UI AI模型设置指南
+# FactorWeave-Quant  AI模型设置指南
 
 ## 问题描述
 
-当启动HIkyuu-UI时，您可能会看到以下警告信息：
+当启动FactorWeave-Quant 时，您可能会看到以下警告信息：
 
 ```
 ⚠️ 加载pattern模型不存在，路径: models\trained\pattern_model.h5
@@ -170,4 +170,4 @@ chmod 755 models/trained
 3. 尝试使用简化模型作为临时解决方案
 4. 确保有足够的磁盘空间（至少500MB）
 
-生成成功后，HIkyuu-UI的AI预测功能将完全可用！ 
+生成成功后，FactorWeave-Quant 的AI预测功能将完全可用！ 

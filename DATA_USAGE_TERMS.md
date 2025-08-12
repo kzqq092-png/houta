@@ -1,10 +1,10 @@
-# YS-Quant‌ 数据使用条款
+# FactorWeave-Quant ‌ 数据使用条款
 
 ## 📋 数据使用声明
 
 ### 1. 适用范围
-本使用条款适用于YS-Quant‌量化交易系统中所有数据源的使用，包括但不限于：
-- 本地数据源（YS-QuantDataSource）
+本使用条款适用于FactorWeave-Quant ‌量化交易系统中所有数据源的使用，包括但不限于：
+- 本地数据源（FactorWeave-Quant DataSource）
 - 开源数据源（AkshareDataSource）  
 - 公开API数据源（东方财富、新浪财经、同花顺等）
 - 第三方插件数据源（Yahoo Finance等）
@@ -26,8 +26,8 @@
 ### 3. 数据来源说明
 
 #### 本地数据源
-- **数据来源**：YS-Quant量化交易框架本地数据库
-- **使用条款**：遵循YS-Quant项目的开源许可证
+- **数据来源**：FactorWeave-Quant 量化交易框架本地数据库
+- **使用条款**：遵循FactorWeave-Quant 项目的开源许可证
 - **合规性**：完全合规，无版权风险
 
 #### 开源数据源（AkShare）
@@ -68,7 +68,7 @@
 ### 5. 数据质量保证
 
 #### 数据质量检查
-YS-Quant‌提供内置的数据质量检查功能：
+FactorWeave-Quant ‌提供内置的数据质量检查功能：
 - **完整性检查**：检查数据是否完整，无缺失值
 - **准确性检查**：检查价格数据的逻辑合理性
 - **一致性检查**：检查数据格式和结构的一致性
@@ -103,7 +103,7 @@ RATE_LIMITS = {
     'sina': 60,         # 每分钟60次
     'tonghuashun': 60,  # 每分钟60次
     'akshare': 120,     # 每分钟120次（开源，相对宽松）
-    'YS-Quant': -1,       # 无限制（本地数据）
+    'FactorWeave-Quant ': -1,       # 无限制（本地数据）
 }
 ```
 
@@ -138,18 +138,18 @@ CACHE_SETTINGS = {
 ### 8. 免责声明
 
 #### 数据准确性免责
-- YS-Quant‌不保证所提供数据的准确性、完整性或时效性
+- FactorWeave-Quant ‌不保证所提供数据的准确性、完整性或时效性
 - 用户应自行验证数据的准确性，并承担使用数据的风险
-- 因数据错误导致的任何损失，YS-Quant‌不承担责任
+- 因数据错误导致的任何损失，FactorWeave-Quant ‌不承担责任
 
 #### 投资决策免责
-- YS-Quant‌仅为数据分析工具，不构成投资建议
+- FactorWeave-Quant ‌仅为数据分析工具，不构成投资建议
 - 用户的投资决策应基于自己的判断，并承担相应风险
-- 因使用本系统进行投资决策导致的损失，YS-Quant‌不承担责任
+- 因使用本系统进行投资决策导致的损失，FactorWeave-Quant ‌不承担责任
 
 #### 技术问题免责
-- YS-Quant‌不保证系统的持续可用性和稳定性
-- 因系统故障、网络问题等技术原因导致的损失，YS-Quant‌不承担责任
+- FactorWeave-Quant ‌不保证系统的持续可用性和稳定性
+- 因系统故障、网络问题等技术原因导致的损失，FactorWeave-Quant ‌不承担责任
 
 ### 9. 条款更新
 
@@ -165,9 +165,9 @@ CACHE_SETTINGS = {
 ### 10. 联系方式
 
 如有关于数据使用的疑问或建议，请通过以下方式联系：
-- **项目主页**：https://github.com/YS-Quant-org/YS-Quant
+- **项目主页**：https://github.com/FactorWeave-Quant -org/FactorWeave-Quant 
 - **问题反馈**：通过GitHub Issues提交
-- **技术讨论**：加入YS-Quant社区讨论群
+- **技术讨论**：加入FactorWeave-Quant 社区讨论群
 
 ### 11. 生效日期
 
@@ -175,4 +175,4 @@ CACHE_SETTINGS = {
 
 ---
 
-**重要提醒**：使用YS-Quant‌即表示您已阅读、理解并同意遵守本使用条款。如果您不同意本条款的任何部分，请停止使用本系统。 
+**重要提醒**：使用FactorWeave-Quant ‌即表示您已阅读、理解并同意遵守本使用条款。如果您不同意本条款的任何部分，请停止使用本系统。 

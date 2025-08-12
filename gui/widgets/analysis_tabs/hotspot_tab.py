@@ -24,7 +24,8 @@ class HotspotAnalysisTab(BaseAnalysisTab):
     # 定义信号
     hotspot_analysis_completed = pyqtSignal(dict)
 
-    def __init__(self, config_manager: Optional[ConfigManager] = None):
+    def __init__(self, config_manager: Optional[ConfigManager] = None, service_container=None):
+        self.service_container = service_container
         super().__init__(config_manager)
         self.hotspot_results = []
         self.hotspot_statistics = {}
@@ -525,47 +526,138 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             self.log_manager.error(f"主题机会分析失败: {str(e)}")
 
     def analyze_capital_flow(self, period: int):
-        """分析资金流向"""
+        """分析资金流向 - 使用真实数据"""
         try:
-            # 模拟资金流向数据
             self.capital_flow = []
 
-            for sector_data in self.sector_rankings[:10]:  # 取前10个板块
-                sector_name = sector_data['板块名称']
+            # 确保有数据管理器 - 使用工厂方法获取正确实例
+            if not hasattr(self, 'data_manager') or not self.data_manager:
+                try:
+                    from utils.manager_factory import ManagerFactory
+                    factory = ManagerFactory()
+                    self.data_manager = factory.get_data_manager()
+                except ImportError:
+                    # 降级方案：直接导入
+                    from core.data_manager import DataManager
+                    self.data_manager = DataManager()
 
-                main_inflow = random.uniform(-50, 200) * 100  # 百万元
-                retail_inflow = random.uniform(-30, 80) * 100
-                total_inflow = main_inflow + retail_inflow
+            # 获取真实的板块资金流数据
+            fund_flow_data = self.data_manager.get_fund_flow()
 
-                # 计算流入强度
-                if abs(total_inflow) > 15000:
-                    intensity = "极强"
-                elif abs(total_inflow) > 8000:
+            if fund_flow_data and 'sector_flow_rank' in fund_flow_data:
+                sector_df = fund_flow_data['sector_flow_rank']
+
+                if not sector_df.empty:
+                    # 处理前10个板块
+                    top_sectors = sector_df.head(10)
+
+                    for _, row in top_sectors.iterrows():
+                        sector_name = row.get('板块', row.get('industry', '未知板块'))
+
+                        # 获取各种资金流数据
+                        main_inflow = self._parse_flow_value(row.get('今日主力净流入-净额', row.get('主力净流入-净额', 0)))
+                        retail_inflow = self._parse_flow_value(row.get('今日散户净流入-净额', row.get('散户净流入-净额', 0)))
+                        total_inflow = main_inflow + retail_inflow
+
+                        # 计算流入强度
+                        abs_total = abs(total_inflow)
+                        if abs_total > 150000000:  # 1.5亿
+                            intensity = "极强"
+                        elif abs_total > 80000000:  # 8000万
+                            intensity = "强"
+                        elif abs_total > 30000000:  # 3000万
+                            intensity = "中等"
+                        else:
+                            intensity = "弱"
+
+                        # 判断资金偏好
+                        if abs(main_inflow) > abs(retail_inflow) * 2:
+                            preference = "机构偏好"
+                        elif abs(retail_inflow) > abs(main_inflow) * 2:
+                            preference = "散户偏好"
+                        else:
+                            preference = "均衡流入"
+
+                        self.capital_flow.append({
+                            '板块名称': sector_name,
+                            '主力净流入': f"{main_inflow/10000:.0f}万",
+                            '散户净流入': f"{retail_inflow/10000:.0f}万",
+                            '总净流入': f"{total_inflow/10000:.0f}万",
+                            '流入强度': intensity,
+                            '资金偏好': preference
+                        })
+
+                    self.log_manager.info(f"资金流向分析完成，共分析 {len(self.capital_flow)} 个板块")
+                else:
+                    self.log_manager.warning("板块资金流数据为空")
+            else:
+                self.log_manager.warning("未获取到板块资金流数据")
+
+            # 如果没有获取到真实数据，使用板块排行数据作为替代
+            if not self.capital_flow and hasattr(self, 'sector_rankings') and self.sector_rankings:
+                self._analyze_capital_flow_from_rankings()
+
+        except Exception as e:
+            self.log_manager.error(f"资金流向分析失败: {str(e)}")
+
+    def _parse_flow_value(self, value):
+        """解析资金流数值"""
+        try:
+            if isinstance(value, str):
+                # 处理带单位的字符串
+                if '万' in value:
+                    return float(value.replace('万', '')) * 10000
+                elif '亿' in value:
+                    return float(value.replace('亿', '')) * 100000000
+                else:
+                    return float(value)
+            elif isinstance(value, (int, float)):
+                return float(value)
+            else:
+                return 0.0
+        except:
+            return 0.0
+
+    def _analyze_capital_flow_from_rankings(self):
+        """从板块排行数据分析资金流向（备用方案）"""
+        try:
+            for sector_data in self.sector_rankings[:10]:
+                sector_name = sector_data.get('板块名称', '未知板块')
+
+                # 基于涨跌幅估算资金流
+                change_pct = sector_data.get('涨跌幅', 0)
+                if isinstance(change_pct, str):
+                    change_pct = float(change_pct.replace('%', ''))
+
+                # 简单的估算逻辑
+                estimated_flow = change_pct * 10000000  # 按涨跌幅估算资金流
+                main_inflow = estimated_flow * 0.7  # 主力占70%
+                retail_inflow = estimated_flow * 0.3  # 散户占30%
+
+                # 计算强度和偏好
+                abs_total = abs(estimated_flow)
+                if abs_total > 50000000:
                     intensity = "强"
-                elif abs(total_inflow) > 3000:
+                elif abs_total > 20000000:
                     intensity = "中等"
                 else:
                     intensity = "弱"
 
-                # 判断资金偏好
-                if main_inflow > retail_inflow * 2:
-                    preference = "机构偏好"
-                elif retail_inflow > main_inflow * 2:
-                    preference = "散户偏好"
-                else:
-                    preference = "均衡流入"
+                preference = "机构偏好" if main_inflow > retail_inflow else "散户偏好"
 
                 self.capital_flow.append({
                     '板块名称': sector_name,
-                    '主力净流入': f"{main_inflow/100:.0f}万",
-                    '散户净流入': f"{retail_inflow/100:.0f}万",
-                    '总净流入': f"{total_inflow/100:.0f}万",
+                    '主力净流入': f"{main_inflow/10000:.0f}万",
+                    '散户净流入': f"{retail_inflow/10000:.0f}万",
+                    '总净流入': f"{estimated_flow/10000:.0f}万",
                     '流入强度': intensity,
                     '资金偏好': preference
                 })
 
+            self.log_manager.info(f"使用排行数据估算资金流向完成，共 {len(self.capital_flow)} 个板块")
+
         except Exception as e:
-            self.log_manager.error(f"资金流向分析失败: {str(e)}")
+            self.log_manager.error(f"从排行数据分析资金流向失败: {str(e)}")
 
     def analyze_sector_rotation(self, period: int):
         """分析板块轮动"""

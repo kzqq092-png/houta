@@ -349,7 +349,6 @@ class GPUEnhancedCrosshairMixin:
 
         # 更新配置项
         if 'style' in config_dict:
-            from core.webgpu.crosshair_engine import CrosshairStyle
             try:
                 config.style = CrosshairStyle(config_dict['style'].lower())
             except ValueError:

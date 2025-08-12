@@ -27,8 +27,13 @@ class RealDataProvider:
         self.config = get_config()
         self.validator = get_data_validator()
 
-        # 初始化数据管理器
-        self.data_manager = DataManager()
+        # 初始化数据管理器 - 使用工厂方法
+        try:
+            from utils.manager_factory import ManagerFactory
+            factory = ManagerFactory()
+            self.data_manager = factory.get_data_manager()
+        except ImportError:
+            self.data_manager = DataManager()
 
         # 缓存管理
         self._cache = {}

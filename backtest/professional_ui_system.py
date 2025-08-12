@@ -140,7 +140,6 @@ class ProfessionalUISystem:
             border-radius: 10px;
             border: 1px solid {self.theme["border"]};
             margin: 10px 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }}
         
         /* 成功指标 */
@@ -219,7 +218,7 @@ class ProfessionalUISystem:
         
         .stButton > button:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            background-color: #f0f0f0;
         }}
         
         /* 选择框样�?*/

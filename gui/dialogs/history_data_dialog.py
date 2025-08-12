@@ -483,7 +483,6 @@ class HistoryDataDialog(QDialog):
     def _generate_sample_data(self, stock_code: str, start_date: str, end_date: str) -> List[Dict]:
         """生成示例数据"""
         import random
-        from datetime import datetime, timedelta
 
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")

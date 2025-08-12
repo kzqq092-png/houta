@@ -1,5 +1,5 @@
 """
-YS-Quant量化交易系统健康检查器
+FactorWeave-Quant 量化交易系统健康检查器
 监控形态识别系统的整体健康状态和性能指标
 """
 
@@ -40,7 +40,7 @@ class SystemHealthChecker:
 
     def run_comprehensive_check(self) -> Dict[str, Any]:
         """运行全面的系统健康检查"""
-        print("🔍 开始YS-Quant量化交易系统健康检查...")
+        print("🔍 开始FactorWeave-Quant 量化交易系统健康检查...")
 
         health_report = {
             'timestamp': datetime.now().isoformat(),
@@ -413,7 +413,7 @@ class SystemHealthChecker:
         """生成可读的健康报告"""
         lines = []
         lines.append("=" * 60)
-        lines.append("YS-Quant量化交易系统健康报告")
+        lines.append("FactorWeave-Quant 量化交易系统健康报告")
         lines.append("=" * 60)
         lines.append(f"检查时间: {report['timestamp']}")
         lines.append(f"总体状态: {report['overall_health'].upper()}")
@@ -463,7 +463,6 @@ def main():
 
     # 在测试模式下，我们需要模拟服务容器和服务
     from core.events import EventBus
-    from core.containers import ServiceContainer
 
     # 1. 创建模拟组件
     event_bus = EventBus()

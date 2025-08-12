@@ -446,7 +446,6 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 self.log_manager.info("已清除图表")
 
             # 处理不同的数据类型
-            import pandas as pd
             if isinstance(kdata, pd.DataFrame):
                 # DataFrame直接使用
                 if kdata.empty:
@@ -544,7 +543,6 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 self.log_manager.warning("更新成交量: K线数据为空")
                 return
 
-            import pandas as pd
             if not isinstance(kdata, pd.DataFrame):
                 self.log_manager.warning(f"更新成交量: K线数据格式错误: {type(kdata)}")
                 return
@@ -585,7 +583,6 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
                 self.log_manager.warning("更新指标: K线数据为空")
                 return
 
-            import pandas as pd
             if not isinstance(kdata, pd.DataFrame):
                 self.log_manager.warning(f"更新指标: K线数据格式错误: {type(kdata)}")
                 return

@@ -51,7 +51,7 @@ except ImportError as e:
 
 # 导入合并后的专业情绪分析标签页（包含实时分析和报告功能）
 try:
-    from gui.widgets.analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
+    from gui.widgets.analysis_tabs.professional_sentiment_tab import ProfessionalSentimentTab
     PROFESSIONAL_SENTIMENT_AVAILABLE = True
     # 向后兼容，EnhancedSentimentAnalysisTab 现在指向 ProfessionalSentimentTab
     EnhancedSentimentAnalysisTab = ProfessionalSentimentTab
@@ -122,7 +122,6 @@ class RightPanel(BasePanel):
         self.analysis_service = None
         if coordinator and hasattr(coordinator, 'service_container') and coordinator.service_container:
             try:
-                from core.services import AnalysisService
                 self.analysis_service = coordinator.service_container.resolve(AnalysisService)
             except Exception as e:
                 logger.warning(f"无法获取AnalysisService: {e}")
@@ -291,25 +290,34 @@ class RightPanel(BasePanel):
 
         # 专业分析标签页
         if PROFESSIONAL_TABS_AVAILABLE:
-            # 形态分析
-            self._pattern_tab = PatternAnalysisTab(config_manager, event_bus=self.coordinator.event_bus)
-            tab_widget.addTab(self._pattern_tab, "形态分析")
-            self.add_widget('pattern_tab', self._pattern_tab)
-            self._professional_tabs.append(self._pattern_tab)
+            # 形态分析 - 异步初始化
+            try:
+                self._pattern_tab = PatternAnalysisTab(config_manager, event_bus=self.coordinator.event_bus)
+                tab_widget.addTab(self._pattern_tab, "形态分析")
+                self.add_widget('pattern_tab', self._pattern_tab)
+                self._professional_tabs.append(self._pattern_tab)
+            except Exception as e:
+                logger.error(f"创建形态分析标签页失败: {e}")
 
-            # 趋势分析
-            self._trend_tab = TrendAnalysisTab(config_manager)
-            tab_widget.addTab(self._trend_tab, "趋势分析")
-            self.add_widget('trend_tab', self._trend_tab)
-            self._professional_tabs.append(self._trend_tab)
+            # 趋势分析 - 异步初始化
+            try:
+                self._trend_tab = TrendAnalysisTab(config_manager)
+                tab_widget.addTab(self._trend_tab, "趋势分析")
+                self.add_widget('trend_tab', self._trend_tab)
+                self._professional_tabs.append(self._trend_tab)
+            except Exception as e:
+                logger.error(f"创建趋势分析标签页失败: {e}")
 
-            # 波浪分析
-            self._wave_tab = WaveAnalysisTab(config_manager)
-            tab_widget.addTab(self._wave_tab, "波浪分析")
-            self.add_widget('wave_tab', self._wave_tab)
-            self._professional_tabs.append(self._wave_tab)
+            # 波浪分析 - 异步初始化
+            try:
+                self._wave_tab = WaveAnalysisTab(config_manager)
+                tab_widget.addTab(self._wave_tab, "波浪分析")
+                self.add_widget('wave_tab', self._wave_tab)
+                self._professional_tabs.append(self._wave_tab)
+            except Exception as e:
+                logger.error(f"创建波浪分析标签页失败: {e}")
 
-            # 情绪分析 - 优先使用专业版
+            # 情绪分析 - 优先使用专业版，异步初始化
             try:
                 if PROFESSIONAL_SENTIMENT_AVAILABLE:
                     self._sentiment_tab = ProfessionalSentimentTab(config_manager)
@@ -337,29 +345,86 @@ class RightPanel(BasePanel):
                 placeholder_layout.addWidget(placeholder_label)
                 tab_widget.addTab(placeholder_tab, "📊 情绪分析")
 
-            # K线情绪分析 - 新增标签页
+                # K线情绪分析 - 使用服务容器
             if KLINE_SENTIMENT_AVAILABLE:
                 try:
-                    self._kline_sentiment_tab = EnhancedKLineSentimentTab(config_manager)
+                    logger.info("🔄 开始创建K线情绪分析标签页...")
+                    import time
+                    start_time = time.time()
+
+                    logger.info("📦 导入K线情绪分析标签页模块...")
+                    logger.info("✅ K线情绪分析标签页模块导入成功")
+
+                    logger.info("🏗️ 创建K线情绪分析标签页实例...")
+                    self._kline_sentiment_tab = EnhancedKLineSentimentTab(
+                        config_manager=config_manager,
+                        service_container=self.coordinator.service_container
+                    )
+
+                    create_time = time.time()
+                    logger.info(f"⏱️ K线情绪分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
+
+                    logger.info("🎨 添加K线情绪分析标签页到UI...")
                     tab_widget.addTab(self._kline_sentiment_tab, "📈 K线情绪")
+
+                    # 注册到组件管理
+                    logger.info("📝 注册K线情绪分析标签页到组件管理...")
                     self.add_widget('kline_sentiment_tab', self._kline_sentiment_tab)
                     self._professional_tabs.append(self._kline_sentiment_tab)
-                    logger.info("✅ K线情绪分析标签页创建成功")
+
+                    end_time = time.time()
+                    logger.info(f"✅ K线情绪分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
                 except Exception as kline_error:
                     logger.error(f"❌ K线情绪分析标签页创建失败: {kline_error}")
                     logger.error(traceback.format_exc())
 
-            # 板块资金流
-            self._sector_flow_tab = SectorFlowTab(config_manager)
-            tab_widget.addTab(self._sector_flow_tab, "板块资金流")
-            self.add_widget('sector_flow_tab', self._sector_flow_tab)
-            self._professional_tabs.append(self._sector_flow_tab)
+                    # 板块资金流 - 使用服务容器
+            try:
+                logger.info("🔄 开始创建板块资金流标签页...")
+                start_time = time.time()
 
-            # 热点分析
-            self._hotspot_tab = HotspotAnalysisTab(config_manager)
-            tab_widget.addTab(self._hotspot_tab, "热点分析")
-            self.add_widget('hotspot_tab', self._hotspot_tab)
-            self._professional_tabs.append(self._hotspot_tab)
+                logger.info("📦 导入板块资金流标签页模块...")
+                logger.info("✅ 板块资金流标签页模块导入成功")
+
+                logger.info("🏗️ 创建板块资金流标签页实例...")
+                self._sector_flow_tab = SectorFlowTab(
+                    config_manager=config_manager,
+                    service_container=self.coordinator.service_container
+                )
+
+                create_time = time.time()
+                logger.info(f"⏱️ 板块资金流标签页实例创建耗时: {(create_time - start_time):.2f}秒")
+
+                logger.info("🎨 添加板块资金流标签页到UI...")
+                tab_widget.addTab(self._sector_flow_tab, "板块资金流")
+
+                # 注册到组件管理
+                logger.info("📝 注册板块资金流标签页到组件管理...")
+                self.add_widget('sector_flow_tab', self._sector_flow_tab)
+                self._professional_tabs.append(self._sector_flow_tab)
+
+                end_time = time.time()
+                logger.info(f"✅ 板块资金流标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
+            except Exception as e:
+                logger.error(f"❌ 板块资金流标签页创建失败: {e}")
+                logger.error(traceback.format_exc())
+
+            # 热点分析 - 使用服务容器
+            try:
+                self._hotspot_tab = HotspotAnalysisTab(
+                    config_manager=config_manager,
+                    service_container=self.coordinator.service_container
+                )
+                tab_widget.addTab(self._hotspot_tab, "热点分析")
+
+                # 注册到组件管理
+                self.add_widget('hotspot_tab', self._hotspot_tab)
+                self._professional_tabs.append(self._hotspot_tab)
+
+                logger.info("✅ 热点分析标签页创建完成")
+            except Exception as e:
+                logger.error(f"❌ 热点分析标签页创建失败: {e}")
+                logger.error(traceback.format_exc())
 
             # 情绪报告功能现在已经整合到专业版情绪分析标签页中（双标签页设计）
             # 不再需要单独的情绪报告标签页
@@ -385,8 +450,6 @@ class RightPanel(BasePanel):
         # 批量分析工具标签页
         if ANALYSIS_TOOLS_AVAILABLE:
             # 创建一个继承自QWidget的包装器来传递log_manager
-            from PyQt5.QtWidgets import QWidget
-
             class AnalysisToolsWrapper(QWidget):
                 def __init__(self, parent, logger):
                     super().__init__(parent)
@@ -749,7 +812,7 @@ class RightPanel(BasePanel):
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理UI数据就绪事件，直接使用事件中的数据更新面板"""
+        """处理UI数据就绪事件，异步更新面板避免阻塞"""
         try:
             logger.info(f"RightPanel收到UIDataReadyEvent，股票: {event.stock_code}")
             # 更新股票信息
@@ -762,27 +825,19 @@ class RightPanel(BasePanel):
             analysis_data = event.ui_data.get('analysis')
             kline_data = event.ui_data.get('kline_data')
 
-            # 传递K线数据到所有专业分析标签页
+            # 异步传递K线数据到依赖K线的专业标签页，避免阻塞UI
             if kline_data is not None and not kline_data.empty:
-                logger.info(f"传递K线数据到所有专业分析标签页，数据长度: {len(kline_data)}")
-
-                # 传递到所有专业标签页
-                for tab in self._professional_tabs:
-                    if hasattr(tab, 'set_kdata'):
-                        try:
-                            tab.set_kdata(kline_data)
-                            # 如果是形态分析标签页，确保数据正确设置
-                            if hasattr(tab, 'kdata'):
-                                tab.kdata = kline_data
-                            logger.debug(f"K线数据已传递到{type(tab).__name__}")
-                        except Exception as e:
-                            logger.error(f"传递K线数据到{type(tab).__name__}失败: {e}")
+                active_tab_widget = self.get_widget('tab_widget')
+                active_tab = active_tab_widget.currentWidget() if active_tab_widget else None
+                if active_tab and getattr(active_tab, 'skip_kdata', False):
+                    logger.info("当前激活标签页不依赖K线数据，跳过向其它标签页分发K线数据")
+                else:
+                    logger.info(f"异步传递K线数据到依赖K线的专业标签页，数据长度: {len(kline_data)}")
+                    self._async_update_professional_tabs(kline_data)
 
             # 如果有分析数据，更新基础功能标签页（只有在组件存在时）
             if analysis_data and self._has_basic_tabs:
                 self._update_analysis_display(analysis_data)
-
-            # 分析时间现在在主图右下角显示
 
             # 更新状态为数据加载完成
             self._update_status(f"已加载 {self._current_stock_name} 数据，分析完成")
@@ -792,6 +847,79 @@ class RightPanel(BasePanel):
         except Exception as e:
             logger.error(f"处理UIDataReadyEvent失败: {e}")
             logger.error(traceback.format_exc())
+
+    def _async_update_professional_tabs(self, kline_data):
+        """异步更新专业标签页，避免阻塞UI线程"""
+        try:
+            from PyQt5.QtCore import QTimer
+
+            # 创建一个队列来管理标签页更新
+            self._tab_update_queue = list(self._professional_tabs)
+            self._current_kline_data = kline_data
+
+            # 使用定时器批量处理标签页更新
+            if not hasattr(self, '_tab_update_timer'):
+                self._tab_update_timer = QTimer()
+                self._tab_update_timer.setSingleShot(True)
+                self._tab_update_timer.timeout.connect(self._process_next_tab_update)
+
+            # 立即开始处理第一个标签页
+            self._process_next_tab_update()
+
+        except Exception as e:
+            logger.error(f"异步更新专业标签页失败: {e}")
+            # 如果异步更新失败，回退到同步更新
+            self._sync_update_professional_tabs(kline_data)
+
+    def _process_next_tab_update(self):
+        """处理队列中的下一个标签页更新"""
+        try:
+            if not hasattr(self, '_tab_update_queue') or not self._tab_update_queue:
+                logger.debug("所有专业标签页数据更新完成")
+                return
+
+            # 取出队列中的下一个标签页
+            tab = self._tab_update_queue.pop(0)
+
+            # 如果标签声明跳过K线数据，则直接处理下一个
+            try:
+                if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
+                    logger.debug(f"跳过向{type(tab).__name__}传递K线数据（skip_kdata=True）")
+                elif hasattr(tab, 'set_kdata'):
+                    try:
+                        tab.set_kdata(self._current_kline_data)
+                        # 如果是形态分析标签页，确保数据正确设置
+                        if hasattr(tab, 'kdata'):
+                            tab.kdata = self._current_kline_data
+                        logger.debug(f"K线数据已传递到{type(tab).__name__}")
+                    except Exception as e:
+                        logger.error(f"传递K线数据到{type(tab).__name__}失败: {e}")
+            finally:
+                pass
+
+            # 如果还有更多标签页需要处理，调度下一次更新
+            if self._tab_update_queue:
+                self._tab_update_timer.start(50)  # 50ms后处理下一个
+
+        except Exception as e:
+            logger.error(f"处理标签页更新失败: {e}")
+
+    def _sync_update_professional_tabs(self, kline_data):
+        """同步更新专业标签页（作为异步更新的备用方案）"""
+        try:
+            # 传递到所有专业标签页
+            for tab in self._professional_tabs:
+                if hasattr(tab, 'set_kdata'):
+                    try:
+                        tab.set_kdata(kline_data)
+                        # 如果是形态分析标签页，确保数据正确设置
+                        if hasattr(tab, 'kdata'):
+                            tab.kdata = kline_data
+                        logger.debug(f"K线数据已传递到{type(tab).__name__}")
+                    except Exception as e:
+                        logger.error(f"传递K线数据到{type(tab).__name__}失败: {e}")
+        except Exception as e:
+            logger.error(f"同步更新专业标签页失败: {e}")
 
     def _update_analysis_display(self, analysis_data: Dict[str, Any]) -> None:
         """更新分析数据显示"""

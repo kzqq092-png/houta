@@ -55,7 +55,6 @@ except ImportError:
     CHARTS_AVAILABLE = False
 
 # 再次确保核心事件类型在全局范围内可用
-from core.metrics.events import SystemResourceUpdated
 
 # 导入优化系统组件
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -215,7 +214,6 @@ class PerformanceChart(QWidget):
                   for pattern in patterns]
 
         # 创建DataFrame
-        import pandas as pd
         df = pd.DataFrame({
             'pattern': patterns,
             'score': scores

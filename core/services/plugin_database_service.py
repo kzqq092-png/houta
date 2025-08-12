@@ -51,13 +51,17 @@ class PluginDatabaseService(QObject):
     def register_plugin_from_metadata(self, plugin_name: str, metadata: Dict[str, Any]) -> bool:
         """从插件元数据注册插件"""
         try:
+            # 如果已存在，保留原有状态
+            existing_status = self.db_manager.get_plugin_status(plugin_name)
+            status_value = (existing_status.value if existing_status else PluginStatus.UNLOADED.value)
+
             # 构建插件记录
             plugin_record = PluginRecord(
                 name=plugin_name,
                 display_name=metadata.get('display_name', plugin_name),
                 version=metadata.get('version', '1.0.0'),
                 plugin_type=metadata.get('plugin_type', PluginType.ANALYSIS.value),
-                status=PluginStatus.UNLOADED.value,
+                status=status_value,
                 description=metadata.get('description', ''),
                 author=metadata.get('author', ''),
                 email=metadata.get('email', ''),
@@ -413,6 +417,23 @@ class PluginDatabaseService(QObject):
         except Exception as e:
             logger.error(f"获取远程管理数据失败: {e}")
             return {}
+
+    def save_plugin_config_json(self, plugin_name: str, config: Dict[str, Any], config_type: str = 'user') -> bool:
+        try:
+            ok = self.db_manager.save_unified_plugin_config(plugin_name, config, config_type=config_type)
+            if ok:
+                self.database_updated.emit()
+            return ok
+        except Exception as e:
+            logger.error(f"保存插件配置失败: {plugin_name}, 错误: {e}")
+            return False
+
+    def get_plugin_config_json(self, plugin_name: str, config_type: str = 'user') -> Optional[Dict[str, Any]]:
+        try:
+            return self.db_manager.load_unified_plugin_config(plugin_name, config_type=config_type)
+        except Exception as e:
+            logger.error(f"读取插件配置失败: {plugin_name}, 错误: {e}")
+            return None
 
 
 # 全局服务实例

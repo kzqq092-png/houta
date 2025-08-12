@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import logging
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
@@ -36,23 +36,23 @@ class AkShareSentimentPlugin(BaseSentimentPlugin):
             print(f"[{level.upper()}] {message}")
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="AkShare情绪数据源",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://github.com/akfamily/akshare",
-            license="MIT",
-            description="基于AkShare库获取真实的市场情绪数据，包括新闻情绪、VIX指数、微博情绪等",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=["akshare>=1.11.0", "pandas>=1.3.0", "numpy>=1.20.0"],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="https://akshare.akfamily.xyz/",
-            tags=["sentiment", "emotion", "vix", "news", "weibo", "market"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "AkShare情绪数据源",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://github.com/akfamily/akshare",
+            "license": "MIT",
+            "description": "基于AkShare库获取真实的市场情绪数据，包括新闻情绪、VIX指数、微博情绪等",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": ["akshare>=1.11.0", "pandas>=1.3.0", "numpy>=1.20.0"],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "https://akshare.akfamily.xyz/",
+            "tags": ["sentiment", "emotion", "vix", "news", "weibo", "market"]
+        }
 
     def _fetch_raw_sentiment_data(self, **kwargs) -> SentimentResponse:
         """获取AkShare原始情绪数据"""

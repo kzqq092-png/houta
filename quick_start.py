@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HIkyuu-UI 2.0 系统快速启动器
+FactorWeave-Quant  2.0 系统快速启动器
 提供GUI和命令行两种启动模式，集成所有系统功能
 
 版本: 2.0 (重构版本)
-作者: HIkyuu-UI Team
+作者: FactorWeave-Quant  Team
 """
 
 from analysis.pattern_manager import PatternManager
@@ -45,10 +45,10 @@ logger = logging.getLogger(__name__)
 
 class HIkyuuQuickStart:
     """
-    HIkyuu-UI 2.0 快速启动器
+    FactorWeave-Quant  2.0 快速启动器
 
     提供两种启动模式：
-    1. GUI模式：启动完整的HIkyuu-UI 2.0图形界面
+    1. GUI模式：启动完整的FactorWeave-Quant  2.0图形界面
     2. 命令行模式：提供菜单式的命令行界面
     """
 
@@ -113,7 +113,7 @@ class HIkyuuQuickStart:
 
     def _run_gui_mode(self):
         """运行GUI模式"""
-        print("🚀 启动 HIkyuu-UI 2.0 图形界面...")
+        print("🚀 启动 FactorWeave-Quant  2.0 图形界面...")
 
         try:
             # 导入主应用程序
@@ -158,7 +158,7 @@ class HIkyuuQuickStart:
                 elif choice == "8":
                     self._help_menu()
                 elif choice == "0":
-                    print("\n👋 感谢使用 HIkyuu-UI 2.0 系统！")
+                    print("\n👋 感谢使用 FactorWeave-Quant  2.0 系统！")
                     break
                 else:
                     print("❌ 无效选择，请重试")
@@ -181,7 +181,7 @@ class HIkyuuQuickStart:
     def _show_banner(self):
         """显示启动横幅"""
         print("=" * 80)
-        print("🚀 HIkyuu-UI 2.0 系统快速启动器")
+        print("🚀 FactorWeave-Quant  2.0 系统快速启动器")
         print("=" * 80)
         print("专业级股票分析与量化交易平台")
         print("✨ 完整UI界面 | 🧠 智能优化 | 📊 技术分析 | 🔌 插件生态")
@@ -770,7 +770,7 @@ class HIkyuuQuickStart:
     def _launch_full_gui(self):
         """启动完整GUI界面"""
         try:
-            print("🚀 正在启动HIkyuu-UI 2.0完整界面...")
+            print("🚀 正在启动FactorWeave-Quant  2.0完整界面...")
 
             # 创建新的启动器实例以GUI模式运行
             gui_launcher = HIkyuuQuickStart(mode="gui")
@@ -809,7 +809,7 @@ class HIkyuuQuickStart:
 
     def _show_quick_start_guide(self):
         """显示快速入门指南"""
-        print("\n📖 HIkyuu-UI 2.0 快速入门指南")
+        print("\n📖 FactorWeave-Quant  2.0 快速入门指南")
         print("=" * 50)
         print("1. 首次使用")
         print("   - 运行系统初始化 (菜单 1-1)")
@@ -835,7 +835,7 @@ class HIkyuuQuickStart:
 
     def _show_feature_description(self):
         """显示功能说明"""
-        print("\n⚙️  HIkyuu-UI 2.0 功能说明")
+        print("\n⚙️  FactorWeave-Quant  2.0 功能说明")
         print("=" * 50)
         print("🔧 系统管理")
         print("   - 系统初始化、状态监控、诊断工具")
@@ -971,7 +971,6 @@ class HIkyuuQuickStart:
         print("🔄 启动性能对比分析...")
         try:
             from optimization.optimization_dashboard import OptimizationDashboard
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -987,8 +986,6 @@ class HIkyuuQuickStart:
         """生成评估报告"""
         print("🔄 启动评估报告生成...")
         try:
-            from gui.dialogs.performance_evaluation_dialog import PerformanceEvaluationDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1005,8 +1002,6 @@ class HIkyuuQuickStart:
         """查看性能历史"""
         print("🔄 启动性能历史查看...")
         try:
-            from optimization.optimization_dashboard import OptimizationDashboard
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1023,7 +1018,6 @@ class HIkyuuQuickStart:
         print("🔄 启动自定义优化界面...")
         try:
             from gui.dialogs.system_optimizer_dialog import SystemOptimizerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1039,8 +1033,6 @@ class HIkyuuQuickStart:
         """查看优化历史"""
         print("🔄 启动优化历史查看...")
         try:
-            from optimization.optimization_dashboard import OptimizationDashboard
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1057,7 +1049,6 @@ class HIkyuuQuickStart:
         print("🔄 启动版本对比界面...")
         try:
             from gui.dialogs.version_manager_dialog import VersionManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1074,8 +1065,6 @@ class HIkyuuQuickStart:
         """删除版本"""
         print("🔄 启动版本删除界面...")
         try:
-            from gui.dialogs.version_manager_dialog import VersionManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1091,8 +1080,6 @@ class HIkyuuQuickStart:
         """版本统计"""
         print("🔄 启动版本统计界面...")
         try:
-            from gui.dialogs.version_manager_dialog import VersionManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1109,8 +1096,6 @@ class HIkyuuQuickStart:
         """版本回滚"""
         print("🔄 启动版本回滚界面...")
         try:
-            from gui.dialogs.version_manager_dialog import VersionManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1127,7 +1112,6 @@ class HIkyuuQuickStart:
         print("🔄 启动数据导入界面...")
         try:
             from gui.dialogs.data_export_dialog import DataExportDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1145,7 +1129,6 @@ class HIkyuuQuickStart:
         print("🔄 启动历史数据清理...")
         try:
             from gui.dialogs.data_quality_dialog import DataQualityDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1162,8 +1145,6 @@ class HIkyuuQuickStart:
         """备份数据"""
         print("🔄 启动数据备份界面...")
         try:
-            from gui.dialogs.data_export_dialog import DataExportDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1180,8 +1161,6 @@ class HIkyuuQuickStart:
         """数据统计"""
         print("🔄 启动数据统计界面...")
         try:
-            from gui.dialogs.data_quality_dialog import DataQualityDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1198,8 +1177,6 @@ class HIkyuuQuickStart:
         """数据质量检查"""
         print("🔄 启动数据质量检查界面...")
         try:
-            from gui.dialogs.data_quality_dialog import DataQualityDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1215,8 +1192,6 @@ class HIkyuuQuickStart:
         """启动性能监控"""
         print("🔄 启动性能监控界面...")
         try:
-            from optimization.optimization_dashboard import OptimizationDashboard
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1233,8 +1208,6 @@ class HIkyuuQuickStart:
         """启动版本管理器"""
         print("🔄 启动版本管理器...")
         try:
-            from gui.dialogs.version_manager_dialog import VersionManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1271,7 +1244,6 @@ class HIkyuuQuickStart:
         print("🔄 启动插件市场...")
         try:
             from gui.dialogs.enhanced_plugin_market_dialog import EnhancedPluginMarketDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1288,7 +1260,6 @@ class HIkyuuQuickStart:
         print("🔄 启动插件管理界面...")
         try:
             from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1305,8 +1276,6 @@ class HIkyuuQuickStart:
         """安装插件"""
         print("🔄 启动插件安装界面...")
         try:
-            from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1323,8 +1292,6 @@ class HIkyuuQuickStart:
         """卸载插件"""
         print("🔄 启动插件卸载界面...")
         try:
-            from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1341,8 +1308,6 @@ class HIkyuuQuickStart:
         """切换插件状态"""
         print("🔄 启动插件状态管理...")
         try:
-            from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1358,8 +1323,6 @@ class HIkyuuQuickStart:
         """更新插件"""
         print("🔄 启动插件更新界面...")
         try:
-            from gui.dialogs.plugin_manager_dialog import PluginManagerDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1377,7 +1340,6 @@ class HIkyuuQuickStart:
         print("🔄 启动配置查看界面...")
         try:
             from gui.dialogs.settings_dialog import SettingsDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1394,8 +1356,6 @@ class HIkyuuQuickStart:
         """修改配置"""
         print("🔄 启动配置修改界面...")
         try:
-            from gui.dialogs.settings_dialog import SettingsDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1411,8 +1371,6 @@ class HIkyuuQuickStart:
         """重置配置"""
         print("🔄 启动配置重置界面...")
         try:
-            from gui.dialogs.settings_dialog import SettingsDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1429,8 +1387,6 @@ class HIkyuuQuickStart:
         """导出配置"""
         print("🔄 启动配置导出界面...")
         try:
-            from gui.dialogs.settings_dialog import SettingsDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1447,8 +1403,6 @@ class HIkyuuQuickStart:
         """导入配置"""
         print("🔄 启动配置导入界面...")
         try:
-            from gui.dialogs.settings_dialog import SettingsDialog
-            from PyQt5.QtWidgets import QApplication
 
             if not QApplication.instance():
                 app = QApplication([])
@@ -1463,7 +1417,7 @@ class HIkyuuQuickStart:
 
     def _show_example_code(self):
         """显示示例代码"""
-        print("\n💻 HIkyuu-UI 示例代码")
+        print("\n💻 FactorWeave-Quant  示例代码")
         print("=" * 50)
         print("1. 基本使用示例:")
         print("```python")
@@ -1550,7 +1504,7 @@ class HIkyuuQuickStart:
 def create_argument_parser():
     """创建命令行参数解析器"""
     parser = argparse.ArgumentParser(
-        description="HIkyuu-UI 2.0 系统快速启动器",
+        description="FactorWeave-Quant  2.0 系统快速启动器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 启动模式:
@@ -1580,7 +1534,7 @@ def create_argument_parser():
     parser.add_argument(
         "--version", "-v",
         action="version",
-        version="HIkyuu-UI 2.0"
+        version="FactorWeave-Quant  2.0"
     )
 
     return parser

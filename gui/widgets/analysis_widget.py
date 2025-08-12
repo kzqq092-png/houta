@@ -491,19 +491,95 @@ class AnalysisWidget(QWidget):
         QMessageBox.information(self, "帮助", help_text)
 
     def on_tab_changed(self, index):
-        """Tab切换事件处理"""
+        """标签页切换事件 - 优化版本，避免阻塞UI"""
         try:
-            current_widget = self.tab_widget.widget(index)
-            tab_name = self.tab_widget.tabText(index)
+            # 取消之前的更新请求，避免重复处理
+            if hasattr(self, 'update_throttler'):
+                self.update_throttler.cancel_all_updates()
 
-            self.log_manager.info(f"切换到标签页: {tab_name}")
-
-            # 如果有数据，自动刷新当前标签页
-            if self.current_kdata is not None and hasattr(current_widget, 'set_kdata'):
-                current_widget.set_kdata(self.current_kdata)
+            # 使用节流器处理标签页切换，延迟执行避免频繁切换
+            if hasattr(self, 'update_throttler'):
+                self.update_throttler.request_update(
+                    'tab_changed',
+                    self._do_tab_changed,
+                    index
+                )
+            else:
+                # 如果没有节流器，直接处理但不立即刷新数据
+                self._do_tab_changed_without_refresh(index)
 
         except Exception as e:
             self.log_manager.error(f"Tab切换处理失败: {e}")
+
+    def _do_tab_changed_without_refresh(self, index):
+        """处理标签页切换但不立即刷新数据"""
+        try:
+            if index < 0 or index >= self.tab_widget.count():
+                return
+
+            current_tab = self.tab_widget.widget(index)
+            tab_name = self.tab_widget.tabText(index)
+
+            self.log_manager.debug(f"切换到标签页: {tab_name}")
+
+            # 只设置数据，不立即刷新（避免阻塞）
+            if (self.current_kdata is not None and
+                hasattr(current_tab, 'set_kdata') and
+                    hasattr(current_tab, 'current_kdata')):
+
+                # 检查是否需要更新数据
+                if not hasattr(current_tab, 'current_kdata') or current_tab.current_kdata is None:
+                    # 只有在标签页没有数据时才设置
+                    current_tab.set_kdata(self.current_kdata)
+                    self.log_manager.debug(f"为 {tab_name} 设置K线数据")
+
+        except Exception as e:
+            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
+
+    def _do_tab_changed(self, index):
+        """实际处理标签页切换 - 延迟刷新版本"""
+        try:
+            if index < 0 or index >= self.tab_widget.count():
+                return
+
+            current_tab = self.tab_widget.widget(index)
+            tab_name = self.tab_widget.tabText(index)
+
+            self.log_manager.debug(f"切换到标签页: {tab_name}")
+
+            # 检查标签页是否需要数据
+            if (self.current_kdata is not None and
+                    hasattr(current_tab, 'set_kdata')):
+
+                # 检查数据是否已经设置
+                data_needs_update = True
+                if hasattr(current_tab, 'current_kdata') and current_tab.current_kdata is not None:
+                    # 如果标签页已有数据，检查是否为同一份数据
+                    if hasattr(current_tab, 'data_hash') and hasattr(self, '_current_data_hash'):
+                        data_needs_update = current_tab.data_hash != self._current_data_hash
+
+                if data_needs_update:
+                    # 设置数据，let BaseAnalysisTab handle async refresh
+                    current_tab.set_kdata(self.current_kdata)
+                    self.log_manager.debug(f"为 {tab_name} 更新K线数据")
+                else:
+                    self.log_manager.debug(f"{tab_name} 数据已是最新，跳过更新")
+
+            # 如果标签页支持延迟刷新且需要刷新
+            elif (hasattr(current_tab, 'refresh') and
+                  hasattr(current_tab, 'needs_refresh') and
+                  getattr(current_tab, 'needs_refresh', False)):
+
+                # 使用更长的延迟来避免频繁切换时的重复计算
+                if hasattr(self, 'update_throttler'):
+                    self.update_throttler.request_update(
+                        f'refresh_current_tab_{tab_name}',
+                        current_tab.refresh,
+                        delay_ms=300  # 增加延迟到300ms
+                    )
+
+        except Exception as e:
+            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
 
     def set_kdata(self, kdata):
         """设置K线数据 - 使用防抖机制
@@ -511,12 +587,28 @@ class AnalysisWidget(QWidget):
         Args:
             kdata: K线数据
         """
-        # 使用更新节流器来控制K线数据更新频率
-        self.update_throttler.request_update(
-            'set_kdata',
-            self._do_set_kdata,
-            kdata
-        )
+        try:
+            # 计算数据哈希用于变化检测
+            import hashlib
+
+            if isinstance(kdata, pd.DataFrame) and not kdata.empty:
+                data_str = f"{len(kdata)}_{kdata.iloc[-1].to_string() if len(kdata) > 0 else ''}"
+                self._current_data_hash = hashlib.md5(data_str.encode()).hexdigest()
+            else:
+                self._current_data_hash = "empty"
+
+            # 使用更新节流器来控制K线数据更新频率
+            if hasattr(self, 'update_throttler'):
+                self.update_throttler.request_update(
+                    'set_kdata',
+                    self._do_set_kdata,
+                    kdata
+                )
+            else:
+                self._do_set_kdata(kdata)
+
+        except Exception as e:
+            self.log_manager.error(f"设置K线数据失败: {e}")
 
     def _do_set_kdata(self, kdata):
         """实际执行K线数据设置"""
@@ -533,7 +625,7 @@ class AnalysisWidget(QWidget):
 
             self.current_kdata = processed_kdata
 
-            # 通知所有标签页更新数据
+            # 通知所有标签页更新数据（异步方式）
             for tab_name, tab_component in self.tab_components.items():
                 if hasattr(tab_component, 'set_kdata'):
                     try:
@@ -547,90 +639,6 @@ class AnalysisWidget(QWidget):
         except Exception as e:
             self.log_manager.error(f"设置K线数据失败: {str(e)}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
-
-    def refresh_all_tabs(self):
-        """刷新所有标签页 - 使用防抖机制"""
-        self.update_throttler.request_update(
-            'refresh_all_tabs',
-            self._do_refresh_all_tabs
-        )
-
-    def _do_refresh_all_tabs(self):
-        """实际执行刷新所有标签页"""
-        try:
-            if self.current_kdata is None:
-                self.log_manager.warning("当前没有K线数据，无法刷新")
-                return
-
-            self.log_manager.info("开始刷新所有分析标签页...")
-
-            for tab_name, tab_component in self.tab_components.items():
-                if hasattr(tab_component, 'refresh'):
-                    try:
-                        # 使用节流器为每个标签页的刷新请求添加延迟
-                        self.update_throttler.request_update(
-                            f'refresh_tab_{tab_name}',
-                            tab_component.refresh
-                        )
-                    except Exception as e:
-                        self.log_manager.warning(
-                            f"刷新标签页 {tab_name} 失败: {str(e)}")
-
-            self.log_manager.info("所有标签页刷新请求已提交")
-
-        except Exception as e:
-            self.log_manager.error(f"刷新所有标签页失败: {str(e)}")
-            self.error_occurred.emit(f"刷新失败: {str(e)}")
-
-    def refresh(self) -> None:
-        """刷新当前标签页"""
-        current_index = self.tab_widget.currentIndex()
-        current_widget = self.tab_widget.widget(current_index)
-
-        if hasattr(current_widget, 'refresh_data'):
-            current_widget.refresh_data()
-
-    def run_button_analysis_async(self, button, analysis_func, *args, **kwargs):
-        """异步运行分析函数 - 为标签页组件提供的接口"""
-        try:
-            # 显示加载状态
-            self.show_loading("正在分析...")
-
-            # 使用线程池执行任务
-            from concurrent.futures import ThreadPoolExecutor
-
-            def task():
-                try:
-                    return analysis_func(*args, **kwargs)
-                except Exception as e:
-                    return {"error": str(e)}
-
-            def on_done(future):
-                try:
-                    result = future.result()
-                    self.hide_loading()
-                    if isinstance(result, dict) and "error" in result:
-                        self.error_occurred.emit(result["error"])
-                    else:
-                        self.analysis_completed.emit(result if isinstance(
-                            result, dict) else {"result": result})
-                except Exception as e:
-                    self.hide_loading()
-                    self.error_occurred.emit(f"分析执行失败: {str(e)}")
-
-            # 在线程池中执行任务
-            if not hasattr(self, '_executor'):
-                self._executor = ThreadPoolExecutor(max_workers=2)
-
-            future = self._executor.submit(task)
-            future.add_done_callback(on_done)
-
-            return future
-
-        except Exception as e:
-            self.hide_loading()
-            self.log_manager.error(f"异步分析执行失败: {e}")
-            self.error_occurred.emit(f"异步分析执行失败: {str(e)}")
 
     def _kdata_preprocess(self, kdata, context="分析"):
         """K线数据预处理 - 为标签页组件提供的接口"""
@@ -656,131 +664,6 @@ class AnalysisWidget(QWidget):
         except Exception as e:
             self.log_manager.error(f"K线数据预处理失败: {e}")
             return None
-
-    def _update_pattern_filter_options(self):
-        """更新形态过滤器选项 - 兼容原接口"""
-        if hasattr(self.pattern_tab, 'pattern_type_combo'):
-            try:
-                # 添加形态类型选项
-                for pattern_type in ALL_PATTERN_TYPES[:10]:  # 限制显示数量
-                    self.pattern_tab.pattern_type_combo.addItem(pattern_type)
-            except Exception as e:
-                self.log_manager.warning(f"更新形态过滤器选项失败: {e}")
-
-    # 兼容性方法 - 保持原有接口
-    def refresh_technical_data(self):
-        """刷新技术分析数据 - 兼容原接口"""
-        if hasattr(self.technical_tab, 'refresh_data'):
-            self.technical_tab.refresh_data()
-
-    def refresh_pattern_data(self):
-        """刷新形态分析数据 - 兼容原接口"""
-        if hasattr(self.pattern_tab, 'refresh_data'):
-            self.pattern_tab.refresh_data()
-
-    def identify_patterns(self):
-        """识别形态 - 兼容原接口"""
-        if hasattr(self.pattern_tab, 'identify_patterns'):
-            self.pattern_tab.identify_patterns()
-
-    def calculate_indicators(self):
-        """计算技术指标 - 兼容原接口，直接调用技术分析标签页的统一接口"""
-        if hasattr(self.technical_tab, 'calculate_indicators'):
-            self.technical_tab.calculate_indicators()
-
-    def _connect_chart_widget_signals(self):
-        """连接图表组件信号 - 兼容原接口"""
-        try:
-            if hasattr(self, 'chart_widget') and self.chart_widget:
-                # 连接图表数据更新信号到分析组件
-                if hasattr(self.chart_widget, 'data_updated'):
-                    self.chart_widget.data_updated.connect(self.set_kdata)
-
-                # 连接其他可能的图表信号
-                if hasattr(self.chart_widget, 'stock_changed'):
-                    self.chart_widget.stock_changed.connect(
-                        self._on_stock_changed)
-
-                self.log_manager.info("图表组件信号连接成功")
-            else:
-                self.log_manager.warning("图表组件未设置，跳过信号连接")
-
-        except Exception as e:
-            self.log_manager.error(f"连接图表组件信号失败: {e}")
-
-    def _on_stock_changed(self, stock_code):
-        """股票切换事件处理 - 兼容原接口"""
-        try:
-            self.log_manager.info(f"股票切换到: {stock_code}")
-            # 这里可以添加股票切换时的处理逻辑
-
-        except Exception as e:
-            self.log_manager.error(f"处理股票切换事件失败: {e}")
-
-    def request_chart_update(self, chart_data: Dict[str, Any], delay_ms: int = 200):
-        """请求图表更新 - 使用防抖机制
-
-        Args:
-            chart_data: 图表数据
-            delay_ms: 延迟时间（毫秒）
-        """
-        self._pending_chart_update = chart_data
-        self.chart_update_timer.start(delay_ms)
-
-    def _execute_chart_update(self):
-        """执行实际的图表更新"""
-        if self._pending_chart_update is None:
-            return
-
-        try:
-            chart_data = self._pending_chart_update
-            self._pending_chart_update = None
-
-            # 执行图表更新逻辑
-            current_tab = self.tab_widget.currentWidget()
-            if hasattr(current_tab, 'update_chart'):
-                current_tab.update_chart(chart_data)
-
-        except Exception as e:
-            self.log_manager.error(f"执行图表更新失败: {str(e)}")
-
-    def on_tab_changed(self, index):
-        """标签页切换事件 - 优化频率"""
-        # 取消之前的更新请求
-        self.update_throttler.cancel_all_updates()
-
-        # 使用节流器处理标签页切换
-        self.update_throttler.request_update(
-            'tab_changed',
-            self._do_tab_changed,
-            index
-        )
-
-    def _do_tab_changed(self, index):
-        """实际处理标签页切换"""
-        try:
-            if index < 0 or index >= self.tab_widget.count():
-                return
-
-            current_tab = self.tab_widget.widget(index)
-            tab_name = self.tab_widget.tabText(index)
-
-            self.log_manager.debug(f"切换到标签页: {tab_name}")
-
-            # 如果当前标签页有数据且需要刷新
-            if (self.current_kdata is not None and
-                hasattr(current_tab, 'refresh') and
-                hasattr(current_tab, 'needs_refresh') and
-                    getattr(current_tab, 'needs_refresh', True)):
-
-                # 延迟刷新，避免频繁切换时的重复计算
-                self.update_throttler.request_update(
-                    f'refresh_current_tab_{tab_name}',
-                    current_tab.refresh
-                )
-
-        except Exception as e:
-            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
 
     def refresh_current_tab(self):
         """刷新当前标签页 - 优化版本"""

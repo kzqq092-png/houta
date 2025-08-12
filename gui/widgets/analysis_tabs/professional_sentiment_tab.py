@@ -93,7 +93,7 @@ class SentimentAnalysisThread(QThread):
             sentiment_results = self._process_sentiment_response(response)
 
             if not sentiment_results:
-                self.error_occurred.emit("未能获取任何情绪数据，请检查插件配置和网络连接")
+                self.log_manager.warning("未能获取任何情绪数据，请检查插件配置和网络连接")
                 return
 
             results['sentiment_results'] = sentiment_results
@@ -251,6 +251,15 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
         # 初始化情绪数据服务
         self._initialize_sentiment_service()
+
+        # 连接插件数据库服务（用于动态刷新与按启用状态过滤）
+        try:
+            from core.services.plugin_database_service import get_plugin_database_service
+            self.db_service = get_plugin_database_service()
+            if hasattr(self.db_service, 'database_updated'):
+                self.db_service.database_updated.connect(self.on_plugins_db_updated)
+        except Exception:
+            self.db_service = None
 
         # 加载可用插件
         self.load_available_plugins()
@@ -762,7 +771,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def load_available_plugins(self):
         """加载可用的情绪数据源插件 - 只使用真实插件"""
         try:
-            print("�� 加载可用的情绪数据源插件...")
+            print("🔄 加载可用的情绪数据源插件...")
 
             # 确保plugins_layout已初始化
             if not hasattr(self, 'plugins_layout') or self.plugins_layout is None:
@@ -777,108 +786,166 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             self.available_plugins = {}
 
-            # 强制导入AVAILABLE_PLUGINS确保可用
-            from plugins.sentiment_data_sources import AVAILABLE_PLUGINS as LOADED_PLUGINS
-            print(f"📋 检测到 {len(LOADED_PLUGINS)} 个可用插件: {list(LOADED_PLUGINS.keys())}")
+            # 仅以数据库为真源：读取全部并筛选 ENABLED + 情绪类
+            records = []
+            try:
+                if getattr(self, 'db_service', None):
+                    records = self.db_service.get_all_plugins(force_refresh=True) or []
+            except Exception as e:
+                print(f"⚠️ 读取数据库插件列表失败，将回退展示空列表: {e}")
+                records = []
 
-            if not LOADED_PLUGINS:
-                error_msg = "没有检测到任何情绪数据源插件"
+            enabled_records = []
+            for rec in (records or []):
+                try:
+                    status = (rec.get('status') or '').lower()
+                    name = (rec.get('name') or '').strip()
+                    entry = (rec.get('entry_point') or '').strip()
+                    path = (rec.get('path') or '').strip()
+                    is_enabled = status in ('enabled', '启用', 'on', 'true', '1')
+                    is_sentiment = ('sentiment_data_sources' in name) or ('sentiment_data_sources' in entry) or ('sentiment_data_sources' in path)
+                    if is_enabled and is_sentiment:
+                        enabled_records.append(rec)
+                except Exception:
+                    continue
+
+            # DB驱动发现：逐条尝试导入模块并检测是否定义了 BaseSentimentPlugin 子类
+            from importlib import import_module
+            from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+
+            discovered_records = []  # [(rec, plugin_cls)]
+            for rec in (enabled_records or []):
+                rec_name = (rec.get('name') or '').strip()
+                entry = (rec.get('entry_point') or '').strip()
+                path = (rec.get('path') or '').strip()
+
+                module_name = ''
+                class_name = ''
+                try:
+                    # 1) 优先使用 entry_point: module:Class
+                    if entry and ':' in entry:
+                        module_name, class_name = entry.split(':', 1)
+                    # 2) 其次使用 path（通常为模块路径）
+                    elif path:
+                        module_name = path if path.startswith('plugins.') else f"plugins.{path}"
+                    # 3) 其次使用 name（兼容历史记录）
+                    elif rec_name:
+                        if rec_name.startswith('plugins.'):
+                            module_name = rec_name
+                        elif rec_name.startswith('sentiment_data_sources'):
+                            module_name = f"plugins.{rec_name}"
+                        else:
+                            # 兼容旧短名：尝试拼接为标准路径
+                            module_name = f"plugins.sentiment_data_sources.{rec_name}_plugin"
+                    else:
+                        continue
+
+                    # 导入模块
+                    module = import_module(module_name)
+
+                    # 定位插件类
+                    plugin_cls = None
+                    if class_name:
+                        plugin_cls = getattr(module, class_name, None)
+                    if not plugin_cls:
+                        for attr in dir(module):
+                            obj = getattr(module, attr)
+                            try:
+                                if isinstance(obj, type) and issubclass(obj, BaseSentimentPlugin) and obj is not BaseSentimentPlugin:
+                                    plugin_cls = obj
+                                    break
+                            except Exception:
+                                continue
+
+                    if plugin_cls and isinstance(plugin_cls, type) and issubclass(plugin_cls, BaseSentimentPlugin):
+                        discovered_records.append((rec, plugin_cls))
+                except Exception as e:
+                    print(f"⚠️ 无法加载情绪插件 {rec_name}，尝试模块 {module_name} 失败: {e}")
+                    continue
+
+            print(f"📋 数据库启用的情绪插件: {[rec.get('name') for rec, _ in discovered_records]}")
+
+            if not discovered_records:
+                error_msg = "没有检测到任何情绪数据源插件（请在插件管理器中启用后重试）"
                 print(f"❌ {error_msg}")
-                QMessageBox.critical(self, "错误", error_msg)
+                try:
+                    if hasattr(self, 'status_label') and self.status_label:
+                        self.status_label.setText(error_msg)
+                except Exception:
+                    pass
                 return
 
-            # 加载真实插件
+            # 加载并渲染
             row, col = 0, 0
             loaded_count = 0
+            self.available_plugins = {}
 
-            for plugin_key, plugin_class in LOADED_PLUGINS.items():
+            for rec, plugin_cls in discovered_records:
+                rec_name = rec.get('name') or ''
                 try:
-                    print(f"🔄 正在加载插件: {plugin_key}")
+                    instance = plugin_cls()
+                    self.available_plugins[rec_name] = instance
 
-                    # 创建插件实例获取元数据
-                    plugin_instance = plugin_class()
-                    metadata = plugin_instance.metadata
+                    # 优先使用get_plugin_info方法获取中文信息
+                    display_name = rec_name
+                    description = rec.get('description', '')
 
-                    # 创建复选框
-                    checkbox = QCheckBox(f"📊 {metadata.name}")
-                    checkbox.setToolTip(f"{metadata.description}\n版本: {metadata.version}\n作者: {metadata.author}")
+                    if hasattr(instance, 'get_plugin_info'):
+                        try:
+                            plugin_info = instance.get_plugin_info()
+                            display_name = plugin_info.name  # 中文显示名称
+                            description = plugin_info.description
+                            version = plugin_info.version
+                            author = plugin_info.author
+                        except Exception as e:
+                            print(f"⚠️ 获取插件信息失败 {rec_name}: {e}")
+                            # 回退到metadata
+                            meta = instance.metadata if hasattr(instance, 'metadata') else {}
+                            display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
+                            version = rec.get('version', '1.0.0')
+                            author = rec.get('author', '')
+                    else:
+                        # 回退到metadata
+                        meta = instance.metadata if hasattr(instance, 'metadata') else {}
+                        display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
+                        version = rec.get('version', '1.0.0')
+                        author = rec.get('author', '')
 
-                    # 默认选中有真实数据源的插件
-                    if plugin_key in ['vix_sentiment', 'akshare_sentiment']:
-                        checkbox.setChecked(True)
+                    # 同步显示名与描述到数据库（仅更新元信息，不改变状态）
+                    try:
+                        if getattr(self, 'db_service', None):
+                            payload = {
+                                'display_name': display_name,
+                                'description': description,
+                                'version': version,
+                                'plugin_type': rec.get('plugin_type', 'sentiment'),
+                                'author': author
+                            }
+                            self.db_service.register_plugin_from_metadata(rec_name, payload)
+                    except Exception as e:
+                        print(f"⚠️ 同步显示名/描述失败 {rec_name}: {e}")
 
-                    # 立即设置为可见
-                    checkbox.setVisible(True)
-                    checkbox.show()
+                    # 渲染复选框
+                    checkbox = QCheckBox(f"📊 {display_name}")
+                    checkbox.setToolTip(f"{description}\n版本: {version}\n作者: {author}")
+                    checkbox.setChecked(True)
+                    checkbox.stateChanged.connect(self._on_plugin_selected_changed)
 
-                    # 添加到布局
                     self.plugins_layout.addWidget(checkbox, row, col)
-                    print(f"🎯 已添加复选框到布局: 行{row}, 列{col}")
-
-                    self.available_plugins[plugin_key] = {
-                        'class': plugin_class,
-                        'instance': plugin_instance,
-                        'metadata': metadata,
-                        'checkbox': checkbox
-                    }
-
-                    # 注册插件到服务
-                    if self.sentiment_service:
-                        self.sentiment_service.register_plugin(plugin_key, plugin_instance)
-
-                    print(f"✅ 成功加载插件: {metadata.name}")
-                    loaded_count += 1
-
-                    # 布局管理
                     col += 1
-                    if col >= 2:  # 每行2个插件
+                    if col >= 3:
                         col = 0
                         row += 1
-
+                    loaded_count += 1
                 except Exception as e:
-                    print(f"❌ 加载插件 {plugin_key} 失败: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    print(f"⚠️ 加载情绪插件失败 {rec_name}: {e}")
 
-            if loaded_count == 0:
-                error_msg = "所有插件加载失败，无法提供情绪分析功能"
-                print(f"❌ {error_msg}")
-                QMessageBox.critical(self, "错误", error_msg)
-            else:
-                print(f"✅ 成功加载 {loaded_count} 个情绪数据源插件")
-
-            # 强制更新UI
-            if hasattr(self, 'plugins_widget') and self.plugins_widget:
-                self.plugins_widget.update()
-                self.plugins_widget.repaint()
-                self.plugins_widget.setVisible(True)  # 确保可见
-                print(f"🔄 强制更新插件UI，当前布局子项数量: {self.plugins_layout.count()}")
-
-                # 强制显示所有复选框
-                for i in range(self.plugins_layout.count()):
-                    item = self.plugins_layout.itemAt(i)
-                    if item and item.widget():
-                        widget = item.widget()
-                        widget.setVisible(True)
-                        widget.update()
-                        print(f"  强制显示复选框 {i}: {widget.text()}")
-
-            # 更新父容器
-            if hasattr(self, 'main_tab_widget') and self.main_tab_widget:
-                self.main_tab_widget.update()
-
-            # 更新整个标签页
-            self.update()
-            self.repaint()
-
-            # 更新状态显示
-            self.update_status_display()
+            print(f"✅ 已从数据库加载情绪插件: {loaded_count} 个")
 
         except Exception as e:
-            print(f"❌ 加载插件失败: {e}")
+            print(f"❌ 加载可用插件失败: {e}")
             import traceback
             traceback.print_exc()
-            QMessageBox.critical(self, "错误", f"加载插件失败: {str(e)}")
 
     def select_all_plugins(self):
         """全选插件"""
@@ -1836,6 +1903,41 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 pass
 
         super().closeEvent(event)
+
+    def set_kdata(self, kdata):
+        """设置K线数据 - 优化版本，避免重复分析"""
+        try:
+            # 调用父类方法进行基础设置
+            super().set_kdata(kdata)
+
+            # 如果有数据且当前标签页可见，才进行情绪分析
+            if (kdata is not None and not kdata.empty and
+                    hasattr(self, 'isVisible') and self.isVisible()):
+
+                # 检查是否启用了自动刷新
+                if hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb.isChecked():
+                    # 延迟执行，避免阻塞UI
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(200, self._delayed_analyze_sentiment)
+
+        except Exception as e:
+            print(f"❌ [ProfessionalSentimentTab] 设置K线数据失败: {e}")
+
+    def _delayed_analyze_sentiment(self):
+        """延迟执行情绪分析"""
+        try:
+            if hasattr(self, 'analyze_sentiment'):
+                self.analyze_sentiment()
+        except Exception as e:
+            print(f"❌ [ProfessionalSentimentTab] 延迟情绪分析失败: {e}")
+
+    def on_plugins_db_updated(self):
+        """数据库插件状态更新回调 -> 刷新情绪插件列表"""
+        try:
+            print("🔄 检测到数据库更新，刷新情绪插件列表...")
+            self.load_available_plugins()
+        except Exception as e:
+            print(f"⚠️ 刷新情绪插件列表失败: {e}")
 
 
 # 为了向后兼容，添加别名

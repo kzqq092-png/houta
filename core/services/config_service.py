@@ -459,7 +459,7 @@ class ConfigService(BaseService):
         """设置默认配置"""
         self._default_config = {
             'app': {
-                'name': 'YS-Quant‌',
+                'name': 'FactorWeave-Quant ‌',
                 'version': '1.0.0',
                 'language': 'zh_CN',
                 'auto_save': True,

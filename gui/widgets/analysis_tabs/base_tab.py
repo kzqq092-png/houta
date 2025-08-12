@@ -72,7 +72,7 @@ class BaseAnalysisTab(QWidget):
         raise NotImplementedError("子类必须实现create_ui方法")
 
     def set_kdata(self, kdata):
-        """设置K线数据 - 增强版
+        """设置K线数据 - 增强版（异步优化）
 
         Args:
             kdata: K线数据
@@ -103,12 +103,44 @@ class BaseAnalysisTab(QWidget):
                 'data_type': type(kdata).__name__
             })
 
-            # 刷新数据
-            self.refresh_data()
+            # 异步刷新数据，避免阻塞UI线程
+            self._schedule_async_refresh()
 
         except Exception as e:
             self.log_manager.error(f"{self.__class__.__name__} 设置K线数据失败: {e}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
+
+    def _schedule_async_refresh(self):
+        """异步调度数据刷新，避免阻塞UI线程"""
+        try:
+            # 取消之前的刷新任务
+            if hasattr(self, '_refresh_timer'):
+                self._refresh_timer.stop()
+
+            # 创建单次定时器，延迟执行刷新
+            from PyQt5.QtCore import QTimer
+            self._refresh_timer = QTimer()
+            self._refresh_timer.setSingleShot(True)
+            self._refresh_timer.timeout.connect(self._async_refresh_data)
+
+            # 延迟100ms执行，让UI有机会响应
+            self._refresh_timer.start(100)
+
+            self.log_manager.debug(f"{self.__class__.__name__}: 已调度异步刷新")
+
+        except Exception as e:
+            self.log_manager.error(f"调度异步刷新失败: {e}")
+            # 如果异步调度失败，回退到同步刷新
+            self.refresh_data()
+
+    def _async_refresh_data(self):
+        """异步刷新数据的实际执行方法"""
+        try:
+            self.log_manager.debug(f"{self.__class__.__name__}: 开始异步刷新数据")
+            self.refresh_data()
+        except Exception as e:
+            self.log_manager.error(f"异步刷新数据失败: {e}")
+            self.error_occurred.emit(f"异步刷新数据失败: {str(e)}")
 
     def _validate_kdata(self, kdata) -> bool:
         """验证K线数据有效性 - 使用统一验证模块"""
@@ -167,11 +199,18 @@ class BaseAnalysisTab(QWidget):
             return str(time.time())  # fallback
 
     def refresh_data(self):
-        """刷新数据 - 增强版"""
+        """刷新数据 - 增强版（性能优化）"""
         if not self.is_initialized:
             return
 
+        # 防止重复刷新
+        if hasattr(self, '_is_refreshing') and self._is_refreshing:
+            self.log_manager.debug(f"{self.__class__.__name__}: 正在刷新中，跳过重复请求")
+            return
+
+        self._is_refreshing = True
         start_time = time.time()
+
         try:
             self._do_refresh_data()
 
@@ -183,6 +222,8 @@ class BaseAnalysisTab(QWidget):
             self.performance_stats['error_count'] += 1
             self.log_manager.error(f"{self.__class__.__name__} 刷新数据失败: {e}")
             self.error_occurred.emit(f"刷新数据失败: {str(e)}")
+        finally:
+            self._is_refreshing = False
 
     def _do_refresh_data(self):
         """实际的数据刷新逻辑 - 子类可重写"""
@@ -502,7 +543,7 @@ class BaseAnalysisTab(QWidget):
             elif isinstance(item, (list, tuple)):
                 # 检查列表是否有有效值
                 has_valid_data = any(
-                    value is not None and str(value).strip() != '' and str(value) != 'N/A' 
+                    value is not None and str(value).strip() != '' and str(value) != 'N/A'
                     for value in item
                 )
                 if has_valid_data:
@@ -520,7 +561,7 @@ class BaseAnalysisTab(QWidget):
                 if column_keys:
                     for col, key in enumerate(column_keys):
                         value = item.get(key, '')
-                        
+
                         # 处理空值和None值
                         if value is None or str(value).strip() == '':
                             text = "--"
@@ -532,14 +573,14 @@ class BaseAnalysisTab(QWidget):
                                 text = str(value)
                         else:
                             text = str(value) if str(value) != 'N/A' else "--"
-                        
+
                         table.setItem(row, col, QTableWidgetItem(text))
                 else:
                     # 使用字典的值顺序
                     for col, value in enumerate(item.values()):
                         if col >= table.columnCount():
                             break
-                        
+
                         # 处理空值
                         if value is None or str(value).strip() == '':
                             text = "--"
@@ -547,14 +588,14 @@ class BaseAnalysisTab(QWidget):
                             text = f"{value:.2f}" if isinstance(value, float) else str(value)
                         else:
                             text = str(value) if str(value) != 'N/A' else "--"
-                        
+
                         table.setItem(row, col, QTableWidgetItem(text))
             elif isinstance(item, (list, tuple)):
                 # 列表数据
                 for col, value in enumerate(item):
                     if col >= table.columnCount():
                         break
-                    
+
                     # 处理空值
                     if value is None or str(value).strip() == '':
                         text = "--"
@@ -562,7 +603,7 @@ class BaseAnalysisTab(QWidget):
                         text = f"{value:.2f}" if isinstance(value, float) else str(value)
                     else:
                         text = str(value) if str(value) != 'N/A' else "--"
-                    
+
                     table.setItem(row, col, QTableWidgetItem(text))
                 else:
                     # 使用字典的值顺序

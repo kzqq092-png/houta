@@ -41,7 +41,7 @@ from .builtin_strategies import *
 
 # 版本信息
 __version__ = "2.0.0"
-__author__ = "HIkyuu Team"
+__author__ = "FactorWeave 团队"
 
 # 全局管理器实例
 _managers_initialized = False

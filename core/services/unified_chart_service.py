@@ -668,12 +668,9 @@ def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) 
     创建一个新的ChartWidget实例。
     """
     try:
-        from core.containers import get_service_container
         from core.services import UnifiedDataManager
-        from core.logger import LogManager
         from core.events import EventBus
         from utils.config_manager import ConfigManager  # 修复：从正确路径导入
-        from utils.theme import get_theme_manager
 
         container = get_service_container()
 

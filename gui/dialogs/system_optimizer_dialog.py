@@ -547,7 +547,6 @@ class SystemOptimizerDialog(QDialog):
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # 如果事件循环正在运行，使用线程池执行
-                    import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(self._analyze_in_thread)
                         analysis = future.result()
@@ -592,7 +591,6 @@ class SystemOptimizerDialog(QDialog):
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(
                             self._get_suggestions_in_thread)

@@ -366,7 +366,6 @@ class ProgressiveLoadingManager:
             logger.info(f"加载图表阶段 {stage_name}: kdata类型={type(kdata)}")
 
             # 验证kdata是否有效
-            import pandas as pd
             if kdata is None:
                 logger.warning(f"跳过加载阶段 {stage_name}: K线数据为空")
                 return

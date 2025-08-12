@@ -464,7 +464,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             error_msg = f"异步回测执行失败: {str(e)}"
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"❌ {error_msg}")
-                import traceback
                 self.log_manager.error(traceback.format_exc())
             else:
                 print(f"[Pattern] ❌ {error_msg}")
@@ -708,7 +707,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             generated_time = backtest_results.get('generated_time')
             if generated_time:
                 try:
-                    from datetime import datetime
                     dt = datetime.fromisoformat(generated_time.replace('Z', '+00:00'))
                     time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
                 except:
@@ -764,7 +762,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             error_msg = f"更新回测显示失败: {str(e)}"
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"❌ {error_msg}")
-                import traceback
                 self.log_manager.error(traceback.format_exc())
             else:
                 print(f"[Pattern] ❌ {error_msg}")
@@ -805,7 +802,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         except Exception as e:
             if hasattr(self, 'log_manager'):
                 self.log_manager.error(f"❌ 更新结果显示失败: {e}")
-                import traceback
                 self.log_manager.error(traceback.format_exc())
             else:
                 print(f"[Pattern] ❌ 更新结果显示失败: {e}")
@@ -841,7 +837,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             self.stats_text.setText(text)
 
         except Exception as e:
-            import traceback
             self.log_manager.error(f"更新统计显示失败: {e}")
             self.log_manager.error(traceback.format_exc())
 
@@ -857,7 +852,6 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                 for alert in alerts:
                     self.pattern_alert.emit(alert['type'], alert)
         except Exception as e:
-            import traceback
             self.log_manager.error(f"处理预警失败: {e}")
             self.log_manager.error(traceback.format_exc())
 

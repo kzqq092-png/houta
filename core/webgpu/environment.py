@@ -327,7 +327,6 @@ class WebGPUEnvironment:
     def _detect_native_gpu_capabilities(self):
         """检测原生GPU能力"""
         try:
-            import OpenGL.GL as gl
 
             # 获取GPU信息
             self._gpu_capabilities.adapter_name = gl.glGetString(gl.GL_RENDERER).decode()

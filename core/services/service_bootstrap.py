@@ -5,6 +5,7 @@
 """
 
 import logging
+import time
 from typing import Optional
 import traceback
 
@@ -118,13 +119,20 @@ class ServiceBootstrap:
         # 先注册UnifiedDataManager
         self.service_container.register_factory(
             UnifiedDataManager,
-            lambda: UnifiedDataManager(self.service_container, self.event_bus)
+            lambda: UnifiedDataManager(self.service_container, self.event_bus),
+            scope=ServiceScope.SINGLETON
         )
 
         # 确保初始化成功后再继续
         try:
             data_manager = self.service_container.resolve(UnifiedDataManager)
             logger.info("✓ 统一数据管理器注册完成")
+
+            # 同时注册为字符串键名，以便向后兼容
+            # 使用name参数避免字符串类型错误
+            self.service_container.register_instance(type(data_manager), data_manager, name='unified_data_manager')
+            logger.info("✓ 统一数据管理器别名注册完成")
+
         except Exception as e:
             logger.error(f"Failed to initialize UnifiedDataManager: {e}")
             # 提供回退机制
@@ -137,9 +145,12 @@ class ServiceBootstrap:
         theme_service.initialize()
         logger.info("✓ 主题服务注册完成")
 
-        # 股票服务
-        self.service_container.register(
-            StockService, scope=ServiceScope.SINGLETON)
+        # ✅ 股票服务 - 使用工厂方法传递服务容器
+        self.service_container.register_factory(
+            StockService,
+            lambda: StockService(service_container=self.service_container),
+            scope=ServiceScope.SINGLETON
+        )
         stock_service = self.service_container.resolve(StockService)
         stock_service.initialize()
         logger.info("✓ 股票服务注册完成")
@@ -220,6 +231,87 @@ class ServiceBootstrap:
             logger.error(f"❌ 情绪数据服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
+            # K线情绪分析服务
+        try:
+            logger.info("🔄 开始注册K线情绪分析服务...")
+            from .kline_sentiment_analyzer import KLineSentimentAnalyzer
+            logger.info("📦 K线情绪分析服务模块导入成功")
+
+            def create_kline_analyzer():
+                logger.info("🏭 开始创建K线情绪分析器实例...")
+                start_time = time.time()
+                analyzer = KLineSentimentAnalyzer()
+                end_time = time.time()
+                logger.info(f"✅ K线情绪分析器实例创建完成，耗时: {(end_time - start_time):.2f}秒")
+                return analyzer
+
+            self.service_container.register_factory(
+                KLineSentimentAnalyzer,
+                create_kline_analyzer,
+                scope=ServiceScope.SINGLETON
+            )
+
+            logger.info("✓ K线情绪分析服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ K线情绪分析服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+            # 板块资金流服务
+        try:
+            logger.info("🔄 开始注册板块资金流服务...")
+            from .sector_fund_flow_service import SectorFundFlowService, SectorFlowConfig
+            from ..data_manager import DataManager
+            logger.info("📦 板块资金流服务模块导入成功")
+
+            # 创建配置
+            logger.info("⚙️ 创建板块资金流服务配置...")
+            sector_config = SectorFlowConfig(
+                cache_duration_minutes=5,
+                auto_refresh_interval_minutes=10,
+                enable_auto_refresh=True
+            )
+            logger.info("✅ 板块资金流服务配置创建完成")
+
+            def create_sector_flow_service():
+                logger.info("🏭 开始创建板块资金流服务实例...")
+                start_time = time.time()
+
+                # 获取数据管理器
+                logger.info("🔍 尝试获取统一数据管理器...")
+                data_manager = None
+                if self.service_container.is_registered('unified_data_manager'):
+                    try:
+                        data_manager = self.service_container.resolve('unified_data_manager')
+                        logger.info("✅ 统一数据管理器获取成功")
+                    except Exception as e:
+                        logger.warning(f"⚠️ 统一数据管理器获取失败: {e}")
+                else:
+                    logger.warning("⚠️ 统一数据管理器未注册")
+
+                # 创建服务
+                logger.info("🏗️ 创建板块资金流服务实例...")
+                service = SectorFundFlowService(
+                    data_manager=data_manager,
+                    config=sector_config,
+                    log_manager=logger
+                )
+
+                end_time = time.time()
+                logger.info(f"✅ 板块资金流服务实例创建完成，耗时: {(end_time - start_time):.2f}秒")
+                return service
+
+            # 注册服务工厂
+            self.service_container.register_factory(
+                SectorFundFlowService,
+                create_sector_flow_service,
+                scope=ServiceScope.SINGLETON
+            )
+
+            logger.info("✓ 板块资金流服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ 板块资金流服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
     def _check_dependencies(self):
         """检查UnifiedDataManager的依赖项"""
         dependencies = ['config_service']
@@ -237,8 +329,9 @@ class ServiceBootstrap:
         try:
             # 尝试使用简化版数据管理器
             from core.data_manager import DataManager
+            fallback_manager = DataManager()
             self.service_container.register_instance(
-                'unified_data_manager', DataManager())
+                type(fallback_manager), fallback_manager, name='unified_data_manager')
             logger.info("✓ 回退数据管理器注册完成")
         except Exception as e:
             logger.error(f"Failed to initialize fallback data manager: {e}")
@@ -249,8 +342,9 @@ class ServiceBootstrap:
                     logger.warning(
                         "Using minimal data manager - limited functionality")
                     return "request_id"
+            minimal_manager = MinimalDataManager()
             self.service_container.register_instance(
-                'unified_data_manager', MinimalDataManager())
+                type(minimal_manager), minimal_manager, name='unified_data_manager')
             logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
 
     def _register_trading_service(self) -> None:

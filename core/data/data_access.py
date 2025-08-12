@@ -185,7 +185,6 @@ class DataAccess:
             return kline_data.data
 
         # 返回空DataFrame保持兼容性
-        import pandas as pd
         return pd.DataFrame()
 
     # 市场数据相关方法

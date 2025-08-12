@@ -288,7 +288,7 @@ class AIModelGenerator:
         print(f"{'='*60}")
 
         if success_count == len(model_types):
-            print("🎉 所有模型生成成功！现在可以重新启动HIkyuu-UI应用程序。")
+            print("🎉 所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
             return True
         else:
             print("⚠️ 部分模型生成失败，请检查错误信息。")
@@ -297,7 +297,7 @@ class AIModelGenerator:
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='生成 YS-Quant AI预测模型')
+    parser = argparse.ArgumentParser(description='生成 FactorWeave-Quant  AI预测模型')
     parser.add_argument('--quick', action='store_true',
                         help='快速模式（较少训练轮次和数据）')
     parser.add_argument('--model', choices=['pattern', 'trend', 'sentiment', 'price', 'all'],
@@ -311,7 +311,7 @@ def main():
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    print("YS-Quant AI模型生成器")
+    print("FactorWeave-Quant  AI模型生成器")
     print("=" * 60)
 
     # 创建模型生成器
@@ -330,7 +330,7 @@ def main():
 
     if success:
         print("\n🎯 下一步操作:")
-        print("1. 重新启动YS-Quant应用程序")
+        print("1. 重新启动FactorWeave-Quant 应用程序")
         print("2. 检查日志确认模型加载成功")
         print("3. 测试AI预测功能")
 

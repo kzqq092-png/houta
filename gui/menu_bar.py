@@ -57,8 +57,9 @@ class MainMenuBar(QMenuBar):
 
     def init_ui(self):
         """初始化菜单栏"""
-        self.parent = self.parentWidget()
-        self.parent.setWindowIcon(QIcon("icons/logo.png"))
+        parent_widget = self.parentWidget()
+        if parent_widget:
+            parent_widget.setWindowIcon(QIcon("icons/logo.png"))
         # 创建菜单项
         self.file_menu = self.addMenu("文件(&F)")
         self.edit_menu = self.addMenu("编辑(&E)")
@@ -379,6 +380,39 @@ class MainMenuBar(QMenuBar):
 
             self.tools_menu.addSeparator()
 
+            # 插件管理子菜单
+            self.plugin_menu = self.tools_menu.addMenu("🔌 插件管理")
+
+            # 数据源插件管理
+            self.data_source_plugin_action = QAction("📋 数据源插件", self)
+            self.data_source_plugin_action.setStatusTip("管理数据源插件：配置、路由和监控")
+            self.data_source_plugin_action.setShortcut("Ctrl+Shift+D")
+            # 注意：信号连接将在connect_signals方法中统一处理
+            self.plugin_menu.addAction(self.data_source_plugin_action)
+
+            # 通用插件管理
+            self.plugin_manager_action = QAction("⚙️ 通用插件", self)
+            self.plugin_manager_action.setStatusTip("管理所有插件：启用、配置和监控")
+            self.plugin_manager_action.setShortcut("Ctrl+Shift+P")
+            # 注意：信号连接将在connect_signals方法中统一处理
+            self.plugin_menu.addAction(self.plugin_manager_action)
+
+            # 情绪数据插件
+            self.sentiment_plugin_action = QAction("📊 情绪数据插件", self)
+            self.sentiment_plugin_action.setStatusTip("管理情绪分析数据源插件")
+            # 注意：信号连接将在connect_signals方法中统一处理
+            self.plugin_menu.addAction(self.sentiment_plugin_action)
+
+            self.plugin_menu.addSeparator()
+
+            # 插件市场
+            self.plugin_market_action = QAction("🛒 插件市场", self)
+            self.plugin_market_action.setStatusTip("浏览和安装新插件")
+            # 注意：信号连接将在connect_signals方法中统一处理
+            self.plugin_menu.addAction(self.plugin_market_action)
+
+            self.tools_menu.addSeparator()
+
             self.tools_menu.addSeparator()
 
             # 高级搜索
@@ -417,17 +451,7 @@ class MainMenuBar(QMenuBar):
     def init_advanced_menu(self):
         """初始化高级功能菜单"""
         try:
-            # 插件管理
-            self.plugin_manager_action = QAction("插件管理", self)
-            self.plugin_manager_action.setStatusTip("管理和配置插件")
-            self.advanced_menu.addAction(self.plugin_manager_action)
-
-            # 插件市场
-            self.plugin_market_action = QAction("插件市场", self)
-            self.plugin_market_action.setStatusTip("浏览和管理插件")
-            self.advanced_menu.addAction(self.plugin_market_action)
-
-            self.advanced_menu.addSeparator()
+            # 注意：插件管理已迁移到工具菜单，避免重复
 
             # 分布式/云API/指标市场/批量分析
             self.node_manager_action = QAction("分布式节点管理", self)
@@ -884,9 +908,11 @@ class MainMenuBar(QMenuBar):
                 ('advanced_search_action', '_on_advanced_search'),
                 ('settings_action', '_on_settings'),
 
-                # 高级功能
-                ('plugin_manager_action', '_on_plugin_manager'),
-                ('plugin_market_action', '_on_plugin_market'),
+                # 插件管理功能 - 使用MenuBar中的直接方法
+                ('data_source_plugin_action', 'show_data_source_plugin_manager'),
+                ('plugin_manager_action', 'show_plugin_manager'),
+                ('sentiment_plugin_action', 'show_sentiment_plugin_manager'),
+                ('plugin_market_action', 'show_plugin_market'),
                 ('optimization_dashboard_action', '_on_optimization_dashboard'),
                 ('one_click_optimize_action', '_on_one_click_optimize'),
                 ('smart_optimize_action', '_on_smart_optimize'),
@@ -905,13 +931,18 @@ class MainMenuBar(QMenuBar):
                 ('about_action', '_on_about'),
             ]
 
-            for action_name, coordinator_method in actions_to_connect:
+            for action_name, method_name in actions_to_connect:
                 if hasattr(self, action_name):
                     action = getattr(self, action_name)
-                    if hasattr(self.coordinator, coordinator_method):
-                        action.triggered.connect(getattr(self.coordinator, coordinator_method))
+
+                    # 优先检查MenuBar本身是否有这个方法（用于插件管理等直接方法）
+                    if hasattr(self, method_name):
+                        action.triggered.connect(getattr(self, method_name))
+                    # 如果MenuBar没有，则检查coordinator
+                    elif hasattr(self.coordinator, method_name):
+                        action.triggered.connect(getattr(self.coordinator, method_name))
                     else:
-                        # 如果coordinator没有对应方法，连接到一个默认的空方法
+                        # 如果都没有对应方法，连接到一个默认的空方法
                         action.triggered.connect(lambda: None)
 
         except Exception as e:
@@ -919,3 +950,136 @@ class MainMenuBar(QMenuBar):
                 self.log_manager.error(f"连接菜单信号失败: {str(e)}")
             else:
                 print(f"连接菜单信号失败: {str(e)}")
+
+    # ==================== 插件管理方法 ====================
+
+    def show_data_source_plugin_manager(self):
+        """显示数据源插件管理器"""
+        try:
+            # 优先使用coordinator的方法
+            if self.coordinator and hasattr(self.coordinator, '_on_plugin_manager'):
+                self.coordinator._on_plugin_manager()
+                return
+
+            # 如果没有coordinator，直接创建对话框
+            self._create_plugin_dialog("数据源插件")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开数据源插件管理器失败:\n{str(e)}"
+            )
+            if self.log_manager:
+                self.log_manager.error(f"打开数据源插件管理器失败: {str(e)}")
+
+    def show_plugin_manager(self):
+        """显示通用插件管理器"""
+        try:
+            # 优先使用coordinator的方法
+            if self.coordinator and hasattr(self.coordinator, '_on_plugin_manager'):
+                self.coordinator._on_plugin_manager()
+                return
+
+            # 如果没有coordinator，直接创建对话框
+            self._create_plugin_dialog("通用插件")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开插件管理器失败:\n{str(e)}"
+            )
+            if self.log_manager:
+                self.log_manager.error(f"打开插件管理器失败: {str(e)}")
+
+    def show_sentiment_plugin_manager(self):
+        """显示情绪数据插件管理器"""
+        try:
+            # 优先使用coordinator的方法
+            if self.coordinator and hasattr(self.coordinator, '_on_plugin_manager'):
+                self.coordinator._on_plugin_manager()
+                return
+
+            # 如果没有coordinator，直接创建对话框
+            self._create_plugin_dialog("情绪数据源")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开情绪数据插件管理器失败:\n{str(e)}"
+            )
+            if self.log_manager:
+                self.log_manager.error(f"打开情绪数据插件管理器失败: {str(e)}")
+
+    def show_plugin_market(self):
+        """显示插件市场"""
+        try:
+            # 优先使用coordinator的方法
+            if self.coordinator and hasattr(self.coordinator, '_on_plugin_manager'):
+                self.coordinator._on_plugin_manager()
+                return
+
+            # 如果没有coordinator，直接创建对话框
+            self._create_plugin_dialog("插件市场")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"打开插件市场失败:\n{str(e)}"
+            )
+            if self.log_manager:
+                self.log_manager.error(f"打开插件市场失败: {str(e)}")
+
+    def _create_plugin_dialog(self, target_tab=None):
+        """创建插件对话框的通用方法"""
+        try:
+            from gui.dialogs.enhanced_plugin_manager_dialog import EnhancedPluginManagerDialog
+            from core.containers import get_service_container
+            from core.plugin_manager import PluginManager
+            from core.services.sentiment_data_service import SentimentDataService
+
+            # 获取服务
+            plugin_manager = None
+            sentiment_service = None
+
+            container = get_service_container()
+            if container:
+                # 获取插件管理器
+                if container.is_registered(PluginManager):
+                    try:
+                        plugin_manager = container.resolve(PluginManager)
+                    except Exception as e:
+                        print(f"⚠️ 获取插件管理器失败: {e}")
+
+                # 获取情绪数据服务
+                if container.is_registered(SentimentDataService):
+                    try:
+                        sentiment_service = container.resolve(SentimentDataService)
+                    except Exception as e:
+                        print(f"⚠️ 获取情绪数据服务失败: {e}")
+
+            # 创建增强版插件管理器对话框
+            dialog = EnhancedPluginManagerDialog(
+                plugin_manager=plugin_manager,
+                sentiment_service=sentiment_service,
+                parent=self.parent()
+            )
+
+            # 切换到指定标签页
+            if target_tab and hasattr(dialog, 'tab_widget'):
+                for i in range(dialog.tab_widget.count()):
+                    tab_text = dialog.tab_widget.tabText(i)
+                    if target_tab in tab_text:
+                        dialog.tab_widget.setCurrentIndex(i)
+                        break
+
+            dialog.exec_()
+
+        except Exception as e:
+            print(f"❌ 创建插件对话框失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise

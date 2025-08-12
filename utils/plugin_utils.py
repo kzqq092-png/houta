@@ -6,7 +6,7 @@
 """
 
 from typing import Dict, Any, Optional
-from plugins.plugin_interface import PluginType, PluginCategory
+from core.plugin_types import PluginType, PluginCategory
 
 
 class PluginDisplayUtils:

@@ -5,7 +5,7 @@
 """
 
 from .base_tab import BaseAnalysisTab
-from .professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
+# from .professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
 from .enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
 from .technical_tab import TechnicalAnalysisTab
 from .trend_tab import TrendAnalysisTab
@@ -19,8 +19,8 @@ from .hotspot_tab import HotspotAnalysisTab
 
 __all__ = [
     'BaseAnalysisTab',
-    'ProfessionalSentimentTab',
-    'SentimentAnalysisTab',  # 向后兼容别名
+    # 'ProfessionalSentimentTab',
+    # 'SentimentAnalysisTab',  # 向后兼容别名
     'EnhancedKLineSentimentTab',
     'TechnicalAnalysisTab',
     'TrendAnalysisTab',

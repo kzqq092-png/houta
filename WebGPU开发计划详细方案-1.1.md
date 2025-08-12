@@ -1,4 +1,4 @@
-# HIkyuu-UI WebGPU独立Canvas完整开发计划
+# FactorWeave-Quant  WebGPU独立Canvas完整开发计划
 
 
 
@@ -1408,4 +1408,4 @@ class UserExperienceTestSuite:
 
 ---
 
-本开发计划基于对HIkyuu-UI现有架构的深入分析，充分考虑了Python 3.11和PyQt5的技术特性，制定了切实可行的实施路线。通过分阶段渐进式开发，确保项目风险可控，同时最大化技术收益和用户体验提升。 
+本开发计划基于对FactorWeave-Quant 现有架构的深入分析，充分考虑了Python 3.11和PyQt5的技术特性，制定了切实可行的实施路线。通过分阶段渐进式开发，确保项目风险可控，同时最大化技术收益和用户体验提升。 

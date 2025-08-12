@@ -787,7 +787,6 @@ class VersionManagerDialog(QDialog):
                 QMessageBox.warning(self, "警告", "请先选择要导出的版本！")
                 return
 
-            from PyQt5.QtWidgets import QFileDialog
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出版本", f"{self.selected_version['version_id']}.json",

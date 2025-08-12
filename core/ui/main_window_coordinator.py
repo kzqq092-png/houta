@@ -40,7 +40,6 @@ class MainWindowCoordinator(QObject):
             dialog.exec_()
         except Exception as e:
             self.logger.error(f"显示节点管理对话框失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"无法打开节点管理对话框: {str(e)}")
 
@@ -52,7 +51,6 @@ class MainWindowCoordinator(QObject):
             dialog.exec_()
         except Exception as e:
             self.logger.error(f"显示云端API管理对话框失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"无法打开云端API管理对话框: {str(e)}")
 
@@ -64,7 +62,6 @@ class MainWindowCoordinator(QObject):
             dialog.exec_()
         except Exception as e:
             self.logger.error(f"显示指标市场对话框失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"无法打开指标市场对话框: {str(e)}")
 
@@ -76,7 +73,6 @@ class MainWindowCoordinator(QObject):
             dialog.exec_()
         except Exception as e:
             self.logger.error(f"显示批量分析对话框失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"无法打开批量分析对话框: {str(e)}")
 
@@ -84,7 +80,6 @@ class MainWindowCoordinator(QObject):
         """显示优化仪表板"""
         try:
             from optimization.optimization_dashboard import OptimizationDashboard
-            from PyQt5.QtWidgets import QMessageBox
 
             # 检查GUI可用性
             try:
@@ -107,7 +102,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"打开优化仪表板失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"打开优化仪表板失败: {str(e)}")
 
@@ -122,7 +116,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"数据导出失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"数据导出失败: {str(e)}")
 
     def run_one_click_optimization(self):
@@ -199,13 +192,11 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"运行一键优化失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"一键优化失败: {str(e)}")
 
     def run_smart_optimization(self):
         """运行智能优化"""
         try:
-            from optimization.auto_tuner import AutoTuner
             from PyQt5.QtWidgets import QInputDialog, QProgressDialog, QMessageBox
             from PyQt5.QtCore import Qt
             import threading
@@ -283,7 +274,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"启动智能优化失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"启动智能优化失败: {str(e)}")
 
     def show_version_manager(self):
@@ -327,7 +317,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"打开版本管理器失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"打开版本管理器失败: {str(e)}")
 
@@ -335,10 +324,6 @@ class MainWindowCoordinator(QObject):
         """显示性能评估"""
         try:
             from core.strategy.performance_evaluator import PerformanceEvaluator
-            from analysis.pattern_manager import PatternManager
-            from PyQt5.QtWidgets import QInputDialog, QProgressDialog, QMessageBox
-            from PyQt5.QtCore import Qt
-            import threading
 
             # 获取要评估的形态名称
             patterns = []
@@ -415,15 +400,12 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"启动性能评估失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"启动性能评估失败: {str(e)}")
 
     def show_optimization_status(self):
         """显示优化系统状态"""
         try:
             from optimization.database_schema import OptimizationDatabaseManager
-            from optimization.auto_tuner import AutoTuner
-            from PyQt5.QtWidgets import QMessageBox
 
             # 获取系统状态
             tuner = AutoTuner(debug_mode=True)
@@ -452,7 +434,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"获取优化系统状态失败: {str(e)}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误",
                                  f"获取优化系统状态失败: {str(e)}")
 
@@ -460,8 +441,6 @@ class MainWindowCoordinator(QObject):
         """检查单个股票数据质量"""
         try:
             from PyQt5.QtWidgets import QInputDialog, QMessageBox, QProgressDialog
-            from PyQt5.QtCore import Qt
-            import threading
 
             # 获取当前股票代码
             current_stock = self.get_current_stock()
@@ -518,7 +497,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"启动单股数据质量检查失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"启动质量检查失败: {str(e)}")
 
     def check_all_stocks_quality(self):
@@ -526,7 +504,6 @@ class MainWindowCoordinator(QObject):
         try:
             from PyQt5.QtWidgets import QMessageBox, QProgressDialog
             from PyQt5.QtCore import Qt, QTimer
-            import threading
 
             # 确认对话框
             reply = QMessageBox.question(
@@ -554,7 +531,6 @@ class MainWindowCoordinator(QObject):
 
             def run_batch_quality_check():
                 try:
-                    from core.services.data_service import DataService
                     data_service = self.service_container.get_service(
                         'data_service')
 
@@ -594,7 +570,6 @@ class MainWindowCoordinator(QObject):
 
                     if reports:
                         # 显示报告对话框
-                        from gui.dialogs.quality_report_dialog import show_quality_report_dialog
                         show_quality_report_dialog(reports, self.main_window)
 
                         self.logger.info(f"已完成 {len(reports)} 只股票的数据质量检查")
@@ -614,7 +589,6 @@ class MainWindowCoordinator(QObject):
 
         except Exception as e:
             self.logger.error(f"启动批量数据质量检查失败: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self.main_window, "错误", f"启动质量检查失败: {str(e)}")
 
     def generate_quality_report(self, kdata, context=""):
@@ -738,7 +712,6 @@ class MainWindowCoordinator(QObject):
         """启动自动质量检查"""
         try:
             from PyQt5.QtCore import QTimer
-            from PyQt5.QtWidgets import QMessageBox
 
             if not hasattr(self, 'auto_quality_timer'):
                 self.auto_quality_timer = QTimer()
@@ -761,7 +734,6 @@ class MainWindowCoordinator(QObject):
         """执行自动质量检查"""
         try:
             # 在后台执行质量检查
-            import threading
 
             def background_check():
                 # 模拟后台质量检查
@@ -798,7 +770,6 @@ class MainWindowCoordinator(QObject):
     def switch_to_multi_screen(self):
         """切换到多屏模式"""
         try:
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.information(
                 self.main_window, "多屏模式",
                 "多屏模式功能正在开发中...\n\n功能包括：\n- 多图表同时显示\n- 图表数据同步\n- 自定义布局\n- 独立缩放控制"
@@ -809,7 +780,6 @@ class MainWindowCoordinator(QObject):
     def switch_to_single_screen(self):
         """切换到单屏模式"""
         try:
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.information(
                 self.main_window, "单屏模式",
                 "已切换到单屏模式"

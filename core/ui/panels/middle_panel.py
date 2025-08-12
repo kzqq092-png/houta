@@ -10,15 +10,15 @@ from typing import Dict, Any, Optional, List, TYPE_CHECKING
 import numpy as np
 from datetime import datetime, timedelta
 import time  # Added for loading time tracking
+import pandas as pd
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QPushButton, QTabWidget, QSplitter, QFrame, QProgressBar,
     QMessageBox, QToolBar, QAction, QSpinBox, QCheckBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot, QDateTime, QDate, QTime
 from PyQt5.QtGui import QFont, QIcon
-
 from .base_panel import BasePanel
 from core.events import StockSelectedEvent, ChartUpdateEvent, IndicatorChangedEvent, UIDataReadyEvent
 from core.services.unified_chart_service import get_unified_chart_service, create_chart_widget, ChartDataLoader, ChartWidget
@@ -679,9 +679,9 @@ class MiddlePanel(BasePanel):
         self.chart_service = None
         if coordinator and hasattr(coordinator, 'service_container') and coordinator.service_container:
             try:
-                from core.services import ChartService
-                self.chart_service = coordinator.service_container.get_service(
-                    ChartService)
+                # ✅ 正确导入并获取图表服务
+                from core.services.chart_service import ChartService
+                self.chart_service = coordinator.service_container.resolve(ChartService)
             except Exception as e:
                 logger.warning(f"无法获取图表服务: {e}")
                 self.chart_service = None
@@ -704,7 +704,6 @@ class MiddlePanel(BasePanel):
 
         # 获取统一图表服务
         try:
-            from core.services.unified_chart_service import get_unified_chart_service
             self.unified_chart_service = get_unified_chart_service(
                 data_source=self.chart_service)
         except ImportError:
@@ -802,7 +801,6 @@ class MiddlePanel(BasePanel):
 
         # 回测区间选择
         from PyQt5.QtWidgets import QDateEdit
-        from PyQt5.QtCore import QDate
         toolbar.addWidget(QLabel("回测区间:"))
         start_date_edit = QDateEdit()
         start_date_edit.setCalendarPopup(True)
@@ -1199,7 +1197,6 @@ class MiddlePanel(BasePanel):
             self._update_status("已切换到单屏模式")
 
             # 发布多屏模式切换事件
-            from core.events.events import MultiScreenToggleEvent
             self.event_bus.publish(MultiScreenToggleEvent(is_multi_screen=False))
 
         except Exception as e:
@@ -1262,7 +1259,6 @@ class MiddlePanel(BasePanel):
         Returns:
             tuple: (开始日期, 结束日期) 的QDate对象
         """
-        from PyQt5.QtCore import QDate
 
         end_date = QDate.currentDate()  # 结束日期总是当前日期
 
@@ -1427,7 +1423,6 @@ class MiddlePanel(BasePanel):
             # 获取子区间数据
             sub = kdata.iloc[start_idx:end_idx+1]
             if sub.empty:
-                from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(self._root_frame, "提示", "区间数据无效！")
                 return
 
@@ -1523,7 +1518,6 @@ class MiddlePanel(BasePanel):
 
         except Exception as e:
             logger.error(f"Failed to show stat dialog: {e}")
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self._root_frame, "区间统计错误", str(e))
 
     def _do_dispose(self) -> None:

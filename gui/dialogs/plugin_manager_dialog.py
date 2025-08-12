@@ -26,7 +26,7 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 
 from core.plugin_manager import PluginManager, PluginInfo, PluginStatus, PluginType, PluginCategory
-from plugins.plugin_interface import PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -118,7 +118,7 @@ class PluginStatusWidget(QWidget):
             }}
         """)
         status_label.setText(self._get_status_text(self.plugin_info.status))
-        # status_label.setFixedWidth(100)
+        status_label.setFixedWidth(60)
         layout.addWidget(status_label)
 
         # 操作按钮（右侧）
@@ -567,7 +567,6 @@ class PluginConfigDialog(QDialog):
             return None
         except Exception as e:
             print(f"🚫 [调试] 获取插件实例失败: {e}")
-            import traceback
             traceback.print_exc()
             return None
 
@@ -631,7 +630,6 @@ class PluginConfigDialog(QDialog):
 
         except Exception as e:
             print(f"❌ [调试] 加载ConfigurablePlugin配置失败: {e}")
-            import traceback
             traceback.print_exc()
             raise
 
@@ -809,7 +807,6 @@ class PluginConfigDialog(QDialog):
 
         except Exception as e:
             print(f"❌ [调试] 保存插件配置失败: {e}")
-            import traceback
             traceback.print_exc()
             logger.error(f"保存插件配置失败: {e}")
             QMessageBox.critical(self, "错误", f"保存配置失败: {e}")
@@ -1343,7 +1340,6 @@ class PluginManagerDialog(QDialog):
 
                     # 更新数据库状态
                     if self.db_service:
-                        from db.models.plugin_models import PluginStatus as DbPluginStatus
                         self.db_service.update_plugin_status(
                             plugin_name, DbPluginStatus.ENABLED, "用户手动启用"
                         )
@@ -1386,7 +1382,6 @@ class PluginManagerDialog(QDialog):
 
                     # 更新数据库状态
                     if self.db_service:
-                        from db.models.plugin_models import PluginStatus as DbPluginStatus
                         self.db_service.update_plugin_status(
                             plugin_name, DbPluginStatus.DISABLED, "用户手动禁用"
                         )
@@ -1453,7 +1448,6 @@ class PluginManagerDialog(QDialog):
     def _batch_enable_plugins(self, plugin_names: list):
         """批量启用插件 - 直接更新状态，无弹窗"""
         try:
-            from db.models.plugin_models import PluginStatus as DbPluginStatus
 
             success_count = 0
             error_count = 0
@@ -1508,7 +1502,6 @@ class PluginManagerDialog(QDialog):
     def _batch_disable_plugins(self, plugin_names: list):
         """批量禁用插件 - 直接更新状态，无弹窗"""
         try:
-            from db.models.plugin_models import PluginStatus as DbPluginStatus
 
             success_count = 0
             error_count = 0

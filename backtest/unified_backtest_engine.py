@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-统一回测引擎 - YS-Quant‌系统核心回测模块
+统一回测引擎 - FactorWeave-Quant ‌系统核心回测模块
 
 整合了所有回测功能：
 1. 修复版基础回测（修复了15个关键bug）
@@ -1228,7 +1228,7 @@ def create_portfolio_backtest_engine(level: str = "professional") -> PortfolioBa
 
 
 if __name__ == "__main__":
-    print("统一回测引擎 - YS-Quant‌系统")
+    print("统一回测引擎 - FactorWeave-Quant ‌系统")
     print("=" * 50)
     print("功能特性:")
     print("✅ 修复了15个关键bug")

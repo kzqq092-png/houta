@@ -1,6 +1,6 @@
 # 自定义指标插件示例
 
-这是一个展示如何通过插件系统为YS-Quant‌添加自定义指标的示例插件。
+这是一个展示如何通过插件系统为FactorWeave-Quant ‌添加自定义指标的示例插件。
 
 ## 包含的指标
 
@@ -37,8 +37,8 @@ VWAP = ∑(PRICE * VOLUME) / ∑(VOLUME)
 
 ## 使用方法
 
-1. 将此插件目录复制到YS-Quant‌的`plugins`目录下
-2. 重启YS-Quant‌应用
+1. 将此插件目录复制到FactorWeave-Quant ‌的`plugins`目录下
+2. 重启FactorWeave-Quant ‌应用
 3. 在技术分析面板中，您将看到新增的"市场情绪指标"和"成交量加权平均价"选项
 
 ## 开发自定义指标

@@ -429,7 +429,6 @@ class PluginConfigManager:
                 logger.error(f"备份目录不存在: {backup_path}")
                 return False
 
-            import shutil
             shutil.rmtree(self.config_dir)
             shutil.copytree(backup_path, self.config_dir)
 

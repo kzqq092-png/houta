@@ -271,7 +271,6 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
     def _execute_algorithm_safely(self, algorithm_code: str, safe_globals: dict, safe_locals: dict) -> List[PatternResult]:
         """安全执行算法代码，带超时和资源监控 - 跨平台版本"""
         import threading
-        import time
         import sys
 
         # 尝试导入psutil，如果失败则跳过内存监控
@@ -767,7 +766,6 @@ class PerformanceMonitor:
 
     def start_recognition(self):
         """开始识别计时"""
-        import time
         self.start_time = time.time()
 
     def end_recognition(self, success: bool = True, pattern_count: int = 0):
@@ -836,8 +834,6 @@ class PerformanceMonitor:
     def get_memory_usage(self) -> float:
         """获取内存使用量(MB)"""
         try:
-            import psutil
-            import os
             process = psutil.Process(os.getpid())
             return process.memory_info().rss / 1024 / 1024
         except ImportError:

@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
@@ -30,23 +30,23 @@ class CryptoSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         ]
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="加密货币情绪插件",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://github.com/hikyuu/hikyuu-ui",
-            license="MIT",
-            description="基于加密货币Fear & Greed指数和市场数据分析整体市场情绪",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=[],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="",
-            tags=["sentiment", "crypto", "bitcoin", "fear_greed", "market"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "加密货币情绪插件",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://github.com/hikyuu/FactorWeave-Quant ",
+            "license": "MIT",
+            "description": "基于加密货币Fear & Greed指数和市场数据分析整体市场情绪",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": [],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "",
+            "tags": ["sentiment", "crypto", "bitcoin", "fear_greed", "market"]
+        }
 
     def get_config_schema(self) -> List[PluginConfigField]:
         """获取配置模式定义"""

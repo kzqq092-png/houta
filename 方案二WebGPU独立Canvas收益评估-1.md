@@ -380,11 +380,11 @@ competitive_pressure == "高"    # 竞争压力大
 - 保持与matplotlib的兼容性
 - 用户逐步迁移策略
 
-方案二将为YS-Quant带来**技术突破、用户体验革命和商业价值飞跃**，是值得投入的战略性技术升级。 
+方案二将为FactorWeave-Quant 带来**技术突破、用户体验革命和商业价值飞跃**，是值得投入的战略性技术升级。 
 
 
 gantt
-    title HIkyuu-UI WebGPU开发计划
+    title FactorWeave-Quant  WebGPU开发计划
     dateFormat YYYY-MM-DD
     section Phase1 基础激活
         环境检测配置    :2024-12-01, 5d

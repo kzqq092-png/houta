@@ -63,7 +63,6 @@ class FallbackDataManager:
 
     def get_kdata(self, stock_code, period='D', count=365):
         """返回空DataFrame"""
-        import pandas as pd
         return pd.DataFrame()
 
     def get_latest_price(self, stock_code):
@@ -108,7 +107,6 @@ class MinimalDataManager:
         return []
 
     def get_kdata(self, stock_code, period='D', count=365):
-        import pandas as pd
         return pd.DataFrame()
 
 
@@ -227,56 +225,85 @@ class StockRepository(BaseRepository):
             if not self.is_connected():
                 self.connect()
 
-            # 检查数据管理器是否支持市场筛选
-            if hasattr(self.data_manager, 'get_stock_list') and market:
-                try:
-                    stock_list_dict = self.data_manager.get_stock_list(market)
-                except TypeError:
-                    # 如果不支持参数，则获取全部并手动筛选
-                    all_stocks = self.data_manager.get_stock_list()
-                    stock_list_dict = [s for s in all_stocks if hasattr(
-                        s, 'get') and s.get('market') == market] if market else all_stocks
-            else:
-                stock_list_dict = self.data_manager.get_stock_list()
+            # 安全获取底层方法；若不存在则切换到备用数据管理器
+            get_list_fn = getattr(self.data_manager, 'get_stock_list', None)
+            if get_list_fn is None:
+                self.logger.warning("DataManager缺少get_stock_list方法，切换到备用数据管理器")
+                self._create_fallback_data_manager()
+                get_list_fn = getattr(self.data_manager, 'get_stock_list', None)
+                if get_list_fn is None:
+                    self.logger.error("备用数据管理器仍缺少get_stock_list方法，返回空列表")
+                    return []
 
-            stock_list = []
-
-            for stock_dict in stock_list_dict:
-                # 确保stock_dict是字典类型或有get方法的对象
-                if isinstance(stock_dict, str):
-                    # 如果是字符串，可能是股票代码
-                    stock_info = StockInfo(
-                        code=stock_dict,
-                        name='',
-                        market='',
-                        industry=None,
-                        sector=None
-                    )
-                elif hasattr(stock_dict, 'get'):
-                    # 字典或类字典对象
-                    stock_info = StockInfo(
-                        code=stock_dict.get('code', ''),
-                        name=stock_dict.get('name', ''),
-                        market=stock_dict.get('market', ''),
-                        industry=stock_dict.get('industry'),
-                        sector=stock_dict.get('sector')
-                    )
-                elif hasattr(stock_dict, 'code'):
-                    # 对象属性访问
-                    stock_info = StockInfo(
-                        code=getattr(stock_dict, 'code', ''),
-                        name=getattr(stock_dict, 'name', ''),
-                        market=getattr(stock_dict, 'market', ''),
-                        industry=getattr(stock_dict, 'industry', None),
-                        sector=getattr(stock_dict, 'sector', None)
-                    )
+            # 调用底层方法，兼容是否接受market参数
+            try:
+                raw_list = get_list_fn(market)
+            except TypeError:
+                # 方法可能不支持参数；获取全部后再过滤
+                raw_all = get_list_fn()
+                if market:
+                    # 尝试在上层过滤（支持DataFrame或列表）
+                    try:
+                        import pandas as pd  # 局部导入以避免全局依赖
+                        if isinstance(raw_all, pd.DataFrame):
+                            raw_list = raw_all[raw_all['market'].str.lower() == str(market).lower()]
+                        else:
+                            raw_list = [s for s in raw_all if (
+                                (hasattr(s, 'get') and str(s.get('market', '')).lower() == str(market).lower()) or
+                                (hasattr(s, 'market') and str(getattr(s, 'market', '')).lower() == str(market).lower())
+                            )]
+                    except Exception:
+                        raw_list = raw_all
                 else:
-                    # 跳过无法处理的数据类型
-                    self.logger.warning(
-                        f"Skipping unsupported stock data type: {type(stock_dict)}")
-                    continue
+                    raw_list = raw_all
 
-                stock_list.append(stock_info)
+            stock_list: List[StockInfo] = []
+
+            # 统一不同返回类型到StockInfo
+            try:
+                if isinstance(raw_list, pd.DataFrame):
+                    iter_items = raw_list.to_dict(orient='records')
+                else:
+                    iter_items = raw_list
+            except Exception:
+                iter_items = raw_list
+
+            for item in (iter_items or []):
+                try:
+                    if isinstance(item, StockInfo):
+                        stock_info = item
+                    elif hasattr(item, 'get'):
+                        stock_info = StockInfo(
+                            code=item.get('code', '') or item.get('symbol', ''),
+                            name=item.get('name', ''),
+                            market=item.get('market', ''),
+                            industry=item.get('industry'),
+                            sector=item.get('sector')
+                        )
+                    elif hasattr(item, 'code'):
+                        stock_info = StockInfo(
+                            code=getattr(item, 'code', ''),
+                            name=getattr(item, 'name', ''),
+                            market=getattr(item, 'market', ''),
+                            industry=getattr(item, 'industry', None),
+                            sector=getattr(item, 'sector', None)
+                        )
+                    elif isinstance(item, str):
+                        stock_info = StockInfo(
+                            code=item,
+                            name='',
+                            market='',
+                            industry=None,
+                            sector=None
+                        )
+                    else:
+                        self.logger.warning(f"跳过不支持的股票数据类型: {type(item)}")
+                        continue
+
+                    stock_list.append(stock_info)
+                except Exception as inner_e:
+                    self.logger.warning(f"跳过异常股票项: {inner_e}")
+                    continue
 
             return stock_list
 
@@ -373,7 +400,7 @@ class KlineRepository(BaseRepository):
         """连接数据源"""
         try:
             if self.data_manager is None:
-                # 动态导入避免循环依赖
+                # ✅ 动态导入避免循环依赖
                 from core.data_manager import DataManager
                 self.data_manager = DataManager()
             return True
@@ -419,14 +446,32 @@ class KlineRepository(BaseRepository):
             if not self.is_connected():
                 self.connect()
 
-            # 从数据管理器获取K线数据
-            kline_df = self.data_manager.get_kdata(
-                params.stock_code,
-                params.period,
-                count=params.count or 365
-            )
+            # 兼容不同DataManager实现的命名：get_kdata 与 get_k_data
+            dm_get_kdata = getattr(self.data_manager, 'get_kdata', None)
+            if dm_get_kdata is None:
+                dm_get_kdata = getattr(self.data_manager, 'get_k_data', None)
 
-            if kline_df is None or kline_df.empty:
+            if dm_get_kdata is None:
+                self.logger.error("DataManager缺少get_kdata/get_k_data方法，无法获取K线数据")
+                return None
+
+            # 从数据管理器获取K线数据
+            try:
+                # 优先使用count，若DataManager实现支持start/end也能兼容
+                kline_df = dm_get_kdata(
+                    params.stock_code,
+                    params.period,
+                    params.count or 365
+                )
+            except TypeError:
+                # 某些实现可能要求命名参数
+                kline_df = dm_get_kdata(
+                    stock_code=params.stock_code,
+                    period=params.period,
+                    count=params.count or 365
+                )
+
+            if kline_df is None or getattr(kline_df, 'empty', True):
                 return None
 
             # 转换为KlineData对象
@@ -480,7 +525,7 @@ class MarketRepository(BaseRepository):
         """连接数据源"""
         try:
             if self.data_manager is None:
-                # 动态导入避免循环依赖
+                # ✅ 动态导入避免循环依赖
                 from core.data_manager import DataManager
                 self.data_manager = DataManager()
             return True

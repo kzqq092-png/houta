@@ -5,6 +5,7 @@
 """
 
 import pandas as pd
+import threading
 from typing import Dict, Any, Optional, List, Set
 from core.base_logger import BaseLogManager
 
@@ -68,6 +69,17 @@ class DataManager:
         # 添加异步处理支持
         self._async_executor = ThreadPoolExecutor(max_workers=4)
         self._data_loading_queue = asyncio.Queue() if hasattr(asyncio, 'Queue') else None
+
+        # 新增：插件化数据源管理（Task 1.2 扩展）
+        self._plugin_data_sources = {}  # 插件数据源注册表
+        self._data_source_priorities = {   # 数据源优先级配置
+            'stock': ['hikyuu', 'akshare', 'eastmoney'],
+            'futures': [],
+            'crypto': []
+        }
+        self._routing_strategy = 'priority'  # 路由策略: priority, round_robin, health_based
+        self._health_status = {}  # 数据源健康状态
+        self._plugin_lock = threading.RLock()  # 插件操作锁
 
         # 自动加载和更新行业数据
         try:
@@ -196,6 +208,58 @@ class DataManager:
         except Exception as e:
             if self.log_manager:
                 self.log_manager.warning(f"预加载数据失败: {str(e)}")
+
+    def get_fund_flow(self) -> Dict[str, Any]:
+        """获取资金流向数据
+
+        Returns:
+            Dict[str, Any]: 包含各种资金流数据的字典
+        """
+        try:
+            result = {}
+
+            # 优先使用当前数据源
+            current_source = self._data_sources.get(self._current_source)
+
+            if current_source and hasattr(current_source, 'get_stock_sector_fund_flow_rank'):
+                # 使用当前数据源获取数据
+                result['sector_flow_rank'] = current_source.get_stock_sector_fund_flow_rank()
+                result['market_fund_flow'] = current_source.get_stock_market_fund_flow()
+                result['main_fund_flow'] = current_source.get_stock_main_fund_flow()
+
+                if self.log_manager:
+                    self.log_manager.info(f"使用 {self._current_source} 数据源获取资金流数据成功")
+            else:
+                # 降级到AkShare数据源
+                if 'akshare' not in self._data_sources:
+                    from .akshare_data_source import AkshareDataSource
+                    self._data_sources['akshare'] = AkshareDataSource()
+
+                akshare_source = self._data_sources['akshare']
+                result['sector_flow_rank'] = akshare_source.get_stock_sector_fund_flow_rank()
+                result['market_fund_flow'] = akshare_source.get_stock_market_fund_flow()
+                result['main_fund_flow'] = akshare_source.get_stock_main_fund_flow()
+
+                if self.log_manager:
+                    self.log_manager.info("使用 AkShare 数据源获取资金流数据成功")
+
+            return result
+
+        except Exception as e:
+            error_msg = f"获取资金流数据失败: {str(e)}"
+            if self.log_manager:
+                self.log_manager.error(error_msg)
+                self.log_manager.error(traceback.format_exc())
+            # 返回空数据而不是异常，确保系统稳定性
+            return {
+                'sector_flow_rank': pd.DataFrame(),
+                'market_fund_flow': pd.DataFrame(),
+                'main_fund_flow': pd.DataFrame()
+            }
+
+    def get_current_source(self) -> str:
+        """获取当前数据源类型"""
+        return self._current_source
 
     def _preload_single_stock(self, code: str, freq: str, priority: int):
         """预加载单个股票数据"""
@@ -1200,7 +1264,7 @@ class AsyncDataManagerWrapper(QObject):
         """设置数据源
 
         Args:
-            source: 数据源名称 ("hikyuu", "eastmoney", "sina", "tonghuashun")
+            source: 数据源名称 ("hikyuu", "eastmoney", "sina", "tonghuashun", "akshare")
         """
         try:
             self.log_manager.info(f"设置数据源: {source}")
@@ -1221,12 +1285,15 @@ class AsyncDataManagerWrapper(QObject):
             elif source == "tonghuashun":
                 from .tonghuashun_source import TongHuaShunDataSource
                 self._data_sources['tonghuashun'] = TongHuaShunDataSource()
+            elif source == "akshare":
+                self._data_sources['akshare'] = AkshareDataSource()
             else:  # 默认使用 Hikyuu
                 from .hikyuu_source import HikyuuDataSource
                 self._data_sources['hikyuu'] = HikyuuDataSource()
 
             # 初始化数据源
-            self._data_sources[source].init()
+            if hasattr(self._data_sources[source], 'init'):
+                self._data_sources[source].init()
 
             self.log_manager.info(f"数据源设置完成: {source}")
 
@@ -1247,9 +1314,80 @@ class AsyncDataManagerWrapper(QObject):
             self.log_manager.error(traceback.format_exc())
             raise
 
-    def get_current_source(self) -> str:
-        """获取当前数据源类型"""
-        return self._current_source
+    def get_sector_fund_flow_summary(self, symbol: str, indicator: str = "今日") -> pd.DataFrame:
+        """获取板块资金流汇总数据
+
+        Args:
+            symbol: 板块名称
+            indicator: 时间周期
+
+        Returns:
+            pd.DataFrame: 板块资金流汇总数据
+        """
+        try:
+            current_source = self._data_sources.get(self._current_source)
+
+            if current_source and hasattr(current_source, 'get_stock_sector_fund_flow_summary'):
+                return current_source.get_stock_sector_fund_flow_summary(symbol, indicator)
+            else:
+                # 降级到AkShare
+                if 'akshare' not in self._data_sources:
+                    self._data_sources['akshare'] = AkshareDataSource()
+                return self._data_sources['akshare'].get_stock_sector_fund_flow_summary(symbol, indicator)
+
+        except Exception as e:
+            self.log_manager.error(f"获取板块资金流汇总失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_sector_fund_flow_hist(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
+        """获取板块历史资金流数据
+
+        Args:
+            symbol: 板块名称
+            period: 时间周期
+
+        Returns:
+            pd.DataFrame: 板块历史资金流数据
+        """
+        try:
+            current_source = self._data_sources.get(self._current_source)
+
+            if current_source and hasattr(current_source, 'get_stock_sector_fund_flow_hist'):
+                return current_source.get_stock_sector_fund_flow_hist(symbol, period)
+            else:
+                # 降级到AkShare
+                if 'akshare' not in self._data_sources:
+                    self._data_sources['akshare'] = AkshareDataSource()
+                return self._data_sources['akshare'].get_stock_sector_fund_flow_hist(symbol, period)
+
+        except Exception as e:
+            self.log_manager.error(f"获取板块历史资金流失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_concept_fund_flow_hist(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
+        """获取概念历史资金流数据
+
+        Args:
+            symbol: 概念名称
+            period: 时间周期
+
+        Returns:
+            pd.DataFrame: 概念历史资金流数据
+        """
+        try:
+            current_source = self._data_sources.get(self._current_source)
+
+            if current_source and hasattr(current_source, 'get_stock_concept_fund_flow_hist'):
+                return current_source.get_stock_concept_fund_flow_hist(symbol, period)
+            else:
+                # 降级到AkShare
+                if 'akshare' not in self._data_sources:
+                    self._data_sources['akshare'] = AkshareDataSource()
+                return self._data_sources['akshare'].get_stock_concept_fund_flow_hist(symbol, period)
+
+        except Exception as e:
+            self.log_manager.error(f"获取概念历史资金流失败: {str(e)}")
+            return pd.DataFrame()
 
     def get_available_sources(self) -> List[str]:
         """获取所有可用的数据源类型"""
@@ -1325,7 +1463,6 @@ class AsyncDataManagerWrapper(QObject):
 
             # 初始化Akshare数据源
             try:
-                from .akshare_data_source import AkshareDataSource
                 self._data_sources['akshare'] = AkshareDataSource()
                 self.log_manager.info("Akshare数据源初始化成功")
             except Exception as e:
@@ -1334,6 +1471,287 @@ class AsyncDataManagerWrapper(QObject):
         except Exception as e:
             self.log_manager.error(f"初始化数据源失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
+
+    def register_plugin_data_source(self, plugin_id: str, plugin_instance) -> bool:
+        """
+        注册插件数据源（Task 1.2 新增方法）
+
+        Args:
+            plugin_id: 插件唯一标识符
+            plugin_instance: 插件实例，必须实现IDataSourcePlugin接口
+
+        Returns:
+            bool: 注册是否成功
+        """
+        try:
+            with self._plugin_lock:
+                # 导入必要的模块
+                from .data_source_extensions import (
+                    IDataSourcePlugin, DataSourcePluginAdapter,
+                    validate_plugin_interface
+                )
+
+                # 验证插件接口
+                if not validate_plugin_interface(plugin_instance):
+                    self.log_manager.error(f"插件接口验证失败: {plugin_id}")
+                    return False
+
+                # 创建适配器桥接现有接口
+                adapter = DataSourcePluginAdapter(plugin_instance, plugin_id)
+
+                # 尝试连接插件
+                if not adapter.connect():
+                    self.log_manager.error(f"插件连接失败: {plugin_id}")
+                    return False
+
+                # 注册到现有数据源字典（保持兼容性）
+                self._data_sources[plugin_id] = adapter
+
+                # 注册到插件数据源字典
+                self._plugin_data_sources[plugin_id] = adapter
+
+                # 初始化健康状态
+                self._health_status[plugin_id] = True
+
+                self.log_manager.info(f"插件数据源注册成功: {plugin_id}")
+                return True
+
+        except Exception as e:
+            self.log_manager.error(f"插件数据源注册失败 {plugin_id}: {str(e)}")
+            self.log_manager.error(traceback.format_exc())
+            return False
+
+    def unregister_plugin_data_source(self, plugin_id: str) -> bool:
+        """
+        注销插件数据源
+
+        Args:
+            plugin_id: 插件唯一标识符
+
+        Returns:
+            bool: 注销是否成功
+        """
+        try:
+            with self._plugin_lock:
+                # 从数据源字典中移除
+                if plugin_id in self._data_sources:
+                    adapter = self._data_sources[plugin_id]
+                    adapter.disconnect()
+                    del self._data_sources[plugin_id]
+
+                # 从插件数据源字典中移除
+                if plugin_id in self._plugin_data_sources:
+                    del self._plugin_data_sources[plugin_id]
+
+                # 清理健康状态
+                if plugin_id in self._health_status:
+                    del self._health_status[plugin_id]
+
+                # 从优先级列表中移除
+                for asset_type, priorities in self._data_source_priorities.items():
+                    if plugin_id in priorities:
+                        priorities.remove(plugin_id)
+
+                self.log_manager.info(f"插件数据源注销成功: {plugin_id}")
+                return True
+
+        except Exception as e:
+            self.log_manager.error(f"插件数据源注销失败 {plugin_id}: {str(e)}")
+            return False
+
+    def set_data_source_priority(self, asset_type: str, priorities: List[str]) -> None:
+        """
+        设置数据源优先级（Task 1.2 新增方法）
+
+        Args:
+            asset_type: 资产类型（stock, futures, crypto等）
+            priorities: 数据源优先级列表，按优先级顺序排列
+        """
+        try:
+            with self._plugin_lock:
+                # 验证数据源是否存在
+                valid_priorities = []
+                for source_id in priorities:
+                    if source_id in self._data_sources:
+                        valid_priorities.append(source_id)
+                    else:
+                        self.log_manager.warning(f"数据源不存在，跳过: {source_id}")
+
+                self._data_source_priorities[asset_type] = valid_priorities
+                self.log_manager.info(f"设置 {asset_type} 数据源优先级: {valid_priorities}")
+
+        except Exception as e:
+            self.log_manager.error(f"设置数据源优先级失败: {str(e)}")
+
+    def get_data_with_fallback(self, symbol: str, data_type: str = 'kline',
+                               asset_type: str = 'stock', **kwargs) -> pd.DataFrame:
+        """
+        支持故障切换的数据获取（Task 1.2 新增方法）
+
+        Args:
+            symbol: 标的代码
+            data_type: 数据类型
+            asset_type: 资产类型
+            **kwargs: 其他参数（如频率、起止日期等）
+
+        Returns:
+            pd.DataFrame: 数据DataFrame
+
+        Raises:
+            RuntimeError: 所有数据源都不可用时抛出
+        """
+        priorities = self._data_source_priorities.get(asset_type, ['hikyuu'])
+
+        for source_id in priorities:
+            if source_id not in self._data_sources:
+                continue
+
+            try:
+                # 健康检查
+                if not self._check_source_health(source_id):
+                    self.log_manager.warning(f"数据源健康检查失败，跳过: {source_id}")
+                    continue
+
+                # 获取数据
+                if source_id in self._plugin_data_sources:
+                    # 使用插件数据源
+                    adapter = self._plugin_data_sources[source_id]
+                    if data_type == 'kline':
+                        data = adapter.get_kdata(
+                            symbol=symbol,
+                            freq=kwargs.get('freq', 'D'),
+                            start_date=kwargs.get('start_date'),
+                            end_date=kwargs.get('end_date'),
+                            count=kwargs.get('count')
+                        )
+                    elif data_type == 'real_time':
+                        data = adapter.get_real_time_quotes([symbol])
+                    else:
+                        # 其他数据类型，直接调用插件接口
+                        plugin = adapter.plugin
+                        data = plugin.fetch_data(symbol, data_type, **kwargs)
+                else:
+                    # 使用现有数据源
+                    source = self._data_sources[source_id]
+                    if hasattr(source, 'get_kdata'):
+                        data = source.get_kdata(symbol, kwargs.get('freq', 'D'))
+                    else:
+                        self.log_manager.warning(f"数据源不支持get_kdata方法: {source_id}")
+                        continue
+
+                if data is not None and not data.empty:
+                    self.log_manager.debug(f"数据获取成功: {source_id}")
+                    self._health_status[source_id] = True
+                    return data
+
+            except Exception as e:
+                self.log_manager.warning(f"数据源 {source_id} 失败，切换到下一个: {str(e)}")
+                self._health_status[source_id] = False
+                continue
+
+        raise RuntimeError(f"所有数据源都不可用，资产类型: {asset_type}")
+
+    def _check_source_health(self, source_id: str) -> bool:
+        """
+        检查数据源健康状态
+
+        Args:
+            source_id: 数据源标识符
+
+        Returns:
+            bool: 是否健康
+        """
+        try:
+            if source_id in self._plugin_data_sources:
+                # 插件数据源健康检查
+                adapter = self._plugin_data_sources[source_id]
+                health_result = adapter.health_check()
+                is_healthy = health_result.is_healthy
+                self._health_status[source_id] = is_healthy
+                return is_healthy
+            else:
+                # 现有数据源默认为健康（可根据需要实现具体检查逻辑）
+                return self._health_status.get(source_id, True)
+
+        except Exception as e:
+            self.log_manager.error(f"健康检查失败 {source_id}: {str(e)}")
+            self._health_status[source_id] = False
+            return False
+
+    def get_plugin_data_sources(self) -> Dict[str, Any]:
+        """
+        获取所有插件数据源信息
+
+        Returns:
+            Dict[str, Any]: 插件数据源信息字典
+        """
+        try:
+            with self._plugin_lock:
+                plugin_info = {}
+                for plugin_id, adapter in self._plugin_data_sources.items():
+                    try:
+                        info = adapter.get_plugin_info()
+                        stats = adapter.get_statistics()
+
+                        plugin_info[plugin_id] = {
+                            'info': {
+                                'id': info.id,
+                                'name': info.name,
+                                'version': info.version,
+                                'description': info.description,
+                                'author': info.author,
+                                'supported_asset_types': [at.value for at in info.supported_asset_types],
+                                'supported_data_types': [dt.value for dt in info.supported_data_types]
+                            },
+                            'statistics': stats,
+                            'health_status': self._health_status.get(plugin_id, False)
+                        }
+                    except Exception as e:
+                        self.log_manager.error(f"获取插件信息失败 {plugin_id}: {str(e)}")
+                        plugin_info[plugin_id] = {
+                            'error': str(e)
+                        }
+
+                return plugin_info
+
+        except Exception as e:
+            self.log_manager.error(f"获取插件数据源信息失败: {str(e)}")
+            return {}
+
+    def get_data_source_priorities(self) -> Dict[str, List[str]]:
+        """
+        获取数据源优先级配置
+
+        Returns:
+            Dict[str, List[str]]: 优先级配置字典
+        """
+        with self._plugin_lock:
+            return self._data_source_priorities.copy()
+
+    def set_routing_strategy(self, strategy: str) -> bool:
+        """
+        设置路由策略
+
+        Args:
+            strategy: 路由策略（priority, round_robin, health_based）
+
+        Returns:
+            bool: 设置是否成功
+        """
+        try:
+            valid_strategies = ['priority', 'round_robin', 'health_based']
+            if strategy not in valid_strategies:
+                self.log_manager.error(f"无效的路由策略: {strategy}")
+                return False
+
+            with self._plugin_lock:
+                self._routing_strategy = strategy
+                self.log_manager.info(f"路由策略已设置为: {strategy}")
+                return True
+
+        except Exception as e:
+            self.log_manager.error(f"设置路由策略失败: {str(e)}")
+            return False
 
     def _test_data_source(self, source_name: str) -> bool:
         """测试数据源是否可用

@@ -1,5 +1,5 @@
 """
-YS-Quant‌ 插件开发工具包(SDK)
+FactorWeave-Quant ‌ 插件开发工具包(SDK)
 
 提供插件开发的便利工具、模板生成器和测试框架。
 """
@@ -129,7 +129,7 @@ class {class_name}(I{plugin_type}Plugin):
 ## 安装方法
 
 1. 下载插件文件
-2. 在YS-Quant‌中打开插件管理器
+2. 在FactorWeave-Quant ‌中打开插件管理器
 3. 点击"安装本地插件"
 4. 选择插件文件进行安装
 
@@ -753,7 +753,6 @@ class PluginSDK:
 """
 
 import unittest
-import pandas as pd
 from unittest.mock import Mock
 
 from {template_vars['main_module']} import {template_vars['class_name']}

@@ -14,7 +14,7 @@
 # from .optimization_dashboard import OptimizationDashboard
 
 __version__ = "1.0.0"
-__author__ = "HiKyuu-UI Team"
+__author__ = "FactorWeave-Quant  Team"
 
 __all__ = [
     # 'PerformanceEvaluator',

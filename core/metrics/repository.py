@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 # 获取项目根目录的绝对路径
 # 在大多数情况下，这个脚本会在项目的某个子目录中运行
 # 我们假设项目根目录是当前文件路径的第五级父目录
-# D:/DevelopTool/FreeCode/YS-Quant‌/YS-Quant‌/core/metrics/repository.py
-# 根目录是 YS-Quant‌
+# D:/DevelopTool/FreeCode/FactorWeave-Quant ‌/FactorWeave-Quant ‌/core/metrics/repository.py
+# 根目录是 FactorWeave-Quant ‌
 try:
     # This logic assumes a fixed directory structure.
     # A more robust solution might involve environment variables or a configuration file

@@ -64,7 +64,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 创建主窗口
         self._main_window = QMainWindow(parent)
-        self._main_window.setWindowTitle("YS-Quant‌ 2.0 股票分析系统")
+        self._main_window.setWindowTitle("FactorWeave-Quant ‌ 2.0 股票分析系统")
         self._main_window.setGeometry(100, 100, 1400, 900)
         self._main_window.setMinimumSize(1200, 800)
 
@@ -74,7 +74,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 窗口状态
         self._window_state = {
-            'title': 'YS-Quant‌ 2.0 股票分析系统',
+            'title': 'FactorWeave-Quant ‌ 2.0 股票分析系统',
             'geometry': (100, 100, 1400, 900),
             'min_size': (1200, 800),
             'is_maximized': False
@@ -1132,7 +1132,7 @@ Ctrl+F12 - 关于
         """关于对话框"""
         from PyQt5.QtWidgets import QMessageBox
         about_text = """
-YS-Quant‌ 2.0 (重构版本)
+FactorWeave-Quant ‌ 2.0 (重构版本)
 
 基于HIkyuu量化框架的股票分析工具
 
@@ -1146,7 +1146,7 @@ YS-Quant‌ 2.0 (重构版本)
 版本：2.0
 作者：HIkyuu开发团队
         """
-        QMessageBox.about(self._main_window, "关于 YS-Quant‌",
+        QMessageBox.about(self._main_window, "关于 FactorWeave-Quant ‌",
                           about_text.strip())
 
     # 高级功能菜单方法（保持原有实现）
@@ -1604,7 +1604,7 @@ YS-Quant‌ 2.0 (重构版本)
             QMessageBox.information(
                 self._main_window,
                 "启动向导",
-                "欢迎使用YS-Quant‌ 2.0！\n\n"
+                "欢迎使用FactorWeave-Quant ‌ 2.0！\n\n"
                 "主要功能：\n"
                 "1. 股票数据查看和分析\n"
                 "2. 技术指标计算和显示\n"
@@ -1717,7 +1717,7 @@ YS-Quant‌ 2.0 (重构版本)
                 QMessageBox.warning(
                     self._main_window,
                     "使用条款",
-                    "您必须同意数据使用条款才能使用YS-Quant‌系统。\n程序将退出。"
+                    "您必须同意数据使用条款才能使用FactorWeave-Quant ‌系统。\n程序将退出。"
                 )
                 # 延迟退出，让用户看到消息
                 from PyQt5.QtCore import QTimer

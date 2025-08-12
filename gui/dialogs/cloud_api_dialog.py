@@ -427,7 +427,6 @@ class CloudApiDialog(QDialog):
             self.test_connection_btn.setText("测试中...")
 
             # 在实际应用中，这里应该发送真实的HTTP请求
-            import time
             time.sleep(1)  # 模拟网络延迟
 
             self.test_connection_btn.setEnabled(True)

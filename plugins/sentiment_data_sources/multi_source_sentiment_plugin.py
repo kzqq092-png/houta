@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import logging
 
-from plugins.plugin_interface import PluginType, PluginCategory, PluginMetadata
+from core.plugin_types import PluginType, PluginCategory
 from .base_sentiment_plugin import BaseSentimentPlugin
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
@@ -55,23 +55,23 @@ class MultiSourceSentimentPlugin(BaseSentimentPlugin):
         }
 
     @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="多源情绪数据插件",
-            version="1.0.0",
-            author="HIkyuu-UI Team",
-            email="support@hikyuu.com",
-            website="https://github.com/hikyuu/hikyuu-ui",
-            license="MIT",
-            description="集成多种免费情绪分析API：FMP、Exorde、AI Market Mood等，提供全面的市场情绪数据",
-            plugin_type=PluginType.DATA_SOURCE,
-            category=PluginCategory.CORE,
-            dependencies=["requests>=2.25.0", "pandas>=1.3.0", "numpy>=1.20.0"],
-            min_hikyuu_version="1.0.0",
-            max_hikyuu_version="2.0.0",
-            documentation_url="https://site.financialmodelingprep.com/developer/docs",
-            tags=["sentiment", "emotion", "multi-source", "fmp", "exorde", "free"]
-        )
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "name": "多源情绪数据插件",
+            "version": "1.0.0",
+            "author": "FactorWeave-Quant  Team",
+            "email": "support@hikyuu.com",
+            "website": "https://github.com/hikyuu/FactorWeave-Quant ",
+            "license": "MIT",
+            "description": "集成多种免费情绪分析API：FMP、Exorde、AI Market Mood等，提供全面的市场情绪数据",
+            "plugin_type": PluginType.DATA_SOURCE,
+            "category": PluginCategory.CORE,
+            "dependencies": ["requests>=2.25.0", "pandas>=1.3.0", "numpy>=1.20.0"],
+            "min_hikyuu_version": "1.0.0",
+            "max_hikyuu_version": "2.0.0",
+            "documentation_url": "https://site.financialmodelingprep.com/developer/docs",
+            "tags": ["sentiment", "emotion", "multi-source", "fmp", "exorde", "free"]
+        }
 
     def _fetch_raw_sentiment_data(self, **kwargs) -> SentimentResponse:
         """获取原始情绪数据"""

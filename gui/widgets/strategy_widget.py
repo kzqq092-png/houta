@@ -520,7 +520,6 @@ class StrategyWidget(QWidget):
     def _load_strategy_config(self, filepath: str) -> dict:
         """从文件加载策略配置"""
         try:
-            import json
 
             with open(filepath, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
@@ -537,7 +536,6 @@ class StrategyWidget(QWidget):
     def load_strategy_config(self):
         """加载策略配置"""
         try:
-            import os
             from PyQt5.QtWidgets import QFileDialog
 
             # 选择配置文件
@@ -587,8 +585,6 @@ class StrategyWidget(QWidget):
     def get_saved_configs(self) -> list:
         """获取已保存的策略配置列表"""
         try:
-            import os
-            import json
 
             config_dir = "configs/strategies"
             if not os.path.exists(config_dir):
@@ -705,7 +701,6 @@ class StrategyWidget(QWidget):
                                                  QMessageBox.Yes | QMessageBox.No)
                     if reply == QMessageBox.Yes:
                         try:
-                            import os
                             os.remove(config['filepath'])
                             config_table.removeRow(current_row)
                             configs.pop(current_row)

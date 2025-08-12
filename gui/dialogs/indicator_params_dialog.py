@@ -420,8 +420,6 @@ class IndicatorParamsDialog(QDialog):
     def _save_preset(self):
         """保存当前参数为预设"""
         try:
-            import os
-            import json
             from datetime import datetime
             from PyQt5.QtWidgets import QInputDialog
 

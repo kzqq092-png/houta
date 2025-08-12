@@ -620,7 +620,6 @@ def get_indicator_inputs(indicator_name: str) -> list:
     # 尝试从数据库获取指标定义
     try:
         from db.models.indicator_models import IndicatorDatabase
-        import os
 
         db_path = os.path.join(os.path.dirname(
             __file__), '..', 'db', 'indicators.db')

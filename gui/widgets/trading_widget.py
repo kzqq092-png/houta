@@ -643,9 +643,6 @@ class TradingWidget(QWidget):
         try:
             from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView, QHeaderView, QPushButton, QDialog, QVBoxLayout, QLabel
             from PyQt5.QtGui import QFont, QColor, QBrush
-            import plotly.graph_objs as go
-            import plotly.io as pio
-            import pandas as pd
             # 1. 分组展示绩效、风险、交易指标
             perf = results.get('performance') or results.get('metrics') or {}
             risk = results.get('risk', {})
@@ -708,7 +705,6 @@ class TradingWidget(QWidget):
             if hasattr(self, 'trend_chart_area'):
                 self.trend_chart_area.setHtml("")
             else:
-                from PyQt5.QtWebEngineWidgets import QWebEngineView
                 self.trend_chart_area = QWebEngineView()
                 self.layout().addWidget(self.trend_chart_area)
             # 多策略对比数据结构：results['multi_strategy'] = {'策略A': {...}, '策略B': {...}}
@@ -1244,7 +1240,6 @@ class TradingWidget(QWidget):
     def _execute_analysis(self, strategy: str, params: dict) -> dict:
         """优化分析逻辑，提升性能和健壮性，标准化结果结构。"""
         import numpy as np
-        import threading
         results = {'strategy': strategy, 'signals': None,
                    'indicators': {}, 'metrics': {}, 'error': None}
         try:
@@ -1290,8 +1285,6 @@ class TradingWidget(QWidget):
             data = self._kdata_cache.get(cache_key)
             if data is None or data.empty:
                 # 通过服务容器获取股票数据
-                from core.containers import get_service_container
-                from core.services import StockService
 
                 service_container = get_service_container()
                 stock_service = service_container.get_service(StockService)

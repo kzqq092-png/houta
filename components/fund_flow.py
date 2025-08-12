@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QMutex, QMutexLocker
 from PyQt5.QtGui import QColor, QPalette, QPainter, QFont
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QBarSeries, QBarSet
 import matplotlib.pyplot as plt
@@ -12,6 +12,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+from concurrent.futures import ThreadPoolExecutor
 
 from core.stock_screener import DataManager, StockScreener
 from components.stock_screener import StockScreenerWidget
@@ -34,6 +35,361 @@ except ImportError:
 
 # 设置Qt全局字体
 QApplication.setFont(QFont("Microsoft YaHei", 10))
+
+
+class FlowDataCalculationWorker(QThread):
+    """资金流数据计算工作线程"""
+
+    # 信号定义
+    industry_flow_calculated = pyqtSignal(dict)  # 行业资金流计算完成
+    concept_flow_calculated = pyqtSignal(dict)   # 概念资金流计算完成
+    main_force_calculated = pyqtSignal(dict)     # 主力资金分析计算完成
+    north_flow_calculated = pyqtSignal(dict)     # 北向资金流计算完成
+    calculation_error = pyqtSignal(str)          # 计算错误
+    calculation_progress = pyqtSignal(int, str)  # 计算进度
+
+    def __init__(self, calculation_type: str, data: dict, parent=None):
+        super().__init__(parent)
+        self.calculation_type = calculation_type
+        self.data = data
+        self._mutex = QMutex()
+
+    def run(self):
+        """运行数据计算"""
+        try:
+            with QMutexLocker(self._mutex):
+                if self.calculation_type == "industry_flow":
+                    result = self._calculate_industry_flow()
+                    self.industry_flow_calculated.emit(result)
+                elif self.calculation_type == "concept_flow":
+                    result = self._calculate_concept_flow()
+                    self.concept_flow_calculated.emit(result)
+                elif self.calculation_type == "main_force":
+                    result = self._calculate_main_force_analysis()
+                    self.main_force_calculated.emit(result)
+                elif self.calculation_type == "north_flow":
+                    result = self._calculate_north_flow()
+                    self.north_flow_calculated.emit(result)
+
+        except Exception as e:
+            self.calculation_error.emit(f"{self.calculation_type}计算失败: {str(e)}")
+
+    def _calculate_industry_flow(self) -> dict:
+        """计算行业资金流向数据"""
+        self.calculation_progress.emit(10, "正在生成行业数据...")
+
+        # 生成模拟数据
+        industries = [
+            "医药生物", "计算机", "电子", "通信", "传媒",
+            "电气设备", "机械设备", "汽车", "食品饮料", "银行"
+        ]
+
+        self.calculation_progress.emit(30, "正在计算资金流向...")
+        inflows = np.random.uniform(10, 100, 10)
+        outflows = np.random.uniform(10, 100, 10)
+        net_flows = inflows - outflows
+        strengths = np.random.uniform(0, 100, 10)
+
+        self.calculation_progress.emit(60, "正在排序数据...")
+        sorted_indices = np.argsort(-net_flows)
+
+        self.calculation_progress.emit(90, "正在生成图表数据...")
+        # 获取前5个行业的数据用于图表
+        top5_idx = sorted_indices[:5]
+        top5_industries = [industries[i] for i in top5_idx]
+        top5_net_flows = [net_flows[i] for i in top5_idx]
+
+        self.calculation_progress.emit(100, "计算完成")
+
+        return {
+            'table_data': {
+                'industries': industries,
+                'inflows': inflows,
+                'outflows': outflows,
+                'net_flows': net_flows,
+                'strengths': strengths,
+                'sorted_indices': sorted_indices
+            },
+            'chart_data': {
+                'industries': top5_industries,
+                'net_flows': top5_net_flows
+            }
+        }
+
+    def _calculate_concept_flow(self) -> dict:
+        """计算概念资金流向数据"""
+        self.calculation_progress.emit(10, "正在生成概念数据...")
+
+        concepts = [
+            "人工智能", "新能源", "半导体", "5G", "云计算",
+            "区块链", "生物医药", "新材料", "智能驾驶", "元宇宙"
+        ]
+
+        self.calculation_progress.emit(30, "正在计算资金流向...")
+        inflows = np.random.uniform(10, 100, 10)
+        outflows = np.random.uniform(10, 100, 10)
+        net_flows = inflows - outflows
+        strengths = np.random.uniform(0, 100, 10)
+
+        self.calculation_progress.emit(60, "正在排序数据...")
+        sorted_indices = np.argsort(-net_flows)
+
+        self.calculation_progress.emit(90, "正在生成图表数据...")
+        top5_idx = sorted_indices[:5]
+        top5_concepts = [concepts[i] for i in top5_idx]
+        top5_net_flows = [net_flows[i] for i in top5_idx]
+
+        self.calculation_progress.emit(100, "计算完成")
+
+        return {
+            'table_data': {
+                'concepts': concepts,
+                'inflows': inflows,
+                'outflows': outflows,
+                'net_flows': net_flows,
+                'strengths': strengths,
+                'sorted_indices': sorted_indices
+            },
+            'chart_data': {
+                'concepts': top5_concepts,
+                'net_flows': top5_net_flows
+            }
+        }
+
+    def _calculate_main_force_analysis(self) -> dict:
+        """计算主力资金分析数据"""
+        self.calculation_progress.emit(20, "正在生成主力资金数据...")
+
+        # 生成模拟数据
+        dates = pd.date_range(end=pd.Timestamp.now(), periods=10, freq='D')
+        main_force_flow = np.random.normal(0, 50, 10)
+
+        self.calculation_progress.emit(50, "正在计算资金规模分布...")
+        sizes = ['超大单', '大单', '中单', '小单']
+        values = np.random.uniform(20, 40, 4)
+
+        self.calculation_progress.emit(80, "正在计算活跃度数据...")
+        activity_data = np.random.uniform(0, 1, (5, 5))
+        times = ['09:30', '10:30', '11:30', '14:00', '15:00']
+        types = ['买入', '卖出', '净买入', '净卖出', '成交额']
+
+        self.calculation_progress.emit(100, "计算完成")
+
+        return {
+            'flow_data': {
+                'dates': dates,
+                'flow': main_force_flow
+            },
+            'size_data': {
+                'sizes': sizes,
+                'values': values
+            },
+            'activity_data': {
+                'data': activity_data,
+                'times': times,
+                'types': types
+            }
+        }
+
+    def _calculate_north_flow(self) -> dict:
+        """计算北向资金流数据"""
+        self.calculation_progress.emit(30, "正在生成北向资金数据...")
+
+        # 生成模拟北向资金数据
+        dates = pd.date_range(end=pd.Timestamp.now(), periods=10, freq='D')
+        inflows = np.random.uniform(50, 200, 10)
+        outflows = np.random.uniform(30, 180, 10)
+
+        self.calculation_progress.emit(100, "计算完成")
+
+        return {
+            'dates': dates,
+            'inflows': inflows,
+            'outflows': outflows
+        }
+
+
+class ChartRenderingWorker(QThread):
+    """图表渲染工作线程"""
+
+    chart_rendered = pyqtSignal(str, object)  # 图表类型，渲染结果
+    rendering_error = pyqtSignal(str)
+    rendering_progress = pyqtSignal(int, str)
+
+    def __init__(self, chart_type: str, data: dict, figure: Figure, parent=None):
+        super().__init__(parent)
+        self.chart_type = chart_type
+        self.data = data
+        self.figure = figure
+        self._mutex = QMutex()
+
+    def run(self):
+        """运行图表渲染"""
+        try:
+            with QMutexLocker(self._mutex):
+                if self.chart_type == "industry_chart":
+                    self._render_industry_chart()
+                elif self.chart_type == "concept_chart":
+                    self._render_concept_chart()
+                elif self.chart_type == "main_force_chart":
+                    self._render_main_force_chart()
+
+                self.chart_rendered.emit(self.chart_type, None)
+
+        except Exception as e:
+            self.rendering_error.emit(f"{self.chart_type}渲染失败: {str(e)}")
+
+    def _render_industry_chart(self):
+        """渲染行业资金流图表"""
+        self.rendering_progress.emit(20, "正在清理图表...")
+        self.figure.clear()
+
+        self.rendering_progress.emit(50, "正在绘制图表...")
+        ax = self.figure.add_subplot(111)
+
+        chart_data = self.data['chart_data']
+        industries = chart_data['industries']
+        net_flows = chart_data['net_flows']
+
+        # 绘制水平条形图
+        bars = ax.barh(industries, net_flows)
+
+        # 设置条形图颜色
+        for i, bar in enumerate(bars):
+            bar.set_color('#4CAF50' if net_flows[i] >= 0 else '#F44336')
+
+        # 添加数值标签
+        for i, v in enumerate(net_flows):
+            ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
+                    va='center', ha='left' if v >= 0 else 'right')
+
+        self.rendering_progress.emit(80, "正在添加统计信息...")
+
+        # 添加统计信息
+        table_data = self.data['table_data']
+        net_flows_full = table_data['net_flows']
+        net_max = net_flows_full.max()
+        net_min = net_flows_full.min()
+        net_mean = net_flows_full.mean()
+        net_sum = net_flows_full.sum()
+
+        ax.text(0.5, 1.05, f"净流入  最大: {net_max:.3f}亿  最小: {net_min:.3f}亿  均值: {net_mean:.3f}亿  合计: {net_sum:.3f}亿",
+                transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
+
+        ax.set_title('行业资金流向TOP5')
+        ax.grid(True, alpha=0.3)
+
+        self.rendering_progress.emit(100, "图表渲染完成")
+        self.figure.tight_layout()
+
+    def _render_concept_chart(self):
+        """渲染概念资金流图表"""
+        self.rendering_progress.emit(20, "正在清理图表...")
+        self.figure.clear()
+
+        self.rendering_progress.emit(50, "正在绘制图表...")
+        ax = self.figure.add_subplot(111)
+
+        chart_data = self.data['chart_data']
+        concepts = chart_data['concepts']
+        net_flows = chart_data['net_flows']
+
+        # 绘制水平条形图
+        bars = ax.barh(concepts, net_flows)
+
+        # 设置条形图颜色
+        for i, bar in enumerate(bars):
+            bar.set_color('#4CAF50' if net_flows[i] >= 0 else '#F44336')
+
+        # 添加数值标签
+        for i, v in enumerate(net_flows):
+            ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
+                    va='center', ha='left' if v >= 0 else 'right')
+
+        self.rendering_progress.emit(80, "正在添加统计信息...")
+
+        # 添加统计信息
+        table_data = self.data['table_data']
+        net_flows_full = table_data['net_flows']
+        net_max = net_flows_full.max()
+        net_min = net_flows_full.min()
+        net_mean = net_flows_full.mean()
+        net_sum = net_flows_full.sum()
+
+        ax.text(0.5, 1.05, f"净流入  最大: {net_max:.3f}亿  最小: {net_min:.3f}亿  均值: {net_mean:.3f}亿  合计: {net_sum:.3f}亿",
+                transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
+
+        ax.set_title('概念资金流向TOP5')
+        ax.grid(True, alpha=0.3)
+
+        self.rendering_progress.emit(100, "图表渲染完成")
+        self.figure.tight_layout()
+
+    def _render_main_force_chart(self):
+        """渲染主力资金分析图表"""
+        self.rendering_progress.emit(10, "正在清理图表...")
+        self.figure.clear()
+
+        self.rendering_progress.emit(30, "正在创建图表布局...")
+        gs = self.figure.add_gridspec(1, 3)
+        ax1 = self.figure.add_subplot(gs[0])  # 主力净流入
+        ax2 = self.figure.add_subplot(gs[1])  # 资金规模分布
+        ax3 = self.figure.add_subplot(gs[2])  # 主力活跃度
+
+        # 1. 主力净流入趋势
+        self.rendering_progress.emit(50, "正在绘制主力净流入...")
+        flow_data = self.data['flow_data']
+        dates = flow_data['dates']
+        main_force_flow = flow_data['flow']
+
+        bars = ax1.bar(dates, main_force_flow)
+        for i, bar in enumerate(bars):
+            bar.set_color('#4CAF50' if main_force_flow[i] >= 0 else '#F44336')
+
+        ax1.set_title('主力净流入趋势')
+        ax1.tick_params(axis='x', rotation=45)
+
+        # 添加统计信息
+        mf_max = main_force_flow.max()
+        mf_min = main_force_flow.min()
+        mf_mean = main_force_flow.mean()
+        mf_sum = main_force_flow.sum()
+        ax1.text(0.5, 1.05, f"最大: {mf_max:.3f}  最小: {mf_min:.3f}  均值: {mf_mean:.3f}  合计: {mf_sum:.3f}",
+                 transform=ax1.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
+
+        # 2. 资金规模分布
+        self.rendering_progress.emit(70, "正在绘制资金规模分布...")
+        size_data = self.data['size_data']
+        sizes = size_data['sizes']
+        values = size_data['values']
+        colors = ['#2196F3', '#4CAF50', '#FFC107', '#FF5722']
+
+        ax2.pie(values, labels=sizes, colors=colors, autopct='%1.1f%%')
+        ax2.set_title('资金规模分布')
+
+        # 添加总金额
+        total_value = values.sum()
+        ax2.text(0.5, 1.08, f"总金额: {total_value:.3f}", transform=ax2.transAxes,
+                 ha='center', va='bottom', fontsize=11, color='#2196F3')
+
+        # 3. 主力活跃度热力图
+        self.rendering_progress.emit(90, "正在绘制活跃度热力图...")
+        activity_data = self.data['activity_data']
+        activity_matrix = activity_data['data']
+        times = activity_data['times']
+        types = activity_data['types']
+
+        sns.heatmap(activity_matrix, annot=True, fmt='.2f', cmap='RdYlGn',
+                    xticklabels=times, yticklabels=types, ax=ax3)
+        ax3.set_title('主力活跃度分析')
+
+        # 添加均值
+        act_mean = activity_matrix.mean()
+        ax3.text(0.5, 1.05, f"均值: {act_mean:.3f}", transform=ax3.transAxes,
+                 ha='center', va='bottom', fontsize=11, color='#f57c00')
+
+        self.rendering_progress.emit(100, "图表渲染完成")
+        self.figure.tight_layout()
 
 
 class DataUpdateThread(QThread):
@@ -84,6 +440,13 @@ class FundFlowWidget(BaseAnalysisTab):
         self.template_manager = TemplateManager(
             template_dir="templates/fund_flow")
         self.main_layout = QVBoxLayout(self)
+
+        # 异步处理相关属性
+        self._calculation_worker = None
+        self._rendering_worker = None
+        self._thread_pool = ThreadPoolExecutor(max_workers=4)
+        self._update_mutex = QMutex()
+
         self.init_ui()
 
     def init_ui(self):
@@ -144,31 +507,77 @@ class FundFlowWidget(BaseAnalysisTab):
             self.update_thread.start()
 
     def _fetch_fund_flow_data(self) -> dict:
-        """获取资金流数据 - 统一的数据获取方法"""
-        if hasattr(self.data_manager, 'get_fund_flow'):
+        """获取资金流数据 - 使用真实数据源"""
+        try:
+            # 确保数据管理器存在
+            if not self.data_manager:
+                self.log_manager.warning("数据管理器未初始化，无法获取资金流数据")
+                return self._get_empty_fund_flow_data()
+
+            # 获取真实资金流数据
             data = self.data_manager.get_fund_flow()
 
+            # 验证数据结构
+            if not isinstance(data, dict):
+                self.log_manager.warning("资金流数据格式不正确")
+                return self._get_empty_fund_flow_data()
+
+            # 数据预处理和格式化
+            processed_data = {}
+
+            # 处理板块资金流排行数据
+            if 'sector_flow_rank' in data and not data['sector_flow_rank'].empty:
+                sector_df = data['sector_flow_rank']
+                # 标准化列名
+                if '板块' in sector_df.columns:
+                    sector_df = sector_df.rename(columns={'板块': 'industry'})
+                if '今日主力净流入-净额' in sector_df.columns:
+                    sector_df = sector_df.rename(columns={'今日主力净流入-净额': 'net_inflow'})
+                elif '主力净流入-净额' in sector_df.columns:
+                    sector_df = sector_df.rename(columns={'主力净流入-净额': 'net_inflow'})
+
+                processed_data['industry_flow'] = sector_df
+                self.log_manager.info(f"板块资金流数据获取成功，共 {len(sector_df)} 条记录")
+            else:
+                processed_data['industry_flow'] = pd.DataFrame()
+
+            # 处理大盘资金流数据
+            if 'market_fund_flow' in data and not data['market_fund_flow'].empty:
+                market_df = data['market_fund_flow']
+                processed_data['north_flow'] = market_df
+                self.log_manager.info(f"大盘资金流数据获取成功，共 {len(market_df)} 条记录")
+            else:
+                processed_data['north_flow'] = pd.DataFrame()
+
+            # 处理主力资金流数据
+            if 'main_fund_flow' in data and not data['main_fund_flow'].empty:
+                main_df = data['main_fund_flow']
+                processed_data['main_force'] = main_df
+                self.log_manager.info(f"主力资金流数据获取成功，共 {len(main_df)} 条记录")
+            else:
+                processed_data['main_force'] = pd.DataFrame()
+
             # 自动补全所有DataFrame中的code字段
-            for k, v in data.items():
+            for k, v in processed_data.items():
                 if isinstance(v, pd.DataFrame) and 'code' not in v.columns and hasattr(self.data_manager, 'current_stock'):
                     v = v.copy()
-                    v['code'] = getattr(self.data_manager,
-                                        'current_stock', None)
-                    data[k] = v
+                    v['code'] = getattr(self.data_manager, 'current_stock', None)
+                    processed_data[k] = v
 
-            return data
-        else:
-            # 模拟数据
-            return {
-                'north_flow': pd.DataFrame({
-                    'date': pd.date_range('2024-01-01', periods=30),
-                    'net_inflow': np.random.randn(30) * 1000000
-                }),
-                'industry_flow': pd.DataFrame({
-                    'industry': ['科技', '金融', '医药', '消费', '地产'],
-                    'net_inflow': np.random.randn(5) * 100000000
-                })
-            }
+            self.log_manager.info("资金流数据获取和处理完成")
+            return processed_data
+
+        except Exception as e:
+            self.log_manager.error(f"获取资金流数据失败: {str(e)}")
+            return self._get_empty_fund_flow_data()
+
+    def _get_empty_fund_flow_data(self) -> dict:
+        """获取空的资金流数据结构"""
+        return {
+            'north_flow': pd.DataFrame(),
+            'industry_flow': pd.DataFrame(),
+            'main_force': pd.DataFrame()
+        }
 
     def create_control_buttons(self, layout):
         """创建控制按钮 - 使用基类统一方法"""
@@ -415,7 +824,6 @@ class FundFlowWidget(BaseAnalysisTab):
                 pass
             button.clicked.connect(lambda: self._run_analysis_async(
                 button, analysis_func, *args, **kwargs))
-        from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
             self._thread_pool = ThreadPoolExecutor(max_workers=2)
         future = self._thread_pool.submit(task)
@@ -504,24 +912,39 @@ class FundFlowWidget(BaseAnalysisTab):
             self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
 
     def _update_north_flow(self, data):
-        """更新北向资金流向图表"""
-        self.north_chart.removeAllSeries()
+        """异步更新北向资金流向图表"""
+        try:
+            # 使用QTimer.singleShot确保在主线程中执行UI更新
+            QTimer.singleShot(0, lambda: self._update_north_flow_ui(data))
+        except Exception as e:
+            self.log_manager.error(f"更新北向资金流向图表失败: {str(e)}")
 
-        # 创建流入流出柱状图
-        bar_set_in = QBarSet("流入")
-        bar_set_out = QBarSet("流出")
+    def _update_north_flow_ui(self, data):
+        """在主线程中更新北向资金流向图表UI"""
+        try:
+            self.north_chart.removeAllSeries()
 
-        # 添加数据
-        for date, values in data.get('north_flow', {}).items():
-            bar_set_in.append(values['inflow'])
-            bar_set_out.append(values['outflow'])
+            # 创建流入流出柱状图
+            bar_set_in = QBarSet("流入")
+            bar_set_out = QBarSet("流出")
 
-        series = QBarSeries()
-        series.append(bar_set_in)
-        series.append(bar_set_out)
+            # 添加数据
+            north_flow_data = data.get('north_flow', {})
+            if isinstance(north_flow_data, dict):
+                for date, values in north_flow_data.items():
+                    if isinstance(values, dict):
+                        bar_set_in.append(values.get('inflow', 0))
+                        bar_set_out.append(values.get('outflow', 0))
 
-        self.north_chart.addSeries(series)
-        self.north_chart.createDefaultAxes()
+            series = QBarSeries()
+            series.append(bar_set_in)
+            series.append(bar_set_out)
+
+            self.north_chart.addSeries(series)
+            self.north_chart.createDefaultAxes()
+
+        except Exception as e:
+            self.log_manager.error(f"北向资金流向图表UI更新失败: {str(e)}")
 
     def _check_alerts(self, data):
         """检查预警条件"""
@@ -530,28 +953,60 @@ class FundFlowWidget(BaseAnalysisTab):
             if value >= alert['threshold']:
                 alert['callback'](indicator, value)
 
-    def closeEvent(self, event):
-        """关闭事件处理"""
-        if hasattr(self, 'update_thread'):
-            self.update_thread.stop()
-            self.update_thread.wait()
-        super().closeEvent(event)
-
     def update_industry_flow(self):
-        """更新行业资金流向"""
+        """异步更新行业资金流向"""
         try:
-            # 生成模拟数据
-            industries = [
-                "医药生物", "计算机", "电子", "通信", "传媒",
-                "电气设备", "机械设备", "汽车", "食品饮料", "银行"
-            ]
-            inflows = np.random.uniform(10, 100, 10)
-            outflows = np.random.uniform(10, 100, 10)
-            net_flows = inflows - outflows
-            strengths = np.random.uniform(0, 100, 10)  # 资金强度指标
+            with QMutexLocker(self._update_mutex):
+                # 停止现有的计算工作线程
+                if self._calculation_worker and self._calculation_worker.isRunning():
+                    self._calculation_worker.quit()
+                    self._calculation_worker.wait()
 
-            # 按净流入排序
-            sorted_indices = np.argsort(-net_flows)
+                # 创建新的计算工作线程
+                self._calculation_worker = FlowDataCalculationWorker("industry_flow", {})
+                self._calculation_worker.industry_flow_calculated.connect(self._on_industry_flow_calculated)
+                self._calculation_worker.calculation_error.connect(self._on_calculation_error)
+                self._calculation_worker.calculation_progress.connect(self._on_calculation_progress)
+
+                # 启动异步计算
+                self._calculation_worker.start()
+
+                # 显示加载状态
+                self._show_loading_status("正在更新行业资金流向...")
+
+        except Exception as e:
+            self.log_manager.error(f"启动行业资金流向更新失败: {str(e)}")
+
+    def _on_industry_flow_calculated(self, result: dict):
+        """处理行业资金流计算结果"""
+        try:
+            table_data = result['table_data']
+
+            # 更新表格数据
+            self._update_industry_table(table_data)
+
+            # 异步渲染图表
+            if self._rendering_worker and self._rendering_worker.isRunning():
+                self._rendering_worker.quit()
+                self._rendering_worker.wait()
+
+            self._rendering_worker = ChartRenderingWorker("industry_chart", result, self.industry_figure)
+            self._rendering_worker.chart_rendered.connect(self._on_industry_chart_rendered)
+            self._rendering_worker.rendering_error.connect(self._on_rendering_error)
+            self._rendering_worker.start()
+
+        except Exception as e:
+            self.log_manager.error(f"处理行业资金流计算结果失败: {str(e)}")
+
+    def _update_industry_table(self, table_data: dict):
+        """更新行业资金流表格（在主线程中执行）"""
+        try:
+            industries = table_data['industries']
+            inflows = table_data['inflows']
+            outflows = table_data['outflows']
+            net_flows = table_data['net_flows']
+            strengths = table_data['strengths']
+            sorted_indices = table_data['sorted_indices']
 
             # 更新表格
             for i, idx in enumerate(sorted_indices):
@@ -569,9 +1024,11 @@ class FundFlowWidget(BaseAnalysisTab):
                         item.setForeground(
                             QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.industry_table.setItem(i, j, item)
+
             # 添加合计、均值行
             row_count = len(industries)
             self.industry_table.setRowCount(row_count + 2)
+
             # 合计行
             sum_items = [QTableWidgetItem("合计"),
                          QTableWidgetItem(f"{net_flows.sum():.3f}"),
@@ -582,6 +1039,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 item.setBackground(QColor("#e3f2fd"))
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.industry_table.setItem(row_count, j, item)
+
             # 均值行
             mean_items = [QTableWidgetItem("均值"),
                           QTableWidgetItem(f"{net_flows.mean():.3f}"),
@@ -592,75 +1050,83 @@ class FundFlowWidget(BaseAnalysisTab):
                 item.setBackground(QColor("#fffde7"))
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.industry_table.setItem(row_count + 1, j, item)
+
             # 极值高亮
             max_net_idx = np.argmax(net_flows)
             min_net_idx = np.argmin(net_flows)
             max_str_idx = np.argmax(strengths)
             min_str_idx = np.argmin(strengths)
-            self.industry_table.item(
-                max_net_idx, 1).setBackground(QColor("#ffe082"))
-            self.industry_table.item(
-                min_net_idx, 1).setBackground(QColor("#ffccbc"))
-            self.industry_table.item(
-                max_str_idx, 4).setBackground(QColor("#b2ff59"))
-            self.industry_table.item(
-                min_str_idx, 4).setBackground(QColor("#ffcdd2"))
-
-            # 更新行业资金流向图表
-            self.industry_figure.clear()
-            ax = self.industry_figure.add_subplot(111)
-
-            # 获取前5个行业的数据
-            top5_idx = sorted_indices[:5]
-            top5_industries = [industries[i] for i in top5_idx]
-            top5_net_flows = [net_flows[i] for i in top5_idx]
-
-            # 绘制水平条形图
-            bars = ax.barh(top5_industries, top5_net_flows)
-
-            # 设置条形图颜色
-            for i, bar in enumerate(bars):
-                bar.set_color(
-                    '#4CAF50' if top5_net_flows[i] >= 0 else '#F44336')
-
-            # 添加数值标签
-            for i, v in enumerate(top5_net_flows):
-                ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
-                        va='center', ha='left' if v >= 0 else 'right')
-
-            # 顶部显示净流入最大、最小、均值、合计
-            net_max = net_flows.max()
-            net_min = net_flows.min()
-            net_mean = net_flows.mean()
-            net_sum = net_flows.sum()
-            ax.text(0.5, 1.05, f"净流入  最大: {net_max:.3f}亿  最小: {net_min:.3f}亿  均值: {net_mean:.3f}亿  合计: {net_sum:.3f}亿",
-                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
-
-            ax.set_title('行业资金流向TOP5')
-            ax.grid(True, alpha=0.3)
-
-            # 调整布局
-            self.industry_figure.tight_layout()
-            self.industry_canvas.draw()
+            self.industry_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.industry_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.industry_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.industry_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
         except Exception as e:
-            print(f"更新行业资金流向失败: {str(e)}")
+            self.log_manager.error(f"更新行业资金流表格失败: {str(e)}")
+
+    def _on_industry_chart_rendered(self, chart_type: str, result):
+        """处理行业图表渲染完成"""
+        try:
+            self.industry_canvas.draw()
+            self._hide_loading_status()
+            self.log_manager.info("行业资金流向更新完成")
+        except Exception as e:
+            self.log_manager.error(f"行业图表渲染完成处理失败: {str(e)}")
 
     def update_concept_flow(self):
-        """更新概念资金流向"""
+        """异步更新概念资金流向"""
         try:
-            # 生成模拟数据
-            concepts = [
-                "人工智能", "新能源", "半导体", "5G", "云计算",
-                "区块链", "生物医药", "新材料", "智能驾驶", "元宇宙"
-            ]
-            inflows = np.random.uniform(10, 100, 10)
-            outflows = np.random.uniform(10, 100, 10)
-            net_flows = inflows - outflows
-            strengths = np.random.uniform(0, 100, 10)  # 资金强度指标
+            with QMutexLocker(self._update_mutex):
+                # 停止现有的计算工作线程
+                if self._calculation_worker and self._calculation_worker.isRunning():
+                    self._calculation_worker.quit()
+                    self._calculation_worker.wait()
 
-            # 按净流入排序
-            sorted_indices = np.argsort(-net_flows)
+                # 创建新的计算工作线程
+                self._calculation_worker = FlowDataCalculationWorker("concept_flow", {})
+                self._calculation_worker.concept_flow_calculated.connect(self._on_concept_flow_calculated)
+                self._calculation_worker.calculation_error.connect(self._on_calculation_error)
+                self._calculation_worker.calculation_progress.connect(self._on_calculation_progress)
+
+                # 启动异步计算
+                self._calculation_worker.start()
+
+                # 显示加载状态
+                self._show_loading_status("正在更新概念资金流向...")
+
+        except Exception as e:
+            self.log_manager.error(f"启动概念资金流向更新失败: {str(e)}")
+
+    def _on_concept_flow_calculated(self, result: dict):
+        """处理概念资金流计算结果"""
+        try:
+            table_data = result['table_data']
+
+            # 更新表格数据
+            self._update_concept_table(table_data)
+
+            # 异步渲染图表
+            if self._rendering_worker and self._rendering_worker.isRunning():
+                self._rendering_worker.quit()
+                self._rendering_worker.wait()
+
+            self._rendering_worker = ChartRenderingWorker("concept_chart", result, self.concept_figure)
+            self._rendering_worker.chart_rendered.connect(self._on_concept_chart_rendered)
+            self._rendering_worker.rendering_error.connect(self._on_rendering_error)
+            self._rendering_worker.start()
+
+        except Exception as e:
+            self.log_manager.error(f"处理概念资金流计算结果失败: {str(e)}")
+
+    def _update_concept_table(self, table_data: dict):
+        """更新概念资金流表格（在主线程中执行）"""
+        try:
+            concepts = table_data['concepts']
+            inflows = table_data['inflows']
+            outflows = table_data['outflows']
+            net_flows = table_data['net_flows']
+            strengths = table_data['strengths']
+            sorted_indices = table_data['sorted_indices']
 
             # 更新表格
             for i, idx in enumerate(sorted_indices):
@@ -678,9 +1144,11 @@ class FundFlowWidget(BaseAnalysisTab):
                         item.setForeground(
                             QColor("#4CAF50" if net_flows[idx] >= 0 else "#F44336"))
                     self.concept_table.setItem(i, j, item)
+
             # 添加合计、均值行
             row_count = len(concepts)
             self.concept_table.setRowCount(row_count + 2)
+
             # 合计行
             sum_items = [QTableWidgetItem("合计"),
                          QTableWidgetItem(f"{net_flows.sum():.3f}"),
@@ -691,6 +1159,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 item.setBackground(QColor("#e3f2fd"))
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.concept_table.setItem(row_count, j, item)
+
             # 均值行
             mean_items = [QTableWidgetItem("均值"),
                           QTableWidgetItem(f"{net_flows.mean():.3f}"),
@@ -701,120 +1170,152 @@ class FundFlowWidget(BaseAnalysisTab):
                 item.setBackground(QColor("#fffde7"))
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.concept_table.setItem(row_count + 1, j, item)
+
             # 极值高亮
             max_net_idx = np.argmax(net_flows)
             min_net_idx = np.argmin(net_flows)
             max_str_idx = np.argmax(strengths)
             min_str_idx = np.argmin(strengths)
-            self.concept_table.item(
-                max_net_idx, 1).setBackground(QColor("#ffe082"))
-            self.concept_table.item(
-                min_net_idx, 1).setBackground(QColor("#ffccbc"))
-            self.concept_table.item(
-                max_str_idx, 4).setBackground(QColor("#b2ff59"))
-            self.concept_table.item(
-                min_str_idx, 4).setBackground(QColor("#ffcdd2"))
-
-            # 更新概念资金流向图表
-            self.concept_figure.clear()
-            ax = self.concept_figure.add_subplot(111)
-
-            # 获取前5个概念的数据
-            top5_idx = sorted_indices[:5]
-            top5_concepts = [concepts[i] for i in top5_idx]
-            top5_net_flows = [net_flows[i] for i in top5_idx]
-
-            # 绘制水平条形图
-            bars = ax.barh(top5_concepts, top5_net_flows)
-
-            # 设置条形图颜色
-            for i, bar in enumerate(bars):
-                bar.set_color(
-                    '#4CAF50' if top5_net_flows[i] >= 0 else '#F44336')
-
-            # 添加数值标签
-            for i, v in enumerate(top5_net_flows):
-                ax.text(v + (1 if v >= 0 else -1), i, f'{v:.1f}亿',
-                        va='center', ha='left' if v >= 0 else 'right')
-
-            # 顶部显示净流入最大、最小、均值、合计
-            net_max = net_flows.max()
-            net_min = net_flows.min()
-            net_mean = net_flows.mean()
-            net_sum = net_flows.sum()
-            ax.text(0.5, 1.05, f"净流入  最大: {net_max:.3f}亿  最小: {net_min:.3f}亿  均值: {net_mean:.3f}亿  合计: {net_sum:.3f}亿",
-                    transform=ax.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
-
-            ax.set_title('概念资金流向TOP5')
-            ax.grid(True, alpha=0.3)
-
-            # 调整布局
-            self.concept_figure.tight_layout()
-            self.concept_canvas.draw()
+            self.concept_table.item(max_net_idx, 1).setBackground(QColor("#ffe082"))
+            self.concept_table.item(min_net_idx, 1).setBackground(QColor("#ffccbc"))
+            self.concept_table.item(max_str_idx, 4).setBackground(QColor("#b2ff59"))
+            self.concept_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
         except Exception as e:
-            print(f"更新概念资金流向失败: {str(e)}")
+            self.log_manager.error(f"更新概念资金流表格失败: {str(e)}")
+
+    def _on_concept_chart_rendered(self, chart_type: str, result):
+        """处理概念图表渲染完成"""
+        try:
+            self.concept_canvas.draw()
+            self._hide_loading_status()
+            self.log_manager.info("概念资金流向更新完成")
+        except Exception as e:
+            self.log_manager.error(f"概念图表渲染完成处理失败: {str(e)}")
 
     def update_main_force_analysis(self):
-        """更新主力资金分析"""
+        """异步更新主力资金分析"""
         try:
-            self.main_force_figure.clear()
+            with QMutexLocker(self._update_mutex):
+                # 停止现有的计算工作线程
+                if self._calculation_worker and self._calculation_worker.isRunning():
+                    self._calculation_worker.quit()
+                    self._calculation_worker.wait()
 
-            # 创建网格布局
-            gs = self.main_force_figure.add_gridspec(1, 3)
-            ax1 = self.main_force_figure.add_subplot(gs[0])  # 主力净流入
-            ax2 = self.main_force_figure.add_subplot(gs[1])  # 资金规模分布
-            ax3 = self.main_force_figure.add_subplot(gs[2])  # 主力活跃度
+                # 创建新的计算工作线程
+                self._calculation_worker = FlowDataCalculationWorker("main_force", {})
+                self._calculation_worker.main_force_calculated.connect(self._on_main_force_calculated)
+                self._calculation_worker.calculation_error.connect(self._on_calculation_error)
+                self._calculation_worker.calculation_progress.connect(self._on_calculation_progress)
 
-            # 生成模拟数据
-            dates = pd.date_range(end=pd.Timestamp.now(), periods=10, freq='D')
-            main_force_flow = np.random.normal(0, 50, 10)
+                # 启动异步计算
+                self._calculation_worker.start()
 
-            # 1. 主力净流入趋势
-            bars = ax1.bar(dates, main_force_flow)
-            for i, bar in enumerate(bars):
-                bar.set_color(
-                    '#4CAF50' if main_force_flow[i] >= 0 else '#F44336')
-            ax1.set_title('主力净流入趋势')
-            ax1.tick_params(axis='x', rotation=45)
-            # 顶部显示最大、最小、均值、合计
-            mf_max = main_force_flow.max()
-            mf_min = main_force_flow.min()
-            mf_mean = main_force_flow.mean()
-            mf_sum = main_force_flow.sum()
-            ax1.text(0.5, 1.05, f"最大: {mf_max:.3f}  最小: {mf_min:.3f}  均值: {mf_mean:.3f}  合计: {mf_sum:.3f}",
-                     transform=ax1.transAxes, ha='center', va='bottom', fontsize=11, color='#1976d2')
-
-            # 2. 资金规模分布
-            sizes = ['超大单', '大单', '中单', '小单']
-            values = np.random.uniform(20, 40, 4)
-            colors = ['#2196F3', '#4CAF50', '#FFC107', '#FF5722']
-            ax2.pie(values, labels=sizes, colors=colors, autopct='%1.1f%%')
-            ax2.set_title('资金规模分布')
-            # 顶部显示总金额
-            total_value = values.sum()
-            ax2.text(0.5, 1.08, f"总金额: {total_value:.3f}", transform=ax2.transAxes,
-                     ha='center', va='bottom', fontsize=11, color='#2196F3')
-
-            # 3. 主力活跃度热力图
-            activity_data = np.random.uniform(0, 1, (5, 5))
-            times = ['09:30', '10:30', '11:30', '14:00', '15:00']
-            types = ['买入', '卖出', '净买入', '净卖出', '成交额']
-
-            sns.heatmap(activity_data, annot=True, fmt='.2f', cmap='RdYlGn',
-                        xticklabels=times, yticklabels=types, ax=ax3)
-            ax3.set_title('主力活跃度分析')
-            # 顶部显示均值
-            act_mean = activity_data.mean()
-            ax3.text(0.5, 1.05, f"均值: {act_mean:.3f}", transform=ax3.transAxes,
-                     ha='center', va='bottom', fontsize=11, color='#f57c00')
-
-            # 调整布局
-            self.main_force_figure.tight_layout()
-            self.main_force_canvas.draw()
+                # 显示加载状态
+                self._show_loading_status("正在更新主力资金分析...")
 
         except Exception as e:
-            print(f"更新主力资金分析失败: {str(e)}")
+            self.log_manager.error(f"启动主力资金分析更新失败: {str(e)}")
+
+    def _on_main_force_calculated(self, result: dict):
+        """处理主力资金分析计算结果"""
+        try:
+            # 异步渲染图表
+            if self._rendering_worker and self._rendering_worker.isRunning():
+                self._rendering_worker.quit()
+                self._rendering_worker.wait()
+
+            self._rendering_worker = ChartRenderingWorker("main_force_chart", result, self.main_force_figure)
+            self._rendering_worker.chart_rendered.connect(self._on_main_force_chart_rendered)
+            self._rendering_worker.rendering_error.connect(self._on_rendering_error)
+            self._rendering_worker.start()
+
+        except Exception as e:
+            self.log_manager.error(f"处理主力资金分析计算结果失败: {str(e)}")
+
+    def _on_main_force_chart_rendered(self, chart_type: str, result):
+        """处理主力资金分析图表渲染完成"""
+        try:
+            self.main_force_canvas.draw()
+            self._hide_loading_status()
+            self.log_manager.info("主力资金分析更新完成")
+        except Exception as e:
+            self.log_manager.error(f"主力资金分析图表渲染完成处理失败: {str(e)}")
+
+    # 添加辅助方法
+    def _show_loading_status(self, message: str):
+        """显示加载状态"""
+        try:
+            # 可以在这里添加加载状态的UI显示
+            if hasattr(self, 'log_manager'):
+                self.log_manager.info(message)
+        except Exception as e:
+            print(f"显示加载状态失败: {str(e)}")
+
+    def _hide_loading_status(self):
+        """隐藏加载状态"""
+        try:
+            # 可以在这里隐藏加载状态的UI显示
+            pass
+        except Exception as e:
+            print(f"隐藏加载状态失败: {str(e)}")
+
+    def _on_calculation_error(self, error_message: str):
+        """处理计算错误"""
+        try:
+            self._hide_loading_status()
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"资金流数据计算错误: {error_message}")
+            else:
+                print(f"资金流数据计算错误: {error_message}")
+        except Exception as e:
+            print(f"处理计算错误失败: {str(e)}")
+
+    def _on_rendering_error(self, error_message: str):
+        """处理渲染错误"""
+        try:
+            self._hide_loading_status()
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"图表渲染错误: {error_message}")
+            else:
+                print(f"图表渲染错误: {error_message}")
+        except Exception as e:
+            print(f"处理渲染错误失败: {str(e)}")
+
+    def _on_calculation_progress(self, progress: int, message: str):
+        """处理计算进度"""
+        try:
+            # 可以在这里更新进度显示
+            if hasattr(self, 'log_manager'):
+                self.log_manager.debug(f"计算进度 {progress}%: {message}")
+        except Exception as e:
+            print(f"处理计算进度失败: {str(e)}")
+
+    def closeEvent(self, event):
+        """关闭事件处理 - 清理资源"""
+        try:
+            # 停止所有工作线程
+            if self._calculation_worker and self._calculation_worker.isRunning():
+                self._calculation_worker.quit()
+                self._calculation_worker.wait()
+
+            if self._rendering_worker and self._rendering_worker.isRunning():
+                self._rendering_worker.quit()
+                self._rendering_worker.wait()
+
+            # 关闭线程池
+            if hasattr(self, '_thread_pool'):
+                self._thread_pool.shutdown(wait=True)
+
+            # 停止数据更新线程
+            if hasattr(self, 'update_thread'):
+                self.update_thread.stop()
+                self.update_thread.wait()
+
+        except Exception as e:
+            print(f"关闭资源时出错: {str(e)}")
+        finally:
+            super().closeEvent(event)
 
     def show_template_manager_dialog(self):
         """显示模板管理对话框 - 使用基类统一方法"""

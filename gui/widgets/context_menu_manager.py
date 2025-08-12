@@ -715,7 +715,6 @@ class ContextMenuManager(QObject):
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
-    import sys
 
     app = QApplication(sys.argv)
 

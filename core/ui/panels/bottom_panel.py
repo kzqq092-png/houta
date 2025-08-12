@@ -225,7 +225,7 @@ class BottomPanel(BasePanel):
     def _add_welcome_logs(self):
         """添加欢迎日志"""
         logger = logging.getLogger(__name__)
-        logger.info("YS-Quant‌ 2.0 系统启动成功")
+        logger.info("FactorWeave-Quant ‌ 2.0 系统启动成功")
         logger.info("日志系统已初始化")
         logger.debug("调试模式已启用")
 

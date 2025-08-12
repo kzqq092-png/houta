@@ -90,16 +90,96 @@ class SentimentDataService(QObject):
         try:
             from plugins.sentiment_data_sources.akshare_sentiment_plugin import AkShareSentimentPlugin
             akshare_plugin = AkShareSentimentPlugin()
-            self.register_plugin('akshare_sentiment', akshare_plugin, priority=10, weight=1.0)
+            # 使用与插件管理器一致的全限定键，确保数据库与UI一致
+            self.register_plugin('sentiment_data_sources.akshare_sentiment_plugin', akshare_plugin, priority=10, weight=1.0)
         except ImportError:
             self.log_manager.warning("未能导入AkShare情绪插件，相关功能将不可用。")
         except Exception as e:
             self.log_manager.error(f"注册AkShare情绪插件失败: {e}")
 
+    def _auto_discover_sentiment_plugins(self):
+        """从插件管理器自动发现并注册情绪插件"""
+        if not self.plugin_manager:
+            self.log_manager.warning("⚠️ 插件管理器不可用，无法自动发现情绪插件")
+            return
+
+        try:
+            # 获取所有插件实例
+            all_plugins = self.plugin_manager.get_all_plugins()
+            registered_count = 0
+
+            for plugin_name, plugin_instance in all_plugins.items():
+                try:
+                    # 检查插件是否是情绪数据源
+                    if self._is_sentiment_plugin(plugin_instance):
+                        # 如果尚未注册，则注册它
+                        if plugin_name not in self._registered_plugins:
+                            # 获取插件优先级和权重（可以从插件属性或metadata获取）
+                            priority = getattr(plugin_instance, 'priority', 50)
+                            weight = getattr(plugin_instance, 'weight', 1.0)
+
+                            success = self.register_plugin(plugin_name, plugin_instance, priority, weight)
+                            if success:
+                                registered_count += 1
+                                self.log_manager.info(f"✅ 自动注册情绪插件: {plugin_name}")
+                            else:
+                                self.log_manager.warning(f"⚠️ 自动注册情绪插件失败: {plugin_name}")
+                        else:
+                            self.log_manager.debug(f"插件 {plugin_name} 已注册，跳过")
+
+                except Exception as e:
+                    self.log_manager.warning(f"⚠️ 检查插件 {plugin_name} 失败: {e}")
+
+            if registered_count > 0:
+                self.log_manager.info(f"✅ 自动发现并注册了 {registered_count} 个情绪插件")
+            else:
+                self.log_manager.info("📝 未发现新的情绪插件")
+
+        except Exception as e:
+            self.log_manager.error(f"❌ 自动发现情绪插件失败: {e}")
+
+    def _is_sentiment_plugin(self, plugin_instance) -> bool:
+        """检查插件是否是情绪数据源插件"""
+        try:
+            # 方法1：检查是否实现了ISentimentDataSource接口
+            if isinstance(plugin_instance, ISentimentDataSource):
+                return True
+
+            # 方法2：检查是否有必要的方法
+            required_methods = ['get_sentiment_data', 'get_name']
+            if all(hasattr(plugin_instance, method) for method in required_methods):
+                return True
+
+            # 方法3：检查插件类名或模块名是否包含sentiment
+            class_name = plugin_instance.__class__.__name__.lower()
+            module_name = plugin_instance.__class__.__module__.lower()
+
+            if 'sentiment' in class_name or 'sentiment' in module_name:
+                # 进一步检查是否有基本的情绪数据方法
+                if hasattr(plugin_instance, 'get_sentiment_data'):
+                    return True
+
+            return False
+
+        except Exception as e:
+            self.log_manager.debug(f"检查插件类型失败: {e}")
+            return False
+
     def initialize(self) -> bool:
         """初始化情绪数据服务"""
         try:
             self.log_manager.info("🚀 初始化情绪数据服务...")
+
+            # 在初始化时从插件管理器自动发现并注册情绪插件
+            self._auto_discover_sentiment_plugins()
+
+            # 将已注册的情绪插件元信息（中文名/描述）同步写入数据库（不改动启用状态）
+            try:
+                self._sync_registered_plugins_to_db()
+                self._remove_orphan_db_records()
+            except Exception as e:
+                self.log_manager.warning(f"⚠️ 同步情绪插件元信息到数据库失败: {e}")
+
             if self.config.enable_auto_refresh:
                 self._start_auto_refresh()
 
@@ -114,6 +194,98 @@ class SentimentDataService(QObject):
         except Exception as e:
             self.log_manager.error(f"❌ 情绪数据服务初始化失败: {e}")
             return False
+
+    def _sync_registered_plugins_to_db(self) -> None:
+        """将已注册的情绪插件元信息写入数据库（保留原有状态）。"""
+        try:
+            from .plugin_database_service import get_plugin_database_service
+            dbs = get_plugin_database_service()
+
+            for name, instance in self._registered_plugins.items():
+                try:
+                    meta = {}
+                    if hasattr(instance, 'metadata'):
+                        meta = instance.metadata if isinstance(instance.metadata, dict) else {}
+
+                    display_name = meta.get('name') if isinstance(meta, dict) else None
+                    description = meta.get('description') if isinstance(meta, dict) else None
+                    author = meta.get('author') if isinstance(meta, dict) else ''
+                    version = meta.get('version') if isinstance(meta, dict) else '1.0.0'
+                    license_text = meta.get('license') if isinstance(meta, dict) else ''
+                    homepage = meta.get('website') if isinstance(meta, dict) else ''
+                    repository = meta.get('repository') if isinstance(meta, dict) else ''
+                    tags = meta.get('tags') if isinstance(meta, dict) else []
+
+                    # 入口点：module:Class
+                    module_name = instance.__class__.__module__
+                    class_name = instance.__class__.__name__
+                    entry_point = f"{module_name}:{class_name}"
+
+                    payload = {
+                        'display_name': display_name or name,
+                        'description': description or getattr(instance, '__doc__', '') or '',
+                        'version': version,
+                        'plugin_type': 'analysis',  # 情绪插件归类为分析类
+                        'author': author,
+                        'homepage': homepage,
+                        'repository': repository,
+                        'license': license_text,
+                        'tags': tags,
+                        'entry_point': entry_point,
+                        'path': module_name,
+                    }
+
+                    dbs.register_plugin_from_metadata(name, payload)
+                except Exception as e:
+                    self.log_manager.debug(f"同步插件 {name} 到数据库失败: {e}")
+        except Exception as e:
+            self.log_manager.debug(f"初始化数据库服务失败: {e}")
+
+    def _remove_orphan_db_records(self) -> None:
+        """删除数据库中不存在于当前注册集合的情绪插件记录。"""
+        try:
+            from .plugin_database_service import get_plugin_database_service
+            dbs = get_plugin_database_service()
+            records = dbs.get_all_plugins(force_refresh=True)
+            registered = set(self._registered_plugins.keys())
+
+            for rec in records:
+                name = rec.get('name') or ''
+                entry = rec.get('entry_point') or ''
+                # 仅对情绪插件命名空间进行清理
+                if ('sentiment_data_sources' in name) or ('sentiment_data_sources' in entry):
+                    if name not in registered:
+                        try:
+                            dbs.remove_plugin(name)
+                            self.log_manager.info(f"🧹 已删除不存在的情绪插件记录: {name}")
+                        except Exception as e:
+                            self.log_manager.warning(f"⚠️ 删除情绪插件记录失败 {name}: {e}")
+        except Exception as e:
+            self.log_manager.debug(f"情绪插件孤儿清理失败: {e}")
+
+    def get_plugin_metadata(self, name: str) -> Dict[str, Any]:
+        """获取指定情绪插件的元信息（用于UI展示）。"""
+        try:
+            inst = self._registered_plugins.get(name)
+            if not inst:
+                return {}
+            meta = {}
+            if hasattr(inst, 'metadata'):
+                meta = inst.metadata if isinstance(inst.metadata, dict) else {}
+            # 补全必要字段
+            module_name = inst.__class__.__module__
+            class_name = inst.__class__.__name__
+            entry_point = f"{module_name}:{class_name}"
+            return {
+                'name': meta.get('name') if isinstance(meta, dict) else name,
+                'display_name': meta.get('name') if isinstance(meta, dict) else name,
+                'description': meta.get('description', '') if isinstance(meta, dict) else '',
+                'version': meta.get('version', '1.0.0') if isinstance(meta, dict) else '1.0.0',
+                'author': meta.get('author', '') if isinstance(meta, dict) else '',
+                'entry_point': entry_point,
+            }
+        except Exception:
+            return {}
 
     def cleanup(self) -> None:
         """清理服务资源"""
@@ -260,6 +432,258 @@ class SentimentDataService(QObject):
         """获取已注册的插件列表"""
         return list(self._registered_plugins.keys())
 
+    def get_available_plugins_info(self) -> Dict[str, Dict[str, Any]]:
+        """获取已注册插件的详细信息，包括中文名称"""
+        plugins_info = {}
+
+        for plugin_name, plugin_instance in self._registered_plugins.items():
+            try:
+                # 获取插件信息
+                plugin_info = {}
+
+                # 尝试使用新的get_plugin_info方法
+                if hasattr(plugin_instance, 'get_plugin_info'):
+                    try:
+                        info_obj = plugin_instance.get_plugin_info()
+                        plugin_info = {
+                            'name': info_obj.name,  # 中文显示名称
+                            'display_name': info_obj.name,
+                            'description': info_obj.description,
+                            'author': info_obj.author,
+                            'version': info_obj.version,
+                            'plugin_type': info_obj.plugin_type,
+                            'category': info_obj.category,
+                            'tags': info_obj.tags
+                        }
+                    except Exception as e:
+                        self.log_manager.warning(f"获取插件信息失败 {plugin_name}: {e}")
+
+                # 后备方案：使用metadata属性
+                if not plugin_info and hasattr(plugin_instance, 'metadata'):
+                    try:
+                        metadata = plugin_instance.metadata
+                        plugin_info = {
+                            'name': metadata.get('name', plugin_name),
+                            'display_name': metadata.get('name', plugin_name),
+                            'description': metadata.get('description', ''),
+                            'author': metadata.get('author', ''),
+                            'version': metadata.get('version', '1.0.0'),
+                            'plugin_type': metadata.get('plugin_type', 'sentiment'),
+                            'category': metadata.get('category', 'core'),
+                            'tags': metadata.get('tags', [])
+                        }
+                    except Exception as e:
+                        self.log_manager.warning(f"获取插件metadata失败 {plugin_name}: {e}")
+
+                # 最后的后备方案
+                if not plugin_info:
+                    plugin_info = {
+                        'name': plugin_name,
+                        'display_name': plugin_name,
+                        'description': '情绪数据源插件',
+                        'author': '未知',
+                        'version': '1.0.0',
+                        'plugin_type': 'sentiment',
+                        'category': 'core',
+                        'tags': [],
+                        'priority': 100,
+                        'weight': 1.0,
+                        'registered': True,
+                        'internal_name': plugin_name,
+                        'error': 'Unknown error'
+                    }
+
+                # 添加状态信息
+                plugin_info.update({
+                    'priority': self._plugin_priorities.get(plugin_name, 100),
+                    'weight': self._plugin_weights.get(plugin_name, 1.0),
+                    'registered': True,
+                    'internal_name': plugin_name  # 保留内部名称用于操作
+                })
+
+                plugins_info[plugin_name] = plugin_info
+
+            except Exception as e:
+                self.log_manager.error(f"获取插件 {plugin_name} 信息失败: {e}")
+                # 提供最基本的信息
+                plugins_info[plugin_name] = {
+                    'name': plugin_name,
+                    'display_name': plugin_name,
+                    'description': '插件信息获取失败',
+                    'author': '未知',
+                    'version': '1.0.0',
+                    'plugin_type': 'sentiment',
+                    'category': 'core',
+                    'tags': [],
+                    'priority': 100,
+                    'weight': 1.0,
+                    'registered': True,
+                    'internal_name': plugin_name,
+                    'error': str(e)
+                }
+
+        return plugins_info
+
+    def test_plugin_connection(self, plugin_name: str) -> bool:
+        """测试指定插件的连接状态"""
+        try:
+            if plugin_name not in self._registered_plugins:
+                self.log_manager.warning(f"插件 {plugin_name} 未注册")
+                return False
+
+            plugin = self._registered_plugins[plugin_name]
+
+            # 方法1：检查插件是否有test_connection方法
+            if hasattr(plugin, 'test_connection'):
+                try:
+                    return plugin.test_connection()
+                except Exception as e:
+                    self.log_manager.error(f"插件 {plugin_name} 连接测试失败: {e}")
+                    return False
+
+            # 方法2：检查插件是否有is_connected方法
+            if hasattr(plugin, 'is_connected'):
+                try:
+                    return plugin.is_connected()
+                except Exception as e:
+                    self.log_manager.error(f"插件 {plugin_name} 连接状态检查失败: {e}")
+                    return False
+
+            # 方法3：尝试获取测试数据
+            if hasattr(plugin, 'get_sentiment_data'):
+                try:
+                    # 尝试获取一个简单的测试数据
+                    test_result = plugin.get_sentiment_data('000001', datetime.now() - timedelta(days=1), datetime.now())
+                    return test_result is not None and test_result.success
+                except Exception as e:
+                    self.log_manager.error(f"插件 {plugin_name} 数据获取测试失败: {e}")
+                    return False
+
+            # 如果都没有，假设连接正常
+            self.log_manager.info(f"插件 {plugin_name} 无法测试连接，假设正常")
+            return True
+
+        except Exception as e:
+            self.log_manager.error(f"测试插件 {plugin_name} 连接时发生错误: {e}")
+            return False
+
+    def enable_plugin(self, plugin_name: str) -> bool:
+        """启用指定的情绪数据源插件"""
+        try:
+            if plugin_name not in self._registered_plugins:
+                self.log_manager.warning(f"插件 {plugin_name} 未注册，无法启用")
+                return False
+
+            plugin = self._registered_plugins[plugin_name]
+
+            # 检查插件是否有启用方法
+            if hasattr(plugin, 'enable'):
+                try:
+                    result = plugin.enable()
+                    if result:
+                        self.log_manager.info(f"插件 {plugin_name} 已启用")
+
+                        # 更新数据库状态
+                        self._update_plugin_status_in_db(plugin_name, "enabled")
+
+                        # 如果插件在选中列表中，确保它在活跃状态
+                        if plugin_name in self._selected_plugins:
+                            self._selected_plugins.remove(plugin_name)
+                        self._selected_plugins.append(plugin_name)
+
+                        return True
+                    else:
+                        self.log_manager.warning(f"插件 {plugin_name} 启用失败")
+                        return False
+                except Exception as e:
+                    self.log_manager.error(f"插件 {plugin_name} 启用时发生错误: {e}")
+                    return False
+            else:
+                # 插件没有explicit的enable方法，标记为启用状态
+                self.log_manager.info(f"插件 {plugin_name} 没有enable方法，标记为启用状态")
+                self._update_plugin_status_in_db(plugin_name, "enabled")
+
+                if plugin_name not in self._selected_plugins:
+                    self._selected_plugins.append(plugin_name)
+
+                return True
+
+        except Exception as e:
+            self.log_manager.error(f"启用插件 {plugin_name} 时发生错误: {e}")
+            return False
+
+    def disable_plugin(self, plugin_name: str) -> bool:
+        """禁用指定的情绪数据源插件"""
+        try:
+            if plugin_name not in self._registered_plugins:
+                self.log_manager.warning(f"插件 {plugin_name} 未注册，无法禁用")
+                return False
+
+            plugin = self._registered_plugins[plugin_name]
+
+            # 检查插件是否有禁用方法
+            if hasattr(plugin, 'disable'):
+                try:
+                    result = plugin.disable()
+                    if result:
+                        self.log_manager.info(f"插件 {plugin_name} 已禁用")
+
+                        # 更新数据库状态
+                        self._update_plugin_status_in_db(plugin_name, "disabled")
+
+                        # 从选中列表中移除
+                        if plugin_name in self._selected_plugins:
+                            self._selected_plugins.remove(plugin_name)
+
+                        return True
+                    else:
+                        self.log_manager.warning(f"插件 {plugin_name} 禁用失败")
+                        return False
+                except Exception as e:
+                    self.log_manager.error(f"插件 {plugin_name} 禁用时发生错误: {e}")
+                    return False
+            else:
+                # 插件没有explicit的disable方法，标记为禁用状态
+                self.log_manager.info(f"插件 {plugin_name} 没有disable方法，标记为禁用状态")
+                self._update_plugin_status_in_db(plugin_name, "disabled")
+
+                if plugin_name in self._selected_plugins:
+                    self._selected_plugins.remove(plugin_name)
+
+                return True
+
+        except Exception as e:
+            self.log_manager.error(f"禁用插件 {plugin_name} 时发生错误: {e}")
+            return False
+
+    def set_plugin_enabled(self, plugin_name: str, enabled: bool) -> bool:
+        """设置插件的启用状态"""
+        if enabled:
+            return self.enable_plugin(plugin_name)
+        else:
+            return self.disable_plugin(plugin_name)
+
+    def _update_plugin_status_in_db(self, plugin_name: str, status: str):
+        """更新插件在数据库中的状态"""
+        try:
+            from core.services.plugin_database_service import get_plugin_database_service
+            from db.models.plugin_models import PluginStatus
+
+            db_service = get_plugin_database_service()
+            if db_service:
+                # 映射状态到数据库枚举
+                status_mapping = {
+                    'enabled': PluginStatus.ENABLED,
+                    'disabled': PluginStatus.DISABLED,
+                    'error': PluginStatus.ERROR
+                }
+
+                db_status = status_mapping.get(status, PluginStatus.LOADED)
+                db_service.update_plugin_status(plugin_name, db_status, f"情绪数据服务{status}")
+
+        except Exception as e:
+            self.log_manager.warning(f"更新插件 {plugin_name} 数据库状态失败: {e}")
+
     def get_plugin_status(self, name: str) -> Dict[str, Any]:
         """
         获取插件状态
@@ -271,12 +695,73 @@ class SentimentDataService(QObject):
             Dict[str, Any]: 插件状态信息
         """
         if name not in self._registered_plugins:
-            return {"status": "not_registered"}
+            return {
+                "status": "not_registered",
+                "enabled": False,
+                "is_connected": False,
+                "last_response_time": 0,
+                "error_count": 0,
+                "last_update": datetime.now(),
+                "priority": 100,
+                "weight": 1.0
+            }
 
         plugin = self._registered_plugins[name]
 
+        # 检查插件是否启用（在选中列表中）
+        is_enabled = name in self._selected_plugins if self._selected_plugins else True
+
+        # 检查连接状态
+        is_connected = False
+        try:
+            if hasattr(plugin, 'is_connected'):
+                is_connected = plugin.is_connected()
+            elif hasattr(plugin, 'test_connection'):
+                is_connected = plugin.test_connection()
+            else:
+                # 如果没有连接检查方法，假设已连接
+                is_connected = True
+        except Exception as e:
+            self.log_manager.debug(f"检查插件 {name} 连接状态失败: {e}")
+            is_connected = False
+
+        # 获取响应时间（如果插件支持）
+        last_response_time = 0
+        try:
+            if hasattr(plugin, 'get_last_response_time'):
+                last_response_time = plugin.get_last_response_time()
+            elif hasattr(plugin, 'response_time'):
+                last_response_time = getattr(plugin, 'response_time', 0)
+        except:
+            pass
+
+        # 获取错误计数（如果插件支持）
+        error_count = 0
+        try:
+            if hasattr(plugin, 'get_error_count'):
+                error_count = plugin.get_error_count()
+            elif hasattr(plugin, 'error_count'):
+                error_count = getattr(plugin, 'error_count', 0)
+        except:
+            pass
+
+        # 获取最后更新时间
+        last_update = datetime.now()
+        try:
+            if hasattr(plugin, 'get_last_update'):
+                last_update = plugin.get_last_update()
+            elif hasattr(plugin, 'last_update'):
+                last_update = getattr(plugin, 'last_update', datetime.now())
+        except:
+            pass
+
         return {
             "status": "registered",
+            "enabled": is_enabled,
+            "is_connected": is_connected,
+            "last_response_time": last_response_time,
+            "error_count": error_count,
+            "last_update": last_update,
             "priority": self._plugin_priorities.get(name, 100),
             "weight": self._plugin_weights.get(name, 1.0),
             "available_indicators": plugin.get_available_indicators() if hasattr(plugin, 'get_available_indicators') else []
@@ -371,6 +856,14 @@ class SentimentDataService(QObject):
         """从单个插件获取数据"""
         try:
             response = plugin.fetch_sentiment_data()
+
+            # 兼容性保护：插件可能错误地返回了 None
+            if response is None:
+                return SentimentResponse(
+                    success=False,
+                    error_message=f"插件 {plugin_name} 返回空结果(None)",
+                    update_time=datetime.now()
+                )
 
             # 验证数据质量
             if response.success and response.data:
