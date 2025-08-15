@@ -1,8 +1,8 @@
-# HIkyuu-UI系统全面功能检查报告
+# FactorWeave-Quant系统全面功能检查报告
 
 ## 📋 检查概述
 
-本报告对HIkyuu-UI系统进行了全面的功能检查，确保没有遗漏任何重要的架构组件和功能。
+本报告对FactorWeave-Quant系统进行了全面的功能检查，确保没有遗漏任何重要的架构组件和功能。
 
 ## ✅ 已确认的系统组件
 
@@ -40,7 +40,7 @@
 #### 2.3 数据访问层
 - ✅ `core/data/data_access.py` - 数据访问统一接口
 - ✅ `core/data/repository.py` - 数据仓储模式
-- ✅ `core/data/hikyuu_data_manager.py` - HIkyuu数据管理
+- ✅ `core/data/FactorWeave-Quant_data_manager.py` - FactorWeave-Quant数据管理
 - ✅ `core/data_manager.py` - 通用数据管理器
 
 ### 3. UI组件系统 ✅
@@ -251,7 +251,7 @@ class StockService:
 
 ### 💡 **结论**
 
-HIkyuu-UI系统是一个**设计优秀但实现不完整**的系统。它拥有：
+FactorWeave-Quant系统是一个**设计优秀但实现不完整**的系统。它拥有：
 - ✅ 完善的组件架构
 - ✅ 丰富的功能模块
 - ✅ 先进的设计理念

@@ -21,9 +21,10 @@ from PyQt5.QtCore import pyqtSlot
 
 from .base_coordinator import BaseCoordinator
 from ..events import (
-    EventBus, StockSelectedEvent, ChartUpdateEvent, AnalysisCompleteEvent,
-    DataUpdateEvent, ErrorEvent, UIUpdateEvent, ThemeChangedEvent, UIDataReadyEvent
+    EventBus, StockSelectedEvent, AssetSelectedEvent, ChartUpdateEvent, AnalysisCompleteEvent,
+    DataUpdateEvent, ErrorEvent, UIUpdateEvent, ThemeChangedEvent, UIDataReadyEvent, AssetDataReadyEvent
 )
+from ..plugin_types import AssetType
 from ..containers import ServiceContainer
 from ..services import (
     StockService, ChartService, AnalysisService,
@@ -65,7 +66,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 创建主窗口
         self._main_window = QMainWindow(parent)
-        self._main_window.setWindowTitle("FactorWeave-Quant ‌ 2.0 股票分析系统")
+        self._main_window.setWindowTitle("FactorWeave-Quant ‌ 2.0 多资产分析系统")
         self._main_window.setGeometry(100, 100, 1400, 900)
         self._main_window.setMinimumSize(1200, 800)
 
@@ -75,7 +76,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 窗口状态
         self._window_state = {
-            'title': 'FactorWeave-Quant ‌ 2.0 股票分析系统',
+            'title': 'FactorWeave-Quant ‌ 2.0 多资产分析系统',
             'geometry': (100, 100, 1400, 900),
             'min_size': (1200, 800),
             'is_maximized': False
@@ -89,10 +90,30 @@ class MainWindowCoordinator(BaseCoordinator):
             'panel_padding': 5
         }
 
-        # 中央数据状态
-        self._current_stock_code: Optional[str] = None
-        self._current_stock_data: Dict[str, Any] = {}
+        # 中央数据状态（支持多资产类型）
+        self._current_symbol: Optional[str] = None
+        self._current_asset_name: Optional[str] = None
+        self._current_asset_type: AssetType = AssetType.STOCK
+        self._current_market: Optional[str] = None
+        self._current_asset_data: Dict[str, Any] = {}
         self._is_loading = False
+
+        # 向后兼容属性
+        @property
+        def _current_stock_code(self) -> Optional[str]:
+            return self._current_symbol
+
+        @_current_stock_code.setter
+        def _current_stock_code(self, value: Optional[str]):
+            self._current_symbol = value
+
+        @property
+        def _current_stock_data(self) -> Dict[str, Any]:
+            return self._current_asset_data
+
+        @_current_stock_data.setter
+        def _current_stock_data(self, value: Dict[str, Any]):
+            self._current_asset_data = value
 
     def _do_initialize(self) -> None:
         """初始化协调器"""
@@ -107,6 +128,15 @@ class MainWindowCoordinator(BaseCoordinator):
                 ConfigService)
             self._data_manager = self.service_container.resolve(
                 UnifiedDataManager)
+
+            # 获取资产服务（TET模式）
+            try:
+                from ..services import AssetService
+                self._asset_service = self.service_container.resolve(AssetService)
+                logger.info("✅ AssetService初始化成功")
+            except Exception as e:
+                logger.warning(f"⚠️ AssetService初始化失败: {e}")
+                self._asset_service = None
 
             # 初始化窗口
             self._setup_window()
@@ -575,9 +605,13 @@ class MainWindowCoordinator(BaseCoordinator):
     def _register_event_handlers(self) -> None:
         """注册事件处理器"""
         try:
-            # 注册股票选择事件处理器
+            # 注册股票选择事件处理器（向后兼容）
             self.event_bus.subscribe(
                 StockSelectedEvent, self._on_stock_selected)
+
+            # 注册通用资产选择事件处理器
+            self.event_bus.subscribe(
+                AssetSelectedEvent, self._on_asset_selected)
 
             # 注册图表更新事件处理器
             self.event_bus.subscribe(ChartUpdateEvent, self._on_chart_updated)
@@ -592,8 +626,11 @@ class MainWindowCoordinator(BaseCoordinator):
             # 注册错误事件处理器
             self.event_bus.subscribe(ErrorEvent, self._on_error)
 
-            # 注册UI数据就绪事件处理器
+            # 注册UI数据就绪事件处理器（向后兼容）
             self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
+
+            # 注册通用资产数据就绪事件处理器
+            self.event_bus.subscribe(AssetDataReadyEvent, self._on_asset_data_ready)
 
             # 注册主题变化事件处理器
             self.event_bus.subscribe(ThemeChangedEvent, self._on_theme_changed)
@@ -665,10 +702,11 @@ class MainWindowCoordinator(BaseCoordinator):
             return
 
         # 在开始新任务前，取消之前所有相关的请求
+        previous_stock_code = getattr(self, '_current_stock_code', '未知')
         try:
             await self._chart_service.cancel_previous_requests()
             await self._analysis_service.cancel_previous_requests()
-            logger.info(f"已取消先前为 {self._current_stock_code} 发出的请求。")
+            logger.info(f"已取消先前为 {previous_stock_code} 发出的请求。")
         except Exception as e:
             logger.error(f"取消先前请求时出错: {e}", exc_info=True)
 
@@ -765,6 +803,198 @@ class MainWindowCoordinator(BaseCoordinator):
 
         finally:
             self._is_loading = False
+
+    @measure_performance("MainWindowCoordinator._on_asset_selected")
+    async def _on_asset_selected(self, event: AssetSelectedEvent) -> None:
+        """处理通用资产选择事件（支持多资产类型）"""
+        if not event or not event.symbol or self._is_loading:
+            return
+
+        # 在开始新任务前，取消之前所有相关的请求
+        try:
+            await self._chart_service.cancel_previous_requests()
+            await self._analysis_service.cancel_previous_requests()
+            logger.info(f"已取消先前为 {self._current_symbol} 发出的请求。")
+        except Exception as e:
+            logger.error(f"取消先前请求时出错: {e}", exc_info=True)
+
+        self._is_loading = True
+
+        # 更新当前资产状态
+        self._current_symbol = event.symbol
+        self._current_asset_name = event.name
+        self._current_asset_type = event.asset_type
+        self._current_market = event.market
+
+        # 更新窗口标题
+        asset_type_name = self._get_asset_type_display_name(event.asset_type)
+        self._main_window.setWindowTitle(f"FactorWeave-Quant ‌ 2.0 - {event.name} ({event.symbol}) - {asset_type_name}")
+
+        self.show_message(
+            f"正在加载 {event.name} ({event.symbol}) 的{asset_type_name}数据...", level='info')
+
+        try:
+            # 从事件中提取参数
+            period = event.period if event.period else 'D'  # 默认日线
+            time_range = event.time_range if event.time_range else "最近1年"  # 默认最近1年
+            chart_type = event.chart_type if event.chart_type else "K线图"  # 默认K线图
+
+            logger.info(f"加载数据，资产：{event.symbol}，类型：{event.asset_type.value}，周期：{period}，时间范围：{time_range}")
+
+            # 尝试使用资产服务获取数据
+            asset_data = None
+            try:
+                if hasattr(self, '_asset_service') and self._asset_service:
+                    asset_data = self._asset_service.get_historical_data(
+                        symbol=event.symbol,
+                        asset_type=event.asset_type,
+                        period=period
+                    )
+                else:
+                    # 降级到统一数据管理器
+                    asset_data = self._data_manager.get_asset_data(
+                        symbol=event.symbol,
+                        asset_type=event.asset_type,
+                        period=period
+                    )
+            except Exception as e:
+                logger.warning(f"使用TET模式获取数据失败，尝试传统方式: {e}")
+
+                # 如果是股票类型，降级到传统方式
+                if event.asset_type == AssetType.STOCK:
+                    kline_data_response = await self._data_manager.request_data(
+                        stock_code=event.symbol,
+                        data_type='kdata',
+                        period=period,
+                        time_range=time_range
+                    )
+
+                    if isinstance(kline_data_response, dict):
+                        asset_data = kline_data_response.get('kline_data')
+                    else:
+                        asset_data = kline_data_response
+
+            # 关键检查点：确认核心数据是否存在
+            if asset_data is None or asset_data.empty:
+                logger.warning(f"无法获取 {event.name} 的数据。")
+                self.show_message(
+                    f"无法获取 {event.name} ({event.symbol}) 的数据，请尝试其他{asset_type_name}。", level='warning')
+                return
+
+            logger.info(f"资产数据加载完成: {event.symbol}, 开始分析...")
+
+            # 如果是股票类型，进行传统分析
+            analysis_data = None
+            if event.asset_type == AssetType.STOCK:
+                try:
+                    analysis_data = await self._analysis_service.analyze_stock(
+                        stock_code=event.symbol,
+                        analysis_type='comprehensive',
+                        kline_data=asset_data
+                    )
+                    logger.info(f"股票分析数据加载完成: {event.symbol}")
+                except Exception as e:
+                    logger.warning(f"股票分析失败: {e}")
+
+            # 存储到中央数据状态
+            self._current_asset_data = {
+                'symbol': event.symbol,
+                'name': event.name,
+                'asset_type': event.asset_type.value,
+                'market': event.market,
+                'period': period,
+                'time_range': time_range,
+                'chart_type': chart_type,
+                'kline_data': asset_data,
+                'analysis_data': analysis_data or {}
+            }
+
+            # 发送资产数据就绪事件
+            asset_data_ready_event = AssetDataReadyEvent(
+                symbol=event.symbol,
+                name=event.name,
+                asset_type=event.asset_type,
+                market=event.market,
+                data_type="kline",
+                data=asset_data
+            )
+
+            # 同时发送向后兼容的UIDataReadyEvent（如果是股票）
+            if event.asset_type == AssetType.STOCK:
+                ui_data_ready_event = UIDataReadyEvent(
+                    stock_code=event.symbol,
+                    stock_name=event.name,
+                    kline_data=asset_data,
+                    market=event.market
+                )
+                self.event_bus.emit(ui_data_ready_event)
+
+            self.event_bus.emit(asset_data_ready_event)
+
+            # 更新状态栏
+            self.show_message(
+                f"{event.name} ({event.symbol}) 数据加载完成", level='success')
+
+            logger.info(f"资产数据流程完成: {event.symbol}")
+
+        except Exception as e:
+            logger.error(f"加载资产 {event.symbol} 数据时出错: {e}", exc_info=True)
+            self.show_message(
+                f"加载 {event.name} 数据失败", level='error')
+
+            import traceback
+            error_event = ErrorEvent(
+                source='MainWindowCoordinator',
+                error_type=type(e).__name__,
+                error_message=str(e),
+                error_traceback=traceback.format_exc(),
+                severity='high'
+            )
+            self.event_bus.publish(error_event)
+
+        finally:
+            self._is_loading = False
+
+    def _get_asset_type_display_name(self, asset_type: AssetType) -> str:
+        """获取资产类型的显示名称"""
+        display_names = {
+            AssetType.STOCK: "股票",
+            AssetType.CRYPTO: "加密货币",
+            AssetType.FUTURES: "期货",
+            AssetType.FOREX: "外汇",
+            AssetType.INDEX: "指数",
+            AssetType.FUND: "基金",
+            AssetType.BOND: "债券",
+            AssetType.COMMODITY: "商品"
+        }
+        return display_names.get(asset_type, "未知资产")
+
+    @pyqtSlot(AssetDataReadyEvent)
+    def _on_asset_data_ready(self, event: AssetDataReadyEvent) -> None:
+        """处理通用资产数据就绪事件"""
+        try:
+            if not event or not event.symbol:
+                return
+
+            # 更新窗口标题
+            asset_type_name = self._get_asset_type_display_name(event.asset_type)
+            title = f"FactorWeave-Quant ‌ 2.0 - {event.name} ({event.symbol}) - {asset_type_name}"
+            if event.market:
+                title += f" [{event.market}]"
+
+            self._main_window.setWindowTitle(title)
+
+            # 更新状态栏
+            status_text = f"当前资产: {event.name} ({event.symbol}) | 类型: {asset_type_name}"
+            if event.market:
+                status_text += f" | 市场: {event.market}"
+
+            self.show_message(status_text, level='info')
+
+            logger.info(f"资产数据就绪事件处理完成: {event.symbol}")
+
+        except Exception as e:
+            logger.error(f"处理资产数据就绪事件失败: {e}")
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:

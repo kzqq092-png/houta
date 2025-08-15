@@ -40,7 +40,7 @@ class TuningTask:
 class AutoTuner:
     """自动调优器"""
 
-    def __init__(self, max_workers: int = 4, debug_mode: bool = False):
+    def __init__(self, max_workers: int = os.cpu_count() * 2, debug_mode: bool = False):
         self.max_workers = max_workers
         self.debug_mode = debug_mode
 

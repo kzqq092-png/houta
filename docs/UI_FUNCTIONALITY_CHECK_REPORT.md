@@ -56,7 +56,7 @@
 ### 6. 图形界面功能
 | 功能 | UI组件 | 集成状态 | 备注 |
 |------|--------|----------|------|
-| 完整GUI界面 | main.py (HIkyuuUIApplication) | ✅ | 372行完整架构 |
+| 完整GUI界面 | main.py (FactorWeave-QuantUIApplication) | ✅ | 372行完整架构 |
 | 优化仪表板 | optimization_dashboard.py | ✅ | 独立的PyQt5应用 |
 | 性能监控 | optimization_dashboard.py | ✅ | 实时系统监控 |
 | 版本管理器 | version_manager_dialog.py | ✅ | 完整的版本管理界面 |
@@ -129,7 +129,7 @@ def _view_optimization_history(self): pass
 `quick_start.py` 中的GUI启动方式可能存在循环导入问题：
 ```python
 def _launch_full_gui(self):
-    gui_launcher = HIkyuuQuickStart(mode="gui")
+    gui_launcher = FactorWeave-QuantQuickStart(mode="gui")
     return gui_launcher.run()
 ```
 

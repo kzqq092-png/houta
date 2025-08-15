@@ -178,7 +178,7 @@ class MemoryMonitor:
                 if gpu_memory is not None:
                     self.gpu_memory_samples.append(gpu_memory)
 
-                time.sleep(0.1)  # 100ms采样间隔
+                time.sleep(1)  # 1000ms采样间隔
 
             except Exception as e:
                 logger.warning(f"内存监控异常: {e}")

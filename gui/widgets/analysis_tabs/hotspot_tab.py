@@ -533,9 +533,9 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             # 确保有数据管理器 - 使用工厂方法获取正确实例
             if not hasattr(self, 'data_manager') or not self.data_manager:
                 try:
-                    from utils.manager_factory import ManagerFactory
-                    factory = ManagerFactory()
-                    self.data_manager = factory.get_data_manager()
+                    from utils.manager_factory import get_manager_factory, get_data_manager
+                    factory = get_manager_factory()
+                    self.data_manager = get_data_manager()
                 except ImportError:
                     # 降级方案：直接导入
                     from core.data_manager import DataManager

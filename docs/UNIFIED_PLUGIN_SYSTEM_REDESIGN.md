@@ -1,4 +1,4 @@
-# HIkyuu插件管理系统统一重构设计
+# FactorWeave-Quant插件管理系统统一重构设计
 
 > **基于现状分析**: 深度分析现有插件架构和功能
 > **融合设计**: 企业级安全 + 量化专家性能 + 现有接口兼容
@@ -130,8 +130,8 @@ CREATE TABLE plugins_registry (
     icon_path TEXT,
     
     -- 版本兼容性
-    min_hikyuu_version TEXT,
-    max_hikyuu_version TEXT,
+    min_FactorWeave-Quant_version TEXT,
+    max_FactorWeave-Quant_version TEXT,
     
     -- 状态管理
     status TEXT DEFAULT 'discovered',
@@ -391,8 +391,8 @@ class UnifiedPluginDiscoveryEngine:
                 compatibility_result['required_fixes'].append('需要继承适当的插件接口类')
             
             # 3. 检查版本兼容性
-            min_version = metadata.get('min_hikyuu_version', '0.0.0')
-            max_version = metadata.get('max_hikyuu_version', '999.0.0')
+            min_version = metadata.get('min_FactorWeave-Quant_version', '0.0.0')
+            max_version = metadata.get('max_FactorWeave-Quant_version', '999.0.0')
             current_version = '2.0.1'  # 当前系统版本
             
             if not self._version_in_range(current_version, min_version, max_version):
@@ -428,8 +428,8 @@ class UnifiedPluginDiscoveryEngine:
             'tags': json.dumps(metadata.get('tags', [])),
             'icon_path': metadata.get('icon_path', ''),
             
-            'min_hikyuu_version': metadata.get('min_hikyuu_version', ''),
-            'max_hikyuu_version': metadata.get('max_hikyuu_version', ''),
+            'min_FactorWeave-Quant_version': metadata.get('min_FactorWeave-Quant_version', ''),
+            'max_FactorWeave-Quant_version': metadata.get('max_FactorWeave-Quant_version', ''),
             
             'max_memory_mb': metadata.get('max_memory_mb', 256),
             'max_cpu_percent': metadata.get('max_cpu_percent', 10),
@@ -926,4 +926,4 @@ Phase 4: 管理优化 (1周)
 - 向后兼容性: 100%
 ```
 
-这个统一重构设计既保持了现有插件系统的完整兼容性，又融合了企业级安全特性和量化专家级性能优化，为HIkyuu提供了一个面向未来的插件管理解决方案。 
+这个统一重构设计既保持了现有插件系统的完整兼容性，又融合了企业级安全特性和量化专家级性能优化，为FactorWeave-Quant提供了一个面向未来的插件管理解决方案。 

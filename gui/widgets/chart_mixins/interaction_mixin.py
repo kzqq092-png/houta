@@ -36,15 +36,38 @@ class InteractionMixin:
                         break
                     p = p.parent()
 
+            # 🚀 优先使用TET模式（AssetService）
+            kdata = None
+            try:
+                from core.containers import get_service_container
+                from core.services import AssetService
+                from core.plugin_types import AssetType
+
+                service_container = get_service_container()
+                asset_service = service_container.resolve(AssetService)
+
+                if asset_service:
+                    kdata = asset_service.get_historical_data(
+                        symbol=code,
+                        asset_type=AssetType.STOCK,
+                        period='D'
+                    )
+                    if kdata is not None and not kdata.empty:
+                        self.update_chart({'kdata': kdata, 'stock_code': code})
+                        return
+            except Exception as e:
+                if hasattr(self, 'log_manager') and self.log_manager:
+                    self.log_manager.warning(f"TET模式拖拽数据获取失败: {e}")
+
+            # 📊 降级到传统data_manager
             if data_manager:
-                # 使用data_manager加载数据
                 kdata = data_manager.get_kdata(code)
                 if kdata is not None and not kdata.empty:
                     self.update_chart({'kdata': kdata, 'stock_code': code})
                 else:
                     self.show_no_data(f"无法获取 {code} 的数据")
             else:
-                self.show_no_data("数据管理器未初始化")
+                self.show_no_data("所有数据获取方式都失败")
         except Exception as e:
             if hasattr(self, 'log_manager') and self.log_manager:
                 self.log_manager.error(f"处理拖拽事件失败: {str(e)}")

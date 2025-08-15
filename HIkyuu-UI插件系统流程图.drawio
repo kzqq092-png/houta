@@ -1,0 +1,397 @@
+<mxfile host="65bd71144e">
+    <diagram name="HIkyuu-UI插件系统流程图" id="plugin-system-flowchart">
+        <mxGraphModel dx="1359" dy="922" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="2339" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="HIkyuu-UI插件系统流程图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1f497d;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="20" width="400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lifecycle-title" value="插件生命周期流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="80" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="start" value="系统启动" style="ellipse;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="130" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="scan-plugins" value="扫描插件目录" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="220" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="parse-metadata" value="解析插件元数据&lt;br&gt;(plugin.json)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="310" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="validate-plugin" value="验证插件完整性&lt;br&gt;和依赖关系" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="400" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="register-plugin" value="注册插件到&lt;br&gt;数据库" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="490" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="check-enable" value="插件是否&lt;br&gt;设置为启用?" style="rhombus;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="580" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="load-plugin" value="动态加载&lt;br&gt;插件模块" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="590" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="initialize-plugin" value="初始化插件&lt;br&gt;传递上下文" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="680" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="running-state" value="插件运行状态&lt;br&gt;响应事件" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="770" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="standby-state" value="插件待机状态&lt;br&gt;(LOADED)" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="700" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui-flow-title" value="插件管理UI交互流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="80" width="250" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="open-manager" value="用户打开&lt;br&gt;插件管理器" style="ellipse;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="130" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="load-plugin-list" value="异步加载&lt;br&gt;插件列表" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="220" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="display-info" value="显示插件信息&lt;br&gt;状态和配置" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="310" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="user-action" value="用户选择操作" style="rhombus;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="400" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="enable-plugin" value="启用插件" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="520" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="disable-plugin" value="禁用插件" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="520" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="config-plugin" value="配置插件" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="810" y="520" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="uninstall-plugin" value="卸载插件" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="520" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="market-flow-title" value="插件市场流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="80" width="150" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="open-market" value="打开插件市场" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="1220" y="130" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="search-plugins" value="搜索/浏览&lt;br&gt;插件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="220" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="show-cards" value="显示插件卡片&lt;br&gt;评分和信息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="310" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="select-install" value="用户选择&lt;br&gt;安装插件?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="400" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="download-plugin" value="下载插件文件&lt;br&gt;显示进度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="520" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="install-plugin" value="解压安装&lt;br&gt;注册插件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="610" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="datasource-flow-title" value="数据源插件调用流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="900" width="250" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="data-request" value="数据管理器&lt;br&gt;接收数据请求" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="950" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="route-selection" value="数据源路由器&lt;br&gt;选择插件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1040" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="call-plugin" value="调用数据源插件&lt;br&gt;fetch_data()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1130" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="check-cache" value="检查数据缓存" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="1220" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="return-cache" value="返回缓存数据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="1230" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="call-api" value="调用外部API&lt;br&gt;获取数据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1340" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="process-data" value="数据格式化&lt;br&gt;和标准化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1430" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="update-cache" value="更新数据缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1520" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="record-performance" value="记录性能指标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="1610" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="return-data" value="返回标准化数据" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="1700" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="error-flow-title" value="错误处理和恢复流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="900" width="250" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="detect-error" value="检测到插件错误" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc0000;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="950" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="classify-error" value="错误类型分类" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="1040" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="load-error" value="加载错误&lt;br&gt;标记为ERROR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc0000;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="1160" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="runtime-error" value="运行时错误&lt;br&gt;自动重试" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="1160" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="network-error" value="网络错误&lt;br&gt;切换数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="1160" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="log-error" value="记录错误日志&lt;br&gt;和性能指标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="1260" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="notify-user" value="通知用户&lt;br&gt;错误信息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="1350" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="start-to-scan" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="start" target="scan-plugins" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="200" as="sourcePoint"/>
+                        <mxPoint x="200" y="210" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="scan-to-parse" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="scan-plugins" target="parse-metadata" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="290" as="sourcePoint"/>
+                        <mxPoint x="200" y="300" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="parse-to-validate" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="parse-metadata" target="validate-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="380" as="sourcePoint"/>
+                        <mxPoint x="200" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="validate-to-register" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="validate-plugin" target="register-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="470" as="sourcePoint"/>
+                        <mxPoint x="200" y="480" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="register-to-check" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="register-plugin" target="check-enable" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="560" as="sourcePoint"/>
+                        <mxPoint x="200" y="570" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="check-to-load" value="是" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="check-enable" target="load-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="290" y="620" as="sourcePoint"/>
+                        <mxPoint x="340" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="check-to-standby" value="否" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="check-enable" target="standby-state" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="670" as="sourcePoint"/>
+                        <mxPoint x="200" y="690" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="load-to-init" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="load-plugin" target="initialize-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="420" y="660" as="sourcePoint"/>
+                        <mxPoint x="420" y="670" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="init-to-running" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="initialize-plugin" target="running-state" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="420" y="750" as="sourcePoint"/>
+                        <mxPoint x="420" y="760" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="open-to-load-list" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="open-manager" target="load-plugin-list" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="200" as="sourcePoint"/>
+                        <mxPoint x="810" y="210" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="load-to-display" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="load-plugin-list" target="display-info" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="290" as="sourcePoint"/>
+                        <mxPoint x="810" y="300" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="display-to-action" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="display-info" target="user-action" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="380" as="sourcePoint"/>
+                        <mxPoint x="810" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="action-to-enable" value="启用" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="user-action" target="enable-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="730" y="480" as="sourcePoint"/>
+                        <mxPoint x="600" y="510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="action-to-disable" value="禁用" style="endArrow=classic;html=1;rounded=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="user-action" target="disable-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="770" y="480" as="sourcePoint"/>
+                        <mxPoint x="730" y="510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="action-to-config" value="配置" style="endArrow=classic;html=1;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="user-action" target="config-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="850" y="480" as="sourcePoint"/>
+                        <mxPoint x="860" y="510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="action-to-uninstall" value="卸载" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="user-action" target="uninstall-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="890" y="480" as="sourcePoint"/>
+                        <mxPoint x="990" y="510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="market-open-to-search" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0d0d0d;" parent="1" source="open-market" target="search-plugins" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1280" y="200" as="sourcePoint"/>
+                        <mxPoint x="1280" y="210" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="search-to-show" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0d0d0d;" parent="1" source="search-plugins" target="show-cards" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1280" y="290" as="sourcePoint"/>
+                        <mxPoint x="1280" y="300" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="show-to-select" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0d0d0d;" parent="1" source="show-cards" target="select-install" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1280" y="380" as="sourcePoint"/>
+                        <mxPoint x="1280" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="select-to-download" value="是" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0d0d0d;" parent="1" source="select-install" target="download-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1280" y="490" as="sourcePoint"/>
+                        <mxPoint x="1280" y="510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="download-to-install" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0d0d0d;" parent="1" source="download-plugin" target="install-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="1280" y="590" as="sourcePoint"/>
+                        <mxPoint x="1280" y="600" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="request-to-route" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="data-request" target="route-selection" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="210" y="1020" as="sourcePoint"/>
+                        <mxPoint x="200" y="1030" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="route-to-call" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="route-selection" target="call-plugin" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1110" as="sourcePoint"/>
+                        <mxPoint x="200" y="1120" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="call-to-cache" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="call-plugin" target="check-cache" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1200" as="sourcePoint"/>
+                        <mxPoint x="200" y="1210" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cache-to-return" value="有缓存" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="check-cache" target="return-cache" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="290" y="1260" as="sourcePoint"/>
+                        <mxPoint x="340" y="1260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cache-to-api" value="无缓存" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="check-cache" target="call-api" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1310" as="sourcePoint"/>
+                        <mxPoint x="200" y="1330" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="api-to-process" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="call-api" target="process-data" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1410" as="sourcePoint"/>
+                        <mxPoint x="200" y="1420" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="process-to-update" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="process-data" target="update-cache" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1500" as="sourcePoint"/>
+                        <mxPoint x="200" y="1510" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="update-to-record" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="update-cache" target="record-performance" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1590" as="sourcePoint"/>
+                        <mxPoint x="200" y="1600" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="record-to-return" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="record-performance" target="return-data" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="200" y="1680" as="sourcePoint"/>
+                        <mxPoint x="210" y="1690" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="error-to-classify" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="detect-error" target="classify-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="1020" as="sourcePoint"/>
+                        <mxPoint x="810" y="1030" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="classify-to-load-error" value="加载错误" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="classify-error" target="load-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="730" y="1120" as="sourcePoint"/>
+                        <mxPoint x="610" y="1150" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="classify-to-runtime" value="运行时错误" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="classify-error" target="runtime-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="1120" as="sourcePoint"/>
+                        <mxPoint x="760" y="1150" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="classify-to-network" value="网络错误" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="classify-error" target="network-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="890" y="1120" as="sourcePoint"/>
+                        <mxPoint x="910" y="1150" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="errors-to-log" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="load-error" target="log-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="610" y="1230" as="sourcePoint"/>
+                        <mxPoint x="775" y="1250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="runtime-to-log" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="runtime-error" target="log-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="760" y="1230" as="sourcePoint"/>
+                        <mxPoint x="810" y="1250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="network-to-log" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="network-error" target="log-error" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="910" y="1230" as="sourcePoint"/>
+                        <mxPoint x="845" y="1250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="log-to-notify" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontColor=#0a0a0a;" parent="1" source="log-error" target="notify-user" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="810" y="1330" as="sourcePoint"/>
+                        <mxPoint x="810" y="1340" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend-title-flow" value="图例" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=default;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="1800" width="60" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-start-end" value="开始/结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="1840" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-process" value="处理过程" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="220" y="1840" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-decision" value="判断决策" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="1830" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-database" value="数据操作" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="1840" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-error" value="错误处理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc0000;fontSize=12;fontColor=#0a0a0a;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="1840" width="100" height="40" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

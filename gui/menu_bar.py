@@ -1080,6 +1080,4 @@ class MainMenuBar(QMenuBar):
 
         except Exception as e:
             print(f"❌ 创建插件对话框失败: {e}")
-            import traceback
-            traceback.print_exc()
             raise

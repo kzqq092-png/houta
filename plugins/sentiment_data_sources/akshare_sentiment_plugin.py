@@ -54,6 +54,10 @@ class AkShareSentimentPlugin(BaseSentimentPlugin):
             "tags": ["sentiment", "emotion", "vix", "news", "weibo", "market"]
         }
 
+    def fetch_sentiment_data(self) -> SentimentResponse:
+        """获取情绪数据 - ISentimentDataSource接口实现"""
+        return self._fetch_raw_sentiment_data()
+
     def _fetch_raw_sentiment_data(self, **kwargs) -> SentimentResponse:
         """获取AkShare原始情绪数据"""
         sentiment_data = []
@@ -123,15 +127,28 @@ class AkShareSentimentPlugin(BaseSentimentPlugin):
     def _fetch_news_sentiment(self) -> Optional[SentimentData]:
         """获取新闻情绪指数"""
         try:
-            # 使用akshare获取新闻情绪相关数据
-            # 注意：这里使用的是模拟数据，因为akshare的新闻情绪API可能需要特殊配置
-
-            # 尝试获取A股新闻数据（间接反映情绪）
+            # 使用akshare获取真实的市场情绪相关数据
             current_time = datetime.now()
 
-            # 模拟新闻情绪指数（基于一些间接指标）
-            news_score = np.random.normal(50, 10)  # 正态分布，均值50
-            news_score = max(0, min(100, news_score))  # 限制在0-100范围
+            # 尝试获取市场情绪相关指标
+            try:
+                # 获取A股市场情绪指标 - 使用真实的AKShare接口
+                import akshare as ak
+
+                # 获取沪深300指数涨跌幅作为市场情绪参考
+                index_data = ak.index_zh_a_hist(symbol="000300", period="daily", start_date=current_time.strftime("%Y%m%d"))
+                if not index_data.empty:
+                    latest_data = index_data.iloc[-1]
+                    change_pct = float(latest_data.get('涨跌幅', 0))
+                    # 将涨跌幅转换为情绪分数 (范围0-100)
+                    news_score = 50 + (change_pct * 10)  # 涨跌幅*10作为情绪调整
+                    news_score = max(0, min(100, news_score))
+                else:
+                    self._safe_log("warning", "无法获取市场指数数据")
+                    return None
+            except Exception as e:
+                self._safe_log("error", f"获取AKShare市场数据失败: {e}")
+                return None
 
             # 根据分数确定状态和信号
             if news_score >= 70:
@@ -544,3 +561,38 @@ class AkShareSentimentPlugin(BaseSentimentPlugin):
             return True
         except:
             return False
+
+    def validate_data_quality(self, data: List[SentimentData]) -> str:
+        """
+        验证数据质量
+
+        Args:
+            data: 待验证的情绪数据
+
+        Returns:
+            str: 数据质量评级 ('excellent', 'good', 'fair', 'poor')
+        """
+        if not data:
+            return 'poor'
+
+        # 检查数据完整性
+        complete_count = sum(1 for item in data if item.value is not None and item.confidence > 0.3)
+        completeness_ratio = complete_count / len(data)
+
+        # 检查数据新鲜度
+        current_time = datetime.now()
+        fresh_count = sum(1 for item in data if (current_time - item.timestamp).total_seconds() < 3600)
+        freshness_ratio = fresh_count / len(data) if data else 0
+
+        # 检查置信度
+        avg_confidence = sum(item.confidence for item in data) / len(data) if data else 0
+
+        # 综合评分
+        if completeness_ratio >= 0.9 and freshness_ratio >= 0.8 and avg_confidence >= 0.7:
+            return 'excellent'
+        elif completeness_ratio >= 0.7 and freshness_ratio >= 0.6 and avg_confidence >= 0.5:
+            return 'good'
+        elif completeness_ratio >= 0.5 and freshness_ratio >= 0.4 and avg_confidence >= 0.3:
+            return 'fair'
+        else:
+            return 'poor'

@@ -78,6 +78,8 @@ class MySteelDataPlugin(IDataSourcePlugin):
             'COTTON': {'name': '棉花', 'category': '农产品', 'unit': '元/吨', 'market': '郑州'}
         }
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -186,6 +188,10 @@ class MySteelDataPlugin(IDataSourcePlugin):
         except Exception as e:
             self.logger.error(f"获取 {symbol} 价格数据失败: {e}")
             return self._get_simulated_kline_data(symbol, start_date, end_date, frequency)
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
 
     def _get_simulated_kline_data(self, symbol: str, start_date: datetime,
                                   end_date: datetime, frequency: str) -> List[KlineData]:

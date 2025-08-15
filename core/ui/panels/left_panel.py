@@ -20,24 +20,27 @@ from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QIcon, QFont
 
 from .base_panel import BasePanel
-from core.events.events import StockSelectedEvent
+from core.events.events import StockSelectedEvent, AssetSelectedEvent
 from utils.performance_monitor import measure_performance
 # 引入服务和类型
 from core.services import StockService
 from core.services.unified_data_manager import UnifiedDataManager
+from core.services.asset_service import AssetService
+from core.plugin_types import AssetType
 
 logger = logging.getLogger(__name__)
 
 
 class LeftPanel(BasePanel):
     """
-    左侧面板 - 股票列表
+    左侧面板 - 多资产列表
 
     功能：
-    1. 股票搜索和筛选
-    2. 股票列表显示
-    3. 收藏管理
-    4. 股票信息展示
+    1. 多资产类型选择（股票、加密货币、期货等）
+    2. 资产搜索和筛选
+    3. 资产列表显示
+    4. 收藏管理
+    5. 资产信息展示
     """
 
     def __init__(self,
@@ -49,6 +52,21 @@ class LeftPanel(BasePanel):
         """初始化左侧面板"""
         self.stock_service = stock_service
         self.data_manager = data_manager
+
+        # 尝试获取资产服务
+        self.asset_service = None
+        self.multi_asset_enabled = False
+        try:
+            if hasattr(coordinator, 'service_container'):
+                self.asset_service = coordinator.service_container.resolve(AssetService)
+                self.multi_asset_enabled = True
+                logger.info("✅ 多资产支持已启用")
+        except Exception as e:
+            logger.info(f"ℹ️ 多资产服务不可用，使用股票模式: {e}")
+
+        # 当前选择的资产类型
+        self.current_asset_type = AssetType.STOCK
+        self.current_market = None
 
         # 添加防抖相关属性
         self._selection_timer = None
@@ -83,20 +101,205 @@ class LeftPanel(BasePanel):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
+        # 创建资产类型选择区域（如果启用多资产支持）
+        if self.multi_asset_enabled:
+            self._create_asset_type_selector(main_layout)
+
         # 创建搜索区域
         self._create_search_area(main_layout)
 
         # 创建筛选区域
         self._create_filter_area(main_layout)
 
-        # 创建股票列表
-        self._create_stock_list(main_layout)
+        # 创建资产列表（原股票列表）
+        self._create_asset_list(main_layout)
 
         # 创建指标列表
         self._create_indicator_section(main_layout)
 
         # 创建状态栏
         self._create_status_bar(main_layout)
+
+    def _create_asset_type_selector(self, layout: QVBoxLayout) -> None:
+        """创建资产类型选择器"""
+        try:
+            # 创建分组框
+            asset_type_group = QGroupBox("资产类型")
+            asset_type_layout = QVBoxLayout(asset_type_group)
+
+            # 创建资产类型下拉框
+            self.asset_type_combo = QComboBox()
+            self.asset_type_combo.setMinimumHeight(30)
+
+            # 添加支持的资产类型
+            asset_types = [
+                ("股票 (Stock)", AssetType.STOCK),
+                ("加密货币 (Crypto)", AssetType.CRYPTO),
+                ("期货 (Futures)", AssetType.FUTURES),
+                ("外汇 (Forex)", AssetType.FOREX),
+                ("指数 (Index)", AssetType.INDEX),
+                ("基金 (Fund)", AssetType.FUND)
+            ]
+
+            for display_name, asset_type in asset_types:
+                self.asset_type_combo.addItem(display_name, asset_type)
+
+            # 连接信号
+            self.asset_type_combo.currentTextChanged.connect(self._on_asset_type_changed)
+
+            asset_type_layout.addWidget(self.asset_type_combo)
+            layout.addWidget(asset_type_group)
+
+            logger.info("资产类型选择器创建完成")
+
+        except Exception as e:
+            logger.error(f"创建资产类型选择器失败: {e}")
+
+    def _on_asset_type_changed(self, text: str) -> None:
+        """资产类型变更处理"""
+        try:
+            # 获取选中的资产类型
+            selected_data = self.asset_type_combo.currentData()
+            if selected_data:
+                old_type = self.current_asset_type
+                self.current_asset_type = selected_data
+
+                logger.info(f"资产类型切换: {old_type.value} → {self.current_asset_type.value}")
+
+                # 更新市场过滤器
+                self._update_market_filters()
+
+                # 重新加载资产列表
+                self._reload_asset_list()
+
+        except Exception as e:
+            logger.error(f"资产类型变更处理失败: {e}")
+
+    def _update_market_filters(self) -> None:
+        """根据资产类型更新市场过滤器"""
+        try:
+            if not hasattr(self, 'market_combo'):
+                return
+
+            # 定义不同资产类型的市场选项
+            market_options = {
+                AssetType.STOCK: ["全部", "上海", "深圳", "创业板", "科创板", "北交所"],
+                AssetType.CRYPTO: ["全部", "Binance", "Coinbase", "OKX", "Huobi"],
+                AssetType.FUTURES: ["全部", "上期所", "大商所", "郑商所", "中金所"],
+                AssetType.FOREX: ["全部", "主要货币对", "次要货币对", "奇异货币对"],
+                AssetType.INDEX: ["全部", "A股指数", "港股指数", "美股指数"],
+                AssetType.FUND: ["全部", "股票型", "债券型", "混合型", "货币型"]
+            }
+
+            options = market_options.get(self.current_asset_type, ["全部"])
+
+            # 更新市场下拉框
+            self.market_combo.clear()
+            self.market_combo.addItems(options)
+
+            logger.debug(f"市场过滤器已更新: {options}")
+
+        except Exception as e:
+            logger.error(f"更新市场过滤器失败: {e}")
+
+    def _reload_asset_list(self) -> None:
+        """重新加载资产列表"""
+        try:
+            if not self.asset_service:
+                # 如果没有资产服务，且不是股票类型，则显示空列表
+                if self.current_asset_type != AssetType.STOCK:
+                    self._clear_asset_list()
+                    return
+                else:
+                    # 股票类型使用传统加载方式
+                    self._load_stock_list_legacy()
+                    return
+
+            # 获取当前市场过滤
+            market = None
+            if hasattr(self, 'market_combo'):
+                market_text = self.market_combo.currentText()
+                if market_text != "全部":
+                    market = market_text
+
+            # 使用资产服务加载数据
+            assets = self.asset_service.get_asset_list(
+                asset_type=self.current_asset_type,
+                market=market
+            )
+
+            # 更新UI显示
+            self._populate_asset_table(assets)
+
+            # 更新状态
+            self._update_status(f"已加载 {len(assets)} 个{self.current_asset_type.value}资产")
+
+        except Exception as e:
+            logger.error(f"重新加载资产列表失败: {e}")
+            self._update_status(f"加载{self.current_asset_type.value}资产失败")
+
+    def _clear_asset_list(self) -> None:
+        """清空资产列表"""
+        try:
+            if hasattr(self, 'stock_tree'):
+                self.stock_tree.clear()
+            self._update_status("暂无数据")
+        except Exception as e:
+            logger.error(f"清空资产列表失败: {e}")
+
+    def _populate_asset_table(self, assets: List[Dict[str, Any]]) -> None:
+        """填充资产表格"""
+        try:
+            if not hasattr(self, 'stock_tree'):
+                return
+
+            # 清空现有数据
+            self.stock_tree.clear()
+
+            # 添加新数据
+            for asset in assets:
+                item = QTreeWidgetItem()
+                item.setText(0, asset.get('symbol', ''))
+                item.setText(1, asset.get('name', ''))
+                item.setText(2, asset.get('market', ''))
+
+                # 存储完整的资产信息
+                item.setData(0, Qt.UserRole, asset)
+
+                self.stock_tree.addTopLevelItem(item)
+
+            # 更新当前资产列表
+            self.current_stocks = assets
+
+            logger.info(f"资产表格已更新: {len(assets)} 条记录")
+
+        except Exception as e:
+            logger.error(f"填充资产表格失败: {e}")
+
+    def _load_stock_list_legacy(self) -> None:
+        """传统方式加载股票列表（向后兼容）"""
+        try:
+            if self.stock_service:
+                stock_list = self.stock_service.get_stock_list()
+                if stock_list:
+                    # 转换为统一格式
+                    assets = []
+                    for stock in stock_list:
+                        assets.append({
+                            'symbol': stock.get('code', ''),
+                            'name': stock.get('name', ''),
+                            'asset_type': 'STOCK',
+                            'market': stock.get('market', ''),
+                            'status': 'active'
+                        })
+                    self._populate_asset_table(assets)
+                    self._update_status(f"已加载 {len(assets)} 只股票")
+                else:
+                    self._clear_asset_list()
+                    self._update_status("获取股票列表失败")
+        except Exception as e:
+            logger.error(f"传统方式加载股票列表失败: {e}")
+            self._update_status("加载股票列表失败")
 
     def _create_search_area(self, parent_layout: QVBoxLayout) -> None:
         """创建搜索区域"""
@@ -171,8 +374,8 @@ class LeftPanel(BasePanel):
         self.add_widget('favorites_btn', self.favorites_btn)
         self.add_widget('refresh_btn', refresh_btn)
 
-    def _create_stock_list(self, parent_layout: QVBoxLayout) -> None:
-        """创建股票列表"""
+    def _create_asset_list(self, parent_layout: QVBoxLayout) -> None:
+        """创建资产列表（支持多资产类型）"""
         # 股票列表
         self.stock_tree = QTreeWidget()
         self.stock_tree.setHeaderLabels(["代码", "名称"])
@@ -374,17 +577,62 @@ class LeftPanel(BasePanel):
 
     @pyqtSlot(QTreeWidgetItem, int)
     def _on_stock_double_clicked(self, item: QTreeWidgetItem, column: int) -> None:
-        """处理股票双击事件"""
+        """处理资产双击事件（支持多资产类型）"""
         # 在多屏模式下，不响应双击事件，只支持拖拽
         if self._is_multi_screen_mode():
-            logger.debug("多屏模式下不响应股票双击事件，请使用拖拽功能")
-            self.show_message("多屏模式下请拖拽股票到目标图表", level="info")
+            logger.debug(f"多屏模式下不响应{self.current_asset_type.value}双击事件，请使用拖拽功能")
+            self.show_message(f"多屏模式下请拖拽{self.current_asset_type.value}到目标图表", level="info")
             return
 
-        stock_code = item.text(0)
-        stock_name = item.text(1)
-        market = item.data(0, Qt.UserRole).get('market', '')
-        self._select_stock(stock_code, stock_name, market)
+        # 获取资产信息
+        symbol = item.text(0)
+        name = item.text(1)
+        asset_data = item.data(0, Qt.UserRole) or {}
+        market = asset_data.get('market', '')
+
+        # 选择资产
+        self._select_asset(symbol, name, market)
+
+    def _select_asset(self, symbol: str, name: str, market: str = "") -> None:
+        """选择资产（支持多资产类型）"""
+        try:
+            logger.info(f"选择资产: {symbol} ({name}) - 类型: {self.current_asset_type.value}")
+
+            # 发送资产选择事件
+            if self.current_asset_type == AssetType.STOCK:
+                # 向后兼容：股票类型同时发送两种事件
+                stock_event = StockSelectedEvent(
+                    stock_code=symbol,
+                    stock_name=name,
+                    market=market
+                )
+                self.event_bus.emit(stock_event)
+
+                # 同时发送新的通用事件
+                asset_event = AssetSelectedEvent(
+                    symbol=symbol,
+                    name=name,
+                    asset_type=self.current_asset_type,
+                    market=market
+                )
+                self.event_bus.emit(asset_event)
+
+            else:
+                # 非股票类型只发送通用事件
+                asset_event = AssetSelectedEvent(
+                    symbol=symbol,
+                    name=name,
+                    asset_type=self.current_asset_type,
+                    market=market
+                )
+                self.event_bus.emit(asset_event)
+
+            # 更新状态显示
+            self._update_status(f"已选择: {symbol} ({name})")
+
+        except Exception as e:
+            logger.error(f"选择资产失败: {e}")
+            self._update_status("选择资产失败")
 
     def _on_context_menu(self, position) -> None:
         """右键菜单处理"""

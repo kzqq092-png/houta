@@ -346,7 +346,7 @@ def test_parallel_execution():
         logger.info("  开始并行执行...")
         start_time = time.time()
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(os.cpu_count() * 2) as executor:
             futures = [executor.submit(execute_strategy, name)
                        for name in strategies.keys()]
             results = [future.result() for future in futures]

@@ -982,9 +982,10 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 pass
             button.clicked.connect(lambda: self._run_analysis_async(
                 button, analysis_func, *args, **kwargs))
+        import os
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
+            self._thread_pool = ThreadPoolExecutor(os.cpu_count() * 2)
         future = self._thread_pool.submit(task)
         # 只需在finally中恢复，无需重复回调
 

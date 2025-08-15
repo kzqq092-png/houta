@@ -59,13 +59,13 @@ except ImportError as e:
     logging.warning(f"无法导入专业版情绪分析标签页: {e}")
     PROFESSIONAL_SENTIMENT_AVAILABLE = False
 
-# 导入K线情绪分析标签页
+# 导入K线技术分析标签页
 try:
-    from gui.widgets.analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
-    KLINE_SENTIMENT_AVAILABLE = True
+    from gui.widgets.analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
+    KLINE_TECHNICAL_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入K线情绪分析标签页: {e}")
-    KLINE_SENTIMENT_AVAILABLE = False
+    logging.warning(f"无法导入K线技术分析标签页: {e}")
+    KLINE_TECHNICAL_AVAILABLE = False
 
 # 导入AnalysisToolsPanel
 try:
@@ -346,36 +346,35 @@ class RightPanel(BasePanel):
                 tab_widget.addTab(placeholder_tab, "📊 情绪分析")
 
                 # K线情绪分析 - 使用服务容器
-            if KLINE_SENTIMENT_AVAILABLE:
+            if KLINE_TECHNICAL_AVAILABLE:
                 try:
-                    logger.info("🔄 开始创建K线情绪分析标签页...")
+                    logger.info("🔄 开始创建K线技术分析标签页...")
                     import time
                     start_time = time.time()
 
-                    logger.info("📦 导入K线情绪分析标签页模块...")
-                    logger.info("✅ K线情绪分析标签页模块导入成功")
+                    logger.info("📦 导入K线技术分析标签页模块...")
+                    logger.info("✅ K线技术分析标签页模块导入成功")
 
-                    logger.info("🏗️ 创建K线情绪分析标签页实例...")
-                    self._kline_sentiment_tab = EnhancedKLineSentimentTab(
-                        config_manager=config_manager,
-                        service_container=self.coordinator.service_container
+                    logger.info("🏗️ 创建K线技术分析标签页实例...")
+                    self._kline_sentiment_tab = EnhancedKLineTechnicalTab(
+                        config_manager=config_manager
                     )
 
                     create_time = time.time()
-                    logger.info(f"⏱️ K线情绪分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
+                    logger.info(f"⏱️ K线技术分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
 
-                    logger.info("🎨 添加K线情绪分析标签页到UI...")
-                    tab_widget.addTab(self._kline_sentiment_tab, "📈 K线情绪")
+                    logger.info("🎨 添加K线技术分析标签页到UI...")
+                    tab_widget.addTab(self._kline_sentiment_tab, "📈 K线技术")
 
                     # 注册到组件管理
-                    logger.info("📝 注册K线情绪分析标签页到组件管理...")
+                    logger.info("📝 注册K线技术分析标签页到组件管理...")
                     self.add_widget('kline_sentiment_tab', self._kline_sentiment_tab)
                     self._professional_tabs.append(self._kline_sentiment_tab)
 
                     end_time = time.time()
-                    logger.info(f"✅ K线情绪分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
+                    logger.info(f"✅ K线技术分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
                 except Exception as kline_error:
-                    logger.error(f"❌ K线情绪分析标签页创建失败: {kline_error}")
+                    logger.error(f"❌ K线技术分析标签页创建失败: {kline_error}")
                     logger.error(traceback.format_exc())
 
                     # 板块资金流 - 使用服务容器

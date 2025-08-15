@@ -12,6 +12,7 @@ from .theme_service import ThemeService
 from .config_service import ConfigService
 from .industry_service import IndustryService
 from .unified_data_manager import UnifiedDataManager
+from .asset_service import AssetService
 from .service_bootstrap import ServiceBootstrap, bootstrap_services
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     'ConfigService',
     'IndustryService',
     'UnifiedDataManager',
+    'AssetService',
     'ServiceBootstrap',
     'bootstrap_services'
 ]

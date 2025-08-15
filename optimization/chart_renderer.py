@@ -3,6 +3,7 @@
 提供渲染优先级、异步渲染和性能优化功能
 """
 
+import os
 import threading
 import time
 import logging
@@ -63,7 +64,7 @@ class ChartRenderer(QObject):
     render_error = pyqtSignal(str)  # 错误信号
     priority_render_complete = pyqtSignal(str, object)  # 优先级渲染完成信号
 
-    def __init__(self, max_workers: int = 8, enable_progressive: bool = True):
+    def __init__(self, max_workers: int = os.cpu_count() * 2, enable_progressive: bool = True):
         """
         初始化图表渲染器
 

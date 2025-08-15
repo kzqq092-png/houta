@@ -6,7 +6,7 @@
 
 from .base_tab import BaseAnalysisTab
 # from .professional_sentiment_tab import ProfessionalSentimentTab, SentimentAnalysisTab
-from .enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
+from .enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
 from .technical_tab import TechnicalAnalysisTab
 from .trend_tab import TrendAnalysisTab
 from .wave_tab import WaveAnalysisTab
@@ -21,7 +21,7 @@ __all__ = [
     'BaseAnalysisTab',
     # 'ProfessionalSentimentTab',
     # 'SentimentAnalysisTab',  # 向后兼容别名
-    'EnhancedKLineSentimentTab',
+    'EnhancedKLineTechnicalTab',
     'TechnicalAnalysisTab',
     'TrendAnalysisTab',
     'WaveAnalysisTab',

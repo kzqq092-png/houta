@@ -295,15 +295,15 @@ class AnalysisWidget(QWidget):
             self.hotspot_tab.parent_widget = self
             self.tab_components['hotspot'] = self.hotspot_tab
 
-            # K线情绪分析标签页 - 新增
+            # K线技术分析标签页 - 重命名删除重复情绪功能
             try:
-                from .analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineSentimentTab
-                self.kline_sentiment_tab = EnhancedKLineSentimentTab(self.config_manager)
-                self.kline_sentiment_tab.parent_widget = self
-                self.tab_components['kline_sentiment'] = self.kline_sentiment_tab
+                from .analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
+                self.kline_technical_tab = EnhancedKLineTechnicalTab(self.config_manager)
+                self.kline_technical_tab.parent_widget = self
+                self.tab_components['kline_technical'] = self.kline_technical_tab
             except ImportError as e:
-                print(f"K线情绪分析标签页导入失败: {e}")
-                self.kline_sentiment_tab = None
+                print(f"K线技术分析标签页导入失败: {e}")
+                self.kline_technical_tab = None
 
             # 连接信号
             self._connect_tab_signals()
@@ -389,9 +389,9 @@ class AnalysisWidget(QWidget):
         # 情绪报告
         self.tab_widget.addTab(self.sentiment_report_tab, "📊 情绪报告")
 
-        # K线情绪分析 - 新增
-        if hasattr(self, 'kline_sentiment_tab') and self.kline_sentiment_tab:
-            self.tab_widget.addTab(self.kline_sentiment_tab, "📈 K线情绪")
+        # K线技术分析 - 新增
+        if hasattr(self, 'kline_technical_tab') and self.kline_technical_tab:
+            self.tab_widget.addTab(self.kline_technical_tab, "📈 K线技术")
 
     def _connect_tab_signals(self):
         """连接标签页信号 - 修复版"""
@@ -710,7 +710,7 @@ class AnalysisWidget(QWidget):
             self.log_manager.info(f"批量更新指标: {indicators}")
 
             # 并行计算所有指标
-            with ThreadPoolExecutor(max_workers=min(len(indicators), 4)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(indicators), os.cpu_count() * 2)) as executor:
                 futures = []
                 for indicator in indicators:
                     future = executor.submit(

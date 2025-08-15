@@ -13,20 +13,16 @@ FactorWeave-Quant 增强插件管理器对话框
 
 import asyncio
 import concurrent.futures
+import os
+import json
+import requests
 import logging
 import time
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
-    QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QComboBox, QTextEdit, QProgressBar, QListWidget, QListWidgetItem,
-    QSplitter, QGroupBox, QFormLayout, QSpinBox, QCheckBox,
-    QMessageBox, QFrame, QScrollArea, QGridLayout, QSlider,
-    QHeaderView, QAbstractItemView, QApplication
-)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap
 
@@ -154,11 +150,70 @@ class TablePopulationWorker(QThread):
             # 插件名称
             name = getattr(plugin_info, 'name', source_id)
 
-            # 状态（非阻塞，避免长时间锁）
+            # 状态（严格检查，只有真正连接成功才显示活跃）
             try:
-                is_connected = bool(getattr(adapter, 'is_connected', lambda: False)())
+                is_connected = False
+                status_message = "未连接"
+
+                # 严格的连接状态检查：只有所有条件都满足才认为是活跃状态
+                plugin_instance = getattr(adapter, 'plugin', None)
+                if plugin_instance:
+                    # 1. 检查插件是否已初始化
+                    plugin_initialized = getattr(plugin_instance, 'initialized', False)
+                    if not plugin_initialized:
+                        status_message = "插件未初始化"
+                        print(f"❌ 插件 {source_id} 未初始化")
+                    else:
+                        # 2. 检查插件连接状态
+                        if hasattr(plugin_instance, 'is_connected'):
+                            try:
+                                plugin_connected = bool(plugin_instance.is_connected())
+                                if not plugin_connected:
+                                    status_message = "插件未连接"
+                                    print(f"❌ 插件 {source_id} is_connected() 返回 False")
+                                else:
+                                    # 3. 执行健康检查（最严格的验证）
+                                    try:
+                                        health_result = adapter.health_check()
+                                        if hasattr(health_result, 'is_healthy') and health_result.is_healthy:
+                                            # 4. 最后验证：检查适配器状态
+                                            from core.data_source_extensions import PluginStatus
+                                            adapter_status = getattr(adapter, 'status', None)
+                                            if adapter_status == PluginStatus.READY:
+                                                is_connected = True
+                                                status_message = "活跃"
+                                                print(f"✅ 插件 {source_id} 所有检查通过，状态活跃")
+                                            else:
+                                                status_message = f"适配器状态异常: {adapter_status}"
+                                                print(f"❌ 插件 {source_id} 适配器状态不是READY: {adapter_status}")
+                                        else:
+                                            error_msg = getattr(health_result, 'error_message', '健康检查失败')
+                                            status_message = error_msg
+                                            print(f"❌ 插件 {source_id} 健康检查失败: {error_msg}")
+                                    except Exception as e:
+                                        status_message = f"健康检查异常: {str(e)}"
+                                        print(f"❌ 插件 {source_id} 健康检查异常: {e}")
+                            except Exception as e:
+                                status_message = f"连接检查失败: {str(e)}"
+                                print(f"❌ 调用插件is_connected失败 {source_id}: {e}")
+                        else:
+                            status_message = "插件不支持连接检查"
+                            print(f"❌ 插件 {source_id} 不支持连接检查")
+                else:
+                    status_message = "插件实例不存在"
+                    print(f"❌ 插件 {source_id} 实例不存在")
+
+                # 如果还没有连接，检查适配器错误状态以提供更详细的错误信息
+                if not is_connected and hasattr(adapter, 'last_error') and adapter.last_error:
+                    status_message = adapter.last_error
+
                 status = "🟢 活跃" if is_connected else "🔴 未连接"
-            except Exception:
+                print(f"🔍 最终状态 {source_id}: {status} ({status_message})")
+
+            except Exception as e:
+                print(f"检查插件状态失败 {source_id}: {e}")
+                import traceback
+                traceback.print_exc()
                 status = "🟡 未知"
 
             # 支持资产
@@ -177,15 +232,61 @@ class TablePopulationWorker(QThread):
             except:
                 assets = "通用"
 
-            # 健康分数：不在此处主动调用 health_check，避免阻塞；优先使用路由器缓存指标
+            # 健康分数：优先使用路由器缓存指标，避免阻塞
             health_score = "N/A"
             try:
-                m = self.metrics.get(source_id)
-                # 若有可用指标，可在此映射为分数；否则使用 N/A
-                # 例如：根据最近健康状态/平均响应时间计算
-                # 这里保持轻量占位，避免任何阻塞
-            except Exception:
-                pass
+                # 尝试从路由器获取指标
+                from core.services.unified_data_manager import get_unified_data_manager
+                unified_manager = get_unified_data_manager()
+                router = getattr(unified_manager, 'data_source_router', None) if unified_manager else None
+
+                if router and hasattr(router, 'metrics'):
+                    metrics = router.metrics.get(source_id)
+                    if metrics and hasattr(metrics, 'health_score'):
+                        health_score = f"{metrics.health_score:.2f}"
+                    elif metrics and hasattr(metrics, 'success_rate'):
+                        # 基于成功率计算健康分数
+                        success_rate = metrics.success_rate
+                        if success_rate >= 0.9:
+                            health_score = "0.95"
+                        elif success_rate >= 0.7:
+                            health_score = "0.80"
+                        elif success_rate >= 0.5:
+                            health_score = "0.65"
+                        else:
+                            health_score = "0.30"
+
+                # 如果路由器没有指标，尝试从适配器获取
+                if health_score == "N/A" and adapter:
+                    if hasattr(adapter, 'health_score'):
+                        health_score = f"{adapter.health_score:.2f}"
+                    elif hasattr(adapter, 'stats') and adapter.stats:
+                        stats = adapter.stats
+                        total = stats.get('total_requests', 0)
+                        success = stats.get('successful_requests', 0)
+                        if total > 0:
+                            success_rate = success / total
+                            health_score = f"{min(1.0, success_rate + 0.1):.2f}"
+                        else:
+                            health_score = "1.00"  # 新插件默认满分
+                    else:
+                        # 基于连接状态给出基础分数
+                        if status == "🟢 活跃":
+                            health_score = "0.85"
+                        elif status == "🔴 未连接":
+                            health_score = "0.10"
+                        else:
+                            health_score = "0.50"
+
+            except Exception as e:
+                print(f"计算健康分数失败 {source_id}: {e}")
+                # 基于状态给出默认分数
+                if status == "🟢 活跃":
+                    health_score = "0.80"
+                elif status == "🔴 未连接":
+                    health_score = "0.00"
+                else:
+                    health_score = "N/A"
 
             # 优先级
             priority = str(row + 1)
@@ -252,7 +353,7 @@ class DataSourceLoadingWorker(QThread):
                 return
 
             # 使用线程池并发处理插件
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            with concurrent.futures.ThreadPoolExecutor(os.cpu_count() * 2) as executor:
                 future_to_plugin = {}
 
                 for plugin_name, plugin_info in ds_plugins.items():
@@ -1221,8 +1322,9 @@ class EnhancedPluginManagerDialog(QDialog):
                 # 获取并更新真实状态信息
                 if self.sentiment_service:
                     try:
-                        status_info = self.sentiment_service.get_plugin_status(plugin_name)
-                        print(f"✅ 获取到插件 {plugin_name} 的状态信息: {status_info}")
+                        # 使用内部名称（完整插件ID）来获取状态
+                        status_info = self.sentiment_service.get_plugin_status(internal_name)
+                        print(f"✅ 获取到插件 {display_name} 的状态信息: {status_info}")
 
                         # 构建状态信息
                         status = "✅ 已连接" if status_info.get('is_connected', False) else "❌ 未连接"
@@ -1951,30 +2053,45 @@ class EnhancedPluginManagerDialog(QDialog):
                     sentiment_service = container.resolve(SentimentDataService)
 
             if sentiment_service and plugin_name in sentiment_service.get_available_plugins():
-                # 尝试获取插件的测试数据
+                # 执行真实的插件测试
                 try:
-                    plugin_status = sentiment_service.get_plugin_status(plugin_name)
-                    is_healthy = plugin_status.get('is_connected', False)
+                    # 获取插件实例
+                    plugin_instance = sentiment_service._registered_plugins.get(plugin_name)
+                    if not plugin_instance:
+                        raise Exception(f"插件 {plugin_name} 实例不存在")
 
-                    # 实际测试插件连接
-                    if hasattr(sentiment_service, 'test_plugin_connection'):
-                        is_healthy = sentiment_service.test_plugin_connection(plugin_name)
+                    # 执行真实的健康检查
+                    if hasattr(plugin_instance, 'health_check'):
+                        health_result = plugin_instance.health_check()
+                        is_healthy = getattr(health_result, 'is_healthy', False)
+                        error_message = getattr(health_result, 'error_message', None)
+                    elif hasattr(plugin_instance, 'test_connection'):
+                        # 如果插件有test_connection方法
+                        is_healthy = plugin_instance.test_connection()
+                        error_message = None
+                    else:
+                        # 尝试获取基本状态信息
+                        plugin_status = sentiment_service.get_plugin_status(plugin_name)
+                        is_healthy = plugin_status.get('is_connected', False)
+                        error_message = plugin_status.get('error_message', '插件状态未知')
 
                     self.sentiment_plugin_tested.emit(plugin_name, is_healthy)
 
                     if is_healthy:
-                        QMessageBox.information(self, "测试成功", f"插件 {plugin_name} 测试通过")
+                        QMessageBox.information(self, "测试成功", f"插件 {plugin_name} 连接测试通过")
                     else:
-                        QMessageBox.warning(self, "测试失败", f"插件 {plugin_name} 测试失败")
+                        error_msg = error_message or "连接测试失败"
+                        QMessageBox.warning(self, "测试失败", f"插件 {plugin_name} 测试失败:\n{error_msg}")
 
                 except Exception as e:
                     print(f"❌ 测试插件 {plugin_name} 失败: {e}")
                     self.sentiment_plugin_tested.emit(plugin_name, False)
                     QMessageBox.critical(self, "测试错误", f"测试插件 {plugin_name} 时发生错误:\n{str(e)}")
             else:
-                # 模拟测试（fallback）
-                QTimer.singleShot(1000, lambda: self.sentiment_plugin_tested.emit(plugin_name, True))
-                QMessageBox.information(self, "模拟测试", f"插件 {plugin_name} 模拟测试通过")
+                # 情绪数据服务不可用或插件未注册
+                error_msg = "情绪数据服务不可用" if not sentiment_service else f"插件 {plugin_name} 未注册"
+                self.sentiment_plugin_tested.emit(plugin_name, False)
+                QMessageBox.warning(self, "测试失败", f"无法测试插件 {plugin_name}:\n{error_msg}")
 
         except Exception as e:
             print(f"❌ 测试插件时发生错误: {e}")
@@ -2971,20 +3088,73 @@ class EnhancedPluginManagerDialog(QDialog):
             avg_response_time = 0.0
             health_score = 0.0
 
-            # 尝试从适配器获取统计信息
-            if adapter and hasattr(adapter, 'get_statistics'):
+            # 优先从路由器获取聚合指标
+            try:
+                from core.services.unified_data_manager import get_unified_data_manager
+                unified_manager = get_unified_data_manager()
+                router = getattr(unified_manager, 'data_source_router', None) if unified_manager else None
+
+                if router and hasattr(router, 'metrics'):
+                    # 获取所有数据源的聚合指标
+                    all_metrics = router.metrics
+                    if all_metrics:
+                        total_total_requests = sum(m.total_requests for m in all_metrics.values())
+                        total_successful_requests = sum(m.successful_requests for m in all_metrics.values())
+                        total_failed_requests = sum(m.failed_requests for m in all_metrics.values())
+
+                        if total_total_requests > 0:
+                            total_requests = total_total_requests
+                            success_rate = total_successful_requests / total_total_requests
+
+                        # 计算平均响应时间（加权平均）
+                        total_weighted_time = sum(m.avg_response_time_ms * m.total_requests
+                                                  for m in all_metrics.values() if m.total_requests > 0)
+                        if total_total_requests > 0:
+                            avg_response_time = total_weighted_time / total_total_requests
+
+                        # 计算平均健康分数
+                        health_scores = [m.health_score for m in all_metrics.values()]
+                        if health_scores:
+                            health_score = sum(health_scores) / len(health_scores)
+
+                    # 如果选中了特定插件，显示该插件的指标
+                    if plugin_name and plugin_name in all_metrics:
+                        plugin_metrics = all_metrics[plugin_name]
+                        total_requests = plugin_metrics.total_requests
+                        if plugin_metrics.total_requests > 0:
+                            success_rate = plugin_metrics.successful_requests / plugin_metrics.total_requests
+                        avg_response_time = plugin_metrics.avg_response_time_ms
+                        health_score = plugin_metrics.health_score
+
+            except Exception as e:
+                print(f"从路由器获取指标失败: {e}")
+
+            # 备用：从适配器获取统计信息
+            if total_requests == 0 and adapter:
                 try:
-                    stats = adapter.get_statistics()
-                    total_requests = stats.get('total_requests', 0)
-                    success_rate = stats.get('success_rate', 0.0)
-                    avg_response_time = stats.get('avg_response_time', 0.0)
-                    health_score = 0.8 if success_rate > 0.5 else 0.3  # 简单的健康评分
+                    if hasattr(adapter, 'get_statistics'):
+                        stats = adapter.get_statistics()
+                        total_requests = stats.get('total_requests', 0)
+                        success_rate = stats.get('success_rate', 0.0)
+                        avg_response_time = stats.get('avg_response_time', 0.0)
+                        health_score = 0.8 if success_rate > 0.5 else 0.3
+                    elif hasattr(adapter, 'stats') and adapter.stats:
+                        stats = adapter.stats
+                        total_requests = stats.get('total_requests', 0)
+                        successful = stats.get('successful_requests', 0)
+                        if total_requests > 0:
+                            success_rate = successful / total_requests
+                        health_score = 0.85 if success_rate > 0.8 else 0.5
+                    else:
+                        # 无法获取统计信息时保持默认值
+                        pass
+
                 except Exception as e:
                     print(f"获取适配器统计信息失败: {e}")
 
             # 更新显示
             self.total_requests_label.setText(str(total_requests))
-            self.success_rate_label.setText(f"{success_rate:.2%}")
+            self.success_rate_label.setText(f"{success_rate:.1%}")
             if hasattr(self, 'avg_response_time_label'):
                 self.avg_response_time_label.setText(f"{avg_response_time:.1f}ms")
             if hasattr(self, 'health_score_label'):
@@ -2992,6 +3162,13 @@ class EnhancedPluginManagerDialog(QDialog):
 
         except Exception as e:
             print(f"更新性能指标失败: {e}")
+            # 显示默认值
+            self.total_requests_label.setText("0")
+            self.success_rate_label.setText("0.0%")
+            if hasattr(self, 'avg_response_time_label'):
+                self.avg_response_time_label.setText("0.0ms")
+            if hasattr(self, 'health_score_label'):
+                self.health_score_label.setText("0.00")
 
     def update_priority_list(self):
         """更新优先级列表"""
@@ -3264,15 +3441,39 @@ class EnhancedPluginManagerDialog(QDialog):
     def configure_data_source_plugin(self, source_id):
         """配置数据源插件"""
         try:
-            from gui.dialogs.data_source_plugin_config_dialog import DataSourcePluginConfigDialog
+            print(f"⚙️ 开始配置数据源插件: {source_id}")
 
+            from gui.dialogs.data_source_plugin_config_dialog import DataSourcePluginConfigDialog
+            print("✅ 成功导入配置对话框")
+        except ImportError as ie:
+            print(f"❌ 导入配置对话框失败: {ie}")
+            QMessageBox.information(self, "功能开发中", f"插件 {source_id} 的配置功能正在开发中...")
+            return
+
+        try:
+            # 检查插件是否存在
+            from core.services.unified_data_manager import get_unified_data_manager
+            unified_manager = get_unified_data_manager()
+            if unified_manager and hasattr(unified_manager, 'data_source_router'):
+                router = unified_manager.data_source_router
+                if router and source_id not in router.data_sources:
+                    available_sources = list(router.data_sources.keys())
+                    print(f"❌ 插件 {source_id} 不存在，可用插件: {available_sources}")
+                    QMessageBox.warning(self, "配置失败", f"插件 {source_id} 不存在\n可用插件: {', '.join(available_sources)}")
+                    return
+
+            print(f"🔧 创建配置对话框...")
             config_dialog = DataSourcePluginConfigDialog(source_id, self)
             config_dialog.config_changed.connect(self.on_plugin_config_changed)
-            config_dialog.exec_()
 
-        except ImportError:
-            QMessageBox.information(self, "功能开发中", f"插件 {source_id} 的配置功能正在开发中...")
+            print(f"📋 显示配置对话框...")
+            result = config_dialog.exec_()
+            print(f"配置对话框结果: {result}")
+
         except Exception as e:
+            print(f"❌ 配置插件时发生异常: {e}")
+            import traceback
+            traceback.print_exc()
             QMessageBox.critical(self, "配置错误", f"打开插件配置对话框失败:\n{str(e)}")
 
     def on_plugin_config_changed(self, source_id: str, config: dict):
@@ -3290,36 +3491,58 @@ class EnhancedPluginManagerDialog(QDialog):
     def test_data_source_plugin(self, source_id):
         """测试数据源插件"""
         try:
+            print(f"🧪 开始测试数据源插件: {source_id}")
+
             from core.services.unified_data_manager import get_unified_data_manager
 
             unified_manager = get_unified_data_manager()
-            if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
+            if not unified_manager:
+                print("❌ 统一数据管理器不可用")
+                QMessageBox.warning(self, "测试失败", "统一数据管理器不可用")
+                return
+
+            if not hasattr(unified_manager, 'data_source_router'):
+                print("❌ 数据源路由器未启用")
                 QMessageBox.warning(self, "测试失败", "数据源路由器未启用")
                 return
 
             router = unified_manager.data_source_router
+            if not router:
+                print("❌ 数据源路由器为空")
+                QMessageBox.warning(self, "测试失败", "数据源路由器为空")
+                return
+
             if source_id not in router.data_sources:
-                QMessageBox.warning(self, "测试失败", f"插件 {source_id} 不存在")
+                print(f"❌ 插件 {source_id} 不存在于路由器中")
+                available_sources = list(router.data_sources.keys())
+                print(f"可用的数据源: {available_sources}")
+                QMessageBox.warning(self, "测试失败", f"插件 {source_id} 不存在\n可用插件: {', '.join(available_sources)}")
                 return
 
             # 执行健康检查
+            print(f"🔍 执行健康检查...")
             adapter = router.data_sources[source_id]
+            print(f"适配器类型: {type(adapter).__name__}")
+
             health_result = adapter.health_check()
+            print(f"健康检查结果: is_healthy={health_result.is_healthy}, response_time={health_result.response_time_ms}ms")
 
             if health_result.is_healthy:
-                QMessageBox.information(
-                    self, "测试成功",
-                    f"插件 {source_id} 测试通过\n"
-                    f"响应时间: {health_result.response_time_ms:.1f}ms"
-                )
+                message = f"插件 {source_id} 测试通过\n响应时间: {health_result.response_time_ms:.1f}ms"
+                if health_result.error_message:
+                    message += f"\n备注: {health_result.error_message}"
+                print(f"✅ 测试成功: {message}")
+                QMessageBox.information(self, "测试成功", message)
             else:
-                QMessageBox.warning(
-                    self, "测试失败",
-                    f"插件 {source_id} 测试失败\n"
-                    f"错误: {health_result.error_message or '未知错误'}"
-                )
+                error_msg = health_result.error_message or '未知错误'
+                message = f"插件 {source_id} 测试失败\n错误: {error_msg}"
+                print(f"⚠️ 测试失败: {message}")
+                QMessageBox.warning(self, "测试失败", message)
 
         except Exception as e:
+            print(f"❌ 测试插件时发生异常: {e}")
+            import traceback
+            traceback.print_exc()
             QMessageBox.critical(self, "测试错误", f"测试插件时发生错误:\n{str(e)}")
 
     def create_status_monitor_tab(self):

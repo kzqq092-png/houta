@@ -741,7 +741,7 @@ python main.py
 ```json
 {
     "data_sources": {
-        "primary": "hikyuu",
+        "primary": "FactorWeave-Quant",
         "fallback": ["akshare", "tushare"]
     }
 }
@@ -800,11 +800,11 @@ def calculate_indicators(self, kdata: pd.DataFrame, indicators: List[str]) -> Di
 
 **使用自定义异常**:
 ```python
-class HIkyuuUIException(Exception):
+class FactorWeave-QuantUIException(Exception):
     """FactorWeave-Quant ‌基础异常"""
     pass
 
-class DataValidationError(HIkyuuUIException):
+class DataValidationError(FactorWeave-QuantUIException):
     """数据验证错误"""
     pass
 ```
@@ -948,8 +948,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**Q: HIkyuu安装失败**
-A: HIkyuu需要特定的编译环境，请参考HIkyuu官方文档。
+**Q: FactorWeave-Quant安装失败**
+A: FactorWeave-Quant需要特定的编译环境，请参考FactorWeave-Quant官方文档。
 
 ### 2. 运行问题
 

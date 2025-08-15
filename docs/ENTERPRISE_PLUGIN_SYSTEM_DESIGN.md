@@ -634,7 +634,7 @@ class LicenseAuthorizationServer:
     """授权服务器"""
     
     def __init__(self):
-        self.app = FastAPI(title="HIkyuu Plugin License Server")
+        self.app = FastAPI(title="FactorWeave-Quant Plugin License Server")
         self.db = AsyncSQLAlchemy()
         self.security = SecurityManager()
         self._setup_routes()

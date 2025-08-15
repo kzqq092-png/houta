@@ -1061,6 +1061,17 @@ class PluginManager(QObject):
                                     # 创建适配器
                                     adapter = DataSourcePluginAdapter(plugin_instance, plugin_name)
 
+                                    # 关键修复：连接适配器
+                                    try:
+                                        if adapter.connect():
+                                            logger.info(f"✅ 数据源插件适配器连接成功: {plugin_name}")
+                                        else:
+                                            logger.warning(f"⚠️ 数据源插件适配器连接失败: {plugin_name}")
+                                            # 即使连接失败也继续注册，让路由器处理
+                                    except Exception as e:
+                                        logger.error(f"❌ 数据源插件适配器连接异常 {plugin_name}: {e}")
+                                        # 即使连接异常也继续注册，让路由器处理
+
                                     # 注册到路由器
                                     success = unified_manager.data_source_router.register_data_source(
                                         plugin_name,
@@ -1484,7 +1495,18 @@ class PluginManager(QObject):
 
             # 调用插件的启用方法
             if hasattr(plugin_instance, 'enable'):
-                plugin_instance.enable()
+                try:
+                    plugin_instance.enable()
+                except Exception as enable_error:
+                    logger.error(f"插件启用方法执行失败 {plugin_name}: {enable_error}")
+                    # 设置插件状态为错误
+                    if plugin_name in self.enhanced_plugins:
+                        self.enhanced_plugins[plugin_name].status = PluginStatus.ERROR
+                        self.enhanced_plugins[plugin_name].enabled = False
+                        self._update_plugin_status_in_db(plugin_name, PluginStatus.ERROR, f"启用失败: {str(enable_error)}")
+
+                    self.plugin_error.emit(plugin_name, str(enable_error))
+                    return False
 
             # 更新插件状态
             if plugin_name in self.enhanced_plugins:
@@ -1502,6 +1524,12 @@ class PluginManager(QObject):
 
         except Exception as e:
             logger.error(f"启用插件失败 {plugin_name}: {e}")
+            # 设置插件状态为错误
+            if plugin_name in self.enhanced_plugins:
+                self.enhanced_plugins[plugin_name].status = PluginStatus.ERROR
+                self.enhanced_plugins[plugin_name].enabled = False
+                self._update_plugin_status_in_db(plugin_name, PluginStatus.ERROR, f"启用失败: {str(e)}")
+
             self.plugin_error.emit(plugin_name, str(e))
             return False
 

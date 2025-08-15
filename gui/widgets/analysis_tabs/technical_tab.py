@@ -2449,9 +2449,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
 
         # 导出按钮
         export_btn = QPushButton("导出技术分析结果")
-        export_btn.setFixedHeight(20)
+        export_btn.setFixedHeight(24)
         export_btn.setStyleSheet(
-            "QPushButton { background-color: #17a2b8; color: white; }")
+            "QPushButton { background-color: #17a2b8; font-size: 10px; color: white; }")
         export_btn.clicked.connect(self.export_technical_data)
         export_layout.addWidget(export_btn)
 

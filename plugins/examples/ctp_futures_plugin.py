@@ -75,6 +75,8 @@ class CTPFuturesPlugin(IDataSourcePlugin):
             'ZC2312': {'name': '动力煤期货', 'exchange': 'CZCE', 'multiplier': 100}
         }
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -184,6 +186,10 @@ class CTPFuturesPlugin(IDataSourcePlugin):
             base_price = 3800.0
         else:
             base_price = 3000.0
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
 
         while current_date <= end_date:
             # 模拟价格波动

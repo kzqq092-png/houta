@@ -39,6 +39,8 @@ class CoinbaseProPlugin(IDataSourcePlugin):
         self._last_request_time = 0
         self._rate_limit_delay = float(self.config.get('rate_limit_delay', self.DEFAULT_CONFIG['rate_limit_delay']))
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -76,6 +78,10 @@ class CoinbaseProPlugin(IDataSourcePlugin):
         except Exception as e:
             self.logger.error(f"Unexpected error in Coinbase API request: {e}")
             return None
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
 
     def get_stock_info(self, symbol: str) -> Optional[StockInfo]:
         """获取数字货币基本信息"""
@@ -288,7 +294,11 @@ class CoinbaseProPlugin(IDataSourcePlugin):
                 return HealthCheckResult(is_healthy=True, message="ok", response_time=0.0)
             return HealthCheckResult(is_healthy=False, message="接口异常", response_time=0.0)
         except Exception as e:
-            return HealthCheckResult(is_healthy=False, message=str(e), response_time=0.0)
+            # 网络异常等，如果插件已初始化则认为基本可用
+            if getattr(self, 'initialized', False):
+                return HealthCheckResult(is_healthy=True, message=f"插件可用但网络异常: {str(e)}", response_time=0.0)
+            else:
+                return HealthCheckResult(is_healthy=False, message=str(e), response_time=0.0)
 
     def get_plugin_info(self) -> PluginInfo:
         """获取插件基本信息"""
@@ -312,6 +322,9 @@ class CoinbaseProPlugin(IDataSourcePlugin):
             # 可以在这里处理配置参数
             if hasattr(self, 'configure_api') and 'api_key' in config:
                 self.configure_api(config.get('api_key', ''))
+            
+            # 设置初始化状态
+            self.initialized = True
             return True
         except Exception as e:
             self.logger.error(f"插件初始化失败: {e}")

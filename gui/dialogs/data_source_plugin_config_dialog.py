@@ -535,6 +535,7 @@ class DataSourcePluginConfigDialog(QDialog):
     def load_plugin_info(self):
         """加载插件信息"""
         try:
+            from core.services.unified_data_manager import get_unified_data_manager
 
             unified_manager = get_unified_data_manager()
             if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
@@ -594,11 +595,19 @@ class DataSourcePluginConfigDialog(QDialog):
                 from db.models.plugin_models import get_data_source_config_manager  # type: ignore
                 config_manager = get_data_source_config_manager()
                 db_entry = config_manager.get_plugin_config(self.source_id)
-            except Exception:
+                if db_entry:
+                    logger.info(f"从数据库加载到插件配置: {self.source_id}")
+                else:
+                    logger.info(f"数据库中未找到插件配置: {self.source_id}")
+            except Exception as e:
+                logger.error(f"从数据库加载插件配置失败 {self.source_id}: {e}")
                 db_entry = None
 
-            # 默认配置
-            default_config = {
+            # 获取插件特定的默认配置
+            default_config = self._get_plugin_specific_default_config()
+
+            # 通用默认配置
+            base_default_config = {
                 "connection": {
                     "host": "",
                     "port": 443,
@@ -634,32 +643,273 @@ class DataSourcePluginConfigDialog(QDialog):
                 }
             }
 
+            # 合并插件特定配置和通用配置
+            merged_default = {**base_default_config, **default_config}
+            for section in base_default_config:
+                if section in default_config and isinstance(default_config[section], dict):
+                    merged_default[section] = {**base_default_config[section], **default_config[section]}
+
+            default_config = merged_default
+
             if db_entry and isinstance(db_entry, dict):
                 # db_entry: {config_data, priority, weight, enabled}
                 config_data = db_entry.get("config_data", {})
                 if isinstance(config_data, dict):
-                    # 合并：DB覆盖默认
-                    merged = {**default_config, **config_data}
+                    # 深度合并：DB覆盖默认，但保持结构完整
+                    merged = {**default_config}
+                    for section_key, section_value in config_data.items():
+                        if section_key in merged and isinstance(merged[section_key], dict) and isinstance(section_value, dict):
+                            # 深度合并嵌套字典
+                            merged[section_key] = {**merged[section_key], **section_value}
+                        else:
+                            # 直接覆盖
+                            merged[section_key] = section_value
                     self.current_config = merged
+                    logger.info(f"应用数据库配置: {self.source_id}, 主机地址: {merged.get('connection', {}).get('host', '未设置')}")
                 else:
                     self.current_config = default_config
+                    logger.info(f"使用默认配置: {self.source_id} (数据库配置格式异常)")
             else:
                 self.current_config = default_config
+                logger.info(f"使用默认配置: {self.source_id} (数据库中无配置)")
 
             self.apply_config_to_ui()
 
         except Exception as e:
             logger.error(f"加载配置失败: {str(e)}")
 
+    def _get_plugin_specific_default_config(self) -> dict:
+        """获取插件特定的默认配置"""
+        plugin_configs = {
+            # AKShare股票插件
+            "examples.akshare_stock_plugin": {
+                "connection": {
+                    "host": "akshare.akfamily.xyz",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 60
+                },
+                "auth": {
+                    "type": "无认证"
+                },
+                "advanced": {
+                    "custom_params": {
+                        "data_source": "akshare",
+                        "market": "A股",
+                        "encoding": "utf-8"
+                    }
+                }
+            },
+
+            # Binance加密货币插件
+            "examples.binance_crypto_plugin": {
+                "connection": {
+                    "host": "api.binance.com",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "API密钥",
+                    "api_key": ""
+                },
+                "advanced": {
+                    "custom_params": {
+                        "base_url": "https://api.binance.com",
+                        "testnet": False
+                    }
+                }
+            },
+
+            # 东方财富插件
+            "examples.eastmoney_stock_plugin": {
+                "connection": {
+                    "host": "push2.eastmoney.com",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 45
+                },
+                "auth": {
+                    "type": "无认证"
+                },
+                "advanced": {
+                    "custom_params": {
+                        "market": "沪深A股",
+                        "data_format": "json"
+                    }
+                }
+            },
+
+            # Wind数据插件
+            "examples.wind_data_plugin": {
+                "connection": {
+                    "host": "localhost",
+                    "port": 9001,
+                    "use_ssl": False,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "用户名密码",
+                    "username": "",
+                    "password": ""
+                },
+                "advanced": {
+                    "custom_params": {
+                        "wind_terminal_path": "C:\\Wind\\Wind.NET.Client\\WindNET.exe",
+                        "auto_login": True
+                    }
+                }
+            },
+
+            # Yahoo Finance插件
+            "examples.yahoo_finance_datasource": {
+                "connection": {
+                    "host": "query1.finance.yahoo.com",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "无认证"
+                },
+                "advanced": {
+                    "custom_params": {
+                        "region": "US",
+                        "lang": "en-US"
+                    }
+                }
+            },
+
+            # CTP期货插件
+            "examples.ctp_futures_plugin": {
+                "connection": {
+                    "host": "180.168.146.187",
+                    "port": 10131,
+                    "use_ssl": False,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "用户名密码",
+                    "username": "",
+                    "password": ""
+                },
+                "advanced": {
+                    "custom_params": {
+                        "broker_id": "",
+                        "app_id": "",
+                        "auth_code": ""
+                    }
+                }
+            },
+
+            # 债券数据插件
+            "examples.bond_data_plugin": {
+                "connection": {
+                    "host": "api.bond-data.com",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "API密钥",
+                    "api_key": ""
+                }
+            },
+
+            # 我的钢铁网插件
+            "examples.mysteel_data_plugin": {
+                "connection": {
+                    "host": "api.mysteel.com",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "API密钥",
+                    "api_key": ""
+                }
+            },
+
+            # 文华财经插件
+            "examples.wenhua_data_plugin": {
+                "connection": {
+                    "host": "api.wenhua.com.cn",
+                    "port": 443,
+                    "use_ssl": True,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "API密钥",
+                    "api_key": "",
+                    "username": "",
+                    "password": ""
+                }
+            },
+
+            # 通达信股票插件
+            "examples.tongdaxin_stock_plugin": {
+                "connection": {
+                    "host": "119.147.212.81",
+                    "port": 7709,
+                    "use_ssl": False,
+                    "timeout": 30
+                },
+                "auth": {
+                    "type": "无认证"
+                },
+                "advanced": {
+                    "custom_params": {
+                        "max_retries": 3,
+                        "cache_duration": 300,
+                        "auto_select_server": True,
+                        "use_local_data": False,
+                        "local_data_path": "",
+                        "server_list": [
+                            "119.147.212.81:7709",
+                            "114.80.63.12:7709",
+                            "119.147.171.206:7709",
+                            "113.105.142.136:7709",
+                            "180.153.18.170:7709",
+                            "180.153.18.171:7709"
+                        ]
+                    }
+                }
+            }
+        }
+
+        # 尝试从插件适配器获取配置
+        try:
+            if hasattr(self, 'adapter') and self.adapter:
+                plugin = getattr(self.adapter, 'plugin', None)
+                if plugin:
+                    # 检查插件是否有默认配置
+                    if hasattr(plugin, 'DEFAULT_CONFIG') and isinstance(plugin.DEFAULT_CONFIG, dict):
+                        return plugin.DEFAULT_CONFIG
+                    elif hasattr(plugin, 'default_config') and isinstance(plugin.default_config, dict):
+                        return plugin.default_config
+                    elif hasattr(plugin, 'config') and isinstance(plugin.config, dict):
+                        return plugin.config
+        except Exception as e:
+            logger.debug(f"从插件获取默认配置失败: {e}")
+
+        # 返回插件特定配置或空字典
+        return plugin_configs.get(self.source_id, {})
+
     def apply_config_to_ui(self):
         """将配置应用到UI控件"""
         try:
             config = self.current_config
+            logger.info(f"应用配置到UI: {self.source_id}, 配置节数: {len(config)}")
 
             # 连接配置
             conn = config.get("connection", {})
-            self.host_edit.setText(conn.get("host", ""))
-            self.port_spin.setValue(conn.get("port", 443))
+            host = conn.get("host", "")
+            port = conn.get("port", 443)
+
+            logger.info(f"设置UI控件: 主机={host}, 端口={port}")
+
+            self.host_edit.setText(host)
+            self.port_spin.setValue(port)
             self.use_ssl_check.setChecked(conn.get("use_ssl", True))
             self.timeout_spin.setValue(conn.get("timeout", 30))
 
@@ -823,7 +1073,7 @@ class DataSourcePluginConfigDialog(QDialog):
     def update_metrics(self):
         """更新性能指标"""
         try:
-
+            from core.services.unified_data_manager import get_unified_data_manager
             unified_manager = get_unified_data_manager()
             if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
                 return
@@ -862,7 +1112,7 @@ class DataSourcePluginConfigDialog(QDialog):
     def reset_metrics(self):
         """重置性能指标"""
         try:
-
+            from core.services.unified_data_manager import get_unified_data_manager
             unified_manager = get_unified_data_manager()
             if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
                 QMessageBox.warning(self, "重置失败", "数据源路由器未启用")
@@ -911,6 +1161,7 @@ class DataSourcePluginConfigDialog(QDialog):
 
             # 写入数据库
             try:
+                from db.models.plugin_models import get_data_source_config_manager
                 config_manager = get_data_source_config_manager()
 
                 # 保持与数据源路由兼容的基础字段
@@ -953,6 +1204,7 @@ class DataSourcePluginConfigDialog(QDialog):
 
             # 写入数据库
             try:
+                from db.models.plugin_models import get_data_source_config_manager
                 config_manager = get_data_source_config_manager()
                 routing = config.get("routing", {})
                 priority = int(routing.get("priority", 5))
@@ -971,6 +1223,7 @@ class DataSourcePluginConfigDialog(QDialog):
 
             # 重连适配器
             try:
+                from core.services.unified_data_manager import get_unified_data_manager
                 unified_manager = get_unified_data_manager()
                 if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
                     QMessageBox.warning(self, "重连失败", "数据源路由器未启用")

@@ -959,9 +959,10 @@ class TradingWidget(QWidget):
                 pass
             button.clicked.connect(lambda: self._run_analysis_async(
                 button, analysis_func, *args, progress_callback=progress_callback, **kwargs))
+        import os
         from concurrent.futures import ThreadPoolExecutor
         if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
+            self._thread_pool = ThreadPoolExecutor(os.cpu_count() * 2)
         future = self._thread_pool.submit(task)
         # 支持进度回调
         if progress_callback:
@@ -1092,19 +1093,45 @@ class TradingWidget(QWidget):
             # 使用统一回测引擎
             from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
 
-            # 获取股票数据并生成信号
+            # 获取股票数据并生成信号（TET模式优先）
             from core.containers import get_service_container
-            from core.services import StockService
+            from core.services import StockService, AssetService
+            from core.plugin_types import AssetType
 
-            # 通过服务容器获取股票服务
+            # 通过服务容器获取服务
             service_container = get_service_container()
-            stock_service = service_container.get_service(StockService)
-            main_window = None  # 保持兼容性
+            kdata = None
 
-            if stock_service:
-                kdata = stock_service.get_kdata(self.current_stock.strip())
-                if kdata is None or kdata.empty:
-                    raise ValueError("无法获取股票数据")
+            # 🚀 优先尝试AssetService（TET模式）
+            try:
+                asset_service = service_container.resolve(AssetService)
+                if asset_service:
+                    log_structured(self.log_manager, f"🚀 TradingWidget使用TET模式获取数据: {self.current_stock.strip()}", level="info")
+                    kdata = asset_service.get_historical_data(
+                        symbol=self.current_stock.strip(),
+                        asset_type=AssetType.STOCK,
+                        period='D'
+                    )
+                    if kdata is not None and not kdata.empty:
+                        log_structured(self.log_manager, f"✅ TET模式获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}", level="info")
+                    else:
+                        log_structured(self.log_manager, f"⚠️ TET模式返回空数据: {self.current_stock.strip()}", level="warning")
+                        kdata = None
+            except Exception as e:
+                log_structured(self.log_manager, f"❌ TET模式获取失败: {e}", level="warning")
+                kdata = None
+
+            # 📊 降级到StockService
+            if kdata is None or (hasattr(kdata, 'empty') and kdata.empty):
+                stock_service = service_container.get_service(StockService)
+                if stock_service:
+                    log_structured(self.log_manager, f"🔄 降级到StockService模式: {self.current_stock.strip()}", level="info")
+                    kdata = stock_service.get_kdata(self.current_stock.strip())
+                    if kdata is not None and not kdata.empty:
+                        log_structured(self.log_manager, f"✅ StockService获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}", level="info")
+
+            if kdata is None or kdata.empty:
+                raise ValueError("无法获取股票数据 - 所有数据源都失败")
 
                 # 生成交易信号（简化版）
                 signal_data = kdata.copy()
@@ -1284,14 +1311,36 @@ class TradingWidget(QWidget):
                 self._kdata_cache = {}
             data = self._kdata_cache.get(cache_key)
             if data is None or data.empty:
-                # 通过服务容器获取股票数据
+                # 通过服务容器获取股票数据（TET模式优先）
+                from core.services import AssetService
+                from core.plugin_types import AssetType
 
                 service_container = get_service_container()
-                stock_service = service_container.get_service(StockService)
-                if stock_service:
-                    data = stock_service.get_kdata(stock_code)
-                if data is not None and not data.empty:
-                    self._kdata_cache[cache_key] = data
+
+                # 🚀 优先尝试AssetService（TET模式）
+                try:
+                    asset_service = service_container.resolve(AssetService)
+                    if asset_service:
+                        data = asset_service.get_historical_data(
+                            symbol=stock_code,
+                            asset_type=AssetType.STOCK,
+                            period='D'
+                        )
+                        if data is not None and not data.empty:
+                            self._kdata_cache[cache_key] = data
+                            log_structured(self.log_manager, f"✅ 分析缓存TET模式: {stock_code} | 记录数: {len(data)}", level="info")
+                except Exception as e:
+                    log_structured(self.log_manager, f"❌ 分析TET模式失败: {e}", level="warning")
+                    data = None
+
+                # 📊 降级到StockService
+                if data is None or (hasattr(data, 'empty') and data.empty):
+                    stock_service = service_container.get_service(StockService)
+                    if stock_service:
+                        data = stock_service.get_kdata(stock_code)
+                        if data is not None and not data.empty:
+                            self._kdata_cache[cache_key] = data
+                            log_structured(self.log_manager, f"✅ 分析缓存StockService: {stock_code} | 记录数: {len(data)}", level="info")
             if data is None or data.empty:
                 results['error'] = f"{stock_code}股票K线数据为空，无法分析"
                 self.set_status_message(results['error'], error=True)
@@ -1672,21 +1721,58 @@ class TradingWidget(QWidget):
             if not self.current_stock:
                 return None
 
-            # 尝试从data_manager获取实时价格
-            from core.data_manager import data_manager
-            realtime_data = data_manager.get_realtime_quotes(
-                [self.current_stock])
+            # 🚀 尝试从AssetService获取实时/历史价格（TET模式优先）
+            try:
+                from core.containers import get_service_container
+                from core.services import AssetService
+                from core.plugin_types import AssetType
 
-            if realtime_data and self.current_stock in realtime_data:
-                return float(realtime_data[self.current_stock].get('price', 0))
+                service_container = get_service_container()
+                asset_service = service_container.resolve(AssetService)
 
-            # 如果没有实时数据，使用最新的K线数据
-            kdata = data_manager.get_kdata(self.current_stock, ktype='D')
-            if kdata is not None and len(kdata) > 0:
-                if hasattr(kdata, 'iloc'):  # DataFrame
-                    return float(kdata.iloc[-1]['close'])
-                else:  # KData
-                    return float(kdata[-1].close)
+                if asset_service:
+                    # 首先尝试获取实时数据
+                    try:
+                        realtime_data = asset_service.get_real_time_data(
+                            symbol=self.current_stock,
+                            asset_type=AssetType.STOCK
+                        )
+                        if realtime_data and 'price' in realtime_data:
+                            return float(realtime_data['price'])
+                    except Exception:
+                        pass  # 实时数据失败，继续尝试历史数据
+
+                    # 如果没有实时数据，使用最新的K线数据
+                    kdata = asset_service.get_historical_data(
+                        symbol=self.current_stock,
+                        asset_type=AssetType.STOCK,
+                        period='D'
+                    )
+                    if kdata is not None and len(kdata) > 0:
+                        if hasattr(kdata, 'iloc'):  # DataFrame
+                            return float(kdata.iloc[-1]['close'])
+                        else:  # KData
+                            return float(kdata[-1].close)
+            except Exception as e:
+                log_structured(self.log_manager, f"❌ TET模式获取当前价格失败: {e}", level="warning")
+
+            # 📊 降级到传统data_manager
+            try:
+                from core.data_manager import data_manager
+                realtime_data = data_manager.get_realtime_quotes([self.current_stock])
+
+                if realtime_data and self.current_stock in realtime_data:
+                    return float(realtime_data[self.current_stock].get('price', 0))
+
+                # 如果没有实时数据，使用最新的K线数据
+                kdata = data_manager.get_kdata(self.current_stock, ktype='D')
+                if kdata is not None and len(kdata) > 0:
+                    if hasattr(kdata, 'iloc'):  # DataFrame
+                        return float(kdata.iloc[-1]['close'])
+                    else:  # KData
+                        return float(kdata[-1].close)
+            except Exception as e:
+                log_structured(self.log_manager, f"❌ 传统模式获取当前价格失败: {e}", level="error")
 
             return None
 

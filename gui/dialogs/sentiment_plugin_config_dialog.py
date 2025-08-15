@@ -47,7 +47,8 @@ class PluginConfigWidget(QWidget):
         header_layout = QHBoxLayout(header_frame)
 
         # 插件名称和状态
-        name_label = QLabel(f"📊 {self.plugin_name}")
+        display_name = self.config.get('display_name', self.plugin_name)
+        name_label = QLabel(f"📊 {display_name}")
         name_label.setFont(QFont("Arial", 12, QFont.Bold))
         header_layout.addWidget(name_label)
 
@@ -62,7 +63,7 @@ class PluginConfigWidget(QWidget):
         # 测试按钮
         test_btn = QPushButton("🔍 测试连接")
         test_btn.setMaximumWidth(100)
-        test_btn.clicked.connect(lambda: self.test_requested.emit(self.plugin_name))
+        test_btn.clicked.connect(self._on_test_requested)
         header_layout.addWidget(test_btn)
 
         layout.addWidget(header_frame)
@@ -244,6 +245,12 @@ class PluginConfigWidget(QWidget):
         # 发送配置变化信号
         self.config_changed.emit(self.plugin_name, self.config)
 
+    def _on_test_requested(self):
+        """处理测试连接请求"""
+        # 使用内部名称（如果有的话），否则使用显示名称
+        plugin_id = getattr(self, '_internal_name', self.plugin_name)
+        self.test_requested.emit(plugin_id)
+
     def update_status(self, status: str, last_update: Optional[datetime] = None,
                       data_quality: str = "unknown"):
         """更新状态信息"""
@@ -423,8 +430,9 @@ class SentimentPluginConfigDialog(QDialog):
 
     def create_example_plugins(self):
         """创建示例插件配置"""
+        # 使用与实际注册插件一致的名称
         example_plugins = {
-            "AkShare情绪数据源": {
+            "sentiment_data_sources.akshare_sentiment_plugin": {
                 'enabled': True,
                 'weight': 1.0,
                 'priority': 10,
@@ -436,23 +444,26 @@ class SentimentPluginConfigDialog(QDialog):
                 'vix_enabled': True,
                 'consumer_confidence_enabled': True,
                 'fx_sentiment_enabled': True,
-                'weibo_time_period': '近7天'
+                'weibo_time_period': '近7天',
+                'display_name': 'AkShare情绪数据源'  # 用于显示的友好名称
             },
-            "东方财富数据源": {
+            "sentiment_data_sources.eastmoney_sentiment_plugin": {
                 'enabled': False,
                 'weight': 0.8,
                 'priority': 20,
                 'cache_duration_minutes': 3,
                 'retry_attempts': 2,
-                'timeout_seconds': 20
+                'timeout_seconds': 20,
+                'display_name': '东方财富数据源'
             },
-            "同花顺数据源": {
+            "sentiment_data_sources.tonghuashun_sentiment_plugin": {
                 'enabled': False,
                 'weight': 0.9,
                 'priority': 15,
                 'cache_duration_minutes': 4,
                 'retry_attempts': 3,
-                'timeout_seconds': 25
+                'timeout_seconds': 25,
+                'display_name': '同花顺数据源'
             }
         }
 
@@ -488,10 +499,43 @@ class SentimentPluginConfigDialog(QDialog):
 
         widget.update_status("正在测试...")
 
-        # 模拟测试过程
-        QTimer.singleShot(2000, lambda: self._finish_plugin_test(plugin_name, True))
+        # 执行真实的插件测试
+        try:
+            # 获取情绪数据服务
+            if SERVICE_AVAILABLE:
+                from core.containers import get_service_container
+                container = get_service_container()
 
-    def _finish_plugin_test(self, plugin_name: str, success: bool):
+                if container and container.is_registered(SentimentDataService):
+                    sentiment_service = container.resolve(SentimentDataService)
+
+                    if sentiment_service and plugin_name in sentiment_service.get_available_plugins():
+                        # 获取插件实例并执行真实测试
+                        plugin_instance = sentiment_service._registered_plugins.get(plugin_name)
+                        if plugin_instance:
+                            if hasattr(plugin_instance, 'health_check'):
+                                health_result = plugin_instance.health_check()
+                                is_healthy = getattr(health_result, 'is_healthy', False)
+                                error_message = getattr(health_result, 'error_message', None)
+                            elif hasattr(plugin_instance, 'test_connection'):
+                                is_healthy = plugin_instance.test_connection()
+                                error_message = None
+                            else:
+                                # 基本状态检查
+                                plugin_status = sentiment_service.get_plugin_status(plugin_name)
+                                is_healthy = plugin_status.get('is_connected', False)
+                                error_message = plugin_status.get('error_message', '插件状态未知')
+
+                            QTimer.singleShot(500, lambda: self._finish_plugin_test(plugin_name, is_healthy, error_message))
+                            return
+
+            # 如果服务不可用，显示错误
+            QTimer.singleShot(500, lambda: self._finish_plugin_test(plugin_name, False, "情绪数据服务不可用"))
+
+        except Exception as e:
+            QTimer.singleShot(500, lambda: self._finish_plugin_test(plugin_name, False, str(e)))
+
+    def _finish_plugin_test(self, plugin_name: str, success: bool, error_message: str = None):
         """完成插件测试"""
         widget = self.plugin_widgets.get(plugin_name)
         if not widget:
@@ -502,7 +546,8 @@ class SentimentPluginConfigDialog(QDialog):
             QMessageBox.information(self, "测试成功", f"插件 {plugin_name} 连接测试成功！")
         else:
             widget.update_status("连接失败", None, "poor")
-            QMessageBox.warning(self, "测试失败", f"插件 {plugin_name} 连接测试失败！")
+            error_msg = error_message or "连接测试失败"
+            QMessageBox.warning(self, "测试失败", f"插件 {plugin_name} 连接测试失败:\n{error_msg}")
 
     def test_all_plugins(self):
         """测试所有插件"""

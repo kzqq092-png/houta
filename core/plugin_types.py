@@ -50,16 +50,30 @@ class AssetType(Enum):
 
     定义系统支持的金融资产类型，用于数据源插件的分类和路由。
     """
-    STOCK = "stock"                      # 股票
-    FUTURES = "futures"                  # 期货
-    CRYPTO = "crypto"                    # 数字货币
-    FOREX = "forex"                      # 外汇
-    BOND = "bond"                        # 债券
-    COMMODITY = "commodity"              # 商品
-    INDEX = "index"                      # 指数
-    FUND = "fund"                        # 基金
-    OPTION = "option"                    # 期权
-    WARRANT = "warrant"                  # 权证
+    STOCK = "stock"                          # 股票
+    FUTURES = "futures"                      # 期货
+    CRYPTO = "crypto"                        # 数字货币
+    FOREX = "forex"                          # 外汇
+    BOND = "bond"                            # 债券
+    COMMODITY = "commodity"                  # 商品
+    INDEX = "index"                          # 指数
+    FUND = "fund"                            # 基金
+    OPTION = "option"                        # 期权
+    WARRANT = "warrant"                      # 权证
+
+    # 扩展：板块相关资产类型
+    SECTOR = "sector"                        # 板块
+    INDUSTRY_SECTOR = "industry_sector"      # 行业板块
+    CONCEPT_SECTOR = "concept_sector"        # 概念板块
+    STYLE_SECTOR = "style_sector"            # 风格板块
+    THEME_SECTOR = "theme_sector"            # 主题板块
+
+    # 扩展：中国特色资产类型
+    STOCK_A = "stock_a"                      # A股
+    STOCK_B = "stock_b"                      # B股
+    STOCK_H = "stock_h"                      # H股
+    STOCK_US = "stock_us"                    # 美股
+    STOCK_HK = "stock_hk"                    # 港股
 
 
 class DataType(Enum):
@@ -75,6 +89,28 @@ class DataType(Enum):
     FUNDAMENTAL = "fundamental"              # 基本面数据
     NEWS = "news"                            # 新闻数据
     ANNOUNCEMENT = "announcement"            # 公告数据
+
+    # 扩展：资金流相关数据类型
+    FUND_FLOW = "fund_flow"                  # 资金流数据
+    SECTOR_FUND_FLOW = "sector_fund_flow"    # 板块资金流
+    INDIVIDUAL_FUND_FLOW = "individual_fund_flow"  # 个股资金流
+    MAIN_FUND_FLOW = "main_fund_flow"        # 主力资金流
+
+    # 扩展：板块相关数据类型
+    SECTOR_DATA = "sector_data"              # 板块数据
+    SECTOR_ROTATION = "sector_rotation"      # 板块轮动
+    CONCEPT_DATA = "concept_data"            # 概念板块数据
+    INDUSTRY_DATA = "industry_data"          # 行业板块数据
+
+    # 扩展：技术分析数据类型
+    TECHNICAL_INDICATORS = "technical_indicators"  # 技术指标
+    PATTERN_RECOGNITION = "pattern_recognition"    # 形态识别
+    SENTIMENT_DATA = "sentiment_data"        # 情绪数据
+
+    # 扩展：实时数据类型
+    REAL_TIME_FUND_FLOW = "real_time_fund_flow"    # 实时资金流
+    REAL_TIME_SECTOR = "real_time_sector"    # 实时板块数据
+    INTRADAY_DATA = "intraday_data"          # 分时数据
 
 
 class DataSourceProvider(Enum):

@@ -18,6 +18,8 @@ from asyncio import Future as AsyncioFuture
 
 from ..events import EventBus, DataUpdateEvent
 from ..containers import ServiceContainer, get_service_container
+from ..plugin_types import AssetType, DataType
+from ..tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData, create_tet_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +54,9 @@ class DataRequestStatus(Enum):
 class DataRequest:
     """数据请求"""
     request_id: str
-    stock_code: str
-    data_type: str  # 'kdata', 'indicators', 'analysis'
+    symbol: str  # 统一使用symbol替代stock_code
+    asset_type: AssetType = AssetType.STOCK  # 新增资产类型支持
+    data_type: str = 'kdata'  # 'kdata', 'indicators', 'analysis'
     period: str = 'D'
     time_range: int = 365
     parameters: Dict[str, Any] = None
@@ -61,6 +64,17 @@ class DataRequest:
     future: Optional[AsyncioFuture] = None  # 用于async/await
     timestamp: float = 0
     status: DataRequestStatus = DataRequestStatus.PENDING
+
+    # 向后兼容属性
+    @property
+    def stock_code(self) -> str:
+        """向后兼容：股票代码"""
+        return self.symbol
+
+    @stock_code.setter
+    def stock_code(self, value: str):
+        """向后兼容：设置股票代码"""
+        self.symbol = value
 
     def __post_init__(self):
         if self.timestamp == 0:
@@ -71,7 +85,8 @@ class DataRequest:
     def __eq__(self, other):
         if not isinstance(other, DataRequest):
             return NotImplemented
-        return (self.stock_code == other.stock_code and
+        return (self.symbol == other.symbol and
+                self.asset_type == other.asset_type and
                 self.data_type == other.data_type and
                 self.period == other.period and
                 self.time_range == other.time_range and
@@ -81,7 +96,8 @@ class DataRequest:
         # The hash should be based on the immutable fields that define the request's identity
         # Note: self.parameters is mutable, so we convert it to a string representation of its items
         param_tuple = tuple(sorted((self.parameters or {}).items()))
-        return hash((self.stock_code,
+        return hash((self.symbol,
+                     self.asset_type,
                      self.data_type,
                      self.period,
                      self.time_range,
@@ -94,10 +110,12 @@ class UnifiedDataManager:
 
     功能：
     1. 协调数据加载请求
-    2. 避免重复数据加载
+    2. 避免重复数据加载  
     3. 提供统一的数据访问接口
     4. 管理数据缓存
     5. 优化数据加载性能
+    6. 支持TET数据管道（Transform-Extract-Transform）
+    7. 多资产类型数据处理
     """
 
     def __init__(self, service_container: ServiceContainer, event_bus: EventBus, max_workers: int = 3):
@@ -152,7 +170,208 @@ class UnifiedDataManager:
             'cache_misses': 0
         }
 
+        # 数据源路由器
+        self.data_source_router = None
+        self._initialize_data_source_router()
+
+        # TET数据管道支持
+        self.tet_pipeline: Optional[TETDataPipeline] = None
+        self.tet_enabled = False
+        self._initialize_tet_pipeline()
+
         logger.info("Unified data manager initialized")
+
+    def _initialize_data_source_router(self):
+        """初始化数据源路由器"""
+        try:
+            from ..data_source_router import DataSourceRouter
+            self.data_source_router = DataSourceRouter()
+            logger.info("✅ 数据源路由器已初始化")
+        except Exception as e:
+            logger.warning(f"⚠️ 数据源路由器初始化失败: {e}")
+            self.data_source_router = None
+
+    def _initialize_tet_pipeline(self):
+        """初始化TET数据管道"""
+        try:
+            logger.info("🔧 正在初始化TET数据管道...")
+
+            # 尝试获取数据源路由器
+            if hasattr(self, 'data_source_router') and self.data_source_router:
+                router = self.data_source_router
+                logger.info("✅ 使用本地数据源路由器")
+            else:
+                # 从服务容器获取
+                logger.info("🔍 尝试从服务容器获取数据源路由器...")
+                from ..data_source_router import DataSourceRouter
+                try:
+                    router = self.service_container.resolve(DataSourceRouter)
+                    logger.info("✅ 从服务容器获取数据源路由器成功")
+                except Exception as resolve_error:
+                    logger.warning(f"⚠️ 从服务容器获取数据源路由器失败: {resolve_error}")
+                    router = None
+
+            if router:
+                # 检查路由器中的数据源数量
+                source_count = len(router.data_sources) if hasattr(router, 'data_sources') else 0
+                logger.info(f"📊 数据源路由器状态: {source_count} 个数据源已注册")
+
+                from ..tet_data_pipeline import create_tet_pipeline
+                self.tet_pipeline = create_tet_pipeline(router)
+                self.tet_enabled = True
+                logger.info("🎉 TET数据管道已成功启用！")
+                logger.info(f"🚀 TET模式已激活，支持多资产类型数据处理")
+            else:
+                logger.warning("❌ 数据源路由器不可用，TET管道未启用")
+                logger.warning("💡 建议检查插件管理器和数据源注册")
+                self.tet_enabled = False
+
+        except Exception as e:
+            logger.error(f"❌ TET数据管道初始化失败: {e}")
+            logger.error("🔄 将使用传统数据获取模式")
+            import traceback
+            logger.debug(traceback.format_exc())
+            self.tet_enabled = False
+
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """
+        获取资产列表（TET模式）
+
+        Args:
+            asset_type: 资产类型
+            market: 市场过滤
+
+        Returns:
+            List[Dict]: 标准化的资产列表
+        """
+        if self.tet_enabled and self.tet_pipeline:
+            try:
+                query = StandardQuery(
+                    symbol="",  # 资产列表查询不需要具体symbol
+                    asset_type=asset_type,
+                    data_type=DataType.ASSET_LIST,
+                    market=market
+                )
+
+                result = self.tet_pipeline.process(query)
+                return self._format_asset_list(result.data)
+
+            except Exception as e:
+                logger.warning(f"TET模式获取资产列表失败: {e}")
+
+        # 降级到传统方式
+        return self._legacy_get_asset_list(asset_type, market)
+
+    def get_asset_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK,
+                       data_type: DataType = DataType.HISTORICAL_KLINE,
+                       period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
+        """
+        获取资产数据（TET模式）
+
+        Args:
+            symbol: 交易代码
+            asset_type: 资产类型
+            data_type: 数据类型
+            period: 周期
+            **kwargs: 其他参数
+
+        Returns:
+            Optional[pd.DataFrame]: 标准化数据
+        """
+        if self.tet_enabled and self.tet_pipeline:
+            try:
+                logger.info(f"🚀 使用TET模式获取数据: {symbol} ({asset_type.value})")
+
+                query = StandardQuery(
+                    symbol=symbol,
+                    asset_type=asset_type,
+                    data_type=data_type,
+                    period=period,
+                    **kwargs
+                )
+
+                result = self.tet_pipeline.process(query)
+
+                # 记录使用的数据源
+                if result and hasattr(result, 'source_info') and result.source_info:
+                    data_source = result.source_info.get('provider', 'Unknown')
+                    logger.info(f"✅ TET数据获取成功: {symbol} | 数据源: {data_source} | 记录数: {len(result.data) if result.data is not None else 0}")
+                else:
+                    logger.info(f"✅ TET数据获取成功: {symbol} | 记录数: {len(result.data) if result.data is not None else 0}")
+
+                return result.data
+
+            except Exception as e:
+                logger.warning(f"❌ TET模式获取数据失败: {symbol} - {e}")
+                logger.info("🔄 降级到传统数据获取模式")
+
+        # 降级到传统方式
+        if asset_type == AssetType.STOCK:
+            logger.info(f"📊 使用传统模式获取股票数据: {symbol}")
+            data = self._legacy_get_stock_data(symbol, period, **kwargs)
+            if data is not None:
+                logger.info(f"✅ 传统模式数据获取成功: {symbol} | 数据源: HIkyuu/DataAccess | 记录数: {len(data)}")
+            else:
+                logger.warning(f"❌ 传统模式数据获取失败: {symbol}")
+            return data
+        else:
+            logger.warning(f"❌ 传统模式不支持资产类型: {asset_type.value} | 建议启用TET模式")
+            return None
+
+    def _format_asset_list(self, asset_data: pd.DataFrame) -> List[Dict[str, Any]]:
+        """格式化资产列表为标准格式"""
+        if asset_data.empty:
+            return []
+
+        result = []
+        for _, row in asset_data.iterrows():
+            result.append({
+                'symbol': row.get('symbol', ''),
+                'name': row.get('name', ''),
+                'asset_type': row.get('asset_type', ''),
+                'market': row.get('market', ''),
+                'status': row.get('status', 'active')
+            })
+
+        return result
+
+    def _legacy_get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """传统方式获取资产列表"""
+        try:
+            if asset_type == AssetType.STOCK:
+                # 使用传统的股票数据获取方式
+                from ..data.data_access import DataAccess
+                data_access = DataAccess()
+                stock_list = data_access.get_stock_list()
+
+                result = []
+                for stock in stock_list:
+                    result.append({
+                        'symbol': stock.get('code', ''),
+                        'name': stock.get('name', ''),
+                        'asset_type': 'STOCK',
+                        'market': stock.get('market', market or ''),
+                        'status': 'active'
+                    })
+                return result
+            else:
+                logger.warning(f"传统模式不支持资产类型: {asset_type.value}")
+                return []
+
+        except Exception as e:
+            logger.error(f"传统方式获取资产列表失败: {e}")
+            return []
+
+    def _legacy_get_stock_data(self, symbol: str, period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
+        """传统方式获取股票数据"""
+        try:
+            # 使用现有的股票数据获取逻辑
+            from ..data.data_access import DataAccess
+            data_access = DataAccess()
+            return data_access.get_kdata(symbol, period)
+        except Exception as e:
+            logger.error(f"传统方式获取股票数据失败: {e}")
+            return None
 
     async def get_stock_data(self, code: str, freq: str, start_date=None, end_date=None, request_id=None):
         """统一的数据请求方法，区分历史和实时数据"""

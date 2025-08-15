@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import os
 import threading
 import time
 import logging
@@ -52,7 +53,7 @@ class LoadingTask:
 class ProgressiveLoadingManager:
     """渐进式加载管理器"""
 
-    def __init__(self, max_workers: int = 4, enable_delays: bool = True):
+    def __init__(self, max_workers: int = os.cpu_count() * 2, enable_delays: bool = True):
         """
         初始化渐进式加载管理器
 
@@ -79,10 +80,10 @@ class ProgressiveLoadingManager:
         # 阶段延迟配置（毫秒）
         self.stage_delays = {
             LoadingStage.CRITICAL: 0,      # 立即加载
-            LoadingStage.HIGH: 100,        # 100ms后
-            LoadingStage.NORMAL: 200,      # 200ms后
-            LoadingStage.LOW: 300,         # 300ms后
-            LoadingStage.BACKGROUND: 500   # 500ms后
+            LoadingStage.HIGH: 5,        # 5ms后
+            LoadingStage.NORMAL: 10,      # 10ms后
+            LoadingStage.LOW: 20,         # 20ms后
+            LoadingStage.BACKGROUND: 30   # 30ms后
         }
 
         # 根据设备性能调整延迟
@@ -738,7 +739,7 @@ def get_progressive_loader() -> ProgressiveLoadingManager:
     return _progressive_loader
 
 
-def initialize_progressive_loader(max_workers: int = 4, enable_delays: bool = True):
+def initialize_progressive_loader(max_workers: int = os.cpu_count() * 2, enable_delays: bool = True):
     """初始化全局渐进式加载管理器"""
     global _progressive_loader
     if _progressive_loader is not None:

@@ -25,6 +25,7 @@ import asyncio
 import logging
 import traceback
 from pathlib import Path
+import os
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent
@@ -45,7 +46,7 @@ except ImportError as e:
 try:
     from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
     # 初始化WebGPU图表渲染器（包含自动降级功能）
-    initialize_webgpu_chart_renderer(max_workers=10, enable_progressive=True)
+    initialize_webgpu_chart_renderer(max_workers=os.cpu_count() * 2, enable_progressive=True)
     logging.info("WebGPU硬件加速渲染系统初始化成功")
 except ImportError:
     logging.warning("WebGPU模块不可用，将使用标准渲染")

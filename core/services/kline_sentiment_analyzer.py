@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 try:
     import yfinance as yf
@@ -77,7 +78,7 @@ class KLineSentimentAnalyzer:
         self.last_update = {}
 
         # 线程池
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.executor = ThreadPoolExecutor(os.cpu_count() * 2)
 
         # 检查依赖
         self.check_dependencies()

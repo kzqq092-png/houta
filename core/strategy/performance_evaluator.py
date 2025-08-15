@@ -14,6 +14,7 @@ import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 import math
+import os
 
 from .base_strategy import StrategySignal, SignalType
 
@@ -131,7 +132,7 @@ class StrategyMetrics:
 class StrategyPerformanceEvaluator:
     """策略性能评估器 - 高精度性能分析"""
 
-    def __init__(self, risk_free_rate: float = 0.03, max_workers: int = 4):
+    def __init__(self, risk_free_rate: float = 0.03, max_workers: int = os.cpu_count() * 3):
         """初始化性能评估器
 
         Args:

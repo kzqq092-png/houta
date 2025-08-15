@@ -127,7 +127,7 @@ class PluginInfo:
 class PluginMarketAPI:
     """插件市场API客户端"""
 
-    def __init__(self, base_url: str = "https://api.FactorWeave-Quant ‌.com/plugins"):
+    def __init__(self, base_url: str = "https://api.factorweave-quant.com/plugins"):
         """
         初始化API客户端
 
@@ -137,7 +137,7 @@ class PluginMarketAPI:
         self.base_url = base_url
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'FactorWeave-Quant ‌/2.0 Plugin Market Client'
+            'User-Agent': 'FactorWeave-Quant/2.0 Plugin Market Client'
         })
 
     def search_plugins(self,

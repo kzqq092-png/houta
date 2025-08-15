@@ -414,9 +414,9 @@ class ExordeSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         return sentiment_data
 
     def _fetch_simulated_exorde_data(self) -> List[SentimentData]:
-        """获取模拟Exorde数据"""
-        emotion_scores = self._generate_emotion_spectrum()
-        return self._create_sentiment_data_from_emotions(emotion_scores, "Exorde-模拟")
+        """当API不可用时的降级处理 - 返回空数据而不是模拟数据"""
+        self._safe_log("warning", "Exorde API不可用，无法获取情感数据")
+        return []
 
     def _generate_emotion_spectrum(self) -> Dict[str, float]:
         """生成27种情绪光谱"""

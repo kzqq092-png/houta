@@ -176,7 +176,8 @@ class SentimentDataService(QObject):
             # 将已注册的情绪插件元信息（中文名/描述）同步写入数据库（不改动启用状态）
             try:
                 self._sync_registered_plugins_to_db()
-                self._remove_orphan_db_records()
+                # 延迟执行孤儿清理，确保所有插件都有机会注册
+                self._fully_initialized = False
             except Exception as e:
                 self.log_manager.warning(f"⚠️ 同步情绪插件元信息到数据库失败: {e}")
 
@@ -185,6 +186,15 @@ class SentimentDataService(QObject):
 
             self._is_initialized = True
             self._is_running = True
+
+            # 标记完全初始化完成，现在可以安全地进行孤儿清理
+            self._fully_initialized = True
+
+            # 在完全初始化后再进行孤儿清理
+            try:
+                self._remove_orphan_db_records()
+            except Exception as e:
+                self.log_manager.warning(f"⚠️ 清理孤儿插件记录失败: {e}")
 
             self.log_manager.info(f"✅ 情绪数据服务初始化完成，已注册 {len(self._registered_plugins)} 个插件")
             self.service_status_changed.emit("running")
@@ -244,22 +254,56 @@ class SentimentDataService(QObject):
     def _remove_orphan_db_records(self) -> None:
         """删除数据库中不存在于当前注册集合的情绪插件记录。"""
         try:
+            # 只有在服务完全初始化后才进行清理，避免误删
+            if not hasattr(self, '_fully_initialized') or not self._fully_initialized:
+                self.log_manager.debug("服务未完全初始化，跳过孤儿插件清理")
+                return
+
             from .plugin_database_service import get_plugin_database_service
             dbs = get_plugin_database_service()
             records = dbs.get_all_plugins(force_refresh=True)
             registered = set(self._registered_plugins.keys())
+
+            # 检查插件管理器中的所有情绪插件
+            plugin_manager_plugins = set()
+            try:
+                if self.plugin_manager:
+                    all_plugins = self.plugin_manager.get_all_plugins()
+                    for plugin_name in all_plugins.keys():
+                        if 'sentiment_data_sources' in plugin_name:
+                            plugin_manager_plugins.add(plugin_name)
+            except Exception as e:
+                self.log_manager.debug(f"获取插件管理器插件列表失败: {e}")
 
             for rec in records:
                 name = rec.get('name') or ''
                 entry = rec.get('entry_point') or ''
                 # 仅对情绪插件命名空间进行清理
                 if ('sentiment_data_sources' in name) or ('sentiment_data_sources' in entry):
-                    if name not in registered:
+                    # 只删除既不在注册集合中，也不在插件管理器中的插件
+                    if name not in registered and name not in plugin_manager_plugins:
+                        # 额外检查：如果插件文件存在，不要删除
+                        plugin_exists = False
                         try:
-                            dbs.remove_plugin(name)
-                            self.log_manager.info(f"🧹 已删除不存在的情绪插件记录: {name}")
-                        except Exception as e:
-                            self.log_manager.warning(f"⚠️ 删除情绪插件记录失败 {name}: {e}")
+                            import importlib
+                            importlib.import_module(name)
+                            plugin_exists = True
+                        except ImportError:
+                            plugin_exists = False
+
+                        # 再次确认：只删除真正不存在的插件，且状态为error或unloaded的
+                        rec_status = rec.get('status', '').lower()
+                        should_delete = (not plugin_exists and
+                                         rec_status in ('error', 'unloaded', 'failed'))
+
+                        if should_delete:
+                            try:
+                                dbs.remove_plugin(name)
+                                self.log_manager.info(f"🧹 已删除不存在的情绪插件记录: {name}")
+                            except Exception as e:
+                                self.log_manager.warning(f"⚠️ 删除情绪插件记录失败 {name}: {e}")
+                        else:
+                            self.log_manager.debug(f"保留插件记录: {name} (状态: {rec_status}, 模块存在: {plugin_exists})")
         except Exception as e:
             self.log_manager.debug(f"情绪插件孤儿清理失败: {e}")
 

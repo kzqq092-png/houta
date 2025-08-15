@@ -1,7 +1,7 @@
 # ChartWidget长文本拆分项目完成报告
 
 ## 项目概述
-本项目成功将HIkyuu量化交易系统中的`chart_widget.py`文件（2391行）进行了长文本拆分，采用Mixin模式将代码按功能逻辑分组到10个专业模块，大幅提升了代码的可维护性和开发效率。
+本项目成功将FactorWeave-Quant量化交易系统中的`chart_widget.py`文件（2391行）进行了长文本拆分，采用Mixin模式将代码按功能逻辑分组到10个专业模块，大幅提升了代码的可维护性和开发效率。
 
 ## 拆分成果
 
@@ -85,7 +85,7 @@ gui/widgets/chart_widget.py (259行)  - 主控制类
 ### 功能测试
 - ✅ **导入测试**: `from gui.widgets.chart_widget import ChartWidget` 成功
 - ✅ **初始化测试**: ChartWidget实例化无错误
-- ✅ **系统启动**: HIkyuu Trading System完整启动成功
+- ✅ **系统启动**: FactorWeave-Quant Trading System完整启动成功
 - ✅ **UI渲染**: 图表控件正常显示和交互
 
 ### 性能测试
@@ -149,7 +149,7 @@ gui/widgets/chart_widget.py (259行)  - 主控制类
 
 本次ChartWidget长文本拆分项目圆满成功，在不改变任何架构的前提下，将2391行的巨型文件成功拆分为10个专业模块，主文件行数减少89%，显著提升了代码的可维护性和开发效率。
 
-项目采用的Mixin模式和最佳实践可以作为其他大型文件拆分的参考模板，为HIkyuu量化交易系统的长期维护和发展奠定了坚实的基础。
+项目采用的Mixin模式和最佳实践可以作为其他大型文件拆分的参考模板，为FactorWeave-Quant量化交易系统的长期维护和发展奠定了坚实的基础。
 
 ---
 **项目完成时间**: 2025-06-25  

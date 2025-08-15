@@ -116,7 +116,21 @@ class ServiceBootstrap:
         # 添加依赖检查
         self._check_dependencies()
 
-        # 先注册UnifiedDataManager
+        # 先注册DataSourceRouter（TET模式依赖）
+        logger.info("注册数据源路由器...")
+        try:
+            from ..data_source_router import DataSourceRouter
+            self.service_container.register_factory(
+                DataSourceRouter,
+                lambda: DataSourceRouter(),
+                scope=ServiceScope.SINGLETON
+            )
+            router = self.service_container.resolve(DataSourceRouter)
+            logger.info("✓ 数据源路由器注册完成")
+        except Exception as e:
+            logger.warning(f"⚠️ 数据源路由器注册失败: {e}")
+
+        # 然后注册UnifiedDataManager
         self.service_container.register_factory(
             UnifiedDataManager,
             lambda: UnifiedDataManager(self.service_container, self.event_bus),
@@ -200,6 +214,24 @@ class ServiceBootstrap:
             logger.info("✓ AI预测服务注册完成")
         except Exception as e:
             logger.error(f"❌ AI预测服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+        # 资产服务（多资产类型支持）
+        try:
+            from .asset_service import AssetService
+            self.service_container.register_factory(
+                AssetService,
+                lambda: AssetService(
+                    unified_data_manager=self.service_container.resolve(UnifiedDataManager),
+                    stock_service=self.service_container.resolve(StockService),
+                    service_container=self.service_container
+                ),
+                scope=ServiceScope.SINGLETON
+            )
+            asset_service = self.service_container.resolve(AssetService)
+            logger.info("✓ 资产服务注册完成")
+        except Exception as e:
+            logger.error(f"❌ 资产服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
             # 注意：情绪数据服务需要在插件管理器注册后才能初始化

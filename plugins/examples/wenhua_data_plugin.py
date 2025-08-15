@@ -74,6 +74,8 @@ class WenhuaDataPlugin(IDataSourcePlugin):
             '601398': {'name': '工商银行', 'type': 'stock', 'exchange': 'SH'}
         }
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -179,6 +181,10 @@ class WenhuaDataPlugin(IDataSourcePlugin):
                 return '创业板'
             else:
                 return '其他'
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
 
     def _get_fallback_stock_info(self, symbol: str) -> StockInfo:
         """获取备用证券信息"""

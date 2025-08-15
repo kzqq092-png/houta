@@ -2,7 +2,7 @@
 
 ## 概述
 
-HIkyuu WebGPU硬件加速系统为量化分析平台提供高性能图表渲染能力。系统采用渐进式降级架构，支持WebGPU、OpenGL、Canvas2D、matplotlib等多种渲染后端，确保在各种环境下都能提供最佳性能。
+FactorWeave-Quant WebGPU硬件加速系统为量化分析平台提供高性能图表渲染能力。系统采用渐进式降级架构，支持WebGPU、OpenGL、Canvas2D、matplotlib等多种渲染后端，确保在各种环境下都能提供最佳性能。
 
 ## 核心架构
 

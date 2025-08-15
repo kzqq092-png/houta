@@ -259,8 +259,8 @@ class CustomChartToolPlugin(IChartToolPlugin):
     plugin_type=PluginType.INDICATOR,  # 必需
     category=PluginCategory.COMMUNITY, # 必需
     dependencies=["numpy", "pandas"],  # 可选
-    min_hikyuu_version="2.0.0",       # 必需
-    max_hikyuu_version="3.0.0",       # 必需
+    min_FactorWeave-Quant_version="2.0.0",       # 必需
+    max_FactorWeave-Quant_version="3.0.0",       # 必需
     tags=["标签1", "标签2"],           # 可选
     icon_path="icons/plugin.png",     # 可选
     documentation_url="https://...",   # 可选
@@ -516,7 +516,7 @@ def calculate(self, data: pd.DataFrame, **params) -> Dict[str, pd.Series]:
 
 ## 📞 技术支持
 
-- 官方网站: https://hikyuu.org
-- 技术论坛: https://forum.hikyuu.org
-- 问题反馈: https://github.com/hikyuu/FactorWeave-Quant ‌/issues
-- 邮箱支持: support@hikyuu.org 
+- 官方网站: https://FactorWeave-Quant.org
+- 技术论坛: https://forum.FactorWeave-Quant.org
+- 问题反馈: https://github.com/FactorWeave-Quant/FactorWeave-Quant ‌/issues
+- 邮箱支持: support@FactorWeave-Quant.org 

@@ -29,18 +29,24 @@ class StockService(CacheableService, ConfigurableService):
     负责股票数据的获取、缓存和管理。
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None, cache_size: int = 100, **kwargs):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, cache_size: int = 100,
+                 service_container=None, **kwargs):
         """
         初始化股票服务
 
         Args:
             config: 服务配置
             cache_size: 缓存大小
+            service_container: 服务容器
             **kwargs: 其他参数
         """
-        # 初始化各个基类
-        CacheableService.__init__(self, cache_size=cache_size, **kwargs)
-        ConfigurableService.__init__(self, config=config, **kwargs)
+        # 提取service_container，避免传递给不需要它的父类
+        self.service_container = service_container
+
+        # 初始化各个基类（不传递service_container）
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'service_container'}
+        CacheableService.__init__(self, cache_size=cache_size, **filtered_kwargs)
+        ConfigurableService.__init__(self, config=config, **filtered_kwargs)
 
         # 使用新的数据访问层
         self._data_access = DataAccess()

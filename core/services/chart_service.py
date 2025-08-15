@@ -630,15 +630,17 @@ class ChartService(CacheableService, ConfigurableService):
     def _get_stock_service(self):
         """获取股票服务"""
         try:
+            # 导入StockService放在方法开始，确保在所有分支中都可用
+            from .stock_service import StockService
+
             if hasattr(self, 'service_container') and self.service_container:
-                from .stock_service import StockService
-                return self.service_container.get_service(StockService)
+                return self.service_container.resolve(StockService)
             else:
-                # 通过事件总线获取服务容器
+                # 通过全局服务容器获取
                 try:
                     from ..containers import get_service_container
                     container = get_service_container()
-                    return container.try_resolve(StockService)
+                    return container.resolve(StockService)
                 except ImportError:
                     # 如果没有服务容器，返回None
                     logger.warning("Service container not available")

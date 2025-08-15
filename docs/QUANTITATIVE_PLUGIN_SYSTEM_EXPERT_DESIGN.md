@@ -1,4 +1,4 @@
-# HIkyuu远程插件加载系统设计
+# FactorWeave-Quant远程插件加载系统设计
 
 > **企业级远程插件管理**: 安全 + 便利 + 扩展性
 > **兼容现有架构**: 100%兼容现有插件接口和装饰器
@@ -30,7 +30,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                HIkyuu远程插件加载系统架构                    │
+│                FactorWeave-Quant远程插件加载系统架构                    │
 ├─────────────────────────────────────────────────────────────┤
 │  UI交互层        │    业务逻辑层      │    数据传输层       │
 │  ┌─────────────┐ │  ┌───────────────┐ │  ┌───────────────┐  │
@@ -82,7 +82,7 @@ class RemotePluginRegistry:
                     headers = {
                         'Authorization': f"Bearer {search_request['auth_token']}",
                         'Content-Type': 'application/json',
-                        'User-Agent': 'HIkyuu-Plugin-Client/2.0.1'
+                        'User-Agent': 'FactorWeave-Quant-Plugin-Client/2.0.1'
                     }
                     
                     async with session.post(
@@ -117,7 +117,7 @@ class RemotePluginRegistry:
             async with aiohttp.ClientSession() as session:
                 headers = {
                     'Authorization': f"Bearer {auth_token}",
-                    'User-Agent': 'HIkyuu-Plugin-Client/2.0.1'
+                    'User-Agent': 'FactorWeave-Quant-Plugin-Client/2.0.1'
                 }
                 
                 async with session.get(
@@ -228,7 +228,7 @@ class SecurePluginDownloader:
                 return cached_plugin
             
             # 2. 创建临时下载目录
-            download_dir = Path(tempfile.mkdtemp(prefix=f"hikyuu_plugin_{download_id}_"))
+            download_dir = Path(tempfile.mkdtemp(prefix=f"FactorWeave-Quant_plugin_{download_id}_"))
             
             try:
                 # 3. 下载插件文件
@@ -549,7 +549,7 @@ class RemoteAuthManager:
                 'payment_method': payment_info['method'],
                 'client_id': self.config.get('client_id'),
                 'client_info': {
-                    'platform': 'HIkyuu',
+                    'platform': 'FactorWeave-Quant',
                     'version': '2.0.1',
                     'machine_id': self._get_machine_id()
                 }
@@ -908,7 +908,7 @@ class EnhancedPluginMarketDialog(QDialog):
         
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("HIkyuu插件市场 - 远程插件支持")
+        self.setWindowTitle("FactorWeave-Quant插件市场 - 远程插件支持")
         self.setMinimumSize(1200, 800)
         
         layout = QVBoxLayout(self)

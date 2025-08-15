@@ -8,6 +8,7 @@ import json
 import socket
 import threading
 import time
+import os
 import uuid
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timedelta
@@ -221,7 +222,7 @@ class TaskScheduler:
         self.running_tasks: Dict[str, DistributedTask] = {}
         self.completed_tasks: List[DistributedTask] = []
         self.nodes: Dict[str, NodeInfo] = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.executor = ThreadPoolExecutor(os.cpu_count() * 2)
 
     def add_node(self, node: NodeInfo):
         """添加节点"""

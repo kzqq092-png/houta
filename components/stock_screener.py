@@ -23,6 +23,7 @@ from core.indicator_service import get_indicator_categories, get_all_indicators_
 from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
 import time
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 
 class PagedTableWidget(QWidget):
@@ -2069,7 +2070,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             button.clicked.connect(lambda: self._run_analysis_async(
                 button, analysis_func, *args, **kwargs))
         if not hasattr(self, '_thread_pool'):
-            self._thread_pool = ThreadPoolExecutor(max_workers=2)
+            self._thread_pool = ThreadPoolExecutor(os.cpu_count() * 2)
         future = self._thread_pool.submit(task)
         # 只需在finally中恢复，无需重复回调
 

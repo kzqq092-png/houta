@@ -63,9 +63,9 @@ class SectorFundFlowService(QObject):
         # 使用数据管理器工厂获取正确的DataManager实例
         if data_manager is None:
             try:
-                from utils.manager_factory import ManagerFactory
-                factory = ManagerFactory()
-                self.data_manager = factory.get_data_manager()
+                from utils.manager_factory import get_manager_factory, get_data_manager
+                factory = get_manager_factory()
+                self.data_manager = get_data_manager()
             except ImportError:
                 # 降级到直接导入
                 self.data_manager = DataManager()

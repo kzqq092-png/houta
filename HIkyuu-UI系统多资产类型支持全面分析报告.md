@@ -1,8 +1,8 @@
-# HIkyuu-UI系统多资产类型支持全面分析报告
+# FactorWeave-Quant系统多资产类型支持全面分析报告
 
 ## 📋 分析范围
 
-本报告基于对HIkyuu-UI系统的全面分析，包括：
+本报告基于对FactorWeave-Quant系统的全面分析，包括：
 - **数据层**：插件系统、数据源、UnifiedDataManager
 - **业务层**：服务架构、数据处理、路由系统  
 - **UI层**：界面组件、交互逻辑、用户体验

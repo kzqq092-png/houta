@@ -67,7 +67,7 @@ class DataManager:
             log_manager=self.log_manager)  # 行业管理器
 
         # 添加异步处理支持
-        self._async_executor = ThreadPoolExecutor(max_workers=4)
+        self._async_executor = ThreadPoolExecutor(os.cpu_count() * 2)
         self._data_loading_queue = asyncio.Queue() if hasattr(asyncio, 'Queue') else None
 
         # 新增：插件化数据源管理（Task 1.2 扩展）
@@ -276,455 +276,6 @@ class DataManager:
             if self.log_manager:
                 self.log_manager.warning(f"预加载股票 {code} 失败: {str(e)}")
 
-
-class AsyncDataManagerWrapper(QObject):
-    """异步数据管理器包装器，提供Qt信号支持"""
-
-    data_loaded = pyqtSignal(str, object)  # code, data
-    error_occurred = pyqtSignal(str, str)  # code, error_message
-    progress_updated = pyqtSignal(int, str)  # progress, message
-
-    def __init__(self, data_manager: DataManager):
-        super().__init__()
-        self.data_manager = data_manager
-        self._load_tasks = {}  # 跟踪加载任务
-
-    def load_data_async(self, code: str, freq: str = 'D',
-                        start_date: Optional[str] = None,
-                        end_date: Optional[str] = None):
-        """异步加载数据并发出信号"""
-
-        class LoadWorker(QThread):
-            finished = pyqtSignal(str, object)
-            error = pyqtSignal(str, str)
-            progress = pyqtSignal(int, str)
-
-            def __init__(self, data_manager, code, freq, start_date, end_date):
-                super().__init__()
-                self.data_manager = data_manager
-                self.code = code
-                self.freq = freq
-                self.start_date = start_date
-                self.end_date = end_date
-
-            @measure_performance("LoadWorker.run")
-            def run(self):
-                try:
-                    self.progress.emit(10, f"开始加载 {self.code} 数据...")
-
-                    data = self.data_manager.get_k_data(
-                        self.code, self.freq, self.start_date, self.end_date
-                    )
-
-                    self.progress.emit(100, f"加载 {self.code} 完成")
-                    self.finished.emit(self.code, data)
-
-                except Exception as e:
-                    self.error.emit(self.code, str(e))
-
-        # 创建并启动工作线程
-        worker = LoadWorker(self.data_manager, code,
-                            freq, start_date, end_date)
-        worker.finished.connect(self.data_loaded.emit)
-        worker.error.connect(self.error_occurred.emit)
-        worker.progress.connect(self.progress_updated.emit)
-
-        # 保存任务引用，防止被垃圾回收
-        self._load_tasks[code] = worker
-        worker.finished.connect(lambda: self._load_tasks.pop(code, None))
-        worker.error.connect(lambda: self._load_tasks.pop(code, None))
-
-        worker.start()
-
-    def cancel_loading(self, code: str):
-        """取消加载任务"""
-        if code in self._load_tasks:
-            worker = self._load_tasks[code]
-            if worker.isRunning():
-                worker.terminate()
-                worker.wait()
-            self._load_tasks.pop(code, None)
-
-    def get_config(self, key: str, default=None):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT value FROM config WHERE key=?', (key,))
-        row = cursor.fetchone()
-        if row:
-            import json
-            try:
-                return json.loads(row[0])
-            except Exception:
-                return row[0]
-        return default
-
-    def set_config(self, key: str, value):
-        value_str = json.dumps(value, ensure_ascii=False)
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'REPLACE INTO config (key, value) VALUES (?, ?)', (key, value_str))
-        self.conn.commit()
-
-    def get_data_source(self):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'SELECT name, type, config, is_active FROM data_source WHERE is_active=1')
-        row = cursor.fetchone()
-        if row:
-            config = json.loads(row[2]) if row[2] else {}
-            # 防御性：config必须为dict
-            if not isinstance(config, dict):
-                config = {}
-            return {'name': row[0], 'type': row[1], 'config': config, 'is_active': row[3]}
-        return None
-
-    def set_data_source(self, name: str):
-        # 类型检查，防止传入非字符串
-        if not isinstance(name, str):
-            raise TypeError(f"set_data_source期望字符串，实际为{type(name)}")
-        cursor = self.conn.cursor()
-        cursor.execute('UPDATE data_source SET is_active=0')
-        cursor.execute(
-            'UPDATE data_source SET is_active=1 WHERE name=?', (name,))
-        self.conn.commit()
-
-    def get_stock_list(self):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'SELECT code, name, market_code, type, valid, start_date, end_date, industry_id, extra FROM stock')
-        rows = cursor.fetchall()
-        columns = ['code', 'name', 'market', 'type', 'valid',
-                   'start_date', 'end_date', 'industry_id', 'extra']
-        return pd.DataFrame(rows, columns=columns)
-
-    def get_industry_list(self):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'SELECT id, name, parent_id, level, extra FROM industry')
-        rows = cursor.fetchall()
-        columns = ['id', 'name', 'parent_id', 'level', 'extra']
-        return pd.DataFrame(rows, columns=columns)
-
-    def get_market_list(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT id, name, code, region, extra FROM market')
-        rows = cursor.fetchall()
-        columns = ['id', 'name', 'code', 'region', 'extra']
-        return pd.DataFrame(rows, columns=columns)
-
-    def get_concept_list(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT code, name, extra FROM concept')
-        rows = cursor.fetchall()
-        columns = ['code', 'name', 'extra']
-        return pd.DataFrame(rows, columns=columns)
-
-    def get_indicator_list(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT name, category, params, extra FROM indicator')
-        rows = cursor.fetchall()
-        columns = ['name', 'category', 'params', 'extra']
-        return pd.DataFrame(rows, columns=columns)
-
-    def get_favorites(self, user_id: str, fav_type: str):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'SELECT fav_key, fav_value FROM user_favorites WHERE user_id=? AND fav_type=?', (user_id, fav_type))
-        rows = cursor.fetchall()
-        return rows
-
-    def add_favorite(self, user_id: str, fav_type: str, fav_key: str, fav_value: str):
-        cursor = self.conn.cursor()
-        cursor.execute('INSERT INTO user_favorites (user_id, fav_type, fav_key, fav_value) VALUES (?, ?, ?, ?)',
-                       (user_id, fav_type, fav_key, fav_value))
-        self.conn.commit()
-
-    def remove_favorite(self, user_id: str, fav_type: str, fav_key: str):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'DELETE FROM user_favorites WHERE user_id=? AND fav_type=? AND fav_key=?', (user_id, fav_type, fav_key))
-        self.conn.commit()
-
-    def _init_market_industry_data(self):
-        """初始化市场和行业数据"""
-        try:
-            # 初始化市场映射
-            market_data = {
-                'SH': {'name': '上海证券交易所', 'code': 'SH', 'prefix': ['600', '601', '603', '605', '688']},
-                'SZ': {'name': '深圳证券交易所', 'code': 'SZ', 'prefix': ['000', '001', '002', '003', '300']},
-                'BJ': {'name': '北京证券交易所', 'code': 'BJ', 'prefix': ['8', '430']},
-                'HK': {'name': '港股通', 'code': 'HK', 'prefix': ['9']},
-                'US': {'name': '美股', 'code': 'US', 'prefix': ['7']}
-            }
-            self.cache_manager.set('market_data', market_data)
-
-            # 初始化市场和行业股票集合
-            market_stocks = {}
-            industry_stocks = {}
-            industry_data = {}
-
-            # 遍历所有股票，更新市场和行业数据
-            for stock in sm:
-                try:
-                    if not stock.valid:
-                        continue
-
-                    market = stock.market
-                    code = stock.code
-
-                    # 更新市场股票集合
-                    if market not in market_stocks:
-                        market_stocks[market] = set()
-                    market_stocks[market].add(code)
-
-                    # 从行业管理器获取行业信息
-                    try:
-                        industry_info = self.industry_manager.get_industry(
-                            code)
-                        if industry_info:
-                            industry = industry_info.get(
-                                'csrc_industry', '') or industry_info.get('exchange_industry', '')
-                            if industry:
-                                # 处理多级行业
-                                industry_levels = industry.split('/')
-                                for i, level in enumerate(industry_levels):
-                                    level = level.strip()
-                                    if level:
-                                        # 创建行业层级结构
-                                        if i == 0:  # 主行业
-                                            if level not in industry_data:
-                                                industry_data[level] = {
-                                                    'sub_industries': set(),
-                                                    'stocks': set()
-                                                }
-                                            industry_data[level]['stocks'].add(
-                                                code)
-                                        elif i == 1:  # 子行业
-                                            main_industry = industry_levels[0].strip(
-                                            )
-                                            if main_industry in industry_data:
-                                                industry_data[main_industry]['sub_industries'].add(
-                                                    level)
-                                                if level not in industry_stocks:
-                                                    industry_stocks[level] = set(
-                                                    )
-                                                industry_stocks[level].add(
-                                                    code)
-                    except Exception as e:
-                        log_structured(self.log_manager, "get_industry_info",
-                                       level="warning", status="fail", error=str(e))
-                        continue
-
-                except Exception as e:
-                    log_structured(self.log_manager, "process_stock_data",
-                                   level="warning", status="fail", error=f"{code} - {str(e)}")
-                    continue
-
-            # 缓存市场和行业数据
-            self.cache_manager.set('market_stocks', market_stocks)
-            self.cache_manager.set('industry_stocks', industry_stocks)
-            self.cache_manager.set('industry_data', industry_data)
-
-            log_structured(self.log_manager, "market_industry_init", level="info", status="success",
-                           count=len(market_data), industry_count=len(industry_data))
-
-        except Exception as e:
-            log_structured(self.log_manager, "market_industry_init",
-                           level="error", status="fail", error=str(e))
-            log_structured(self.log_manager, "traceback",
-                           level="error", error=traceback.format_exc())
-
-    def get_markets(self) -> Dict[str, Dict]:
-        """获取所有市场数据
-
-        Returns:
-            市场数据字典
-        """
-        return self.cache_manager.get('market_data') or {}
-
-    def get_industries(self) -> Dict[str, Dict]:
-        """获取所有行业数据
-
-        Returns:
-            行业数据字典
-        """
-        return self.cache_manager.get('industry_data') or {}
-
-    def get_market_stocks(self, market: str) -> Set[str]:
-        """获取指定市场的所有股票
-
-        Args:
-            market: 市场代码
-
-        Returns:
-            股票代码集合
-        """
-        market_stocks = self.cache_manager.get('market_stocks') or {}
-        return market_stocks.get(market, set()).copy()
-
-    def get_industry_stocks(self, industry: str) -> Set[str]:
-        """获取指定行业的所有股票
-
-        Args:
-            industry: 行业名称
-
-        Returns:
-            股票代码集合
-        """
-        industry_stocks = self.cache_manager.get('industry_stocks') or {}
-        return industry_stocks.get(industry, set()).copy()
-
-    def get_sub_industries(self, main_industry: str) -> Set[str]:
-        """获取主行业的所有子行业
-
-        Args:
-            main_industry: 主行业名称
-
-        Returns:
-            子行业名称集合
-        """
-        industry_data = self.cache_manager.get('industry_data') or {}
-        industry_info = industry_data.get(main_industry, {})
-        return industry_info.get('sub_industries', set()).copy()
-
-    def _convert_hikyuu_datetime(self, dt) -> str:
-        """转换Hikyuu的Datetime对象为标准日期字符串
-
-        Args:
-            dt: Hikyuu的Datetime对象
-
-        Returns:
-            str: 标准日期字符串，格式：YYYY-MM-DD
-        """
-        try:
-            if hasattr(dt, 'number'):
-                n = int(dt.number)
-                if n == 0:
-                    return None
-                s = str(n)
-                return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
-            elif isinstance(dt, (datetime, pd.Timestamp)):
-                return dt.strftime('%Y-%m-%d')
-            return str(dt)
-        except Exception as e:
-            log_structured(self.log_manager, "convert_date",
-                           level="warning", error=str(e))
-            return None
-
-    def _standardize_kdata_format(self, df: pd.DataFrame, code: str) -> pd.DataFrame:
-        """标准化K线数据格式，统一处理所有数据源的返回格式
-
-        Args:
-            df: 原始DataFrame
-            code: 股票代码
-
-        Returns:
-            pd.DataFrame: 标准化后的DataFrame，datetime作为索引
-        """
-        if df is None or df.empty:
-            return df
-
-        df_copy = df.copy()
-
-        # 处理datetime字段
-        datetime_col_name = None
-        datetime_in_index = False
-
-        # 检查datetime是否在列中
-        for col in ['datetime', 'date', 'time', 'timestamp']:
-            if col in df_copy.columns:
-                datetime_col_name = col
-                break
-
-        # 检查datetime是否在索引中
-        if datetime_col_name is None and isinstance(df_copy.index, pd.DatetimeIndex):
-            datetime_in_index = True
-        elif datetime_col_name is None and hasattr(df_copy.index, 'name') and df_copy.index.name in ['datetime', 'date', 'time']:
-            datetime_in_index = True
-
-        # 如果datetime既不在列中也不在索引中，尝试从索引推断
-        if datetime_col_name is None and not datetime_in_index:
-            try:
-                # 尝试将索引转换为datetime
-                df_copy.index = pd.to_datetime(df_copy.index)
-                datetime_in_index = True
-            except:
-                # 如果无法转换，添加默认datetime列
-                self.log_manager.warning(f"股票 {code} 无法推断datetime字段，使用默认日期")
-                df_copy['datetime'] = pd.date_range(
-                    start='2020-01-01', periods=len(df_copy), freq='D')
-                datetime_col_name = 'datetime'
-
-        # 标准化列名映射
-        column_mapping = {
-            'open': 'open',
-            'high': 'high',
-            'low': 'low',
-            'close': 'close',
-            'volume': 'volume',
-            'vol': 'volume',  # 兼容性映射
-            'amount': 'amount',
-            'amt': 'amount',  # 兼容性映射
-            'turnover': 'amount'  # 兼容性映射
-        }
-
-        # 重命名列
-        for old_name, new_name in column_mapping.items():
-            if old_name in df_copy.columns and old_name != new_name:
-                df_copy = df_copy.rename(columns={old_name: new_name})
-
-        # 确保datetime作为索引
-        if datetime_col_name and not datetime_in_index:
-            # datetime在列中，需要设置为索引
-            df_copy[datetime_col_name] = pd.to_datetime(
-                df_copy[datetime_col_name])
-            df_copy = df_copy.set_index(datetime_col_name)
-        elif not datetime_in_index:
-            # 既不在列中也不在索引中，这种情况已经在上面处理了
-            pass
-
-        # 确保索引名称为datetime
-        if df_copy.index.name != 'datetime':
-            df_copy.index.name = 'datetime'
-
-        # 确保必要的数值列存在并转换为数值类型
-        required_numeric_cols = ['open', 'high', 'low', 'close', 'volume']
-        for col in required_numeric_cols:
-            if col not in df_copy.columns:
-                if col == 'volume' and 'vol' in df_copy.columns:
-                    df_copy[col] = df_copy['vol']
-                elif col == 'amount' and 'amt' in df_copy.columns:
-                    df_copy[col] = df_copy['amt']
-                else:
-                    # 为缺失的列填充默认值
-                    if col == 'volume':
-                        df_copy[col] = 0
-                    elif col == 'amount':
-                        df_copy[col] = df_copy.get(
-                            'close', 0) * df_copy.get('volume', 0)
-                    else:
-                        df_copy[col] = df_copy.get('close', 0)  # 用收盘价填充其他价格字段
-
-            # 转换为数值类型
-            if col in df_copy.columns:
-                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
-
-        # 添加amount列（如果不存在）
-        if 'amount' not in df_copy.columns:
-            df_copy['amount'] = df_copy['close'] * df_copy['volume']
-
-        # 确保code字段存在
-        if 'code' not in df_copy.columns:
-            df_copy['code'] = code
-
-        # 数据清洗
-        df_copy = df_copy.replace([np.inf, -np.inf], np.nan)
-        df_copy = df_copy.dropna(subset=['close'])  # 至少要有收盘价
-
-        # 按时间排序
-        df_copy = df_copy.sort_index()
-
-        return df_copy
-
     def get_k_data(self, code: str, freq: str = 'D',
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
@@ -904,6 +455,10 @@ class AsyncDataManagerWrapper(QObject):
                     self.log_manager.info(
                         f"成功获取股票 {code} 的K线数据， 时间范围: {df.index[0]} 至 {df.index[-1]}，共 {len(df)} 条记录")
 
+                end_time = time.time()
+                self.log_manager.info(
+                    f"[DataManager.get_k_data] 完成: code={code}, shape={df.shape}, 耗时={end_time - start_time:.3f}s")
+
                 return df
 
             except Exception as source_error:
@@ -932,10 +487,31 @@ class AsyncDataManagerWrapper(QObject):
             self.log_manager.error(f"获取K线数据失败: {str(e)}")
             self.log_manager.error(traceback.format_exc())
             return pd.DataFrame()
-        finally:
-            elapsed = int((time.time() - start_time) * 1000)
-            self.log_manager.performance(
-                f"[DataManager.get_k_data] 结束，耗时: {elapsed} ms")
+
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """
+        获取K线数据 - 兼容命名接口
+        这是get_k_data方法的别名，适配不同的调用习惯
+
+        Args:
+            stock_code: 股票代码
+            period: 周期 (D/W/M/1/5/15/30/60)
+            count: 数据条数
+
+        Returns:
+            K线数据DataFrame
+        """
+        try:
+            # 调用主要的get_k_data方法
+            return self.get_k_data(
+                code=stock_code,
+                freq=period,
+                query=-count  # 使用负数表示最近N条记录
+            )
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"get_kdata调用失败: {stock_code} - {e}")
+            return pd.DataFrame()
 
     def get_stock_list(self, market: str = 'all') -> pd.DataFrame:
         """获取股票列表

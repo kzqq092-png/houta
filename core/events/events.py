@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Union
 import uuid
 
+from ..plugin_types import AssetType
+
 
 @dataclass
 class BaseEvent(ABC):
@@ -30,28 +32,131 @@ class BaseEvent(ABC):
 
 
 @dataclass
-class StockSelectedEvent(BaseEvent):
+class AssetSelectedEvent(BaseEvent):
     """
-    股票选择事件
+    资产选择事件（通用）
 
-    当用户选择一只股票时触发。
+    当用户选择任意类型资产时触发，支持股票、加密货币、期货等。
     """
-    stock_code: str = ""
-    stock_name: str = ""
-    market: str = ""
-    period: str = ""        # 周期：日线、周线、月线等
-    time_range: str = ""    # 时间范围：最近7天、最近30天等
-    chart_type: str = ""    # 图表类型：K线图、分时图等
+    symbol: str = ""                        # 交易代码
+    name: str = ""                          # 资产名称
+    asset_type: AssetType = AssetType.STOCK  # 资产类型
+    market: str = ""                        # 市场
+    period: str = ""                        # 周期：日线、周线、月线等
+    time_range: str = ""                    # 时间范围：最近7天、最近30天等
+    chart_type: str = ""                    # 图表类型：K线图、分时图等
 
     def __post_init__(self):
         super().__post_init__()
         self.data.update({
-            'stock_code': self.stock_code,
-            'stock_name': self.stock_name,
+            'symbol': self.symbol,
+            'name': self.name,
+            'asset_type': self.asset_type.value if isinstance(self.asset_type, AssetType) else self.asset_type,
             'market': self.market,
             'period': self.period,
             'time_range': self.time_range,
             'chart_type': self.chart_type
+        })
+
+
+@dataclass
+class StockSelectedEvent(AssetSelectedEvent):
+    """
+    股票选择事件（向后兼容）
+
+    继承自AssetSelectedEvent，保持与现有代码的兼容性。
+    """
+    stock_code: str = ""  # 向后兼容属性
+    stock_name: str = ""  # 向后兼容属性
+
+    def __init__(self, stock_code: str = "", stock_name: str = "",
+                 market: str = "", period: str = "", time_range: str = "",
+                 chart_type: str = "", **kwargs):
+        # 使用父类构造函数，映射股票特定字段到通用字段
+        super().__init__(
+            symbol=stock_code,
+            name=stock_name,
+            asset_type=AssetType.STOCK,
+            market=market,
+            period=period,
+            time_range=time_range,
+            chart_type=chart_type,
+            **kwargs
+        )
+
+        # 保持向后兼容的属性
+        self.stock_code = stock_code
+        self.stock_name = stock_name
+
+    def __post_init__(self):
+        super().__post_init__()
+        # 确保向后兼容的数据字段
+        self.data.update({
+            'stock_code': self.stock_code,
+            'stock_name': self.stock_name
+        })
+
+
+@dataclass
+class AssetDataReadyEvent(BaseEvent):
+    """
+    资产数据就绪事件（通用）
+
+    当任意类型资产的数据加载完成时触发。
+    """
+    symbol: str = ""
+    name: str = ""
+    asset_type: AssetType = AssetType.STOCK
+    market: str = ""
+    data_type: str = "kline"  # kline, realtime, analysis等
+    data: Any = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'symbol': self.symbol,
+            'name': self.name,
+            'asset_type': self.asset_type.value if isinstance(self.asset_type, AssetType) else self.asset_type,
+            'market': self.market,
+            'data_type': self.data_type
+        })
+
+
+@dataclass
+class UIDataReadyEvent(AssetDataReadyEvent):
+    """
+    UI数据就绪事件（向后兼容）
+
+    继承自AssetDataReadyEvent，保持与现有UI代码的兼容性。
+    """
+    stock_code: str = ""  # 向后兼容
+    stock_name: str = ""  # 向后兼容
+    kline_data: Any = None  # 向后兼容
+
+    def __init__(self, stock_code: str = "", stock_name: str = "",
+                 kline_data: Any = None, market: str = "", **kwargs):
+        super().__init__(
+            symbol=stock_code,
+            name=stock_name,
+            asset_type=AssetType.STOCK,
+            market=market,
+            data_type="kline",
+            data=kline_data,
+            **kwargs
+        )
+
+        # 向后兼容属性
+        self.stock_code = stock_code
+        self.stock_name = stock_name
+        self.kline_data = kline_data
+
+    def __post_init__(self):
+        super().__post_init__()
+        # 向后兼容的数据字段
+        self.data.update({
+            'stock_code': self.stock_code,
+            'stock_name': self.stock_name,
+            'kline_data': self.kline_data
         })
 
 

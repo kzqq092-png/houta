@@ -861,10 +861,10 @@ diagnostic_file = collect_diagnostic_info()
 
 ### 技术支持信息
 
-- **项目地址**: https://github.com/hikyuu-org/hikyuu
+- **项目地址**: https://github.com/FactorWeave-Quant-org/FactorWeave-Quant
 - **问题反馈**: GitHub Issues
-- **邮箱支持**: support@hikyuu.org
-- **文档地址**: https://hikyuu.readthedocs.io/
+- **邮箱支持**: support@FactorWeave-Quant.org
+- **文档地址**: https://FactorWeave-Quant.readthedocs.io/
 
 提交问题时请包含：
 1. 完整的错误消息

@@ -63,7 +63,12 @@ class SystemResourceService:
                 self.event_bus.publish(event)
 
             except Exception as e:
-                print(f"资源监控线程错误: {e}")
+                try:
+                    print(f"资源监控线程错误: {str(e)}")
+                except:
+                    print(f"资源监控线程错误: {type(e).__name__}")
+                import traceback
+                traceback.print_exc()
 
             # 等待下一个间隔
             self._stop_event.wait(self._interval)

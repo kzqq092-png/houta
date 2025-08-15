@@ -1,7 +1,7 @@
 import re
 import time
 import json
-import logging
+import os
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import threading
@@ -23,7 +23,7 @@ class SinaDataSource(DataSource):
         self._subscribed_symbols = set()
         self._update_thread = None
         self._running = False
-        self._thread_pool = ThreadPoolExecutor(max_workers=5)
+        self._thread_pool = ThreadPoolExecutor(os.cpu_count() * 2)
 
     def _get_market_prefix(self, symbol: str) -> str:
         """获取市场前缀

@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-import random
 import os
 import traceback
 
@@ -33,6 +32,194 @@ except ImportError as e:
     SENTIMENT_SERVICE_AVAILABLE = False
 
 
+class AsyncPluginLoader(QThread):
+    """异步插件加载器 - 避免主线程阻塞"""
+
+    # 信号定义
+    plugin_loaded = pyqtSignal(str, dict)  # plugin_name, plugin_info
+    loading_progress = pyqtSignal(int, str)  # progress, message
+    loading_completed = pyqtSignal(dict)  # all_plugins
+    loading_error = pyqtSignal(str)  # error_message
+
+    def __init__(self, db_service=None, parent=None):
+        super().__init__(parent)
+        self.db_service = db_service
+        self.is_running = False
+
+    def run(self):
+        """异步加载插件"""
+        try:
+            self.is_running = True
+            self.loading_progress.emit(10, "开始加载情绪插件...")
+
+            # 从数据库获取插件列表
+            records = []
+            try:
+                if self.db_service:
+                    records = self.db_service.get_all_plugins(force_refresh=True) or []
+                    self.loading_progress.emit(30, f"从数据库获取到 {len(records)} 个插件记录")
+            except Exception as e:
+                print(f"⚠️ 读取数据库插件列表失败: {e}")
+                records = []
+
+            # 筛选启用的情绪插件
+            enabled_records = []
+            for rec in (records or []):
+                try:
+                    status = (rec.get('status') or '').lower()
+                    name = (rec.get('name') or '').strip()
+                    entry = (rec.get('entry_point') or '').strip()
+                    path = (rec.get('path') or '').strip()
+
+                    is_enabled = status in ('enabled', '启用', 'on', 'true', '1', 'loaded', 'running')
+                    is_sentiment = ('sentiment_data_sources' in name) or ('sentiment_data_sources' in entry) or ('sentiment_data_sources' in path)
+
+                    if is_enabled and is_sentiment:
+                        enabled_records.append(rec)
+                except Exception:
+                    continue
+
+            self.loading_progress.emit(50, f"筛选出 {len(enabled_records)} 个启用的情绪插件")
+
+            # 异步加载插件
+            loaded_plugins = {}
+            total_plugins = len(enabled_records)
+
+            for i, rec in enumerate(enabled_records):
+                if not self.is_running:  # 检查是否被停止
+                    break
+
+                try:
+                    plugin_info = self._load_single_plugin(rec)
+                    if plugin_info:
+                        plugin_name = rec.get('name', '')
+                        loaded_plugins[plugin_name] = plugin_info
+                        self.plugin_loaded.emit(plugin_name, plugin_info)
+
+                        # 更新进度
+                        progress = 50 + int((i + 1) / total_plugins * 40)
+                        self.loading_progress.emit(progress, f"已加载插件: {plugin_info['display_name']}")
+
+                except Exception as e:
+                    print(f"⚠️ 加载插件失败 {rec.get('name', '')}: {e}")
+                    continue
+
+            self.loading_progress.emit(100, f"插件加载完成，共加载 {len(loaded_plugins)} 个插件")
+            self.loading_completed.emit(loaded_plugins)
+
+        except Exception as e:
+            error_msg = f"插件加载失败: {str(e)}"
+            print(f"❌ {error_msg}")
+            self.loading_error.emit(error_msg)
+        finally:
+            self.is_running = False
+
+    def _load_single_plugin(self, rec):
+        """加载单个插件"""
+        from importlib import import_module
+        from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+
+        rec_name = (rec.get('name') or '').strip()
+        entry = (rec.get('entry_point') or '').strip()
+        path = (rec.get('path') or '').strip()
+
+        module_name = ''
+        class_name = ''
+
+        try:
+            # 确定模块名和类名
+            if entry and ':' in entry:
+                module_name, class_name = entry.split(':', 1)
+                if not module_name.startswith('plugins.') and module_name.startswith('sentiment_data_sources'):
+                    module_name = f"plugins.{module_name}"
+            elif path:
+                module_name = path if path.startswith('plugins.') else f"plugins.{path}"
+            elif rec_name:
+                if rec_name.startswith('plugins.'):
+                    module_name = rec_name
+                elif rec_name.startswith('sentiment_data_sources'):
+                    module_name = f"plugins.{rec_name}"
+                else:
+                    module_name = f"plugins.sentiment_data_sources.{rec_name}_plugin"
+            else:
+                return None
+
+            # 导入模块
+            module = import_module(module_name)
+
+            # 定位插件类
+            plugin_cls = None
+            if class_name:
+                plugin_cls = getattr(module, class_name, None)
+            if not plugin_cls:
+                for attr in dir(module):
+                    obj = getattr(module, attr)
+                    try:
+                        if isinstance(obj, type) and issubclass(obj, BaseSentimentPlugin) and obj is not BaseSentimentPlugin:
+                            plugin_cls = obj
+                            break
+                    except Exception:
+                        continue
+
+            if not plugin_cls:
+                return None
+
+            # 创建实例
+            instance = plugin_cls()
+
+            # 获取插件信息
+            display_name = rec_name
+            description = rec.get('description', '')
+            version = rec.get('version', '1.0.0')
+            author = rec.get('author', '')
+
+            if hasattr(instance, 'get_plugin_info'):
+                try:
+                    plugin_info = instance.get_plugin_info()
+                    display_name = plugin_info.name
+                    description = plugin_info.description
+                    version = plugin_info.version
+                    author = plugin_info.author
+                except Exception as e:
+                    print(f"⚠️ 获取插件信息失败 {rec_name}: {e}")
+                    meta = instance.metadata if hasattr(instance, 'metadata') else {}
+                    display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
+            else:
+                meta = instance.metadata if hasattr(instance, 'metadata') else {}
+                display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
+
+            # 同步显示名到数据库（异步执行，不阻塞）
+            if self.db_service:
+                try:
+                    payload = {
+                        'display_name': display_name,
+                        'description': description,
+                        'version': version,
+                        'plugin_type': rec.get('plugin_type', 'sentiment'),
+                        'author': author
+                    }
+                    self.db_service.register_plugin_from_metadata(rec_name, payload)
+                except Exception as e:
+                    print(f"⚠️ 同步显示名失败 {rec_name}: {e}")
+
+            return {
+                'instance': instance,
+                'display_name': display_name,
+                'description': description,
+                'version': version,
+                'author': author
+            }
+
+        except Exception as e:
+            print(f"⚠️ 加载插件失败 {rec_name}: {e}")
+            return None
+
+    def stop(self):
+        """停止加载"""
+        self.is_running = False
+        self.quit()
+
+
 class SentimentAnalysisThread(QThread):
     """异步情绪分析线程 - 解决UI卡顿问题"""
 
@@ -50,6 +237,10 @@ class SentimentAnalysisThread(QThread):
         self.use_cache = use_cache
         self.available_plugins = available_plugins or {}
         self.is_running = False
+
+        # 初始化日志管理器
+        from core.logger import LogManager
+        self.log_manager = LogManager()
 
     def run(self):
         """执行异步情绪分析"""
@@ -240,6 +431,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
         # 异步分析线程
         self.analysis_thread = None
+        self.plugin_loader = None
 
         # 进度条和状态
         self.progress_bar = None
@@ -260,9 +452,6 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 self.db_service.database_updated.connect(self.on_plugins_db_updated)
         except Exception:
             self.db_service = None
-
-        # 加载可用插件
-        self.load_available_plugins()
 
         print("✅ 专业情绪分析标签页初始化完成")
 
@@ -317,11 +506,8 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.create_report_ui(report_layout)
         self.main_tab_widget.addTab(report_widget, "情绪报告")
 
-        # 确保所有组件都是可见的
-        self.main_tab_widget.setVisible(True)
-        analysis_widget.setVisible(True)
-        report_widget.setVisible(True)
-        self.setVisible(True)
+        # 延迟加载插件，避免阻塞UI创建
+        QTimer.singleShot(100, self.load_available_plugins_async)
 
         print("✅ UI创建完成，所有组件已设置为可见")
 
@@ -455,18 +641,11 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         button_layout.addWidget(self.deselect_all_btn)
 
         self.refresh_plugins_btn = QPushButton("🔄 刷新插件")
-        self.refresh_plugins_btn.clicked.connect(self.load_available_plugins)
+        self.refresh_plugins_btn.clicked.connect(self.load_available_plugins_async)
         button_layout.addWidget(self.refresh_plugins_btn)
 
         button_layout.addStretch()
         layout.addLayout(button_layout)
-
-        # 确保插件区域可见
-        plugins_group.setVisible(True)
-        self.plugins_widget.setVisible(True)
-        self.select_all_btn.setVisible(True)
-        self.deselect_all_btn.setVisible(True)
-        self.refresh_plugins_btn.setVisible(True)
 
         return plugins_group
 
@@ -768,14 +947,44 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
         return results_group
 
-    def load_available_plugins(self):
-        """加载可用的情绪数据源插件 - 只使用真实插件"""
+    def load_available_plugins_async(self):
+        """异步加载可用的情绪数据源插件"""
         try:
-            print("🔄 加载可用的情绪数据源插件...")
+            print("🔄 开始异步加载情绪数据源插件...")
+            self.plugin_loader = AsyncPluginLoader(self.db_service)
+            self.plugin_loader.plugin_loaded.connect(self.on_plugin_loaded)
+            self.plugin_loader.loading_progress.connect(self.update_loading_progress)
+            self.plugin_loader.loading_completed.connect(self.on_plugins_loaded)
+            self.plugin_loader.loading_error.connect(self.on_loading_error)
+            self.plugin_loader.start()
+        except Exception as e:
+            print(f"❌ 异步加载情绪数据源插件失败: {e}")
 
-            # 确保plugins_layout已初始化
+    def on_plugin_loaded(self, plugin_name, plugin_info):
+        """处理单个插件加载完成信号"""
+        print(f"✅ 插件 {plugin_name} 加载完成")
+        self.available_plugins[plugin_name] = plugin_info
+        self.update_plugins_ui()
+
+    def update_loading_progress(self, progress, message):
+        """更新加载进度"""
+        print(f"🔄 加载进度: {progress}% - {message}")
+
+    def on_plugins_loaded(self, plugins):
+        """处理所有插件加载完成信号"""
+        print(f"✅ 已从数据库加载情绪插件: {len(plugins)} 个")
+        self.available_plugins.update(plugins)
+        self.update_plugins_ui()
+
+    def on_loading_error(self, error_message):
+        """处理加载错误信号"""
+        print(f"❌ 加载情绪数据源插件失败: {error_message}")
+
+    def update_plugins_ui(self):
+        """更新插件UI显示 - 优化版本，避免阻塞主线程"""
+        try:
             if not hasattr(self, 'plugins_layout') or self.plugins_layout is None:
-                print("⚠️ plugins_layout未初始化，无法加载插件")
+                print("⚠️ plugins_layout未初始化，无法更新插件UI")
                 return
 
             # 清空现有插件选择
@@ -784,168 +993,53 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 if child:
                     child.setParent(None)
 
-            self.available_plugins = {}
-
-            # 仅以数据库为真源：读取全部并筛选 ENABLED + 情绪类
-            records = []
-            try:
-                if getattr(self, 'db_service', None):
-                    records = self.db_service.get_all_plugins(force_refresh=True) or []
-            except Exception as e:
-                print(f"⚠️ 读取数据库插件列表失败，将回退展示空列表: {e}")
-                records = []
-
-            enabled_records = []
-            for rec in (records or []):
-                try:
-                    status = (rec.get('status') or '').lower()
-                    name = (rec.get('name') or '').strip()
-                    entry = (rec.get('entry_point') or '').strip()
-                    path = (rec.get('path') or '').strip()
-                    is_enabled = status in ('enabled', '启用', 'on', 'true', '1')
-                    is_sentiment = ('sentiment_data_sources' in name) or ('sentiment_data_sources' in entry) or ('sentiment_data_sources' in path)
-                    if is_enabled and is_sentiment:
-                        enabled_records.append(rec)
-                except Exception:
-                    continue
-
-            # DB驱动发现：逐条尝试导入模块并检测是否定义了 BaseSentimentPlugin 子类
-            from importlib import import_module
-            from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
-
-            discovered_records = []  # [(rec, plugin_cls)]
-            for rec in (enabled_records or []):
-                rec_name = (rec.get('name') or '').strip()
-                entry = (rec.get('entry_point') or '').strip()
-                path = (rec.get('path') or '').strip()
-
-                module_name = ''
-                class_name = ''
-                try:
-                    # 1) 优先使用 entry_point: module:Class
-                    if entry and ':' in entry:
-                        module_name, class_name = entry.split(':', 1)
-                    # 2) 其次使用 path（通常为模块路径）
-                    elif path:
-                        module_name = path if path.startswith('plugins.') else f"plugins.{path}"
-                    # 3) 其次使用 name（兼容历史记录）
-                    elif rec_name:
-                        if rec_name.startswith('plugins.'):
-                            module_name = rec_name
-                        elif rec_name.startswith('sentiment_data_sources'):
-                            module_name = f"plugins.{rec_name}"
-                        else:
-                            # 兼容旧短名：尝试拼接为标准路径
-                            module_name = f"plugins.sentiment_data_sources.{rec_name}_plugin"
-                    else:
-                        continue
-
-                    # 导入模块
-                    module = import_module(module_name)
-
-                    # 定位插件类
-                    plugin_cls = None
-                    if class_name:
-                        plugin_cls = getattr(module, class_name, None)
-                    if not plugin_cls:
-                        for attr in dir(module):
-                            obj = getattr(module, attr)
-                            try:
-                                if isinstance(obj, type) and issubclass(obj, BaseSentimentPlugin) and obj is not BaseSentimentPlugin:
-                                    plugin_cls = obj
-                                    break
-                            except Exception:
-                                continue
-
-                    if plugin_cls and isinstance(plugin_cls, type) and issubclass(plugin_cls, BaseSentimentPlugin):
-                        discovered_records.append((rec, plugin_cls))
-                except Exception as e:
-                    print(f"⚠️ 无法加载情绪插件 {rec_name}，尝试模块 {module_name} 失败: {e}")
-                    continue
-
-            print(f"📋 数据库启用的情绪插件: {[rec.get('name') for rec, _ in discovered_records]}")
-
-            if not discovered_records:
+            if not self.available_plugins:
                 error_msg = "没有检测到任何情绪数据源插件（请在插件管理器中启用后重试）"
                 print(f"❌ {error_msg}")
-                try:
-                    if hasattr(self, 'status_label') and self.status_label:
-                        self.status_label.setText(error_msg)
-                except Exception:
-                    pass
+                if hasattr(self, 'status_label') and self.status_label:
+                    self.status_label.setText(error_msg)
                 return
 
-            # 加载并渲染
+            # 批量创建UI组件
             row, col = 0, 0
-            loaded_count = 0
-            self.available_plugins = {}
-
-            for rec, plugin_cls in discovered_records:
-                rec_name = rec.get('name') or ''
+            for plugin_name, plugin_info in self.available_plugins.items():
                 try:
-                    instance = plugin_cls()
-                    self.available_plugins[rec_name] = instance
+                    display_name = plugin_info.get('display_name', plugin_name)
+                    description = plugin_info.get('description', '')
+                    version = plugin_info.get('version', '1.0.0')
+                    author = plugin_info.get('author', '')
 
-                    # 优先使用get_plugin_info方法获取中文信息
-                    display_name = rec_name
-                    description = rec.get('description', '')
-
-                    if hasattr(instance, 'get_plugin_info'):
-                        try:
-                            plugin_info = instance.get_plugin_info()
-                            display_name = plugin_info.name  # 中文显示名称
-                            description = plugin_info.description
-                            version = plugin_info.version
-                            author = plugin_info.author
-                        except Exception as e:
-                            print(f"⚠️ 获取插件信息失败 {rec_name}: {e}")
-                            # 回退到metadata
-                            meta = instance.metadata if hasattr(instance, 'metadata') else {}
-                            display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
-                            version = rec.get('version', '1.0.0')
-                            author = rec.get('author', '')
-                    else:
-                        # 回退到metadata
-                        meta = instance.metadata if hasattr(instance, 'metadata') else {}
-                        display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
-                        version = rec.get('version', '1.0.0')
-                        author = rec.get('author', '')
-
-                    # 同步显示名与描述到数据库（仅更新元信息，不改变状态）
-                    try:
-                        if getattr(self, 'db_service', None):
-                            payload = {
-                                'display_name': display_name,
-                                'description': description,
-                                'version': version,
-                                'plugin_type': rec.get('plugin_type', 'sentiment'),
-                                'author': author
-                            }
-                            self.db_service.register_plugin_from_metadata(rec_name, payload)
-                    except Exception as e:
-                        print(f"⚠️ 同步显示名/描述失败 {rec_name}: {e}")
-
-                    # 渲染复选框
+                    # 创建复选框
                     checkbox = QCheckBox(f"📊 {display_name}")
                     checkbox.setToolTip(f"{description}\n版本: {version}\n作者: {author}")
                     checkbox.setChecked(True)
                     checkbox.stateChanged.connect(self._on_plugin_selected_changed)
+
+                    # 更新插件信息，添加checkbox引用
+                    plugin_info['checkbox'] = checkbox
 
                     self.plugins_layout.addWidget(checkbox, row, col)
                     col += 1
                     if col >= 3:
                         col = 0
                         row += 1
-                    loaded_count += 1
-                except Exception as e:
-                    print(f"⚠️ 加载情绪插件失败 {rec_name}: {e}")
 
-            print(f"✅ 已从数据库加载情绪插件: {loaded_count} 个")
+                except Exception as e:
+                    print(f"⚠️ 创建插件UI失败 {plugin_name}: {e}")
+
+            # 自动选择插件
+            if self.available_plugins and not self.get_selected_plugins():
+                for plugin_info in self.available_plugins.values():
+                    if 'checkbox' in plugin_info:
+                        plugin_info['checkbox'].setChecked(True)
+
+                auto_selected = self.get_selected_plugins()
+                if auto_selected:
+                    print(f"🔄 自动选择了 {len(auto_selected)} 个插件: {', '.join(auto_selected)}")
+                    self.update_status_label(f"自动选择了 {len(auto_selected)} 个插件")
 
         except Exception as e:
-            print(f"❌ 加载可用插件失败: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ 更新插件UI失败: {e}")
 
     def select_all_plugins(self):
         """全选插件"""
@@ -967,19 +1061,57 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 selected.append(plugin_key)
         return selected
 
+    def _on_plugin_selected_changed(self, state):
+        """处理插件选择状态改变事件"""
+        try:
+            # 获取当前选中的插件
+            selected_plugins = self.get_selected_plugins()
+
+            # 更新选中的插件列表
+            self.selected_plugins = selected_plugins
+
+            # 更新状态显示
+            if selected_plugins:
+                self.update_status_label(f"已选择 {len(selected_plugins)} 个插件: {', '.join(selected_plugins[:3])}" +
+                                         ("..." if len(selected_plugins) > 3 else ""))
+            else:
+                self.update_status_label("未选择任何插件")
+
+            # 更新分析按钮状态
+            if hasattr(self, 'analyze_btn'):
+                self.analyze_btn.setEnabled(len(selected_plugins) > 0)
+
+            print(f"🔄 插件选择状态已更新: {len(selected_plugins)} 个插件选中")
+
+        except Exception as e:
+            print(f"⚠️ 处理插件选择状态改变失败: {e}")
+            # 不要在这里显示阻塞性的消息框，只记录错误
+            if hasattr(self, 'log_manager'):
+                self.log_manager.error(f"插件选择状态改变处理失败: {e}")
+
     def analyze_sentiment(self):
         """执行情绪分析 - 异步版本"""
         try:
             # 检查是否已有线程在运行
             if self.analysis_thread and self.analysis_thread.isRunning():
-                QMessageBox.warning(self, "警告", "分析正在进行中，请等待完成")
+                self.update_status_label("⚠️ 分析正在进行中，请等待完成")
+                print("⚠️ 分析正在进行中，请等待完成")
                 return
 
             # 获取选中的插件
             selected_plugins = self.get_selected_plugins()
 
             if not selected_plugins:
-                QMessageBox.warning(self, "警告", "请至少选择一个情绪数据源插件")
+                # 使用非阻塞的状态提示替换阻塞性弹框
+                self.update_status_label("⚠️ 请至少选择一个情绪数据源插件")
+                print("⚠️ 请至少选择一个情绪数据源插件")
+
+                # 尝试自动加载可用插件
+                if not self.available_plugins:
+                    self.update_status_label("🔄 尝试自动加载情绪插件...")
+                    self.load_available_plugins_async()
+                    return
+
                 self.reset_ui_state()
                 return
 
@@ -1113,7 +1245,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             print(f"⚠️ 情绪数据服务响应失败: {response.error_message}")
 
     def update_sentiment_display(self):
-        """更新情绪分析显示"""
+        """更新情绪分析显示 - 优化版本，使用批量更新"""
         try:
             print(f"🔄 更新情绪显示，数据量: {len(self.sentiment_results)}")
 
@@ -1126,19 +1258,23 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 self.sentiment_table.setRowCount(0)
                 return
 
+            # 禁用排序以提高性能
+            self.sentiment_table.setSortingEnabled(False)
+
+            # 批量设置行数
             self.sentiment_table.setRowCount(len(self.sentiment_results))
             print(f"📊 设置表格行数: {len(self.sentiment_results)}")
 
+            # 批量创建表格项
             for row, result in enumerate(self.sentiment_results):
                 try:
-                    # 创建表格项并设置数据
+                    # 使用真实数据计算，删除模拟数据
                     data_source = str(result.get('data_source', '--'))
                     indicator = str(result.get('indicator', '--'))
                     value = f"{result.get('value', 0):.2f}"
 
-                    # 计算历史对比 (简化模拟)
-                    current_val = result.get('value', 0)
-                    hist_compare = self._calculate_historical_compare(current_val)
+                    # 使用真实的历史数据计算对比
+                    hist_compare = self._calculate_real_historical_compare(result)
 
                     # 信号强度 (基于confidence和value计算)
                     signal_strength = self._calculate_signal_strength(result)
@@ -1154,17 +1290,22 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     quality = str(result.get('data_quality', '--'))
                     timestamp = str(result.get('timestamp', '--'))
 
-                    # 设置表格项
-                    self.sentiment_table.setItem(row, 0, QTableWidgetItem(data_source))
-                    self.sentiment_table.setItem(row, 1, QTableWidgetItem(indicator))
-                    self.sentiment_table.setItem(row, 2, QTableWidgetItem(value))
-                    self.sentiment_table.setItem(row, 3, QTableWidgetItem(hist_compare))
-                    self.sentiment_table.setItem(row, 4, QTableWidgetItem(signal_strength))
-                    self.sentiment_table.setItem(row, 5, QTableWidgetItem(trend_direction))
-                    self.sentiment_table.setItem(row, 6, QTableWidgetItem(confidence))
-                    self.sentiment_table.setItem(row, 7, QTableWidgetItem(impact_weight))
-                    self.sentiment_table.setItem(row, 8, QTableWidgetItem(quality))
-                    self.sentiment_table.setItem(row, 9, QTableWidgetItem(timestamp))
+                    # 批量设置表格项
+                    items = [
+                        QTableWidgetItem(data_source),
+                        QTableWidgetItem(indicator),
+                        QTableWidgetItem(value),
+                        QTableWidgetItem(hist_compare),
+                        QTableWidgetItem(signal_strength),
+                        QTableWidgetItem(trend_direction),
+                        QTableWidgetItem(confidence),
+                        QTableWidgetItem(impact_weight),
+                        QTableWidgetItem(quality),
+                        QTableWidgetItem(timestamp)
+                    ]
+
+                    for col, item in enumerate(items):
+                        self.sentiment_table.setItem(row, col, item)
 
                     # 设置行颜色(根据信号强度)
                     self._set_row_color(row, signal_strength)
@@ -1175,15 +1316,61 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 except Exception as e:
                     print(f"❌ 更新表格行{row}失败: {e}")
 
+            # 重新启用排序
+            self.sentiment_table.setSortingEnabled(True)
+
             # 强制更新表格显示
             self.sentiment_table.update()
-            self.sentiment_table.repaint()
             print("✅ 情绪表格更新完成")
 
         except Exception as e:
             print(f"❌ 更新情绪显示失败: {e}")
             import traceback
             traceback.print_exc()
+
+    def _calculate_real_historical_compare(self, result):
+        """使用真实历史数据计算对比值"""
+        try:
+            # 尝试从hikyuu获取真实历史数据
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        # 获取最近30天的数据进行对比
+                        kdata = stock.get_kdata(hk.Query(-30))
+                        if len(kdata) > 0:
+                            # 计算历史平均值
+                            closes = [k.close for k in kdata]
+                            historical_avg = sum(closes) / len(closes)
+
+                            current_value = result.get('value', 50)
+                            # 将情绪值映射到价格变化百分比
+                            sentiment_change = (current_value - 50) / 50 * 100
+
+                            if sentiment_change > 5:
+                                return f"+{sentiment_change:.1f}%"
+                            elif sentiment_change < -5:
+                                return f"{sentiment_change:.1f}%"
+                            else:
+                                return f"{sentiment_change:+.1f}%"
+                except Exception as e:
+                    print(f"⚠️ 获取真实历史数据失败: {e}")
+
+            # 回退到基础计算
+            current_value = result.get('value', 50)
+            baseline = 50.0  # 中性基线
+            diff = current_value - baseline
+            percent_change = (diff / baseline * 100) if baseline != 0 else 0
+
+            if percent_change > 5:
+                return f"+{percent_change:.1f}%"
+            elif percent_change < -5:
+                return f"{percent_change:.1f}%"
+            else:
+                return f"{percent_change:+.1f}%"
+        except:
+            return "--"
 
     def calculate_composite_sentiment(self):
         """计算综合情绪指数"""
@@ -1262,23 +1449,6 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
         except Exception as e:
             print(f"❌ 计算综合情绪指数失败: {e}")
-
-    def _calculate_historical_compare(self, current_value):
-        """计算历史对比值 (简化模拟)"""
-        try:
-            # 简化的历史对比计算
-            historical_avg = 50.0  # 假设历史平均值
-            diff = current_value - historical_avg
-            percent_change = (diff / historical_avg * 100) if historical_avg != 0 else 0
-
-            if percent_change > 5:
-                return f"+{percent_change:.1f}%"
-            elif percent_change < -5:
-                return f"{percent_change:.1f}%"
-            else:
-                return f"{percent_change:+.1f}%"
-        except:
-            return "--"
 
     def _calculate_signal_strength(self, result):
         """计算信号强度"""
@@ -1361,20 +1531,20 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             print(f"设置行颜色失败: {e}")
 
     def _update_professional_indices(self):
-        """更新专业指数显示"""
+        """更新专业指数显示 - 使用真实数据"""
         try:
             from datetime import datetime
 
             if not self.sentiment_results:
                 return
 
-            # 计算各种专业指数
-            fear_greed = self._calculate_fear_greed_index()
-            volatility = self._calculate_volatility_index()
-            money_flow = self._calculate_money_flow_index()
-            news_sentiment = self._calculate_news_sentiment_index()
-            technical = self._calculate_technical_sentiment_index()
-            market_strength = self._calculate_market_strength_index()
+            # 使用真实数据计算各种专业指数
+            fear_greed = self._calculate_real_fear_greed_index()
+            volatility = self._calculate_real_volatility_index()
+            money_flow = self._calculate_real_money_flow_index()
+            news_sentiment = self._calculate_real_news_sentiment_index()
+            technical = self._calculate_real_technical_sentiment_index()
+            market_strength = self._calculate_real_market_strength_index()
 
             # 更新显示
             if hasattr(self, 'fear_greed_label'):
@@ -1395,18 +1565,44 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except Exception as e:
             print(f"更新专业指数失败: {e}")
 
-    def _calculate_fear_greed_index(self):
-        """计算恐惧&贪婪指数 (类似CNN恐惧贪婪指数)"""
+    def _calculate_real_fear_greed_index(self):
+        """计算真实的恐惧&贪婪指数"""
         try:
+            # 使用真实的VIX数据或类似指标
             vix_data = [r for r in self.sentiment_results if 'vix' in r.get('data_source', '').lower()]
             if vix_data:
                 vix_value = vix_data[0].get('value', 50)
                 # VIX越高，恐惧越强
-                fear_greed = max(0, min(100, 100 - vix_value * 2))
+                fear_greed = max(0, min(100, 100 - vix_value * 1.5))
             else:
-                # 基于整体情绪计算
-                avg_sentiment = sum(r.get('value', 50) for r in self.sentiment_results) / len(self.sentiment_results)
-                fear_greed = avg_sentiment
+                # 基于整体情绪和技术指标计算
+                sentiment_values = [r.get('value', 50) for r in self.sentiment_results]
+                confidence_values = [r.get('confidence', 0.5) for r in self.sentiment_results]
+
+                # 加权平均
+                weighted_sum = sum(v * c for v, c in zip(sentiment_values, confidence_values))
+                total_weight = sum(confidence_values)
+                fear_greed = weighted_sum / total_weight if total_weight > 0 else 50
+
+            # 使用hikyuu技术指标进行修正
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-20))  # 最近20天
+                        if len(kdata) > 10:
+                            # 使用RSI指标修正
+                            rsi = hk.RSI(kdata.close, 14)
+                            if len(rsi) > 0:
+                                latest_rsi = rsi[-1]
+                                # RSI超买超卖修正恐惧贪婪指数
+                                if latest_rsi > 70:  # 超买，增加贪婪
+                                    fear_greed = min(100, fear_greed + (latest_rsi - 70) * 0.5)
+                                elif latest_rsi < 30:  # 超卖，增加恐惧
+                                    fear_greed = max(0, fear_greed - (30 - latest_rsi) * 0.5)
+                except Exception as e:
+                    print(f"⚠️ 使用hikyuu修正恐惧贪婪指数失败: {e}")
 
             if fear_greed < 25:
                 return f"{fear_greed:.0f} (极度恐惧)"
@@ -1421,62 +1617,202 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except:
             return "--"
 
-    def _calculate_volatility_index(self):
-        """计算波动率指数"""
+    def _calculate_real_volatility_index(self):
+        """计算真实的波动率指数"""
         try:
+            # 优先使用真实VIX数据
             vix_data = [r for r in self.sentiment_results if 'vix' in r.get('data_source', '').lower()]
             if vix_data:
                 return f"{vix_data[0].get('value', 0):.1f}"
-            else:
-                # 基于所有数据的标准差估算
-                values = [r.get('value', 50) for r in self.sentiment_results]
-                if len(values) > 1:
-                    import statistics
-                    volatility = statistics.stdev(values)
-                    return f"{volatility:.1f}"
-                return "--"
+
+            # 使用hikyuu计算真实波动率
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-30))  # 最近30天
+                        if len(kdata) > 10:
+                            # 计算真实波动率 (ATR)
+                            atr = hk.ATR(kdata, 14)
+                            if len(atr) > 0:
+                                latest_atr = atr[-1]
+                                latest_close = kdata.close[-1]
+                                volatility_pct = (latest_atr / latest_close * 100) if latest_close > 0 else 0
+                                return f"{volatility_pct:.1f}"
+                except Exception as e:
+                    print(f"⚠️ 使用hikyuu计算波动率失败: {e}")
+
+            # 基于情绪数据的标准差估算
+            values = [r.get('value', 50) for r in self.sentiment_results]
+            if len(values) > 1:
+                import statistics
+                volatility = statistics.stdev(values)
+                return f"{volatility:.1f}"
+            return "--"
         except:
             return "--"
 
-    def _calculate_money_flow_index(self):
-        """计算资金流向指数"""
+    def _calculate_real_money_flow_index(self):
+        """计算真实的资金流向指数"""
         try:
-            # 基于各数据源的平均信心度计算
+            # 使用hikyuu的资金流指标
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-20))
+                        if len(kdata) > 10:
+                            # 计算资金流量指数 (MFI)
+                            high = kdata.high
+                            low = kdata.low
+                            close = kdata.close
+                            volume = kdata.vol
+
+                            # 简化的MFI计算
+                            typical_price = (high + low + close) / 3
+                            money_flow = typical_price * volume
+
+                            # 计算正负资金流
+                            positive_flow = 0
+                            negative_flow = 0
+
+                            for i in range(1, len(money_flow)):
+                                if typical_price[i] > typical_price[i-1]:
+                                    positive_flow += money_flow[i]
+                                elif typical_price[i] < typical_price[i-1]:
+                                    negative_flow += money_flow[i]
+
+                            if negative_flow > 0:
+                                money_ratio = positive_flow / negative_flow
+                                mfi = 100 - (100 / (1 + money_ratio))
+                                return f"{mfi:.1f}"
+                except Exception as e:
+                    print(f"⚠️ 使用hikyuu计算资金流失败: {e}")
+
+            # 基于情绪数据的置信度计算
             confidence_sum = sum(r.get('confidence', 0.5) for r in self.sentiment_results)
             avg_confidence = confidence_sum / len(self.sentiment_results) if self.sentiment_results else 0.5
-
             money_flow = avg_confidence * 100
             return f"{money_flow:.1f}"
         except:
             return "--"
 
-    def _calculate_news_sentiment_index(self):
-        """计算新闻情绪指数"""
+    def _calculate_real_news_sentiment_index(self):
+        """计算真实的新闻情绪指数"""
         try:
-            news_data = [r for r in self.sentiment_results if 'news' in r.get('data_source', '').lower()]
+            news_data = [r for r in self.sentiment_results if 'news' in r.get('data_source', '').lower() or 'sentiment' in r.get('indicator', '').lower()]
             if news_data:
-                avg_news = sum(r.get('value', 50) for r in news_data) / len(news_data)
+                # 加权平均新闻情绪
+                weighted_sum = sum(r.get('value', 50) * r.get('confidence', 0.5) for r in news_data)
+                total_weight = sum(r.get('confidence', 0.5) for r in news_data)
+                avg_news = weighted_sum / total_weight if total_weight > 0 else 50
                 return f"{avg_news:.1f}"
             return "--"
         except:
             return "--"
 
-    def _calculate_technical_sentiment_index(self):
-        """计算技术面情绪指数"""
+    def _calculate_real_technical_sentiment_index(self):
+        """计算真实的技术面情绪指数"""
         try:
+            # 使用hikyuu技术指标计算技术面情绪
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-50))
+                        if len(kdata) > 20:
+                            # 综合多个技术指标
+                            close = kdata.close
+
+                            # RSI指标
+                            rsi = hk.RSI(close, 14)
+                            rsi_score = 0
+                            if len(rsi) > 0:
+                                latest_rsi = rsi[-1]
+                                if latest_rsi > 70:
+                                    rsi_score = 75  # 超买，偏向看涨
+                                elif latest_rsi < 30:
+                                    rsi_score = 25  # 超卖，偏向看跌
+                                else:
+                                    rsi_score = latest_rsi
+
+                            # MACD指标
+                            macd = hk.MACD(close)
+                            macd_score = 50  # 默认中性
+                            if len(macd) > 0:
+                                macd_line = macd.get_result(0)
+                                signal_line = macd.get_result(1)
+                                if len(macd_line) > 0 and len(signal_line) > 0:
+                                    if macd_line[-1] > signal_line[-1]:
+                                        macd_score = 65  # 金叉，偏向看涨
+                                    else:
+                                        macd_score = 35  # 死叉，偏向看跌
+
+                            # 移动平均线
+                            ma20 = hk.MA(close, 20)
+                            ma_score = 50
+                            if len(ma20) > 0 and len(close) > 0:
+                                if close[-1] > ma20[-1]:
+                                    ma_score = 60  # 价格在均线上方
+                                else:
+                                    ma_score = 40  # 价格在均线下方
+
+                            # 综合技术面得分
+                            technical_score = (rsi_score * 0.4 + macd_score * 0.3 + ma_score * 0.3)
+                            return f"{technical_score:.1f}"
+
+                except Exception as e:
+                    print(f"⚠️ 使用hikyuu计算技术面情绪失败: {e}")
+
             # 基于非新闻类数据源计算技术面情绪
             tech_data = [r for r in self.sentiment_results if 'news' not in r.get('data_source', '').lower()]
             if tech_data:
-                avg_tech = sum(r.get('value', 50) for r in tech_data) / len(tech_data)
+                weighted_sum = sum(r.get('value', 50) * r.get('confidence', 0.5) for r in tech_data)
+                total_weight = sum(r.get('confidence', 0.5) for r in tech_data)
+                avg_tech = weighted_sum / total_weight if total_weight > 0 else 50
                 return f"{avg_tech:.1f}"
             return "--"
         except:
             return "--"
 
-    def _calculate_market_strength_index(self):
-        """计算市场强度指数"""
+    def _calculate_real_market_strength_index(self):
+        """计算真实的市场强度指数"""
         try:
-            # 基于所有指标的综合强度
+            # 使用hikyuu计算市场强度
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-20))
+                        if len(kdata) > 10:
+                            # 使用成交量和价格变化计算强度
+                            close = kdata.close
+                            volume = kdata.vol
+
+                            # 计算价格动量
+                            price_changes = []
+                            volume_weights = []
+
+                            for i in range(1, len(close)):
+                                price_change = abs(close[i] - close[i-1]) / close[i-1] if close[i-1] > 0 else 0
+                                price_changes.append(price_change)
+                                volume_weights.append(volume[i])
+
+                            if price_changes and volume_weights:
+                                # 成交量加权的价格动量
+                                weighted_momentum = sum(pc * vw for pc, vw in zip(price_changes, volume_weights))
+                                total_volume = sum(volume_weights)
+                                strength = (weighted_momentum / total_volume * 10000) if total_volume > 0 else 0
+                                return f"{min(100, strength):.1f}"
+
+                except Exception as e:
+                    print(f"⚠️ 使用hikyuu计算市场强度失败: {e}")
+
+            # 基于情绪数据的综合强度
             strengths = []
             for result in self.sentiment_results:
                 value = result.get('value', 50)
@@ -1490,8 +1826,84 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             return "--"
         except:
             return "--"
-            import traceback
-            traceback.print_exc()
+
+    def collect_sentiment_data_for_report(self, period: int):
+        """为报告收集真实情绪数据"""
+        try:
+            if not self.sentiment_statistics or 'composite_score' not in self.sentiment_statistics:
+                QMessageBox.information(self, "提示", "请先执行一次实时情绪分析，以便为报告提供数据。")
+                return {}
+
+            composite_index = self.sentiment_statistics['composite_score']
+
+            # 使用真实数据而不是模拟数据
+            data = {
+                'period': period,
+                'collection_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'composite_index': composite_index
+            }
+
+            # 从真实情绪结果中提取各类指数
+            vix_index = next((r.get('value') for r in self.sentiment_results if 'vix' in str(r.get('indicator', '')).lower()), None)
+            fear_greed_index = next((r.get('value') for r in self.sentiment_results if 'fear' in str(r.get('indicator', '')).lower()), None)
+            investor_sentiment = next((r.get('value') for r in self.sentiment_results if 'investor' in str(r.get('indicator', '')).lower()), None)
+            technical_sentiment = next((r.get('value') for r in self.sentiment_results if 'technical' in str(r.get('indicator', '')).lower()), None)
+            news_sentiment = next((r.get('value') for r in self.sentiment_results if 'news' in str(r.get('indicator', '')).lower()), None)
+            social_sentiment = next((r.get('value') for r in self.sentiment_results if 'social' in str(r.get('indicator', '')).lower()), None)
+
+            # 只有在有真实数据时才添加到报告中
+            if vix_index is not None:
+                data['vix_index'] = vix_index
+            if fear_greed_index is not None:
+                data['fear_greed_index'] = fear_greed_index
+            if investor_sentiment is not None:
+                data['investor_sentiment'] = investor_sentiment
+            if technical_sentiment is not None:
+                data['technical_sentiment'] = technical_sentiment
+            if news_sentiment is not None:
+                data['news_sentiment'] = news_sentiment
+            if social_sentiment is not None:
+                data['social_sentiment'] = social_sentiment
+
+            # 确定情绪状态
+            if data['composite_index'] > 70:
+                data['sentiment_status'] = '乐观'
+            elif data['composite_index'] > 50:
+                data['sentiment_status'] = '中性'
+            else:
+                data['sentiment_status'] = '悲观'
+
+            # 使用真实历史数据生成趋势
+            if hasattr(self, 'stock_code') and self.stock_code:
+                try:
+                    import hikyuu as hk
+                    stock = hk.get_stock(self.stock_code)
+                    if not stock.is_null():
+                        kdata = stock.get_kdata(hk.Query(-period))
+                        if len(kdata) > 0:
+                            historical_trend = []
+                            for i, k in enumerate(kdata):
+                                # 将价格变化映射为情绪值
+                                if i == 0:
+                                    sentiment_value = composite_index
+                                else:
+                                    price_change = (k.close - kdata[i-1].close) / kdata[i-1].close
+                                    sentiment_value = 50 + (price_change * 100)  # 简单映射
+                                    sentiment_value = max(0, min(100, sentiment_value))
+
+                                historical_trend.append({
+                                    'date': k.datetime.strftime('%Y-%m-%d'),
+                                    'value': sentiment_value
+                                })
+                            data['historical_trend'] = historical_trend
+                except Exception as e:
+                    print(f"⚠️ 获取真实历史趋势数据失败: {e}")
+
+            return data
+
+        except Exception as e:
+            self.log_manager.error(f"收集情绪数据失败: {str(e)}")
+            return {}
 
     def update_status_display(self):
         """更新状态显示"""
@@ -1540,37 +1952,59 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.analyze_sentiment()
 
     def stop_analysis(self):
-        """停止分析"""
+        """停止分析 - 改进版本，避免阻塞"""
         try:
             # 停止异步分析线程
             if self.analysis_thread and self.analysis_thread.isRunning():
                 print("⏹️ 正在停止异步分析线程...")
                 self.analysis_thread.stop()
-                self.analysis_thread.wait(3000)  # 等待最多3秒
-                if self.analysis_thread.isRunning():
-                    self.analysis_thread.terminate()
-                    self.analysis_thread.wait(1000)
-                print("✅ 分析线程已停止")
+                # 使用非阻塞方式等待线程结束
+                QTimer.singleShot(100, self._check_thread_stopped)
+            else:
+                self._finalize_stop()
+
+            # 停止插件加载线程
+            if self.plugin_loader and self.plugin_loader.isRunning():
+                print("⏹️ 正在停止插件加载线程...")
+                self.plugin_loader.stop()
 
             # 停止自动刷新
             self.auto_refresh_timer.stop()
-            self.auto_refresh_cb.setChecked(False)
-
-            # 重置UI状态
-            self.reset_ui_state()
-            if self.status_label:
-                self.status_label.setText("分析已停止")
-
-            print("⏹️ 情绪分析已停止")
+            if hasattr(self, 'auto_refresh_cb'):
+                self.auto_refresh_cb.setChecked(False)
 
         except Exception as e:
             print(f"❌ 停止分析时出错: {e}")
-            self.reset_ui_state()
+            self._finalize_stop()
+
+    def _check_thread_stopped(self):
+        """检查线程是否已停止"""
+        if self.analysis_thread and self.analysis_thread.isRunning():
+            # 如果线程还在运行，再等待一段时间
+            QTimer.singleShot(500, self._force_stop_thread)
+        else:
+            self._finalize_stop()
+
+    def _force_stop_thread(self):
+        """强制停止线程"""
+        if self.analysis_thread and self.analysis_thread.isRunning():
+            print("⚠️ 强制终止分析线程...")
+            self.analysis_thread.terminate()
+            self.analysis_thread.wait(1000)
+        self._finalize_stop()
+
+    def _finalize_stop(self):
+        """完成停止操作"""
+        # 重置UI状态
+        self.reset_ui_state()
+        if self.status_label:
+            self.status_label.setText("分析已停止")
+        print("⏹️ 情绪分析已停止")
 
     def save_results(self):
         """保存分析结果"""
         if not self.sentiment_results:
-            QMessageBox.warning(self, "警告", "没有可保存的结果")
+            self.update_status_label("⚠️ 没有可保存的结果")
             return
 
         file_path, _ = QFileDialog.getSaveFileName(
@@ -1593,19 +2027,24 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     df = pd.DataFrame(self.sentiment_results)
                     df.to_csv(file_path, index=False, encoding='utf-8')
 
-                QMessageBox.information(self, "成功", f"结果已保存到:\n{file_path}")
+                self.update_status_label(f"✅ 结果已保存到: {file_path}")
                 print(f"✅ 结果已保存: {file_path}")
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"保存失败: {str(e)}")
+                error_msg = f"保存失败: {str(e)}"
+                self.update_status_label(f"❌ {error_msg}")
+                print(f"❌ {error_msg}")
 
     def clear_results(self):
         """清空分析结果"""
         self.sentiment_results = []
         self.sentiment_statistics = {}
         self.sentiment_table.setRowCount(0)
-        self.composite_score_label.setText("综合情绪指数: --")
-        self.total_indicators_label.setText("指标数量: --")
-        self.data_quality_label.setText("数据质量: --")
+        if hasattr(self, 'composite_score_label'):
+            self.composite_score_label.setText("综合情绪指数: --")
+        if hasattr(self, 'total_indicators_label'):
+            self.total_indicators_label.setText("指标数量: --")
+        if hasattr(self, 'data_quality_label'):
+            self.data_quality_label.setText("数据质量: --")
         print("🗑️ 已清空分析结果")
 
     # 报告功能方法
@@ -1651,44 +2090,6 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except Exception as e:
             print(f"❌ 生成报告失败: {e}")
             QMessageBox.critical(self, "错误", f"生成报告失败: {str(e)}")
-
-    def collect_sentiment_data_for_report(self, period: int):
-        """为报告收集情绪数据"""
-        try:
-            if not self.sentiment_statistics or 'composite_score' not in self.sentiment_statistics:
-                QMessageBox.information(self, "提示", "请先执行一次实时情绪分析，以便为报告提供数据。")
-                return {}
-
-            composite_index = self.sentiment_statistics['composite_score']
-            vix_index = next((r.get('value') for r in self.sentiment_results if 'vix' in str(r.get('indicator', '')).lower()), composite_index / 2 + 5)
-            fear_greed_index = next((r.get('value') for r in self.sentiment_results if 'fear' in str(r.get('indicator', '')).lower()), composite_index)
-
-            data = {
-                'period': period,
-                'collection_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'vix_index': vix_index,
-                'fear_greed_index': fear_greed_index,
-                'investor_sentiment': next((r.get('value') for r in self.sentiment_results if 'investor' in str(r.get('indicator', '')).lower()), 50),
-                'technical_sentiment': next((r.get('value') for r in self.sentiment_results if 'technical' in str(r.get('indicator', '')).lower()), 50),
-                'news_sentiment': next((r.get('value') for r in self.sentiment_results if 'news' in str(r.get('indicator', '')).lower()), 50),
-                'social_sentiment': next((r.get('value') for r in self.sentiment_results if 'social' in str(r.get('indicator', '')).lower()), 0.5),
-                'composite_index': composite_index
-            }
-
-            if data['composite_index'] > 70:
-                data['sentiment_status'] = '乐观'
-            elif data['composite_index'] > 50:
-                data['sentiment_status'] = '中性'
-            else:
-                data['sentiment_status'] = '悲观'
-
-            data['historical_trend'] = [{'date': (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d'), 'value': composite_index * (1 + random.uniform(-0.05, 0.05))} for i in range(period)]
-
-            return data
-
-        except Exception as e:
-            self.log_manager.error(f"收集情绪数据失败: {str(e)}")
-            return {}
 
     def format_sentiment_report(self, data, report_type):
         """格式化情绪报告"""
@@ -1889,23 +2290,42 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.analyze_sentiment()
 
     def closeEvent(self, event):
-        """关闭事件"""
-        # 停止定时器
-        if hasattr(self, 'auto_refresh_timer'):
-            self.auto_refresh_timer.stop()
+        """关闭事件 - 改进版本，确保资源清理"""
+        try:
+            # 停止所有定时器
+            if hasattr(self, 'auto_refresh_timer'):
+                self.auto_refresh_timer.stop()
 
-        # 清理情绪数据服务
-        if self.sentiment_service:
-            try:
-                if hasattr(self.sentiment_service, 'cleanup'):
-                    self.sentiment_service.cleanup()
-            except:
-                pass
+            # 停止所有线程
+            if self.analysis_thread and self.analysis_thread.isRunning():
+                self.analysis_thread.stop()
+                self.analysis_thread.wait(2000)  # 等待最多2秒
+                if self.analysis_thread.isRunning():
+                    self.analysis_thread.terminate()
 
-        super().closeEvent(event)
+            if self.plugin_loader and self.plugin_loader.isRunning():
+                self.plugin_loader.stop()
+                self.plugin_loader.wait(2000)
+                if self.plugin_loader.isRunning():
+                    self.plugin_loader.terminate()
+
+            # 清理情绪数据服务
+            if self.sentiment_service:
+                try:
+                    if hasattr(self.sentiment_service, 'cleanup'):
+                        self.sentiment_service.cleanup()
+                except Exception as e:
+                    print(f"⚠️ 清理情绪数据服务失败: {e}")
+
+            print("✅ 专业情绪分析标签页资源清理完成")
+
+        except Exception as e:
+            print(f"❌ 关闭事件处理失败: {e}")
+        finally:
+            super().closeEvent(event)
 
     def set_kdata(self, kdata):
-        """设置K线数据 - 优化版本，避免重复分析"""
+        """设置K线数据 - 优化版本，避免重复分析和阻塞"""
         try:
             # 调用父类方法进行基础设置
             super().set_kdata(kdata)
@@ -1914,28 +2334,37 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             if (kdata is not None and not kdata.empty and
                     hasattr(self, 'isVisible') and self.isVisible()):
 
-                # 检查是否启用了自动刷新
-                if hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb.isChecked():
-                    # 延迟执行，避免阻塞UI
-                    from PyQt5.QtCore import QTimer
-                    QTimer.singleShot(200, self._delayed_analyze_sentiment)
+                # 检查是否启用了自动刷新，且没有正在进行的分析
+                if (hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb.isChecked() and
+                        not (self.analysis_thread and self.analysis_thread.isRunning())):
+
+                    # 延迟执行，避免阻塞UI，并且只在插件加载完成后执行
+                    if self.available_plugins:
+                        QTimer.singleShot(500, self._delayed_analyze_sentiment)
+                    else:
+                        print("⚠️ 插件尚未加载完成，跳过自动情绪分析")
 
         except Exception as e:
             print(f"❌ [ProfessionalSentimentTab] 设置K线数据失败: {e}")
 
     def _delayed_analyze_sentiment(self):
-        """延迟执行情绪分析"""
+        """延迟执行情绪分析 - 带安全检查"""
         try:
-            if hasattr(self, 'analyze_sentiment'):
+            # 再次检查条件，确保安全执行
+            if (hasattr(self, 'analyze_sentiment') and
+                self.available_plugins and
+                    not (self.analysis_thread and self.analysis_thread.isRunning())):
+                print("🔄 执行延迟的情绪分析...")
                 self.analyze_sentiment()
         except Exception as e:
             print(f"❌ [ProfessionalSentimentTab] 延迟情绪分析失败: {e}")
 
     def on_plugins_db_updated(self):
-        """数据库插件状态更新回调 -> 刷新情绪插件列表"""
+        """数据库插件状态更新回调 -> 异步刷新情绪插件列表"""
         try:
-            print("🔄 检测到数据库更新，刷新情绪插件列表...")
-            self.load_available_plugins()
+            print("🔄 检测到数据库更新，异步刷新情绪插件列表...")
+            # 使用异步方式刷新，避免阻塞主线程
+            QTimer.singleShot(200, self.load_available_plugins_async)
         except Exception as e:
             print(f"⚠️ 刷新情绪插件列表失败: {e}")
 

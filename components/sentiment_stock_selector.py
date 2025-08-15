@@ -259,7 +259,7 @@ class SentimentStockSelectorDialog(QDialog):
         best_signal = None
         result = "信号\t参数\t目标值\n"
         tasks = []
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(os.cpu_count() * 2) as executor:
             for sig in signals:
                 base_param = self.signal_config[sig]
                 range_dict = base_param.get('__range__', {})

@@ -60,6 +60,8 @@ class CustomDataPlugin(IDataSourcePlugin):
             'CUSTOM003': {'name': '自定义外汇1', 'type': 'forex', 'market': 'CUSTOM'}
         }
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -522,6 +524,9 @@ class CustomDataPlugin(IDataSourcePlugin):
             # 可以在这里处理配置参数
             if hasattr(self, 'configure_api') and 'api_key' in config:
                 self.configure_api(config.get('api_key', ''))
+            
+            # 设置初始化状态
+            self.initialized = True
             return True
         except Exception as e:
             self.logger.error(f"插件初始化失败: {e}")
@@ -535,6 +540,10 @@ class CustomDataPlugin(IDataSourcePlugin):
                 self._disconnect_wind()
         except Exception as e:
             self.logger.error(f"插件关闭失败: {e}")
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
 
     def fetch_data(self, symbol: str, data_type: str,
                    start_date: Optional[datetime] = None,

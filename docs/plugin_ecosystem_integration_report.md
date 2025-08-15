@@ -74,7 +74,7 @@ class IPlugin(ABC):
 sdk.create_plugin_project(
     name="MACD指标",
     plugin_type=PluginType.INDICATOR,
-    author="HIkyuu团队",
+    author="FactorWeave-Quant团队",
     description="MACD技术指标插件"
 )
 

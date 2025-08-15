@@ -456,6 +456,67 @@ class DataSourceRouter:
             logger.error(f"注销数据源 {source_id} 失败: {str(e)}")
             return False
 
+    def get_data_source(self, source_id: str) -> Optional[DataSourcePluginAdapter]:
+        """
+        获取指定ID的数据源
+
+        Args:
+            source_id: 数据源ID
+
+        Returns:
+            Optional[DataSourcePluginAdapter]: 数据源适配器，如果不存在则返回None
+        """
+        try:
+            with self._lock:
+                adapter = self.data_sources.get(source_id)
+                if adapter:
+                    logger.debug(f"获取数据源 {source_id} 成功")
+                    return adapter
+                else:
+                    logger.debug(f"数据源 {source_id} 不存在")
+                    return None
+        except Exception as e:
+            logger.error(f"获取数据源 {source_id} 失败: {str(e)}")
+            return None
+
+    def get_all_data_sources(self) -> Dict[str, DataSourcePluginAdapter]:
+        """
+        获取所有注册的数据源
+
+        Returns:
+            Dict[str, DataSourcePluginAdapter]: 所有数据源的字典
+        """
+        try:
+            with self._lock:
+                return self.data_sources.copy()
+        except Exception as e:
+            logger.error(f"获取所有数据源失败: {str(e)}")
+            return {}
+
+    def is_data_source_available(self, source_id: str) -> bool:
+        """
+        检查数据源是否可用
+
+        Args:
+            source_id: 数据源ID
+
+        Returns:
+            bool: 是否可用
+        """
+        try:
+            with self._lock:
+                if source_id not in self.data_sources:
+                    return False
+
+                circuit_breaker = self.circuit_breakers.get(source_id)
+                if not circuit_breaker:
+                    return False
+
+                return circuit_breaker.can_execute()
+        except Exception as e:
+            logger.error(f"检查数据源 {source_id} 可用性失败: {str(e)}")
+            return False
+
     def set_asset_priorities(self, asset_type: AssetType, priorities: List[str]) -> None:
         """
         设置资产类型的数据源优先级

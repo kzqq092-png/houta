@@ -186,6 +186,66 @@ class HikyuuDataManager:
             logger.error(f"Failed to get K-data for {stock_code}: {e}")
             return pd.DataFrame()
 
+    def get_historical_data(self, symbol: str, asset_type: str = 'stock', period: str = 'D', count: int = 365, **kwargs) -> Optional[pd.DataFrame]:
+        """
+        获取历史数据 - TET模式兼容接口
+
+        Args:
+            symbol: 股票代码
+            asset_type: 资产类型 (默认为'stock')，可以是字符串或AssetType枚举
+            period: 周期 (D/W/M)
+            count: 数据条数
+            **kwargs: 其他参数
+
+        Returns:
+            历史数据DataFrame，如果获取失败返回None
+        """
+        try:
+            logger.debug(f"TET模式获取历史数据: {symbol}, 资产类型={asset_type}, 周期={period}, 数量={count}")
+
+            # 处理AssetType枚举
+            asset_type_str = asset_type
+            if hasattr(asset_type, 'value'):  # 是枚举类型
+                asset_type_str = asset_type.value
+            elif hasattr(asset_type, 'name'):  # 是枚举类型的另一种形式
+                asset_type_str = asset_type.name.lower()
+
+            # 目前只支持股票类型
+            if asset_type_str not in ['stock', 'equity']:
+                logger.warning(f"不支持的资产类型: {asset_type_str}")
+                return None
+
+            # 标准化股票代码
+            normalized_symbol = self._normalize_stock_code(symbol)
+
+            # 调用现有的get_kdata方法
+            df = self.get_kdata(normalized_symbol, period, count)
+
+            if df is not None and not df.empty:
+                logger.debug(f"✅ TET模式获取成功: {symbol} -> {normalized_symbol} | 记录数: {len(df)}")
+                return df
+            else:
+                logger.warning(f"⚠️ TET模式获取空数据: {symbol} -> {normalized_symbol}")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ TET模式获取历史数据失败: {symbol} - {e}")
+            return None
+
+    def get_k_data(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """
+        获取K线数据的别名方法 - 兼容不同的命名规范
+
+        Args:
+            stock_code: 股票代码
+            period: 周期 (D/W/M)
+            count: 数据条数
+
+        Returns:
+            K线数据DataFrame
+        """
+        return self.get_kdata(stock_code, period, count)
+
     def _normalize_stock_code(self, stock_code: str) -> str:
         """
         标准化股票代码格式

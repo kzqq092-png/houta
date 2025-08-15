@@ -14,7 +14,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
-import pickle
+import os
 from concurrent.futures import ThreadPoolExecutor
 import warnings
 
@@ -225,7 +225,7 @@ class ParameterValidator:
 class StrategyParameterManager:
     """策略参数管理器 - 高性能参数管理和优化"""
 
-    def __init__(self, max_workers: int = 4):
+    def __init__(self, max_workers: int = os.cpu_count() * 2):
         """初始化参数管理器
 
         Args:

@@ -87,6 +87,8 @@ class BondDataPlugin(IDataSourcePlugin):
             '信用债': (90.0, 110.0)
         }
 
+        self.initialized = False  # 插件初始化状态
+
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
         return self.supported_asset_types
@@ -213,7 +215,16 @@ class BondDataPlugin(IDataSourcePlugin):
 
         # 可转债价格可能偏离面值较多
         if bond_type == '可转债':
-            base_price = random.uniform(100.0, 140.0)
+            # 可转债特殊处理逻辑
+            pass
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        return getattr(self, 'initialized', False)
+
+    def _generate_bond_data(self, bond_code: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """生成债券数据"""
+        base_price = random.uniform(100.0, 140.0)
 
         while current_date <= end_date:
             # 债券价格波动相对较小（除了可转债）
