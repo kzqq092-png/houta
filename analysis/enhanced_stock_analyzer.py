@@ -479,8 +479,8 @@ class ProfessionalStockAnalyzer:
             drawdown = (cumulative_returns - rolling_max) / rolling_max
             max_drawdown = drawdown.min()
 
-            # 计算VaR (95%置信度)
-            var_95 = np.percentile(returns, 5)
+            # 计算VaR (95%置信度) - 修复：VaR应该为正值表示损失
+            var_95 = abs(np.percentile(returns, 5))
 
             # 风险等级评估
             if volatility < 0.15:

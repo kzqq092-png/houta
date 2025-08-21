@@ -28,9 +28,8 @@ from .strategy_factory import (
 from .parameter_manager import (
     StrategyParameterManager, ParameterValidator, get_parameter_manager
 )
-from .performance_evaluator import (
-    StrategyPerformanceEvaluator, get_performance_evaluator
-)
+# 使用统一性能监控系统
+from core.performance import get_performance_monitor as get_performance_evaluator
 from .lifecycle_manager import (
     StrategyLifecycleManager, get_lifecycle_manager
 )

@@ -40,7 +40,13 @@ class MovingAverageStrategyPlugin(IStrategyPluginV2):
             description="经典双均线交叉策略，基于快慢均线生成交易信号",
             author="FactorWeave 团队",
             supported_asset_types=[],
-            supported_data_types=[]
+            supported_data_types=[],
+            capabilities={
+                "strategies": ["moving_average_crossover"],
+                "parameters": ["fast_period", "slow_period", "stop_loss_pct", "take_profit_pct"],
+                "asset_types": ["stock", "futures", "forex"],
+                "real_time_support": True
+            }
         )
 
     def get_config_schema(self) -> Dict[str, Any]:

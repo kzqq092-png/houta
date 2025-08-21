@@ -537,9 +537,9 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                     factory = get_manager_factory()
                     self.data_manager = get_data_manager()
                 except ImportError:
-                    # 降级方案：直接导入
-                    from core.data_manager import DataManager
-                    self.data_manager = DataManager()
+                    # 降级方案：使用统一数据管理器
+                    from core.services.unified_data_manager import get_unified_data_manager
+                    self.data_manager = get_unified_data_manager()
 
             # 获取真实的板块资金流数据
             fund_flow_data = self.data_manager.get_fund_flow()

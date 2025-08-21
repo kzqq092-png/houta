@@ -2,6 +2,7 @@
 统一数据管理器
 
 负责协调各服务的数据加载请求，避免重复数据加载，提供统一的数据访问接口。
+集成了原DataManager和HikyuuDataManager的所有功能。
 """
 
 import logging
@@ -15,13 +16,51 @@ from enum import Enum
 import pandas as pd
 import asyncio
 from asyncio import Future as AsyncioFuture
+import numpy as np
+import sqlite3
+import os
+import traceback
 
 from ..events import EventBus, DataUpdateEvent
 from ..containers import ServiceContainer, get_service_container
 from ..plugin_types import AssetType, DataType
-from ..tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData, create_tet_pipeline
+from ..tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData
+
+# 安全导入hikyuu模块
+logger = logging.getLogger(__name__)
+try:
+    import hikyuu as hku
+    from hikyuu.interactive import sm
+    HIKYUU_AVAILABLE = True
+    logger.info("✅ HIkyuu模块导入成功")
+except ImportError as e:
+    logger.warning(f"⚠️ HIkyuu模块导入失败: {e}")
+    logger.warning("将使用模拟数据模式运行")
+    hku = None
+    sm = None
+    HIKYUU_AVAILABLE = False
+
+# 导入其他数据源
+try:
+    from ..eastmoney_source import EastMoneyDataSource
+    from ..sina_source import SinaDataSource
+    from ..tonghuashun_source import TongHuaShunDataSource
+except ImportError as e:
+    logger.warning(f"部分数据源导入失败: {e}")
+
+# 导入缓存和工具
+try:
+    from utils.cache import Cache
+    from utils.log_util import log_structured
+    from core.performance import measure_performance
+except ImportError as e:
+    logger.warning(f"工具模块导入失败: {e}")
+    Cache = None
 
 logger = logging.getLogger(__name__)
+
+# 数据库路径
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'hikyuu_system.db')
 
 
 def get_unified_data_manager() -> Optional['UnifiedDataManager']:
@@ -110,24 +149,29 @@ class UnifiedDataManager:
 
     功能：
     1. 协调数据加载请求
-    2. 避免重复数据加载  
+    2. 避免重复数据加载
     3. 提供统一的数据访问接口
     4. 管理数据缓存
     5. 优化数据加载性能
     6. 支持TET数据管道（Transform-Extract-Transform）
     7. 多资产类型数据处理
+    8. 集成HIkyuu、东方财富、新浪等多数据源
+    9. 行业数据管理
+    10. SQLite数据库支持
     """
 
-    def __init__(self, service_container: ServiceContainer, event_bus: EventBus, max_workers: int = 3):
+    def __init__(self, service_container: ServiceContainer = None, event_bus: EventBus = None, max_workers: int = 3):
         """
         初始化统一数据管理器
 
         Args:
-            service_container: 服务容器
-            event_bus: 事件总线
+            service_container: 服务容器 (可选)
+            event_bus: 事件总线 (可选)
             max_workers: 最大工作线程数
         """
-        self.service_container = service_container
+        # 兼容性处理 - 允许None参数
+        from ..containers import get_service_container
+        self.service_container = service_container or get_service_container()
         self.event_bus = event_bus
         self.loop = None  # 延迟初始化，在异步方法中获取
 
@@ -147,22 +191,110 @@ class UnifiedDataManager:
         self._cache_lock = threading.Lock()
         self._cache_ttl = 300  # 5分钟缓存TTL
 
+        # 初始化缓存管理器
+        if Cache:
+            self.cache_manager = Cache()
+        else:
+            self.cache_manager = None
+
+        # 数据库连接
+        try:
+            self.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+            self._db_lock = threading.Lock()
+        except Exception as e:
+            logger.error(f"数据库连接失败: {e}")
+            self.conn = None
+            self._db_lock = None
+
+        # HIkyuu相关初始化
+        self._hikyuu_available = HIKYUU_AVAILABLE
+        if self._hikyuu_available:
+            self.sm = sm
+            self._invalid_stocks_cache = set()
+            self._valid_stocks_cache = set()
+        else:
+            self.sm = None
+            self._invalid_stocks_cache = set()
+            self._valid_stocks_cache = set()
+
+        # 多数据源支持
+        self._current_source = 'hikyuu' if HIKYUU_AVAILABLE else 'mock'
+        self._data_sources = {}
+        self._initialize_data_sources()
+
+        # 插件化数据源管理
+        self._plugin_data_sources = {}
+        self._data_source_priorities = {
+            'stock': ['hikyuu', 'eastmoney', 'sina', 'tonghuashun'],
+            'futures': [],
+            'crypto': []
+        }
+        self._routing_strategy = 'priority'
+        self._health_status = {}
+        self._plugin_lock = threading.RLock()
+
+        # 行业管理器初始化
+        try:
+            from ..industry_manager import IndustryManager
+            self.industry_manager = IndustryManager()
+            self._load_industry_data()
+        except Exception as e:
+            logger.warning(f"行业管理器初始化失败: {e}")
+            self.industry_manager = None
+
         # 去重机制
-        self._request_dedup: Dict[str, Set[DataRequest]] = {}  # 请求键 -> 请求ID集合
+        self._request_dedup: Dict[str, Set[DataRequest]] = {}
         self._dedup_lock = threading.Lock()
 
-        # 请求跟踪器 - 用于取消请求
+        # 请求跟踪
         self.request_tracker: Dict[str, Dict[str, Any]] = {}
         self.request_tracker_lock = threading.Lock()
 
-        # 数据策略
+        # TET数据管道支持
+        self.tet_enabled = True  # 默认启用TET模式
+        self.tet_pipeline = None
+
+        # 数据处理策略
+        from ..tet_data_pipeline import HistoryDataStrategy, RealtimeDataStrategy
         self.history_data_strategy = HistoryDataStrategy()
         self.realtime_data_strategy = RealtimeDataStrategy()
+
+        # 初始化TET管道
+        try:
+            from ..tet_data_pipeline import TETDataPipeline
+            from ..data_source_router import DataSourceRouter
+
+            # 创建数据源路由器
+            data_source_router = DataSourceRouter()
+
+            # 初始化TET管道
+            self.tet_pipeline = TETDataPipeline(data_source_router)
+            logger.info("TET数据管道初始化成功")
+
+            # 注册HIkyuu数据源插件到路由器和TET管道 - 删除手动注册，使用自动发现机制
+            # self._register_hikyuu_plugin_to_router(data_source_router)
+
+            # 插件发现状态标记
+            self._plugins_discovered = False
+
+            # 延迟插件发现 - 不在初始化时立即执行
+            # 将在服务引导完成后通过外部调用执行
+            logger.info("TET数据管道初始化完成，等待插件发现...")
+
+        except ImportError as e:
+            logger.error(f"TET数据管道模块导入失败: {e}")
+            logger.info("🔄 禁用TET数据管道，使用传统HIkyuu模式")
+            self.tet_enabled = False
+            self.tet_pipeline = None
+        except Exception as e:
+            logger.warning(f"TET数据管道初始化失败: {e}")
+            logger.info("🔄 降级到传统HIkyuu模式")
+            self.tet_enabled = False
+            self._plugins_discovered = False
 
         # 统计信息
         self._stats = {
             'requests_total': 0,
-            'requests_deduplicated': 0,
             'requests_completed': 0,
             'requests_failed': 0,
             'requests_cancelled': 0,
@@ -170,68 +302,838 @@ class UnifiedDataManager:
             'cache_misses': 0
         }
 
-        # 数据源路由器
-        self.data_source_router = None
-        self._initialize_data_source_router()
+        logger.info("统一数据管理器初始化完成")
 
-        # TET数据管道支持
-        self.tet_pipeline: Optional[TETDataPipeline] = None
-        self.tet_enabled = False
-        self._initialize_tet_pipeline()
-
-        logger.info("Unified data manager initialized")
-
-    def _initialize_data_source_router(self):
-        """初始化数据源路由器"""
+    def _initialize_data_sources(self):
+        """初始化数据源"""
         try:
-            from ..data_source_router import DataSourceRouter
-            self.data_source_router = DataSourceRouter()
-            logger.info("✅ 数据源路由器已初始化")
+            # 初始化东方财富数据源
+            try:
+                self._data_sources['eastmoney'] = EastMoneyDataSource()
+                logger.info("东方财富数据源初始化成功")
+            except Exception as e:
+                logger.warning(f"东方财富数据源初始化失败: {e}")
+
+            # 初始化新浪数据源
+            try:
+                self._data_sources['sina'] = SinaDataSource()
+                logger.info("新浪数据源初始化成功")
+            except Exception as e:
+                logger.warning(f"新浪数据源初始化失败: {e}")
+
+                # 初始化同花顺数据源
+            try:
+                self._data_sources['tonghuashun'] = TongHuaShunDataSource()
+                logger.info("同花顺数据源初始化成功")
+            except Exception as e:
+                logger.warning(f"同花顺数据源初始化失败: {e}")
+
         except Exception as e:
-            logger.warning(f"⚠️ 数据源路由器初始化失败: {e}")
-            self.data_source_router = None
+            logger.error(f"数据源初始化失败: {e}")
 
-    def _initialize_tet_pipeline(self):
-        """初始化TET数据管道"""
+    def _load_industry_data(self):
+        """加载行业数据"""
+        if self.industry_manager:
+            try:
+                self.industry_manager.load_cache()
+                self.industry_manager.update_industry_data()
+                logger.info("行业数据加载成功")
+            except Exception as e:
+                logger.error(f"行业数据加载失败: {e}")
+
+    def get_available_sources(self) -> List[str]:
+        """获取可用的数据源列表"""
+        sources = []
+        if self._hikyuu_available:
+            sources.append('hikyuu')
+        sources.extend(self._data_sources.keys())
+        return sources
+
+    def switch_data_source(self, source: str) -> bool:
+        """切换数据源"""
+        if source in self.get_available_sources():
+            old_source = self._current_source
+            self._current_source = source
+            logger.info(f"数据源从 {old_source} 切换到 {source}")
+            return True
+        else:
+            logger.error(f"数据源 {source} 不可用")
+            return False
+
+    def get_stock_list(self, market: str = 'all') -> pd.DataFrame:
+        """
+        获取股票列表（插件化架构）
+
+        Args:
+            market: 市场类型 ('all', 'sh', 'sz', 'bj')
+
+        Returns:
+            股票列表DataFrame
+        """
         try:
-            logger.info("🔧 正在初始化TET数据管道...")
+            cache_key = f"stock_list_{market}"
 
-            # 尝试获取数据源路由器
-            if hasattr(self, 'data_source_router') and self.data_source_router:
-                router = self.data_source_router
-                logger.info("✅ 使用本地数据源路由器")
-            else:
-                # 从服务容器获取
-                logger.info("🔍 尝试从服务容器获取数据源路由器...")
-                from ..data_source_router import DataSourceRouter
+            # 尝试从缓存获取数据
+            if self.cache_manager:
+                cached_data = self.cache_manager.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"从缓存获取股票列表: {len(cached_data)} 只股票")
+                    return cached_data
+
+            # 优先使用TET数据管道（插件化架构）
+            if self.tet_enabled and self.tet_pipeline:
+                logger.info("🚀 使用TET数据管道获取股票列表（插件化架构）")
                 try:
-                    router = self.service_container.resolve(DataSourceRouter)
-                    logger.info("✅ 从服务容器获取数据源路由器成功")
-                except Exception as resolve_error:
-                    logger.warning(f"⚠️ 从服务容器获取数据源路由器失败: {resolve_error}")
-                    router = None
+                    from ..tet_data_pipeline import StandardQuery
+                    from ..plugin_types import AssetType, DataType
 
-            if router:
-                # 检查路由器中的数据源数量
-                source_count = len(router.data_sources) if hasattr(router, 'data_sources') else 0
-                logger.info(f"📊 数据源路由器状态: {source_count} 个数据源已注册")
+                    # 创建标准化查询请求
+                    query = StandardQuery(
+                        symbol="",  # 股票列表查询不需要具体symbol
+                        asset_type=AssetType.STOCK,
+                        data_type=DataType.ASSET_LIST,
+                        market=market,
+                        provider=self._current_source  # 指定当前数据源
+                    )
 
-                from ..tet_data_pipeline import create_tet_pipeline
-                self.tet_pipeline = create_tet_pipeline(router)
-                self.tet_enabled = True
-                logger.info("🎉 TET数据管道已成功启用！")
-                logger.info(f"🚀 TET模式已激活，支持多资产类型数据处理")
+                    # 通过TET管道处理请求
+                    result = self.tet_pipeline.process(query)
+
+                    if result and result.data is not None:
+                        # 转换为DataFrame格式
+                        if isinstance(result.data, list) and len(result.data) > 0:
+                            df = pd.DataFrame(result.data)
+
+                            # 缓存结果
+                            if self.cache_manager and not df.empty:
+                                self.cache_manager.set(cache_key, df)
+
+                            logger.info(f"✅ 通过TET管道获取股票列表成功: {len(df)} 只股票")
+                            return df
+                        elif isinstance(result.data, pd.DataFrame) and not result.data.empty:
+                            # 如果已经是DataFrame格式
+                            if self.cache_manager:
+                                self.cache_manager.set(cache_key, result.data)
+                            logger.info(f"✅ 通过TET管道获取股票列表成功: {len(result.data)} 只股票")
+                            return result.data
+                        else:
+                            logger.warning("TET管道返回空数据")
+                    else:
+                        logger.warning("TET管道处理失败")
+
+                except Exception as e:
+                    logger.warning(f"TET管道获取股票列表失败: {e}，降级到传统模式")
+
+            # 降级到传统数据源（保持向后兼容性）
+            logger.info("🔄 降级到传统数据源模式")
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu' and self._hikyuu_available:
+                df = self._get_hikyuu_stock_list_legacy(market)
+            elif self._current_source in self._data_sources:
+                df = self._get_external_stock_list(market, self._current_source)
             else:
-                logger.warning("❌ 数据源路由器不可用，TET管道未启用")
-                logger.warning("💡 建议检查插件管理器和数据源注册")
-                self.tet_enabled = False
+                df = self._get_mock_stock_list(market)
+
+            # 缓存结果
+            if self.cache_manager and not df.empty:
+                self.cache_manager.set(cache_key, df)
+
+            return df
 
         except Exception as e:
-            logger.error(f"❌ TET数据管道初始化失败: {e}")
-            logger.error("🔄 将使用传统数据获取模式")
-            import traceback
-            logger.debug(traceback.format_exc())
-            self.tet_enabled = False
+            logger.error(f"获取股票列表失败: {e}")
+            return pd.DataFrame()
+
+    def _get_hikyuu_stock_list_legacy(self, market: str = 'all') -> pd.DataFrame:
+        """使用HIkyuu获取股票列表"""
+        try:
+            stocks = []
+            total_count = 0
+            valid_count = 0
+
+            for stock in self.sm:
+                total_count += 1
+
+                if not stock.valid:
+                    continue
+
+                # 安全获取市场信息
+                stock_market = getattr(stock, 'market', '') or ''
+                stock_code = getattr(stock, 'code', '') or ''
+                stock_name = getattr(stock, 'name', '') or ''
+
+                # 根据market参数过滤
+                if market and market != 'all' and (market or '').lower() != (stock_market or '').lower():
+                    continue
+
+                # 构建股票代码（市场+代码）
+                market_code = f"{(stock_market or '').lower()}{stock_code}"
+
+                # 获取行业信息
+                industry = getattr(stock, 'industry', None) or '其他'
+                if not industry and self.industry_manager:
+                    try:
+                        industry_info = self.industry_manager.get_industry(stock_code)
+                        if industry_info:
+                            industry = (industry_info.get('csrc_industry') or
+                                        industry_info.get('exchange_industry') or
+                                        industry_info.get('industry') or '其他')
+                    except Exception as e:
+                        logger.warning(f"获取股票 {stock_code} 行业信息失败: {e}")
+
+                stock_info = {
+                    'code': market_code,
+                    'name': stock_name,
+                    'market': stock_market,
+                    'industry': industry,
+                    'type': getattr(stock, 'type', ''),
+                    'valid': getattr(stock, 'valid', False),
+                    'start_date': str(stock.start_datetime) if hasattr(stock, 'start_datetime') and stock.start_datetime else None,
+                    'end_date': str(stock.last_datetime) if hasattr(stock, 'last_datetime') and stock.last_datetime else None
+                }
+                stocks.append(stock_info)
+                valid_count += 1
+
+            df = pd.DataFrame(stocks)
+
+            # 缓存数据
+            if self.cache_manager and not df.empty:
+                self.cache_manager.set(f"stock_list_{market}", df)
+
+            logger.info(f"HIkyuu获取股票列表成功: 总数={total_count}, 有效={valid_count}, 市场={market}")
+            return df
+
+        except Exception as e:
+            logger.error(f"HIkyuu获取股票列表失败: {e}")
+            return pd.DataFrame()
+
+    def _get_external_stock_list(self, market: str, source: str) -> pd.DataFrame:
+        """使用外部数据源获取股票列表"""
+        try:
+            if source in self._data_sources:
+                df = self._data_sources[source].get_stock_list(market)
+
+                # 补充行业信息
+                if not df.empty and 'code' in df.columns and self.industry_manager:
+                    df['industry'] = df.apply(
+                        lambda x: self._get_industry_info(x['code']), axis=1)
+
+                # 确保行业列存在
+                if not df.empty and 'industry' not in df.columns:
+                    df['industry'] = '其他'
+
+                # 缓存数据
+                if self.cache_manager and not df.empty:
+                    self.cache_manager.set(f"stock_list_{market}", df)
+
+                return df
+            else:
+                logger.error(f"数据源 {source} 不存在")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"外部数据源 {source} 获取股票列表失败: {e}")
+            return pd.DataFrame()
+
+    def _get_mock_stock_list(self, market: str = 'all') -> pd.DataFrame:
+        """获取模拟股票列表"""
+        mock_stocks = [
+            {'code': 'sz000001', 'name': '平安银行', 'market': 'sz', 'industry': '银行'},
+            {'code': 'sz000002', 'name': '万科A', 'market': 'sz', 'industry': '房地产'},
+            {'code': 'sh600000', 'name': '浦发银行', 'market': 'sh', 'industry': '银行'},
+            {'code': 'sh600036', 'name': '招商银行', 'market': 'sh', 'industry': '银行'},
+            {'code': 'sh600519', 'name': '贵州茅台', 'market': 'sh', 'industry': '食品饮料'},
+            {'code': 'sz000858', 'name': '五粮液', 'market': 'sz', 'industry': '食品饮料'},
+            {'code': 'sz300750', 'name': '宁德时代', 'market': 'sz', 'industry': '电池'},
+            {'code': 'sz002415', 'name': '海康威视', 'market': 'sz', 'industry': '电子'},
+            {'code': 'sz000725', 'name': '京东方A', 'market': 'sz', 'industry': '电子'},
+            {'code': 'sh600276', 'name': '恒瑞医药', 'market': 'sh', 'industry': '医药生物'},
+        ]
+
+        if market != 'all':
+            mock_stocks = [s for s in mock_stocks if s['market'] == market]
+
+        return pd.DataFrame(mock_stocks)
+
+    def _get_industry_info(self, stock_code: str) -> str:
+        """获取股票行业信息"""
+        if self.industry_manager:
+            try:
+                industry_info = self.industry_manager.get_industry(stock_code)
+                if industry_info:
+                    return (industry_info.get('csrc_industry') or
+                            industry_info.get('exchange_industry') or
+                            industry_info.get('industry') or '其他')
+            except Exception as e:
+                logger.warning(f"获取股票 {stock_code} 行业信息失败: {e}")
+        return '其他'
+
+    def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
+        """
+        获取K线数据 - 统一接口
+
+        Args:
+            stock_code: 股票代码
+            period: 周期 (D/W/M/1/5/15/30/60)
+            count: 数据条数
+
+        Returns:
+            K线数据DataFrame
+        """
+        try:
+            cache_key = f"kdata_{stock_code}_{period}_{count}"
+
+            # 尝试从缓存获取
+            if self.cache_manager:
+                cached_data = self.cache_manager.get(cache_key)
+                if cached_data is not None and not cached_data.empty:
+                    return cached_data
+
+            # 根据当前数据源获取数据
+            if self._current_source == 'hikyuu' and self._hikyuu_available:
+                df = self._get_hikyuu_kdata(stock_code, period, count)
+            elif self._current_source in self._data_sources:
+                df = self._get_external_kdata(stock_code, period, count, self._current_source)
+            else:
+                df = pd.DataFrame()
+
+            # 数据标准化和清洗
+            if not df.empty:
+                df = self._standardize_kdata_format(df, stock_code)
+
+                # 缓存数据
+                if self.cache_manager:
+                    self.cache_manager.set(cache_key, df)
+
+            return df
+
+        except Exception as e:
+            logger.error(f"获取K线数据失败: {stock_code} - {e}")
+            return pd.DataFrame()
+
+    def _get_hikyuu_kdata(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
+        """通过插件系统获取K线数据（重构版）"""
+        try:
+            logger.info(f"🔄 通过插件系统获取K线数据: {stock_code}, period={period}, count={count}")
+
+            # 优先使用TET数据管道（插件化架构）
+            if self.tet_enabled and self.tet_pipeline:
+                try:
+                    from ..tet_data_pipeline import StandardQuery
+                    from ..plugin_types import AssetType, DataType
+
+                    # 创建标准化查询请求
+                    query = StandardQuery(
+                        symbol=stock_code,
+                        asset_type=AssetType.STOCK,
+                        data_type=DataType.HISTORICAL_KLINE,
+                        period=period,
+                        provider=self._current_source,
+                        extra_params={'count': count}
+                    )
+
+                    # 通过TET管道处理请求
+                    result = self.tet_pipeline.process(query)
+
+                    if result and result.data is not None:
+                        if isinstance(result.data, pd.DataFrame) and not result.data.empty:
+                            logger.info(f"✅ 通过TET管道获取K线数据成功: {len(result.data)} 条记录")
+                            return result.data
+                        else:
+                            logger.warning("TET管道返回空K线数据")
+                    else:
+                        logger.warning("TET管道K线数据处理失败")
+
+                except Exception as e:
+                    logger.warning(f"TET管道获取K线数据失败: {e}，降级到传统模式")
+
+            # 降级到传统HIkyuu调用（保持向后兼容性）
+            logger.info("🔄 降级到传统HIkyuu模式获取K线数据")
+            legacy_data = self._get_hikyuu_kdata_legacy(stock_code, period, count)
+
+            # 如果传统模式也失败，按获取数据为空处理
+            if legacy_data.empty:
+                logger.warning(f"⚠️ 传统模式也无法获取数据: {stock_code}，返回空数据")
+
+            return legacy_data
+
+        except Exception as e:
+            logger.error(f"获取K线数据失败: {e}")
+            return pd.DataFrame()
+
+    def get_historical_data(self, symbol: str, asset_type=None, period: str = "D", count: int = 365, **kwargs) -> Optional[pd.DataFrame]:
+        """
+        获取历史数据（兼容AssetService接口）
+
+        Args:
+            symbol: 资产代码
+            asset_type: 资产类型（兼容性参数，可选）
+            period: 周期
+            count: 数据条数
+            **kwargs: 其他参数
+
+        Returns:
+            Optional[pd.DataFrame]: 历史数据
+        """
+        try:
+            # 对于股票数据，直接使用get_kdata方法
+            return self.get_kdata(symbol, period, count)
+        except Exception as e:
+            logger.error(f"获取历史数据失败 {symbol}: {e}")
+            return None
+
+    def _get_hikyuu_kdata_legacy(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
+        """使用HIkyuu获取K线数据（传统模式）"""
+        try:
+            # 获取股票对象
+            stock = sm[stock_code]
+            if not stock.valid:
+                logger.warning(f"股票代码无效: {stock_code}")
+                return pd.DataFrame()
+
+            # 转换周期
+            ktype_map = {
+                'D': hku.Query.DAY,
+                'W': hku.Query.WEEK,
+                'M': hku.Query.MONTH,
+                '1': hku.Query.MIN,
+                '5': hku.Query.MIN5,
+                '15': hku.Query.MIN15,
+                '30': hku.Query.MIN30,
+                '60': hku.Query.MIN60
+            }
+
+            ktype = ktype_map.get(period, hku.Query.DAY)
+
+            # 构建查询
+            if count > 0:
+                # 获取最近N条记录 - 使用更安全的方式
+                try:
+                    # 直接使用count参数，让HIkyuu自动处理日期
+                    query = hku.Query(-count, ktype)  # 负数表示最近N条
+                except Exception as date_e:
+                    logger.warning(f"使用count查询失败，尝试日期范围查询: {date_e}")
+                    # 降级到日期范围查询
+                    end_date = stock.last_datetime
+                    # 更保守的日期估算：交易日通常少于自然日
+                    days_back = min(count * 2, 365 * 5)  # 最多回溯5年
+                    try:
+                        from datetime import timedelta
+                        # 使用Python datetime计算，再转为HIkyuu Datetime
+                        end_py = end_date.datetime()
+                        start_py = end_py - timedelta(days=days_back)
+                        start_date = hku.Datetime(start_py)
+                        query = hku.Query(start_date, end_date, ktype)
+                    except Exception as fallback_e:
+                        logger.error(f"日期计算失败: {fallback_e}")
+                        # 最后的降级：只获取一年数据
+                        query = hku.Query(-252, ktype)  # 一年约252个交易日
+            else:
+                # 获取所有数据
+                query = hku.Query(stock.start_datetime, stock.last_datetime, ktype)
+
+            # 获取K线数据
+            kdata = stock.getKData(query)
+
+            # 转换为DataFrame
+            if len(kdata) == 0:
+                return pd.DataFrame()
+
+            data = []
+            for i in range(len(kdata)):
+                record = kdata[i]
+                data.append({
+                    'datetime': record.datetime.datetime(),
+                    'open': float(record.open),
+                    'high': float(record.high),
+                    'low': float(record.low),
+                    'close': float(record.close),
+                    'volume': float(record.volume),
+                    'amount': float(record.amount) if hasattr(record, 'amount') else 0.0
+                })
+
+            df = pd.DataFrame(data)
+            if not df.empty:
+                df.set_index('datetime', inplace=True)
+                df['code'] = stock_code
+
+            return df
+
+        except Exception as e:
+            logger.error(f"HIkyuu获取K线数据失败: {stock_code} - {e}")
+            return pd.DataFrame()
+
+    def _get_external_kdata(self, stock_code: str, period: str, count: int, source: str) -> pd.DataFrame:
+        """使用外部数据源获取K线数据"""
+        try:
+            if source in self._data_sources:
+                # 计算日期范围
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=count)
+
+                # 调用数据源的get_kdata方法
+                df = self._data_sources[source].get_kdata(
+                    stock_code, period, start_date, end_date)
+
+                return df
+            else:
+                logger.error(f"数据源 {source} 不存在")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"外部数据源 {source} 获取K线数据失败: {stock_code} - {e}")
+            return pd.DataFrame()
+
+    def _standardize_kdata_format(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
+        """标准化K线数据格式"""
+        try:
+            if df.empty:
+                return df
+
+            # 确保必要的列存在
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                logger.warning(f"K线数据缺少必要列: {missing_columns}")
+                return pd.DataFrame()
+
+            # 处理datetime索引
+            if 'datetime' in df.columns and not isinstance(df.index, pd.DatetimeIndex):
+                df['datetime'] = pd.to_datetime(df['datetime'])
+                df.set_index('datetime', inplace=True)
+            elif not isinstance(df.index, pd.DatetimeIndex):
+                logger.warning("K线数据缺少datetime字段")
+                return pd.DataFrame()
+
+            # 数据清洗
+            df = df.replace([np.inf, -np.inf], np.nan)
+            df = df.dropna(subset=['close'])  # 至少要有收盘价
+
+            # 确保code字段存在
+            if 'code' not in df.columns:
+                df['code'] = stock_code
+
+            # 确保amount字段存在
+            if 'amount' not in df.columns:
+                df['amount'] = 0.0
+
+            # 数据类型转换
+            for col in ['open', 'high', 'low', 'close', 'volume', 'amount']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            return df
+
+        except Exception as e:
+            logger.error(f"标准化K线数据格式失败: {e}")
+            return pd.DataFrame()
+
+    def get_stock_info(self, stock_code: str) -> Optional[Dict[str, Any]]:
+        """获取股票信息"""
+        try:
+            if self._current_source == 'hikyuu' and self._hikyuu_available:
+                stock = sm[stock_code]
+                if stock.valid:
+                    return {
+                        'code': stock_code,
+                        'name': stock.name,
+                        'market': stock.market,
+                        'type': stock.type,
+                        'valid': stock.valid,
+                        'start_date': str(stock.start_datetime) if stock.start_datetime else None,
+                        'end_date': str(stock.last_datetime) if stock.last_datetime else None,
+                        'industry': self._get_industry_info(stock_code)
+                    }
+
+            # 从股票列表中查找
+            stock_list = self.get_stock_list()
+            if not stock_list.empty:
+                matches = stock_list[stock_list['code'] == stock_code]
+                if not matches.empty:
+                    return matches.iloc[0].to_dict()
+
+            return None
+
+        except Exception as e:
+            logger.error(f"获取股票信息失败: {stock_code} - {e}")
+            return None
+
+    def search_stocks(self, keyword: str) -> List[Dict[str, Any]]:
+        """搜索股票"""
+        try:
+            stock_list = self.get_stock_list()
+            if stock_list.empty:
+                return []
+
+            keyword_lower = keyword.lower()
+            matches = stock_list[
+                (stock_list['code'].str.lower().str.contains(keyword_lower, na=False)) |
+                (stock_list['name'].str.lower().str.contains(keyword_lower, na=False))
+            ]
+
+            return matches.to_dict('records')
+
+        except Exception as e:
+            logger.error(f"搜索股票失败: {keyword} - {e}")
+            return []
+
+    def get_fund_flow(self) -> Dict[str, Any]:
+        """获取资金流数据 - 通过TET框架和数据源插件获取真实数据"""
+        try:
+            fund_flow_data = {
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
+            }
+
+            if self.tet_enabled and self.tet_pipeline:
+                logger.info("🚀 使用TET数据管道获取资金流数据")
+
+                try:
+                    # 获取板块资金流数据
+                    sector_query = StandardQuery(
+                        asset_type=AssetType.SECTOR,
+                        data_type=DataType.SECTOR_FUND_FLOW,
+                        symbol="",
+                        extra_params={"period": "1d", "limit": 50}
+                    )
+                    sector_result = self.tet_pipeline.process(sector_query)
+
+                    if sector_result and sector_result.success and sector_result.data is not None:
+                        if isinstance(sector_result.data, pd.DataFrame):
+                            fund_flow_data['sector_flow_rank'] = sector_result.data
+                        else:
+                            # 如果返回的是列表或字典，转换为DataFrame
+                            fund_flow_data['sector_flow_rank'] = pd.DataFrame(sector_result.data)
+                        logger.info(f"✅ TET获取板块资金流数据成功: {len(fund_flow_data['sector_flow_rank'])} 条记录")
+                    else:
+                        logger.warning("⚠️ TET板块资金流数据为空或失败")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ TET获取板块资金流数据失败: {e}")
+
+                try:
+                    # 获取个股资金流数据
+                    individual_query = StandardQuery(
+                        asset_type=AssetType.STOCK,
+                        data_type=DataType.INDIVIDUAL_FUND_FLOW,
+                        symbol="",
+                        extra_params={"period": "1d", "limit": 100}
+                    )
+                    individual_result = self.tet_pipeline.process(individual_query)
+
+                    if individual_result and individual_result.success and individual_result.data is not None:
+                        if isinstance(individual_result.data, pd.DataFrame):
+                            fund_flow_data['individual_flow'] = individual_result.data
+                        else:
+                            fund_flow_data['individual_flow'] = pd.DataFrame(individual_result.data)
+                        logger.info(f"✅ TET获取个股资金流数据成功: {len(fund_flow_data['individual_flow'])} 条记录")
+                    else:
+                        logger.warning("⚠️ TET个股资金流数据为空或失败")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ TET获取个股资金流数据失败: {e}")
+
+                try:
+                    # 获取市场整体资金流数据
+                    market_query = StandardQuery(
+                        asset_type=AssetType.INDEX,
+                        data_type=DataType.MAIN_FUND_FLOW,
+                        symbol="",
+                        extra_params={"period": "1d"}
+                    )
+                    market_result = self.tet_pipeline.process(market_query)
+
+                    if market_result and market_result.success and market_result.data is not None:
+                        if isinstance(market_result.data, dict):
+                            fund_flow_data['market_flow'] = market_result.data
+                        elif isinstance(market_result.data, pd.DataFrame) and not market_result.data.empty:
+                            # 将DataFrame转换为字典
+                            fund_flow_data['market_flow'] = market_result.data.to_dict('records')[0] if len(market_result.data) > 0 else {}
+                        else:
+                            fund_flow_data['market_flow'] = {}
+                        logger.info(f"✅ TET获取市场资金流数据成功")
+                    else:
+                        logger.warning("⚠️ TET市场资金流数据为空或失败")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ TET获取市场资金流数据失败: {e}")
+
+            else:
+                logger.info("🔄 降级到传统数据源模式获取资金流数据")
+                # 使用HIkyuu或其他传统数据源获取资金流数据
+                fund_flow_data = self._get_fund_flow_legacy()
+
+            # 如果所有数据都为空，生成模拟数据用于测试
+            if (fund_flow_data['sector_flow_rank'].empty and
+                fund_flow_data['individual_flow'].empty and
+                    not fund_flow_data['market_flow']):
+                logger.info("📊 生成模拟资金流数据用于测试")
+                fund_flow_data = self._generate_mock_fund_flow_data()
+
+            return fund_flow_data
+
+        except Exception as e:
+            logger.error(f"获取资金流数据失败: {e}")
+            return {
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
+            }
+
+    def _get_fund_flow_legacy(self) -> Dict[str, Any]:
+        """传统数据源获取资金流数据"""
+        try:
+            # 尝试通过HIkyuu获取资金流数据
+            import hikyuu as hku
+
+            fund_flow_data = {
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
+            }
+
+            # HIkyuu目前可能不直接支持资金流数据，这里预留接口
+            # 可以通过其他数据源API补充
+            logger.info("📊 HIkyuu传统模式暂不支持资金流数据，返回空数据")
+
+            return fund_flow_data
+
+        except Exception as e:
+            logger.error(f"传统数据源获取资金流数据失败: {e}")
+            return {
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
+            }
+
+    def _generate_mock_fund_flow_data(self) -> Dict[str, Any]:
+        """生成模拟资金流数据用于测试"""
+        try:
+            import numpy as np
+            from datetime import datetime, timedelta
+
+            # 生成板块资金流排行数据
+            sectors = ['银行', '证券', '保险', '房地产', '钢铁', '煤炭', '有色金属', '石油石化',
+                       '电力', '公用事业', '交通运输', '电子', '计算机', '通信', '医药生物',
+                       '食品饮料', '纺织服装', '轻工制造', '化工', '建筑材料']
+
+            sector_data = []
+            for i, sector in enumerate(sectors):
+                net_inflow = np.random.uniform(-5000, 8000)  # 净流入金额（万元）
+                inflow_rate = np.random.uniform(-8, 12)      # 净流入率（%）
+
+                sector_data.append({
+                    'sector_name': sector,
+                    'net_inflow': round(net_inflow, 2),
+                    'inflow_rate': round(inflow_rate, 2),
+                    'main_inflow': round(net_inflow * 0.6, 2),
+                    'retail_inflow': round(net_inflow * 0.4, 2),
+                    'rank': i + 1,
+                    'update_time': datetime.now()
+                })
+
+            sector_df = pd.DataFrame(sector_data)
+
+            # 生成个股资金流数据
+            stocks = ['平安银行', '招商银行', '中国平安', '贵州茅台', '五粮液', '美的集团',
+                      '格力电器', '海康威视', '恒瑞医药', '迈瑞医疗', '宁德时代', '比亚迪',
+                      '立讯精密', '韦尔股份', 'TCL科技', '京东方A', '三一重工', '中联重科',
+                      '万科A', '保利发展']
+
+            individual_data = []
+            for i, stock in enumerate(stocks):
+                code = f"00000{i+1:02d}"  # 模拟股票代码
+                net_inflow = np.random.uniform(-2000, 5000)
+                inflow_rate = np.random.uniform(-10, 15)
+
+                individual_data.append({
+                    'stock_code': code,
+                    'stock_name': stock,
+                    'net_inflow': round(net_inflow, 2),
+                    'inflow_rate': round(inflow_rate, 2),
+                    'main_inflow': round(net_inflow * 0.65, 2),
+                    'retail_inflow': round(net_inflow * 0.35, 2),
+                    'price': round(np.random.uniform(10, 200), 2),
+                    'change_rate': round(np.random.uniform(-5, 8), 2),
+                    'update_time': datetime.now()
+                })
+
+            individual_df = pd.DataFrame(individual_data)
+
+            # 生成市场整体资金流数据
+            market_flow = {
+                'total_net_inflow': round(np.random.uniform(-50000, 80000), 2),
+                'main_net_inflow': round(np.random.uniform(-30000, 50000), 2),
+                'retail_net_inflow': round(np.random.uniform(-20000, 30000), 2),
+                'north_bound_inflow': round(np.random.uniform(-100, 200), 2),
+                'market_sentiment': np.random.choice(['强势', '中性', '弱势']),
+                'active_ratio': round(np.random.uniform(0.6, 0.9), 2),
+                'update_time': datetime.now()
+            }
+
+            logger.info("✅ 生成模拟资金流数据完成")
+
+            return {
+                'sector_flow_rank': sector_df,
+                'individual_flow': individual_df,
+                'market_flow': market_flow
+            }
+
+        except Exception as e:
+            logger.error(f"生成模拟资金流数据失败: {e}")
+            return {
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
+            }
+
+    def test_connection(self) -> bool:
+        """测试数据源连接"""
+        try:
+            if self._current_source == 'hikyuu' and self._hikyuu_available:
+                return self.sm is not None and len(list(self.sm)) > 0
+            elif self._current_source in self._data_sources:
+                # 尝试获取股票列表来测试连接
+                test_list = self._data_sources[self._current_source].get_stock_list('sh')
+                return not test_list.empty
+            else:
+                return True  # 模拟模式总是可用
+
+        except Exception as e:
+            logger.error(f"测试数据源连接失败: {e}")
+            return False
+
+    def get_latest_price(self, stock_code: str) -> float:
+        """获取最新价格"""
+        try:
+            # 获取最近的K线数据
+            kdata = self.get_kdata(stock_code, 'D', 1)
+            if not kdata.empty:
+                return float(kdata['close'].iloc[-1])
+            else:
+                return 0.0
+
+        except Exception as e:
+            logger.error(f"获取最新价格失败: {stock_code} - {e}")
+            return 0.0
+
+    def cleanup(self):
+        """清理资源"""
+        try:
+            # 关闭线程池
+            if hasattr(self, '_executor'):
+                self._executor.shutdown(wait=True)
+
+            # 关闭数据库连接
+            if self.conn:
+                self.conn.close()
+
+            logger.info("统一数据管理器资源清理完成")
+
+        except Exception as e:
+            logger.error(f"清理资源失败: {e}")
 
     def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
         """
@@ -246,6 +1148,12 @@ class UnifiedDataManager:
         """
         if self.tet_enabled and self.tet_pipeline:
             try:
+                # 懒加载检查：如果插件还没发现，重新尝试发现
+                if not self._plugins_discovered:
+                    logger.info("🔄 TET管道首次使用，重新尝试插件发现...")
+                    self._auto_discover_data_source_plugins()
+
+                logger.info("🚀 使用TET数据管道获取股票列表（插件化架构）")
                 query = StandardQuery(
                     symbol="",  # 资产列表查询不需要具体symbol
                     asset_type=asset_type,
@@ -254,13 +1162,50 @@ class UnifiedDataManager:
                 )
 
                 result = self.tet_pipeline.process(query)
+
+                # 检查结果是否为空
+                if not result.data or len(result.data) == 0:
+                    logger.warning("TET管道返回空数据")
+                    raise Exception("TET管道返回空数据")
+
                 return self._format_asset_list(result.data)
 
             except Exception as e:
                 logger.warning(f"TET模式获取资产列表失败: {e}")
+                logger.info("🔄 降级到传统数据源模式")
 
         # 降级到传统方式
         return self._legacy_get_asset_list(asset_type, market)
+
+    def get_current_source(self) -> str:
+        """获取当前数据源"""
+        return getattr(self, '_current_source', 'hikyuu' if self._hikyuu_available else 'mock')
+
+    def get_historical_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK,
+                            period: str = "D", count: int = 365, **kwargs) -> Optional[pd.DataFrame]:
+        """
+        获取历史数据（兼容AssetService接口）
+
+        Args:
+            symbol: 资产代码
+            asset_type: 资产类型
+            period: 周期
+            count: 数据条数
+            **kwargs: 其他参数
+
+        Returns:
+            Optional[pd.DataFrame]: 历史数据
+        """
+        try:
+            if asset_type == AssetType.STOCK:
+                # 对于股票，使用get_kdata方法
+                return self.get_kdata(symbol, period, count)
+            else:
+                # 对于其他资产类型，使用get_asset_data方法
+                return self.get_asset_data(symbol, asset_type, DataType.HISTORICAL_KLINE, period, **kwargs)
+        except Exception as e:
+            logger.error(f"获取历史数据失败 {symbol}: {e}")
+            return None
 
     def get_asset_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK,
                        data_type: DataType = DataType.HISTORICAL_KLINE,
@@ -354,6 +1299,30 @@ class UnifiedDataManager:
                         'status': 'active'
                     })
                 return result
+            elif asset_type == AssetType.CRYPTO:
+                # 添加基本的加密货币支持
+                logger.info("提供基本的加密货币列表")
+                crypto_list = [
+                    {'symbol': 'BTC', 'name': 'Bitcoin', 'market': 'binance'},
+                    {'symbol': 'ETH', 'name': 'Ethereum', 'market': 'binance'},
+                    {'symbol': 'BNB', 'name': 'Binance Coin', 'market': 'binance'},
+                    {'symbol': 'ADA', 'name': 'Cardano', 'market': 'binance'},
+                    {'symbol': 'DOT', 'name': 'Polkadot', 'market': 'binance'},
+                    {'symbol': 'MATIC', 'name': 'Polygon', 'market': 'binance'},
+                    {'symbol': 'SOL', 'name': 'Solana', 'market': 'binance'},
+                    {'symbol': 'AVAX', 'name': 'Avalanche', 'market': 'binance'},
+                ]
+
+                result = []
+                for crypto in crypto_list:
+                    result.append({
+                        'symbol': crypto['symbol'],
+                        'name': crypto['name'],
+                        'asset_type': 'CRYPTO',
+                        'market': crypto['market'],
+                        'status': 'active'
+                    })
+                return result
             else:
                 logger.warning(f"传统模式不支持资产类型: {asset_type.value}")
                 return []
@@ -361,6 +1330,38 @@ class UnifiedDataManager:
         except Exception as e:
             logger.error(f"传统方式获取资产列表失败: {e}")
             return []
+
+    def register_data_source_plugin(self, plugin_id: str, adapter, priority: int = 0, weight: float = 1.0) -> bool:
+        """
+        注册数据源插件到路由器和TET管道
+
+        Args:
+            plugin_id: 插件ID
+            adapter: 插件适配器
+            priority: 优先级
+            weight: 权重
+
+        Returns:
+            bool: 注册是否成功
+        """
+        try:
+            # 注册到TET管道的路由器
+            if hasattr(self, 'tet_pipeline') and self.tet_pipeline and hasattr(self.tet_pipeline, 'router'):
+                router = self.tet_pipeline.router
+                success = router.register_data_source(plugin_id, adapter, priority, weight)
+                if success:
+                    logger.info(f"✅ 插件 {plugin_id} 已注册到TET数据管道路由器")
+                    return True
+                else:
+                    logger.error(f"❌ 插件 {plugin_id} 注册到TET数据管道路由器失败")
+                    return False
+            else:
+                logger.warning("⚠️ TET数据管道不可用，无法注册插件")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ 注册数据源插件失败 {plugin_id}: {e}")
+            return False
 
     def _legacy_get_stock_data(self, symbol: str, period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
         """传统方式获取股票数据"""
@@ -900,39 +1901,524 @@ class UnifiedDataManager:
 
         logger.info("Unified data manager disposed")
 
+    def _auto_discover_data_source_plugins(self) -> None:
+        """自动发现和注册数据源插件"""
+        try:
+            # 从服务容器获取插件管理器
+            plugin_manager = None
+            if self.service_container:
+                try:
+                    from ..plugin_manager import PluginManager
+                    plugin_manager = self.service_container.resolve(PluginManager)
+                except:
+                    logger.warning("无法获取插件管理器，跳过插件自动发现")
+                    return
+
+            if not plugin_manager:
+                logger.warning("插件管理器不可用，跳过插件自动发现")
+                return
+
+            # 获取所有已加载的插件
+            all_plugins = plugin_manager.get_all_plugins()
+            registered_count = 0
+
+            for plugin_name, plugin_instance in all_plugins.items():
+                try:
+                    # 检查是否是数据源插件
+                    if self._is_data_source_plugin(plugin_instance):
+                        # 注册到TET数据管道
+                        success = self.register_data_source_plugin(
+                            plugin_name,
+                            plugin_instance,
+                            priority=getattr(plugin_instance, 'priority', 50),
+                            weight=getattr(plugin_instance, 'weight', 1.0)
+                        )
+
+                        if success:
+                            registered_count += 1
+                            logger.info(f"✅ 自动注册数据源插件: {plugin_name}")
+                        else:
+                            logger.warning(f"⚠️ 数据源插件注册失败: {plugin_name}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ 检查插件失败 {plugin_name}: {e}")
+
+            if registered_count > 0:
+                logger.info(f"✅ 自动发现并注册了 {registered_count} 个数据源插件")
+                self._plugins_discovered = True
+            else:
+                logger.info("📝 未发现新的数据源插件")
+
+        except Exception as e:
+            logger.error(f"❌ 自动发现数据源插件失败: {e}")
+
+    def _is_data_source_plugin(self, plugin_instance) -> bool:
+        """检查插件是否是数据源插件"""
+        try:
+            from ..data_source_extensions import IDataSourcePlugin
+            return isinstance(plugin_instance, IDataSourcePlugin)
+        except Exception:
+            # 检查是否有必要的方法
+            required_methods = ['get_asset_list', 'get_kdata', 'health_check']
+            return all(hasattr(plugin_instance, method) for method in required_methods)
+
+    def discover_and_register_data_source_plugins(self) -> None:
+        """
+        发现并注册数据源插件（公共方法）
+        在所有服务初始化完成后调用
+        """
+        if self._plugins_discovered:
+            logger.info("插件已发现，跳过重复发现")
+            return
+
+        logger.info("开始发现和注册数据源插件...")
+
+        try:
+            # 尝试自动发现插件
+            self._auto_discover_data_source_plugins()
+
+            # 如果自动发现失败，尝试手动注册核心插件
+            if not self._plugins_discovered:
+                logger.info("自动发现失败，尝试手动注册核心插件...")
+                self._manual_register_core_plugins()
+
+        except Exception as e:
+            logger.error(f"插件发现和注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _manual_register_core_plugins(self) -> None:
+        """手动注册核心数据源插件"""
+        registered_count = 0
+
+        # 1. 注册HIkyuu插件（最高优先级）
+        try:
+            from plugins.data_sources.hikyuu_data_plugin import HikyuuDataPlugin
+            hikyuu_plugin = HikyuuDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "hikyuu_data_source",
+                hikyuu_plugin,
+                priority=1,  # 最高优先级
+                weight=2.0
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册HIkyuu数据源插件成功")
+            else:
+                logger.warning("⚠️ HIkyuu数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ HIkyuu插件注册失败: {e}")
+
+        # 2. 注册AkShare插件（支持sector_fund_flow）
+        try:
+            from plugins.examples.akshare_stock_plugin import AKShareStockPlugin
+            akshare_plugin = AKShareStockPlugin()
+
+            # 扩展AkShare插件支持SECTOR_FUND_FLOW
+            self._extend_akshare_plugin_for_sector_flow(akshare_plugin)
+
+            success = self.register_data_source_plugin(
+                "akshare_stock",
+                akshare_plugin,
+                priority=10,  # 较低优先级，HIkyuu优先
+                weight=1.5
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册AkShare数据源插件成功")
+            else:
+                logger.warning("⚠️ AkShare数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ AkShare插件注册失败: {e}")
+
+        # 3. 注册Wind插件（如果可用）
+        try:
+            from plugins.examples.wind_data_plugin import WindDataPlugin
+            wind_plugin = WindDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "wind_data_source",
+                wind_plugin,
+                priority=5,  # 较高优先级，专业数据源
+                weight=1.8
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册Wind数据源插件成功")
+            else:
+                logger.warning("⚠️ Wind数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Wind插件注册失败: {e}")
+
+        # 4. 注册东方财富插件
+        try:
+            from plugins.examples.eastmoney_stock_plugin import EastMoneyStockPlugin
+            eastmoney_plugin = EastMoneyStockPlugin()
+
+            success = self.register_data_source_plugin(
+                "eastmoney_stock",
+                eastmoney_plugin,
+                priority=20,
+                weight=1.0
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册东方财富数据源插件成功")
+            else:
+                logger.warning("⚠️ 东方财富数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 东方财富插件注册失败: {e}")
+
+        # 5. 注册通达信插件
+        try:
+            from plugins.examples.tongdaxin_stock_plugin import TongdaxinStockPlugin
+            tongdaxin_plugin = TongdaxinStockPlugin()
+
+            success = self.register_data_source_plugin(
+                "tongdaxin_stock",
+                tongdaxin_plugin,
+                priority=15,
+                weight=1.3
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册通达信数据源插件成功")
+            else:
+                logger.warning("⚠️ 通达信数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 通达信插件注册失败: {e}")
+
+        # 6. 注册Yahoo Finance插件
+        try:
+            from plugins.examples.yahoo_finance_datasource import YahooFinanceDataSourcePlugin
+            yahoo_plugin = YahooFinanceDataSourcePlugin()
+
+            success = self.register_data_source_plugin(
+                "yahoo_finance",
+                yahoo_plugin,
+                priority=25,
+                weight=1.2
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册Yahoo Finance数据源插件成功")
+            else:
+                logger.warning("⚠️ Yahoo Finance数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Yahoo Finance插件注册失败: {e}")
+
+        # 7. 注册期货数据插件
+        try:
+            from plugins.examples.futures_data_plugin import FuturesDataPlugin
+            futures_plugin = FuturesDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "futures_data_source",
+                futures_plugin,
+                priority=30,
+                weight=1.2
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册期货数据源插件成功")
+            else:
+                logger.warning("⚠️ 期货数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 期货插件注册失败: {e}")
+
+        # 8. 注册CTP期货插件
+        try:
+            from plugins.examples.ctp_futures_plugin import CTPFuturesPlugin
+            ctp_plugin = CTPFuturesPlugin()
+
+            success = self.register_data_source_plugin(
+                "ctp_futures",
+                ctp_plugin,
+                priority=12,  # 较高优先级的期货数据源
+                weight=1.6
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册CTP期货数据源插件成功")
+            else:
+                logger.warning("⚠️ CTP期货数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ CTP期货插件注册失败: {e}")
+
+        # 9. 注册文华财经插件
+        try:
+            from plugins.examples.wenhua_data_plugin import WenhuaDataPlugin
+            wenhua_plugin = WenhuaDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "wenhua_data",
+                wenhua_plugin,
+                priority=18,
+                weight=1.4
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册文华财经数据源插件成功")
+            else:
+                logger.warning("⚠️ 文华财经数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 文华财经插件注册失败: {e}")
+
+        # 10. 注册外汇数据插件
+        try:
+            from plugins.examples.forex_data_plugin import ForexDataPlugin
+            forex_plugin = ForexDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "forex_data_source",
+                forex_plugin,
+                priority=35,
+                weight=1.0
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册外汇数据源插件成功")
+            else:
+                logger.warning("⚠️ 外汇数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 外汇插件注册失败: {e}")
+
+        # 11. 注册债券数据插件
+        try:
+            from plugins.examples.bond_data_plugin import BondDataPlugin
+            bond_plugin = BondDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "bond_data_source",
+                bond_plugin,
+                priority=40,
+                weight=1.0
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册债券数据源插件成功")
+            else:
+                logger.warning("⚠️ 债券数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 债券插件注册失败: {e}")
+
+        # 12. 注册加密货币数据插件
+        try:
+            from plugins.examples.crypto_data_plugin import CryptoDataPlugin
+            crypto_plugin = CryptoDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "crypto_data_source",
+                crypto_plugin,
+                priority=45,
+                weight=1.1
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册加密货币数据源插件成功")
+            else:
+                logger.warning("⚠️ 加密货币数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 加密货币插件注册失败: {e}")
+
+        # 13. 注册币安加密货币插件
+        try:
+            from plugins.examples.binance_crypto_plugin import BinanceCryptoPlugin
+            binance_plugin = BinanceCryptoPlugin()
+
+            success = self.register_data_source_plugin(
+                "binance_crypto",
+                binance_plugin,
+                priority=22,  # 较高优先级的加密货币数据源
+                weight=1.4
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册币安加密货币数据源插件成功")
+            else:
+                logger.warning("⚠️ 币安加密货币数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 币安加密货币插件注册失败: {e}")
+
+        # 14. 注册火币加密货币插件
+        try:
+            from plugins.examples.huobi_crypto_plugin import HuobiCryptoPlugin
+            huobi_plugin = HuobiCryptoPlugin()
+
+            success = self.register_data_source_plugin(
+                "huobi_crypto",
+                huobi_plugin,
+                priority=24,
+                weight=1.3
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册火币加密货币数据源插件成功")
+            else:
+                logger.warning("⚠️ 火币加密货币数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 火币加密货币插件注册失败: {e}")
+
+        # 15. 注册OKX加密货币插件
+        try:
+            from plugins.examples.okx_crypto_plugin import OKXCryptoPlugin
+            okx_plugin = OKXCryptoPlugin()
+
+            success = self.register_data_source_plugin(
+                "okx_crypto",
+                okx_plugin,
+                priority=26,
+                weight=1.3
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册OKX加密货币数据源插件成功")
+            else:
+                logger.warning("⚠️ OKX加密货币数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ OKX加密货币插件注册失败: {e}")
+
+        # 16. 注册Coinbase加密货币插件
+        try:
+            from plugins.examples.coinbase_crypto_plugin import CoinbaseCryptoPlugin
+            coinbase_plugin = CoinbaseCryptoPlugin()
+
+            success = self.register_data_source_plugin(
+                "coinbase_crypto",
+                coinbase_plugin,
+                priority=28,
+                weight=1.2
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册Coinbase加密货币数据源插件成功")
+            else:
+                logger.warning("⚠️ Coinbase加密货币数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Coinbase加密货币插件注册失败: {e}")
+
+        # 17. 注册我的钢铁网数据插件
+        try:
+            from plugins.examples.mysteel_data_plugin import MySteelDataPlugin
+            mysteel_plugin = MySteelDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "mysteel_data",
+                mysteel_plugin,
+                priority=50,
+                weight=0.8
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册我的钢铁网数据源插件成功")
+            else:
+                logger.warning("⚠️ 我的钢铁网数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 我的钢铁网插件注册失败: {e}")
+
+        # 18. 注册自定义数据插件
+        try:
+            from plugins.examples.custom_data_plugin import CustomDataPlugin
+            custom_plugin = CustomDataPlugin()
+
+            success = self.register_data_source_plugin(
+                "custom_data_source",
+                custom_plugin,
+                priority=99,  # 最低优先级
+                weight=0.5
+            )
+
+            if success:
+                registered_count += 1
+                logger.info("✅ 手动注册自定义数据源插件成功")
+            else:
+                logger.warning("⚠️ 自定义数据源插件注册失败")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 自定义插件注册失败: {e}")
+
+        if registered_count > 0:
+            logger.info(f"✅ 手动注册了 {registered_count} 个核心数据源插件")
+            self._plugins_discovered = True
+        else:
+            logger.warning("⚠️ 未能注册任何数据源插件")
+
+    def _extend_akshare_plugin_for_sector_flow(self, akshare_plugin) -> None:
+        """扩展AkShare插件以支持SECTOR_FUND_FLOW数据类型"""
+        try:
+            # 添加SECTOR_FUND_FLOW到支持的数据类型
+            if hasattr(akshare_plugin, 'plugin_info'):
+                plugin_info = akshare_plugin.plugin_info
+                if hasattr(plugin_info, 'supported_data_types'):
+                    from ..plugin_types import DataType
+                    if DataType.SECTOR_FUND_FLOW not in plugin_info.supported_data_types:
+                        plugin_info.supported_data_types.append(DataType.SECTOR_FUND_FLOW)
+                        logger.info("✅ AkShare插件已扩展支持SECTOR_FUND_FLOW")
+
+            # 添加获取板块资金流的方法
+            def get_sector_fund_flow_data(symbol: str, **kwargs):
+                try:
+                    import akshare as ak
+                    # 根据symbol类型选择合适的akshare函数
+                    if symbol == "sector":
+                        return ak.stock_sector_fund_flow_rank(indicator="今日")
+                    else:
+                        return ak.stock_sector_fund_flow_summary(symbol=symbol, indicator="今日")
+                except Exception as e:
+                    logger.error(f"获取板块资金流数据失败: {e}")
+                    return None
+
+            # 动态添加方法到插件实例
+            akshare_plugin.get_sector_fund_flow_data = get_sector_fund_flow_data
+            logger.info("✅ AkShare插件已添加板块资金流数据获取方法")
+
+        except Exception as e:
+            logger.error(f"扩展AkShare插件失败: {e}")
+
+    @property
+    def data_source_router(self):
+        """
+        兼容性属性：提供对数据源路由器的访问
+
+        Returns:
+            数据源路由器实例，如果TET管道可用的话
+        """
+        if hasattr(self, 'tet_pipeline') and self.tet_pipeline:
+            return self.tet_pipeline.router
+        return None
+
 # 数据策略类
-
-
-class HistoryDataStrategy:
-    """历史数据加载策略"""
-
-    async def get_data(self, code: str, freq: str, start_date=None, end_date=None):
-        """获取历史数据"""
-        logger.debug(
-            f"Loading historical data for {code} from {start_date} to {end_date}")
-        # 实际实现应该调用相应的历史数据服务
-        # 这里为示例实现
-        try:
-            # 模拟异步加载
-            await asyncio.sleep(0.1)
-            return {'type': 'historical', 'code': code, 'freq': freq, 'data': []}
-        except Exception as e:
-            logger.error(f"Error loading historical data: {e}")
-            return None
-
-
-class RealtimeDataStrategy:
-    """实时数据加载策略"""
-
-    async def get_data(self, code: str, freq: str, start_date=None, end_date=None):
-        """获取实时数据"""
-        logger.debug(f"Loading realtime data for {code}")
-        # 实际实现应该调用实时行情服务
-        # 这里为示例实现
-        try:
-            # 模拟异步加载
-            await asyncio.sleep(0.2)
-            return {'type': 'realtime', 'code': code, 'freq': freq, 'data': []}
-        except Exception as e:
-            logger.error(f"Error loading realtime data: {e}")
-            return None

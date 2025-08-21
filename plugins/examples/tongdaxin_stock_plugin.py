@@ -115,7 +115,14 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
         # 当前使用的服务器
         self.current_server = self.server_list[0]
 
-    def get_plugin_info(self) -> PluginInfo:
+        # 连接状态属性
+        self.connection_time = None
+        self.last_activity = None
+        self.last_error = None
+        self.config = {}
+
+    @property
+    def plugin_info(self) -> PluginInfo:
         """获取插件信息"""
         return PluginInfo(
             id="tongdaxin_stock_plugin",
@@ -129,8 +136,157 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 DataType.REAL_TIME_QUOTE,
                 DataType.FUNDAMENTAL,
                 DataType.TRADE_TICK
-            ]
+            ],
+            capabilities={
+                "markets": ["SH", "SZ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True
+            }
         )
+
+    def get_plugin_info(self) -> PluginInfo:
+        """获取插件信息（方法形式）"""
+        return self.plugin_info
+
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
+        try:
+            with self.connection_lock:
+                if not PYTDX_AVAILABLE:
+                    self.last_error = "pytdx库未安装"
+                    return False
+
+                if not self.api_client:
+                    self.api_client = TdxHq_API()
+
+                # 尝试连接
+                if self._ensure_connection():
+                    self.last_success_time = datetime.now()
+                    return True
+                else:
+                    return False
+        except Exception as e:
+            self.last_error = str(e)
+            self.logger.error(f"连接失败: {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """断开连接"""
+        try:
+            with self.connection_lock:
+                if self.api_client:
+                    try:
+                        self.api_client.disconnect()
+                    except:
+                        pass  # 忽略断开连接时的错误
+                    self.api_client = None
+                return True
+        except Exception as e:
+            self.logger.error(f"断开连接失败: {e}")
+            return False
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        try:
+            with self.connection_lock:
+                if not self.api_client:
+                    return False
+                # 简单的连接测试
+                return self._test_connection()
+        except:
+            return False
+
+    def get_connection_info(self):
+        """获取连接信息"""
+        from core.data_source_extensions import ConnectionInfo
+        return ConnectionInfo(
+            is_connected=self.is_connected(),
+            connection_time=self.connection_time,
+            last_activity=self.last_activity,
+            connection_params={
+                "server_info": f"{self.current_server[0]}:{self.current_server[1]}" if self.current_server else "未连接",
+                "timeout": self.config.get('timeout', 30)
+            },
+            error_message=self.last_error
+        )
+
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """获取资产列表"""
+        try:
+            if asset_type != AssetType.STOCK:
+                return []
+
+            # 获取股票列表
+            stock_df = self.get_stock_list()
+            if stock_df is None or stock_df.empty:
+                return []
+
+            # 转换为标准格式
+            asset_list = []
+            for _, row in stock_df.iterrows():
+                asset_info = {
+                    "symbol": row.get('code', ''),
+                    "name": row.get('name', ''),
+                    "market": row.get('market', ''),
+                    "asset_type": asset_type.value,
+                    "currency": "CNY",
+                    "exchange": row.get('market', '')
+                }
+                asset_list.append(asset_info)
+
+            return asset_list
+        except Exception as e:
+            self.logger.error(f"获取资产列表失败: {e}")
+            return []
+
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """获取K线数据"""
+        try:
+            # 转换频率参数
+            period_map = {
+                "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
+                "60m": "1hour", "D": "daily", "W": "weekly", "M": "monthly"
+            }
+            period = period_map.get(freq, "daily")
+
+            # 调用现有的get_kline_data方法
+            return self.get_kline_data(
+                symbol=symbol,
+                period=period,
+                start_date=start_date,
+                end_date=end_date,
+                count=count
+            )
+        except Exception as e:
+            self.logger.error(f"获取K线数据失败: {e}")
+            return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
+        """获取实时行情"""
+        try:
+            # 调用现有的get_real_time_data方法
+            real_time_data = self.get_real_time_data(symbols)
+
+            # 转换为标准格式
+            quotes = []
+            for symbol, data in real_time_data.items():
+                if data and isinstance(data, dict):
+                    quote = {
+                        "symbol": symbol,
+                        "price": data.get('price', 0.0),
+                        "change": data.get('change', 0.0),
+                        "change_percent": data.get('change_percent', 0.0),
+                        "volume": data.get('volume', 0),
+                        "timestamp": data.get('timestamp', datetime.now().isoformat())
+                    }
+                    quotes.append(quote)
+
+            return quotes
+        except Exception as e:
+            self.logger.error(f"获取实时行情失败: {e}")
+            return []
 
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
@@ -297,8 +453,8 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             if not self.initialized:
                 return HealthCheckResult(
                     is_healthy=False,
-                    response_time_ms=0.0,
-                    error_message="插件未初始化"
+                    message="插件未初始化",
+                    response_time_ms=0.0
                 )
 
             # 测试连接
@@ -307,9 +463,9 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 self.last_success_time = datetime.now()
                 return HealthCheckResult(
                     is_healthy=True,
+                    message="连接正常",
                     response_time_ms=response_time,
-                    error_message=None,
-                    additional_info={
+                    extra_info={
                         'server': f"{self.current_server[0]}:{self.current_server[1]}",
                         'request_count': self.request_count
                     }
@@ -318,9 +474,9 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
                 response_time = (time.time() - start_time) * 1000
                 return HealthCheckResult(
                     is_healthy=False,
+                    message="无法连接到通达信服务器",
                     response_time_ms=response_time,
-                    error_message="无法连接到通达信服务器",
-                    additional_info={
+                    extra_info={
                         'server': f"{self.current_server[0]}:{self.current_server[1]}",
                         'last_success': self.last_success_time.isoformat() if self.last_success_time else None
                     }
@@ -334,7 +490,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             return HealthCheckResult(
                 is_healthy=False,
                 response_time_ms=response_time,
-                error_message=error_msg
+                message=error_msg
             )
 
     def _convert_symbol_to_tdx_format(self, symbol: str) -> tuple:

@@ -5,12 +5,13 @@
 提供统一的接口来访问系统的各种组件
 """
 
+from core.performance import get_performance_monitor
 import logging
 from typing import Dict, Any, Optional
 from .logger import LogManager
 from .config import ConfigManager
 from .data_validator import ProfessionalDataValidator, ValidationLevel
-from .performance_monitor import get_performance_monitor
+# from .performance_monitor import get_performance_monitor  # 已迁移到统一模块
 from utils import ConfigManager as UtilsConfigManager
 
 # 全局实例
@@ -158,7 +159,7 @@ def get_data_validator() -> DataValidator:
     return _data_validator
 
 
-# 重新导出性能监控器
+# 重新导出性能监控器（使用统一模块）
 
 __all__ = [
     'get_logger',

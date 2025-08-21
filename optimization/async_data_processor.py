@@ -16,7 +16,7 @@ import pandas as pd
 from enum import Enum
 import psutil
 from utils.trace_context import get_trace_id, set_trace_id
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 
 logger = logging.getLogger(__name__)
 

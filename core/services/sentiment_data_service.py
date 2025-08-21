@@ -37,7 +37,7 @@ class SentimentDataServiceConfig:
     cache_duration_minutes: int = 5  # 缓存持续时间（分钟）
     auto_refresh_interval_minutes: int = 10  # 自动刷新间隔（分钟）
     max_concurrent_fetches: int = 3  # 最大并发获取数量
-    plugin_timeout_seconds: int = 30  # 插件超时时间（秒）
+    plugin_timeout_seconds: int = 15  # 插件超时时间（秒）- 减少超时时间，避免长时间阻塞
     min_data_quality_threshold: str = 'fair'  # 最低数据质量要求
     enable_fallback: bool = True  # 启用回退机制
     enable_auto_refresh: bool = True  # 启用自动刷新
@@ -472,6 +472,31 @@ class SentimentDataService(QObject):
                 update_time=datetime.now()
             )
 
+    def get_sentiment_data_async(self, force_refresh: bool = False, callback=None):
+        """异步获取情绪数据 - 避免阻塞主线程"""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def async_fetch():
+            try:
+                result = self.get_sentiment_data(force_refresh)
+                if callback:
+                    callback(result)
+                return result
+            except Exception as e:
+                error_result = SentimentResponse(
+                    success=False,
+                    error_message=f"异步获取情绪数据失败: {str(e)}",
+                    update_time=datetime.now()
+                )
+                if callback:
+                    callback(error_result)
+                return error_result
+
+        # 使用线程池执行异步任务
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(async_fetch)
+        return future
+
     def get_available_plugins(self) -> List[str]:
         """获取已注册的插件列表"""
         return list(self._registered_plugins.keys())
@@ -878,21 +903,36 @@ class SentimentDataService(QObject):
             future = self._executor.submit(self._fetch_from_plugin, plugin_name, plugin)
             future_to_plugin[future] = plugin_name
 
-        # 收集结果
-        for future in as_completed(future_to_plugin, timeout=self.config.plugin_timeout_seconds):
-            plugin_name = future_to_plugin[future]
-            try:
-                response = future.result()
-                plugin_responses[plugin_name] = response
+        # 收集结果 - 改进超时处理，避免阻塞主线程
+        completed_futures = set()
+        try:
+            for future in as_completed(future_to_plugin, timeout=self.config.plugin_timeout_seconds):
+                completed_futures.add(future)
+                plugin_name = future_to_plugin[future]
+                try:
+                    response = future.result()
+                    plugin_responses[plugin_name] = response
 
-                if response.success:
-                    self.log_manager.info(f"✅ 从插件 {plugin_name} 获取数据成功")
-                else:
-                    self.log_manager.warning(f"⚠️ 插件 {plugin_name} 返回错误: {response.error_message}")
+                    if response.success:
+                        self.log_manager.info(f"✅ 从插件 {plugin_name} 获取数据成功")
+                    else:
+                        self.log_manager.warning(f"⚠️ 插件 {plugin_name} 返回错误: {response.error_message}")
 
-            except Exception as e:
-                self.log_manager.error(f"❌ 从插件 {plugin_name} 获取数据失败: {e}")
-                self.plugin_error.emit(plugin_name, str(e))
+                except Exception as e:
+                    self.log_manager.error(f"❌ 从插件 {plugin_name} 获取数据失败: {e}")
+                    self.plugin_error.emit(plugin_name, str(e))
+
+        except TimeoutError as e:
+            # 处理超时的future，避免完全阻塞
+            unfinished_futures = set(future_to_plugin.keys()) - completed_futures
+            self.log_manager.warning(f"⚠️ {len(unfinished_futures)} 个插件超时，继续处理已完成的插件")
+
+            # 取消未完成的future
+            for future in unfinished_futures:
+                plugin_name = future_to_plugin[future]
+                self.log_manager.warning(f"⚠️ 插件 {plugin_name} 执行超时，已取消")
+                future.cancel()  # 尝试取消未完成的任务
+                self.plugin_error.emit(plugin_name, "插件执行超时")
 
         return plugin_responses
 

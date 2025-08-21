@@ -130,7 +130,7 @@ def calculate_performance_metrics(trades=None, equity_curve=None, returns_df=Non
 
     try:
         # 使用统一的性能指标计算模块
-        from backtest.performance_metrics import calculate_performance_metrics as calc_full_metrics
+        # 性能指标计算已整合到 core.performance 模块中
 
         if returns_df is not None:
             log_manager.info("使用统一模块计算性能指标（DataFrame输入）")

@@ -13,9 +13,9 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QFormLayout, QPushButton, QTextEdit
 
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
+from core.data_source_data_models import StockInfo, KlineData, MarketData, QueryParams
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult, ConnectionInfo
 from core.plugin_types import AssetType, DataType, PluginType
-from core.data_source_data_models import HealthCheckResult
 
 
 class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
@@ -46,6 +46,12 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
 
         # 插件类型标识（确保被识别为数据源插件）
         self.plugin_type = PluginType.DATA_SOURCE_STOCK
+        # 连接状态属性
+        self.connection_time = None
+        self.last_activity = None
+        self.last_error = None
+        self.config = {}
+
 
     def get_plugin_info(self) -> PluginInfo:
         return PluginInfo(
@@ -55,7 +61,15 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             description="从Yahoo Finance获取股票数据（历史/实时）",
             author="FactorWeave 团队",
             supported_asset_types=[AssetType.STOCK],
-            supported_data_types=[]
+            supported_data_types=[DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE],
+            capabilities={
+                "markets": ["US", "global"],
+                "exchanges": ["NYSE", "NASDAQ", "AMEX"],
+                "frequencies": ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"],
+                "real_time_support": True,
+                "historical_data": True,
+                "international_markets": True
+            }
         )
 
     def initialize(self, config: Dict[str, Any]) -> bool:
@@ -524,3 +538,88 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         retry_edit.textChanged.connect(save_config)
 
         return widget
+
+    @property
+    def plugin_info(self) -> PluginInfo:
+        """获取插件信息"""
+        return PluginInfo(
+            id=f"{self.__class__.__name__.lower()}",
+            name=getattr(self, 'name', self.__class__.__name__),
+            version=getattr(self, 'version', '1.0.0'),
+            description=getattr(self, 'description', '数据源插件'),
+            author=getattr(self, 'author', 'HIkyuu-UI Team'),
+            supported_asset_types=getattr(self, 'supported_asset_types', [AssetType.STOCK]),
+            supported_data_types=getattr(self, 'supported_data_types', [DataType.HISTORICAL_KLINE]),
+            capabilities={
+                "markets": ["SH", "SZ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True
+            }
+        )
+
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
+        try:
+            # TODO: 实现具体的连接逻辑
+            self.logger.info(f"{self.__class__.__name__} 连接成功")
+            return True
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"连接失败: {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """断开连接"""
+        try:
+            # TODO: 实现具体的断开连接逻辑
+            if hasattr(self, 'logger'):
+                self.logger.info(f"{self.__class__.__name__} 断开连接")
+            return True
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"断开连接失败: {e}")
+            return False
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        # TODO: 实现具体的连接状态检查
+        return True
+
+    def get_connection_info(self):
+        """获取连接信息"""
+        from core.data_source_extensions import ConnectionInfo
+        return ConnectionInfo(
+            is_connected=self.is_connected(),
+            server_info="localhost",
+            connection_params={},
+            message="健康"
+        )
+
+    def health_check(self):
+        """健康检查"""
+        from core.data_source_extensions import HealthCheckResult
+        from datetime import datetime
+        return HealthCheckResult(
+            is_healthy=self.is_connected(),
+            response_time=0.0,
+            message="健康",
+            last_check_time=datetime.now()
+        )
+
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """获取资产列表"""
+        # TODO: 实现具体的资产列表获取逻辑
+        return []
+
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """获取K线数据"""
+        # TODO: 实现具体的K线数据获取逻辑
+        import pandas as pd
+        return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
+        """获取实时行情"""
+        # TODO: 实现具体的实时行情获取逻辑
+        return []

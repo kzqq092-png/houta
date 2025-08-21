@@ -15,11 +15,12 @@ from typing import List, Dict, Any
 import uvicorn
 from ai_stock_selector import AIStockSelector
 import pandas as pd
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess
 
 # 假设有全局data_manager实例
-data_manager = DataManager()
+from core.services.unified_data_manager import get_unified_data_manager
+data_manager = get_unified_data_manager()
 
 app = FastAPI(title="HIkyuu量化交易API", version="1.0.0")
 

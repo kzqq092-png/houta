@@ -1,5 +1,7 @@
 """
-交易控件模块
+交易控件模块 - 重构版本
+
+使用服务容器获取交易服务，符合插件架构原则
 """
 from typing import Dict, Any, List, Optional
 from PyQt5.QtWidgets import *
@@ -10,17 +12,15 @@ import time
 from datetime import datetime
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 import threading
-from core.trading_system import TradingSystem
 import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 
-
 from core.logger import LogManager
 from utils.theme import get_theme_manager
-from core.trading_system import trading_system
 from utils.config_manager import ConfigManager
 from utils.log_util import log_structured
+from core.containers import get_service_container
 
 
 class AnalysisStep:
@@ -82,7 +82,7 @@ class AnalysisProcessManager:
 
 
 class TradingWidget(QWidget):
-    """交易控件类"""
+    """交易控件类 - 重构版本"""
 
     # 定义信号
     strategy_changed = pyqtSignal(str)  # 策略变更信号
@@ -98,14 +98,24 @@ class TradingWidget(QWidget):
         """
         super().__init__()
 
-        try:
-            # 初始化变量
-            self.current_stock = None
-            self.current_signals = []
-            self.current_positions = []
+        # 服务依赖
+        self.service_container = get_service_container()
+        self._trading_service = None
+        self._trading_controller = None
+        self._unified_data_manager = None
 
-            # 初始化日志管理器
-            self.log_manager = LogManager()
+        # 初始化基本属性
+        self.current_stock = None
+        self.current_signals = []
+        self.current_positions = []
+        self.log_manager = LogManager()
+        self.config_manager = config_manager or ConfigManager()
+        self.theme_manager = get_theme_manager(self.config_manager)
+        self.process_manager = AnalysisProcessManager()
+
+        try:
+            # 初始化服务
+            self._initialize_services()
 
             # 初始化UI
             self.init_ui()
@@ -113,21 +123,43 @@ class TradingWidget(QWidget):
             # 连接信号
             self.connect_signals()
 
-            # 应用主题
-            self.config_manager = config_manager or ConfigManager()
-            self.theme_manager = get_theme_manager(self.config_manager)
-
-            log_structured(self.log_manager, "trading_widget_init",
-                           level="info", status="success")
-
-            self.process_manager = AnalysisProcessManager()
+            log_structured(self.log_manager, "trading_widget_init", level="info", status="success")
 
         except Exception as e:
             error_msg = f"初始化交易控件失败: {str(e)}"
             log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            log_structured(self.log_manager, traceback.format_exc(), level="error")
             self.error_occurred.emit(error_msg)
+
+    def _initialize_services(self):
+        """初始化服务依赖"""
+        try:
+            # 初始化交易服务
+            from core.services.trading_service import TradingService
+            self._trading_service = self.service_container.resolve(TradingService)
+            if self._trading_service:
+                log_structured(self.log_manager, "交易服务初始化成功", level="info")
+            else:
+                log_structured(self.log_manager, "交易服务初始化失败", level="warning")
+
+            # 初始化交易控制器
+            from core.trading_controller import TradingController
+            self._trading_controller = self.service_container.resolve(TradingController)
+            if self._trading_controller:
+                log_structured(self.log_manager, "交易控制器初始化成功", level="info")
+            else:
+                log_structured(self.log_manager, "交易控制器初始化失败", level="warning")
+
+            # 初始化统一数据管理器
+            from core.services.unified_data_manager import UnifiedDataManager
+            self._unified_data_manager = self.service_container.resolve(UnifiedDataManager)
+            if self._unified_data_manager:
+                log_structured(self.log_manager, "统一数据管理器初始化成功", level="info")
+            else:
+                log_structured(self.log_manager, "统一数据管理器初始化失败", level="warning")
+
+        except Exception as e:
+            log_structured(self.log_manager, f"服务初始化失败: {e}", level="error")
 
     def init_ui(self):
         """初始化UI"""
@@ -981,8 +1013,15 @@ class TradingWidget(QWidget):
 
             self.log_manager.info(f"开始计算信号，策略: {strategy_name}")
 
-            # 调用核心交易系统计算信号
-            signals = trading_system.calculate_signals(strategy=strategy_name)
+            # 使用交易服务计算信号
+            if self._trading_service and hasattr(self._trading_service, 'calculate_signals'):
+                signals = self._trading_service.calculate_signals(
+                    stock_code=self.current_stock.strip(),
+                    kdata=kdata,
+                    strategy=strategy_name
+                )
+            else:
+                signals = []
 
             if signals is None:
                 self.log_manager.error(f"策略 {strategy_name} 未能生成信号。")
@@ -1547,9 +1586,17 @@ class TradingWidget(QWidget):
                 import dask
 
                 def single_task(code, strategy, params):
-                    ts = TradingSystem()
-                    ts.set_stock(code)
-                    ts.load_kdata()
+                    # 使用服务容器获取交易服务
+                    from core.containers import get_service_container
+                    from core.services.trading_service import TradingService
+                    service_container = get_service_container()
+                    ts = service_container.resolve(TradingService)
+                    if not ts:
+                        return None
+                    if ts and hasattr(ts, 'set_current_stock'):
+                        ts.set_current_stock(code)
+                    if ts and hasattr(ts, 'get_kdata'):
+                        kdata = ts.get_kdata(code)
                     p = dict(params)
                     p['strategy'] = strategy
                     res = ts.run_backtest(p)
@@ -1573,9 +1620,17 @@ class TradingWidget(QWidget):
 
                 @ray.remote
                 def single_task(code, strategy, params):
-                    ts = TradingSystem()
-                    ts.set_stock(code)
-                    ts.load_kdata()
+                    # 使用服务容器获取交易服务
+                    from core.containers import get_service_container
+                    from core.services.trading_service import TradingService
+                    service_container = get_service_container()
+                    ts = service_container.resolve(TradingService)
+                    if not ts:
+                        return None
+                    if ts and hasattr(ts, 'set_current_stock'):
+                        ts.set_current_stock(code)
+                    if ts and hasattr(ts, 'get_kdata'):
+                        kdata = ts.get_kdata(code)
                     p = dict(params)
                     p['strategy'] = strategy
                     res = ts.run_backtest(p)
@@ -1596,9 +1651,17 @@ class TradingWidget(QWidget):
                 # 需预先配置celery worker和broker
 
                 def single_task(code, strategy, params):
-                    ts = TradingSystem()
-                    ts.set_stock(code)
-                    ts.load_kdata()
+                    # 使用服务容器获取交易服务
+                    from core.containers import get_service_container
+                    from core.services.trading_service import TradingService
+                    service_container = get_service_container()
+                    ts = service_container.resolve(TradingService)
+                    if not ts:
+                        return None
+                    if ts and hasattr(ts, 'set_current_stock'):
+                        ts.set_current_stock(code)
+                    if ts and hasattr(ts, 'get_kdata'):
+                        kdata = ts.get_kdata(code)
                     p = dict(params)
                     p['strategy'] = strategy
                     res = ts.run_backtest(p)
@@ -1621,9 +1684,18 @@ class TradingWidget(QWidget):
                     for strategy in strategy_list:
                         for params in param_grid:
                             try:
-                                ts = TradingSystem()
-                                ts.set_stock(code)
-                                ts.load_kdata()
+                                # 使用服务容器获取交易服务
+                                from core.containers import get_service_container
+                                from core.services.trading_service import TradingService
+                                service_container = get_service_container()
+                                ts = service_container.resolve(TradingService)
+                                if not ts:
+                                    continue
+
+                                if ts and hasattr(ts, 'set_current_stock'):
+                                    ts.set_current_stock(code)
+                                if ts and hasattr(ts, 'get_kdata'):
+                                    kdata = ts.get_kdata(code)
                                 p = dict(params)
                                 p['strategy'] = strategy
                                 res = ts.run_backtest(p)

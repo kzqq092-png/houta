@@ -374,6 +374,143 @@ class PluginManager(QObject):
         except Exception as e:
             self.log_manager.error(f"插件管理器初始化失败: {e}")
 
+    def discover_and_register_plugins(self) -> None:
+        """
+        发现并注册所有插件
+        在服务引导完成后调用，确保所有依赖服务都已可用
+        """
+        try:
+            self.log_manager.info("开始发现和注册插件...")
+
+            # 1. 重新扫描插件目录
+            self._scan_plugin_directory()
+
+            # 2. 加载新发现的插件
+            self._load_discovered_plugins()
+
+            # 3. 注册数据源插件到统一数据管理器
+            self._register_data_source_plugins_to_manager()
+
+            self.log_manager.info(f"✓ 插件发现和注册完成，共管理 {len(self.enhanced_plugins)} 个插件")
+
+        except Exception as e:
+            self.log_manager.error(f"❌ 插件发现和注册失败: {e}")
+            import traceback
+            self.log_manager.error(traceback.format_exc())
+
+    def _scan_plugin_directory(self) -> None:
+        """扫描插件目录，发现新插件"""
+        try:
+            plugin_files = []
+
+            # 扫描插件目录
+            for plugin_path in self.plugin_dir.rglob("*.py"):
+                if plugin_path.name != "__init__.py" and not plugin_path.name.startswith("_"):
+                    plugin_files.append(plugin_path)
+
+            self.log_manager.info(f"发现 {len(plugin_files)} 个潜在插件文件")
+
+        except Exception as e:
+            self.log_manager.error(f"扫描插件目录失败: {e}")
+
+    def _load_discovered_plugins(self) -> None:
+        """加载发现的插件"""
+        try:
+            # 重新加载所有插件
+            self.load_all_plugins()
+
+        except Exception as e:
+            self.log_manager.error(f"加载发现的插件失败: {e}")
+
+    def _register_data_source_plugins_to_manager(self) -> None:
+        """将数据源插件注册到统一数据管理器"""
+        try:
+            if not self.data_manager:
+                self.log_manager.warning("数据管理器不可用，跳过数据源插件注册")
+                return
+
+            registered_count = 0
+
+            # 遍历所有插件，找出数据源插件
+            for plugin_name, plugin_info in self.enhanced_plugins.items():
+                try:
+                    # 从plugin_instances中获取插件实例
+                    plugin_instance = self.plugin_instances.get(plugin_name)
+
+                    if plugin_instance and self._is_data_source_plugin_instance(plugin_instance):
+                        if hasattr(self.data_manager, 'register_data_source_plugin'):
+                            success = self.data_manager.register_data_source_plugin(
+                                plugin_name,
+                                plugin_instance,
+                                priority=getattr(plugin_instance, 'priority', 50),
+                                weight=getattr(plugin_instance, 'weight', 1.0)
+                            )
+
+                            if success:
+                                registered_count += 1
+                                self.log_manager.info(f"✅ 数据源插件注册成功: {plugin_name}")
+                            else:
+                                self.log_manager.warning(f"⚠️ 数据源插件注册失败: {plugin_name}")
+                        else:
+                            self.log_manager.warning(f"⚠️ 数据管理器缺少register_data_source_plugin方法")
+                    else:
+                        if plugin_instance:
+                            self.log_manager.debug(f"插件 {plugin_name} 不是数据源插件")
+                        else:
+                            self.log_manager.debug(f"插件 {plugin_name} 实例不存在")
+
+                except Exception as e:
+                    self.log_manager.warning(f"⚠️ 注册数据源插件失败 {plugin_name}: {e}")
+
+            if registered_count > 0:
+                self.log_manager.info(f"✅ 成功注册了 {registered_count} 个数据源插件到统一数据管理器")
+            else:
+                self.log_manager.info("📝 未发现可注册的数据源插件")
+
+        except Exception as e:
+            self.log_manager.error(f"注册数据源插件到管理器失败: {e}")
+
+    def _is_data_source_plugin(self, plugin_info: PluginInfo) -> bool:
+        """检查插件是否是数据源插件"""
+        try:
+            # 检查插件类型
+            if plugin_info.plugin_type and 'DATA_SOURCE' in str(plugin_info.plugin_type).upper():
+                return True
+
+            # 检查插件实例是否实现了数据源接口
+            if plugin_info.instance:
+                from .data_source_extensions import IDataSourcePlugin
+                if isinstance(plugin_info.instance, IDataSourcePlugin):
+                    return True
+
+                # 检查是否有必要的数据源方法
+                required_methods = ['get_asset_list', 'get_kdata', 'health_check']
+                if all(hasattr(plugin_info.instance, method) for method in required_methods):
+                    return True
+
+        except Exception as e:
+            self.log_manager.warning(f"检查数据源插件时出错: {e}")
+
+        return False
+
+    def _is_data_source_plugin_instance(self, plugin_instance) -> bool:
+        """检查插件实例是否是数据源插件"""
+        try:
+            # 检查插件实例是否实现了数据源接口
+            from .data_source_extensions import IDataSourcePlugin
+            if isinstance(plugin_instance, IDataSourcePlugin):
+                return True
+
+            # 检查是否有必要的数据源方法
+            required_methods = ['get_asset_list', 'get_kdata', 'health_check']
+            if all(hasattr(plugin_instance, method) for method in required_methods):
+                return True
+
+        except Exception as e:
+            self.log_manager.warning(f"检查数据源插件实例时出错: {e}")
+
+        return False
+
     def _load_data_source_configs_from_db(self):
         """从数据库加载数据源配置"""
         try:
@@ -461,31 +598,50 @@ class PluginManager(QObject):
                 # 新增：同时注册到统一数据管理器的路由器
                 try:
                     from .services.unified_data_manager import get_unified_data_manager
-                    from .data_source_extensions import DataSourcePluginAdapter
+                    from .data_source_extensions import DataSourcePluginAdapter, IDataSourcePlugin
 
                     unified_manager = get_unified_data_manager()
                     if unified_manager and hasattr(unified_manager, 'register_data_source_plugin'):
-                        # 创建适配器
-                        adapter = DataSourcePluginAdapter(plugin_info.instance, plugin_info.id)
-
-                        # 注册到统一数据管理器的路由器
-                        success = unified_manager.register_data_source_plugin(
-                            plugin_info.id,
-                            adapter,
-                            priority=0,  # 默认优先级
-                            weight=1.0   # 默认权重
-                        )
-
-                        if success:
-                            self.log_manager.info(f"插件成功注册到统一数据管理器路由器: {plugin_info.id}")
+                        # 严格限制：仅对实现 IDataSourcePlugin 的实例注册到路由器
+                        if not isinstance(plugin_info.instance, IDataSourcePlugin):
+                            logger.debug(f"跳过路由器注册（非IDataSourcePlugin）: {plugin_info.id}")
+                            pass
                         else:
-                            self.log_manager.warning(f"插件注册到统一数据管理器路由器失败: {plugin_info.id}")
-                    else:
-                        self.log_manager.warning("统一数据管理器不可用，跳过路由器注册")
+                            # 创建适配器
+                            adapter = DataSourcePluginAdapter(plugin_info.instance, plugin_info.id)
+
+                            # 关键修复：连接适配器
+                            try:
+                                if adapter.connect():
+                                    logger.info(f"✅ 数据源插件适配器连接成功: {plugin_info.id}")
+                                else:
+                                    logger.warning(f"⚠️ 数据源插件适配器连接失败: {plugin_info.id}")
+                                    # 即使连接失败也继续注册，让路由器处理
+                            except Exception as e:
+                                logger.error(f"❌ 数据源插件适配器连接异常 {plugin_info.id}: {e}")
+                                # 即使连接异常也继续注册，让路由器处理
+
+                            # 使用正确的注册方法：register_data_source_plugin
+                            success = unified_manager.register_data_source_plugin(
+                                plugin_info.id,
+                                adapter,
+                                priority=0,
+                                weight=1.0
+                            )
+
+                            if success:
+                                logger.info(f"✅ 数据源插件注册到统一数据管理器成功: {plugin_info.id}")
+                            else:
+                                logger.warning(f"⚠️ 数据源插件注册到统一数据管理器失败: {plugin_info.id}")
+
+                        # 可观测性：如果实现了接口但未注册成功，明确报警
+                        if isinstance(plugin_info.instance, IDataSourcePlugin) and not success:
+                            logger.error(f"❗ 已实现IDataSourcePlugin但未注册成功: id={plugin_info.id}, class={type(plugin_info.instance).__name__}")
+                        else:
+                            logger.debug(f"统一数据管理器不可用或缺少register_data_source_plugin方法，跳过路由器注册: {plugin_info.id}")
 
                 except Exception as e:
-                    self.log_manager.warning(f"注册到统一数据管理器失败 {plugin_info.id}: {str(e)}")
-                    # 不影响主要加载流程，只是警告
+                    logger.error(f"❌ 注册到统一数据管理器异常 {plugin_info.id}: {e}")
 
                 # 存储到数据源插件字典
                 self.data_source_plugins[plugin_info.id] = plugin_info
@@ -506,7 +662,7 @@ class PluginManager(QObject):
 
     def unload_data_source_plugin(self, plugin_id: str) -> bool:
         """
-        卸载数据源插件
+        卸载数据源插件（支持热插拔）
 
         Args:
             plugin_id: 插件ID
@@ -522,19 +678,59 @@ class PluginManager(QObject):
 
                 plugin_info = self.data_source_plugins[plugin_id]
 
-                # 从数据管理器注销
-                if self.data_manager:
-                    self.data_manager.unregister_plugin_data_source(plugin_id)
+                self.log_manager.info(f"开始卸载数据源插件: {plugin_id}")
 
-                # 从插件字典中移除
+                # 1. 断开插件连接
+                try:
+                    if hasattr(plugin_info.instance, 'disconnect'):
+                        plugin_info.instance.disconnect()
+                        self.log_manager.info(f"插件连接已断开: {plugin_id}")
+                except Exception as e:
+                    self.log_manager.warning(f"断开插件连接失败 {plugin_id}: {str(e)}")
+
+                # 2. 从TET框架注销
+                try:
+                    from .services.unified_data_manager import get_unified_data_manager
+                    unified_manager = get_unified_data_manager()
+                    if unified_manager and hasattr(unified_manager, 'tet_pipeline') and unified_manager.tet_pipeline:
+                        unified_manager.tet_pipeline.unregister_plugin(plugin_id)
+                        self.log_manager.info(f"插件从TET框架注销成功: {plugin_id}")
+                except Exception as e:
+                    self.log_manager.warning(f"从TET框架注销失败 {plugin_id}: {str(e)}")
+
+                # 3. 从统一数据管理器注销
+                try:
+                    if unified_manager and hasattr(unified_manager, 'unregister_data_source_plugin'):
+                        unified_manager.unregister_data_source_plugin(plugin_id)
+                        self.log_manager.info(f"插件从统一数据管理器注销成功: {plugin_id}")
+                except Exception as e:
+                    self.log_manager.warning(f"从统一数据管理器注销失败 {plugin_id}: {str(e)}")
+
+                # 4. 从数据管理器注销
+                if self.data_manager:
+                    try:
+                        self.data_manager.unregister_plugin_data_source(plugin_id)
+                        self.log_manager.info(f"插件从数据管理器注销成功: {plugin_id}")
+                    except Exception as e:
+                        self.log_manager.warning(f"从数据管理器注销失败 {plugin_id}: {str(e)}")
+
+                # 5. 清理插件实例
+                try:
+                    if hasattr(plugin_info.instance, 'cleanup'):
+                        plugin_info.instance.cleanup()
+                        self.log_manager.info(f"插件资源清理完成: {plugin_id}")
+                except Exception as e:
+                    self.log_manager.warning(f"插件资源清理失败 {plugin_id}: {str(e)}")
+
+                # 6. 从插件字典中移除
                 del self.data_source_plugins[plugin_id]
 
-                # 从分类列表中移除
+                # 7. 从分类列表中移除
                 if plugin_info.plugin_type in self.plugins_by_type:
                     if plugin_id in self.plugins_by_type[plugin_info.plugin_type]:
                         self.plugins_by_type[plugin_info.plugin_type].remove(plugin_id)
 
-                # 从其他插件存储中移除
+                # 8. 从其他插件存储中移除
                 if plugin_id in self.loaded_plugins:
                     del self.loaded_plugins[plugin_id]
                 if plugin_id in self.plugin_instances:
@@ -542,11 +738,291 @@ class PluginManager(QObject):
                 if plugin_id in self.enhanced_plugins:
                     del self.enhanced_plugins[plugin_id]
 
-                self.log_manager.info(f"数据源插件卸载成功: {plugin_id}")
+                # 9. 发送插件卸载事件
+                try:
+                    if self.event_bus:
+                        self.event_bus.emit('plugin_unloaded', {
+                            'plugin_id': plugin_id,
+                            'plugin_type': plugin_info.plugin_type.value if hasattr(plugin_info.plugin_type, 'value') else str(plugin_info.plugin_type),
+                            'timestamp': datetime.now().isoformat()
+                        })
+                except Exception as e:
+                    self.log_manager.warning(f"发送插件卸载事件失败 {plugin_id}: {str(e)}")
+
+                self.log_manager.info(f"✅ 数据源插件卸载成功: {plugin_id}")
                 return True
 
         except Exception as e:
-            self.log_manager.error(f"卸载数据源插件失败 {plugin_id}: {str(e)}")
+            self.log_manager.error(f"❌ 卸载数据源插件失败 {plugin_id}: {str(e)}")
+            return False
+
+    def reload_data_source_plugin(self, plugin_id: str) -> bool:
+        """
+        重新加载数据源插件（热重载）
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            bool: 重载是否成功
+        """
+        try:
+            self.log_manager.info(f"开始重新加载数据源插件: {plugin_id}")
+
+            # 保存插件信息
+            if plugin_id not in self.data_source_plugins:
+                self.log_manager.error(f"数据源插件不存在: {plugin_id}")
+                return False
+
+            plugin_info = self.data_source_plugins[plugin_id]
+            plugin_path = getattr(plugin_info, 'path', None)
+
+            # 卸载现有插件
+            if not self.unload_data_source_plugin(plugin_id):
+                self.log_manager.error(f"卸载插件失败: {plugin_id}")
+                return False
+
+            # 重新加载插件
+            if plugin_path:
+                return self.load_data_source_plugin_from_file(plugin_path)
+            else:
+                # 尝试从默认位置重新加载
+                plugin_file = f"plugins/data_sources/{plugin_id}.py"
+                if os.path.exists(plugin_file):
+                    return self.load_data_source_plugin_from_file(plugin_file)
+                else:
+                    self.log_manager.error(f"找不到插件文件: {plugin_id}")
+                    return False
+
+        except Exception as e:
+            self.log_manager.error(f"重新加载数据源插件失败 {plugin_id}: {str(e)}")
+            return False
+
+    def switch_data_source_plugin(self, from_plugin_id: str, to_plugin_id: str) -> bool:
+        """
+        切换数据源插件
+
+        Args:
+            from_plugin_id: 当前插件ID
+            to_plugin_id: 目标插件ID
+
+        Returns:
+            bool: 切换是否成功
+        """
+        try:
+            self.log_manager.info(f"切换数据源插件: {from_plugin_id} -> {to_plugin_id}")
+
+            # 检查目标插件是否存在
+            if to_plugin_id not in self.data_source_plugins:
+                self.log_manager.error(f"目标数据源插件不存在: {to_plugin_id}")
+                return False
+
+            # 获取统一数据管理器
+            try:
+                from .services.unified_data_manager import get_unified_data_manager
+                unified_manager = get_unified_data_manager()
+
+                if not unified_manager:
+                    self.log_manager.error("统一数据管理器不可用")
+                    return False
+
+                # 切换数据源优先级
+                if hasattr(unified_manager, 'set_data_source_priority'):
+                    # 将目标插件设为最高优先级
+                    current_priorities = unified_manager.get_data_source_priorities()
+                    stock_priorities = current_priorities.get('stock', [])
+
+                    # 移除目标插件（如果存在）
+                    if to_plugin_id in stock_priorities:
+                        stock_priorities.remove(to_plugin_id)
+
+                    # 将目标插件设为第一优先级
+                    new_priorities = [to_plugin_id] + stock_priorities
+                    unified_manager.set_data_source_priority('stock', new_priorities)
+
+                    self.log_manager.info(f"数据源优先级已更新: {new_priorities}")
+
+                # 发送切换事件
+                if self.event_bus:
+                    self.event_bus.emit('data_source_switched', {
+                        'from_plugin': from_plugin_id,
+                        'to_plugin': to_plugin_id,
+                        'timestamp': datetime.now().isoformat()
+                    })
+
+                return True
+
+            except Exception as e:
+                self.log_manager.error(f"切换数据源失败: {str(e)}")
+                return False
+
+        except Exception as e:
+            self.log_manager.error(f"切换数据源插件失败: {str(e)}")
+            return False
+
+    def health_check_data_source_plugins(self) -> Dict[str, Dict[str, Any]]:
+        """
+        检查所有数据源插件的健康状态
+
+        Returns:
+            Dict[str, Dict[str, Any]]: 插件健康状态字典
+        """
+        try:
+            health_results = {}
+
+            for plugin_id, plugin_info in self.data_source_plugins.items():
+                try:
+                    if hasattr(plugin_info.instance, 'health_check'):
+                        health_result = plugin_info.instance.health_check()
+                        health_results[plugin_id] = {
+                            'is_healthy': health_result.is_healthy,
+                            'status_code': health_result.status_code,
+                            'message': health_result.message,
+                            'response_time_ms': health_result.response_time_ms,
+                            'last_check_time': health_result.last_check_time.isoformat() if health_result.last_check_time else None,
+                            'details': health_result.details or {}
+                        }
+                    else:
+                        health_results[plugin_id] = {
+                            'is_healthy': False,
+                            'status_code': 501,
+                            'message': '插件不支持健康检查',
+                            'response_time_ms': 0.0,
+                            'last_check_time': datetime.now().isoformat(),
+                            'details': {}
+                        }
+
+                except Exception as e:
+                    health_results[plugin_id] = {
+                        'is_healthy': False,
+                        'status_code': 500,
+                        'message': f'健康检查异常: {str(e)}',
+                        'response_time_ms': 0.0,
+                        'last_check_time': datetime.now().isoformat(),
+                        'details': {'error': str(e)}
+                    }
+
+            return health_results
+
+        except Exception as e:
+            self.log_manager.error(f"检查数据源插件健康状态失败: {str(e)}")
+            return {}
+
+    def get_data_source_plugin_statistics(self) -> Dict[str, Dict[str, Any]]:
+        """
+        获取所有数据源插件的统计信息
+
+        Returns:
+            Dict[str, Dict[str, Any]]: 插件统计信息字典
+        """
+        try:
+            stats_results = {}
+
+            for plugin_id, plugin_info in self.data_source_plugins.items():
+                try:
+                    if hasattr(plugin_info.instance, 'get_statistics'):
+                        stats = plugin_info.instance.get_statistics()
+                        stats_results[plugin_id] = stats
+                    else:
+                        stats_results[plugin_id] = {
+                            'total_requests': 0,
+                            'successful_requests': 0,
+                            'failed_requests': 0,
+                            'average_response_time': 0.0,
+                            'last_request_time': None,
+                            'uptime': 0.0
+                        }
+
+                except Exception as e:
+                    self.log_manager.warning(f"获取插件统计信息失败 {plugin_id}: {str(e)}")
+                    stats_results[plugin_id] = {'error': str(e)}
+
+            return stats_results
+
+        except Exception as e:
+            self.log_manager.error(f"获取数据源插件统计信息失败: {str(e)}")
+            return {}
+
+    def enable_data_source_plugin(self, plugin_id: str) -> bool:
+        """
+        启用数据源插件
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            bool: 启用是否成功
+        """
+        try:
+            if plugin_id not in self.data_source_plugins:
+                self.log_manager.error(f"数据源插件不存在: {plugin_id}")
+                return False
+
+            plugin_info = self.data_source_plugins[plugin_id]
+
+            # 连接插件
+            if hasattr(plugin_info.instance, 'connect'):
+                if plugin_info.instance.connect():
+                    self.log_manager.info(f"数据源插件已启用: {plugin_id}")
+
+                    # 发送启用事件
+                    if self.event_bus:
+                        self.event_bus.emit('plugin_enabled', {
+                            'plugin_id': plugin_id,
+                            'timestamp': datetime.now().isoformat()
+                        })
+
+                    return True
+                else:
+                    self.log_manager.error(f"数据源插件连接失败: {plugin_id}")
+                    return False
+            else:
+                self.log_manager.warning(f"数据源插件不支持连接操作: {plugin_id}")
+                return True  # 认为已启用
+
+        except Exception as e:
+            self.log_manager.error(f"启用数据源插件失败 {plugin_id}: {str(e)}")
+            return False
+
+    def disable_data_source_plugin(self, plugin_id: str) -> bool:
+        """
+        禁用数据源插件
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            bool: 禁用是否成功
+        """
+        try:
+            if plugin_id not in self.data_source_plugins:
+                self.log_manager.error(f"数据源插件不存在: {plugin_id}")
+                return False
+
+            plugin_info = self.data_source_plugins[plugin_id]
+
+            # 断开插件连接
+            if hasattr(plugin_info.instance, 'disconnect'):
+                if plugin_info.instance.disconnect():
+                    self.log_manager.info(f"数据源插件已禁用: {plugin_id}")
+
+                    # 发送禁用事件
+                    if self.event_bus:
+                        self.event_bus.emit('plugin_disabled', {
+                            'plugin_id': plugin_id,
+                            'timestamp': datetime.now().isoformat()
+                        })
+
+                    return True
+                else:
+                    self.log_manager.error(f"数据源插件断开失败: {plugin_id}")
+                    return False
+            else:
+                self.log_manager.warning(f"数据源插件不支持断开操作: {plugin_id}")
+                return True  # 认为已禁用
+
+        except Exception as e:
+            self.log_manager.error(f"禁用数据源插件失败 {plugin_id}: {str(e)}")
             return False
 
     def get_data_source_plugins(self) -> Dict[str, PluginInfo]:
@@ -778,6 +1254,63 @@ class PluginManager(QObject):
                         continue
 
                     plugin_name = f"sentiment_data_sources.{plugin_path.stem}"
+                    if self.load_plugin(plugin_name, plugin_path):
+                        loaded_count += 1
+
+            # 加载data_sources目录中的数据源插件
+            data_sources_dir = self.plugin_dir / "data_sources"
+            if data_sources_dir.exists():
+                # 确保data_sources目录是一个包
+                init_file = data_sources_dir / "__init__.py"
+                if not init_file.exists():
+                    with open(init_file, 'w') as f:
+                        f.write('"""数据源插件包"""')
+                    logger.info(f"创建data_sources包的__init__.py文件")
+
+                for plugin_path in data_sources_dir.glob("*.py"):
+                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        continue
+
+                    plugin_name = f"data_sources.{plugin_path.stem}"
+                    if self.load_plugin(plugin_name, plugin_path):
+                        loaded_count += 1
+
+            # 加载indicators目录中的指标插件
+            indicators_dir = self.plugin_dir / "indicators"
+            if indicators_dir.exists():
+                # 确保indicators目录是一个包
+                init_file = indicators_dir / "__init__.py"
+                if not init_file.exists():
+                    with open(init_file, 'w') as f:
+                        f.write('"""指标插件包"""')
+                    logger.info(f"创建indicators包的__init__.py文件")
+
+                for plugin_path in indicators_dir.glob("*.py"):
+                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        continue
+
+                    plugin_name = f"indicators.{plugin_path.stem}"
+                    if self.load_plugin(plugin_name, plugin_path):
+                        loaded_count += 1
+
+            # 加载strategies目录中的策略插件
+            strategies_dir = self.plugin_dir / "strategies"
+            if strategies_dir.exists():
+                # 确保strategies目录是一个包
+                init_file = strategies_dir / "__init__.py"
+                if not init_file.exists():
+                    with open(init_file, 'w') as f:
+                        f.write('"""策略插件包"""')
+                    logger.info(f"创建strategies包的__init__.py文件")
+
+                for plugin_path in strategies_dir.glob("*.py"):
+                    if plugin_path.name in excluded_files or plugin_path.name.startswith("__"):
+                        logger.info(f"跳过非插件文件: {plugin_path.name}")
+                        continue
+
+                    plugin_name = f"strategies.{plugin_path.stem}"
                     if self.load_plugin(plugin_name, plugin_path):
                         loaded_count += 1
 
@@ -1052,7 +1585,7 @@ class PluginManager(QObject):
                             from .data_source_extensions import DataSourcePluginAdapter, IDataSourcePlugin
 
                             unified_manager = get_unified_data_manager()
-                            if unified_manager and hasattr(unified_manager, 'data_source_router'):
+                            if unified_manager and hasattr(unified_manager, 'register_data_source_plugin'):
                                 # 严格限制：仅对实现 IDataSourcePlugin 的实例注册到路由器
                                 if not isinstance(plugin_instance, IDataSourcePlugin):
                                     logger.debug(f"跳过路由器注册（非IDataSourcePlugin）: {plugin_name}")
@@ -1072,8 +1605,8 @@ class PluginManager(QObject):
                                         logger.error(f"❌ 数据源插件适配器连接异常 {plugin_name}: {e}")
                                         # 即使连接异常也继续注册，让路由器处理
 
-                                    # 注册到路由器
-                                    success = unified_manager.data_source_router.register_data_source(
+                                    # 使用正确的注册方法：register_data_source_plugin
+                                    success = unified_manager.register_data_source_plugin(
                                         plugin_name,
                                         adapter,
                                         priority=0,
@@ -1081,19 +1614,18 @@ class PluginManager(QObject):
                                     )
 
                                     if success:
-                                        logger.info(f"✅ 数据源插件注册到统一数据管理器路由器成功: {plugin_name}")
+                                        logger.info(f"✅ 数据源插件注册到统一数据管理器成功: {plugin_name}")
                                     else:
-                                        logger.warning(f"⚠️ 数据源插件注册到统一数据管理器路由器失败: {plugin_name}")
+                                        logger.warning(f"⚠️ 数据源插件注册到统一数据管理器失败: {plugin_name}")
 
                                 # 可观测性：如果实现了接口但未注册成功，明确报警
                                 if isinstance(plugin_instance, IDataSourcePlugin) and not success:
-                                    logger.error(f"❗ 已实现IDataSourcePlugin但未注册路由器: id={plugin_name}, class={type(plugin_instance).__name__}")
-                            else:
-                                logger.debug(f"统一数据管理器不可用，跳过路由器注册: {plugin_name}")
+                                    logger.error(f"❗ 已实现IDataSourcePlugin但未注册成功: id={plugin_name}, class={type(plugin_instance).__name__}")
+                                else:
+                                    logger.debug(f"统一数据管理器不可用或缺少register_data_source_plugin方法，跳过路由器注册: {plugin_name}")
 
                         except Exception as e:
                             logger.error(f"❌ 注册到统一数据管理器路由器异常 {plugin_name}: {e}")
-                            # 继续流程
 
                 # 同步到数据库
                 self._sync_plugin_state_with_db(plugin_name, plugin_info)
@@ -1248,6 +1780,27 @@ class PluginManager(QObject):
                         attr.__name__ not in excluded_class_names):
                     logger.info(f"找到带有_plugin_metadata属性的插件类: {attr.__name__}")
                     return attr
+
+            # 检查是否有策略类（使用@register_strategy装饰器）
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (isinstance(attr, type) and
+                    hasattr(attr, '_strategy_name') and
+                        attr.__name__ not in excluded_class_names):
+                    logger.info(f"找到策略类: {attr.__name__} (策略名: {attr._strategy_name})")
+                    return attr
+
+            # 查找继承自BaseStrategy的类
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (isinstance(attr, type) and
+                    hasattr(attr, '__bases__') and
+                        attr.__name__ not in excluded_class_names):
+                    # 检查基类名称
+                    for base in attr.__bases__:
+                        if base.__name__ == 'BaseStrategy':
+                            logger.info(f"找到继承自BaseStrategy的类: {attr.__name__}")
+                            return attr
 
             # 查找继承自IPlugin的类
             for attr_name in dir(module):

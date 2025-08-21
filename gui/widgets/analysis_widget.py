@@ -81,11 +81,12 @@ class AnalysisWidget(QWidget):
 
     data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
 
-    def __init__(self, config_manager: Optional[ConfigManager] = None):
+    def __init__(self, config_manager: Optional[ConfigManager] = None, service_container=None):
         """初始化分析控件
 
         Args:
             config_manager: Optional ConfigManager instance to use
+            service_container: 服务容器实例
         """
 
         super().__init__()
@@ -93,6 +94,16 @@ class AnalysisWidget(QWidget):
         # 使用统一的管理器工厂
         self.config_manager = config_manager or get_config_manager()
         self.log_manager = get_log_manager()
+        self.service_container = service_container
+
+        # 如果没有service_container，尝试获取
+        if not self.service_container:
+            try:
+                from core.containers import get_service_container
+                self.service_container = get_service_container()
+            except Exception as e:
+                self.log_manager.warning(f"无法获取服务容器: {e}")
+                self.service_container = None
 
         # 初始化更新节流器
         self.update_throttler = get_update_throttler()
@@ -286,7 +297,7 @@ class AnalysisWidget(QWidget):
                 self.tab_components['sentiment_report'] = self.sentiment_report_tab
 
             # 板块资金流标签页
-            self.sector_flow_tab = SectorFlowTab(self.config_manager)
+            self.sector_flow_tab = SectorFlowTab(self.config_manager, self.service_container)
             self.sector_flow_tab.parent_widget = self
             self.tab_components['sector_flow'] = self.sector_flow_tab
 

@@ -26,8 +26,8 @@ from typing import Dict, List, Optional, Any
 import pandas as pd
 import logging
 
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
-from core.data_source_data_models import HealthCheckResult
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
+from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import PluginType, AssetType, DataType
 from core.logger import get_logger
 
@@ -88,6 +88,8 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
 
     def get_plugin_info(self) -> PluginInfo:
         """获取插件信息"""
+
+        pass
 
     def is_connected(self) -> bool:
         """检查连接状态"""

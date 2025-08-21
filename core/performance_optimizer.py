@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from core.logger import LogManager, LogLevel
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 
 
 class OptimizationLevel(Enum):

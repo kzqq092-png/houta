@@ -21,7 +21,7 @@ from .strategy_registry import StrategyRegistry
 from .strategy_factory import StrategyFactory
 from .strategy_engine import StrategyEngine
 from .parameter_manager import StrategyParameterManager, ParameterRange
-from .performance_evaluator import StrategyPerformanceEvaluator, StrategyMetrics
+from core.performance import UnifiedPerformanceMonitor as StrategyPerformanceEvaluator, PerformanceStats as StrategyMetrics
 
 
 class LifecycleStage(Enum):

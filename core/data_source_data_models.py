@@ -95,29 +95,13 @@ class MarketData:
 @dataclass
 class QueryParams:
     """查询参数"""
-    symbol: str                           # 证券代码
-    start_date: Optional[datetime] = None  # 开始日期
-    end_date: Optional[datetime] = None   # 结束日期
-    frequency: str = "1d"                 # 频率
-    limit: Optional[int] = None           # 数量限制
+    symbol: str                               # 股票代码
+    start_date: Optional[str] = None         # 开始日期
+    end_date: Optional[str] = None           # 结束日期
+    period: str = "D"                        # 周期 (D-日, W-周, M-月)
+    count: Optional[int] = None              # 数量限制
     extra_params: Dict[str, Any] = field(default_factory=dict)  # 额外参数
 
 
-@dataclass
-class HealthCheckResult:
-    """健康检查结果"""
-    is_healthy: bool                      # 是否健康
-    message: str                          # 状态消息
-    response_time: float = 0.0           # 响应时间(毫秒)
-    extra_info: Dict[str, Any] = field(default_factory=dict)  # 额外信息
-    timestamp: datetime = field(default_factory=datetime.now)  # 时间戳
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            'is_healthy': self.is_healthy,
-            'message': self.message,
-            'response_time': self.response_time,
-            'extra_info': self.extra_info,
-            'timestamp': self.timestamp.isoformat()
-        }
+# HealthCheckResult类已移至core/data_source_extensions.py进行统一管理
+# 请从core.data_source_extensions导入HealthCheckResult

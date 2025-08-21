@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
-from core.stock_screener import DataManager, StockScreener
+from core.stock_screener import StockScreener
+from core.services.unified_data_manager import UnifiedDataManager
 from components.stock_screener import StockScreenerWidget
 from pylab import mpl
 from gui.ui_components import BaseAnalysisPanel

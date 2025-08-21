@@ -1413,14 +1413,16 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 error_msg += "1. 数据是否有效\n"
                 error_msg += "2. 参数设置是否正确\n"
                 error_msg += "3. ta-lib库是否正确安装"
-                QMessageBox.warning(self, "计算失败", error_msg)
+                # 使用信号发送错误，避免阻塞UI
+                self.error_occurred.emit(error_msg)
 
         except Exception as e:
             self.hide_loading()
             error_msg = f"技术指标计算过程出错: {str(e)}"
             self.log_manager.error(error_msg)
             self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
-            QMessageBox.critical(self, "错误", error_msg)
+            # 使用信号发送错误，避免阻塞UI
+            self.error_occurred.emit(error_msg)
 
     def _calculate_single_indicator_with_params(self, indicator_name: str) -> Optional[Dict[str, Any]]:
         """计算单个指标，包含参数处理和错误处理"""
@@ -1434,7 +1436,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.log_manager.info(f"计算指标 {indicator_name}，参数: {params}")
 
             # 统一通过IndicatorService计算
-            result_df = calculate_indicator(self.current_kdata, indicator_name, params)
+            result_df = calculate_indicator(indicator_name, self.current_kdata, **params)
 
             # 处理结果 - calculate_indicator返回的是DataFrame
             if result_df is None or result_df.empty:

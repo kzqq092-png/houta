@@ -1042,7 +1042,7 @@ class ProfessionalUISystem:
                     self.max_drawdown = max_drawdown
                     self.win_rate = 0.55
                     self.profit_factor = 1.2
-                    self.var_95 = np.percentile(returns, 5)
+                    self.var_95 = abs(np.percentile(returns, 5))  # 修复：VaR应该为正值表示损失
                     self.sortino_ratio = sharpe_ratio * 1.2
                     self.calmar_ratio = annualized_return / max_drawdown if max_drawdown != 0 else 0
 

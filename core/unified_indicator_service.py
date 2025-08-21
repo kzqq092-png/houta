@@ -44,7 +44,7 @@ except ImportError:
 
 
 class UnifiedIndicatorService:
-    """统一指标服务类 - 支持技术指标和形态识别"""
+    """统一指标服务类 - 支持技术指标和形态识别（插件化版本）"""
 
     def __init__(self, db_path: str = UNIFIED_DB_PATH):
         """
@@ -58,6 +58,21 @@ class UnifiedIndicatorService:
         self._custom_functions = {}  # 存储自定义函数缓存
         self._indicators_cache = {}  # 指标元数据缓存
         self._patterns_cache = {}   # 形态元数据缓存
+
+        # 插件化支持
+        self._indicator_plugins = {}  # 指标插件字典 {plugin_id: plugin_adapter}
+        self._plugin_priorities = {}  # 插件优先级 {plugin_id: priority}
+        self._calculation_cache = {}  # 计算结果缓存
+        self._cache_enabled = True
+
+        # 高级功能支持
+        self._backend_selection_strategy = "priority"  # 后端选择策略: priority, performance, accuracy, availability
+        self._performance_monitor = {}  # 性能监控 {plugin_id: {avg_time, success_rate, etc.}}
+        self._consistency_checker_enabled = False  # 结果一致性检查
+        self._async_calculation_enabled = False  # 异步计算支持
+        self._max_cache_size = 1000  # 最大缓存条目数
+        self._cache_ttl_seconds = 3600  # 缓存生存时间（秒）
+
         self._init_connection()
 
     def _init_connection(self):
@@ -87,6 +102,167 @@ class UnifiedIndicatorService:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """上下文管理器退出"""
         self.close()
+
+    # ==================== 插件管理方法 ====================
+
+    def register_indicator_plugin(self, plugin_id: str, plugin_adapter, priority: int = 50) -> bool:
+        """
+        注册指标插件
+
+        Args:
+            plugin_id: 插件唯一标识
+            plugin_adapter: 插件适配器实例
+            priority: 优先级（数字越小优先级越高）
+
+        Returns:
+            bool: 注册是否成功
+        """
+        try:
+            # 验证插件接口
+            from .indicator_extensions import validate_indicator_plugin_interface
+
+            if not hasattr(plugin_adapter, 'plugin'):
+                logger.error(f"插件适配器无效: {plugin_id}")
+                return False
+
+            if not validate_indicator_plugin_interface(plugin_adapter.plugin):
+                logger.error(f"指标插件接口验证失败: {plugin_id}")
+                return False
+
+            # 注册插件
+            self._indicator_plugins[plugin_id] = plugin_adapter
+            self._plugin_priorities[plugin_id] = priority
+
+            logger.info(f"✅ 指标插件注册成功: {plugin_id} (优先级: {priority})")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 注册指标插件失败 {plugin_id}: {e}")
+            return False
+
+    def unregister_indicator_plugin(self, plugin_id: str) -> bool:
+        """
+        注销指标插件
+
+        Args:
+            plugin_id: 插件唯一标识
+
+        Returns:
+            bool: 注销是否成功
+        """
+        try:
+            if plugin_id in self._indicator_plugins:
+                # 清理插件缓存
+                plugin_adapter = self._indicator_plugins[plugin_id]
+                if hasattr(plugin_adapter, 'clear_cache'):
+                    plugin_adapter.clear_cache()
+
+                # 移除插件
+                del self._indicator_plugins[plugin_id]
+                del self._plugin_priorities[plugin_id]
+
+                # 清理相关计算缓存
+                self._clear_plugin_cache(plugin_id)
+
+                logger.info(f"✅ 指标插件注销成功: {plugin_id}")
+                return True
+            else:
+                logger.warning(f"指标插件不存在: {plugin_id}")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ 注销指标插件失败 {plugin_id}: {e}")
+            return False
+
+    def get_registered_plugins(self) -> List[str]:
+        """获取已注册的插件列表"""
+        return list(self._indicator_plugins.keys())
+
+    def get_plugin_priorities(self) -> Dict[str, int]:
+        """获取插件优先级配置"""
+        return self._plugin_priorities.copy()
+
+    def set_plugin_priority(self, plugin_id: str, priority: int) -> bool:
+        """
+        设置插件优先级
+
+        Args:
+            plugin_id: 插件标识
+            priority: 新优先级
+
+        Returns:
+            bool: 设置是否成功
+        """
+        if plugin_id in self._indicator_plugins:
+            self._plugin_priorities[plugin_id] = priority
+            logger.info(f"插件优先级已更新: {plugin_id} -> {priority}")
+            return True
+        else:
+            logger.error(f"插件不存在: {plugin_id}")
+            return False
+
+    def _get_sorted_plugins(self) -> List[Tuple[str, Any]]:
+        """获取按优先级排序的插件列表"""
+        return sorted(
+            [(plugin_id, adapter) for plugin_id, adapter in self._indicator_plugins.items()],
+            key=lambda x: self._plugin_priorities.get(x[0], 999)
+        )
+
+    def _clear_plugin_cache(self, plugin_id: str) -> None:
+        """清理指定插件的缓存"""
+        keys_to_remove = [key for key in self._calculation_cache.keys() if key.startswith(f"{plugin_id}:")]
+        for key in keys_to_remove:
+            del self._calculation_cache[key]
+
+    def clear_all_cache(self) -> None:
+        """清理所有缓存"""
+        self._calculation_cache.clear()
+        self._indicators_cache.clear()
+        self._patterns_cache.clear()
+
+        # 清理插件缓存
+        for plugin_adapter in self._indicator_plugins.values():
+            if hasattr(plugin_adapter, 'clear_cache'):
+                plugin_adapter.clear_cache()
+
+        logger.info("所有指标缓存已清理")
+
+    def enable_cache(self, enabled: bool = True) -> None:
+        """启用或禁用缓存"""
+        self._cache_enabled = enabled
+        logger.info(f"指标缓存已{'启用' if enabled else '禁用'}")
+
+    def _generate_cache_key(self, indicator_name: str, parameters: Dict[str, Any],
+                            data_hash: str, plugin_id: str = None) -> str:
+        """生成缓存键"""
+        import hashlib
+
+        # 创建参数字符串
+        param_str = json.dumps(parameters, sort_keys=True)
+
+        # 生成缓存键
+        key_parts = [indicator_name, param_str, data_hash]
+        if plugin_id:
+            key_parts.insert(0, plugin_id)
+
+        key_string = "|".join(key_parts)
+        return hashlib.md5(key_string.encode()).hexdigest()
+
+    def _get_data_hash(self, data: pd.DataFrame) -> str:
+        """获取数据哈希值"""
+        import hashlib
+
+        # 使用数据的形状和部分内容生成哈希
+        shape_str = str(data.shape)
+        if not data.empty:
+            # 使用首尾几行数据生成哈希
+            sample_data = pd.concat([data.head(3), data.tail(3)])
+            content_str = str(sample_data.values.tobytes())
+        else:
+            content_str = "empty"
+
+        hash_string = f"{shape_str}|{content_str}"
+        return hashlib.md5(hash_string.encode()).hexdigest()[:16]
 
     # ==================== 基础查询方法 ====================
 
@@ -448,7 +624,7 @@ class UnifiedIndicatorService:
 
     def calculate_indicator(self, name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
         """
-        计算指标（技术指标或形态指标）
+        计算指标（技术指标或形态指标）- 插件化版本
 
         参数:
             name: 指标名称
@@ -458,18 +634,196 @@ class UnifiedIndicatorService:
         返回:
             DataFrame: 添加了指标列的DataFrame
         """
-        # 首先尝试作为技术指标处理
+        if params is None:
+            params = {}
+
+        # 1. 首先尝试使用插件计算
+        plugin_result = self._calculate_indicator_with_plugins(name, df, params)
+        if plugin_result is not None:
+            return plugin_result
+
+        # 2. 回退到传统方法：技术指标
         indicator = self.get_indicator(name)
         if indicator:
             return self._calculate_technical_indicator(name, df, params, indicator)
 
-        # 如果不是技术指标，尝试作为形态指标处理
+        # 3. 回退到传统方法：形态指标
         pattern = self.get_pattern(name)
         if pattern:
             return self._calculate_pattern_indicator(name, df, params, pattern)
 
         logger.error(f"指标或形态 {name} 不存在")
         return df.copy()
+
+    def _calculate_indicator_with_plugins(self, name: str, df: pd.DataFrame, params: Dict[str, Any]) -> Optional[pd.DataFrame]:
+        """
+        使用插件计算指标
+
+        Args:
+            name: 指标名称
+            df: 输入数据
+            params: 参数
+
+        Returns:
+            Optional[pd.DataFrame]: 计算结果或None
+        """
+        if not self._indicator_plugins:
+            return None
+
+        try:
+            # 检查缓存
+            if self._cache_enabled:
+                data_hash = self._get_data_hash(df)
+                cache_key = self._generate_cache_key(name, params, data_hash)
+                if cache_key in self._calculation_cache:
+                    logger.debug(f"指标缓存命中: {name}")
+                    return self._calculation_cache[cache_key]
+
+            # 按优先级尝试插件
+            for plugin_id, plugin_adapter in self._get_sorted_plugins():
+                try:
+                    # 检查插件是否支持该指标
+                    supported_indicators = plugin_adapter.get_supported_indicators()
+                    if name not in supported_indicators:
+                        continue
+
+                    logger.debug(f"使用插件计算指标: {plugin_id}.{name}")
+
+                    # 转换数据格式
+                    from .indicator_extensions import StandardKlineData, IndicatorCalculationContext
+
+                    kline_data = StandardKlineData.from_dataframe(df)
+                    context = IndicatorCalculationContext(
+                        symbol="unknown",
+                        timeframe="D",
+                        cache_enabled=self._cache_enabled
+                    )
+
+                    # 计算指标
+                    result = plugin_adapter.calculate_indicator(name, kline_data, params, context)
+
+                    if result and not result.data.empty:
+                        # 合并结果到原始DataFrame
+                        result_df = df.copy()
+                        for col in result.data.columns:
+                            result_df[col] = result.data[col]
+
+                        # 缓存结果
+                        if self._cache_enabled:
+                            self._calculation_cache[cache_key] = result_df
+
+                        logger.info(f"✅ 插件指标计算成功: {plugin_id}.{name}")
+                        return result_df
+
+                except Exception as e:
+                    logger.warning(f"插件指标计算失败 {plugin_id}.{name}: {e}")
+                    continue
+
+            # 所有插件都失败
+            logger.debug(f"所有插件都无法计算指标: {name}")
+            return None
+
+        except Exception as e:
+            logger.error(f"插件指标计算异常 {name}: {e}")
+            return None
+
+    def batch_calculate_indicators(self, indicators: List[Tuple[str, Dict[str, Any]]], df: pd.DataFrame) -> pd.DataFrame:
+        """
+        批量计算指标
+
+        Args:
+            indicators: 指标列表 [(指标名称, 参数), ...]
+            df: 输入数据
+
+        Returns:
+            pd.DataFrame: 包含所有指标的结果
+        """
+        result_df = df.copy()
+
+        try:
+            # 1. 尝试使用插件批量计算
+            plugin_results = self._batch_calculate_with_plugins(indicators, df)
+
+            # 2. 合并插件结果
+            for indicator_name, plugin_result in plugin_results.items():
+                if plugin_result and not plugin_result.data.empty:
+                    for col in plugin_result.data.columns:
+                        result_df[col] = plugin_result.data[col]
+
+            # 3. 对于插件未处理的指标，使用传统方法
+            processed_indicators = set(plugin_results.keys())
+            for indicator_name, params in indicators:
+                if indicator_name not in processed_indicators:
+                    try:
+                        indicator_result = self.calculate_indicator(indicator_name, result_df, params)
+                        result_df = indicator_result
+                    except Exception as e:
+                        logger.error(f"传统方法计算指标失败 {indicator_name}: {e}")
+
+            return result_df
+
+        except Exception as e:
+            logger.error(f"批量计算指标失败: {e}")
+            return result_df
+
+    def _batch_calculate_with_plugins(self, indicators: List[Tuple[str, Dict[str, Any]]], df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        使用插件批量计算指标
+
+        Args:
+            indicators: 指标列表
+            df: 输入数据
+
+        Returns:
+            Dict[str, Any]: 插件计算结果
+        """
+        plugin_results = {}
+
+        try:
+            # 按插件分组指标
+            plugin_indicators = {}
+            for indicator_name, params in indicators:
+                for plugin_id, plugin_adapter in self._get_sorted_plugins():
+                    supported_indicators = plugin_adapter.get_supported_indicators()
+                    if indicator_name in supported_indicators:
+                        if plugin_id not in plugin_indicators:
+                            plugin_indicators[plugin_id] = []
+                        plugin_indicators[plugin_id].append((indicator_name, params))
+                        break
+
+            # 对每个插件进行批量计算
+            for plugin_id, plugin_indicator_list in plugin_indicators.items():
+                try:
+                    plugin_adapter = self._indicator_plugins[plugin_id]
+
+                    # 转换数据格式
+                    from .indicator_extensions import StandardKlineData, IndicatorCalculationContext
+
+                    kline_data = StandardKlineData.from_dataframe(df)
+                    context = IndicatorCalculationContext(
+                        symbol="unknown",
+                        timeframe="D",
+                        cache_enabled=self._cache_enabled
+                    )
+
+                    # 批量计算
+                    batch_results = plugin_adapter.batch_calculate_indicators(
+                        plugin_indicator_list, kline_data, context
+                    )
+
+                    # 合并结果
+                    plugin_results.update(batch_results)
+
+                    logger.info(f"✅ 插件批量计算完成: {plugin_id} ({len(plugin_indicator_list)} 个指标)")
+
+                except Exception as e:
+                    logger.error(f"插件批量计算失败 {plugin_id}: {e}")
+
+            return plugin_results
+
+        except Exception as e:
+            logger.error(f"插件批量计算异常: {e}")
+            return {}
 
     def _calculate_technical_indicator(self, name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]], indicator: Dict[str, Any]) -> pd.DataFrame:
         """计算技术指标"""
@@ -993,6 +1347,418 @@ def fix_stoch_parameters(params: Dict) -> Dict:
             fixed_params['slowd_matype'] = 0
 
     return fixed_params
+
+
+class UnifiedIndicatorServiceEnhanced(UnifiedIndicatorService):
+    """增强版统一指标服务 - 添加高级功能"""
+
+    def __init__(self, db_path: str = UNIFIED_DB_PATH):
+        super().__init__(db_path)
+
+        # 高级功能支持
+        self._backend_selection_strategy = "priority"  # 后端选择策略: priority, performance, accuracy, availability
+        self._performance_monitor = {}  # 性能监控 {plugin_id: {avg_time, success_rate, etc.}}
+        self._consistency_checker_enabled = False  # 结果一致性检查
+        self._async_calculation_enabled = False  # 异步计算支持
+        self._max_cache_size = 1000  # 最大缓存条目数
+        self._cache_ttl_seconds = 3600  # 缓存生存时间（秒）
+
+    def set_backend_selection_strategy(self, strategy: str) -> bool:
+        """
+        设置后端选择策略
+
+        Args:
+            strategy: 策略类型 - priority, performance, accuracy, availability
+
+        Returns:
+            bool: 设置是否成功
+        """
+        valid_strategies = ["priority", "performance", "accuracy", "availability"]
+        if strategy in valid_strategies:
+            self._backend_selection_strategy = strategy
+            logger.info(f"后端选择策略已更新为: {strategy}")
+            return True
+        else:
+            logger.error(f"无效的后端选择策略: {strategy}，有效选项: {valid_strategies}")
+            return False
+
+    def get_backend_selection_strategy(self) -> str:
+        """获取当前后端选择策略"""
+        return self._backend_selection_strategy
+
+    def enable_consistency_checker(self, enabled: bool = True) -> None:
+        """启用或禁用结果一致性检查"""
+        self._consistency_checker_enabled = enabled
+        logger.info(f"结果一致性检查已{'启用' if enabled else '禁用'}")
+
+    def enable_async_calculation(self, enabled: bool = True) -> None:
+        """启用或禁用异步计算"""
+        self._async_calculation_enabled = enabled
+        logger.info(f"异步计算已{'启用' if enabled else '禁用'}")
+
+    def set_cache_config(self, max_size: int = 1000, ttl_seconds: int = 3600) -> None:
+        """
+        设置缓存配置
+
+        Args:
+            max_size: 最大缓存条目数
+            ttl_seconds: 缓存生存时间（秒）
+        """
+        self._max_cache_size = max_size
+        self._cache_ttl_seconds = ttl_seconds
+
+        # 清理超出大小限制的缓存
+        if len(self._calculation_cache) > max_size:
+            # 保留最近使用的缓存项
+            cache_items = list(self._calculation_cache.items())
+            self._calculation_cache = dict(cache_items[-max_size:])
+
+        logger.info(f"缓存配置已更新: 最大条目数={max_size}, TTL={ttl_seconds}秒")
+
+    def get_performance_statistics(self) -> Dict[str, Dict[str, Any]]:
+        """
+        获取插件性能统计信息
+
+        Returns:
+            Dict: 插件性能统计 {plugin_id: {avg_time, success_rate, total_calls, etc.}}
+        """
+        return self._performance_monitor.copy()
+
+    def _update_performance_monitor(self, plugin_id: str, calculation_time_ms: float, success: bool) -> None:
+        """
+        更新性能监控数据
+
+        Args:
+            plugin_id: 插件ID
+            calculation_time_ms: 计算时间（毫秒）
+            success: 是否成功
+        """
+        if plugin_id not in self._performance_monitor:
+            self._performance_monitor[plugin_id] = {
+                'total_calls': 0,
+                'successful_calls': 0,
+                'failed_calls': 0,
+                'total_time_ms': 0.0,
+                'avg_time_ms': 0.0,
+                'success_rate': 0.0,
+                'last_update': datetime.now()
+            }
+
+        stats = self._performance_monitor[plugin_id]
+        stats['total_calls'] += 1
+        stats['total_time_ms'] += calculation_time_ms
+
+        if success:
+            stats['successful_calls'] += 1
+        else:
+            stats['failed_calls'] += 1
+
+        # 更新平均值
+        stats['avg_time_ms'] = stats['total_time_ms'] / stats['total_calls']
+        stats['success_rate'] = (stats['successful_calls'] / stats['total_calls']) * 100
+        stats['last_update'] = datetime.now()
+
+    def calculate_indicator_enhanced(self, name: str, df: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+        增强版指标计算，包含性能监控和一致性检查
+
+        Args:
+            name: 指标名称
+            df: 输入数据
+            params: 参数
+
+        Returns:
+            Tuple[pd.DataFrame, Dict[str, Any]]: (结果数据, 元数据)
+        """
+        if params is None:
+            params = {}
+
+        metadata = {
+            "indicator_name": name,
+            "backend_strategy": self._backend_selection_strategy,
+            "calculation_start_time": datetime.now(),
+            "selected_plugin": None,
+            "calculation_time_ms": 0.0,
+            "consistency_report": None,
+            "performance_stats": None
+        }
+
+        start_time = datetime.now()
+
+        try:
+            # 1. 选择最优插件
+            optimal_plugin = self._select_optimal_plugin(name)
+
+            if optimal_plugin:
+                plugin_id, plugin_adapter = optimal_plugin
+                metadata["selected_plugin"] = plugin_id
+
+                # 2. 使用选定插件计算
+                try:
+                    from .indicator_extensions import StandardKlineData, IndicatorCalculationContext
+
+                    kline_data = StandardKlineData.from_dataframe(df)
+                    context = IndicatorCalculationContext(
+                        symbol="enhanced_calc",
+                        timeframe="D",
+                        cache_enabled=self._cache_enabled
+                    )
+
+                    plugin_start_time = datetime.now()
+                    result = plugin_adapter.calculate_indicator(name, kline_data, params, context)
+                    plugin_calculation_time = (datetime.now() - plugin_start_time).total_seconds() * 1000
+
+                    if result and not result.data.empty:
+                        # 合并结果到原始DataFrame
+                        result_df = df.copy()
+                        for col in result.data.columns:
+                            result_df[col] = result.data[col]
+
+                        # 更新性能监控
+                        self._update_performance_monitor(plugin_id, plugin_calculation_time, True)
+
+                        # 一致性检查
+                        if self._consistency_checker_enabled:
+                            metadata["consistency_report"] = self._check_result_consistency(name, df, params, result_df)
+
+                        metadata["calculation_time_ms"] = plugin_calculation_time
+                        metadata["performance_stats"] = self._performance_monitor.get(plugin_id, {})
+
+                        return result_df, metadata
+
+                    else:
+                        # 插件计算失败，更新性能监控
+                        self._update_performance_monitor(plugin_id, plugin_calculation_time, False)
+
+                except Exception as e:
+                    logger.error(f"插件计算失败 {plugin_id}.{name}: {e}")
+                    self._update_performance_monitor(plugin_id, 0, False)
+
+            # 3. 回退到传统方法
+            result_df = self.calculate_indicator(name, df, params)
+            metadata["selected_plugin"] = "traditional"
+            metadata["calculation_time_ms"] = (datetime.now() - start_time).total_seconds() * 1000
+
+            return result_df, metadata
+
+        except Exception as e:
+            logger.error(f"增强指标计算失败 {name}: {e}")
+            metadata["error"] = str(e)
+            metadata["calculation_time_ms"] = (datetime.now() - start_time).total_seconds() * 1000
+            return df.copy(), metadata
+
+    def _select_optimal_plugin(self, indicator_name: str) -> Optional[Tuple[str, Any]]:
+        """
+        根据策略选择最优插件
+
+        Args:
+            indicator_name: 指标名称
+
+        Returns:
+            Optional[Tuple[str, Any]]: (plugin_id, plugin_adapter) 或 None
+        """
+        available_plugins = []
+
+        # 找到支持该指标的所有插件
+        for plugin_id, plugin_adapter in self._indicator_plugins.items():
+            try:
+                supported_indicators = plugin_adapter.get_supported_indicators()
+                if indicator_name in supported_indicators:
+                    available_plugins.append((plugin_id, plugin_adapter))
+            except Exception as e:
+                logger.warning(f"检查插件支持时出错 {plugin_id}: {e}")
+                continue
+
+        if not available_plugins:
+            return None
+
+        # 根据策略选择插件
+        if self._backend_selection_strategy == "priority":
+            # 按优先级排序
+            return min(available_plugins, key=lambda x: self._plugin_priorities.get(x[0], 999))
+
+        elif self._backend_selection_strategy == "performance":
+            # 按性能排序（平均计算时间）
+            def get_performance_score(plugin_tuple):
+                plugin_id = plugin_tuple[0]
+                if plugin_id in self._performance_monitor:
+                    return self._performance_monitor[plugin_id]['avg_time_ms']
+                return float('inf')  # 未知性能的插件排在最后
+
+            return min(available_plugins, key=get_performance_score)
+
+        elif self._backend_selection_strategy == "accuracy":
+            # 按成功率排序
+            def get_accuracy_score(plugin_tuple):
+                plugin_id = plugin_tuple[0]
+                if plugin_id in self._performance_monitor:
+                    return -self._performance_monitor[plugin_id]['success_rate']  # 负数，因为要最大化成功率
+                return 0  # 未知准确性的插件排在中间
+
+            return min(available_plugins, key=get_accuracy_score)
+
+        elif self._backend_selection_strategy == "availability":
+            # 选择最近成功使用的插件
+            def get_availability_score(plugin_tuple):
+                plugin_id = plugin_tuple[0]
+                if plugin_id in self._performance_monitor:
+                    last_update = self._performance_monitor[plugin_id]['last_update']
+                    return -(last_update.timestamp())  # 负数，因为要最大化时间戳
+                return float('inf')
+
+            return min(available_plugins, key=get_availability_score)
+
+        else:
+            # 默认按优先级
+            return min(available_plugins, key=lambda x: self._plugin_priorities.get(x[0], 999))
+
+    def _check_result_consistency(self, indicator_name: str, df: pd.DataFrame, params: Dict[str, Any],
+                                  primary_result: pd.DataFrame) -> Dict[str, Any]:
+        """
+        检查结果一致性（使用多个后端计算同一指标并比较结果）
+
+        Args:
+            indicator_name: 指标名称
+            df: 输入数据
+            params: 参数
+            primary_result: 主要结果
+
+        Returns:
+            Dict: 一致性检查报告
+        """
+        if not self._consistency_checker_enabled:
+            return {"enabled": False}
+
+        consistency_report = {
+            "enabled": True,
+            "primary_backend": None,
+            "comparison_results": [],
+            "consistency_score": 0.0,
+            "warnings": []
+        }
+
+        try:
+            # 获取所有支持该指标的插件
+            available_plugins = []
+            for plugin_id, plugin_adapter in self._indicator_plugins.items():
+                try:
+                    supported_indicators = plugin_adapter.get_supported_indicators()
+                    if indicator_name in supported_indicators:
+                        available_plugins.append((plugin_id, plugin_adapter))
+                except:
+                    continue
+
+            if len(available_plugins) < 2:
+                consistency_report["warnings"].append("可用插件数量不足，无法进行一致性检查")
+                return consistency_report
+
+            # 使用其他插件计算相同指标
+            comparison_results = []
+            for plugin_id, plugin_adapter in available_plugins:
+                try:
+                    # 转换数据格式并计算
+                    from .indicator_extensions import StandardKlineData, IndicatorCalculationContext
+
+                    kline_data = StandardKlineData.from_dataframe(df)
+                    context = IndicatorCalculationContext(
+                        symbol="consistency_check",
+                        timeframe="D",
+                        cache_enabled=False  # 不使用缓存以确保重新计算
+                    )
+
+                    result = plugin_adapter.calculate_indicator(indicator_name, kline_data, params, context)
+
+                    if result and not result.data.empty:
+                        comparison_results.append({
+                            "plugin_id": plugin_id,
+                            "backend": result.metadata.get('backend', 'Unknown'),
+                            "data": result.data,
+                            "calculation_time_ms": result.metadata.get('calculation_time_ms', 0)
+                        })
+
+                except Exception as e:
+                    consistency_report["warnings"].append(f"插件 {plugin_id} 计算失败: {e}")
+                    continue
+
+            # 计算一致性分数
+            if len(comparison_results) >= 2:
+                consistency_scores = []
+
+                for i, result1 in enumerate(comparison_results):
+                    for j, result2 in enumerate(comparison_results[i+1:], i+1):
+                        try:
+                            # 比较数值结果（忽略NaN值）
+                            data1 = result1["data"].select_dtypes(include=[np.number])
+                            data2 = result2["data"].select_dtypes(include=[np.number])
+
+                            if data1.shape == data2.shape:
+                                # 计算相关系数
+                                correlation = data1.corrwith(data2, axis=0).mean()
+                                if not np.isnan(correlation):
+                                    consistency_scores.append(correlation)
+
+                        except Exception as e:
+                            consistency_report["warnings"].append(f"比较 {result1['plugin_id']} 和 {result2['plugin_id']} 时出错: {e}")
+
+                if consistency_scores:
+                    consistency_report["consistency_score"] = np.mean(consistency_scores)
+
+            consistency_report["comparison_results"] = comparison_results
+
+        except Exception as e:
+            consistency_report["warnings"].append(f"一致性检查异常: {e}")
+
+        return consistency_report
+
+    def get_cache_statistics(self) -> Dict[str, Any]:
+        """
+        获取缓存统计信息
+
+        Returns:
+            Dict: 缓存统计信息
+        """
+        return {
+            "cache_enabled": self._cache_enabled,
+            "current_cache_size": len(self._calculation_cache),
+            "max_cache_size": self._max_cache_size,
+            "cache_ttl_seconds": self._cache_ttl_seconds,
+            "cache_keys": list(self._calculation_cache.keys())[:10]  # 只显示前10个键
+        }
+
+    def preload_indicators(self, indicators: List[str], sample_data: pd.DataFrame) -> Dict[str, bool]:
+        """
+        预加载指标（预热）
+
+        Args:
+            indicators: 指标名称列表
+            sample_data: 样本数据
+
+        Returns:
+            Dict[str, bool]: 预加载结果 {indicator_name: success}
+        """
+        preload_results = {}
+
+        logger.info(f"开始预加载 {len(indicators)} 个指标...")
+
+        for indicator_name in indicators:
+            try:
+                # 使用默认参数计算指标
+                result = self.calculate_indicator(indicator_name, sample_data, {})
+                preload_results[indicator_name] = not result.empty
+
+                if preload_results[indicator_name]:
+                    logger.debug(f"✅ 指标预加载成功: {indicator_name}")
+                else:
+                    logger.warning(f"⚠️ 指标预加载返回空结果: {indicator_name}")
+
+            except Exception as e:
+                preload_results[indicator_name] = False
+                logger.error(f"❌ 指标预加载失败 {indicator_name}: {e}")
+
+        successful_count = sum(preload_results.values())
+        logger.info(f"预加载完成: {successful_count}/{len(indicators)} 个指标成功")
+
+        return preload_results
 
 
 if __name__ == '__main__':

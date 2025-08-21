@@ -22,8 +22,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
 
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
-from core.data_source_data_models import HealthCheckResult
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
+from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import AssetType, DataType
 from core.logger import get_logger
 
@@ -747,7 +747,7 @@ class FuturesDataPlugin(IDataSourcePlugin):
                     is_healthy=False,
                     response_time=0,
                     timestamp=datetime.now(),
-                    error_message="插件未初始化"
+                    message="插件未初始化"
                 )
 
             if self.base_url and REQUESTS_AVAILABLE:

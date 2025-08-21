@@ -19,7 +19,7 @@ from core.adapters import get_logger, get_config, get_performance_monitor
 from .base_strategy import BaseStrategy, StrategySignal
 from .strategy_registry import get_strategy_registry
 from .strategy_database import get_strategy_database_manager
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 
 
 class StrategyCache:

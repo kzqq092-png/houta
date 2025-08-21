@@ -89,6 +89,7 @@ class DataType(Enum):
     FUNDAMENTAL = "fundamental"              # 基本面数据
     NEWS = "news"                            # 新闻数据
     ANNOUNCEMENT = "announcement"            # 公告数据
+    ASSET_LIST = "asset_list"                # 资产列表
 
     # 扩展：资金流相关数据类型
     FUND_FLOW = "fund_flow"                  # 资金流数据

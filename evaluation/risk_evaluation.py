@@ -111,9 +111,9 @@ class RiskEvaluator:
                 recommendation=self._get_var_recommendation(level)
             )
 
-        # CVaR计算
-        var_95 = np.percentile(returns, 5)
-        cvar_95 = returns[returns <= var_95].mean()
+        # CVaR计算 - 修复：VaR应该为正值表示损失
+        var_95 = abs(np.percentile(returns, 5))
+        cvar_95 = returns[returns <= -var_95].mean()  # 使用负VaR作为阈值
 
         level = self._determine_risk_level(
             abs(cvar_95), self.risk_thresholds['var_95'])

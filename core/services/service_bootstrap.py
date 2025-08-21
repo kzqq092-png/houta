@@ -8,6 +8,7 @@ import logging
 import time
 from typing import Optional
 import traceback
+import pandas as pd
 
 # 先导入容器和事件总线
 from core.containers import ServiceContainer, get_service_container
@@ -63,17 +64,20 @@ class ServiceBootstrap:
             # 1. 注册核心服务
             self._register_core_services()
 
-            # 2. 注册业务服务
+            # 2. 注册业务服务（包含UnifiedDataManager）
             self._register_business_services()
 
-            # 3. 注册交易服务
+            # 3. 注册插件服务（在UnifiedDataManager之后）
+            self._register_plugin_services()
+
+            # 4. 注册交易服务
             self._register_trading_service()
 
-            # 4. 注册监控服务
+            # 5. 注册监控服务
             self._register_monitoring_services()
 
-            # 5. 注册插件服务
-            self._register_plugin_services()
+            # 6. 执行插件发现和注册（在所有服务注册完成后）
+            self._post_initialization_plugin_discovery()
 
             return True
         except Exception as e:
@@ -92,17 +96,15 @@ class ServiceBootstrap:
             type(self.event_bus), self.event_bus)
         logger.info("✓ 事件总线注册完成")
 
-        # 注册 ConfigManager
-        from utils.config_manager import ConfigManager
-        config_manager = ConfigManager()
-        self.service_container.register_instance(ConfigManager, config_manager)
-        logger.info("✓ ConfigManager 注册完成")
-
-        # 注册配置服务
-        config_service = ConfigService(config_file='config/config.json')
+        # 注册统一配置服务
+        config_service = ConfigService(config_file='config/config.json', use_sqlite=True)
         config_service.initialize()
         self.service_container.register_instance(ConfigService, config_service)
-        logger.info("✓ 配置服务注册完成")
+
+        # 为了兼容性，也注册为ConfigManager类型
+        from utils.config_manager import ConfigManager
+        self.service_container.register_instance(ConfigManager, config_service)
+        logger.info("✓ 统一配置服务注册完成")
 
         # 注册日志服务
         log_manager = LogManager()
@@ -178,10 +180,10 @@ class ServiceBootstrap:
 
         # WebGPU图表渲染器
         try:
-            from optimization.webgpu_chart_renderer import get_webgpu_chart_renderer
+            from optimization.webgpu_chart_renderer import get_webgpu_chart_renderer, WebGPUChartRenderer
             webgpu_renderer = get_webgpu_chart_renderer()
             self.service_container.register_instance(
-                'webgpu_chart_renderer', webgpu_renderer)
+                WebGPUChartRenderer, webgpu_renderer)
             logger.info("✓ WebGPU图表渲染器注册完成")
         except ImportError as e:
             logger.warning(f"WebGPU图表渲染器不可用: {e}")
@@ -247,13 +249,27 @@ class ServiceBootstrap:
             )
 
             # 注册服务工厂（延迟初始化）
-            self.service_container.register_factory(
-                SentimentDataService,
-                lambda: SentimentDataService(
-                    plugin_manager=self.service_container.resolve(PluginManager) if self.service_container.is_registered(PluginManager) else None,
+            def create_sentiment_service():
+                # 在创建时获取插件管理器
+                plugin_manager = None
+                try:
+                    if self.service_container.is_registered(PluginManager):
+                        plugin_manager = self.service_container.resolve(PluginManager)
+                        logger.info("✅ 成功获取插件管理器用于情绪数据服务")
+                    else:
+                        logger.warning("⚠️ 插件管理器未注册，情绪数据服务将使用受限模式")
+                except Exception as e:
+                    logger.warning(f"⚠️ 获取插件管理器失败: {e}")
+
+                return SentimentDataService(
+                    plugin_manager=plugin_manager,
                     config=sentiment_config,
                     log_manager=logger
-                ),
+                )
+
+            self.service_container.register_factory(
+                SentimentDataService,
+                create_sentiment_service,
                 scope=ServiceScope.SINGLETON
             )
 
@@ -292,7 +308,6 @@ class ServiceBootstrap:
         try:
             logger.info("🔄 开始注册板块资金流服务...")
             from .sector_fund_flow_service import SectorFundFlowService, SectorFlowConfig
-            from ..data_manager import DataManager
             logger.info("📦 板块资金流服务模块导入成功")
 
             # 创建配置
@@ -311,14 +326,14 @@ class ServiceBootstrap:
                 # 获取数据管理器
                 logger.info("🔍 尝试获取统一数据管理器...")
                 data_manager = None
-                if self.service_container.is_registered('unified_data_manager'):
-                    try:
-                        data_manager = self.service_container.resolve('unified_data_manager')
+                try:
+                    if self.service_container.is_registered(UnifiedDataManager):
+                        data_manager = self.service_container.resolve(UnifiedDataManager)
                         logger.info("✅ 统一数据管理器获取成功")
-                    except Exception as e:
-                        logger.warning(f"⚠️ 统一数据管理器获取失败: {e}")
-                else:
-                    logger.warning("⚠️ 统一数据管理器未注册")
+                    else:
+                        logger.warning("⚠️ 统一数据管理器未注册")
+                except Exception as e:
+                    logger.warning(f"⚠️ 统一数据管理器获取失败: {e}")
 
                 # 创建服务
                 logger.info("🏗️ 创建板块资金流服务实例...")
@@ -359,9 +374,8 @@ class ServiceBootstrap:
         """初始化失败时的回退策略"""
         logger.info("Initializing fallback data manager")
         try:
-            # 尝试使用简化版数据管理器
-            from core.data_manager import DataManager
-            fallback_manager = DataManager()
+            # 尝试使用UnifiedDataManager作为回退
+            fallback_manager = UnifiedDataManager()
             self.service_container.register_instance(
                 type(fallback_manager), fallback_manager, name='unified_data_manager')
             logger.info("✓ 回退数据管理器注册完成")
@@ -369,12 +383,8 @@ class ServiceBootstrap:
             logger.error(f"Failed to initialize fallback data manager: {e}")
             # 创建最小可用的数据管理器
 
-            class MinimalDataManager:
-                def request_data(self, *args, **kwargs):
-                    logger.warning(
-                        "Using minimal data manager - limited functionality")
-                    return "request_id"
-            minimal_manager = MinimalDataManager()
+            # 使用UnifiedDataManager作为最终回退
+            minimal_manager = UnifiedDataManager()
             self.service_container.register_instance(
                 type(minimal_manager), minimal_manager, name='unified_data_manager')
             logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
@@ -384,22 +394,76 @@ class ServiceBootstrap:
         logger.info("注册交易服务...")
 
         try:
-            from .trading_service import TradingService
+            # 注册新的交易引擎
+            from ..trading_engine import TradingEngine, initialize_trading_engine
 
-            self.service_container.register(
-                TradingService,
-                scope=ServiceScope.SINGLETON,
-                factory=lambda: TradingService(
-                    event_bus=self.event_bus,
-                    config={}
-                )
+            trading_engine = initialize_trading_engine(
+                service_container=self.service_container,
+                event_bus=self.event_bus
             )
 
-            # 初始化交易服务
-            trading_service = self.service_container.resolve(TradingService)
-            trading_service.initialize()
+            self.service_container.register_instance(TradingEngine, trading_engine)
+            logger.info("✓ 交易引擎注册完成")
 
-            logger.info("✓ 交易服务注册完成")
+            # 兼容性：也注册为TradingService
+            try:
+                from .trading_service import TradingService
+
+                self.service_container.register(
+                    TradingService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: TradingService(
+                        event_bus=self.event_bus,
+                        config={}
+                    )
+                )
+
+                # 初始化交易服务
+                trading_service = self.service_container.resolve(TradingService)
+                trading_service.initialize()
+                logger.info("✓ 交易服务（兼容性）注册完成")
+
+            except Exception as e:
+                logger.warning(f"⚠️ 交易服务兼容性注册失败: {e}")
+
+            # 注册TradingController
+            try:
+                from ..trading_controller import TradingController
+                from ..logger import LogManager
+
+                self.service_container.register_factory(
+                    TradingController,
+                    lambda: TradingController(
+                        service_container=self.service_container,
+                        log_manager=LogManager()
+                    ),
+                    scope=ServiceScope.SINGLETON
+                )
+                logger.info("✓ 交易控制器注册完成")
+
+            except Exception as e:
+                logger.warning(f"⚠️ 交易控制器注册失败: {e}")
+
+            # 注册StrategyService
+            try:
+                from .strategy_service import StrategyService
+
+                self.service_container.register(
+                    StrategyService,
+                    scope=ServiceScope.SINGLETON,
+                    factory=lambda: StrategyService(
+                        event_bus=self.event_bus,
+                        config={}
+                    )
+                )
+
+                # 初始化策略服务
+                strategy_service = self.service_container.resolve(StrategyService)
+                strategy_service.initialize()
+                logger.info("✓ 策略服务注册完成")
+
+            except Exception as e:
+                logger.warning(f"⚠️ 策略服务注册失败: {e}")
 
         except Exception as e:
             logger.error(f"❌ 交易服务注册失败: {e}")
@@ -477,6 +541,13 @@ class ServiceBootstrap:
             )
 
             plugin_manager = self.service_container.resolve(PluginManager)
+
+            # 将UnifiedDataManager连接到插件管理器
+            if self.service_container.is_registered(UnifiedDataManager):
+                data_manager = self.service_container.resolve(UnifiedDataManager)
+                plugin_manager.data_manager = data_manager
+                logger.info("✅ 插件管理器已连接到UnifiedDataManager")
+
             plugin_manager.initialize()
             logger.info("✓ 插件管理器服务注册完成")
 
@@ -494,6 +565,32 @@ class ServiceBootstrap:
             logger.error(f"❌ 插件管理器服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
+    def _post_initialization_plugin_discovery(self) -> None:
+        """
+        在所有服务注册完成后执行插件发现和注册
+        """
+        logger.info("执行插件发现和注册...")
+        try:
+            # 1. 插件管理器插件发现
+            plugin_manager = self.service_container.resolve(PluginManager)
+            plugin_manager.discover_and_register_plugins()
+            logger.info("✓ 插件管理器插件发现完成")
+
+            # 2. 统一数据管理器数据源插件发现
+            if self.service_container.is_registered(UnifiedDataManager):
+                data_manager = self.service_container.resolve(UnifiedDataManager)
+                if hasattr(data_manager, 'discover_and_register_data_source_plugins'):
+                    data_manager.discover_and_register_data_source_plugins()
+                    logger.info("✓ 数据源插件发现和注册完成")
+                else:
+                    logger.warning("⚠️ UnifiedDataManager不支持插件发现")
+            else:
+                logger.warning("⚠️ UnifiedDataManager未注册")
+
+        except Exception as e:
+            logger.error(f"❌ 插件发现和注册失败: {e}")
+            logger.error(traceback.format_exc())
+
 
 def bootstrap_services() -> bool:
     """
@@ -502,5 +599,8 @@ def bootstrap_services() -> bool:
     Returns:
         引导是否成功
     """
-    bootstrap = ServiceBootstrap()
+    # 使用全局服务容器确保一致性
+    from core.containers.service_container import get_service_container
+    container = get_service_container()
+    bootstrap = ServiceBootstrap(container)
     return bootstrap.bootstrap()

@@ -10,7 +10,7 @@ from PyQt5.QtGui import *
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, List, Union
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 from core.logger import LogManager, LogLevel
 from core.stock_screener import StockScreener
 from datetime import datetime

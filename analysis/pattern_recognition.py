@@ -3,6 +3,7 @@ Enhanced Pattern Recognition Module for Trading System
 完全重构的形态识别模块，与新统一框架完全兼容
 """
 
+from core.performance import get_performance_monitor as _get_unified_monitor
 from utils.data_preprocessing import validate_kdata
 import numpy as np
 import pandas as pd
@@ -932,13 +933,12 @@ class PatternCache:
 
 
 # 全局实例
-_performance_monitor = PerformanceMonitor()
 _pattern_cache = PatternCache()
 
 
-def get_performance_monitor() -> PerformanceMonitor:
+def get_performance_monitor():
     """获取性能监控器实例"""
-    return _performance_monitor
+    return _get_unified_monitor()
 
 
 def get_pattern_cache() -> PatternCache:

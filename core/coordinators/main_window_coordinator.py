@@ -33,7 +33,7 @@ from ..services import (
 from optimization.optimization_dashboard import create_optimization_dashboard
 from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
 from core.metrics.repository import MetricsRepository
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 from gui.menu_bar import MainMenuBar
 
 logger = logging.getLogger(__name__)
@@ -1621,6 +1621,66 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误",
                                  f"打开策略管理对话框失败: {str(e)}")
 
+    def _on_trading_monitor(self) -> None:
+        """交易监控"""
+        try:
+            # 检查是否已经创建了交易监控窗口
+            if not hasattr(self, '_trading_monitor_window') or self._trading_monitor_window is None:
+                from gui.widgets.enhanced_trading_monitor_widget import EnhancedTradingMonitorWidget
+                from core.services.trading_service import TradingService
+                from core.services.strategy_service import StrategyService
+
+                # 从服务容器获取服务
+                trading_service = None
+                strategy_service = None
+
+                try:
+                    trading_service = self.service_container.resolve(TradingService)
+                except Exception as e:
+                    logger.warning(f"无法获取TradingService: {e}")
+
+                try:
+                    strategy_service = self.service_container.resolve(StrategyService)
+                except Exception as e:
+                    logger.warning(f"无法获取StrategyService: {e}")
+
+                # 创建交易监控窗口
+                self._trading_monitor_window = EnhancedTradingMonitorWidget(
+                    parent=None,  # 独立窗口
+                    trading_service=trading_service,
+                    strategy_service=strategy_service
+                )
+
+                # 设置窗口属性
+                self._trading_monitor_window.setWindowTitle("交易监控")
+                self._trading_monitor_window.resize(1200, 800)
+
+                # 设置窗口不置顶
+                self._trading_monitor_window.setWindowFlags(
+                    self._trading_monitor_window.windowFlags() & ~Qt.WindowStaysOnTopHint
+                )
+
+                # 连接窗口关闭事件
+                def on_window_closed():
+                    self._trading_monitor_window = None
+
+                self._trading_monitor_window.closeEvent = lambda event: (
+                    on_window_closed(),
+                    event.accept()
+                )
+
+            # 显示窗口
+            self._trading_monitor_window.show()
+            self._trading_monitor_window.activateWindow()
+            self._trading_monitor_window.raise_()
+
+            logger.info("交易监控窗口已打开")
+
+        except Exception as e:
+            logger.error(f"打开交易监控窗口失败: {e}")
+            QMessageBox.critical(self._main_window, "错误",
+                                 f"打开交易监控窗口失败: {str(e)}")
+
     def _on_optimization_dashboard(self) -> None:
         """显示优化仪表板"""
         try:
@@ -1809,7 +1869,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         """性能评估"""
         try:
             # 使用现有的性能评估器
-            from evaluation.performance_evaluation import create_performance_evaluator
+            from core.performance import get_performance_monitor as create_performance_evaluator
             from gui.dialogs.performance_evaluation_dialog import PerformanceEvaluationDialog
 
             # 创建性能评估器
@@ -1824,7 +1884,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             self.logger.error(f"性能评估模块导入失败: {e}")
             # 使用备用的策略性能评估器
             try:
-                from core.strategy.performance_evaluator import PerformanceEvaluator
+                from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 
                 evaluator = PerformanceEvaluator()
                 dialog = PerformanceEvaluationDialog(self._main_window)
@@ -2222,6 +2282,106 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         except Exception as e:
             logger.error(f"切换性能仪表板失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法切换性能仪表板: {e}")
+
+    def _on_performance_center(self):
+        """打开现代化性能监控中心"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.setWindowTitle("HIkyuu-UI 性能监控中心 - Professional Edition")
+            performance_widget.show()
+            logger.info("现代化性能监控中心已打开")
+        except Exception as e:
+            logger.error(f"打开性能监控中心失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开性能监控中心: {e}")
+
+    def _on_system_performance(self):
+        """显示系统性能监控"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.tab_widget.setCurrentIndex(0)  # 切换到系统监控tab
+            performance_widget.show()
+            logger.info("系统性能监控已打开")
+        except Exception as e:
+            logger.error(f"打开系统性能监控失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开系统性能监控: {e}")
+
+    def _on_ui_performance(self):
+        """显示UI性能优化"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.tab_widget.setCurrentIndex(1)  # 切换到UI优化tab
+            performance_widget.show()
+            logger.info("UI性能优化已打开")
+        except Exception as e:
+            logger.error(f"打开UI性能优化失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开UI性能优化: {e}")
+
+    def _on_strategy_performance(self):
+        """显示策略性能监控"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.tab_widget.setCurrentIndex(2)  # 切换到策略性能tab
+            performance_widget.show()
+            logger.info("策略性能监控已打开")
+        except Exception as e:
+            logger.error(f"打开策略性能监控失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开策略性能监控: {e}")
+
+    def _on_algorithm_performance(self):
+        """显示算法性能监控"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.tab_widget.setCurrentIndex(3)  # 切换到算法性能tab
+            performance_widget.show()
+            logger.info("算法性能监控已打开")
+        except Exception as e:
+            logger.error(f"打开算法性能监控失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开算法性能监控: {e}")
+
+    def _on_auto_tuning(self):
+        """显示自动调优"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            performance_widget = show_modern_performance_monitor(self._main_window)
+            performance_widget.tab_widget.setCurrentIndex(4)  # 切换到自动调优tab
+            performance_widget.show()
+            logger.info("自动调优已打开")
+        except Exception as e:
+            logger.error(f"打开自动调优失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开自动调优: {e}")
+
+    def _on_performance_report(self):
+        """生成性能报告"""
+        try:
+            from core.performance import get_performance_monitor
+            from PyQt5.QtWidgets import QFileDialog
+
+            monitor = get_performance_monitor()
+
+            # 选择保存位置
+            filepath, _ = QFileDialog.getSaveFileName(
+                self._main_window,
+                "导出性能报告",
+                f"performance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                "JSON Files (*.json);;All Files (*)"
+            )
+
+            if filepath:
+                report = monitor.export_report(filepath)
+                QMessageBox.information(
+                    self._main_window,
+                    "成功",
+                    f"性能报告已导出到:\n{filepath}"
+                )
+                logger.info(f"性能报告已导出: {filepath}")
+        except Exception as e:
+            logger.error(f"导出性能报告失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法导出性能报告: {e}")
 
     def _toggle_log_panel(self):
         """切换日志面板的显示/隐藏状态"""

@@ -6,7 +6,7 @@ from PyQt5.QtGui import QColor, QPalette, QPainter, QMovie
 from PyQt5.QtChart import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 import time
 from typing import Dict, Any, Optional, List, Union
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 from core.logger import LogManager, LogLevel
 from datetime import datetime
 import ptvsd
@@ -23,7 +23,7 @@ class DataUpdateThread(QThread):
     error_occurred = pyqtSignal(str)  # 错误信号
     status_changed = pyqtSignal(str)  # 状态信号
 
-    def __init__(self, data_manager: DataManager, log_manager: Optional[LogManager] = None):
+    def __init__(self, data_manager: UnifiedDataManager, log_manager: Optional[LogManager] = None):
         super().__init__()
         self.data_manager = data_manager
         self.log_manager = log_manager or LogManager()

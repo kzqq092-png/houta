@@ -3,7 +3,7 @@ AKShare股票数据源插件
 
 提供A股实时和历史数据获取功能，支持：
 - A股股票基本信息
-- 历史K线数据  
+- 历史K线数据
 - 实时行情数据
 - 财务数据
 - 行业分类数据
@@ -18,16 +18,17 @@ AKShare股票数据源插件
 日期: 2024
 """
 
+from datetime import datetime, timedelta
 import time
 import traceback
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
-from core.data_source_data_models import HealthCheckResult
-from core.plugin_types import PluginType, AssetType, DataType
+from core.data_source_data_models import QueryParams
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.logger import get_logger
+from core.plugin_types import AssetType, DataType, PluginType
 
 logger = get_logger(__name__)
 
@@ -64,6 +65,10 @@ class AKShareStockPlugin(IDataSourcePlugin):
         self.request_count = 0
         self.last_error = None
 
+        # 连接状态属性
+        self.connection_time = None
+        self.last_activity = None
+
         # 插件基本信息
         self.name = "AKShare股票数据源插件"
         self.version = "1.0.0"
@@ -87,12 +92,30 @@ class AKShareStockPlugin(IDataSourcePlugin):
 
     def get_plugin_info(self) -> PluginInfo:
         """获取插件信息"""
+        return PluginInfo(
+            id="akshare_stock_plugin",
+            name=self.name,
+            version=self.version,
+            description=self.description,
+            author=self.author,
+            supported_asset_types=[AssetType.STOCK],
+            supported_data_types=[
+                DataType.HISTORICAL_KLINE,
+                DataType.REAL_TIME_QUOTE,
+                DataType.FUNDAMENTAL,
+                DataType.TRADE_TICK,
+                DataType.SECTOR_FUND_FLOW  # 添加板块资金流支持
+            ],
+            capabilities={
+                "markets": ["SH", "SZ", "BJ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True
+            }
+        )
 
-    def is_connected(self) -> bool:
-        """检查连接状态"""
-        return getattr(self, 'initialized', False)
-
-    def get_plugin_info(self) -> PluginInfo:
+    @property
+    def plugin_info(self) -> PluginInfo:
         """获取插件信息"""
         return PluginInfo(
             id="akshare_stock_plugin",
@@ -105,449 +128,310 @@ class AKShareStockPlugin(IDataSourcePlugin):
                 DataType.HISTORICAL_KLINE,
                 DataType.REAL_TIME_QUOTE,
                 DataType.FUNDAMENTAL,
-                DataType.TRADE_TICK
-            ]
+                DataType.TRADE_TICK,
+                DataType.SECTOR_FUND_FLOW  # 添加板块资金流支持
+            ],
+            capabilities={
+                "markets": ["SH", "SZ", "BJ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True
+            }
         )
 
-    def get_supported_asset_types(self) -> List[AssetType]:
-        """获取支持的资产类型"""
-        return [AssetType.STOCK]
-
-    def get_supported_data_types(self) -> List[DataType]:
-        """获取支持的数据类型"""
-        return [
-            DataType.HISTORICAL_KLINE,
-            DataType.REAL_TIME_QUOTE,
-            DataType.FUNDAMENTAL,
-            DataType.TRADE_TICK
-        ]
-
-    def initialize(self, config: Dict[str, Any]) -> bool:
-        """初始化插件"""
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
         try:
             if not AKSHARE_AVAILABLE:
-                raise ImportError("AKShare库未安装")
+                self.last_error = "AKShare库未安装"
+                return False
 
-            if not REQUESTS_AVAILABLE:
-                raise ImportError("requests库未安装")
-
-            merged = self.DEFAULT_CONFIG.copy()
-            merged.update(config or {})
-            self.config = merged
-
-            # 配置参数
-            self.timeout = int(self.config.get('timeout', self.DEFAULT_CONFIG['timeout']))
-            self.max_retries = int(self.config.get('max_retries', self.DEFAULT_CONFIG['max_retries']))
-            self.cache_duration = int(self.config.get('cache_duration', self.DEFAULT_CONFIG['cache_duration']))
-
-            # 尝试测试连接（可选）
-            try:
-                test_data = ak.stock_zh_a_spot_em()
-                if test_data is not None and not test_data.empty:
-                    logger.info("AKShare股票数据源插件初始化成功，网络连接正常")
-                else:
-                    logger.warning("AKShare股票数据源插件初始化成功，但测试数据为空")
-            except Exception as test_e:
-                logger.warning(f"AKShare股票数据源插件初始化成功，但网络测试失败: {test_e}")
-
-            # 无论网络测试是否成功，都认为插件初始化成功
-            self.initialized = True
-            return True
-
+            # AKShare不需要显式连接，测试一个简单的API调用
+            test_data = ak.stock_zh_a_spot_em()
+            if test_data is not None and not test_data.empty:
+                self.logger.info("AKShare数据源连接成功")
+                return True
+            else:
+                self.last_error = "AKShare API测试失败"
+                return False
         except Exception as e:
             self.last_error = str(e)
-            logger.error(f"AKShare股票数据源插件初始化失败: {e}")
+            self.logger.error(f"连接失败: {e}")
             return False
 
-    def shutdown(self) -> bool:
-        """关闭插件"""
+    def disconnect(self) -> bool:
+        """断开连接"""
         try:
-            self.initialized = False
-            self._stock_list_cache = None
-            logger.info("AKShare股票数据源插件关闭成功")
+            # AKShare不需要显式断开连接
+            self.logger.info("AKShare数据源断开连接")
             return True
         except Exception as e:
-            logger.error(f"AKShare股票数据源插件关闭失败: {e}")
+            self.logger.error(f"断开连接失败: {e}")
             return False
 
-    def health_check(self) -> HealthCheckResult:
-        """健康检查"""
-        start_time = time.time()
-
+    def is_connected(self) -> bool:
+        """检查连接状态"""
         try:
-            if not self.initialized:
-                return HealthCheckResult(
-                    is_healthy=False,
-                    response_time=0.0,
-                    message="插件未初始化"
-                )
-
-            # 测试获取实时数据
+            if not AKSHARE_AVAILABLE:
+                return False
+            # 简单测试API是否可用
             test_data = ak.stock_zh_a_spot_em()
+            return test_data is not None and not test_data.empty
+        except:
+            return False
 
+    def get_connection_info(self):
+        """获取连接信息"""
+        from core.data_source_extensions import ConnectionInfo, HealthCheckResult
+        return ConnectionInfo(
+            is_connected=self.is_connected(),
+            connection_time=self.connection_time,
+            last_activity=self.last_activity,
+            connection_params={
+                "server_info": "AKShare API",
+                "timeout": self.config.get('timeout', 30),
+                "max_retries": self.config.get('max_retries', 3)
+            },
+            error_message=self.last_error
+        )
+
+    def health_check(self):
+        """健康检查"""
+        from core.data_source_extensions import HealthCheckResult
+        import time
+
+        start_time = time.time()
+        try:
+            # 测试API是否可用
+            test_data = ak.stock_zh_a_spot_em()
             response_time = (time.time() - start_time) * 1000
 
             if test_data is not None and not test_data.empty:
                 return HealthCheckResult(
                     is_healthy=True,
-                    response_time=response_time,
-                    message="ok"
+                    status_code=200,
+                    message="ok",
+                    response_time_ms=response_time,
+                    last_check_time=datetime.now()
                 )
             else:
                 return HealthCheckResult(
                     is_healthy=False,
-                    response_time=response_time,
-                    message="无法获取数据"
+                    status_code=500,
+                    message="API返回空数据",
+                    response_time_ms=response_time,
+                    last_check_time=datetime.now()
                 )
-
         except Exception as e:
             response_time = (time.time() - start_time) * 1000
-            # 如果插件已初始化，网络异常时仍认为插件可用
-            if self.initialized:
-                return HealthCheckResult(
-                    is_healthy=True,
-                    response_time=response_time,
-                    message=f"插件可用但网络异常: {str(e)[:50]}"
-                )
-            else:
-                return HealthCheckResult(
-                    is_healthy=False,
-                    response_time=response_time,
-                    message=str(e)
-                )
+            return HealthCheckResult(
+                is_healthy=False,
+                status_code=500,
+                message=str(e),
+                response_time_ms=response_time,
+                last_check_time=datetime.now()
+            )
 
-    def get_stock_list(self) -> pd.DataFrame:
-        """获取股票列表"""
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """获取资产列表"""
         try:
-            # 检查缓存
-            current_time = time.time()
-            if (self._stock_list_cache is not None and
-                self._cache_timestamp and
-                    current_time - self._cache_timestamp < self._cache_duration):
-                return self._stock_list_cache
+            if asset_type != AssetType.STOCK:
+                return []
 
-            # 获取A股股票列表
-            stock_list = ak.stock_zh_a_spot_em()
+            # 获取A股列表
+            stock_df = ak.stock_zh_a_spot_em()
+            if stock_df is None or stock_df.empty:
+                return []
 
-            if stock_list is not None and not stock_list.empty:
-                # 标准化列名
-                if '代码' in stock_list.columns:
-                    stock_list = stock_list.rename(columns={
-                        '代码': 'code',
-                        '名称': 'name',
-                        '最新价': 'close',
-                        '涨跌额': 'change',
-                        '涨跌幅': 'pct_change',
-                        '成交量': 'volume',
-                        '成交额': 'amount',
-                        '总市值': 'total_mv',
-                        '流通市值': 'circulating_mv'
-                    })
+            # 转换为标准格式
+            asset_list = []
+            for _, row in stock_df.iterrows():
+                symbol = row.get('代码', '')
+                name = row.get('名称', '')
 
-                # 缓存数据
-                self._stock_list_cache = stock_list
-                self._cache_timestamp = current_time
+                # 判断市场
+                if symbol.startswith('000') or symbol.startswith('002') or symbol.startswith('300'):
+                    exchange = 'SZ'
+                elif symbol.startswith('600') or symbol.startswith('601') or symbol.startswith('603'):
+                    exchange = 'SH'
+                elif symbol.startswith('8') or symbol.startswith('4'):
+                    exchange = 'BJ'
+                else:
+                    exchange = 'Unknown'
 
-                self.request_count += 1
-                logger.info(f"获取股票列表成功，共 {len(stock_list)} 只股票")
-                return stock_list
-            else:
-                raise Exception("获取股票列表为空")
+                if market and exchange != market:
+                    continue
 
+                asset_info = {
+                    "symbol": symbol,
+                    "name": name,
+                    "market": exchange,
+                    "asset_type": asset_type.value,
+                    "currency": "CNY",
+                    "exchange": exchange
+                }
+                asset_list.append(asset_info)
+
+            return asset_list
         except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"获取股票列表失败: {e}")
-            return pd.DataFrame()
+            self.logger.error(f"获取资产列表失败: {e}")
+            return []
 
-    def get_kline_data(self, symbol: str, period: str = 'daily',
-                       start_date: str = None, end_date: str = None,
-                       adjust: str = 'qfq') -> pd.DataFrame:
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
         """获取K线数据"""
         try:
-            self.request_count += 1
+            # 转换频率参数
+            if freq in ["1m", "5m", "15m", "30m", "60m"]:
+                # 分钟级数据
+                period_map = {"1m": "1", "5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+                period = period_map.get(freq, "1")
 
-            # 处理股票代码
-            if '.' in symbol:
-                code = symbol.split('.')[0]
-            else:
-                code = symbol
-
-            # AKShare周期映射
-            period_mapping = {
-                '1min': '1',
-                '5min': '5',
-                '15min': '15',
-                '30min': '30',
-                '60min': '60',
-                'daily': 'daily',
-                'weekly': 'weekly',
-                'monthly': 'monthly'
-            }
-
-            ak_period = period_mapping.get(period, 'daily')
-
-            # 获取K线数据
-            if ak_period in ['1', '5', '15', '30', '60']:
-                # 分钟数据
-                df = ak.stock_zh_a_hist_min_em(
-                    symbol=code,
-                    period=ak_period,
-                    start_date=start_date or (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S'),
-                    end_date=end_date or datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    adjust=adjust
-                )
+                # 使用AKShare获取分钟数据
+                df = ak.stock_zh_a_hist_min_em(symbol=symbol, period=period,
+                                               start_date=start_date, end_date=end_date)
             else:
                 # 日线及以上数据
-                df = ak.stock_zh_a_hist(
-                    symbol=code,
-                    period=ak_period,
-                    start_date=start_date or (datetime.now() - timedelta(days=365)).strftime('%Y%m%d'),
-                    end_date=end_date or datetime.now().strftime('%Y%m%d'),
-                    adjust=adjust
-                )
+                period_map = {"D": "daily", "W": "weekly", "M": "monthly"}
+                period = period_map.get(freq, "daily")
 
-            if df is not None and not df.empty:
-                # 标准化列名
-                column_mapping = {
-                    '时间': 'datetime',
-                    '日期': 'datetime',
-                    '开盘': 'open',
-                    '收盘': 'close',
-                    '最高': 'high',
-                    '最低': 'low',
-                    '成交量': 'volume',
-                    '成交额': 'amount',
-                    '振幅': 'amplitude',
-                    '涨跌幅': 'pct_change',
-                    '涨跌额': 'change',
-                    '换手率': 'turnover'
-                }
+                # 使用AKShare获取日线数据
+                df = ak.stock_zh_a_hist(symbol=symbol, period=period,
+                                        start_date=start_date, end_date=end_date)
 
-                for old_col, new_col in column_mapping.items():
-                    if old_col in df.columns:
-                        df = df.rename(columns={old_col: new_col})
-
-                # 设置索引
-                if 'datetime' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['datetime'])
-                    df = df.set_index('datetime')
-
-                logger.info(f"获取 {symbol} K线数据成功，共 {len(df)} 条记录")
-                return df
-            else:
-                raise Exception("获取K线数据为空")
-
-        except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"获取K线数据失败 {symbol}: {e}")
-            return pd.DataFrame()
-
-    def get_real_time_data(self, symbols: List[str]) -> pd.DataFrame:
-        """获取实时行情数据"""
-        try:
-            self.request_count += 1
-
-            # 获取实时行情
-            df = ak.stock_zh_a_spot_em()
-
-            if df is not None and not df.empty:
-                # 如果指定了股票代码，进行筛选
-                if symbols:
-                    # 处理股票代码格式
-                    clean_symbols = []
-                    for symbol in symbols:
-                        if '.' in symbol:
-                            clean_symbols.append(symbol.split('.')[0])
-                        else:
-                            clean_symbols.append(symbol)
-
-                    # 筛选指定股票
-                    if '代码' in df.columns:
-                        df = df[df['代码'].isin(clean_symbols)]
-                    elif 'code' in df.columns:
-                        df = df[df['code'].isin(clean_symbols)]
-
-                # 标准化列名
-                if '代码' in df.columns:
-                    df = df.rename(columns={
-                        '代码': 'code',
-                        '名称': 'name',
-                        '最新价': 'price',
-                        '涨跌额': 'change',
-                        '涨跌幅': 'pct_change',
-                        '今开': 'open',
-                        '昨收': 'pre_close',
-                        '最高': 'high',
-                        '最低': 'low',
-                        '成交量': 'volume',
-                        '成交额': 'amount'
-                    })
-
-                logger.info(f"获取实时数据成功，共 {len(df)} 只股票")
-                return df
-            else:
-                raise Exception("获取实时数据为空")
-
-        except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"获取实时数据失败: {e}")
-            return pd.DataFrame()
-
-    def fetch_data(self, symbol: str, data_type: str, **kwargs) -> Any:
-        """通用数据获取接口"""
-        try:
-            if data_type == 'kline':
-                return self.get_kline_data(
-                    symbol=symbol,
-                    period=kwargs.get('period', 'daily'),
-                    start_date=kwargs.get('start_date'),
-                    end_date=kwargs.get('end_date'),
-                    adjust=kwargs.get('adjust', 'qfq')
-                )
-            elif data_type == 'realtime':
-                symbols = kwargs.get('symbols', [symbol])
-                return self.get_real_time_data(symbols)
-            elif data_type == 'stock_list':
-                return self.get_stock_list()
-            else:
-                raise ValueError(f"不支持的数据类型: {data_type}")
-
-        except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"获取数据失败 {symbol} ({data_type}): {e}")
-            return None
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """获取统计信息"""
-        return {
-            'total_requests': self.request_count,
-            'success_rate': 1.0 if self.last_error is None else 0.8,
-            'avg_response_time': 0.5,
-            'last_update': datetime.now().isoformat(),
-            'last_error': self.last_error,
-            'supported_markets': list(self.supported_markets.keys()),
-            'cache_status': 'active' if self._stock_list_cache is not None else 'empty'
-        }
-
-    def get_plugin_info(self) -> PluginInfo:
-        """获取插件基本信息"""
-        return PluginInfo(
-            id="akshare_stock",
-            name="AKShare股票数据源",
-            version=self.version,
-            description=self.description,
-            author="FactorWeave-Quant 团队",
-            supported_asset_types=[AssetType.STOCK],
-            supported_data_types=[DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE]
-        )
-
-    def get_supported_data_types(self) -> List[DataType]:
-        """获取支持的数据类型列表"""
-        return [DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE]
-
-    def shutdown(self) -> None:
-        """关闭插件，释放资源"""
-        try:
-            # 清理资源
-            if hasattr(self, '_disconnect_wind'):
-                self._disconnect_wind()
-        except Exception as e:
-            self.logger.error(f"插件关闭失败: {e}")
-
-    def fetch_data(self, symbol: str, data_type: str,
-                   start_date: Optional[datetime] = None,
-                   end_date: Optional[datetime] = None,
-                   **kwargs) -> pd.DataFrame:
-        """获取数据"""
-        try:
-            pass
-
-            if data_type == "historical_kline":
-                if start_date is None:
-                    start_date = datetime.now() - timedelta(days=30)
-                if end_date is None:
-                    end_date = datetime.now()
-
-                kline_data = self.get_kline_data(symbol, start_date, end_date,
-                                                 kwargs.get('frequency', '1d'))
-
-                # 转换为DataFrame格式
-                if kline_data:
-                    data = []
-                    for kline in kline_data:
-                        data.append({
-                            'datetime': kline.timestamp,
-                            'open': kline.open,
-                            'high': kline.high,
-                            'low': kline.low,
-                            'close': kline.close,
-                            'volume': kline.volume
-                        })
-                    return pd.DataFrame(data)
-                else:
-                    return pd.DataFrame()
-            else:
+            if df is None or df.empty:
                 return pd.DataFrame()
 
+            # 标准化列名
+            column_mapping = {
+                '日期': 'datetime', '时间': 'datetime',
+                '开盘': 'open', '最高': 'high', '最低': 'low', '收盘': 'close',
+                '成交量': 'volume', '成交额': 'amount'
+            }
+
+            df = df.rename(columns=column_mapping)
+
+            # 确保有必要的列
+            required_columns = ['datetime', 'open', 'high', 'low', 'close', 'volume']
+            for col in required_columns:
+                if col not in df.columns:
+                    df[col] = 0.0
+
+            return df[required_columns]
+
         except Exception as e:
-            self.logger.error(f"数据获取失败: {e}")
+            self.logger.error(f"获取K线数据失败: {e}")
             return pd.DataFrame()
 
-    def get_real_time_data(self, symbols: List[str]) -> Dict[str, Any]:
-        """获取实时数据"""
+    def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
+        """
+        获取板块资金流数据
+
+        Args:
+            symbol: 板块代码或"sector"表示获取所有板块
+            **kwargs: 其他参数，如indicator等
+
+        Returns:
+            板块资金流数据DataFrame
+        """
         try:
-            result = {}
-            for symbol in symbols:
-                market_data = self.get_market_data(symbol)
-                if market_data:
-                    result[symbol] = {
-                        'symbol': symbol,
-                        'price': market_data.current_price,
-                        'open': market_data.open_price,
-                        'high': market_data.high_price,
-                        'low': market_data.low_price,
-                        'volume': market_data.volume,
-                        'change': market_data.change_amount,
-                        'change_pct': market_data.change_percent,
-                        'timestamp': market_data.timestamp.isoformat()
-                    }
-            return result
+            if not AKSHARE_AVAILABLE:
+                self.logger.error("AKShare库不可用")
+                return pd.DataFrame()
+
+            indicator = kwargs.get('indicator', '今日')
+
+            if symbol == "sector" or symbol is None:
+                # 获取板块资金流排行
+                self.logger.info(f"获取板块资金流排行数据，指标: {indicator}")
+                df = ak.stock_sector_fund_flow_rank(indicator=indicator)
+            else:
+                # 获取特定板块的资金流汇总
+                self.logger.info(f"获取板块 {symbol} 资金流汇总数据，指标: {indicator}")
+                df = ak.stock_sector_fund_flow_summary(symbol=symbol, indicator=indicator)
+
+            if df is None or df.empty:
+                self.logger.warning(f"未获取到板块资金流数据: symbol={symbol}, indicator={indicator}")
+                return pd.DataFrame()
+
+            # 标准化列名（根据实际返回的列名进行映射）
+            column_mapping = {
+                '板块名称': 'sector_name',
+                '板块代码': 'sector_code',
+                '涨跌幅': 'change_pct',
+                '主力净流入-净额': 'main_net_inflow',
+                '主力净流入-净占比': 'main_net_inflow_pct',
+                '超大单净流入-净额': 'super_large_net_inflow',
+                '超大单净流入-净占比': 'super_large_net_inflow_pct',
+                '大单净流入-净额': 'large_net_inflow',
+                '大单净流入-净占比': 'large_net_inflow_pct',
+                '中单净流入-净额': 'medium_net_inflow',
+                '中单净流入-净占比': 'medium_net_inflow_pct',
+                '小单净流入-净额': 'small_net_inflow',
+                '小单净流入-净占比': 'small_net_inflow_pct'
+            }
+
+            # 重命名存在的列
+            for old_name, new_name in column_mapping.items():
+                if old_name in df.columns:
+                    df = df.rename(columns={old_name: new_name})
+
+            self.logger.info(f"成功获取板块资金流数据，共 {len(df)} 条记录")
+            return df
+
         except Exception as e:
-            self.logger.error(f"实时数据获取失败: {e}")
-            return {}
-# 插件工厂函数
+            self.logger.error(f"获取板块资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
+        """获取实时行情"""
+        try:
+            # 获取实时行情数据
+            real_time_df = ak.stock_zh_a_spot_em()
+            if real_time_df is None or real_time_df.empty:
+                return []
+
+            quotes = []
+            for symbol in symbols:
+                # 查找对应的股票数据
+                stock_data = real_time_df[real_time_df['代码'] == symbol]
+                if stock_data.empty:
+                    continue
+
+                row = stock_data.iloc[0]
+                quote = {
+                    "symbol": symbol,
+                    "price": float(row.get('最新价', 0.0)),
+                    "change": float(row.get('涨跌额', 0.0)),
+                    "change_percent": float(row.get('涨跌幅', 0.0)),
+                    "volume": int(row.get('成交量', 0)),
+                    "timestamp": datetime.now().isoformat()
+                }
+                quotes.append(quote)
+
+            return quotes
+        except Exception as e:
+            self.logger.error(f"获取实时行情失败: {e}")
+            return []
 
 
-def create_plugin() -> IDataSourcePlugin:
-    """创建插件实例"""
-    return AKShareStockPlugin()
-
-
-# 插件元数据
-PLUGIN_METADATA = {
-    "name": "AKShare股票数据源插件",
-    "version": "1.0.0",
-    "description": "提供A股实时和历史数据，支持上海、深圳交易所",
-    "author": "FactorWeave-Quant 开发团队",
-    "plugin_type": "data_source_stock",
-    "asset_types": ["stock"],
-    "data_types": ["historical_kline", "real_time_quote", "fundamental", "trade_tick"],
-    "markets": ["SH", "SZ", "BJ"],
-    "config_schema": {
-        "timeout": {
-            "type": "integer",
-            "default": 30,
-            "description": "请求超时时间（秒）"
-        },
-        "max_retries": {
-            "type": "integer",
-            "default": 3,
-            "description": "最大重试次数"
-        },
-        "cache_duration": {
-            "type": "integer",
-            "default": 3600,
-            "description": "缓存持续时间（秒）"
-        }
+# 配置Schema
+AKSHARE_CONFIG_SCHEMA = {
+    "timeout": {
+        "type": "integer",
+        "default": 30,
+        "description": "请求超时时间（秒）"
+    },
+    "max_retries": {
+        "type": "integer",
+        "default": 3,
+        "description": "最大重试次数"
+    },
+    "cache_duration": {
+        "type": "integer",
+        "default": 3600,
+        "description": "缓存持续时间（秒）"
     }
 }

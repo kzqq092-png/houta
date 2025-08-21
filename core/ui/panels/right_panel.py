@@ -25,7 +25,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot
 from PyQt5.QtGui import QFont, QIcon, QColor, QPalette
 
 from .base_panel import BasePanel
+from core.performance import get_performance_monitor
 from core.events import StockSelectedEvent, AnalysisCompleteEvent, ChartUpdateEvent, UIDataReadyEvent
+from core.services.analysis_service import AnalysisService
 
 # 导入完整的技术分析标签页
 try:
@@ -138,6 +140,9 @@ class RightPanel(BasePanel):
         # 专业标签页列表
         self._professional_tabs = []
         self._has_basic_tabs = False  # 标记是否创建了基础标签页
+
+        # 性能优化管理器
+        self._performance_manager = None
 
         super().__init__(parent, coordinator, **kwargs)
 
@@ -256,7 +261,7 @@ class RightPanel(BasePanel):
 
         # 分析时间
         analysis_time_label = QLabel("")
-        analysis_time_label.setStyleSheet("font-size: 12px; color: #6c757d;")
+        analysis_time_label.setStyleSheet("font-size: 12px; color: #cc757d;")
         analysis_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         stock_info_layout.addWidget(analysis_time_label)
         self.add_widget('analysis_time_label', analysis_time_label)
@@ -484,6 +489,23 @@ class RightPanel(BasePanel):
                 logger.error(f"❌ 创建实盘交易标签页失败: {e}")
                 logger.error(traceback.format_exc())
 
+        # 添加性能监控标签页
+        try:
+            logger.info("🔄 开始创建性能监控标签页...")
+            from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
+
+            # 创建现代化性能监控标签页
+            self._performance_monitor_tab = ModernUnifiedPerformanceWidget(
+                parent=self._root_frame
+            )
+            tab_widget.addTab(self._performance_monitor_tab, "性能监控")
+            self.add_widget('performance_monitor_tab', self._performance_monitor_tab)
+
+            logger.info("✅ 性能监控标签页创建成功")
+        except Exception as e:
+            logger.error(f"❌ 创建性能监控标签页失败: {e}")
+            logger.error(traceback.format_exc())
+
         # 控制按钮框架
         button_frame = QFrame()
         main_layout.addWidget(button_frame)
@@ -505,11 +527,20 @@ class RightPanel(BasePanel):
         button_layout.addWidget(export_btn)
         self.add_widget('export_btn', export_btn)
 
+        # 性能监控按钮
+        performance_btn = QPushButton("性能监控")
+        performance_btn.clicked.connect(self._show_performance_monitor)
+        button_layout.addWidget(performance_btn)
+        self.add_widget('performance_btn', performance_btn)
+
         # 状态标签
         status_label = QLabel("就绪")
         status_label.setStyleSheet("color: #6c757d; font-size: 12px;")
         main_layout.addWidget(status_label)
         self.add_widget('status_label', status_label)
+
+        # 在所有标签页创建完成后，初始化性能管理器
+        QTimer.singleShot(100, self._initialize_performance_manager)
 
     def _create_signal_tab(self, parent: QTabWidget) -> None:
         """创建买卖信号标签页"""
@@ -804,6 +835,56 @@ class RightPanel(BasePanel):
         self.event_bus.subscribe(UIDataReadyEvent, self._on_ui_data_ready)
         logger.debug("RightPanel已订阅UIDataReadyEvent事件")
 
+    def _initialize_performance_manager(self) -> None:
+        """初始化性能管理器"""
+        try:
+            # 获取标签页组件
+            tab_widget = self.get_widget('tab_widget')
+
+            # 使用统一性能监控系统
+            self._performance_manager = get_performance_monitor()
+
+            # 标签页性能监控已通过统一系统自动启用
+            logger.info("✅ 标签页性能监控已启用")
+
+            logger.info("✅ 统一性能监控系统已集成")
+
+            # 统一性能监控标签页已自动连接到性能监控系统
+            if hasattr(self, '_performance_monitor_tab') and self._performance_monitor_tab:
+                logger.info("✅ 统一性能监控标签页已就绪")
+
+        except Exception as e:
+            logger.error(f"❌ 性能管理器初始化失败: {e}")
+
+    def _register_tabs_with_performance_monitor(self):
+        """标签页性能监控已通过统一系统自动处理"""
+        logger.info(f"✅ 标签页性能监控已启用，共监控 {len(self._professional_tabs)} 个标签页")
+
+    def _update_tab_with_performance_manager(self, tab, data, progressive=False):
+        """更新标签页数据（兼容性方法）"""
+        try:
+            if hasattr(tab, 'set_kdata'):
+                if progressive and hasattr(tab, 'append_kdata'):
+                    tab.append_kdata(data)
+                else:
+                    tab.set_kdata(data)
+            logger.debug(f"标签页数据更新完成: {type(tab).__name__}")
+        except Exception as e:
+            logger.error(f"标签页数据更新失败: {type(tab).__name__}, 错误: {e}")
+
+    def _show_performance_monitor(self):
+        """显示性能监控窗口"""
+        try:
+            from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+            self._performance_monitor = show_modern_performance_monitor(self)
+            if self._performance_monitor:
+                logger.info("✅ 性能监控窗口已打开")
+            else:
+                logger.error("❌ 无法打开性能监控窗口")
+
+        except Exception as e:
+            logger.error(f"显示性能监控窗口失败: {e}")
+
     def _initialize_data(self) -> None:
         """初始化数据"""
         # 初始状态下显示提示信息
@@ -811,28 +892,35 @@ class RightPanel(BasePanel):
 
     @pyqtSlot(UIDataReadyEvent)
     def _on_ui_data_ready(self, event: UIDataReadyEvent) -> None:
-        """处理UI数据就绪事件，异步更新面板避免阻塞"""
+        """处理UI数据就绪事件，使用性能管理器优化加载"""
         try:
             logger.info(f"RightPanel收到UIDataReadyEvent，股票: {event.stock_code}")
+
+            # 检查是否是新股票
+            is_new_stock = self._current_stock_code != event.stock_code
+
             # 更新股票信息
             self._current_stock_code = event.stock_code
             self._current_stock_name = event.stock_name
             self.get_widget('stock_label').setText(
                 f"{self._current_stock_name} ({self._current_stock_code})")
 
+            # 如果是新股票，重置性能管理器状态
+            if is_new_stock and self._performance_manager:
+                self._performance_manager.reset_for_new_stock(event.stock_code)
+
             # 从事件中直接获取分析数据和K线数据
             analysis_data = event.ui_data.get('analysis')
             kline_data = event.ui_data.get('kline_data')
 
-            # 异步传递K线数据到依赖K线的专业标签页，避免阻塞UI
-            if kline_data is not None and not kline_data.empty:
-                active_tab_widget = self.get_widget('tab_widget')
-                active_tab = active_tab_widget.currentWidget() if active_tab_widget else None
-                if active_tab and getattr(active_tab, 'skip_kdata', False):
-                    logger.info("当前激活标签页不依赖K线数据，跳过向其它标签页分发K线数据")
-                else:
-                    logger.info(f"异步传递K线数据到依赖K线的专业标签页，数据长度: {len(kline_data)}")
-                    self._async_update_professional_tabs(kline_data)
+            # 使用性能管理器更新专业标签页
+            if kline_data is not None and not kline_data.empty and self._performance_manager:
+                logger.info(f"使用性能管理器更新专业标签页，数据长度: {len(kline_data)}")
+                self._update_professional_tabs_with_performance_manager(kline_data)
+            elif kline_data is not None and not kline_data.empty:
+                # 回退到原有机制（如果性能管理器不可用）
+                logger.warning("性能管理器不可用，使用原有更新机制")
+                self._async_update_professional_tabs(kline_data)
 
             # 如果有分析数据，更新基础功能标签页（只有在组件存在时）
             if analysis_data and self._has_basic_tabs:
@@ -846,6 +934,34 @@ class RightPanel(BasePanel):
         except Exception as e:
             logger.error(f"处理UIDataReadyEvent失败: {e}")
             logger.error(traceback.format_exc())
+
+    def _update_professional_tabs_with_performance_manager(self, kline_data):
+        """使用性能管理器更新专业标签页"""
+        try:
+            # 为每个标签页更新数据
+            for tab in self._professional_tabs:
+                # 获取标签页类型
+                tab_type = type(tab).__name__.lower().replace('tab', '').replace('analysis', '')
+
+                # 检查标签页是否跳过K线数据
+                if hasattr(tab, 'skip_kdata') and getattr(tab, 'skip_kdata') is True:
+                    logger.debug(f"跳过标签页（skip_kdata=True）: {tab_type}")
+                    continue
+
+                # 使用性能管理器更新数据
+                self._performance_manager.update_tab_data(
+                    stock_code=self._current_stock_code,
+                    tab_id=tab_type,
+                    data=kline_data,
+                    use_cache=True
+                )
+
+            logger.info(f"✅ 性能管理器完成所有标签页更新")
+
+        except Exception as e:
+            logger.error(f"❌ 性能管理器更新标签页失败: {e}")
+            # 回退到原有机制
+            self._async_update_professional_tabs(kline_data)
 
     def _async_update_professional_tabs(self, kline_data):
         """异步更新专业标签页，避免阻塞UI线程"""
@@ -862,8 +978,8 @@ class RightPanel(BasePanel):
                 self._tab_update_timer.setSingleShot(True)
                 self._tab_update_timer.timeout.connect(self._process_next_tab_update)
 
-            # 立即开始处理第一个标签页
-            self._process_next_tab_update()
+            # 延迟开始处理，确保UI渲染完成
+            self._tab_update_timer.start(100)  # 100ms后开始处理
 
         except Exception as e:
             logger.error(f"异步更新专业标签页失败: {e}")
@@ -898,7 +1014,7 @@ class RightPanel(BasePanel):
 
             # 如果还有更多标签页需要处理，调度下一次更新
             if self._tab_update_queue:
-                self._tab_update_timer.start(50)  # 50ms后处理下一个
+                self._tab_update_timer.start(100)  # 增加间隔，减少UI线程压力
 
         except Exception as e:
             logger.error(f"处理标签页更新失败: {e}")

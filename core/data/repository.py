@@ -1,113 +1,24 @@
 """
-数据仓库层
+数据仓库模块
 
-定义数据访问的抽象接口和具体实现。
-遵循仓库模式，为不同类型的数据提供统一的访问接口。
+提供统一的数据访问接口，支持多种数据源。
 """
 
 import logging
-from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 import pandas as pd
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List, Optional, Union, Tuple
+import asyncio
+from datetime import datetime
+from dataclasses import dataclass
 
+# 导入必要的数据模型
 from .models import StockInfo, KlineData, MarketData, QueryParams
 
 logger = logging.getLogger(__name__)
 
-
-class FallbackDataManager:
-    """
-    统一的备用数据管理器
-
-    当主数据管理器不可用时，提供模拟数据以确保系统正常运行。
-    """
-
-    def __init__(self):
-        self.logger = logging.getLogger("FallbackDataManager")
-        self.mock_stocks = [
-            {'code': '000001', 'name': '平安银行', 'market': 'sz', 'industry': '银行'},
-            {'code': '000002', 'name': '万科A', 'market': 'sz', 'industry': '房地产'},
-            {'code': '600000', 'name': '浦发银行', 'market': 'sh', 'industry': '银行'},
-            {'code': '600036', 'name': '招商银行', 'market': 'sh', 'industry': '银行'},
-            {'code': '600519', 'name': '贵州茅台', 'market': 'sh', 'industry': '食品饮料'},
-            {'code': '000858', 'name': '五粮液', 'market': 'sz', 'industry': '食品饮料'},
-            {'code': '300750', 'name': '宁德时代', 'market': 'sz', 'industry': '电池'},
-            {'code': '002415', 'name': '海康威视', 'market': 'sz', 'industry': '电子'},
-            {'code': '000725', 'name': '京东方A', 'market': 'sz', 'industry': '电子'},
-            {'code': '600276', 'name': '恒瑞医药', 'market': 'sh', 'industry': '医药生物'},
-        ]
-
-    def get_stock_list(self, market=None):
-        """返回模拟股票列表"""
-        if market:
-            return [s for s in self.mock_stocks if s['market'] == market]
-        return self.mock_stocks
-
-    def get_stock_info(self, stock_code):
-        """返回模拟股票信息"""
-        for stock in self.mock_stocks:
-            if stock['code'] == stock_code:
-                return stock
-        return None
-
-    def search_stocks(self, keyword):
-        """搜索股票"""
-        keyword_lower = keyword.lower()
-        results = []
-        for stock in self.mock_stocks:
-            if (keyword_lower in stock['code'].lower() or
-                    keyword_lower in stock['name'].lower()):
-                results.append(stock)
-        return results
-
-    def get_kdata(self, stock_code, period='D', count=365):
-        """返回空DataFrame"""
-        return pd.DataFrame()
-
-    def get_latest_price(self, stock_code):
-        """返回模拟价格"""
-        return 10.0  # 模拟价格
-
-    def get_market_data(self, index_code, date=None):
-        """返回模拟市场数据"""
-        return {
-            'date': date or datetime.now(),
-            'index_code': index_code,
-            'index_name': '模拟指数',
-            'open': 3000.0,
-            'high': 3100.0,
-            'low': 2900.0,
-            'close': 3050.0,
-            'volume': 1000000.0,
-            'amount': 3000000000.0,
-            'change': 50.0,
-            'change_pct': 1.67
-        }
-
-    def get_market_indices(self):
-        """返回模拟指数列表"""
-        return ['000001', '000300', '399001', '399006']
-
-
-class MinimalDataManager:
-    """
-    最小化的数据管理器
-
-    当FallbackDataManager也无法创建时的最后备用方案。
-    """
-
-    def get_stock_list(self, market=None):
-        return []
-
-    def get_stock_info(self, stock_code):
-        return None
-
-    def search_stocks(self, keyword):
-        return []
-
-    def get_kdata(self, stock_code, period='D', count=365):
-        return pd.DataFrame()
+# 废弃的DataManager类已删除，功能已集成到UnifiedDataManager
+# 请使用: from core.services.unified_data_manager import UnifiedDataManager
 
 
 class BaseRepository(ABC):
@@ -144,9 +55,9 @@ class StockRepository(BaseRepository):
         """连接数据源"""
         try:
             if self.data_manager is None:
-                # 动态导入避免循环依赖
-                from core.data_manager import DataManager
-                self.data_manager = DataManager()
+                # 使用统一数据管理器
+                from core.services.unified_data_manager import get_unified_data_manager
+                self.data_manager = get_unified_data_manager()
             return True
         except Exception as e:
             self.logger.error(f"Failed to connect stock repository: {e}")
@@ -261,14 +172,22 @@ class StockRepository(BaseRepository):
 
             # 统一不同返回类型到StockInfo
             try:
+                import pandas as pd
                 if isinstance(raw_list, pd.DataFrame):
-                    iter_items = raw_list.to_dict(orient='records')
+                    if raw_list.empty:
+                        iter_items = []
+                    else:
+                        iter_items = raw_list.to_dict(orient='records')
                 else:
-                    iter_items = raw_list
+                    iter_items = raw_list if raw_list is not None else []
             except Exception:
-                iter_items = raw_list
+                iter_items = raw_list if raw_list is not None else []
 
-            for item in (iter_items or []):
+            # 安全处理迭代项
+            if iter_items is None:
+                iter_items = []
+
+            for item in iter_items:
                 try:
                     if isinstance(item, StockInfo):
                         stock_info = item
@@ -412,11 +331,11 @@ class KlineRepository(BaseRepository):
                     # 即使TET模式成功，也要准备传统模式的备用
                     if self.data_manager is None:
                         try:
-                            from core.data_manager import DataManager
-                            self.data_manager = DataManager()
-                            self.logger.debug("📊 KlineRepository同时准备传统模式DataManager作为备用")
+                            from core.services.unified_data_manager import get_unified_data_manager
+                            self.data_manager = get_unified_data_manager()
+                            self.logger.debug("📊 KlineRepository同时准备统一数据管理器作为备用")
                         except Exception as dm_e:
-                            self.logger.warning(f"⚠️ 无法创建备用DataManager: {dm_e}")
+                            self.logger.warning(f"⚠️ 无法创建备用统一数据管理器: {dm_e}")
 
                     return True
                 except Exception as e:
@@ -426,12 +345,12 @@ class KlineRepository(BaseRepository):
             if self.asset_service is not None:
                 return True
 
-            # 降级到传统DataManager
+            # 降级到统一数据管理器
             if self.data_manager is None:
                 try:
-                    from core.data_manager import DataManager
-                    self.data_manager = DataManager()
-                    self.logger.info("📊 KlineRepository使用传统模式（DataManager）")
+                    from core.services.unified_data_manager import get_unified_data_manager
+                    self.data_manager = get_unified_data_manager()
+                    self.logger.info("📊 KlineRepository使用统一数据管理器")
                 except ImportError:
                     self.logger.error("❌ 无法导入DataManager类")
                     return False
@@ -515,7 +434,10 @@ class KlineRepository(BaseRepository):
                     dm_get_kdata = getattr(self.data_manager, 'get_k_data', None)
 
                 if dm_get_kdata is None:
-                    self.logger.error("❌ DataManager缺少get_kdata/get_k_data方法，无法获取K线数据")
+                    available_methods = [method for method in dir(self.data_manager) if not method.startswith('_')]
+                    self.logger.error(f"❌ DataManager缺少get_kdata/get_k_data方法，无法获取K线数据。"
+                                      f"DataManager类型: {type(self.data_manager)}, "
+                                      f"可用方法: {available_methods[:10] if available_methods else '无公开方法'}...")
                     return None
 
                 # 从数据管理器获取K线数据
@@ -592,9 +514,9 @@ class MarketRepository(BaseRepository):
         """连接数据源"""
         try:
             if self.data_manager is None:
-                # ✅ 动态导入避免循环依赖
-                from core.data_manager import DataManager
-                self.data_manager = DataManager()
+                # ✅ 使用统一数据管理器
+                from core.services.unified_data_manager import get_unified_data_manager
+                self.data_manager = get_unified_data_manager()
             return True
         except Exception as e:
             self.logger.error(f"Failed to connect market repository: {e}")

@@ -1,438 +1,968 @@
 """
 策略服务
 
-提供策略管理、回测、优化等功能。
+提供策略插件管理、回测、优化等功能。
+支持多种策略框架（HIkyuu、Backtrader、自定义等）。
 """
 
 import logging
 import json
 import os
-from typing import Dict, Any, List, Optional
+import asyncio
+from typing import Dict, Any, List, Optional, Union, Tuple, Callable
 from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from enum import Enum
+import uuid
+import numpy as np
+import pandas as pd
 
 from .base_service import BaseService
+from ..events import EventBus
+from ..containers import ServiceContainer
+from ..strategy_extensions import (
+    IStrategyPlugin, StrategyInfo, StrategyContext, PerformanceMetrics,
+    Signal, TradeResult, Position, StandardMarketData,
+    StrategyType, AssetType, TimeFrame, RiskLevel
+)
+from ..strategy_events import (
+    StrategyStartedEvent, StrategyStoppedEvent, StrategyErrorEvent
+)
 
 logger = logging.getLogger(__name__)
 
 
+class BacktestStatus(Enum):
+    """回测状态"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class OptimizationStatus(Enum):
+    """优化状态"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class StrategyConfig:
+    """策略配置"""
+    strategy_id: str
+    plugin_type: str  # 'hikyuu', 'backtrader', 'custom'
+    parameters: Dict[str, Any]
+    enabled: bool = True
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class BacktestTask:
+    """回测任务"""
+    task_id: str
+    strategy_config: StrategyConfig
+    market_data: StandardMarketData
+    context: StrategyContext
+    status: BacktestStatus = BacktestStatus.PENDING
+    progress: float = 0.0
+    result: Optional[PerformanceMetrics] = None
+    error_message: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.now)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+@dataclass
+class OptimizationTask:
+    """优化任务"""
+    task_id: str
+    strategy_config: StrategyConfig
+    optimization_params: Dict[str, Any]
+    market_data: StandardMarketData
+    context: StrategyContext
+    status: OptimizationStatus = OptimizationStatus.PENDING
+    progress: float = 0.0
+    best_parameters: Optional[Dict[str, Any]] = None
+    best_performance: Optional[PerformanceMetrics] = None
+    optimization_history: List[Dict[str, Any]] = field(default_factory=list)
+    error_message: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.now)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
 class StrategyService(BaseService):
-    """策略服务"""
+    """
+    策略服务
 
-    def __init__(self):
+    负责：
+    1. 策略插件管理和注册
+    2. 策略配置管理
+    3. 策略回测服务
+    4. 策略优化服务
+    5. 策略评估和性能分析
+    6. 策略模板管理
+    """
+
+    def __init__(self,
+                 event_bus: Optional[EventBus] = None,
+                 config: Optional[Dict[str, Any]] = None,
+                 **kwargs):
         """初始化策略服务"""
-        super().__init__()
-        self.strategies = {}
-        self.backtest_results = {}
-        self.optimization_results = {}
-        self._load_strategies()
+        super().__init__(event_bus=event_bus, **kwargs)
+        self._config = config or {}
 
-    def _load_strategies(self) -> None:
-        """加载策略"""
+        # 策略插件管理
+        self._strategy_plugins: Dict[str, IStrategyPlugin] = {}
+        self._plugin_factories: Dict[str, Callable[[], IStrategyPlugin]] = {}
+
+        # 策略配置管理
+        self._strategy_configs: Dict[str, StrategyConfig] = {}
+
+        # 回测管理
+        self._backtest_tasks: Dict[str, BacktestTask] = {}
+        self._running_backtests: Dict[str, asyncio.Task] = {}
+
+        # 优化管理
+        self._optimization_tasks: Dict[str, OptimizationTask] = {}
+        self._running_optimizations: Dict[str, asyncio.Task] = {}
+
+        # 性能缓存
+        self._performance_cache: Dict[str, PerformanceMetrics] = {}
+
+        # 服务状态
+        self._max_concurrent_backtests = 3
+        self._max_concurrent_optimizations = 1
+
+        # 初始化
+        self._load_strategy_plugins()
+        self._load_strategy_configs()
+
+    def _do_initialize(self) -> None:
+        """初始化策略服务"""
         try:
-            # 这里应该从文件或数据库加载策略
+            logger.info("Strategy service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize strategy service: {e}")
+            raise
+
+    def _load_strategy_plugins(self) -> None:
+        """加载策略插件"""
+        try:
+            # 注册内置策略插件工厂
+            self._register_builtin_plugin_factories()
+
+            logger.info(f"已注册 {len(self._plugin_factories)} 个策略插件工厂")
+
+        except Exception as e:
+            logger.error(f"加载策略插件失败: {e}")
+
+    def _register_builtin_plugin_factories(self) -> None:
+        """注册内置策略插件工厂"""
+        try:
+            # HIkyuu策略插件
+            try:
+                from plugins.strategies.hikyuu_strategy_plugin import HikyuuStrategyPlugin
+                self._plugin_factories['hikyuu'] = lambda: HikyuuStrategyPlugin()
+            except ImportError:
+                logger.warning("HIkyuu策略插件不可用")
+
+            # Backtrader策略插件
+            try:
+                from plugins.strategies.backtrader_strategy_plugin import BacktraderStrategyPlugin
+                self._plugin_factories['backtrader'] = lambda: BacktraderStrategyPlugin()
+            except ImportError:
+                logger.warning("Backtrader策略插件不可用")
+
+            # 自定义策略插件
+            try:
+                from plugins.strategies.custom_strategy_plugin import CustomStrategyPlugin
+                self._plugin_factories['custom'] = lambda: CustomStrategyPlugin()
+            except ImportError:
+                logger.warning("自定义策略插件不可用")
+
+        except Exception as e:
+            logger.error(f"注册内置策略插件工厂失败: {e}")
+
+    def _load_strategy_configs(self) -> None:
+        """加载策略配置"""
+        try:
+            # 这里应该从数据库或文件加载策略配置
             # 暂时使用示例数据
-            self.strategies = {
-                'ma_cross': {
-                    'name': '双均线策略',
-                    'type': '趋势跟踪',
-                    'description': '基于短期和长期移动平均线的交叉信号进行交易',
-                    'parameters': {
-                        'short_period': 5,
-                        'long_period': 20,
-                        'stop_loss': 0.05,
-                        'take_profit': 0.10
-                    },
-                    'code': '''
-def strategy_logic(data, params):
-    signals = {'buy': [], 'sell': [], 'hold': []}
-    
-    if len(data) > params['long_period']:
-        ma_short = data['close'].rolling(params['short_period']).mean()
-        ma_long = data['close'].rolling(params['long_period']).mean()
-        
-        # 金叉买入
-        if ma_short.iloc[-1] > ma_long.iloc[-1] and ma_short.iloc[-2] <= ma_long.iloc[-2]:
-            signals['buy'].append({
-                'price': data['close'].iloc[-1],
-                'volume': 100,
-                'reason': '金叉买入'
-            })
-        # 死叉卖出
-        elif ma_short.iloc[-1] < ma_long.iloc[-1] and ma_short.iloc[-2] >= ma_long.iloc[-2]:
-            signals['sell'].append({
-                'price': data['close'].iloc[-1],
-                'volume': 100,
-                'reason': '死叉卖出'
-            })
-    
-    return signals
-                    ''',
-                    'created_date': '2024-01-01',
-                    'status': '活跃'
-                },
-                'rsi_reversal': {
-                    'name': 'RSI反转策略',
-                    'type': '均值回归',
-                    'description': '利用RSI超买超卖信号进行反向交易',
-                    'parameters': {
-                        'rsi_period': 14,
-                        'oversold_threshold': 30,
-                        'overbought_threshold': 70,
-                        'stop_loss': 0.03,
-                        'take_profit': 0.08
-                    },
-                    'code': '''
-def strategy_logic(data, params):
-    signals = {'buy': [], 'sell': [], 'hold': []}
-    
-    if len(data) > params['rsi_period']:
-        # 计算RSI
-        delta = data['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=params['rsi_period']).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=params['rsi_period']).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        
-        current_rsi = rsi.iloc[-1]
-        
-        # RSI超卖买入
-        if current_rsi < params['oversold_threshold']:
-            signals['buy'].append({
-                'price': data['close'].iloc[-1],
-                'volume': 100,
-                'reason': f'RSI超卖买入 ({current_rsi:.1f})'
-            })
-        # RSI超买卖出
-        elif current_rsi > params['overbought_threshold']:
-            signals['sell'].append({
-                'price': data['close'].iloc[-1],
-                'volume': 100,
-                'reason': f'RSI超买卖出 ({current_rsi:.1f})'
-            })
-    
-    return signals
-                    ''',
-                    'created_date': '2024-01-15',
-                    'status': '测试中'
-                }
-            }
-
-            logger.info(f"已加载 {len(self.strategies)} 个策略")
+            self._strategy_configs = {}
+            logger.info(f"已加载 {len(self._strategy_configs)} 个策略配置")
 
         except Exception as e:
-            logger.error(f"加载策略失败: {e}")
+            logger.error(f"加载策略配置失败: {e}")
 
-    def get_all_strategies(self) -> List[Dict[str, Any]]:
-        """获取所有策略"""
+    # 策略插件管理
+    def register_strategy_plugin(self, plugin_type: str, plugin_factory: Callable[[], IStrategyPlugin]) -> bool:
+        """注册策略插件工厂"""
         try:
-            return list(self.strategies.values())
-        except Exception as e:
-            logger.error(f"获取策略列表失败: {e}")
-            return []
-
-    def get_strategy(self, strategy_id: str) -> Optional[Dict[str, Any]]:
-        """获取指定策略"""
-        try:
-            return self.strategies.get(strategy_id)
-        except Exception as e:
-            logger.error(f"获取策略失败: {e}")
-            return None
-
-    def save_strategy(self, strategy_data: Dict[str, Any]) -> bool:
-        """保存策略"""
-        try:
-            strategy_id = strategy_data.get(
-                'name', '').lower().replace(' ', '_')
-            if not strategy_id:
-                logger.error("策略名称不能为空")
-                return False
-
-            self.strategies[strategy_id] = strategy_data
-
-            # 这里应该保存到文件或数据库
-            # 暂时只保存在内存中
-
-            logger.info(f"策略已保存: {strategy_data.get('name')}")
+            self._plugin_factories[plugin_type] = plugin_factory
+            logger.info(f"策略插件工厂已注册: {plugin_type}")
             return True
 
         except Exception as e:
-            logger.error(f"保存策略失败: {e}")
+            logger.error(f"注册策略插件工厂失败: {e}")
             return False
 
-    def delete_strategy(self, strategy_id: str) -> bool:
-        """删除策略"""
+    def unregister_strategy_plugin(self, plugin_type: str) -> bool:
+        """注销策略插件工厂"""
         try:
-            if strategy_id in self.strategies:
-                del self.strategies[strategy_id]
-                logger.info(f"策略已删除: {strategy_id}")
+            if plugin_type in self._plugin_factories:
+                del self._plugin_factories[plugin_type]
+
+                # 清理相关的插件实例
+                plugins_to_remove = [pid for pid, plugin in self._strategy_plugins.items()
+                                     if pid.startswith(f"{plugin_type}_")]
+                for plugin_id in plugins_to_remove:
+                    del self._strategy_plugins[plugin_id]
+
+                logger.info(f"策略插件工厂已注销: {plugin_type}")
                 return True
             else:
-                logger.warning(f"策略不存在: {strategy_id}")
+                logger.warning(f"策略插件工厂不存在: {plugin_type}")
                 return False
 
         except Exception as e:
-            logger.error(f"删除策略失败: {e}")
+            logger.error(f"注销策略插件工厂失败: {e}")
             return False
 
-    def clone_strategy(self, strategy_id: str, new_name: str) -> bool:
-        """克隆策略"""
+    def get_available_plugin_types(self) -> List[str]:
+        """获取可用的策略插件类型"""
+        return list(self._plugin_factories.keys())
+
+    def create_strategy_plugin(self, plugin_type: str) -> Optional[IStrategyPlugin]:
+        """创建策略插件实例"""
         try:
-            if strategy_id not in self.strategies:
-                logger.error(f"源策略不存在: {strategy_id}")
+            if plugin_type not in self._plugin_factories:
+                logger.error(f"策略插件类型不存在: {plugin_type}")
+                return None
+
+            plugin = self._plugin_factories[plugin_type]()
+            plugin_id = f"{plugin_type}_{uuid.uuid4().hex[:8]}"
+            self._strategy_plugins[plugin_id] = plugin
+
+            logger.info(f"策略插件实例已创建: {plugin_id}")
+            return plugin
+
+        except Exception as e:
+            logger.error(f"创建策略插件实例失败: {e}")
+            return None
+
+    def get_strategy_plugin_info(self, plugin_type: str) -> Optional[Dict[str, Any]]:
+        """获取策略插件信息"""
+        try:
+            plugin = self.create_strategy_plugin(plugin_type)
+            if plugin:
+                return plugin.plugin_info
+            return None
+
+        except Exception as e:
+            logger.error(f"获取策略插件信息失败: {e}")
+            return None
+
+    # 策略配置管理
+    def create_strategy_config(self,
+                               strategy_id: str,
+                               plugin_type: str,
+                               parameters: Dict[str, Any],
+                               metadata: Optional[Dict[str, Any]] = None) -> bool:
+        """创建策略配置"""
+        try:
+            if strategy_id in self._strategy_configs:
+                logger.error(f"策略配置已存在: {strategy_id}")
                 return False
 
-            # 复制策略数据
-            source_strategy = self.strategies[strategy_id].copy()
-            source_strategy['name'] = new_name
-            source_strategy['created_date'] = datetime.now().strftime(
-                '%Y-%m-%d')
-            source_strategy['status'] = '新建'
+            if plugin_type not in self._plugin_factories:
+                logger.error(f"策略插件类型不存在: {plugin_type}")
+                return False
 
-            # 保存克隆的策略
-            new_strategy_id = new_name.lower().replace(' ', '_')
-            self.strategies[new_strategy_id] = source_strategy
+            config = StrategyConfig(
+                strategy_id=strategy_id,
+                plugin_type=plugin_type,
+                parameters=parameters,
+                metadata=metadata or {}
+            )
 
-            logger.info(f"策略已克隆: {strategy_id} -> {new_strategy_id}")
+            self._strategy_configs[strategy_id] = config
+            logger.info(f"策略配置已创建: {strategy_id}")
             return True
 
         except Exception as e:
-            logger.error(f"克隆策略失败: {e}")
+            logger.error(f"创建策略配置失败: {e}")
             return False
 
-    def run_backtest(self, strategy_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def update_strategy_config(self,
+                               strategy_id: str,
+                               parameters: Optional[Dict[str, Any]] = None,
+                               enabled: Optional[bool] = None,
+                               metadata: Optional[Dict[str, Any]] = None) -> bool:
+        """更新策略配置"""
+        try:
+            if strategy_id not in self._strategy_configs:
+                logger.error(f"策略配置不存在: {strategy_id}")
+                return False
+
+            config = self._strategy_configs[strategy_id]
+
+            if parameters is not None:
+                config.parameters.update(parameters)
+
+            if enabled is not None:
+                config.enabled = enabled
+
+            if metadata is not None:
+                config.metadata.update(metadata)
+
+            config.updated_at = datetime.now()
+
+            logger.info(f"策略配置已更新: {strategy_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"更新策略配置失败: {e}")
+            return False
+
+    def delete_strategy_config(self, strategy_id: str) -> bool:
+        """删除策略配置"""
+        try:
+            if strategy_id not in self._strategy_configs:
+                logger.error(f"策略配置不存在: {strategy_id}")
+                return False
+
+            del self._strategy_configs[strategy_id]
+
+            # 清理相关的回测和优化任务
+            self._cleanup_strategy_tasks(strategy_id)
+
+            logger.info(f"策略配置已删除: {strategy_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"删除策略配置失败: {e}")
+            return False
+
+    def get_strategy_config(self, strategy_id: str) -> Optional[StrategyConfig]:
+        """获取策略配置"""
+        return self._strategy_configs.get(strategy_id)
+
+    def get_all_strategy_configs(self) -> List[StrategyConfig]:
+        """获取所有策略配置"""
+        return list(self._strategy_configs.values())
+
+    def clone_strategy_config(self, source_strategy_id: str, new_strategy_id: str) -> bool:
+        """克隆策略配置"""
+        try:
+            if source_strategy_id not in self._strategy_configs:
+                logger.error(f"源策略配置不存在: {source_strategy_id}")
+                return False
+
+            if new_strategy_id in self._strategy_configs:
+                logger.error(f"目标策略配置已存在: {new_strategy_id}")
+                return False
+
+            source_config = self._strategy_configs[source_strategy_id]
+
+            new_config = StrategyConfig(
+                strategy_id=new_strategy_id,
+                plugin_type=source_config.plugin_type,
+                parameters=source_config.parameters.copy(),
+                metadata=source_config.metadata.copy()
+            )
+
+            self._strategy_configs[new_strategy_id] = new_config
+
+            logger.info(f"策略配置已克隆: {source_strategy_id} -> {new_strategy_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"克隆策略配置失败: {e}")
+            return False
+
+    # 回测服务
+    async def run_backtest(self,
+                           strategy_id: str,
+                           market_data: StandardMarketData,
+                           context: StrategyContext) -> str:
         """运行回测"""
         try:
-            if strategy_id not in self.strategies:
-                logger.error(f"策略不存在: {strategy_id}")
-                return {}
+            if strategy_id not in self._strategy_configs:
+                raise ValueError(f"策略配置不存在: {strategy_id}")
 
-            strategy = self.strategies[strategy_id]
+            # 检查并发限制
+            if len(self._running_backtests) >= self._max_concurrent_backtests:
+                raise ValueError(f"回测任务数量超限，最大允许 {self._max_concurrent_backtests} 个")
 
-            # 模拟回测结果
-            backtest_result = {
-                'strategy_id': strategy_id,
-                'strategy_name': strategy['name'],
-                'start_date': params.get('start_date', '2023-01-01'),
-                'end_date': params.get('end_date', '2024-01-01'),
-                'initial_capital': params.get('initial_capital', 100000),
-                'final_capital': 115600,  # 模拟结果
-                'total_return': 0.156,
-                'annual_return': 0.123,
-                'max_drawdown': -0.082,
-                'sharpe_ratio': 1.45,
-                'win_rate': 0.625,
-                'profit_loss_ratio': 1.8,
-                'total_trades': 48,
-                'winning_trades': 30,
-                'losing_trades': 18,
-                'avg_profit': 1250.5,
-                'avg_loss': -695.8,
-                'max_profit': 3200.0,
-                'max_loss': -1850.0,
-                'backtest_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
+            # 创建回测任务
+            task_id = f"backtest_{strategy_id}_{uuid.uuid4().hex[:8]}"
 
-            # 保存回测结果
-            result_id = f"{strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            self.backtest_results[result_id] = backtest_result
+            backtest_task = BacktestTask(
+                task_id=task_id,
+                strategy_config=self._strategy_configs[strategy_id],
+                market_data=market_data,
+                context=context
+            )
 
-            logger.info(f"回测完成: {strategy['name']}")
-            return backtest_result
+            self._backtest_tasks[task_id] = backtest_task
+
+            # 启动回测任务
+            async_task = asyncio.create_task(self._execute_backtest(task_id))
+            self._running_backtests[task_id] = async_task
+
+            logger.info(f"回测任务已启动: {task_id}")
+            return task_id
 
         except Exception as e:
-            logger.error(f"运行回测失败: {e}")
-            return {}
+            logger.error(f"启动回测失败: {e}")
+            raise
 
-    def optimize_strategy(self, strategy_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """优化策略"""
+    async def _execute_backtest(self, task_id: str) -> None:
+        """执行回测"""
+        backtest_task = self._backtest_tasks[task_id]
+
         try:
-            if strategy_id not in self.strategies:
-                logger.error(f"策略不存在: {strategy_id}")
-                return {}
+            backtest_task.status = BacktestStatus.RUNNING
+            backtest_task.started_at = datetime.now()
 
-            strategy = self.strategies[strategy_id]
+            # 创建策略插件实例
+            plugin = self.create_strategy_plugin(backtest_task.strategy_config.plugin_type)
+            if not plugin:
+                raise ValueError(f"无法创建策略插件: {backtest_task.strategy_config.plugin_type}")
 
-            # 模拟优化结果
-            optimization_result = {
-                'strategy_id': strategy_id,
-                'strategy_name': strategy['name'],
-                'optimization_target': params.get('target', '总收益率'),
-                'optimization_algorithm': params.get('algorithm', '网格搜索'),
-                'iterations': params.get('iterations', 100),
-                'best_parameters': {
-                    'short_period': 5,
-                    'long_period': 20,
-                    'stop_loss': 0.035,
-                    'take_profit': 0.082
-                },
-                'best_performance': {
-                    'total_return': 0.189,
-                    'max_drawdown': -0.061,
-                    'sharpe_ratio': 1.67,
-                    'win_rate': 0.68
-                },
-                'improvement': {
-                    'total_return': 0.033,
-                    'max_drawdown': 0.021,
-                    'sharpe_ratio': 0.22,
-                    'win_rate': 0.055
-                },
-                'optimization_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
+            # 初始化策略
+            if not plugin.initialize_strategy(backtest_task.context, backtest_task.strategy_config.parameters):
+                raise ValueError("策略初始化失败")
 
-            # 保存优化结果
-            result_id = f"{strategy_id}_opt_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            self.optimization_results[result_id] = optimization_result
+            # 执行回测
+            signals = plugin.generate_signals(backtest_task.market_data, backtest_task.context)
+            backtest_task.progress = 0.5
 
-            logger.info(f"策略优化完成: {strategy['name']}")
-            return optimization_result
+            # 模拟交易执行和性能计算
+            performance = plugin.calculate_performance(backtest_task.context)
+            backtest_task.progress = 1.0
+
+            # 保存结果
+            backtest_task.result = performance
+            backtest_task.status = BacktestStatus.COMPLETED
+            backtest_task.completed_at = datetime.now()
+
+            # 缓存性能结果
+            cache_key = f"{backtest_task.strategy_config.strategy_id}_{hash(str(backtest_task.strategy_config.parameters))}"
+            self._performance_cache[cache_key] = performance
+
+            logger.info(f"回测任务完成: {task_id}")
 
         except Exception as e:
-            logger.error(f"策略优化失败: {e}")
-            return {}
+            backtest_task.status = BacktestStatus.FAILED
+            backtest_task.error_message = str(e)
+            backtest_task.completed_at = datetime.now()
 
-    def get_backtest_results(self, strategy_id: str = None) -> List[Dict[str, Any]]:
+            logger.error(f"回测任务失败: {task_id}, 错误: {e}")
+
+        finally:
+            # 清理运行中的任务
+            if task_id in self._running_backtests:
+                del self._running_backtests[task_id]
+
+    def get_backtest_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """获取回测状态"""
+        if task_id not in self._backtest_tasks:
+            return None
+
+        task = self._backtest_tasks[task_id]
+        return {
+            'task_id': task_id,
+            'status': task.status.value,
+            'progress': task.progress,
+            'created_at': task.created_at,
+            'started_at': task.started_at,
+            'completed_at': task.completed_at,
+            'error_message': task.error_message
+        }
+
+    def get_backtest_result(self, task_id: str) -> Optional[PerformanceMetrics]:
         """获取回测结果"""
+        if task_id not in self._backtest_tasks:
+            return None
+
+        task = self._backtest_tasks[task_id]
+        return task.result
+
+    def cancel_backtest(self, task_id: str) -> bool:
+        """取消回测"""
         try:
-            if strategy_id:
-                return [result for result in self.backtest_results.values()
-                        if result.get('strategy_id') == strategy_id]
-            else:
-                return list(self.backtest_results.values())
+            if task_id in self._running_backtests:
+                self._running_backtests[task_id].cancel()
+                del self._running_backtests[task_id]
 
-        except Exception as e:
-            logger.error(f"获取回测结果失败: {e}")
-            return []
+            if task_id in self._backtest_tasks:
+                self._backtest_tasks[task_id].status = BacktestStatus.CANCELLED
 
-    def get_optimization_results(self, strategy_id: str = None) -> List[Dict[str, Any]]:
-        """获取优化结果"""
-        try:
-            if strategy_id:
-                return [result for result in self.optimization_results.values()
-                        if result.get('strategy_id') == strategy_id]
-            else:
-                return list(self.optimization_results.values())
-
-        except Exception as e:
-            logger.error(f"获取优化结果失败: {e}")
-            return []
-
-    def export_strategy(self, strategy_id: str, file_path: str) -> bool:
-        """导出策略"""
-        try:
-            if strategy_id not in self.strategies:
-                logger.error(f"策略不存在: {strategy_id}")
-                return False
-
-            strategy = self.strategies[strategy_id]
-
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(strategy, f, ensure_ascii=False, indent=2)
-
-            logger.info(f"策略已导出: {file_path}")
+            logger.info(f"回测任务已取消: {task_id}")
             return True
 
         except Exception as e:
-            logger.error(f"导出策略失败: {e}")
+            logger.error(f"取消回测任务失败: {e}")
             return False
 
-    def import_strategy(self, file_path: str) -> bool:
-        """导入策略"""
+    # 优化服务
+    async def run_optimization(self,
+                               strategy_id: str,
+                               optimization_params: Dict[str, Any],
+                               market_data: StandardMarketData,
+                               context: StrategyContext) -> str:
+        """运行策略优化"""
         try:
-            if not os.path.exists(file_path):
-                logger.error(f"文件不存在: {file_path}")
-                return False
+            if strategy_id not in self._strategy_configs:
+                raise ValueError(f"策略配置不存在: {strategy_id}")
 
-            with open(file_path, 'r', encoding='utf-8') as f:
-                strategy_data = json.load(f)
+            # 检查并发限制
+            if len(self._running_optimizations) >= self._max_concurrent_optimizations:
+                raise ValueError(f"优化任务数量超限，最大允许 {self._max_concurrent_optimizations} 个")
 
-            # 验证策略数据
-            required_fields = ['name', 'type', 'description', 'code']
-            if not all(field in strategy_data for field in required_fields):
-                logger.error("策略数据格式不正确")
-                return False
+            # 创建优化任务
+            task_id = f"optimization_{strategy_id}_{uuid.uuid4().hex[:8]}"
 
-            # 保存策略
-            return self.save_strategy(strategy_data)
+            optimization_task = OptimizationTask(
+                task_id=task_id,
+                strategy_config=self._strategy_configs[strategy_id],
+                optimization_params=optimization_params,
+                market_data=market_data,
+                context=context
+            )
+
+            self._optimization_tasks[task_id] = optimization_task
+
+            # 启动优化任务
+            async_task = asyncio.create_task(self._execute_optimization(task_id))
+            self._running_optimizations[task_id] = async_task
+
+            logger.info(f"优化任务已启动: {task_id}")
+            return task_id
 
         except Exception as e:
-            logger.error(f"导入策略失败: {e}")
-            return False
+            logger.error(f"启动优化失败: {e}")
+            raise
 
-    def validate_strategy_code(self, code: str) -> Dict[str, Any]:
-        """验证策略代码"""
+    async def _execute_optimization(self, task_id: str) -> None:
+        """执行优化"""
+        optimization_task = self._optimization_tasks[task_id]
+
         try:
-            # 简单的代码验证
-            validation_result = {
-                'valid': True,
-                'errors': [],
-                'warnings': []
-            }
+            optimization_task.status = OptimizationStatus.RUNNING
+            optimization_task.started_at = datetime.now()
 
-            # 检查必要的函数
-            if 'strategy_logic' not in code:
-                validation_result['valid'] = False
-                validation_result['errors'].append("缺少strategy_logic函数")
+            # 获取优化参数
+            opt_params = optimization_task.optimization_params
+            algorithm = opt_params.get('algorithm', 'grid_search')
+            target_metric = opt_params.get('target_metric', 'total_return')
+            param_ranges = opt_params.get('parameter_ranges', {})
 
-            # 检查语法
+            # 执行优化算法
+            if algorithm == 'grid_search':
+                await self._grid_search_optimization(optimization_task, param_ranges, target_metric)
+            elif algorithm == 'random_search':
+                await self._random_search_optimization(optimization_task, param_ranges, target_metric)
+            elif algorithm == 'bayesian':
+                await self._bayesian_optimization(optimization_task, param_ranges, target_metric)
+            else:
+                raise ValueError(f"不支持的优化算法: {algorithm}")
+
+            optimization_task.status = OptimizationStatus.COMPLETED
+            optimization_task.completed_at = datetime.now()
+
+            logger.info(f"优化任务完成: {task_id}")
+
+        except Exception as e:
+            optimization_task.status = OptimizationStatus.FAILED
+            optimization_task.error_message = str(e)
+            optimization_task.completed_at = datetime.now()
+
+            logger.error(f"优化任务失败: {task_id}, 错误: {e}")
+
+        finally:
+            # 清理运行中的任务
+            if task_id in self._running_optimizations:
+                del self._running_optimizations[task_id]
+
+    async def _grid_search_optimization(self,
+                                        optimization_task: OptimizationTask,
+                                        param_ranges: Dict[str, Any],
+                                        target_metric: str) -> None:
+        """网格搜索优化"""
+        # 生成参数组合
+        param_combinations = self._generate_parameter_combinations(param_ranges)
+        total_combinations = len(param_combinations)
+
+        best_score = float('-inf')
+        best_params = None
+        best_performance = None
+
+        for i, params in enumerate(param_combinations):
             try:
-                compile(code, '<string>', 'exec')
-            except SyntaxError as e:
-                validation_result['valid'] = False
-                validation_result['errors'].append(f"语法错误: {e}")
+                # 更新策略参数
+                test_params = optimization_task.strategy_config.parameters.copy()
+                test_params.update(params)
 
-            # 检查潜在问题
-            if 'import os' in code or 'import sys' in code:
-                validation_result['warnings'].append("策略代码包含系统模块导入，请谨慎使用")
+                # 运行回测
+                plugin = self.create_strategy_plugin(optimization_task.strategy_config.plugin_type)
+                if plugin and plugin.initialize_strategy(optimization_task.context, test_params):
+                    signals = plugin.generate_signals(optimization_task.market_data, optimization_task.context)
+                    performance = plugin.calculate_performance(optimization_task.context)
 
-            return validation_result
+                    # 评估性能
+                    score = self._evaluate_performance(performance, target_metric)
+
+                    # 记录历史
+                    optimization_task.optimization_history.append({
+                        'iteration': i + 1,
+                        'parameters': params.copy(),
+                        'performance': performance,
+                        'score': score
+                    })
+
+                    # 更新最佳结果
+                    if score > best_score:
+                        best_score = score
+                        best_params = params.copy()
+                        best_performance = performance
+
+                # 更新进度
+                optimization_task.progress = (i + 1) / total_combinations
+
+                # 避免CPU占用过高
+                if i % 10 == 0:
+                    await asyncio.sleep(0.01)
+
+            except Exception as e:
+                logger.warning(f"优化迭代失败: {e}")
+                continue
+
+        # 保存最佳结果
+        optimization_task.best_parameters = best_params
+        optimization_task.best_performance = best_performance
+
+    async def _random_search_optimization(self,
+                                          optimization_task: OptimizationTask,
+                                          param_ranges: Dict[str, Any],
+                                          target_metric: str) -> None:
+        """随机搜索优化"""
+        max_iterations = optimization_task.optimization_params.get('max_iterations', 100)
+
+        best_score = float('-inf')
+        best_params = None
+        best_performance = None
+
+        for i in range(max_iterations):
+            try:
+                # 随机生成参数
+                params = self._generate_random_parameters(param_ranges)
+
+                # 更新策略参数
+                test_params = optimization_task.strategy_config.parameters.copy()
+                test_params.update(params)
+
+                # 运行回测
+                plugin = self.create_strategy_plugin(optimization_task.strategy_config.plugin_type)
+                if plugin and plugin.initialize_strategy(optimization_task.context, test_params):
+                    signals = plugin.generate_signals(optimization_task.market_data, optimization_task.context)
+                    performance = plugin.calculate_performance(optimization_task.context)
+
+                    # 评估性能
+                    score = self._evaluate_performance(performance, target_metric)
+
+                    # 记录历史
+                    optimization_task.optimization_history.append({
+                        'iteration': i + 1,
+                        'parameters': params.copy(),
+                        'performance': performance,
+                        'score': score
+                    })
+
+                    # 更新最佳结果
+                    if score > best_score:
+                        best_score = score
+                        best_params = params.copy()
+                        best_performance = performance
+
+                # 更新进度
+                optimization_task.progress = (i + 1) / max_iterations
+
+                # 避免CPU占用过高
+                if i % 10 == 0:
+                    await asyncio.sleep(0.01)
+
+            except Exception as e:
+                logger.warning(f"优化迭代失败: {e}")
+                continue
+
+        # 保存最佳结果
+        optimization_task.best_parameters = best_params
+        optimization_task.best_performance = best_performance
+
+    async def _bayesian_optimization(self,
+                                     optimization_task: OptimizationTask,
+                                     param_ranges: Dict[str, Any],
+                                     target_metric: str) -> None:
+        """贝叶斯优化（简化实现）"""
+        # 这里是简化的贝叶斯优化实现
+        # 实际应用中可以使用scikit-optimize等库
+        max_iterations = optimization_task.optimization_params.get('max_iterations', 50)
+
+        # 先进行少量随机搜索作为初始样本
+        await self._random_search_optimization(optimization_task, param_ranges, target_metric)
+
+        # 简化处理：使用随机搜索结果作为贝叶斯优化结果
+        optimization_task.progress = 1.0
+
+    def _generate_parameter_combinations(self, param_ranges: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """生成参数组合"""
+        combinations = []
+
+        # 简化实现：为每个参数生成几个值
+        param_values = {}
+        for param_name, param_range in param_ranges.items():
+            if isinstance(param_range, dict):
+                min_val = param_range.get('min', 1)
+                max_val = param_range.get('max', 10)
+                step = param_range.get('step', 1)
+                param_values[param_name] = list(range(min_val, max_val + 1, step))
+            elif isinstance(param_range, list):
+                param_values[param_name] = param_range
+
+        # 生成笛卡尔积
+        import itertools
+        keys = list(param_values.keys())
+        values = list(param_values.values())
+
+        for combination in itertools.product(*values):
+            combinations.append(dict(zip(keys, combination)))
+
+        return combinations
+
+    def _generate_random_parameters(self, param_ranges: Dict[str, Any]) -> Dict[str, Any]:
+        """生成随机参数"""
+        import random
+
+        params = {}
+        for param_name, param_range in param_ranges.items():
+            if isinstance(param_range, dict):
+                min_val = param_range.get('min', 1)
+                max_val = param_range.get('max', 10)
+                if isinstance(min_val, int) and isinstance(max_val, int):
+                    params[param_name] = random.randint(min_val, max_val)
+                else:
+                    params[param_name] = random.uniform(min_val, max_val)
+            elif isinstance(param_range, list):
+                params[param_name] = random.choice(param_range)
+
+        return params
+
+    def _evaluate_performance(self, performance: PerformanceMetrics, target_metric: str) -> float:
+        """评估性能指标"""
+        if target_metric == 'total_return':
+            return performance.total_return
+        elif target_metric == 'sharpe_ratio':
+            return performance.sharpe_ratio
+        elif target_metric == 'max_drawdown':
+            return -performance.max_drawdown  # 负值，因为回撤越小越好
+        elif target_metric == 'win_rate':
+            return performance.win_rate
+        elif target_metric == 'profit_factor':
+            return performance.profit_factor
+        else:
+            # 默认使用总收益率
+            return performance.total_return
+
+    def get_optimization_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """获取优化状态"""
+        if task_id not in self._optimization_tasks:
+            return None
+
+        task = self._optimization_tasks[task_id]
+        return {
+            'task_id': task_id,
+            'status': task.status.value,
+            'progress': task.progress,
+            'created_at': task.created_at,
+            'started_at': task.started_at,
+            'completed_at': task.completed_at,
+            'error_message': task.error_message,
+            'iterations_completed': len(task.optimization_history)
+        }
+
+    def get_optimization_result(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """获取优化结果"""
+        if task_id not in self._optimization_tasks:
+            return None
+
+        task = self._optimization_tasks[task_id]
+        return {
+            'best_parameters': task.best_parameters,
+            'best_performance': task.best_performance,
+            'optimization_history': task.optimization_history
+        }
+
+    def cancel_optimization(self, task_id: str) -> bool:
+        """取消优化"""
+        try:
+            if task_id in self._running_optimizations:
+                self._running_optimizations[task_id].cancel()
+                del self._running_optimizations[task_id]
+
+            if task_id in self._optimization_tasks:
+                self._optimization_tasks[task_id].status = OptimizationStatus.CANCELLED
+
+            logger.info(f"优化任务已取消: {task_id}")
+            return True
 
         except Exception as e:
-            logger.error(f"验证策略代码失败: {e}")
-            return {'valid': False, 'errors': [str(e)], 'warnings': []}
+            logger.error(f"取消优化任务失败: {e}")
+            return False
 
-    def get_strategy_performance(self, strategy_id: str) -> Dict[str, Any]:
-        """获取策略性能统计"""
+    # 策略评估服务
+    def evaluate_strategy_performance(self, strategy_id: str) -> Optional[Dict[str, Any]]:
+        """评估策略性能"""
         try:
-            if strategy_id not in self.strategies:
-                return {}
+            if strategy_id not in self._strategy_configs:
+                return None
 
             # 获取该策略的所有回测结果
-            backtest_results = self.get_backtest_results(strategy_id)
-            if not backtest_results:
-                return {}
+            strategy_backtests = [task for task in self._backtest_tasks.values()
+                                  if task.strategy_config.strategy_id == strategy_id
+                                  and task.status == BacktestStatus.COMPLETED]
 
-            # 计算性能统计
-            total_returns = [result['total_return']
-                             for result in backtest_results]
-            sharpe_ratios = [result['sharpe_ratio']
-                             for result in backtest_results]
-            max_drawdowns = [result['max_drawdown']
-                             for result in backtest_results]
+            if not strategy_backtests:
+                return None
 
-            performance = {
-                'total_backtests': len(backtest_results),
-                'avg_return': sum(total_returns) / len(total_returns),
-                'best_return': max(total_returns),
-                'worst_return': min(total_returns),
-                'avg_sharpe_ratio': sum(sharpe_ratios) / len(sharpe_ratios),
-                'avg_max_drawdown': sum(max_drawdowns) / len(max_drawdowns),
-                'consistency_score': 1 - (max(total_returns) - min(total_returns)) / max(total_returns) if total_returns else 0
+            # 计算统计指标
+            performances = [task.result for task in strategy_backtests if task.result]
+
+            if not performances:
+                return None
+
+            total_returns = [p.total_return for p in performances]
+            sharpe_ratios = [p.sharpe_ratio for p in performances]
+            max_drawdowns = [p.max_drawdown for p in performances]
+            win_rates = [p.win_rate for p in performances]
+
+            evaluation = {
+                'strategy_id': strategy_id,
+                'total_backtests': len(performances),
+                'performance_stats': {
+                    'avg_total_return': np.mean(total_returns),
+                    'std_total_return': np.std(total_returns),
+                    'min_total_return': np.min(total_returns),
+                    'max_total_return': np.max(total_returns),
+                    'avg_sharpe_ratio': np.mean(sharpe_ratios),
+                    'avg_max_drawdown': np.mean(max_drawdowns),
+                    'avg_win_rate': np.mean(win_rates),
+                },
+                'consistency_score': 1 - (np.std(total_returns) / np.mean(total_returns)) if np.mean(total_returns) != 0 else 0,
+                'risk_adjusted_return': np.mean(total_returns) / (np.mean(max_drawdowns) + 0.01),  # 避免除零
+                'evaluation_date': datetime.now()
             }
 
-            return performance
+            return evaluation
 
         except Exception as e:
-            logger.error(f"获取策略性能失败: {e}")
-            return {}
+            logger.error(f"评估策略性能失败: {e}")
+            return None
+
+    def compare_strategies(self, strategy_ids: List[str]) -> Optional[Dict[str, Any]]:
+        """比较多个策略"""
+        try:
+            evaluations = {}
+
+            for strategy_id in strategy_ids:
+                evaluation = self.evaluate_strategy_performance(strategy_id)
+                if evaluation:
+                    evaluations[strategy_id] = evaluation
+
+            if not evaluations:
+                return None
+
+            # 生成比较报告
+            comparison = {
+                'strategies': evaluations,
+                'rankings': {
+                    'by_total_return': sorted(evaluations.keys(),
+                                              key=lambda s: evaluations[s]['performance_stats']['avg_total_return'],
+                                              reverse=True),
+                    'by_sharpe_ratio': sorted(evaluations.keys(),
+                                              key=lambda s: evaluations[s]['performance_stats']['avg_sharpe_ratio'],
+                                              reverse=True),
+                    'by_consistency': sorted(evaluations.keys(),
+                                             key=lambda s: evaluations[s]['consistency_score'],
+                                             reverse=True),
+                    'by_risk_adjusted_return': sorted(evaluations.keys(),
+                                                      key=lambda s: evaluations[s]['risk_adjusted_return'],
+                                                      reverse=True)
+                },
+                'comparison_date': datetime.now()
+            }
+
+            return comparison
+
+        except Exception as e:
+            logger.error(f"比较策略失败: {e}")
+            return None
+
+    # 辅助方法
+    def _cleanup_strategy_tasks(self, strategy_id: str) -> None:
+        """清理策略相关的任务"""
+        # 清理回测任务
+        backtest_tasks_to_remove = [task_id for task_id, task in self._backtest_tasks.items()
+                                    if task.strategy_config.strategy_id == strategy_id]
+        for task_id in backtest_tasks_to_remove:
+            self.cancel_backtest(task_id)
+            del self._backtest_tasks[task_id]
+
+        # 清理优化任务
+        optimization_tasks_to_remove = [task_id for task_id, task in self._optimization_tasks.items()
+                                        if task.strategy_config.strategy_id == strategy_id]
+        for task_id in optimization_tasks_to_remove:
+            self.cancel_optimization(task_id)
+            del self._optimization_tasks[task_id]
 
     def get_service_status(self) -> Dict[str, Any]:
         """获取服务状态"""
         return {
             'service_name': 'StrategyService',
             'status': 'running',
-            'strategies_count': len(self.strategies),
-            'backtest_results_count': len(self.backtest_results),
-            'optimization_results_count': len(self.optimization_results),
+            'plugin_types_count': len(self._plugin_factories),
+            'strategy_configs_count': len(self._strategy_configs),
+            'active_backtests': len(self._running_backtests),
+            'active_optimizations': len(self._running_optimizations),
+            'total_backtest_tasks': len(self._backtest_tasks),
+            'total_optimization_tasks': len(self._optimization_tasks),
+            'performance_cache_size': len(self._performance_cache),
             'last_update': datetime.now().isoformat()
         }
+
+    def _do_dispose(self) -> None:
+        """清理资源"""
+        try:
+            # 取消所有运行中的任务
+            for task_id in list(self._running_backtests.keys()):
+                self.cancel_backtest(task_id)
+
+            for task_id in list(self._running_optimizations.keys()):
+                self.cancel_optimization(task_id)
+
+            # 清理插件实例
+            self._strategy_plugins.clear()
+
+            super()._do_dispose()
+            logger.info("Strategy service disposed")
+
+        except Exception as e:
+            logger.error(f"Failed to dispose strategy service: {e}")

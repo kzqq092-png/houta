@@ -64,29 +64,25 @@ class StockService(CacheableService, ConfigurableService):
     def _do_initialize(self) -> None:
         """初始化股票服务"""
         try:
-            # 尝试连接真正的HIkyuu数据访问层
+            # 使用统一数据管理器
             try:
-                from ..data.hikyuu_data_manager import HikyuuDataManager
-                hikyuu_data_manager = HikyuuDataManager()
+                from .unified_data_manager import get_unified_data_manager
+                unified_data_manager = get_unified_data_manager()
 
-                # 测试HIkyuu连接
-                if hikyuu_data_manager.test_connection():
-                    logger.info("Using HIkyuu data manager")
-                    self._data_access = DataAccess(hikyuu_data_manager)
+                if unified_data_manager and unified_data_manager.test_connection():
+                    logger.info("Using unified data manager")
+                    self._data_access = DataAccess(unified_data_manager)
                     self._data_access.connect()
                 else:
-                    raise RuntimeError(
-                        "HIkyuu data manager connection test failed")
+                    raise RuntimeError("Unified data manager connection test failed")
 
-            except Exception as hikyuu_error:
-                logger.warning(
-                    f"Failed to initialize HIkyuu data manager: {hikyuu_error}")
+            except Exception as unified_error:
+                logger.warning(f"Failed to initialize unified data manager: {unified_error}")
                 logger.warning("Falling back to default data access layer")
 
                 # 回退到默认数据访问层
                 if not self._data_access.connect():
-                    logger.warning(
-                        "Data access layer connection failed, using mock data mode")
+                    logger.warning("Data access layer connection failed, using mock data mode")
                     self.use_mock_data = True
                 else:
                     self.use_mock_data = False

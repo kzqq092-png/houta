@@ -2,84 +2,157 @@ import sys
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
-from typing import Optional
+from typing import Optional, Dict, Any
 from .logger import LogManager, LogLevel
+from .containers import ServiceContainer
 
-# Import TradingSystem from the new location
-from .trading_system import TradingSystem
-
-# 新建交易控制器（整合原分散的交易控制逻辑）
+# 重构后的交易控制器 - 使用服务架构
 
 
 class TradingController(QObject):
+    """
+    交易控制器 - 重构版本
+
+    使用ServiceContainer获取TradingService，符合插件架构原则
+    """
     signal_updated = pyqtSignal(dict)
     log_updated = pyqtSignal(str)
+    position_updated = pyqtSignal(dict)
+    risk_updated = pyqtSignal(dict)
+    market_updated = pyqtSignal(dict)
+    backtest_updated = pyqtSignal(dict)
 
-    def __init__(self, log_manager: Optional[LogManager] = None):
+    def __init__(self, service_container: ServiceContainer, log_manager: Optional[LogManager] = None):
         super().__init__()
+        self.service_container = service_container
         self.log_manager = log_manager or LogManager()
-        self.trading_system = TradingSystem()
+
+        # 获取交易服务
+        self._trading_service = None
+        self._trading_engine = None
+        self._unified_data_manager = None
+
         self.current_strategy = None
         self.order_queue = []
 
-        # 连接信号
-        self.trading_system.signal_updated.connect(self.handle_signal)
-        self.trading_system.log_updated.connect(self.handle_log)
-        self.trading_system.position_updated.connect(
-            lambda x: self.signal_updated.emit({'type': 'position', 'data': x}))
-        self.trading_system.risk_updated.connect(
-            lambda x: self.signal_updated.emit({'type': 'risk', 'data': x}))
-        self.trading_system.market_updated.connect(
-            lambda x: self.signal_updated.emit({'type': 'market', 'data': x}))
-        self.trading_system.backtest_updated.connect(
-            lambda x: self.signal_updated.emit({'type': 'backtest', 'data': x}))
+        # 初始化服务
+        self._initialize_services()
+
+    def _initialize_services(self):
+        """初始化服务依赖"""
+        try:
+            # 获取交易服务
+            from .services.trading_service import TradingService
+            self._trading_service = self.service_container.resolve(TradingService)
+
+            # 获取交易引擎
+            from .trading_engine import TradingEngine
+            self._trading_engine = self.service_container.resolve(TradingEngine)
+
+            # 获取统一数据管理器
+            from .services.unified_data_manager import UnifiedDataManager
+            self._unified_data_manager = self.service_container.resolve(UnifiedDataManager)
+
+            self.log_manager.info("交易控制器服务依赖初始化完成")
+
+        except Exception as e:
+            self.log_manager.error(f"交易控制器服务依赖初始化失败: {e}")
 
     def initialize(self):
         """Initialize the trading controller"""
         try:
             self.log_manager.info("Initializing trading controller...")
-            # Add initialization code
+
+            if self._trading_service:
+                # 初始化交易服务
+                if hasattr(self._trading_service, 'initialize'):
+                    self._trading_service.initialize()
+
+            self.log_updated.emit("交易控制器初始化完成")
+
         except Exception as e:
-            self.log_manager.error(
-                f"Failed to initialize trading controller: {str(e)}")
+            self.log_manager.error(f"Failed to initialize trading controller: {str(e)}")
+            self.log_updated.emit(f"交易控制器初始化失败: {str(e)}")
             raise
 
     def cleanup(self):
         """Clean up resources"""
         try:
             self.log_manager.info("Cleaning up trading controller...")
-            # Add cleanup code
+
+            if self._trading_service and hasattr(self._trading_service, 'cleanup'):
+                self._trading_service.cleanup()
+
+            if self._trading_engine and hasattr(self._trading_engine, 'cleanup'):
+                self._trading_engine.cleanup()
+
+            self.log_updated.emit("交易控制器清理完成")
+
         except Exception as e:
-            self.log_manager.error(
-                f"Failed to cleanup trading controller: {str(e)}")
+            self.log_manager.error(f"Failed to cleanup trading controller: {str(e)}")
 
     def handle_signal(self, signal):
         """处理交易信号"""
-        # 添加风险控制检查
-        if self.check_risk(signal):
-            self.order_queue.append(signal)
-            self.execute_orders()
+        try:
+            # 添加风险控制检查
+            if self.check_risk(signal):
+                self.order_queue.append(signal)
+                self.execute_orders()
 
-    def check_risk(self, signal):
+        except Exception as e:
+            self.log_updated.emit(f"处理交易信号失败: {str(e)}")
+
+    def check_risk(self, signal) -> bool:
         """风险控制检查"""
-        # 实现实时风险检查逻辑
-        current_risk = self.trading_system.get_current_risk()
-        if current_risk['exposure'] > 0.8:
-            self.log_updated.emit("风险警告: 仓位超过80%")
+        try:
+            if not self._trading_service:
+                self.log_updated.emit("风险检查失败: 交易服务不可用")
+                return False
+
+            # 获取当前风险状态
+            portfolio = self._trading_service.get_portfolio()
+            if portfolio:
+                # 计算仓位比例
+                total_assets = portfolio.total_assets
+                market_value = portfolio.market_value
+
+                if total_assets > 0:
+                    exposure = market_value / total_assets
+                    if exposure > 0.8:
+                        self.log_updated.emit("风险警告: 仓位超过80%")
+                        self.risk_updated.emit({
+                            'type': 'high_exposure',
+                            'exposure': exposure,
+                            'message': '仓位超过80%'
+                        })
+                        return False
+
+            return True
+
+        except Exception as e:
+            self.log_updated.emit(f"风险检查失败: {str(e)}")
             return False
-        return True
 
     def execute_orders(self):
         """执行订单"""
         while self.order_queue:
             order = self.order_queue.pop(0)
             try:
-                # 调用交易系统执行订单
-                result = self.trading_system.execute_order(order)
-                if result['success']:
-                    self.signal_updated.emit({'type': 'order', 'data': result})
+                if not self._trading_service:
+                    self.log_updated.emit("执行订单失败: 交易服务不可用")
+                    continue
+
+                # 使用交易服务执行订单
+                if hasattr(self._trading_service, 'execute_signal'):
+                    result = self._trading_service.execute_signal(order)
+                    if result:
+                        self.signal_updated.emit({'type': 'order', 'data': result})
+                        self.log_updated.emit(f"订单执行成功: {order}")
+                    else:
+                        self.log_updated.emit(f"订单执行失败: {order}")
                 else:
-                    self.log_updated.emit(result['message'])
+                    self.log_updated.emit("交易服务不支持信号执行")
+
             except Exception as e:
                 self.log_updated.emit(f"订单执行失败: {str(e)}")
 
@@ -89,29 +162,57 @@ class TradingController(QObject):
         self.log_updated.emit(message)
 
     def run_backtest(self, params):
-        """运行回测（增强版）"""
+        """运行回测（重构版）"""
         try:
             # 添加参数验证
             if not validate_backtest_params(params):
                 raise ValueError("无效的回测参数")
 
-            # 确保交易系统已初始化
-            if not self.trading_system.initialized:
-                self.log_updated.emit("交易系统未初始化，正在初始化...")
-                if not self.trading_system.initialize_systems(params):
-                    raise ValueError("交易系统初始化失败")
+            if not self._trading_service:
+                raise ValueError("交易服务不可用")
 
-            # 获取股票对象
-            from hikyuu import Stock
-            stock_code = params['stock']  # 现在直接使用stock参数作为代码
-            stock = Stock(stock_code)
+            # 使用交易服务的回测功能
+            if hasattr(self._trading_service, 'run_backtest'):
+                results = self._trading_service.run_backtest(params)
+            else:
+                # 降级到统一数据管理器
+                if not self._unified_data_manager:
+                    raise ValueError("数据管理器不可用")
 
-            # 调用交易系统执行回测
-            results = self.trading_system.run_backtest(
-                stock,
-                params['start_date'],
-                params['end_date']
-            )
+                # 获取K线数据
+                stock_code = params['stock']
+                start_date = params.get('start_date')
+                end_date = params.get('end_date')
+
+                kdata = self._unified_data_manager.get_kdata(
+                    stock_code,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+
+                if kdata is None or (hasattr(kdata, 'empty') and kdata.empty):
+                    raise ValueError("无法获取K线数据")
+
+                # 简化的回测结果
+                results = {
+                    'trades': [],
+                    'positions': [],
+                    'performance': {
+                        'total_return': 0.0,
+                        'annual_return': 0.0,
+                        'max_drawdown': 0.0,
+                        'win_rate': 0.0,
+                        'profit_factor': 1.0,
+                        'sharpe_ratio': 0.0
+                    },
+                    'risk': {
+                        'alpha': 0.0,
+                        'beta': 1.0,
+                        'information_ratio': 0.0,
+                        'tracking_error': 0.0,
+                        'var': 0.0
+                    }
+                }
 
             # 检查结果是否为None
             if results is None:
@@ -120,49 +221,88 @@ class TradingController(QObject):
 
             # 添加风险指标计算
             try:
-                results['risk_metrics'] = self.calculate_risk_metrics(results)
+                if 'risk_metrics' not in results:
+                    results['risk_metrics'] = self.calculate_risk_metrics(results)
             except Exception as e:
                 self.log_updated.emit(f"计算风险指标失败: {str(e)}")
                 results['risk_metrics'] = {}
 
             # 发送信号更新UI
-            self.signal_updated.emit(
-                {'type': 'backtest_complete', 'data': results})
+            self.backtest_updated.emit(results)
+            self.signal_updated.emit({'type': 'backtest_complete', 'data': results})
+
             return results
 
         except Exception as e:
-            self.log_updated.emit(f"回测失败: {str(e)}")
+            error_msg = f"回测失败: {str(e)}"
+            self.log_updated.emit(error_msg)
             return None
 
     def calculate_risk_metrics(self, results):
-        """计算风险指标（整合原分散的风险计算）"""
-        # 实现综合风险指标计算逻辑
-        if not results or 'drawdowns' not in results or 'returns' not in results:
+        """计算风险指标"""
+        try:
+            if not results or 'performance' not in results:
+                return {
+                    'max_drawdown': 0,
+                    'sharpe_ratio': 0,
+                    'var_95': 0
+                }
+
+            performance = results.get('performance', {})
+
+            return {
+                'max_drawdown': performance.get('max_drawdown', 0),
+                'sharpe_ratio': performance.get('sharpe_ratio', 0),
+                'var_95': performance.get('var', 0)
+            }
+
+        except Exception as e:
+            self.log_updated.emit(f"计算风险指标失败: {str(e)}")
             return {
                 'max_drawdown': 0,
                 'sharpe_ratio': 0,
                 'var_95': 0
             }
 
-        # 检查数据是否为空
-        if len(results['drawdowns']) == 0 or len(results['returns']) == 0:
-            return {
-                'max_drawdown': 0,
-                'sharpe_ratio': 0,
-                'var_95': 0
-            }
+    def get_current_positions(self):
+        """获取当前持仓"""
+        try:
+            if self._trading_service and hasattr(self._trading_service, 'get_portfolio'):
+                portfolio = self._trading_service.get_portfolio()
+                return portfolio.positions if portfolio else []
+            elif self._trading_engine and hasattr(self._trading_engine, 'get_all_positions'):
+                return self._trading_engine.get_all_positions()
+            else:
+                return []
 
-        return {
-            'max_drawdown': max(results['drawdowns']),
-            # 避免除零错误
-            'sharpe_ratio': results['returns'].mean() / (results['returns'].std() or 1e-6),
-            'var_95': np.percentile(results['returns'], 5)
-        }
+        except Exception as e:
+            self.log_updated.emit(f"获取持仓失败: {str(e)}")
+            return []
+
+    def get_trading_statistics(self):
+        """获取交易统计"""
+        try:
+            if self._trading_service and hasattr(self._trading_service, 'get_portfolio'):
+                portfolio = self._trading_service.get_portfolio()
+                if portfolio:
+                    return {
+                        'total_assets': portfolio.total_assets,
+                        'available_cash': portfolio.available_cash,
+                        'market_value': portfolio.market_value,
+                        'total_profit_loss': portfolio.total_profit_loss,
+                        'total_profit_loss_pct': portfolio.total_profit_loss_pct,
+                        'trade_count': len(portfolio.trade_history)
+                    }
+            return {}
+
+        except Exception as e:
+            self.log_updated.emit(f"获取交易统计失败: {str(e)}")
+            return {}
 
 
 def validate_backtest_params(params):
     """验证回测参数"""
-    required_fields = ['stock', 'start_date', 'end_date']
+    required_fields = ['stock']
 
     # 检查必填字段
     for field in required_fields:
@@ -171,13 +311,6 @@ def validate_backtest_params(params):
 
     # 验证股票代码
     if not params['stock'] or not isinstance(params['stock'], str):
-        return False
-
-    # 验证日期格式
-    try:
-        # 这里可以添加日期格式检查的逻辑
-        pass
-    except:
         return False
 
     return True

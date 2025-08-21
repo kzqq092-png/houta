@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # 导入性能监控
 try:
-    from utils.performance_monitor import monitor_performance, get_performance_monitor
+    from core.performance import measure_performance as monitor_performance, get_performance_monitor, PerformanceCategory
     PERFORMANCE_MONITORING = True
     logger.info("图表性能监控已启用")
 except ImportError:
@@ -447,8 +447,8 @@ class ChartCanvas(QWidget):
             # 记录加载时间
             if PERFORMANCE_MONITORING and self.performance_monitor:
                 total_time = time.time() - self.loading_start_time
-                self.performance_monitor.record_time(
-                    "chart_loading_total", total_time)
+                self.performance_monitor.record_timing(
+                    "chart_loading_total", total_time, PerformanceCategory.UI)
 
             self.loading_state_changed.emit(False, "")
 
@@ -495,8 +495,8 @@ class ChartCanvas(QWidget):
 
             # 记录性能指标
             if PERFORMANCE_MONITORING and self.performance_monitor:
-                self.performance_monitor.record_time("chart_loading_basic_kdata",
-                                                     time.time() - self.loading_start_time)
+                self.performance_monitor.record_timing("chart_loading_basic_kdata",
+                                                       time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
             self.update_chart({'kdata': kdata})
@@ -509,8 +509,8 @@ class ChartCanvas(QWidget):
 
             # 记录性能指标
             if PERFORMANCE_MONITORING and self.performance_monitor:
-                self.performance_monitor.record_time("chart_loading_volume",
-                                                     time.time() - self.loading_start_time)
+                self.performance_monitor.record_timing("chart_loading_volume",
+                                                       time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
             self.update_chart({'kdata': kdata})
@@ -523,8 +523,8 @@ class ChartCanvas(QWidget):
 
             # 记录性能指标
             if PERFORMANCE_MONITORING and self.performance_monitor:
-                self.performance_monitor.record_time("chart_loading_indicators",
-                                                     time.time() - self.loading_start_time)
+                self.performance_monitor.record_timing("chart_loading_indicators",
+                                                       time.time() - self.loading_start_time, PerformanceCategory.UI)
         else:
             # 使用普通更新
             chart_data = {'kdata': kdata, 'indicators': indicators}

@@ -309,7 +309,13 @@ def measure(operation_name: Optional[str] = None) -> Callable:
     Returns:
         装饰器函数
     """
-    return get_app_metrics_service().measure(operation_name)
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 延迟获取服务，避免在导入时就初始化
+            return get_app_metrics_service().measure(operation_name or func.__name__)(func)(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def measure_time(operation_name: Optional[str] = None) -> Callable:
@@ -322,4 +328,10 @@ def measure_time(operation_name: Optional[str] = None) -> Callable:
     Returns:
         装饰器函数
     """
-    return get_app_metrics_service().measure_time(operation_name)
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 延迟获取服务，避免在导入时就初始化
+            return get_app_metrics_service().measure_time(operation_name or func.__name__)(func)(*args, **kwargs)
+        return wrapper
+    return decorator

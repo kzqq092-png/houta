@@ -24,7 +24,7 @@ import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
 from ..logger import LogManager
-from ..data_manager import DataManager
+from .unified_data_manager import UnifiedDataManager
 
 
 @dataclass
@@ -47,7 +47,7 @@ class SectorFundFlowService(QObject):
     error_occurred = pyqtSignal(str)  # 错误信号
     source_changed = pyqtSignal(str)  # 数据源变更信号
 
-    def __init__(self, data_manager: Optional[DataManager] = None,
+    def __init__(self, data_manager: Optional[UnifiedDataManager] = None,
                  config: Optional[SectorFlowConfig] = None,
                  log_manager: Optional[LogManager] = None):
         """
@@ -68,7 +68,8 @@ class SectorFundFlowService(QObject):
                 self.data_manager = get_data_manager()
             except ImportError:
                 # 降级到直接导入
-                self.data_manager = DataManager()
+                from .unified_data_manager import get_unified_data_manager
+                self.data_manager = get_unified_data_manager()
         else:
             self.data_manager = data_manager
         self.config = config or SectorFlowConfig()

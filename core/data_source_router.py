@@ -630,7 +630,7 @@ class DataSourceRouter:
                 else:
                     metrics.failed_requests += 1
                     circuit_breaker.record_failure()
-                    logger.warning(f"数据源 {source_id} 请求失败: {error}")
+                    # logger.warning(f"数据源 {source_id} 请求失败: {error}")
 
                 # 更新平均响应时间
                 if response_time_ms > 0:
@@ -662,6 +662,23 @@ class DataSourceRouter:
         with self._lock:
             circuit_breaker = self.circuit_breakers.get(source_id)
             return circuit_breaker.state if circuit_breaker else None
+
+    def get_available_sources(self, routing_request) -> List[str]:
+        """
+        获取可用的数据源列表（公共接口）
+
+        Args:
+            routing_request: 路由请求对象，包含asset_type等信息
+
+        Returns:
+            List[str]: 可用数据源ID列表
+        """
+        try:
+            asset_type = routing_request.asset_type
+            return self._get_available_sources(asset_type)
+        except Exception as e:
+            logger.error(f"获取可用数据源失败: {e}")
+            return []
 
     def _get_available_sources(self, asset_type: AssetType) -> List[str]:
         """获取支持指定资产类型的数据源"""
@@ -740,7 +757,7 @@ class DataSourceRouter:
                                 source_id,
                                 health_result.is_healthy,
                                 response_time,
-                                health_result.error_message
+                                health_result.message
                             )
 
                             # 触发健康状态变化事件

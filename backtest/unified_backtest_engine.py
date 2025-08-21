@@ -610,7 +610,7 @@ class UnifiedBacktestEngine:
             calmar_ratio = annualized_return / max_drawdown if max_drawdown != 0 else 0
 
             # VaR和CVaR
-            var_95 = np.percentile(returns, 5)
+            var_95 = abs(np.percentile(returns, 5))  # 修复：VaR应该为正值表示损失
             var_99 = np.percentile(returns, 1)
             cvar_95 = returns[returns <= var_95].mean() if len(
                 returns[returns <= var_95]) > 0 else 0

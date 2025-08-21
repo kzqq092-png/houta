@@ -19,7 +19,7 @@ import warnings
 from typing import Optional, Dict, Any
 from functools import lru_cache
 from core.industry_manager import IndustryManager
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 from core.logger import LogManager
 from utils.theme import ThemeManager
 from utils.config_manager import ConfigManager
@@ -130,7 +130,7 @@ class ManagerFactory:
 
             return self._instances[cache_key]
 
-    def get_data_manager(self, log_manager=None, force_new: bool = False) -> 'DataManager':
+    def get_data_manager(self, log_manager=None, force_new: bool = False) -> 'UnifiedDataManager':
         """
         获取数据管理器实例（单例）
 
@@ -139,7 +139,7 @@ class ManagerFactory:
             force_new: 是否强制创建新实例
 
         Returns:
-            DataManager实例
+            UnifiedDataManager实例
         """
         cache_key = f'data_manager_{id(log_manager) if log_manager else "default"}'
 
@@ -148,12 +148,12 @@ class ManagerFactory:
                 try:
                     if log_manager is None:
                         log_manager = self.get_log_manager()
-                    self._instances[cache_key] = DataManager(log_manager)
+                    self._instances[cache_key] = UnifiedDataManager()
                 except ImportError as e:
-                    warnings.warn(f"无法导入DataManager: {e}")
+                    warnings.warn(f"无法导入UnifiedDataManager: {e}")
                     self._instances[cache_key] = self._create_simple_data_manager()
                 except Exception as e:
-                    warnings.warn(f"创建DataManager失败: {e}")
+                    warnings.warn(f"创建UnifiedDataManager失败: {e}")
                     self._instances[cache_key] = self._create_simple_data_manager()
 
             return self._instances[cache_key]
@@ -190,7 +190,6 @@ class ManagerFactory:
                 try:
                     # 记录开始创建实例
                     log_manager.info(f"开始创建行业管理器实例 - 缓存键: {cache_key}")
-
 
                     # 确保使用统一的日志管理器
                     if log_manager is None:
@@ -470,18 +469,8 @@ class ManagerFactory:
         return SimpleThemeManager()
 
     def _create_simple_data_manager(self):
-        """创建简化版数据管理器"""
-        class SimpleDataManager:
-            def __init__(self):
-                self.data = {}
-
-            def get_data(self, key: str):
-                return self.data.get(key)
-
-            def set_data(self, key: str, value):
-                self.data[key] = value
-
-        return SimpleDataManager()
+        """创建数据管理器 - 重定向到UnifiedDataManager"""
+        return UnifiedDataManager()
 
     def _create_simple_industry_manager(self):
         """创建简化版行业管理器"""
@@ -656,7 +645,7 @@ def get_theme_manager(config_manager=None, force_new: bool = False) -> 'ThemeMan
     return get_manager_factory().get_theme_manager(config_manager, force_new)
 
 
-def get_data_manager(log_manager=None, force_new: bool = False) -> 'DataManager':
+def get_data_manager(log_manager=None, force_new: bool = False) -> 'UnifiedDataManager':
     """
     获取数据管理器实例
 
@@ -665,7 +654,7 @@ def get_data_manager(log_manager=None, force_new: bool = False) -> 'DataManager'
         force_new: 是否强制创建新实例
 
     Returns:
-        DataManager实例
+        UnifiedDataManager实例
     """
     return get_manager_factory().get_data_manager(log_manager, force_new)
 

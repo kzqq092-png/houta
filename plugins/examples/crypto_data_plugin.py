@@ -22,8 +22,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
 
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
-from core.data_source_data_models import HealthCheckResult
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
+from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import AssetType, DataType
 from core.logger import get_logger
 

@@ -6,7 +6,7 @@
 """
 
 # 延迟导入，避免循环依赖和事件循环冲突
-# from .performance_evaluator import PerformanceEvaluator
+# 性能评估器已迁移到 core.performance.UnifiedPerformanceMonitor
 # from .version_manager import VersionManager
 # from .algorithm_optimizer import AlgorithmOptimizer
 # from .auto_tuner import AutoTuner

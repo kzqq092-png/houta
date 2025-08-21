@@ -1,37 +1,38 @@
 """
-行业服务模块
+行业服务
 
-负责行业数据的获取、缓存和管理。
-封装IndustryManager，使其符合服务架构。
+提供行业数据的统一访问接口
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import List, Dict, Any, Optional, Set
+import time
+from datetime import datetime
 from .base_service import CacheableService, ConfigurableService
 from ..events import DataUpdateEvent
 from ..industry_manager import IndustryManager
-from utils.manager_factory import get_industry_manager
+# 移除循环导入，在需要时动态导入
 
 logger = logging.getLogger(__name__)
 
 
 class IndustryService(CacheableService, ConfigurableService):
-    """
-    行业服务
+    """行业数据服务"""
 
-    负责行业数据的获取、缓存和管理。
-    """
-
-    def __init__(self, config: Optional[Dict[str, Any]] = None, cache_size: int = 100, **kwargs):
+    def __init__(self, service_container=None, event_bus=None,
+                 cache_size: int = 1000, config: Dict[str, Any] = None, **kwargs):
         """
         初始化行业服务
 
         Args:
-            config: 服务配置
+            service_container: 服务容器
+            event_bus: 事件总线
             cache_size: 缓存大小
-            **kwargs: 其他参数
+            config: 配置信息
         """
-        # 初始化各个基类
+        logger.info("Initializing IndustryService...")
+
+        # 分别初始化父类
         CacheableService.__init__(self, cache_size=cache_size, **kwargs)
         ConfigurableService.__init__(self, config=config, **kwargs)
 
@@ -42,14 +43,14 @@ class IndustryService(CacheableService, ConfigurableService):
     def _do_initialize(self) -> None:
         """初始化行业服务"""
         try:
-            # 获取行业管理器实例
+            # 获取行业管理器实例 - 动态导入避免循环依赖
+            from utils.manager_factory import get_industry_manager
             self._industry_manager = get_industry_manager()
 
             if self._industry_manager:
                 logger.info("Industry service initialized successfully")
             else:
-                logger.warning(
-                    "Failed to get industry manager, using fallback mode")
+                logger.warning("Failed to get industry manager, using fallback mode")
                 self._create_fallback_manager()
 
         except Exception as e:

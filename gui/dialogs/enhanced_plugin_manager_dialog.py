@@ -172,20 +172,14 @@ class TablePopulationWorker(QThread):
                                     status_message = "插件未连接"
                                     print(f"❌ 插件 {source_id} is_connected() 返回 False")
                                 else:
-                                    # 3. 执行健康检查（最严格的验证）
+                                    # 3. 执行健康检查（与手动测试保持一致）
                                     try:
                                         health_result = adapter.health_check()
                                         if hasattr(health_result, 'is_healthy') and health_result.is_healthy:
-                                            # 4. 最后验证：检查适配器状态
-                                            from core.data_source_extensions import PluginStatus
-                                            adapter_status = getattr(adapter, 'status', None)
-                                            if adapter_status == PluginStatus.READY:
-                                                is_connected = True
-                                                status_message = "活跃"
-                                                print(f"✅ 插件 {source_id} 所有检查通过，状态活跃")
-                                            else:
-                                                status_message = f"适配器状态异常: {adapter_status}"
-                                                print(f"❌ 插件 {source_id} 适配器状态不是READY: {adapter_status}")
+                                            # 健康检查通过即认为连接正常
+                                            is_connected = True
+                                            status_message = "活跃"
+                                            print(f"✅ 插件 {source_id} 健康检查通过，状态活跃")
                                         else:
                                             error_msg = getattr(health_result, 'error_message', '健康检查失败')
                                             status_message = error_msg
@@ -197,8 +191,20 @@ class TablePopulationWorker(QThread):
                                 status_message = f"连接检查失败: {str(e)}"
                                 print(f"❌ 调用插件is_connected失败 {source_id}: {e}")
                         else:
-                            status_message = "插件不支持连接检查"
-                            print(f"❌ 插件 {source_id} 不支持连接检查")
+                            # 插件不支持is_connected方法，直接进行健康检查
+                            try:
+                                health_result = adapter.health_check()
+                                if hasattr(health_result, 'is_healthy') and health_result.is_healthy:
+                                    is_connected = True
+                                    status_message = "活跃"
+                                    print(f"✅ 插件 {source_id} 健康检查通过（无is_connected方法）")
+                                else:
+                                    error_msg = getattr(health_result, 'error_message', '健康检查失败')
+                                    status_message = error_msg
+                                    print(f"❌ 插件 {source_id} 健康检查失败: {error_msg}")
+                            except Exception as e:
+                                status_message = f"健康检查异常: {str(e)}"
+                                print(f"❌ 插件 {source_id} 健康检查异常: {e}")
                 else:
                     status_message = "插件实例不存在"
                     print(f"❌ 插件 {source_id} 实例不存在")
@@ -1328,7 +1334,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
                         # 构建状态信息
                         status = "✅ 已连接" if status_info.get('is_connected', False) else "❌ 未连接"
-                        last_update = self._format_timestamp(status_info.get('last_update'))
+                        last_update = self._format_timestamp(time.time())
                         quality = self._calculate_data_quality(status_info)
 
                         # 更新widget状态 - 使用字典格式

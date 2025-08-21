@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+from core.services.unified_data_accessor import get_stock_data, get_stock_info, calculate_historical_average
 # -*- coding: utf-8 -*-
 """
 专业情绪分析标签页 - 合并增强版本
@@ -1153,7 +1153,9 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except Exception as e:
             print(f"❌ 情绪分析启动失败: {e}")
             traceback.print_exc()
-            QMessageBox.critical(self, "错误", f"启动分析失败: {str(e)}")
+            # 使用非阻塞错误提示替换阻塞式弹框
+            self.update_status_label(f"❌ 启动分析失败: {str(e)}")
+            self.error_occurred.emit(f"启动分析失败: {str(e)}")
             self.reset_ui_state()
 
     def reset_ui_state(self):
@@ -1218,7 +1220,11 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def on_analysis_error(self, error_message: str):
         """异步分析错误信号处理"""
         print(f"❌ [ProfessionalSentimentTab] 情绪分析失败: {error_message}")
-        QMessageBox.critical(self, "错误", f"分析失败: {error_message}")
+        # 使用非阻塞错误提示替换阻塞式弹框
+        self.update_status_label(f"❌ 分析失败: {error_message}")
+        # 发送错误信号给父组件处理
+        if hasattr(self, 'error_occurred'):
+            self.error_occurred.emit(f"情绪分析失败: {error_message}")
         self.reset_ui_state()
 
     def process_sentiment_response(self, response: 'SentimentResponse'):
@@ -1334,7 +1340,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 尝试从hikyuu获取真实历史数据
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         # 获取最近30天的数据进行对比
@@ -1587,7 +1593,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu技术指标进行修正
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-20))  # 最近20天
@@ -1628,7 +1634,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu计算真实波动率
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-30))  # 最近30天
@@ -1659,7 +1665,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu的资金流指标
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-20))
@@ -1719,7 +1725,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu技术指标计算技术面情绪
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-50))
@@ -1784,7 +1790,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu计算市场强度
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-20))
@@ -1876,7 +1882,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用真实历史数据生成趋势
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    import hikyuu as hk
+                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-period))

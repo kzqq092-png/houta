@@ -2,19 +2,23 @@
 TET数据管道实现
 Transform-Extract-Transform数据处理管道
 借鉴OpenBB架构设计，为HIkyuu-UI提供标准化多资产数据支持
+
+增强版本：支持多数据源路由、故障转移、插件化数据源
 """
 
 import logging
 import time
+import asyncio
 from typing import Dict, Any, Optional, List, Tuple, Union
 import pandas as pd
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .plugin_types import AssetType, DataType
-from .data_source_router import DataSourceRouter, RoutingRequest
-from .data_source_extensions import IDataSourcePlugin
+from .data_source_router import DataSourceRouter, RoutingRequest, RoutingStrategy
+from .data_source_extensions import IDataSourcePlugin, DataSourcePluginAdapter, HealthCheckResult
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,12 @@ class StandardQuery:
     provider: Optional[str] = None  # 指定数据源
     extra_params: Dict[str, Any] = field(default_factory=dict)
 
+    # 路由相关参数
+    priority: int = 0
+    timeout_ms: int = 5000
+    retry_count: int = 3
+    fallback_enabled: bool = True
+
     def __post_init__(self):
         """后处理初始化"""
         if self.extra_params is None:
@@ -43,20 +53,57 @@ class StandardData:
     """标准化数据输出"""
     data: pd.DataFrame
     metadata: Dict[str, Any]
-    source_info: Dict[str, str]
+    source_info: Dict[str, Any]
     query: StandardQuery
-    processing_time_ms: float
+    processing_time_ms: float = 0.0
+
+
+@dataclass
+class FailoverResult:
+    """故障转移结果"""
+    success: bool
+    attempts: int
+    failed_sources: List[str]
+    successful_source: Optional[str]
+    error_messages: List[str]
+    total_time_ms: float
 
 
 class TETDataPipeline:
     """
     TET数据管道实现
     Transform-Extract-Transform三阶段数据处理
+
+    增强功能：
+    - 多数据源路由和负载均衡
+    - 智能故障转移
+    - 插件化数据源支持
+    - 异步并发处理
+    - 缓存和性能优化
     """
 
     def __init__(self, data_source_router: DataSourceRouter):
         self.router = data_source_router
         self.logger = logging.getLogger(self.__class__.__name__)
+
+        # 插件管理
+        self._plugins: Dict[str, IDataSourcePlugin] = {}
+        self._adapters: Dict[str, DataSourcePluginAdapter] = {}
+
+        # 缓存管理
+        self._cache: Dict[str, Tuple[StandardData, datetime]] = {}
+        self._cache_ttl = timedelta(minutes=5)  # 缓存5分钟
+
+        # 异步处理
+        self._executor = ThreadPoolExecutor(max_workers=4)
+
+        # 性能统计
+        self._stats = {
+            "total_requests": 0,
+            "cache_hits": 0,
+            "fallback_used": 0,
+            "avg_processing_time": 0.0
+        }
 
         # 字段映射表（用于数据标准化）
         self.field_mappings = {
@@ -82,69 +129,99 @@ class TETDataPipeline:
 
             # 实时数据映射
             DataType.REAL_TIME_QUOTE: {
-                'price': 'price', 'Price': 'price', 'last': 'price', '现价': 'price',
-                'bid': 'bid', 'Bid': 'bid', '买价': 'bid',
-                'ask': 'ask', 'Ask': 'ask', '卖价': 'ask',
-                'volume': 'volume', 'Volume': 'volume', '成交量': 'volume',
-                'change': 'change', 'Change': 'change', '涨跌': 'change',
-                'change_percent': 'change_percent', 'Change%': 'change_percent', '涨跌幅': 'change_percent'
-            },
+                # 基础价格字段
+                'price': 'current_price', 'current': 'current_price', 'last': 'current_price', '现价': 'current_price',
+                'bid': 'bid_price', 'bid_price': 'bid_price', '买一价': 'bid_price',
+                'ask': 'ask_price', 'ask_price': 'ask_price', '卖一价': 'ask_price',
+                'open': 'open_price', 'open_price': 'open_price', '开盘价': 'open_price',
+                'high': 'high_price', 'high_price': 'high_price', '最高价': 'high_price',
+                'low': 'low_price', 'low_price': 'low_price', '最低价': 'low_price',
+                'close': 'prev_close', 'prev_close': 'prev_close', '昨收价': 'prev_close',
 
-            # 资金流数据映射
-            DataType.FUND_FLOW: {
-                'net_inflow': 'net_inflow', '净流入': 'net_inflow', '主力净流入-净额': 'net_inflow',
-                'net_inflow_ratio': 'net_inflow_ratio', '净流入占比': 'net_inflow_ratio', '主力净流入-净占比': 'net_inflow_ratio',
-                'main_inflow': 'main_inflow', '主力流入': 'main_inflow', '主力资金流入': 'main_inflow',
-                'main_outflow': 'main_outflow', '主力流出': 'main_outflow', '主力资金流出': 'main_outflow',
-                'retail_inflow': 'retail_inflow', '散户流入': 'retail_inflow', '中小单流入': 'retail_inflow',
-                'retail_outflow': 'retail_outflow', '散户流出': 'retail_outflow', '中小单流出': 'retail_outflow'
-            },
+                # 成交量和成交额
+                'volume': 'volume', 'vol': 'volume', '成交量': 'volume',
+                'amount': 'turnover', 'turnover': 'turnover', '成交额': 'turnover',
 
-            # 板块资金流数据映射
-            DataType.SECTOR_FUND_FLOW: {
-                'sector_name': 'sector_name', '板块': 'sector_name', '板块名称': 'sector_name',
-                'net_inflow': 'net_inflow', '今日主力净流入-净额': 'net_inflow', '净流入': 'net_inflow',
-                'net_inflow_ratio': 'net_inflow_ratio', '今日主力净流入-净占比': 'net_inflow_ratio', '净流入占比': 'net_inflow_ratio',
-                'change_percent': 'change_percent', '涨跌幅': 'change_percent', '板块涨跌幅': 'change_percent',
-                'leading_stock': 'leading_stock', '领涨股': 'leading_stock', '龙头股': 'leading_stock'
-            },
+                # 涨跌相关
+                'change': 'change', 'chg': 'change', '涨跌额': 'change',
+                'change_pct': 'change_percent', 'pct_chg': 'change_percent', '涨跌幅': 'change_percent',
 
-            # 板块数据映射
-            DataType.SECTOR_DATA: {
-                'sector_name': 'sector_name', '板块': 'sector_name', '板块名称': 'sector_name',
-                'price': 'price', '现价': 'price', '最新价': 'price',
-                'change': 'change', '涨跌': 'change', '涨跌额': 'change',
-                'change_percent': 'change_percent', '涨跌幅': 'change_percent',
-                'volume': 'volume', '成交量': 'volume', '总成交量': 'volume',
-                'turnover': 'turnover', '成交额': 'turnover', '总成交额': 'turnover',
-                'market_cap': 'market_cap', '总市值': 'market_cap', '流通市值': 'market_cap'
-            },
-
-            # 实时资金流数据映射
-            DataType.REAL_TIME_FUND_FLOW: {
-                'time': 'time', '时间': 'time', 'timestamp': 'time',
-                'symbol': 'symbol', '代码': 'symbol', '股票代码': 'symbol',
-                'name': 'name', '名称': 'name', '股票名称': 'name',
-                'net_inflow': 'net_inflow', '净流入': 'net_inflow', '主力净流入': 'net_inflow',
-                'inflow_intensity': 'inflow_intensity', '流入强度': 'inflow_intensity',
-                'activity': 'activity', '活跃度': 'activity', '资金活跃度': 'activity'
-            },
-
-            # 技术指标数据映射
-            DataType.TECHNICAL_INDICATORS: {
-                'ma5': 'ma5', 'MA5': 'ma5', '5日均线': 'ma5',
-                'ma10': 'ma10', 'MA10': 'ma10', '10日均线': 'ma10',
-                'ma20': 'ma20', 'MA20': 'ma20', '20日均线': 'ma20',
-                'rsi': 'rsi', 'RSI': 'rsi', '相对强弱指标': 'rsi',
-                'macd': 'macd', 'MACD': 'macd', 'MACD指标': 'macd',
-                'kdj_k': 'kdj_k', 'KDJ_K': 'kdj_k', 'K值': 'kdj_k',
-                'kdj_d': 'kdj_d', 'KDJ_D': 'kdj_d', 'D值': 'kdj_d',
-                'kdj_j': 'kdj_j', 'KDJ_J': 'kdj_j', 'J值': 'kdj_j'
+                # 时间戳
+                'timestamp': 'update_time', 'time': 'update_time', 'update_time': 'update_time', '更新时间': 'update_time'
             }
         }
 
         # 空值表示（用于清理数据）
         self.null_values = ['N/A', 'null', 'NULL', '', 'nan', 'NaN', 'None', '--', '-']
+
+    def register_plugin(self, plugin_id: str, plugin: IDataSourcePlugin) -> bool:
+        """
+        注册数据源插件
+
+        Args:
+            plugin_id: 插件唯一标识
+            plugin: 插件实例
+
+        Returns:
+            bool: 注册是否成功
+        """
+        try:
+            # 验证插件接口
+            from .data_source_extensions import validate_plugin_interface, create_plugin_adapter
+
+            if not validate_plugin_interface(plugin):
+                self.logger.error(f"插件接口验证失败: {plugin_id}")
+                return False
+
+            # 创建适配器
+            adapter = create_plugin_adapter(plugin, plugin_id)
+            if not adapter:
+                self.logger.error(f"创建插件适配器失败: {plugin_id}")
+                return False
+
+            # 注册到路由器
+            self.router.register_data_source(plugin_id, adapter)
+
+            # 保存引用
+            self._plugins[plugin_id] = plugin
+            self._adapters[plugin_id] = adapter
+
+            self.logger.info(f"数据源插件注册成功: {plugin_id}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"注册数据源插件失败 {plugin_id}: {e}")
+            return False
+
+    def unregister_plugin(self, plugin_id: str) -> bool:
+        """
+        注销数据源插件
+
+        Args:
+            plugin_id: 插件唯一标识
+
+        Returns:
+            bool: 注销是否成功
+        """
+        try:
+            # 从路由器注销
+            self.router.unregister_data_source(plugin_id)
+
+            # 断开连接
+            if plugin_id in self._adapters:
+                self._adapters[plugin_id].disconnect()
+                del self._adapters[plugin_id]
+
+            # 清理引用
+            if plugin_id in self._plugins:
+                del self._plugins[plugin_id]
+
+            self.logger.info(f"数据源插件注销成功: {plugin_id}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"注销数据源插件失败 {plugin_id}: {e}")
+            return False
 
     def process(self, query: StandardQuery) -> StandardData:
         """
@@ -160,16 +237,30 @@ class TETDataPipeline:
             Exception: 处理失败时抛出异常
         """
         start_time = time.time()
+        self._stats["total_requests"] += 1
 
         try:
             self.logger.info(f"开始TET处理: {query.symbol} ({query.asset_type.value}) - {query.data_type.value}")
 
-            # Stage 1: Transform Query（查询转换）
-            provider_query = self.transform_query(query)
-            self.logger.debug(f"查询转换完成: provider={provider_query['provider_id']}")
+            # 检查缓存
+            cache_key = self._generate_cache_key(query)
+            cached_result = self._get_from_cache(cache_key)
+            if cached_result:
+                self._stats["cache_hits"] += 1
+                self.logger.debug(f"缓存命中: {query.symbol}")
+                return cached_result
 
-            # Stage 2: Extract Data（数据提取）
-            raw_data, provider_info = self.extract_data(provider_query)
+            # Stage 1: Transform Query（查询转换）
+            routing_request = self.transform_query(query)
+            self.logger.debug(f"查询转换完成: asset_type={routing_request.asset_type.value}")
+
+            # Stage 2: Extract Data（数据提取 - 支持故障转移）
+            raw_data, provider_info, failover_result = self.extract_data_with_failover(routing_request, query)
+
+            if failover_result and not failover_result.success:
+                self.logger.error(f"所有数据源都失败: {query.symbol}")
+                raise Exception(f"数据提取失败: {', '.join(failover_result.error_messages)}")
+
             self.logger.debug(f"数据提取完成: {len(raw_data) if raw_data is not None else 0} 条记录")
 
             # Stage 3: Transform Data（数据标准化）
@@ -180,11 +271,17 @@ class TETDataPipeline:
 
             result = StandardData(
                 data=standard_data,
-                metadata=self._build_metadata(query, raw_data),
+                metadata=self._build_metadata(query, raw_data, failover_result),
                 source_info=provider_info,
                 query=query,
                 processing_time_ms=processing_time
             )
+
+            # 更新缓存
+            self._set_to_cache(cache_key, result)
+
+            # 更新统计
+            self._update_stats(processing_time)
 
             self.logger.info(f"TET处理完成: {processing_time:.2f}ms")
             return result
@@ -194,431 +291,424 @@ class TETDataPipeline:
             self.logger.error(f"TET处理失败 ({processing_time:.2f}ms): {e}")
             raise
 
-    def transform_query(self, query: StandardQuery) -> Dict[str, Any]:
+    def transform_query(self, query: StandardQuery) -> RoutingRequest:
         """
-        Stage 1: Transform Query
-        将标准查询转换为Provider特定格式
+        Stage 1: 查询转换
+        将标准化查询转换为路由请求
 
         Args:
-            query: 标准化查询请求
+            query: 标准化查询
 
         Returns:
-            Dict: Provider特定的查询信息
+            RoutingRequest: 路由请求
         """
-        # 选择数据源
-        if query.provider:
-            provider_id = query.provider
-            provider = self.router.get_data_source(provider_id)
-            if not provider:
-                raise ValueError(f"指定的数据源不存在: {query.provider}")
-        else:
-            routing_request = RoutingRequest(
-                asset_type=query.asset_type,
-                data_type=query.data_type,
-                symbol=query.symbol,
-                metadata={"market": query.market}
-            )
-            provider_id = self.router.route_request(routing_request)
-            if not provider_id:
-                raise ValueError(f"没有可用的数据源: {query.asset_type.value}/{query.data_type.value}")
-
-            provider = self.router.get_data_source(provider_id)
-
-        # 构建基础查询参数
-        provider_params = {
-            'symbol': self._normalize_symbol(query.symbol, query.asset_type),
-            'data_type': query.data_type.value,
-            'start_date': self._parse_date(query.start_date),
-            'end_date': self._parse_date(query.end_date),
-            'period': query.period
-        }
-
-        # 添加扩展参数
-        if query.extra_params:
-            provider_params.update(query.extra_params)
-
-        # Provider特定的查询转换
-        if hasattr(provider.plugin, 'transform_query_params'):
-            provider_params = provider.plugin.transform_query_params(provider_params)
-        else:
-            # 使用通用转换逻辑
-            provider_params = self._generic_query_transform(provider_params, provider_id)
-
-        return {
-            'provider_id': provider_id,
-            'provider': provider,
-            'params': provider_params
-        }
-
-    def extract_data(self, provider_query: Dict) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """
-        Stage 2: Extract Data
-        从实际数据源获取原始数据
-
-        Args:
-            provider_query: Provider特定的查询信息
-
-        Returns:
-            Tuple[pd.DataFrame, Dict]: 原始数据和Provider信息
-        """
-        provider = provider_query['provider']
-        params = provider_query['params']
-        provider_id = provider_query['provider_id']
-
-        try:
-            # 记录请求开始
-            start_time = time.time()
-
-            # 调用Provider获取数据
-            raw_data = provider.plugin.fetch_data(**params)
-
-            # 记录成功
-            response_time = (time.time() - start_time) * 1000
-            self.router.record_request_result(provider_id, True, response_time)
-
-            provider_info = {
-                'provider_id': provider_id,
-                'provider_name': getattr(provider.plugin, 'name', provider_id),
-                'response_time_ms': response_time,
-                'data_points': len(raw_data) if raw_data is not None else 0,
-                'request_params': params,
-                'timestamp': datetime.now().isoformat()
+        return RoutingRequest(
+            asset_type=query.asset_type,
+            data_type=query.data_type,
+            symbol=query.symbol,
+            priority=query.priority,
+            timeout_ms=query.timeout_ms,
+            retry_count=query.retry_count,
+            metadata={
+                'period': query.period,
+                'start_date': query.start_date,
+                'end_date': query.end_date,
+                'market': query.market,
+                'provider': query.provider,
+                **query.extra_params
             }
+        )
 
-            return raw_data, provider_info
+    def extract_data_with_failover(self, routing_request: RoutingRequest,
+                                   original_query: StandardQuery) -> Tuple[pd.DataFrame, Dict[str, Any], FailoverResult]:
+        """
+        Stage 2: 数据提取（支持故障转移）
 
-        except Exception as e:
-            # 记录失败
-            response_time = (time.time() - start_time) * 1000
-            self.router.record_request_result(provider_id, False, response_time, str(e))
+        Args:
+            routing_request: 路由请求
+            original_query: 原始查询
 
-            self.logger.error(f"数据提取失败 [{provider_id}]: {e}")
-            raise
+        Returns:
+            Tuple[pd.DataFrame, Dict[str, Any], FailoverResult]: (数据, 提供商信息, 故障转移结果)
+        """
+        start_time = time.time()
+        failed_sources = []
+        error_messages = []
+        attempts = 0
+
+        # 获取可用数据源列表
+        available_sources = self.router.get_available_sources(routing_request)
+
+        if not available_sources:
+            failover_result = FailoverResult(
+                success=False,
+                attempts=0,
+                failed_sources=[],
+                successful_source=None,
+                error_messages=["没有可用的数据源"],
+                total_time_ms=(time.time() - start_time) * 1000
+            )
+            return pd.DataFrame(), {}, failover_result
+
+        # 如果指定了特定提供商，优先使用
+        if original_query.provider and original_query.provider in available_sources:
+            available_sources = [original_query.provider] + [s for s in available_sources if s != original_query.provider]
+
+        # 尝试每个数据源
+        for source_id in available_sources:
+            attempts += 1
+
+            try:
+                self.logger.debug(f"尝试数据源: {source_id} (第{attempts}次尝试)")
+
+                # 获取数据源适配器
+                adapter = self._adapters.get(source_id)
+                if not adapter:
+                    error_msg = f"数据源适配器不存在: {source_id}"
+                    error_messages.append(error_msg)
+                    failed_sources.append(source_id)
+                    continue
+
+                # 检查连接状态
+                if not adapter.is_connected():
+                    if not adapter.connect():
+                        error_msg = f"数据源连接失败: {source_id}"
+                        error_messages.append(error_msg)
+                        failed_sources.append(source_id)
+                        continue
+
+                # 提取数据
+                raw_data = self._extract_from_source(adapter, routing_request, original_query)
+
+                if raw_data is not None and not raw_data.empty:
+                    provider_info = {
+                        'provider': source_id,
+                        'plugin_info': adapter.get_plugin_info(),
+                        'extraction_time': datetime.now().isoformat()
+                    }
+
+                    failover_result = FailoverResult(
+                        success=True,
+                        attempts=attempts,
+                        failed_sources=failed_sources,
+                        successful_source=source_id,
+                        error_messages=error_messages,
+                        total_time_ms=(time.time() - start_time) * 1000
+                    )
+
+                    self.logger.info(f"数据提取成功: {source_id} (尝试{attempts}次)")
+                    return raw_data, provider_info, failover_result
+                else:
+                    error_msg = f"数据源返回空数据: {source_id}"
+                    error_messages.append(error_msg)
+                    failed_sources.append(source_id)
+
+            except Exception as e:
+                error_msg = f"数据源异常 {source_id}: {str(e)}"
+                error_messages.append(error_msg)
+                failed_sources.append(source_id)
+                self.logger.warning(error_msg)
+
+        # 所有数据源都失败
+        self._stats["fallback_used"] += 1
+
+        failover_result = FailoverResult(
+            success=False,
+            attempts=attempts,
+            failed_sources=failed_sources,
+            successful_source=None,
+            error_messages=error_messages,
+            total_time_ms=(time.time() - start_time) * 1000
+        )
+
+        return pd.DataFrame(), {}, failover_result
+
+    def _extract_from_source(self, adapter: DataSourcePluginAdapter,
+                             routing_request: RoutingRequest,
+                             original_query: StandardQuery) -> pd.DataFrame:
+        """
+        从指定数据源提取数据
+
+        Args:
+            adapter: 数据源适配器
+            routing_request: 路由请求
+            original_query: 原始查询
+
+        Returns:
+            pd.DataFrame: 提取的数据
+        """
+        if original_query.data_type == DataType.HISTORICAL_KLINE:
+            return adapter.get_kdata(
+                symbol=original_query.symbol,
+                freq=original_query.period,
+                start_date=original_query.start_date,
+                end_date=original_query.end_date,
+                count=original_query.extra_params.get('count')
+            )
+        elif original_query.data_type == DataType.REAL_TIME_QUOTE:
+            return adapter.get_real_time_quotes([original_query.symbol])
+        elif original_query.data_type == DataType.ASSET_LIST:
+            # 获取资产列表
+            asset_list = adapter.get_asset_list(
+                asset_type=original_query.asset_type,
+                market=original_query.market
+            )
+            # 转换为DataFrame
+            if asset_list:
+                return pd.DataFrame(asset_list)
+            else:
+                return pd.DataFrame()
+        elif original_query.data_type == DataType.SECTOR_FUND_FLOW:
+            # 获取板块资金流数据
+            plugin = self._plugins.get(adapter.plugin_id)
+            if plugin and hasattr(plugin, 'get_sector_fund_flow_data'):
+                return plugin.get_sector_fund_flow_data(
+                    symbol=original_query.symbol,
+                    **original_query.extra_params
+                )
+            else:
+                self.logger.warning(f"插件 {adapter.plugin_id} 不支持板块资金流数据")
+                return pd.DataFrame()
+        else:
+            # 其他数据类型，直接调用插件接口
+            plugin = self._plugins.get(adapter.plugin_id)
+            if plugin:
+                if hasattr(plugin, 'fetch_data'):
+                    return plugin.fetch_data(
+                        original_query.symbol,
+                        original_query.data_type.value,
+                        **original_query.extra_params
+                    )
+
+        return pd.DataFrame()
 
     def transform_data(self, raw_data: pd.DataFrame, query: StandardQuery) -> pd.DataFrame:
         """
-        Stage 3: Transform Data
-        标准化数据格式
+        Stage 3: 数据标准化
 
         Args:
             raw_data: 原始数据
-            query: 查询请求
+            query: 查询对象
 
         Returns:
-            pd.DataFrame: 标准化后的数据
+            pd.DataFrame: 标准化数据
         """
         if raw_data is None or raw_data.empty:
             return pd.DataFrame()
 
-        # 创建数据副本
-        standardized = raw_data.copy()
+        try:
+            # 获取字段映射
+            field_mapping = self.field_mappings.get(query.data_type, {})
 
-        # 根据数据类型进行标准化
-        if query.data_type == DataType.HISTORICAL_KLINE:
-            standardized = self._standardize_ohlcv(standardized)
-        elif query.data_type == DataType.REAL_TIME_QUOTE:
-            standardized = self._standardize_realtime(standardized)
-        elif query.data_type in [DataType.ASSET_LIST, DataType.MARKET_INFO]:
-            standardized = self._standardize_asset_list(standardized, query.asset_type)
+            # 应用字段映射
+            standardized_data = raw_data.copy()
+            if field_mapping:
+                standardized_data = standardized_data.rename(columns=field_mapping)
 
-        # 通用数据清理
-        standardized = self._clean_data(standardized)
+            # 数据清洗
+            standardized_data = self._clean_data(standardized_data)
 
-        # 数据验证
-        standardized = self._validate_data(standardized, query.data_type)
+            # 数据类型转换
+            standardized_data = self._convert_data_types(standardized_data, query.data_type)
 
-        return standardized
+            # 数据验证
+            standardized_data = self._validate_data(standardized_data, query.data_type)
 
-    def _normalize_symbol(self, symbol: str, asset_type: AssetType) -> str:
-        """标准化交易代码"""
-        if not symbol:
-            return symbol
+            return standardized_data
 
-        symbol = symbol.upper().strip()
+        except Exception as e:
+            self.logger.error(f"数据标准化失败: {e}")
+            return raw_data  # 返回原始数据作为降级
 
-        # 资产类型特定的标准化
-        if asset_type == AssetType.STOCK:
-            # 股票代码标准化：确保6位数字
-            if symbol.isdigit() and len(symbol) < 6:
-                symbol = symbol.zfill(6)
-        elif asset_type == AssetType.CRYPTO:
-            # 加密货币：确保格式统一
-            if 'USDT' not in symbol and 'USD' not in symbol and '/' not in symbol:
-                symbol = f"{symbol}USDT"  # 默认对USDT
+    def _clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """清洗数据"""
+        # 替换空值
+        for null_val in self.null_values:
+            data = data.replace(null_val, pd.NA)
 
-        return symbol
+        # 删除完全空的行
+        data = data.dropna(how='all')
 
-    def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
-        """解析日期字符串"""
-        if not date_str:
-            return None
+        return data
 
-        # 支持多种日期格式
-        date_formats = [
-            '%Y-%m-%d',
-            '%Y/%m/%d',
-            '%Y%m%d',
-            '%Y-%m-%d %H:%M:%S',
-            '%Y-%m-%dT%H:%M:%S'
+    def _convert_data_types(self, data: pd.DataFrame, data_type: DataType) -> pd.DataFrame:
+        """转换数据类型"""
+        if data_type == DataType.HISTORICAL_KLINE:
+            # K线数据类型转换
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'amount']
+            for col in numeric_columns:
+                if col in data.columns:
+                    data[col] = pd.to_numeric(data[col], errors='coerce')
+
+            # 处理时间列
+            if 'datetime' in data.columns:
+                data['datetime'] = pd.to_datetime(data['datetime'], errors='coerce')
+                if not isinstance(data.index, pd.DatetimeIndex):
+                    data.set_index('datetime', inplace=True)
+
+        elif data_type == DataType.REAL_TIME_QUOTE:
+            # 实时数据类型转换
+            numeric_columns = ['current_price', 'bid_price', 'ask_price', 'volume', 'turnover', 'change', 'change_percent']
+            for col in numeric_columns:
+                if col in data.columns:
+                    data[col] = pd.to_numeric(data[col], errors='coerce')
+
+        return data
+
+    def _validate_data(self, data: pd.DataFrame, data_type: DataType) -> pd.DataFrame:
+        """验证数据完整性"""
+        if data_type == DataType.HISTORICAL_KLINE:
+            required_columns = ['open', 'high', 'low', 'close']
+            missing_columns = [col for col in required_columns if col not in data.columns]
+            if missing_columns:
+                self.logger.warning(f"K线数据缺少必要列: {missing_columns}")
+
+        return data
+
+    def _generate_cache_key(self, query: StandardQuery) -> str:
+        """生成缓存键"""
+        key_parts = [
+            query.symbol,
+            query.asset_type.value,
+            query.data_type.value,
+            query.period,
+            query.start_date or "",
+            query.end_date or "",
+            str(query.extra_params)
         ]
+        return "|".join(key_parts)
 
-        for fmt in date_formats:
-            try:
-                return datetime.strptime(date_str, fmt)
-            except ValueError:
-                continue
-
-        self.logger.warning(f"无法解析日期格式: {date_str}")
+    def _get_from_cache(self, cache_key: str) -> Optional[StandardData]:
+        """从缓存获取数据"""
+        if cache_key in self._cache:
+            data, timestamp = self._cache[cache_key]
+            if datetime.now() - timestamp < self._cache_ttl:
+                return data
+            else:
+                del self._cache[cache_key]
         return None
 
-    def _generic_query_transform(self, params: Dict[str, Any], provider_id: str) -> Dict[str, Any]:
-        """通用查询参数转换"""
-        # 基于Provider ID的特定转换
-        if 'binance' in provider_id.lower():
-            # Binance特定转换
-            if 'period' in params:
-                period_map = {
-                    'D': '1d', '1D': '1d',
-                    'H': '1h', '1H': '1h',
-                    'M': '1m', '1M': '1m'
-                }
-                params['interval'] = period_map.get(params['period'], '1d')
-        elif 'yfinance' in provider_id.lower():
-            # Yahoo Finance特定转换
-            if 'period' in params:
-                period_map = {
-                    'D': '1d', '1D': '1d',
-                    'H': '1h', '1H': '1h'
-                }
-                params['interval'] = period_map.get(params['period'], '1d')
+    def _set_to_cache(self, cache_key: str, data: StandardData) -> None:
+        """设置缓存"""
+        self._cache[cache_key] = (data, datetime.now())
 
-        return params
-
-    def _standardize_ohlcv(self, df: pd.DataFrame) -> pd.DataFrame:
-        """标准化OHLCV数据格式"""
-        if df.empty:
-            return df
-
-        # 字段名映射
-        field_mapping = self.field_mappings[DataType.HISTORICAL_KLINE]
-        df = df.rename(columns=field_mapping)
-
-        # 确保必要字段存在
-        required_fields = ['open', 'high', 'low', 'close', 'volume']
-        for field in required_fields:
-            if field not in df.columns:
-                df[field] = None
-
-        # 数据类型转换
-        numeric_fields = ['open', 'high', 'low', 'close', 'volume', 'amount', 'vwap', 'adj_close']
-        for field in numeric_fields:
-            if field in df.columns:
-                df[field] = pd.to_numeric(df[field], errors='coerce')
-
-        # 处理日期时间索引
-        df = self._standardize_datetime_index(df)
-
-        # 数据完整性检查
-        df = self._validate_ohlcv_data(df)
-
-        return df
-
-    def _standardize_realtime(self, df: pd.DataFrame) -> pd.DataFrame:
-        """标准化实时数据格式"""
-        if df.empty:
-            return df
-
-        # 字段名映射
-        field_mapping = self.field_mappings[DataType.REAL_TIME_QUOTE]
-        df = df.rename(columns=field_mapping)
-
-        # 数据类型转换
-        numeric_fields = ['price', 'bid', 'ask', 'volume', 'change', 'change_percent']
-        for field in numeric_fields:
-            if field in df.columns:
-                df[field] = pd.to_numeric(df[field], errors='coerce')
-
-        return df
-
-    def _standardize_asset_list(self, df: pd.DataFrame, asset_type: AssetType) -> pd.DataFrame:
-        """标准化资产列表格式"""
-        if df.empty:
-            return df
-
-        # 统一字段名
-        standard_columns = {
-            'code': 'symbol', 'Code': 'symbol', 'symbol': 'symbol', '代码': 'symbol',
-            'name': 'name', 'Name': 'name', '名称': 'name',
-            'market': 'market', 'Market': 'market', '市场': 'market',
-            'status': 'status', 'Status': 'status', '状态': 'status'
-        }
-
-        df = df.rename(columns=standard_columns)
-
-        # 确保必要字段存在
-        if 'symbol' not in df.columns:
-            if 'code' in df.columns:
-                df['symbol'] = df['code']
-            else:
-                df['symbol'] = df.index
-
-        if 'name' not in df.columns:
-            df['name'] = df['symbol']
-
-        if 'asset_type' not in df.columns:
-            df['asset_type'] = asset_type.value
-
-        if 'status' not in df.columns:
-            df['status'] = 'active'
-
-        return df
-
-    def _standardize_datetime_index(self, df: pd.DataFrame) -> pd.DataFrame:
-        """标准化日期时间索引"""
-        # 查找日期时间列
-        datetime_candidates = ['datetime', 'date', 'time', 'timestamp']
-        datetime_col = None
-
-        for col in datetime_candidates:
-            if col in df.columns:
-                datetime_col = col
-                break
-
-        if datetime_col:
-            # 将日期时间列设为索引
-            try:
-                df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
-                df = df.set_index(datetime_col)
-                df.index.name = 'datetime'
-            except Exception as e:
-                self.logger.warning(f"日期时间索引设置失败: {e}")
-        elif not isinstance(df.index, pd.DatetimeIndex):
-            # 尝试将索引转换为日期时间
-            try:
-                df.index = pd.to_datetime(df.index, errors='coerce')
-                df.index.name = 'datetime'
-            except Exception as e:
-                self.logger.debug(f"索引日期时间转换失败: {e}")
-
-        return df
-
-    def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """清理数据：空值处理、异常值检测等"""
-        if df.empty:
-            return df
-
-        # 替换各种空值表示
-        df = df.replace(self.null_values, None)
-
-        # 移除完全为空的行
-        df = df.dropna(how='all')
-
-        # 按时间排序
-        if isinstance(df.index, pd.DatetimeIndex):
-            df = df.sort_index()
-
-        return df
-
-    def _validate_ohlcv_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """验证OHLCV数据完整性"""
-        if df.empty:
-            return df
-
-        # 检查OHLC逻辑关系：Low <= Open,Close <= High
-        if all(col in df.columns for col in ['open', 'high', 'low', 'close']):
-            # 标记异常数据但不删除
-            invalid_mask = (
-                (df['low'] > df['open']) |
-                (df['low'] > df['close']) |
-                (df['high'] < df['open']) |
-                (df['high'] < df['close'])
-            )
-
-            if invalid_mask.any():
-                invalid_count = invalid_mask.sum()
-                self.logger.warning(f"发现 {invalid_count} 条OHLC数据异常")
-
-                # 可选：修复异常数据
-                df.loc[invalid_mask, 'high'] = df.loc[invalid_mask, [
-                    'open', 'close', 'high']].max(axis=1)
-                df.loc[invalid_mask, 'low'] = df.loc[invalid_mask, [
-                    'open', 'close', 'low']].min(axis=1)
-
-        return df
-
-    def _validate_data(self, df: pd.DataFrame, data_type: DataType) -> pd.DataFrame:
-        """通用数据验证"""
-        if df.empty:
-            return df
-
-        # 检查数据量
-        if len(df) > 100000:  # 超过10万条数据给出警告
-            self.logger.warning(f"数据量较大: {len(df)} 条记录")
-
-        # 检查内存使用
-        memory_usage = df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
-        if memory_usage > 100:  # 超过100MB给出警告
-            self.logger.warning(f"数据内存使用较大: {memory_usage:.2f} MB")
-
-        return df
-
-    def _build_metadata(self, query: StandardQuery, raw_data: Optional[pd.DataFrame]) -> Dict[str, Any]:
-        """构建元数据信息"""
+    def _build_metadata(self, query: StandardQuery, raw_data: pd.DataFrame,
+                        failover_result: Optional[FailoverResult]) -> Dict[str, Any]:
+        """构建元数据"""
         metadata = {
-            'query': {
-                'symbol': query.symbol,
-                'asset_type': query.asset_type.value,
-                'data_type': query.data_type.value,
-                'period': query.period,
-                'market': query.market
-            },
-            'data_info': {
-                'raw_records': len(raw_data) if raw_data is not None else 0,
-                'processing_timestamp': datetime.now().isoformat()
-            },
-            'tet_version': '1.0.0'
+            'query_time': datetime.now().isoformat(),
+            'data_count': len(raw_data) if raw_data is not None else 0,
+            'asset_type': query.asset_type.value,
+            'data_type': query.data_type.value,
+            'period': query.period
         }
+
+        if failover_result:
+            metadata['failover'] = {
+                'success': failover_result.success,
+                'attempts': failover_result.attempts,
+                'failed_sources': failover_result.failed_sources,
+                'successful_source': failover_result.successful_source,
+                'total_time_ms': failover_result.total_time_ms
+            }
 
         return metadata
 
+    def _update_stats(self, processing_time_ms: float) -> None:
+        """更新统计信息"""
+        total_requests = self._stats["total_requests"]
+        current_avg = self._stats["avg_processing_time"]
 
-# 工厂函数
-def create_tet_pipeline(data_source_router: DataSourceRouter) -> TETDataPipeline:
-    """
-    创建TET数据管道实例
+        self._stats["avg_processing_time"] = (
+            (current_avg * (total_requests - 1) + processing_time_ms) / total_requests
+        )
 
-    Args:
-        data_source_router: 数据源路由器
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取统计信息"""
+        return {
+            **self._stats,
+            'registered_plugins': len(self._plugins),
+            'active_adapters': len(self._adapters),
+            'cache_size': len(self._cache),
+            'cache_hit_rate': self._stats["cache_hits"] / max(self._stats["total_requests"], 1)
+        }
 
-    Returns:
-        TETDataPipeline: TET管道实例
-    """
-    return TETDataPipeline(data_source_router)
+    def clear_cache(self) -> None:
+        """清空缓存"""
+        self._cache.clear()
+        self.logger.info("TET数据管道缓存已清空")
+
+    def health_check_all_sources(self) -> Dict[str, HealthCheckResult]:
+        """检查所有数据源的健康状态"""
+        results = {}
+
+        for plugin_id, adapter in self._adapters.items():
+            try:
+                results[plugin_id] = adapter.health_check()
+            except Exception as e:
+                results[plugin_id] = HealthCheckResult(
+                    is_healthy=False,
+                    status_code=500,
+                    message=f"健康检查异常: {str(e)}",
+                    response_time_ms=0.0,
+                    last_check_time=datetime.now()
+                )
+
+        return results
+
+    async def process_async(self, query: StandardQuery) -> StandardData:
+        """异步处理数据请求"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self._executor, self.process, query)
+
+    def cleanup(self) -> None:
+        """清理资源"""
+        # 断开所有插件连接
+        for adapter in self._adapters.values():
+            try:
+                adapter.disconnect()
+            except Exception as e:
+                self.logger.error(f"断开插件连接失败: {e}")
+
+        # 关闭线程池
+        self._executor.shutdown(wait=True)
+
+        # 清空缓存
+        self.clear_cache()
+
+        self.logger.info("TET数据管道已清理完成")
 
 
-# 便捷函数
-def process_data_request(symbol: str, asset_type: AssetType, data_type: DataType,
-                         data_source_router: DataSourceRouter, **kwargs) -> StandardData:
-    """
-    便捷的数据请求处理函数
+class HistoryDataStrategy:
+    """历史数据加载策略"""
 
-    Args:
-        symbol: 交易代码
-        asset_type: 资产类型
-        data_type: 数据类型
-        data_source_router: 数据源路由器
-        **kwargs: 其他参数
+    async def get_data(self, code: str, freq: str, start_date=None, end_date=None):
+        """获取历史数据"""
+        logger.debug(
+            f"Loading historical data for {code} from {start_date} to {end_date}")
+        # 实际实现应该调用相应的历史数据服务
+        # 这里为示例实现
+        try:
+            # 模拟异步加载
+            await asyncio.sleep(0.1)
+            return {'type': 'historical', 'code': code, 'freq': freq, 'data': []}
+        except Exception as e:
+            logger.error(f"Error loading historical data: {e}")
+            return None
 
-    Returns:
-        StandardData: 处理结果
-    """
-    pipeline = create_tet_pipeline(data_source_router)
 
-    query = StandardQuery(
-        symbol=symbol,
-        asset_type=asset_type,
-        data_type=data_type,
-        **kwargs
-    )
+class RealtimeDataStrategy:
+    """实时数据加载策略"""
 
-    return pipeline.process(query)
+    async def get_data(self, code: str, freq: str, start_date=None, end_date=None):
+        """获取实时数据"""
+        logger.debug(f"Loading realtime data for {code}")
+        # 实际实现应该调用实时行情服务
+        # 这里为示例实现
+        try:
+            # 模拟异步加载
+            await asyncio.sleep(0.2)
+            return {'type': 'realtime', 'code': code, 'freq': freq, 'data': []}
+        except Exception as e:
+            logger.error(f"Error loading realtime data: {e}")
+            return None

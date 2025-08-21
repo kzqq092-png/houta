@@ -3,6 +3,7 @@ import threading
 import time
 import psutil
 from typing import Optional
+import logging
 
 from core.metrics import SystemResourceUpdated
 from core.events.event_bus import EventBus
@@ -25,6 +26,7 @@ class SystemResourceService:
             'monitoring.resource_interval', 1.0)
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self.logger = logging.getLogger(__name__)
 
     def start(self):
         """启动后台监控线程。"""
@@ -43,14 +45,18 @@ class SystemResourceService:
                 # 采集数据
                 cpu_percent = psutil.cpu_percent()
                 memory_info = psutil.virtual_memory()
-                # 尝试获取根目录的磁盘使用情况
+                # 获取磁盘使用情况 - 跨平台兼容
                 try:
-                    disk_usage = psutil.disk_usage('/')
+                    import os
+                    if os.name == 'nt':  # Windows系统
+                        disk_usage = psutil.disk_usage('C:\\')
+                    else:  # Unix/Linux系统
+                        disk_usage = psutil.disk_usage('/')
                     disk_percent = disk_usage.percent
-                except FileNotFoundError:
-                    # 在Windows上，根目录可能是'C:\'
-                    disk_usage = psutil.disk_usage('C:\\')
-                    disk_percent = disk_usage.percent
+                except (FileNotFoundError, SystemError, PermissionError) as e:
+                    # 如果获取失败，使用默认值
+                    disk_percent = 0.0
+                    self.logger.warning(f"无法获取磁盘使用率: {str(e)}")
 
                 # 创建事件
                 event = SystemResourceUpdated(

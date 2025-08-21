@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List, Union, Tuple
 from datetime import datetime, timedelta
 from hikyuu.interactive import *
 from hikyuu.indicator import *
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 from core.logger import LogManager, LogLevel
 import os
 import json
@@ -22,7 +22,7 @@ import ptvsd
 class StockScreener:
     """选股策略核心类"""
 
-    def __init__(self, data_manager: DataManager, log_manager: LogManager):
+    def __init__(self, data_manager: UnifiedDataManager, log_manager: LogManager):
         """初始化选股策略
 
         Args:

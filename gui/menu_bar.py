@@ -68,6 +68,7 @@ class MainMenuBar(QMenuBar):
         self.strategy_menu = self.addMenu("策略(&S)")
         self.data_menu = self.addMenu("数据(&D)")
         self.tools_menu = self.addMenu("工具(&T)")
+        self.performance_menu = self.addMenu("性能监控(&P)")
         self.advanced_menu = self.addMenu("高级功能(&X)")
         self.debug_menu = self.addMenu("调试(&G)")
         self.help_menu = self.addMenu("帮助(&H)")
@@ -78,6 +79,7 @@ class MainMenuBar(QMenuBar):
         self.init_strategy_menu()
         self.init_data_menu()
         self.init_tools_menu()
+        self.init_performance_menu()
         self.init_advanced_menu()
         self.init_debug_menu()
         self.init_help_menu()
@@ -189,12 +191,8 @@ class MainMenuBar(QMenuBar):
             self.theme_menu.addAction(self.light_theme_action)
             self.theme_menu.addAction(self.dark_theme_action)
 
-            # 性能仪表板
-            self.performance_panel_action = QAction("性能仪表板", self)
-            self.performance_panel_action.setCheckable(True)
-            self.performance_panel_action.setChecked(False)
-            self.performance_panel_action.setStatusTip("显示/隐藏性能仪表板")
-            self.view_menu.addAction(self.performance_panel_action)
+            # 性能仪表板已移至顶级性能监控菜单
+            # 保留注释以记录移除原因
 
             # 连接信号到coordinator
             if self.coordinator:
@@ -216,9 +214,8 @@ class MainMenuBar(QMenuBar):
                 self.dark_theme_action.triggered.connect(
                     lambda: self.coordinator._on_theme_changed('dark') if hasattr(self.coordinator, '_on_theme_changed') else None)
 
-                # 性能仪表板
-                self.performance_panel_action.triggered.connect(
-                    lambda: self.coordinator._toggle_performance_panel() if hasattr(self.coordinator, '_toggle_performance_panel') else None)
+                # 性能仪表板信号连接已移至性能监控菜单
+                pass
 
         except Exception as e:
             if self.log_manager:
@@ -293,6 +290,14 @@ class MainMenuBar(QMenuBar):
             self.strategy_optimize_action = QAction("策略优化", self)
             self.strategy_optimize_action.setStatusTip("优化策略参数")
             self.strategy_menu.addAction(self.strategy_optimize_action)
+
+            self.strategy_menu.addSeparator()
+
+            # 交易监控
+            self.trading_monitor_action = QAction(
+                QIcon("icons/monitor.png"), "交易监控", self)
+            self.trading_monitor_action.setStatusTip("打开交易监控窗口")
+            self.strategy_menu.addAction(self.trading_monitor_action)
 
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
@@ -447,6 +452,64 @@ class MainMenuBar(QMenuBar):
         except Exception as e:
             if self.log_manager:
                 self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
+
+    def init_performance_menu(self):
+        """初始化性能监控菜单"""
+        try:
+            # 性能监控中心
+            self.performance_center_action = QAction(QIcon("icons/performance.png"), "性能监控中心(&C)", self)
+            self.performance_center_action.setShortcut("Ctrl+Shift+M")
+            self.performance_center_action.setStatusTip("打开统一性能监控中心")
+            self.performance_menu.addAction(self.performance_center_action)
+
+            self.performance_menu.addSeparator()
+
+            # 系统性能
+            self.system_performance_action = QAction("系统性能(&S)", self)
+            self.system_performance_action.setStatusTip("查看系统CPU、内存、磁盘性能")
+            self.performance_menu.addAction(self.system_performance_action)
+
+            # UI性能优化
+            self.ui_performance_action = QAction("UI性能优化(&U)", self)
+            self.ui_performance_action.setStatusTip("查看和优化用户界面性能")
+            self.performance_menu.addAction(self.ui_performance_action)
+
+            # 策略性能
+            self.strategy_performance_action = QAction("策略性能(&T)", self)
+            self.strategy_performance_action.setStatusTip("查看交易策略性能指标")
+            self.performance_menu.addAction(self.strategy_performance_action)
+
+            # 算法性能
+            self.algorithm_performance_action = QAction("算法性能(&A)", self)
+            self.algorithm_performance_action.setStatusTip("查看算法执行性能")
+            self.performance_menu.addAction(self.algorithm_performance_action)
+
+            self.performance_menu.addSeparator()
+
+            # 自动调优
+            self.auto_tuning_action = QAction("自动调优(&O)", self)
+            self.auto_tuning_action.setStatusTip("启用/配置系统自动性能调优")
+            self.performance_menu.addAction(self.auto_tuning_action)
+
+            # 性能报告
+            self.performance_report_action = QAction("性能报告(&R)", self)
+            self.performance_report_action.setStatusTip("生成和导出性能分析报告")
+            self.performance_menu.addAction(self.performance_report_action)
+
+            self.performance_menu.addSeparator()
+
+            # 性能仪表板 (兼容旧功能)
+            self.performance_dashboard_action = QAction("性能仪表板(&D)", self)
+            self.performance_dashboard_action.setCheckable(True)
+            self.performance_dashboard_action.setChecked(False)
+            self.performance_dashboard_action.setStatusTip("显示/隐藏性能仪表板面板")
+            self.performance_menu.addAction(self.performance_dashboard_action)
+
+            # 注意：信号连接将在connect_signals方法中统一处理
+
+        except Exception as e:
+            if self.log_manager:
+                self.log_manager.error(f"初始化性能监控菜单失败: {str(e)}")
 
     def init_advanced_menu(self):
         """初始化高级功能菜单"""
@@ -873,7 +936,6 @@ class MainMenuBar(QMenuBar):
                 ('toolbar_action', '_on_toggle_toolbar'),
                 ('statusbar_action', '_on_toggle_statusbar'),
                 ('refresh_action', '_on_refresh'),
-                ('performance_panel_action', '_toggle_performance_panel'),
 
                 # 主题相关
                 ('default_theme_action', '_on_default_theme'),
@@ -893,6 +955,7 @@ class MainMenuBar(QMenuBar):
                 ('export_strategy_action', '_on_export_strategy'),
                 ('strategy_backtest_action', '_on_strategy_backtest'),
                 ('strategy_optimize_action', '_on_strategy_optimize'),
+                ('trading_monitor_action', '_on_trading_monitor'),
 
                 # 数据相关
                 ('import_data_action', '_on_import_data'),
@@ -907,6 +970,16 @@ class MainMenuBar(QMenuBar):
                 ('webgpu_status_action', '_on_webgpu_status'),
                 ('advanced_search_action', '_on_advanced_search'),
                 ('settings_action', '_on_settings'),
+
+                # 性能监控菜单
+                ('performance_center_action', '_on_performance_center'),
+                ('system_performance_action', '_on_system_performance'),
+                ('ui_performance_action', '_on_ui_performance'),
+                ('strategy_performance_action', '_on_strategy_performance'),
+                ('algorithm_performance_action', '_on_algorithm_performance'),
+                ('auto_tuning_action', '_on_auto_tuning'),
+                ('performance_report_action', '_on_performance_report'),
+                ('performance_dashboard_action', '_toggle_performance_panel'),
 
                 # 插件管理功能 - 使用MenuBar中的直接方法
                 ('data_source_plugin_action', 'show_data_source_plugin_manager'),

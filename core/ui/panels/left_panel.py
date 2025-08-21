@@ -21,7 +21,7 @@ from PyQt5.QtGui import QIcon, QFont
 
 from .base_panel import BasePanel
 from core.events.events import StockSelectedEvent, AssetSelectedEvent
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 # 引入服务和类型
 from core.services import StockService
 from core.services.unified_data_manager import UnifiedDataManager
@@ -259,9 +259,19 @@ class LeftPanel(BasePanel):
             # 添加新数据
             for asset in assets:
                 item = QTreeWidgetItem()
-                item.setText(0, asset.get('symbol', ''))
-                item.setText(1, asset.get('name', ''))
-                item.setText(2, asset.get('market', ''))
+
+                # 安全地设置文本，处理NA值
+                def safe_text(value):
+                    """安全地转换值为字符串，处理pandas NA值"""
+                    if value is None:
+                        return ''
+                    if pd.isna(value):  # 处理pandas NA值
+                        return ''
+                    return str(value)
+
+                item.setText(0, safe_text(asset.get('symbol', '')))
+                item.setText(1, safe_text(asset.get('name', '')))
+                item.setText(2, safe_text(asset.get('market', '')))
 
                 # 存储完整的资产信息
                 item.setData(0, Qt.UserRole, asset)
@@ -2094,3 +2104,12 @@ class LeftPanel(BasePanel):
 
         except Exception as e:
             logger.error(f"处理多屏模式切换事件失败: {e}")
+
+    def _update_status(self, message: str) -> None:
+        """更新状态栏信息"""
+        try:
+            if hasattr(self, 'status_label') and self.status_label:
+                self.status_label.setText(message)
+            logger.info(f"LeftPanel状态更新: {message}")
+        except Exception as e:
+            logger.error(f"更新状态失败: {e}")

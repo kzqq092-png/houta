@@ -15,7 +15,7 @@ import time
 
 # 使用系统统一组件
 from core.adapters import get_logger, get_config, get_data_validator
-from core.data_manager import DataManager
+from core.services.unified_data_manager import UnifiedDataManager
 
 
 class RealDataProvider:
@@ -33,7 +33,8 @@ class RealDataProvider:
             factory = get_manager_factory()
             self.data_manager = get_data_manager()
         except ImportError:
-            self.data_manager = DataManager()
+            from .services.unified_data_manager import get_unified_data_manager
+        self.data_manager = get_unified_data_manager()
 
         # 缓存管理
         self._cache = {}

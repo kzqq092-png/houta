@@ -20,7 +20,7 @@ from enum import Enum
 
 # 核心模块导入
 from core.services.base_service import AsyncBaseService
-from core.performance_monitor import PerformanceMonitor, get_performance_monitor
+from core.performance import PerformanceMonitor, get_performance_monitor
 from core.config import ConfigManager
 from core.events import EventBus
 from core.logger import get_logger

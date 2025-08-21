@@ -5,7 +5,7 @@
 支持算法版本的保存、回滚、比较和自动清理
 """
 
-from optimization.performance_evaluator import PerformanceMetrics
+from core.performance import PerformanceMetric as PerformanceMetrics
 from optimization.database_schema import OptimizationDatabaseManager
 import json
 import sqlite3

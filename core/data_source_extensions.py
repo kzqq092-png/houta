@@ -1,46 +1,45 @@
 """
-数据源插件扩展模块
-
-提供标准化的数据源插件接口，支持多种资产类型和数据类型的统一访问。
-本模块实现了插件化数据源的核心接口和适配器，确保与现有系统的无缝集成。
-
-作者: FactorWeave-Quant 开发团队
-版本: 1.0.0
-日期: 2024
+数据源插件扩展接口
+为HIkyuu插件化提供标准化的数据源插件接口和适配器
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Union, Callable
-from enum import Enum, auto
-import pandas as pd
-from datetime import datetime
-import threading
-import time
 import logging
-import traceback
+import pandas as pd
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
-
-# 导入现有数据源相关类型
-from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
-
-# 导入统一的枚举定义（避免重复定义）
-from .plugin_types import AssetType, DataType
+from enum import Enum
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
-class PluginStatus(Enum):
-    """插件状态枚举"""
-    UNKNOWN = "unknown"
-    INITIALIZING = "initializing"
-    READY = "ready"
-    ERROR = "error"
-    DISABLED = "disabled"
+class AssetType(Enum):
+    """资产类型"""
+    STOCK = "stock"
+    INDEX = "index"
+    FUND = "fund"
+    BOND = "bond"
+    FUTURES = "futures"
+    OPTIONS = "options"
+    CRYPTO = "crypto"
+    FOREX = "forex"
+
+
+class DataType(Enum):
+    """数据类型"""
+    HISTORICAL_KLINE = "historical_kline"
+    REAL_TIME_QUOTE = "real_time_quote"
+    TICK_DATA = "tick_data"
+    ORDER_BOOK = "order_book"
+    FUNDAMENTAL = "fundamental"
+    NEWS = "news"
+    FINANCIAL_REPORT = "financial_report"
 
 
 @dataclass
 class PluginInfo:
-    """插件信息数据类"""
+    """插件信息"""
     id: str
     name: str
     version: str
@@ -48,456 +47,111 @@ class PluginInfo:
     author: str
     supported_asset_types: List[AssetType]
     supported_data_types: List[DataType]
-    config_schema: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    capabilities: Dict[str, Any]
 
 
 @dataclass
 class HealthCheckResult:
-    """健康检查结果"""
+    """健康检查结果 - 统一版本，兼容所有参数"""
     is_healthy: bool
-    response_time_ms: float
+    message: str
+    # 兼容两种时间参数命名
+    response_time: float = 0.0              # 响应时间(毫秒) - 主要参数
+    response_time_ms: Optional[float] = None  # 兼容参数
+    # 兼容两种时间戳参数
+    timestamp: datetime = field(default_factory=datetime.now)  # 时间戳 - 主要参数
+    last_check_time: Optional[datetime] = None  # 兼容参数
+    # 兼容不同的详细信息参数
+    extra_info: Dict[str, Any] = field(default_factory=dict)  # 额外信息 - 主要参数
+    details: Optional[Dict[str, Any]] = None    # 兼容参数
+    # 其他可选参数
+    status_code: int = 200                      # HTTP状态码
+    error_message: Optional[str] = None         # 错误信息（兼容参数）
+
+    def __post_init__(self):
+        """后处理，统一参数"""
+        # 统一响应时间
+        if self.response_time_ms is not None:
+            self.response_time = self.response_time_ms
+        elif self.response_time_ms is None:
+            self.response_time_ms = self.response_time
+
+        # 统一时间戳
+        if self.last_check_time is not None:
+            self.timestamp = self.last_check_time
+        elif self.last_check_time is None:
+            self.last_check_time = self.timestamp
+
+        # 统一详细信息
+        if self.details is not None:
+            self.extra_info.update(self.details)
+        elif not self.details:
+            self.details = self.extra_info
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'is_healthy': self.is_healthy,
+            'message': self.message,
+            'response_time': self.response_time,
+            'response_time_ms': self.response_time_ms,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'last_check_time': self.last_check_time.isoformat() if self.last_check_time else None,
+            'extra_info': self.extra_info,
+            'details': self.details,
+            'status_code': self.status_code,
+            'error_message': self.error_message
+        }
+
+
+@dataclass
+class ConnectionInfo:
+    """连接信息"""
+    is_connected: bool
+    connection_time: Optional[datetime]
+    last_activity: Optional[datetime]
+    connection_params: Dict[str, Any]
     error_message: Optional[str] = None
-    additional_info: Dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.now)
 
 
 class IDataSourcePlugin(ABC):
     """
-    数据源插件标准接口
+    数据源插件接口
 
-    所有数据源插件必须实现此接口，以确保与FactorWeave-Quant 系统的兼容性。
-    接口设计遵循开闭原则，支持扩展而不修改现有代码。
-
-    示例:
-        class MyDataSourcePlugin(IDataSourcePlugin):
-            def get_plugin_info(self) -> PluginInfo:
-                return PluginInfo(
-                    id="my_data_source",
-                    name="My Data Source",
-                    version="1.0.0",
-                    description="Custom data source implementation",
-                    author="Developer",
-                    supported_asset_types=[AssetType.STOCK],
-                    supported_data_types=[DataType.HISTORICAL_KLINE]
-                )
-
-            def initialize(self, config: Dict[str, Any]) -> bool:
-                # 初始化逻辑
-                return True
-
-            def fetch_data(self, symbol: str, data_type: str, **kwargs) -> pd.DataFrame:
-                # 数据获取逻辑
-                return pd.DataFrame()
+    为HIkyuu插件化提供标准化的数据源接口
+    支持多资产类型、多数据类型、连接管理、健康检查等功能
     """
 
+    @property
     @abstractmethod
-    def get_plugin_info(self) -> PluginInfo:
-        """
-        获取插件基本信息
-
-        Returns:
-            PluginInfo: 包含插件ID、名称、版本、描述等信息
-        """
+    def plugin_info(self) -> PluginInfo:
+        """获取插件信息"""
         pass
 
     @abstractmethod
-    def get_supported_asset_types(self) -> List[AssetType]:
+    def connect(self, **kwargs) -> bool:
         """
-        获取支持的资产类型列表
-
-        Returns:
-            List[AssetType]: 支持的资产类型列表
-        """
-        pass
-
-    @abstractmethod
-    def get_supported_data_types(self) -> List[DataType]:
-        """
-        获取支持的数据类型列表
-
-        Returns:
-            List[DataType]: 支持的数据类型列表
-        """
-        pass
-
-    @abstractmethod
-    def initialize(self, config: Dict[str, Any]) -> bool:
-        """
-        初始化插件
+        连接数据源
 
         Args:
-            config: 插件配置参数字典
-
-        Returns:
-            bool: 初始化是否成功
-
-        Raises:
-            PluginInitializationError: 初始化失败时抛出
-        """
-        pass
-
-    @abstractmethod
-    def shutdown(self) -> None:
-        """
-        关闭插件，释放资源
-        """
-        pass
-
-    @abstractmethod
-    def fetch_data(self, symbol: str, data_type: str,
-                   start_date: Optional[datetime] = None,
-                   end_date: Optional[datetime] = None,
-                   **kwargs) -> pd.DataFrame:
-        """
-        获取数据
-
-        Args:
-            symbol: 标的代码（如股票代码、期货合约等）
-            data_type: 数据类型（对应DataType枚举值）
-            start_date: 开始日期（可选）
-            end_date: 结束日期（可选）
-            **kwargs: 其他参数（如频率、数量等）
-
-        Returns:
-            pd.DataFrame: 包含请求数据的DataFrame
-
-        Raises:
-            DataFetchError: 数据获取失败时抛出
-        """
-        pass
-
-    @abstractmethod
-    def get_real_time_data(self, symbols: List[str]) -> Dict[str, Any]:
-        """
-        获取实时数据
-
-        Args:
-            symbols: 标的代码列表
-
-        Returns:
-            Dict[str, Any]: 实时数据字典，键为标的代码，值为数据
-
-        Raises:
-            RealTimeDataError: 实时数据获取失败时抛出
-        """
-        pass
-
-    @abstractmethod
-    def health_check(self) -> HealthCheckResult:
-        """
-        执行健康检查
-
-        Returns:
-            HealthCheckResult: 健康检查结果
-        """
-        pass
-
-    def get_asset_list(self, asset_type: Optional[AssetType] = None,
-                       market: Optional[str] = None, **filters) -> pd.DataFrame:
-        """
-        获取资产列表（TET模式标准化方法）
-
-        Args:
-            asset_type: 资产类型过滤
-            market: 市场过滤
-            **filters: 其他过滤条件
-
-        Returns:
-            pd.DataFrame: 标准化的资产列表
-
-        注意：默认实现会尝试适配现有方法，子类可重写以提供更好支持
-        """
-        # 默认实现：尝试适配现有方法
-        try:
-            if hasattr(self, 'get_stock_list') and (not asset_type or asset_type == AssetType.STOCK):
-                raw_data = self.get_stock_list()
-                return self._standardize_asset_list(raw_data, AssetType.STOCK)
-            elif hasattr(self, 'get_symbol_list'):
-                raw_data = self.get_symbol_list()
-                return self._standardize_asset_list(raw_data, asset_type or AssetType.STOCK)
-        except Exception as e:
-            logger.warning(f"资产列表获取失败: {e}")
-
-        return pd.DataFrame()  # 空结果兜底
-
-    def get_market_list(self) -> List[Dict[str, Any]]:
-        """
-        获取支持的市场列表
-
-        Returns:
-            List[Dict]: 市场信息列表
-        """
-        # 默认实现：基于支持的资产类型推断市场
-        return self._infer_markets_from_asset_types()
-
-    def transform_query_params(self, standard_params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        TET第一阶段：查询参数转换
-        将标准化参数转换为Provider特定参数
-
-        Args:
-            standard_params: 标准化查询参数
-
-        Returns:
-            Dict: Provider特定参数
-        """
-        # 默认实现：直接返回，子类可重写进行特定转换
-        return standard_params
-
-    def transform_output_data(self, raw_data: pd.DataFrame,
-                              data_type: str) -> pd.DataFrame:
-        """
-        TET第三阶段：数据格式标准化
-        将原始数据转换为标准格式
-
-        Args:
-            raw_data: 原始数据
-            data_type: 数据类型
-
-        Returns:
-            pd.DataFrame: 标准化数据
-        """
-        # 默认实现：基础标准化，子类可重写
-        return self._basic_standardize(raw_data, data_type)
-
-    def _standardize_asset_list(self, raw_data: Any, asset_type: AssetType) -> pd.DataFrame:
-        """
-        标准化资产列表格式
-
-        Args:
-            raw_data: 原始资产数据
-            asset_type: 资产类型
-
-        Returns:
-            pd.DataFrame: 标准化资产列表
-        """
-        if raw_data is None:
-            return pd.DataFrame()
-
-        # 转换为DataFrame
-        if not isinstance(raw_data, pd.DataFrame):
-            if hasattr(raw_data, '__iter__') and not isinstance(raw_data, str):
-                raw_data = pd.DataFrame(list(raw_data))
-            else:
-                return pd.DataFrame()
-
-        # 标准化列名
-        column_mapping = {
-            'code': 'symbol', 'Code': 'symbol', '代码': 'symbol',
-            'name': 'name', 'Name': 'name', '名称': 'name',
-            'market': 'market', 'Market': 'market', '市场': 'market',
-            'status': 'status', 'Status': 'status', '状态': 'status'
-        }
-
-        standardized = raw_data.rename(columns=column_mapping)
-
-        # 确保必要字段存在
-        if 'symbol' not in standardized.columns:
-            if 'code' in raw_data.columns:
-                standardized['symbol'] = raw_data['code']
-            else:
-                standardized['symbol'] = standardized.index
-
-        if 'name' not in standardized.columns:
-            standardized['name'] = standardized['symbol']
-
-        if 'asset_type' not in standardized.columns:
-            standardized['asset_type'] = asset_type.value
-
-        if 'status' not in standardized.columns:
-            standardized['status'] = 'active'
-
-        return standardized
-
-    def _infer_markets_from_asset_types(self) -> List[Dict[str, Any]]:
-        """
-        从支持的资产类型推断市场列表
-
-        Returns:
-            List[Dict]: 市场信息
-        """
-        try:
-            supported_types = self.get_supported_asset_types()
-            markets = []
-
-            for asset_type in supported_types:
-                if asset_type == AssetType.STOCK:
-                    markets.extend([
-                        {'id': 'sh', 'name': '上海证券交易所', 'asset_type': 'STOCK'},
-                        {'id': 'sz', 'name': '深圳证券交易所', 'asset_type': 'STOCK'}
-                    ])
-                elif asset_type == AssetType.CRYPTO:
-                    markets.append({'id': 'crypto', 'name': '加密货币市场', 'asset_type': 'CRYPTO'})
-                elif asset_type == AssetType.FUTURES:
-                    markets.extend([
-                        {'id': 'shfe', 'name': '上海期货交易所', 'asset_type': 'FUTURES'},
-                        {'id': 'dce', 'name': '大连商品交易所', 'asset_type': 'FUTURES'}
-                    ])
-
-            return markets
-
-        except Exception:
-            return [{'id': 'default', 'name': '默认市场', 'asset_type': 'UNKNOWN'}]
-
-    def _basic_standardize(self, raw_data: pd.DataFrame, data_type: str) -> pd.DataFrame:
-        """
-        基础数据标准化
-
-        Args:
-            raw_data: 原始数据
-            data_type: 数据类型
-
-        Returns:
-            pd.DataFrame: 标准化数据
-        """
-        if raw_data is None or raw_data.empty:
-            return pd.DataFrame()
-
-        standardized = raw_data.copy()
-
-        # 基础列名标准化
-        if 'historical_kline' in data_type.lower():
-            column_mapping = {
-                'o': 'open', 'Open': 'open', '开盘价': 'open',
-                'h': 'high', 'High': 'high', '最高价': 'high',
-                'l': 'low', 'Low': 'low', '最低价': 'low',
-                'c': 'close', 'Close': 'close', '收盘价': 'close',
-                'v': 'volume', 'Volume': 'volume', '成交量': 'volume'
-            }
-            standardized = standardized.rename(columns=column_mapping)
-
-        return standardized
-
-    def get_config_schema(self) -> Dict[str, Any]:
-        """
-        获取配置模式定义（可选实现）
-
-        Returns:
-            Dict[str, Any]: 配置模式定义，用于UI动态生成配置界面
-        """
-        return {}
-
-    def validate_config(self, config: Dict[str, Any]) -> bool:
-        """
-        验证配置参数（可选实现）
-
-        Args:
-            config: 配置参数字典
-
-        Returns:
-            bool: 配置是否有效
-        """
-        return True
-
-    def get_rate_limit_info(self) -> Dict[str, Any]:
-        """
-        获取访问频率限制信息（可选实现）
-
-        Returns:
-            Dict[str, Any]: 频率限制信息
-        """
-        return {
-            "requests_per_minute": 60,
-            "requests_per_hour": 1000,
-            "burst_limit": 10
-        }
-
-
-class DataSourcePluginAdapter:
-    """
-    数据源插件适配器
-
-    将IDataSourcePlugin接口适配到现有的DataSource接口，
-    实现新旧系统的无缝桥接。使用适配器模式确保向下兼容。
-    """
-
-    def __init__(self, plugin: IDataSourcePlugin, plugin_id: str):
-        """
-        初始化适配器
-
-        Args:
-            plugin: 数据源插件实例
-            plugin_id: 插件唯一标识符
-        """
-        self.plugin = plugin
-        self.plugin_id = plugin_id
-        self._is_connected = False
-        self._lock = threading.RLock()
-        self._last_health_check = None
-        self._health_check_interval = 300  # 5分钟
-
-        # 适配器状态管理
-        self.status = PluginStatus.UNKNOWN
-        self.error_count = 0
-        self.last_error = None
-        self.last_success_time = None
-
-        # 统计信息
-        self.stats = {
-            "total_requests": 0,
-            "successful_requests": 0,
-            "failed_requests": 0,
-            "avg_response_time": 0.0
-        }
-
-        logger.info(f"DataSourcePluginAdapter创建完成: {plugin_id}")
-
-    def connect(self) -> bool:
-        """
-        连接到数据源（适配DataSource接口）
+            **kwargs: 连接参数
 
         Returns:
             bool: 连接是否成功
         """
-        with self._lock:
-            try:
-                self.status = PluginStatus.INITIALIZING
+        pass
 
-                # 获取插件默认配置
-                config = self._get_default_config()
-
-                # 初始化插件
-                if self.plugin.initialize(config):
-                    self._is_connected = True
-                    self.status = PluginStatus.READY
-                    self.last_success_time = datetime.now()
-
-                    # 初始化统计信息
-                    self.stats["total_requests"] = 0
-                    self.stats["successful_requests"] = 0
-                    self.stats["failed_requests"] = 0
-
-                    logger.info(f"插件连接成功: {self.plugin_id}")
-                    return True
-                else:
-                    self.status = PluginStatus.ERROR
-                    self.last_error = "插件初始化失败"
-                    logger.error(f"插件连接失败: {self.plugin_id}")
-                    return False
-
-            except Exception as e:
-                self.status = PluginStatus.ERROR
-                self.last_error = str(e)
-                self.error_count += 1
-                logger.error(f"插件连接异常 {self.plugin_id}: {e}")
-                return False
-
-    def disconnect(self) -> None:
+    @abstractmethod
+    def disconnect(self) -> bool:
         """
-        断开数据源连接（适配DataSource接口）
+        断开数据源连接
+
+        Returns:
+            bool: 断开是否成功
         """
-        with self._lock:
-            try:
-                if self._is_connected:
-                    self.plugin.shutdown()
-                    self._is_connected = False
-                    self.status = PluginStatus.DISABLED
-                    logger.info(f"插件断开连接: {self.plugin_id}")
+        pass
 
-            except Exception as e:
-                logger.error(f"插件断开连接失败 {self.plugin_id}: {e}")
-
+    @abstractmethod
     def is_connected(self) -> bool:
         """
         检查连接状态
@@ -505,52 +159,51 @@ class DataSourcePluginAdapter:
         Returns:
             bool: 是否已连接
         """
-        return self._is_connected and self.status == PluginStatus.READY
+        pass
 
-    def get_statistics(self) -> Dict[str, Any]:
+    @abstractmethod
+    def get_connection_info(self) -> ConnectionInfo:
         """
-        获取插件统计信息
+        获取连接信息
 
         Returns:
-            Dict[str, Any]: 统计信息字典
+            ConnectionInfo: 连接详细信息
         """
-        with self._lock:
-            total_requests = self.stats.get("total_requests", 0)
-            successful_requests = self.stats.get("successful_requests", 0)
-            failed_requests = self.stats.get("failed_requests", 0)
+        pass
 
-            success_rate = 0.0
-            if total_requests > 0:
-                success_rate = successful_requests / total_requests
-
-            # 计算平均响应时间（简化实现）
-            avg_response_time = 0.0
-            if hasattr(self, '_response_times') and self._response_times:
-                avg_response_time = sum(self._response_times) / len(self._response_times)
-
-            return {
-                "total_requests": total_requests,
-                "successful_requests": successful_requests,
-                "failed_requests": failed_requests,
-                "success_rate": success_rate,
-                "avg_response_time": avg_response_time,
-                "error_count": self.error_count,
-                "last_error": self.last_error,
-                "last_success_time": self.last_success_time,
-                "status": self.status.value if hasattr(self.status, 'value') else str(self.status),
-                "is_connected": self.is_connected()
-            }
-
-    def get_kdata(self, symbol: str, freq: Union[str, DataFrequency],
-                  start_date: Optional[datetime] = None,
-                  end_date: Optional[datetime] = None,
-                  count: Optional[int] = None) -> pd.DataFrame:
+    @abstractmethod
+    def health_check(self) -> HealthCheckResult:
         """
-        获取K线数据（适配DataSource接口）
+        健康检查
+
+        Returns:
+            HealthCheckResult: 健康检查结果
+        """
+        pass
+
+    @abstractmethod
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """
+        获取资产列表
 
         Args:
-            symbol: 股票代码
-            freq: 数据频率
+            asset_type: 资产类型
+            market: 市场代码（可选）
+
+        Returns:
+            List[Dict[str, Any]]: 资产列表
+        """
+        pass
+
+    @abstractmethod
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """
+        获取K线数据
+
+        Args:
+            symbol: 交易代码
+            freq: 频率 (D/W/M/H/30m/15m/5m/1m)
             start_date: 开始日期
             end_date: 结束日期
             count: 数据条数
@@ -558,205 +211,71 @@ class DataSourcePluginAdapter:
         Returns:
             pd.DataFrame: K线数据
         """
-        start_time = time.time()
+        pass
 
-        try:
-            with self._lock:
-                self.stats["total_requests"] += 1
-
-                if not self.is_connected():
-                    raise ConnectionError(f"插件未连接: {self.plugin_id}")
-
-                # 转换频率参数
-                data_type = DataType.HISTORICAL_KLINE.value
-
-                # 准备参数
-                kwargs = {}
-                if count:
-                    kwargs['count'] = count
-                if isinstance(freq, DataFrequency):
-                    kwargs['frequency'] = freq.name
-                else:
-                    kwargs['frequency'] = str(freq)
-
-                # 调用插件接口
-                data = self.plugin.fetch_data(
-                    symbol=symbol,
-                    data_type=data_type,
-                    start_date=start_date,
-                    end_date=end_date,
-                    **kwargs
-                )
-
-                # 更新统计信息
-                response_time = (time.time() - start_time) * 1000
-                self._update_success_stats(response_time)
-
-                return data
-
-        except Exception as e:
-            self._update_error_stats(e)
-            logger.error(f"获取K线数据失败 {self.plugin_id}: {e}")
-            return pd.DataFrame()  # 返回空DataFrame保持兼容性
-
+    @abstractmethod
     def get_real_time_quotes(self, symbols: List[str]) -> pd.DataFrame:
         """
-        获取实时行情（适配DataSource接口）
+        获取实时行情
 
         Args:
-            symbols: 股票代码列表
+            symbols: 交易代码列表
 
         Returns:
             pd.DataFrame: 实时行情数据
         """
-        start_time = time.time()
+        pass
 
-        try:
-            with self._lock:
-                self.stats["total_requests"] += 1
-
-                if not self.is_connected():
-                    raise ConnectionError(f"插件未连接: {self.plugin_id}")
-
-                # 调用插件接口
-                real_time_data = self.plugin.get_real_time_data(symbols)
-
-                # 转换为DataFrame格式
-                data = self._convert_real_time_data_to_dataframe(real_time_data)
-
-                # 更新统计信息
-                response_time = (time.time() - start_time) * 1000
-                self._update_success_stats(response_time)
-
-                return data
-
-        except Exception as e:
-            self._update_error_stats(e)
-            logger.error(f"获取实时行情失败 {self.plugin_id}: {e}")
-            return pd.DataFrame()
-
-    def health_check(self) -> HealthCheckResult:
+    def get_tick_data(self, symbol: str, date: str = None) -> pd.DataFrame:
         """
-        执行健康检查
+        获取Tick数据（可选实现）
+
+        Args:
+            symbol: 交易代码
+            date: 日期
 
         Returns:
-            HealthCheckResult: 健康检查结果
+            pd.DataFrame: Tick数据
         """
-        try:
-            # 检查是否需要执行健康检查
-            now = datetime.now()
-            if (self._last_health_check and
-                    (now - self._last_health_check).total_seconds() < self._health_check_interval):
-                return self._last_health_check_result
+        return pd.DataFrame()
 
-            # 首先检查基本状态
-            if not self.is_connected():
-                result = HealthCheckResult(
-                    is_healthy=False,
-                    response_time_ms=0.0,
-                    error_message="插件未连接",
-                    timestamp=now
-                )
-                self._last_health_check = now
-                self._last_health_check_result = result
-                return result
-
-            # 尝试执行插件的健康检查
-            try:
-                raw_result = self.plugin.health_check()
-                # 兼容不同实现的返回对象，标准化为本模块的 HealthCheckResult
-                try:
-                    rt_ms = getattr(raw_result, 'response_time_ms', None)
-                    if rt_ms is None:
-                        rt_ms = float(getattr(raw_result, 'response_time', 0.0))
-                    msg = getattr(raw_result, 'error_message', None)
-                    if msg is None:
-                        msg = getattr(raw_result, 'message', None)
-                    add_info = getattr(raw_result, 'additional_info', None)
-                    if add_info is None:
-                        add_info = getattr(raw_result, 'extra_info', {})
-                    result = HealthCheckResult(
-                        is_healthy=bool(getattr(raw_result, 'is_healthy', False)),
-                        response_time_ms=rt_ms,
-                        error_message=msg,
-                        additional_info=add_info,
-                        timestamp=getattr(raw_result, 'timestamp', datetime.now())
-                    )
-                except Exception:
-                    # 最小兜底
-                    result = HealthCheckResult(
-                        is_healthy=False,
-                        response_time_ms=0.0,
-                        error_message="健康检查返回结果不兼容",
-                        timestamp=now
-                    )
-            except Exception as plugin_error:
-                # 插件健康检查失败，但不影响插件的基本可用性
-                # 如果插件已经初始化，认为它是可用的，只是健康检查失败
-                is_plugin_available = (
-                    hasattr(self.plugin, 'initialized') and self.plugin.initialized
-                ) or (
-                    hasattr(self.plugin, 'get_plugin_info')  # 基本方法可用
-                )
-
-                result = HealthCheckResult(
-                    is_healthy=is_plugin_available,  # 基于插件可用性而不是健康检查结果
-                    response_time_ms=0.0,
-                    error_message=f"健康检查失败但插件可用: {str(plugin_error)}" if is_plugin_available else f"插件不可用: {str(plugin_error)}",
-                    timestamp=now
-                )
-
-            self._last_health_check = now
-            self._last_health_check_result = result
-
-            # 更新状态 - 更宽松的状态管理
-            if result.is_healthy:
-                if self.status == PluginStatus.ERROR:
-                    self.status = PluginStatus.READY
-                    logger.info(f"插件健康状态恢复: {self.plugin_id}")
-            else:
-                # 不要轻易设置为ERROR状态，除非插件真的不可用
-                if not hasattr(self.plugin, 'get_plugin_info'):
-                    self.status = PluginStatus.ERROR
-                    self.last_error = result.error_message
-                else:
-                    # 插件基本功能可用，只是健康检查失败，保持READY状态
-                    logger.warning(f"插件健康检查失败但保持可用 {self.plugin_id}: {result.error_message}")
-
-            return result
-
-        except Exception as e:
-            # 检查插件是否至少有基本功能
-            is_plugin_available = (
-                hasattr(self.plugin, 'get_plugin_info') and
-                callable(getattr(self.plugin, 'get_plugin_info'))
-            )
-
-            error_result = HealthCheckResult(
-                is_healthy=is_plugin_available,  # 基于插件基本可用性
-                response_time_ms=0.0,
-                error_message=f"健康检查异常但插件可用: {str(e)}" if is_plugin_available else f"健康检查异常: {str(e)}",
-                timestamp=datetime.now()
-            )
-
-            self._last_health_check = datetime.now()
-            self._last_health_check_result = error_result
-
-            # 不要因为健康检查异常就设置为ERROR状态，除非插件真的不可用
-            if not is_plugin_available:
-                self.status = PluginStatus.ERROR
-            self.last_error = str(e)
-            logger.warning(f"插件健康检查异常 {self.plugin_id}: {e}")
-            return error_result
-
-    def get_plugin_info(self) -> PluginInfo:
+    def get_fundamental_data(self, symbol: str) -> Dict[str, Any]:
         """
-        获取插件信息
+        获取基本面数据（可选实现）
+
+        Args:
+            symbol: 交易代码
 
         Returns:
-            PluginInfo: 插件信息
+            Dict[str, Any]: 基本面数据
         """
-        return self.plugin.get_plugin_info()
+        return {}
+
+    def get_financial_reports(self, symbol: str, report_type: str = "annual") -> pd.DataFrame:
+        """
+        获取财务报表数据（可选实现）
+
+        Args:
+            symbol: 交易代码
+            report_type: 报表类型 (annual/quarterly)
+
+        Returns:
+            pd.DataFrame: 财务报表数据
+        """
+        return pd.DataFrame()
+
+    def search_symbols(self, keyword: str, asset_type: AssetType = None) -> List[Dict[str, Any]]:
+        """
+        搜索交易代码（可选实现）
+
+        Args:
+            keyword: 搜索关键词
+            asset_type: 资产类型过滤
+
+        Returns:
+            List[Dict[str, Any]]: 搜索结果
+        """
+        return []
 
     def get_statistics(self) -> Dict[str, Any]:
         """
@@ -765,213 +284,284 @@ class DataSourcePluginAdapter:
         Returns:
             Dict[str, Any]: 统计信息
         """
-        with self._lock:
-            success_rate = 0.0
-            if self.stats["total_requests"] > 0:
-                success_rate = self.stats["successful_requests"] / self.stats["total_requests"]
-
-            return {
-                **self.stats,
-                "success_rate": success_rate,
-                "error_count": self.error_count,
-                "last_error": self.last_error,
-                "last_success_time": self.last_success_time,
-                "status": self.status.value,
-                "is_connected": self.is_connected()
-            }
-
-    def _get_default_config(self) -> Dict[str, Any]:
-        """获取默认配置"""
-        # 基础默认值
-        default_config: Dict[str, Any] = {
-            "timeout": 30,
-            "retry_count": 3,
-            "rate_limit": 100
+        return {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "average_response_time": 0.0,
+            "last_request_time": None,
+            "uptime": 0.0
         }
 
-        # 尝试从数据库读取配置并与默认值合并
-        try:
-            # 延迟导入以避免循环依赖
-            from db.models.plugin_models import get_data_source_config_manager  # type: ignore
-
-            config_manager = get_data_source_config_manager()
-            db_entry = config_manager.get_plugin_config(self.plugin_id)
-
-            if db_entry and isinstance(db_entry, dict):
-                config_data = db_entry.get("config_data", {}) if isinstance(db_entry.get("config_data", {}), dict) else {}
-                # 合并：数据库优先，缺省回退到默认
-                merged = {**default_config, **config_data}
-                return merged
-
-            # 如无记录则尝试从插件对象推断默认配置，并写入数据库进行初始化
-            inferred_defaults: Dict[str, Any] = {}
-
-            try:
-                # 优先使用插件声明的 DEFAULT_CONFIG / default_config / config
-                if hasattr(self.plugin, "DEFAULT_CONFIG") and isinstance(getattr(self.plugin, "DEFAULT_CONFIG"), dict):
-                    inferred_defaults = getattr(self.plugin, "DEFAULT_CONFIG")  # type: ignore
-                elif hasattr(self.plugin, "default_config") and isinstance(getattr(self.plugin, "default_config"), dict):
-                    inferred_defaults = getattr(self.plugin, "default_config")  # type: ignore
-                elif hasattr(self.plugin, "config") and isinstance(getattr(self.plugin, "config"), dict):
-                    inferred_defaults = getattr(self.plugin, "config")  # type: ignore
-            except Exception:
-                inferred_defaults = {}
-
-            seed_config = {**default_config, **(inferred_defaults or {})}
-
-            # 将初始配置写入数据库，优先级/权重采用默认值
-            try:
-                config_manager.save_plugin_config(
-                    plugin_id=self.plugin_id,
-                    config_data=seed_config,
-                    priority=50,
-                    weight=1.0,
-                    enabled=True,
-                )
-            except Exception:
-                # 忽略写入失败，仍返回合并后的默认配置
-                pass
-
-            return seed_config
-
-        except Exception:
-            # 如果数据库不可用或发生错误，则回退基础默认值
-            return default_config
-
-    def _update_success_stats(self, response_time_ms: float) -> None:
-        """更新成功统计"""
-        self.stats["successful_requests"] += 1
-
-        # 更新平均响应时间
-        total_success = self.stats["successful_requests"]
-        current_avg = self.stats["avg_response_time"]
-        self.stats["avg_response_time"] = (
-            (current_avg * (total_success - 1) + response_time_ms) / total_success
-        )
-
-        self.last_success_time = datetime.now()
-
-    def _update_error_stats(self, error: Exception) -> None:
-        """更新错误统计"""
-        self.stats["failed_requests"] += 1
-        self.error_count += 1
-        self.last_error = str(error)
-        self.status = PluginStatus.ERROR
-
-    def _convert_real_time_data_to_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
+    def get_supported_frequencies(self) -> List[str]:
         """
-        将实时数据转换为DataFrame格式
-
-        Args:
-            data: 实时数据字典
+        获取支持的频率列表
 
         Returns:
-            pd.DataFrame: 转换后的DataFrame
+            List[str]: 支持的频率
         """
+        return ["D", "W", "M"]
+
+    def get_supported_markets(self) -> List[str]:
+        """
+        获取支持的市场列表
+
+        Returns:
+            List[str]: 支持的市场
+        """
+        return []
+
+    def validate_symbol(self, symbol: str, asset_type: AssetType = None) -> bool:
+        """
+        验证交易代码是否有效
+
+        Args:
+            symbol: 交易代码
+            asset_type: 资产类型
+
+        Returns:
+            bool: 是否有效
+        """
+        return True
+
+    def normalize_symbol(self, symbol: str, asset_type: AssetType = None) -> str:
+        """
+        标准化交易代码
+
+        Args:
+            symbol: 原始交易代码
+            asset_type: 资产类型
+
+        Returns:
+            str: 标准化后的交易代码
+        """
+        return symbol
+
+    def get_config_schema(self) -> Dict[str, Any]:
+        """
+        获取配置模式
+
+        Returns:
+            Dict[str, Any]: 配置模式
+        """
+        return {}
+
+    def validate_config(self, config: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        验证配置
+
+        Args:
+            config: 配置字典
+
+        Returns:
+            Tuple[bool, str]: (是否有效, 错误信息)
+        """
+        return True, ""
+
+    def update_config(self, config: Dict[str, Any]) -> bool:
+        """
+        更新配置
+
+        Args:
+            config: 新配置
+
+        Returns:
+            bool: 更新是否成功
+        """
+        return True
+
+
+class DataSourcePluginAdapter:
+    """
+    数据源插件适配器
+
+    将插件接口适配到现有的数据管理系统
+    提供统一的访问接口和错误处理
+    """
+
+    def __init__(self, plugin: IDataSourcePlugin, plugin_id: str):
+        """
+        初始化适配器
+
+        Args:
+            plugin: 数据源插件实例
+            plugin_id: 插件唯一标识
+        """
+        self.plugin = plugin
+        self.plugin_id = plugin_id
+        self.logger = logging.getLogger(f"{self.__class__.__name__}.{plugin_id}")
+        self._connection_info = None
+        self._last_health_check = None
+
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
         try:
-            if not data:
-                return pd.DataFrame()
-
-            # 转换为标准格式
-            records = []
-            for symbol, quote_data in data.items():
-                if isinstance(quote_data, dict):
-                    record = {"symbol": symbol, **quote_data}
-                    records.append(record)
-
-            return pd.DataFrame(records)
-
+            result = self.plugin.connect(**kwargs)
+            if result:
+                self._connection_info = self.plugin.get_connection_info()
+                self.logger.info(f"数据源插件连接成功: {self.plugin_id}")
+            else:
+                self.logger.error(f"数据源插件连接失败: {self.plugin_id}")
+            return result
         except Exception as e:
-            logger.error(f"实时数据转换失败: {e}")
+            self.logger.error(f"数据源插件连接异常: {self.plugin_id} - {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """断开连接"""
+        try:
+            result = self.plugin.disconnect()
+            if result:
+                self.logger.info(f"数据源插件断开连接: {self.plugin_id}")
+            return result
+        except Exception as e:
+            self.logger.error(f"数据源插件断开连接异常: {self.plugin_id} - {e}")
+            return False
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        try:
+            return self.plugin.is_connected()
+        except Exception as e:
+            self.logger.error(f"检查连接状态异常: {self.plugin_id} - {e}")
+            return False
+
+    def health_check(self) -> HealthCheckResult:
+        """健康检查"""
+        try:
+            result = self.plugin.health_check()
+            self._last_health_check = result
+            return result
+        except Exception as e:
+            self.logger.error(f"健康检查异常: {self.plugin_id} - {e}")
+            return HealthCheckResult(
+                is_healthy=False,
+                status_code=500,
+                message=f"健康检查异常: {str(e)}",
+                response_time_ms=0.0,
+                last_check_time=datetime.now()
+            )
+
+    def get_stock_list(self, market: str = None) -> pd.DataFrame:
+        """获取股票列表（兼容现有接口）"""
+        try:
+            asset_list = self.plugin.get_asset_list(AssetType.STOCK, market)
+            return pd.DataFrame(asset_list)
+        except Exception as e:
+            self.logger.error(f"获取股票列表异常: {self.plugin_id} - {e}")
             return pd.DataFrame()
 
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """获取资产列表"""
+        try:
+            return self.plugin.get_asset_list(asset_type, market)
+        except Exception as e:
+            self.logger.error(f"获取资产列表异常: {self.plugin_id} - {e}")
+            return []
 
-class PluginInitializationError(Exception):
-    """插件初始化错误"""
-    pass
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """获取K线数据"""
+        try:
+            return self.plugin.get_kdata(symbol, freq, start_date, end_date, count)
+        except Exception as e:
+            self.logger.error(f"获取K线数据异常: {self.plugin_id} - {e}")
+            return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: List[str]) -> pd.DataFrame:
+        """获取实时行情"""
+        try:
+            return self.plugin.get_real_time_quotes(symbols)
+        except Exception as e:
+            self.logger.error(f"获取实时行情异常: {self.plugin_id} - {e}")
+            return pd.DataFrame()
+
+    def get_plugin_info(self) -> PluginInfo:
+        """获取插件信息"""
+        return self.plugin.plugin_info
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取统计信息"""
+        try:
+            return self.plugin.get_statistics()
+        except Exception as e:
+            self.logger.error(f"获取统计信息异常: {self.plugin_id} - {e}")
+            return {}
 
 
-class DataFetchError(Exception):
-    """数据获取错误"""
-    pass
-
-
-class RealTimeDataError(Exception):
-    """实时数据错误"""
-    pass
-
-
-class PluginValidationError(Exception):
-    """插件验证错误"""
-    pass
-
-
-def validate_plugin_interface(plugin: Any) -> bool:
+def validate_plugin_interface(plugin_instance) -> bool:
     """
     验证插件是否实现了必要的接口
 
     Args:
-        plugin: 待验证的插件实例
+        plugin_instance: 插件实例
 
     Returns:
-        bool: 是否通过验证
-
-    Raises:
-        PluginValidationError: 验证失败时抛出
+        bool: 是否符合接口要求
     """
-    try:
-        # 检查是否实现了IDataSourcePlugin接口
-        if not isinstance(plugin, IDataSourcePlugin):
-            raise PluginValidationError("插件必须实现IDataSourcePlugin接口")
+    # 分离plugin_info检查和其他方法检查
+    required_methods = [
+        'connect', 'disconnect', 'is_connected',
+        'get_connection_info', 'health_check', 'get_asset_list',
+        'get_kdata', 'get_real_time_quotes'
+    ]
 
-        # 检查必要方法是否存在
-        required_methods = [
-            'get_plugin_info', 'get_supported_asset_types', 'get_supported_data_types',
-            'initialize', 'shutdown', 'fetch_data', 'get_real_time_data', 'health_check'
-        ]
+    # 检查plugin_info属性（可以是属性或方法）
+    if not hasattr(plugin_instance, 'plugin_info'):
+        logger.error("数据源插件缺少plugin_info属性")
+        return False
 
-        for method_name in required_methods:
-            if not hasattr(plugin, method_name):
-                raise PluginValidationError(f"插件缺少必要方法: {method_name}")
-
-            method = getattr(plugin, method_name)
-            if not callable(method):
-                raise PluginValidationError(f"插件方法不可调用: {method_name}")
-
-        # 验证插件信息
+    plugin_info = getattr(plugin_instance, 'plugin_info')
+    # plugin_info可以是属性(@property)或方法
+    if callable(plugin_info):
+        # 如果是方法，尝试调用
         try:
-            plugin_info = plugin.get_plugin_info()
-            if not isinstance(plugin_info, PluginInfo):
-                raise PluginValidationError("get_plugin_info必须返回PluginInfo实例")
-
-            # 验证必要字段
-            if not plugin_info.id or not plugin_info.name:
-                raise PluginValidationError("插件ID和名称不能为空")
-
+            info_result = plugin_info()
+            if not info_result:
+                logger.error("数据源插件plugin_info方法返回空值")
+                return False
         except Exception as e:
-            raise PluginValidationError(f"插件信息验证失败: {str(e)}")
+            logger.error(f"数据源插件plugin_info方法调用失败: {e}")
+            return False
+    else:
+        # 如果是属性，检查是否为有效对象
+        if not plugin_info:
+            logger.error("数据源插件plugin_info属性为空")
+            return False
 
-        logger.info(f"插件验证成功: {plugin_info.id}")
-        return True
+    # 检查必要方法
+    for method_name in required_methods:
+        if not hasattr(plugin_instance, method_name):
+            logger.error(f"插件缺少必要方法: {method_name}")
+            return False
 
-    except PluginValidationError:
-        raise
+        method = getattr(plugin_instance, method_name)
+        if not callable(method):
+            logger.error(f"插件方法不可调用: {method_name}")
+            return False
+
+    return True
+
+
+def create_plugin_adapter(plugin_instance, plugin_id: str) -> Optional[DataSourcePluginAdapter]:
+    """
+    创建插件适配器
+
+    Args:
+        plugin_instance: 插件实例
+        plugin_id: 插件标识
+
+    Returns:
+        Optional[DataSourcePluginAdapter]: 适配器实例或None
+    """
+    if not validate_plugin_interface(plugin_instance):
+        logger.error(f"插件接口验证失败: {plugin_id}")
+        return None
+
+    try:
+        adapter = DataSourcePluginAdapter(plugin_instance, plugin_id)
+        logger.info(f"插件适配器创建成功: {plugin_id}")
+        return adapter
     except Exception as e:
-        raise PluginValidationError(f"插件验证异常: {str(e)}")
-
-
-# 导出的公共接口
-__all__ = [
-    'IDataSourcePlugin',
-    'DataSourcePluginAdapter',
-    'PluginInfo',
-    'HealthCheckResult',
-    'AssetType',
-    'DataType',
-    'PluginStatus',
-    'PluginInitializationError',
-    'DataFetchError',
-    'RealTimeDataError',
-    'PluginValidationError',
-    'validate_plugin_interface'
-]
+        logger.error(f"创建插件适配器失败: {plugin_id} - {e}")
+        return None

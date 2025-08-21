@@ -167,7 +167,10 @@ class LogManager(BaseLogManager):
             message = f"[trace_id={trace_id or ''}][request_id={request_id or ''}] {message}"
 
         # 检查配置是否存在且有效
-        if self.config and hasattr(self.config, 'async_logging') and self.config.async_logging:
+        if (self.config and
+            hasattr(self.config, 'async_logging') and
+            hasattr(self.config, '__dict__') and  # 确保是对象而不是字符串
+                self.config.async_logging):
             self._async_log(message, level)
         else:
             self._write_log(message, level)

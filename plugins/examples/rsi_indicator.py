@@ -36,7 +36,13 @@ class RSIIndicatorPlugin(IIndicatorPluginV2):
             description="相对强弱指标(RSI)，用于判断超买超卖状态",
             author="FactorWeave 团队",
             supported_asset_types=[],
-            supported_data_types=[]
+            supported_data_types=[],
+            capabilities={
+                "indicators": ["RSI"],
+                "parameters": ["period", "overbought_level", "oversold_level"],
+                "signal_types": ["overbought", "oversold", "neutral"],
+                "real_time_support": True
+            }
         )
 
     def get_config_schema(self) -> Dict[str, Any]:

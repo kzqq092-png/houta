@@ -24,7 +24,7 @@ from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.colors import to_rgba
 import warnings
 import matplotlib.dates as mdates
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 from optimization.update_throttler import get_update_throttler
 
 

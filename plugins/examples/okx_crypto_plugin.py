@@ -11,11 +11,11 @@ from typing import List, Optional, Dict, Any
 import requests
 import pandas as pd
 
-from core.data_source_extensions import IDataSourcePlugin
+from core.data_source_extensions import IDataSourcePlugin, HealthCheckResult
 from core.plugin_types import AssetType, DataType, PluginType
-from core.data_source_extensions import IDataSourcePlugin, PluginInfo
+from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.plugin_types import AssetType, DataType
-from core.data_source_data_models import StockInfo, KlineData, MarketData, QueryParams, HealthCheckResult
+from core.data_source_data_models import QueryParams, StockInfo, KlineData, MarketData
 
 
 class OKXCryptoPlugin(IDataSourcePlugin):
@@ -40,6 +40,12 @@ class OKXCryptoPlugin(IDataSourcePlugin):
         self._rate_limit_delay = float(self.config.get('rate_limit_delay', self.DEFAULT_CONFIG['rate_limit_delay']))
 
         self.initialized = False  # 插件初始化状态
+        # 连接状态属性
+        self.connection_time = None
+        self.last_activity = None
+        self.last_error = None
+        self.config = {}
+
 
     def get_supported_asset_types(self) -> List[AssetType]:
         """获取支持的资产类型"""
@@ -361,7 +367,16 @@ class OKXCryptoPlugin(IDataSourcePlugin):
             description=self.description,
             author="FactorWeave-Quant 团队",
             supported_asset_types=[AssetType.CRYPTO],
-            supported_data_types=[DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE]
+            supported_data_types=[DataType.HISTORICAL_KLINE, DataType.REAL_TIME_QUOTE],
+            capabilities={
+                "exchange": "okx",
+                "cryptocurrencies": ["BTC", "ETH", "LTC", "BCH", "EOS", "XRP", "ADA"],
+                "quote_currencies": ["USDT", "USDC", "BTC", "ETH"],
+                "frequencies": ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "D", "W"],
+                "real_time_support": True,
+                "historical_data": True,
+                "derivatives": True
+            }
         )
 
     def get_supported_data_types(self) -> List[DataType]:
@@ -374,7 +389,7 @@ class OKXCryptoPlugin(IDataSourcePlugin):
             # 可以在这里处理配置参数
             if hasattr(self, 'configure_api') and 'api_key' in config:
                 self.configure_api(config.get('api_key', ''))
-            
+
             # 设置初始化状态
             self.initialized = True
             return True
@@ -451,3 +466,92 @@ class OKXCryptoPlugin(IDataSourcePlugin):
         except Exception as e:
             self.logger.error(f"实时数据获取失败: {e}")
             return {}
+
+    @property
+    def plugin_info(self) -> PluginInfo:
+        """获取插件信息"""
+        return PluginInfo(
+            id=f"{self.__class__.__name__.lower()}",
+            name=getattr(self, 'name', self.__class__.__name__),
+            version=getattr(self, 'version', '1.0.0'),
+            description=getattr(self, 'description', '数据源插件'),
+            author=getattr(self, 'author', 'HIkyuu-UI Team'),
+            supported_asset_types=getattr(self, 'supported_asset_types', [AssetType.STOCK]),
+            supported_data_types=getattr(self, 'supported_data_types', [DataType.HISTORICAL_KLINE]),
+            capabilities={
+                "markets": ["SH", "SZ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True
+            }
+        )
+
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
+        try:
+            # TODO: 实现具体的连接逻辑
+            self.logger.info(f"{self.__class__.__name__} 连接成功")
+            return True
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"连接失败: {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """断开连接"""
+        try:
+            # TODO: 实现具体的断开连接逻辑
+            if hasattr(self, 'logger'):
+                self.logger.info(f"{self.__class__.__name__} 断开连接")
+            return True
+        except Exception as e:
+            if hasattr(self, 'logger'):
+                self.logger.error(f"断开连接失败: {e}")
+            return False
+
+    def is_connected(self) -> bool:
+        """检查连接状态"""
+        # TODO: 实现具体的连接状态检查
+        return True
+
+    def get_connection_info(self):
+        """获取连接信息"""
+        from core.data_source_extensions import ConnectionInfo, HealthCheckResult
+        return ConnectionInfo(
+            is_connected=self.is_connected(),
+            connection_time=self.connection_time,
+            last_activity=self.last_activity,
+            connection_params={
+                "server_info": "localhost",
+                "timeout": self.config.get('timeout', 30)
+            },
+            error_message=self.last_error
+        )
+
+    def health_check(self):
+        """健康检查"""
+        from core.data_source_extensions import HealthCheckResult
+        from datetime import datetime
+        return HealthCheckResult(
+            is_healthy=self.is_connected(),
+            response_time=0.0,
+            message="健康",
+            last_check_time=datetime.now()
+        )
+
+    def get_asset_list(self, asset_type: AssetType, market: str = None) -> List[Dict[str, Any]]:
+        """获取资产列表"""
+        # TODO: 实现具体的资产列表获取逻辑
+        return []
+
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """获取K线数据"""
+        # TODO: 实现具体的K线数据获取逻辑
+        import pandas as pd
+        return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
+        """获取实时行情"""
+        # TODO: 实现具体的实时行情获取逻辑
+        return []

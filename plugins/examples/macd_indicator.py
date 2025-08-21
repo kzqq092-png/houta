@@ -38,7 +38,12 @@ class MACDIndicatorPlugin(IIndicatorPluginV2):
             description="移动平均收敛发散指标(MACD)，用于分析趋势与信号",
             author="FactorWeave 团队",
             supported_asset_types=[],
-            supported_data_types=[]
+            supported_data_types=[],
+            capabilities={
+                "indicators": ["MACD", "MACD_SIGNAL", "MACD_HIST"],
+                "parameters": ["fast_period", "slow_period", "signal_period"],
+                "real_time_support": True
+            }
         )
 
     def get_config_schema(self) -> Dict[str, Any]:

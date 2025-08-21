@@ -10,7 +10,7 @@ FactorWeave-Quant  2.0 系统快速启动器
 
 from analysis.pattern_manager import PatternManager
 from optimization.version_manager import VersionManager
-from optimization.performance_evaluator import PerformanceEvaluator
+from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.auto_tuner import AutoTuner
 from optimization.main_controller import OptimizationController
 from core.services import (

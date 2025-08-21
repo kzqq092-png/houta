@@ -33,7 +33,8 @@ class DataAccess:
 
         # 初始化各个仓库
         self.stock_repo = StockRepository(data_manager)
-        self.kline_repo = KlineRepository(data_manager)
+        # KlineRepository使用asset_service参数，不是data_manager
+        self.kline_repo = KlineRepository(asset_service=data_manager)
         self.market_repo = MarketRepository(data_manager)
 
         # 连接状态

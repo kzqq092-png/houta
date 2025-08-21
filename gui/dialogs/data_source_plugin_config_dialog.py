@@ -847,7 +847,7 @@ class DataSourcePluginConfigDialog(QDialog):
             },
 
             # 通达信股票插件
-            "examples.tongdaxin_stock_plugin": {
+            "plugins.examples.tongdaxin_stock_plugin": {
                 "connection": {
                     "host": "119.147.212.81",
                     "port": 7709,

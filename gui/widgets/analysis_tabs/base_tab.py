@@ -13,7 +13,7 @@ from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
 from utils.cache import Cache
 from utils.trace_context import get_trace_id, set_trace_id
-from utils.performance_monitor import measure_performance
+from core.performance import measure_performance
 
 
 class BaseAnalysisTab(QWidget):
@@ -48,6 +48,9 @@ class BaseAnalysisTab(QWidget):
         # 运行状态
         self.is_loading = False
         self.is_initialized = False
+
+        # 初始化安全错误处理（但不自动连接）
+        # 子类可以调用 self._init_safe_error_handling() 来启用
         self.analysis_count = 0  # 分析次数统计
 
         # 性能监控
@@ -109,6 +112,76 @@ class BaseAnalysisTab(QWidget):
         except Exception as e:
             self.log_manager.error(f"{self.__class__.__name__} 设置K线数据失败: {e}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
+
+    def append_kdata(self, new_data) -> None:
+        """
+        渐进式追加K线数据（用于渐进式加载）
+
+        参数:
+            new_data: 新的数据块
+        """
+        try:
+            if not self._validate_kdata(new_data):
+                self.log_manager.warning(f"{self.__class__.__name__}: 追加数据验证失败")
+                return
+
+            if self.current_kdata is None:
+                # 如果没有现有数据，直接设置
+                self.set_kdata(new_data)
+                return
+
+            # 合并数据
+            if isinstance(self.current_kdata, pd.DataFrame) and isinstance(new_data, pd.DataFrame):
+                # 对于pandas DataFrame，使用concat
+                self.current_kdata = pd.concat([self.current_kdata, new_data], ignore_index=True)
+                self.kdata = self.current_kdata  # 保持兼容性
+            elif hasattr(self.current_kdata, 'extend') and hasattr(new_data, '__iter__'):
+                # 对于列表等可迭代对象
+                self.current_kdata.extend(new_data)
+                self.kdata = self.current_kdata
+            else:
+                # 其他情况，尝试转换为列表处理
+                if not isinstance(self.current_kdata, list):
+                    self.current_kdata = [self.current_kdata]
+                if isinstance(new_data, list):
+                    self.current_kdata.extend(new_data)
+                else:
+                    self.current_kdata.append(new_data)
+                self.kdata = self.current_kdata
+
+            # 更新元数据
+            self.last_update_time = datetime.now()
+            self.data_hash = self._calculate_data_hash(self.current_kdata)
+
+            # 发射追加数据信号
+            self.data_updated.emit({
+                'timestamp': self.last_update_time.isoformat(),
+                'data_length': len(self.current_kdata) if hasattr(self.current_kdata, '__len__') else 0,
+                'data_type': type(self.current_kdata).__name__,
+                'operation': 'append'
+            })
+
+            # 轻量级刷新（仅更新新增部分）
+            self._schedule_incremental_refresh(new_data)
+
+        except Exception as e:
+            self.log_manager.error(f"{self.__class__.__name__} 追加K线数据失败: {e}")
+            self.error_occurred.emit(f"追加K线数据失败: {str(e)}")
+
+    def _schedule_incremental_refresh(self, new_data):
+        """调度增量刷新（仅刷新新增数据部分）"""
+        try:
+            # 如果子类实现了增量刷新方法，使用它
+            if hasattr(self, 'refresh_incremental'):
+                QTimer.singleShot(50, lambda: self.refresh_incremental(new_data))
+            else:
+                # 否则使用完整刷新
+                self._schedule_async_refresh()
+
+        except Exception as e:
+            self.log_manager.error(f"调度增量刷新失败: {e}")
+            # 回退到完整刷新
+            self._schedule_async_refresh()
 
     def _schedule_async_refresh(self):
         """异步调度数据刷新，避免阻塞UI线程"""
@@ -1611,3 +1684,50 @@ class BaseExportThread(QThread):
             error_msg = f"导出失败: {str(e)} trace_id={get_trace_id()}"
             self.log_manager.error(error_msg)
             self.error_occurred.emit(error_msg)
+
+    def _init_safe_error_handling(self):
+        """初始化安全的错误处理机制"""
+        # 注意：只在子类需要时调用
+        # 避免与现有的信号连接冲突
+        pass
+
+    def _handle_error_safely(self, error_msg: str):
+        """安全地处理错误，避免阻塞UI"""
+        try:
+            # 记录到日志
+            self.log_manager.error(f"错误处理: {error_msg}")
+
+            # 使用QTimer延迟显示错误，避免阻塞当前线程
+            QTimer.singleShot(0, lambda: self._show_error_safely(error_msg))
+
+        except Exception as e:
+            # 如果错误处理本身出错，至少记录到日志
+            print(f"错误处理失败: {e}")
+
+    def _show_error_safely(self, error_msg: str):
+        """安全地显示错误信息"""
+        try:
+            # 查找顶级窗口
+            parent = self
+            while parent.parent():
+                parent = parent.parent()
+
+            # 创建非模态消息框
+            msg_box = QMessageBox(parent)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("操作提示")
+            msg_box.setText("操作过程中出现问题")
+            msg_box.setDetailedText(error_msg)
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.setModal(False)  # 设置为非模态
+
+            # 非阻塞显示
+            msg_box.show()
+
+            # 5秒后自动关闭
+            QTimer.singleShot(5000, msg_box.close)
+
+        except Exception as e:
+            # 如果GUI显示失败，至少打印到控制台
+            print(f"GUI错误显示失败: {e}")
+            print(f"原始错误: {error_msg}")

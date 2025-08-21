@@ -7,7 +7,7 @@
 
 from analysis.pattern_manager import PatternManager
 from optimization.version_manager import VersionManager
-from optimization.performance_evaluator import PerformanceEvaluator, PerformanceMetrics
+from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator, PerformanceMetric as PerformanceMetrics
 import random
 import numpy as np
 import pandas as pd

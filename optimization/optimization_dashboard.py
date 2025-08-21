@@ -7,7 +7,7 @@
 
 from analysis.pattern_manager import PatternManager
 from optimization.database_schema import OptimizationDatabaseManager
-from optimization.performance_evaluator import PerformanceEvaluator
+from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner
 import sys

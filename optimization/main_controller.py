@@ -10,7 +10,7 @@ from optimization.optimization_dashboard import OptimizationDashboard, run_dashb
 from optimization.ui_integration import UIIntegration, create_ui_integration
 from optimization.database_schema import OptimizationDatabaseManager
 from optimization.algorithm_optimizer import AlgorithmOptimizer
-from optimization.performance_evaluator import PerformanceEvaluator
+from core.performance import UnifiedPerformanceMonitor as PerformanceEvaluator
 from optimization.version_manager import VersionManager
 from optimization.auto_tuner import AutoTuner, OptimizationConfig
 import sys
