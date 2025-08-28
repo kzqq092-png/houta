@@ -38,7 +38,7 @@ from core.strategy_extensions import (
 logger = logging.getLogger(__name__)
 
 
-class HikyuuSignalAdapter:
+class FactorWeaveSignalAdapter:
     """HIkyuu信号适配器"""
 
     def __init__(self):
@@ -95,7 +95,7 @@ class HikyuuSignalAdapter:
             raise
 
 
-class HikyuuTradingSystemAdapter:
+class FactorWeaveTradingSystemAdapter:
     """HIkyuu交易系统适配器"""
 
     def __init__(self):
@@ -248,7 +248,7 @@ class HikyuuTradingSystemAdapter:
         )
 
 
-class HikyuuStrategyPlugin(IStrategyPlugin):
+class FactorWeaveStrategyPlugin(IStrategyPlugin):
     """HIkyuu策略插件"""
 
     def __init__(self):

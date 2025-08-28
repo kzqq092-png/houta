@@ -258,7 +258,7 @@ class SystemHealthChecker:
             db_paths = [
                 'db/pattern_algorithms.db',
                 'db/hikyuu.db',
-                'data/stock_data.db'
+                'db/stock_data.db'
             ]
 
             db_status = {}

@@ -1,11 +1,109 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QTableView, QPushButton, QMessageBox, QLineEdit, QLabel, QFileDialog, QStyledItemDelegate, QSpinBox, QDoubleSpinBox, QDateEdit, QCheckBox, QComboBox, QInputDialog, QSplitter, QHeaderView, QWidget
 from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QBrush
 import os
 import csv
 import json
 import requests
+import time
+import logging
+import glob
+from datetime import datetime
+
+
+class DatabaseScanThread(QThread):
+    """数据库扫描线程"""
+    scan_completed = pyqtSignal(dict)
+    scan_error = pyqtSignal(str)
+
+    def run(self):
+        """执行数据库扫描"""
+        try:
+            databases = {
+                'sqlite': [],
+                'duckdb': []
+            }
+
+            # 只扫描db目录
+            db_dir = os.path.join(os.getcwd(), 'db')
+            if not os.path.exists(db_dir):
+                self.scan_completed.emit(databases)
+                return
+
+            # 扫描db目录中的数据库文件
+            scan_patterns = [
+                os.path.join(db_dir, "*.db"),
+                os.path.join(db_dir, "*.sqlite"),
+                os.path.join(db_dir, "*.sqlite3"),
+                os.path.join(db_dir, "*.duckdb"),
+            ]
+
+            for pattern in scan_patterns:
+                for file_path in glob.glob(pattern):
+                    if os.path.isfile(file_path):
+                        file_size = os.path.getsize(file_path)
+                        # 跳过空文件或过小的文件
+                        if file_size < 1024:  # 小于1KB
+                            continue
+
+                        # 根据扩展名分类
+                        ext = os.path.splitext(file_path)[1].lower()
+                        if ext in ['.db', '.sqlite', '.sqlite3']:
+                            # 检查是否真的是SQLite文件
+                            if self._is_sqlite_file(file_path):
+                                databases['sqlite'].append({
+                                    'path': file_path,
+                                    'name': os.path.basename(file_path),
+                                    'size': self._format_file_size(file_size)
+                                })
+                        elif ext == '.duckdb':
+                            # 标准DuckDB文件
+                            if self._is_duckdb_file(file_path):
+                                databases['duckdb'].append({
+                                    'path': file_path,
+                                    'name': os.path.basename(file_path),
+                                    'size': self._format_file_size(file_size)
+                                })
+
+            self.scan_completed.emit(databases)
+
+        except Exception as e:
+            self.scan_error.emit(str(e))
+
+    def _is_sqlite_file(self, file_path):
+        """检查文件是否为有效的SQLite数据库"""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(file_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _is_duckdb_file(self, file_path):
+        """检查文件是否为有效的DuckDB数据库"""
+        try:
+            import duckdb
+            conn = duckdb.connect(file_path)
+            conn.execute("SHOW TABLES;")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _format_file_size(self, size_bytes):
+        """格式化文件大小"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
 
 
 class TypeDelegate(QStyledItemDelegate):
@@ -91,11 +189,28 @@ class DatabaseAdminDialog(QDialog):
         self.current_table = None
         self.page_size = 50
         self.current_page = 0
-        self.init_ui()
         self.log = []
+
+        # 慢SQL记录功能
+        self.slow_query_threshold = 500  # 慢查询阈值(毫秒)
+        self.slow_queries = []  # 慢查询记录
+
+        # 数据库文件管理
+        self.available_databases = {
+            'sqlite': [],
+            'duckdb': []
+        }
+        self.current_db_type = 'sqlite'  # 默认类型
+        self.selected_db_path = db_path  # 当前选择的数据库路径
+
+        self.init_ui()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
+
+        # 数据库连接区域 - 集成到顶部
+        self._create_database_connection_panel(main_layout)
+
         main_splitter = QSplitter(Qt.Horizontal)
         # 左侧表名列表
         self.table_list = QListWidget()
@@ -164,6 +279,7 @@ class DatabaseAdminDialog(QDialog):
         self.download_btn = QPushButton("从云端拉取权限")
         self.schema_btn = QPushButton("表结构管理")
         self.stats_btn = QPushButton("数据统计")
+        self.slow_sql_btn = QPushButton("慢SQL记录")
         self.lang_combo = QComboBox()
         self.lang_combo.addItems(["中文", "English"])
         self.lang_combo.currentTextChanged.connect(self.switch_language)
@@ -173,6 +289,7 @@ class DatabaseAdminDialog(QDialog):
         self.download_btn.clicked.connect(self.download_permissions_from_cloud)
         self.schema_btn.clicked.connect(self.show_schema_manager)
         self.stats_btn.clicked.connect(self.show_table_stats)
+        self.slow_sql_btn.clicked.connect(self.show_slow_queries)
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.del_btn)
         btn_layout.addWidget(self.save_btn)
@@ -185,6 +302,7 @@ class DatabaseAdminDialog(QDialog):
         btn_layout.addWidget(self.download_btn)
         btn_layout.addWidget(self.schema_btn)
         btn_layout.addWidget(self.stats_btn)
+        btn_layout.addWidget(self.slow_sql_btn)
         btn_layout.addWidget(self.lang_combo)
         right_layout.addLayout(btn_layout)
         main_splitter.addWidget(right_widget)
@@ -874,3 +992,506 @@ class DatabaseAdminDialog(QDialog):
         self.stats_btn.setText("数据统计" if zh else "Stats")
         self.page_label.setText(self.page_label.text().replace("页", "Page").replace("共", "Total").replace(
             "行", "Rows") if not zh else self.page_label.text().replace("Page", "页").replace("Total", "共").replace("Rows", "行"))
+
+    def _create_database_connection_panel(self, main_layout):
+        """创建数据库连接面板 - 专业紧凑的布局"""
+        from PyQt5.QtWidgets import QGroupBox, QGridLayout, QFrame
+
+        # 创建紧凑的分组框
+        db_group = QGroupBox("数据库连接管理")
+        db_group.setFixedHeight(110)
+        db_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 1ex;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+
+        # 使用紧凑的网格布局
+        db_layout = QGridLayout(db_group)
+        db_layout.setSpacing(2)  # 减少间距
+        db_layout.setContentsMargins(15, 0, 15, 0)  # 紧凑的边距
+
+        # 第一行：类型选择和连接状态（紧凑布局）
+        type_label = QLabel("类型:")
+        type_label.setFixedWidth(40)
+        db_layout.addWidget(type_label, 0, 0)
+
+        self.db_type_combo = QComboBox()
+        self.db_type_combo.addItems(["SQLite", "DuckDB"])
+        self.db_type_combo.setFixedWidth(100)
+        self.db_type_combo.currentTextChanged.connect(self._on_database_type_changed)
+        db_layout.addWidget(self.db_type_combo, 0, 1)
+
+        # 连接状态指示器
+        status_label = QLabel("状态:")
+        status_label.setFixedWidth(30)
+        db_layout.addWidget(status_label, 0, 2)
+
+        self.current_db_label = QLabel(os.path.basename(self.selected_db_path) if self.selected_db_path else "未连接")
+        self.current_db_label.setStyleSheet("""
+            QLabel {
+                color: #2196F3;
+                font-weight: bold;
+                padding: 2px 6px;
+                border: 1px solid #2196F3;
+                border-radius: 3px;
+                background-color: #E3F2FD;
+            }
+        """)
+        self.current_db_label.setFixedWidth(180)
+        db_layout.addWidget(self.current_db_label, 0, 3)
+
+        # 第二行：文件选择（占用更多空间）
+        file_label = QLabel("文件:")
+        file_label.setFixedWidth(30)
+        db_layout.addWidget(file_label, 0, 4)
+
+        self.db_file_combo = QComboBox()
+        self.db_file_combo.setFixedWidth(500)
+        self.db_file_combo.setEditable(False)
+        self.db_file_combo.setStyleSheet("""
+            QComboBox {
+                padding: 4px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+        """)
+        db_layout.addWidget(self.db_file_combo, 0, 5)
+        # 连接按钮（突出显示）
+        self.connect_btn = QPushButton("连接")
+        self.connect_btn.setFixedWidth(150)
+        self.connect_btn.clicked.connect(self._connect_to_selected_database)
+        self.connect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        db_layout.addWidget(self.connect_btn, 0, 6)
+
+        # 第三行：操作按钮（紧凑排列）
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(6)
+
+        # 扫描按钮
+        self.scan_btn = QPushButton("扫描")
+        self.scan_btn.clicked.connect(self._scan_databases_async)
+        self.scan_btn.setStyleSheet("""
+            QPushButton {
+                padding: 4px 8px;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                background-color: #f8f9fa;
+                min-width: 50px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        btn_layout.addWidget(self.scan_btn)
+
+        # 浏览按钮
+        self.browse_btn = QPushButton("浏览")
+        self.browse_btn.clicked.connect(self.browse_database_file)
+        self.browse_btn.setStyleSheet(self.scan_btn.styleSheet())
+        btn_layout.addWidget(self.browse_btn)
+
+        # 筛选输入框
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setPlaceholderText("筛选文件...")
+        self.filter_edit.textChanged.connect(self._filter_database_files)
+        self.filter_edit.setStyleSheet("""
+            QLineEdit {
+                padding: 4px;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                min-width: 120px;
+            }
+        """)
+        btn_layout.addWidget(self.filter_edit)
+
+        # 刷新按钮
+        self.refresh_btn = QPushButton("刷新")
+        self.refresh_btn.clicked.connect(self._scan_databases_async)
+        self.refresh_btn.setStyleSheet(self.scan_btn.styleSheet())
+        btn_layout.addWidget(self.refresh_btn)
+
+        btn_layout.addStretch()  # 推到左边
+
+        db_layout.addWidget(btn_frame, 2, 0, 1, 4)  # 跨越所有列
+
+        # 设置列的拉伸比例
+        db_layout.setColumnStretch(1, 1)  # 文件选择框可拉伸
+        db_layout.setColumnStretch(2, 1)  # 状态标签可拉伸
+
+        main_layout.addWidget(db_group)
+
+    def _connect_to_selected_database(self):
+        """连接到选择的数据库"""
+        selected_path = None
+
+        # 获取选择的路径
+        if self.db_file_combo.currentData():
+            selected_path = self.db_file_combo.currentData()
+        elif self.db_file_combo.currentText():
+            # 如果是手动输入的路径
+            input_path = self.db_file_combo.currentText()
+            if os.path.exists(input_path):
+                selected_path = input_path
+
+        if not selected_path:
+            QMessageBox.warning(self, "警告", "请选择一个有效的数据库文件")
+            return
+
+        try:
+            # 验证数据库文件
+            if self.current_db_type == 'sqlite':
+                if not self._is_sqlite_file(selected_path):
+                    QMessageBox.warning(self, "错误", "选择的文件不是有效的SQLite数据库")
+                    return
+            else:
+                if not self._is_duckdb_file(selected_path):
+                    QMessageBox.warning(self, "错误", "选择的文件不是有效的DuckDB数据库")
+                    return
+
+            # 更新当前连接
+            self.selected_db_path = selected_path
+            self.db_path = selected_path
+            self.current_db_label.setText(os.path.basename(selected_path))
+
+            # 重新连接数据库并加载表列表
+            self._reload_database_tables()
+
+            QMessageBox.information(self, "成功", f"已连接到数据库: {os.path.basename(selected_path)}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "连接失败", f"连接数据库失败: {str(e)}")
+
+    def _reload_database_tables(self):
+        """重新连接数据库并加载表列表"""
+        try:
+            # 关闭当前数据库连接
+            if self.db.isOpen():
+                self.db.close()
+
+            # 重新连接数据库
+            self.db.setDatabaseName(self.db_path)
+            if not self.db.open():
+                raise Exception(f"无法打开数据库: {self.db.lastError().text()}")
+
+            # 清空当前表列表
+            self.table_list.clear()
+
+            # 重新加载表列表
+            tables = self.db.tables()
+            self.table_list.addItems(tables)
+
+            # 如果有表，选择第一个
+            if tables:
+                self.table_list.setCurrentRow(0)
+                first_item = self.table_list.item(0)
+                if first_item:
+                    self.load_table(first_item)
+
+            # 更新主题提示
+            if "themes" in tables:
+                items = self.table_list.findItems("themes", Qt.MatchExactly)
+                if items:
+                    self.table_list.setCurrentItem(items[0])
+                    self.load_table(items[0])
+                    self.theme_hint.setText(
+                        "\u2605 主题表(themes)：用于管理UI主题，支持QSS/JSON类型，建议通过主题管理界面操作。可直接编辑、导入导出主题内容。\n字段说明：name=主题名，type=类型(qss/json)，content=内容，origin=来源，created_at/updated_at=时间。\n如需批量导入QSS主题，可将QSS文件放入QSSTheme目录，重启后自动导入。")
+                    self.theme_hint.setVisible(True)
+            else:
+                self.theme_hint.setVisible(False)
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"重新加载数据库表失败: {str(e)}")
+
+    def _filter_database_files(self):
+        """筛选数据库文件"""
+        filter_text = self.filter_edit.text().lower()
+
+        # 清空当前列表
+        self.db_file_combo.clear()
+
+        # 根据筛选条件添加文件
+        db_type = self.current_db_type
+        if db_type in self.available_databases:
+            for db_info in self.available_databases[db_type]:
+                if not filter_text or filter_text in db_info['name'].lower():
+                    display_text = f"{db_info['name']} ({db_info['size']}) - {os.path.dirname(db_info['path'])}"
+                    self.db_file_combo.addItem(display_text, db_info['path'])
+
+    def _scan_databases_async(self):
+        """异步扫描db目录中的数据库文件"""
+        from PyQt5.QtCore import QThread, pyqtSignal
+
+        # 如果已有扫描线程在运行，先停止
+        if hasattr(self, '_scan_thread') and self._scan_thread.isRunning():
+            return
+
+        # 禁用扫描按钮
+        self.scan_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(False)
+        self.scan_btn.setText("扫描中...")
+
+        # 创建扫描线程
+        self._scan_thread = DatabaseScanThread()
+        self._scan_thread.scan_completed.connect(self._on_scan_completed)
+        self._scan_thread.scan_error.connect(self._on_scan_error)
+        self._scan_thread.start()
+
+    def _on_scan_completed(self, databases):
+        """扫描完成回调"""
+        self.available_databases = databases
+        self.update_database_file_list()
+
+        # 恢复按钮状态
+        self.scan_btn.setEnabled(True)
+        self.refresh_btn.setEnabled(True)
+        self.scan_btn.setText("扫描")
+
+        # 显示扫描结果
+        sqlite_count = len(databases['sqlite'])
+        duckdb_count = len(databases['duckdb'])
+        QMessageBox.information(self, "扫描完成",
+                                f"在db目录中找到:\n"
+                                f"SQLite文件: {sqlite_count} 个\n"
+                                f"DuckDB文件: {duckdb_count} 个")
+
+    def _on_scan_error(self, error_msg):
+        """扫描错误回调"""
+        # 恢复按钮状态
+        self.scan_btn.setEnabled(True)
+        self.refresh_btn.setEnabled(True)
+        self.scan_btn.setText("扫描")
+
+        QMessageBox.warning(self, "扫描失败", f"扫描数据库文件时出错:\n{error_msg}")
+
+    def scan_system_databases(self):
+        """保持向后兼容的同步扫描方法"""
+        self._scan_databases_async()
+
+    def _is_sqlite_file(self, file_path):
+        """检查文件是否为有效的SQLite数据库"""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(file_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _is_duckdb_file(self, file_path):
+        """检查文件是否为有效的DuckDB数据库"""
+        try:
+            import duckdb
+            conn = duckdb.connect(file_path)
+            conn.execute("SHOW TABLES;")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _format_file_size(self, size_bytes):
+        """格式化文件大小"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+    def update_database_file_list(self):
+        """更新数据库文件列表"""
+        if not hasattr(self, 'db_file_combo'):
+            return
+
+        self.db_file_combo.clear()
+
+        # 根据当前选择的数据库类型显示文件
+        db_type = self.current_db_type
+        if db_type in self.available_databases:
+            for db_info in self.available_databases[db_type]:
+                display_text = f"{db_info['name']} ({db_info['size']}) - {os.path.dirname(db_info['path'])}"
+                self.db_file_combo.addItem(display_text, db_info['path'])
+
+        # 应用当前的筛选条件
+        if hasattr(self, 'filter_edit') and self.filter_edit.text():
+            self._filter_database_files()
+
+    def _on_database_type_changed(self, type_text):
+        """数据库类型切换处理"""
+        self.current_db_type = 'sqlite' if type_text == 'SQLite' else 'duckdb'
+        self.update_database_file_list()
+
+    def browse_database_file(self):
+        """浏览选择数据库文件"""
+        from PyQt5.QtWidgets import QFileDialog
+
+        if self.current_db_type == 'sqlite':
+            file_filter = "SQLite数据库 (*.db *.sqlite *.sqlite3);;所有文件 (*.*)"
+        else:
+            file_filter = "DuckDB数据库 (*.duckdb);;所有文件 (*.*)"
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择数据库文件", "", file_filter
+        )
+
+        if file_path:
+            # 添加到对应类型的列表中
+            file_size = os.path.getsize(file_path)
+            db_info = {
+                'path': file_path,
+                'name': os.path.basename(file_path),
+                'size': self._format_file_size(file_size)
+            }
+
+            # 检查是否已存在
+            existing_paths = [db['path'] for db in self.available_databases[self.current_db_type]]
+            if file_path not in existing_paths:
+                self.available_databases[self.current_db_type].append(db_info)
+                self.update_database_file_list()
+
+            # 选中新添加的文件
+            for i in range(self.db_file_combo.count()):
+                if self.db_file_combo.itemData(i) == file_path:
+                    self.db_file_combo.setCurrentIndex(i)
+                    break
+
+    def show_slow_queries(self):
+        """显示慢SQL记录"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout, QLabel
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("慢SQL记录")
+        dialog.resize(800, 600)
+
+        layout = QVBoxLayout(dialog)
+
+        # 统计信息
+        stats_label = QLabel(f"慢查询阈值: {self.slow_query_threshold}ms | 记录数量: {len(self.slow_queries)}")
+        layout.addWidget(stats_label)
+
+        # 慢查询列表
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+
+        if not self.slow_queries:
+            text_edit.setPlainText("暂无慢查询记录")
+        else:
+            content = []
+            for i, query_info in enumerate(self.slow_queries, 1):
+                content.append(f"=== 慢查询 #{i} ===")
+                content.append(f"时间: {query_info['timestamp']}")
+                content.append(f"耗时: {query_info['duration']}ms")
+                content.append(f"SQL: {query_info['sql']}")
+                if query_info.get('error'):
+                    content.append(f"错误: {query_info['error']}")
+                content.append("")
+
+            text_edit.setPlainText("\n".join(content))
+
+        layout.addWidget(text_edit)
+
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+
+        clear_btn = QPushButton("清空记录")
+        clear_btn.clicked.connect(lambda: self._clear_slow_queries(text_edit, stats_label))
+        btn_layout.addWidget(clear_btn)
+
+        export_btn = QPushButton("导出记录")
+        export_btn.clicked.connect(lambda: self._export_slow_queries())
+        btn_layout.addWidget(export_btn)
+
+        btn_layout.addStretch()
+
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+
+        dialog.exec_()
+
+    def _clear_slow_queries(self, text_edit, stats_label):
+        """清空慢查询记录"""
+        self.slow_queries.clear()
+        text_edit.setPlainText("暂无慢查询记录")
+        stats_label.setText(f"慢查询阈值: {self.slow_query_threshold}ms | 记录数量: 0")
+
+    def _export_slow_queries(self):
+        """导出慢查询记录"""
+        from PyQt5.QtWidgets import QFileDialog
+        import json
+
+        if not self.slow_queries:
+            QMessageBox.information(self, "提示", "暂无慢查询记录可导出")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出慢查询记录", f"slow_queries_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            "JSON文件 (*.json);;文本文件 (*.txt)"
+        )
+
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    if file_path.endswith('.json'):
+                        json.dump(self.slow_queries, f, ensure_ascii=False, indent=2)
+                    else:
+                        for i, query_info in enumerate(self.slow_queries, 1):
+                            f.write(f"=== 慢查询 #{i} ===\n")
+                            f.write(f"时间: {query_info['timestamp']}\n")
+                            f.write(f"耗时: {query_info['duration']}ms\n")
+                            f.write(f"SQL: {query_info['sql']}\n")
+                            if query_info.get('error'):
+                                f.write(f"错误: {query_info['error']}\n")
+                            f.write("\n")
+
+                QMessageBox.information(self, "成功", f"慢查询记录已导出到: {file_path}")
+            except Exception as e:
+                QMessageBox.warning(self, "错误", f"导出失败: {str(e)}")
+
+    def record_slow_query(self, sql, duration, error=None):
+        """记录慢查询"""
+        if duration >= self.slow_query_threshold:
+            query_info = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'sql': sql,
+                'duration': duration,
+                'error': error
+            }
+            self.slow_queries.append(query_info)
+
+            # 限制记录数量，避免内存占用过大
+            if len(self.slow_queries) > 1000:
+                self.slow_queries = self.slow_queries[-500:]  # 保留最近500条

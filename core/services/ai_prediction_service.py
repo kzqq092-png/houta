@@ -71,6 +71,7 @@ class PredictionType:
     SENTIMENT = "sentiment"  # 情绪预测
     PRICE = "price"         # 价格预测
     RISK = "risk"           # 风险预测
+    EXECUTION_TIME = "execution_time"  # 执行时间预测
 
 
 class AIPredictionService(BaseService):
@@ -1731,3 +1732,189 @@ class AIPredictionService(BaseService):
             'model_path': 'fallback_pattern_analysis',
             'prediction_type': PredictionType.PATTERN
         }
+
+    def predict_execution_time(self, task_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        预测任务执行时间
+
+        Args:
+            task_config: 任务配置，包含：
+                - task_type: 任务类型
+                - data_size: 数据大小
+                - record_count: 记录数量
+                - batch_size: 批次大小
+                - thread_count: 线程数
+                - use_gpu: 是否使用GPU
+
+        Returns:
+            预测结果字典，包含：
+                - predicted_time: 预测执行时间（秒）
+                - confidence: 置信度
+                - model_type: 使用的模型类型
+                - feature_importance: 特征重要性
+        """
+        try:
+            # 尝试导入执行时间预测模块
+            try:
+                from sklearn.ensemble import RandomForestRegressor
+                from sklearn.preprocessing import StandardScaler
+                import joblib
+                sklearn_available = True
+            except ImportError:
+                sklearn_available = False
+
+            if not sklearn_available:
+                logger.warning("scikit-learn不可用，使用简单预测模型")
+                return self._simple_execution_time_prediction(task_config)
+
+            # 使用机器学习模型进行预测
+            return self._ml_execution_time_prediction(task_config)
+
+        except Exception as e:
+            logger.error(f"执行时间预测失败: {e}")
+            return self._simple_execution_time_prediction(task_config)
+
+    def _ml_execution_time_prediction(self, task_config: Dict[str, Any]) -> Dict[str, Any]:
+        """使用机器学习模型预测执行时间"""
+        try:
+            # 提取特征
+            features = self._extract_task_features(task_config)
+
+            # 尝试加载预训练模型
+            model_path = Path("cache/prediction_models/execution_time_model.joblib")
+            if model_path.exists():
+                try:
+                    import joblib
+                    model_data = joblib.load(model_path)
+                    model = model_data['model']
+                    scaler = model_data['scaler']
+                    feature_names = model_data['feature_names']
+
+                    # 标准化特征
+                    features_scaled = scaler.transform([features])
+
+                    # 预测
+                    predicted_time = model.predict(features_scaled)[0]
+
+                    # 计算置信度（基于模型性能）
+                    confidence = model_data.get('r2_score', 0.7)
+
+                    # 特征重要性
+                    feature_importance = {}
+                    if hasattr(model, 'feature_importances_'):
+                        for name, importance in zip(feature_names, model.feature_importances_):
+                            feature_importance[name] = float(importance)
+
+                    return {
+                        'predicted_time': max(predicted_time, 0.1),  # 最小0.1秒
+                        'confidence': confidence,
+                        'model_type': 'machine_learning',
+                        'feature_importance': feature_importance,
+                        'prediction_type': PredictionType.EXECUTION_TIME
+                    }
+
+                except Exception as e:
+                    logger.warning(f"加载ML模型失败: {e}")
+
+            # 如果没有预训练模型，使用简单预测
+            return self._simple_execution_time_prediction(task_config)
+
+        except Exception as e:
+            logger.error(f"ML执行时间预测失败: {e}")
+            return self._simple_execution_time_prediction(task_config)
+
+    def _extract_task_features(self, task_config: Dict[str, Any]) -> List[float]:
+        """提取任务特征"""
+        features = []
+
+        # 数据大小特征
+        data_size = task_config.get('data_size', 1000)
+        features.append(np.log10(max(data_size, 1)))
+
+        # 记录数量特征
+        record_count = task_config.get('record_count', 100)
+        features.append(np.log10(max(record_count, 1)))
+
+        # 批次大小特征
+        batch_size = task_config.get('batch_size', 1000)
+        features.append(np.log10(max(batch_size, 1)))
+
+        # 线程数特征
+        thread_count = task_config.get('thread_count', 1)
+        features.append(float(thread_count))
+
+        # GPU使用特征
+        use_gpu = task_config.get('use_gpu', False)
+        features.append(1.0 if use_gpu else 0.0)
+
+        # 数据复杂度特征
+        data_complexity = task_config.get('data_complexity', 1.0)
+        features.append(float(data_complexity))
+
+        # 任务类型特征（编码）
+        task_type = task_config.get('task_type', 'default')
+        type_encoding = {
+            'data_import': 1.0,
+            'analysis': 2.0,
+            'prediction': 3.0,
+            'backtest': 4.0,
+            'default': 0.0
+        }
+        features.append(type_encoding.get(task_type, 0.0))
+
+        return features
+
+    def _simple_execution_time_prediction(self, task_config: Dict[str, Any]) -> Dict[str, Any]:
+        """简单的执行时间预测（基于经验公式）"""
+        try:
+            # 基础参数
+            data_size = task_config.get('data_size', 1000)
+            record_count = task_config.get('record_count', 100)
+            batch_size = task_config.get('batch_size', 1000)
+            thread_count = max(task_config.get('thread_count', 1), 1)
+            use_gpu = task_config.get('use_gpu', False)
+
+            # 基础时间计算（每1000条记录约1秒）
+            base_time = record_count / 1000.0
+
+            # 数据大小影响（大数据处理更慢）
+            size_factor = 1.0 + np.log10(max(data_size / 1000000, 1)) * 0.1
+
+            # 批次大小影响（较小批次效率较低）
+            batch_factor = 1.0 + max(0, (1000 - batch_size) / 1000) * 0.2
+
+            # 线程数影响（多线程提升效率，但有上限）
+            thread_factor = 1.0 / min(thread_count, 8) ** 0.7
+
+            # GPU加速影响
+            gpu_factor = 0.3 if use_gpu else 1.0
+
+            # 计算预测时间
+            predicted_time = base_time * size_factor * batch_factor * thread_factor * gpu_factor
+
+            # 添加一些随机性和最小时间
+            predicted_time = max(predicted_time, 0.1)
+
+            return {
+                'predicted_time': predicted_time,
+                'confidence': 0.6,  # 简单模型置信度较低
+                'model_type': 'simple_formula',
+                'feature_importance': {
+                    'record_count': 0.4,
+                    'data_size': 0.2,
+                    'thread_count': 0.2,
+                    'batch_size': 0.1,
+                    'use_gpu': 0.1
+                },
+                'prediction_type': PredictionType.EXECUTION_TIME
+            }
+
+        except Exception as e:
+            logger.error(f"简单执行时间预测失败: {e}")
+            return {
+                'predicted_time': 60.0,  # 默认1分钟
+                'confidence': 0.3,
+                'model_type': 'fallback',
+                'feature_importance': {},
+                'prediction_type': PredictionType.EXECUTION_TIME
+            }

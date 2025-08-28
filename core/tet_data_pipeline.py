@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .plugin_types import AssetType, DataType
 from .data_source_router import DataSourceRouter, RoutingRequest, RoutingStrategy
 from .data_source_extensions import IDataSourcePlugin, DataSourcePluginAdapter, HealthCheckResult
+from .data.field_mapping_engine import FieldMappingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -148,11 +149,140 @@ class TETDataPipeline:
 
                 # 时间戳
                 'timestamp': 'update_time', 'time': 'update_time', 'update_time': 'update_time', '更新时间': 'update_time'
+            },
+
+            # Stage 3 新增：财务报表数据映射
+            DataType.FINANCIAL_STATEMENT: {
+                # 资产负债表字段映射
+                'total_assets': 'total_assets', '资产总计': 'total_assets', '总资产': 'total_assets',
+                'current_assets': 'current_assets', '流动资产': 'current_assets', '流动资产合计': 'current_assets',
+                'non_current_assets': 'non_current_assets', '非流动资产': 'non_current_assets', '非流动资产合计': 'non_current_assets',
+                'cash_and_equivalents': 'cash_and_equivalents', '货币资金': 'cash_and_equivalents', '现金及现金等价物': 'cash_and_equivalents',
+                'accounts_receivable': 'accounts_receivable', '应收账款': 'accounts_receivable', '应收账款净额': 'accounts_receivable',
+                'inventory': 'inventory', '存货': 'inventory', '存货净额': 'inventory',
+                'fixed_assets': 'fixed_assets', '固定资产': 'fixed_assets', '固定资产净额': 'fixed_assets',
+
+                'total_liabilities': 'total_liabilities', '负债总计': 'total_liabilities', '总负债': 'total_liabilities',
+                'current_liabilities': 'current_liabilities', '流动负债': 'current_liabilities', '流动负债合计': 'current_liabilities',
+                'non_current_liabilities': 'non_current_liabilities', '非流动负债': 'non_current_liabilities', '非流动负债合计': 'non_current_liabilities',
+                'accounts_payable': 'accounts_payable', '应付账款': 'accounts_payable', '应付账款余额': 'accounts_payable',
+                'short_term_debt': 'short_term_debt', '短期借款': 'short_term_debt', '短期债务': 'short_term_debt',
+                'long_term_debt': 'long_term_debt', '长期借款': 'long_term_debt', '长期债务': 'long_term_debt',
+
+                'shareholders_equity': 'shareholders_equity', '股东权益': 'shareholders_equity', '净资产': 'shareholders_equity',
+                'paid_in_capital': 'paid_in_capital', '实收资本': 'paid_in_capital', '股本': 'paid_in_capital',
+                'retained_earnings': 'retained_earnings', '留存收益': 'retained_earnings', '未分配利润': 'retained_earnings',
+
+                # 利润表字段映射
+                'operating_revenue': 'operating_revenue', '营业收入': 'operating_revenue', 'revenue': 'operating_revenue', '总收入': 'operating_revenue',
+                'operating_costs': 'operating_costs', '营业成本': 'operating_costs', 'cost_of_sales': 'operating_costs',
+                'gross_profit': 'gross_profit', '毛利润': 'gross_profit', '毛利': 'gross_profit',
+                'operating_expenses': 'operating_expenses', '营业费用': 'operating_expenses', '期间费用': 'operating_expenses',
+                'selling_expenses': 'selling_expenses', '销售费用': 'selling_expenses', '销售成本': 'selling_expenses',
+                'admin_expenses': 'admin_expenses', '管理费用': 'admin_expenses', '管理成本': 'admin_expenses',
+                'rd_expenses': 'rd_expenses', '研发费用': 'rd_expenses', 'r_and_d': 'rd_expenses',
+                'financial_expenses': 'financial_expenses', '财务费用': 'financial_expenses', '利息费用': 'financial_expenses',
+                'operating_profit': 'operating_profit', '营业利润': 'operating_profit', '经营利润': 'operating_profit',
+                'profit_before_tax': 'profit_before_tax', '利润总额': 'profit_before_tax', '税前利润': 'profit_before_tax',
+                'income_tax': 'income_tax', '所得税费用': 'income_tax', '税费': 'income_tax',
+                'net_profit': 'net_profit', '净利润': 'net_profit', 'profit': 'net_profit', '净收益': 'net_profit',
+                'net_profit_attributable_to_parent': 'net_profit_attributable_to_parent', '归母净利润': 'net_profit_attributable_to_parent',
+
+                'eps': 'eps', '每股收益': 'eps', 'earnings_per_share': 'eps', '基本每股收益': 'eps',
+                'diluted_eps': 'diluted_eps', '稀释每股收益': 'diluted_eps', '摊薄每股收益': 'diluted_eps',
+                'book_value_per_share': 'book_value_per_share', '每股净资产': 'book_value_per_share', '每股账面价值': 'book_value_per_share',
+
+                # 现金流量表字段映射
+                'operating_cash_flow': 'operating_cash_flow', '经营现金流': 'operating_cash_flow', 'ocf': 'operating_cash_flow', '经营活动现金流量净额': 'operating_cash_flow',
+                'investing_cash_flow': 'investing_cash_flow', '投资现金流': 'investing_cash_flow', 'icf': 'investing_cash_flow', '投资活动现金流量净额': 'investing_cash_flow',
+                'financing_cash_flow': 'financing_cash_flow', '筹资现金流': 'financing_cash_flow', 'fcf': 'financing_cash_flow', '筹资活动现金流量净额': 'financing_cash_flow',
+                'net_cash_flow': 'net_cash_flow', '现金流量净额': 'net_cash_flow', '现金净增加额': 'net_cash_flow',
+                'free_cash_flow': 'free_cash_flow', '自由现金流': 'free_cash_flow', '自由现金流量': 'free_cash_flow',
+
+                # 财务比率字段映射
+                'roe': 'roe', '净资产收益率': 'roe', 'return_on_equity': 'roe',
+                'roa': 'roa', '总资产收益率': 'roa', 'return_on_assets': 'roa',
+                'roic': 'roic', '投入资本回报率': 'roic', 'return_on_invested_capital': 'roic',
+                'gross_profit_margin': 'gross_profit_margin', '毛利率': 'gross_profit_margin', '毛利润率': 'gross_profit_margin',
+                'net_profit_margin': 'net_profit_margin', '净利率': 'net_profit_margin', '净利润率': 'net_profit_margin',
+                'current_ratio': 'current_ratio', '流动比率': 'current_ratio', '流动性比率': 'current_ratio',
+                'quick_ratio': 'quick_ratio', '速动比率': 'quick_ratio', '酸性测试比率': 'quick_ratio',
+                'debt_to_equity': 'debt_to_equity', '负债权益比': 'debt_to_equity', '债务权益比': 'debt_to_equity',
+                'debt_to_assets': 'debt_to_assets', '资产负债率': 'debt_to_assets', '负债比率': 'debt_to_assets',
+                'asset_liability_ratio': 'asset_liability_ratio', '资产负债比': 'asset_liability_ratio'
+            },
+
+            # Stage 3 新增：宏观经济数据映射
+            DataType.MACRO_ECONOMIC: {
+                # GDP相关指标
+                'gdp': 'gdp', 'GDP': 'gdp', '国内生产总值': 'gdp', 'gross_domestic_product': 'gdp',
+                'gdp_yoy': 'gdp_yoy', 'GDP同比': 'gdp_yoy', 'GDP同比增长率': 'gdp_yoy', 'gdp_growth': 'gdp_yoy',
+                'gdp_qoq': 'gdp_qoq', 'GDP环比': 'gdp_qoq', 'GDP环比增长率': 'gdp_qoq',
+
+                # 价格指数
+                'cpi': 'cpi', 'CPI': 'cpi', '消费者价格指数': 'cpi', 'consumer_price_index': 'cpi',
+                'cpi_yoy': 'cpi_yoy', 'CPI同比': 'cpi_yoy', 'CPI同比增长率': 'cpi_yoy',
+                'ppi': 'ppi', 'PPI': 'ppi', '生产者价格指数': 'ppi', 'producer_price_index': 'ppi',
+                'ppi_yoy': 'ppi_yoy', 'PPI同比': 'ppi_yoy', 'PPI同比增长率': 'ppi_yoy',
+
+                # 利率相关
+                'interest_rate': 'interest_rate', '利率': 'interest_rate', 'rate': 'interest_rate',
+                'benchmark_rate': 'benchmark_rate', '基准利率': 'benchmark_rate', '央行利率': 'benchmark_rate',
+                'deposit_rate': 'deposit_rate', '存款利率': 'deposit_rate', '存款基准利率': 'deposit_rate',
+                'lending_rate': 'lending_rate', '贷款利率': 'lending_rate', '贷款基准利率': 'lending_rate',
+
+                # 汇率相关
+                'exchange_rate': 'exchange_rate', '汇率': 'exchange_rate', 'fx_rate': 'exchange_rate',
+                'usd_cny': 'usd_cny', '美元人民币': 'usd_cny', 'USDCNY': 'usd_cny',
+                'eur_cny': 'eur_cny', '欧元人民币': 'eur_cny', 'EURCNY': 'eur_cny',
+
+                # 货币供应量
+                'money_supply': 'money_supply', '货币供应量': 'money_supply', 'money_stock': 'money_supply',
+                'm0': 'm0', 'M0': 'm0', '流通中货币': 'm0',
+                'm1': 'm1', 'M1': 'm1', '狭义货币': 'm1',
+                'm2': 'm2', 'M2': 'm2', '广义货币': 'm2',
+
+                # 就业指标
+                'unemployment_rate': 'unemployment_rate', '失业率': 'unemployment_rate', '城镇失业率': 'unemployment_rate',
+                'employment_rate': 'employment_rate', '就业率': 'employment_rate', '就业人数': 'employment_rate',
+
+                # 贸易指标
+                'trade_balance': 'trade_balance', '贸易差额': 'trade_balance', '贸易顺差': 'trade_balance',
+                'exports': 'exports', '出口': 'exports', '出口总额': 'exports',
+                'imports': 'imports', '进口': 'imports', '进口总额': 'imports',
+
+                # PMI指标
+                'pmi': 'pmi', 'PMI': 'pmi', '采购经理指数': 'pmi', 'purchasing_managers_index': 'pmi',
+                'manufacturing_pmi': 'manufacturing_pmi', '制造业PMI': 'manufacturing_pmi', '制造业采购经理指数': 'manufacturing_pmi',
+                'services_pmi': 'services_pmi', '服务业PMI': 'services_pmi', '服务业采购经理指数': 'services_pmi',
+
+                # 工业指标
+                'industrial_production': 'industrial_production', '工业增加值': 'industrial_production', '工业生产指数': 'industrial_production',
+                'industrial_production_yoy': 'industrial_production_yoy', '工业增加值同比': 'industrial_production_yoy',
+
+                # 投资指标
+                'fixed_asset_investment': 'fixed_asset_investment', '固定资产投资': 'fixed_asset_investment', '固投': 'fixed_asset_investment',
+                'fixed_asset_investment_yoy': 'fixed_asset_investment_yoy', '固定资产投资同比': 'fixed_asset_investment_yoy',
+
+                # 消费指标
+                'retail_sales': 'retail_sales', '社会消费品零售总额': 'retail_sales', '零售销售': 'retail_sales',
+                'retail_sales_yoy': 'retail_sales_yoy', '社会消费品零售总额同比': 'retail_sales_yoy',
+
+                # 通用字段
+                'value': 'value', '数值': 'value', '指标值': 'value',
+                'unit': 'unit', '单位': 'unit', '计量单位': 'unit',
+                'frequency': 'frequency', '频率': 'frequency', '数据频率': 'frequency',
+                'category': 'category', '分类': 'category', '指标分类': 'category',
+                'indicator_code': 'indicator_code', '指标代码': 'indicator_code', '代码': 'indicator_code',
+                'indicator_name': 'indicator_name', '指标名称': 'indicator_name', '名称': 'indicator_name'
             }
         }
 
         # 空值表示（用于清理数据）
         self.null_values = ['N/A', 'null', 'NULL', '', 'nan', 'NaN', 'None', '--', '-']
+
+        # Stage 3 新增：智能字段映射引擎
+        self.field_mapping_engine = FieldMappingEngine(self.field_mappings)
 
     def register_plugin(self, plugin_id: str, plugin: IDataSourcePlugin) -> bool:
         """
@@ -469,6 +599,28 @@ class TETDataPipeline:
             else:
                 self.logger.warning(f"插件 {adapter.plugin_id} 不支持板块资金流数据")
                 return pd.DataFrame()
+        elif original_query.data_type == DataType.INDIVIDUAL_FUND_FLOW:
+            # 获取个股资金流数据
+            plugin = self._plugins.get(adapter.plugin_id)
+            if plugin and hasattr(plugin, 'get_individual_fund_flow_data'):
+                return plugin.get_individual_fund_flow_data(
+                    symbol=original_query.symbol,
+                    **original_query.extra_params
+                )
+            else:
+                self.logger.warning(f"插件 {adapter.plugin_id} 不支持个股资金流数据")
+                return pd.DataFrame()
+        elif original_query.data_type == DataType.MAIN_FUND_FLOW:
+            # 获取主力资金流数据
+            plugin = self._plugins.get(adapter.plugin_id)
+            if plugin and hasattr(plugin, 'get_main_fund_flow_data'):
+                return plugin.get_main_fund_flow_data(
+                    symbol=original_query.symbol,
+                    **original_query.extra_params
+                )
+            else:
+                self.logger.warning(f"插件 {adapter.plugin_id} 不支持主力资金流数据")
+                return pd.DataFrame()
         else:
             # 其他数据类型，直接调用插件接口
             plugin = self._plugins.get(adapter.plugin_id)
@@ -484,7 +636,7 @@ class TETDataPipeline:
 
     def transform_data(self, raw_data: pd.DataFrame, query: StandardQuery) -> pd.DataFrame:
         """
-        Stage 3: 数据标准化
+        Stage 3: 增强的数据标准化 (集成智能字段映射引擎)
 
         Args:
             raw_data: 原始数据
@@ -497,7 +649,63 @@ class TETDataPipeline:
             return pd.DataFrame()
 
         try:
-            # 获取字段映射
+            self.logger.info(f"开始数据标准化，数据类型: {query.data_type}, 原始字段: {list(raw_data.columns)}")
+
+            # 1. 应用智能字段映射
+            mapped_data = self.field_mapping_engine.map_fields(raw_data, query.data_type)
+
+            # 2. 数据类型转换
+            standardized_data = self._standardize_data_types(mapped_data, query.data_type)
+
+            # 3. 数据验证
+            if not self.field_mapping_engine.validate_mapping_result(standardized_data, query.data_type):
+                self.logger.warning(f"数据映射验证失败: {query.data_type}")
+                # 降级到基础映射
+                standardized_data = self._apply_basic_mapping(raw_data, query)
+
+            # 4. 应用数据质量检查（集成现有功能）
+            quality_score = self._calculate_quality_score(standardized_data, query.data_type)
+            if 'data_quality_score' not in standardized_data.columns:
+                standardized_data['data_quality_score'] = quality_score
+
+            # 5. 数据清洗
+            standardized_data = self._clean_data(standardized_data)
+
+            # 6. 最终验证
+            standardized_data = self._validate_data(standardized_data, query.data_type)
+
+            self.logger.info(f"数据标准化完成，最终字段: {list(standardized_data.columns)}")
+            return standardized_data
+
+        except Exception as e:
+            self.logger.error(f"数据标准化失败: {e}")
+            # 降级到基础映射
+            return self._apply_basic_mapping(raw_data, query)
+
+    def _clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """清洗数据"""
+        # 替换空值
+        for null_val in self.null_values:
+            data = data.replace(null_val, pd.NA)
+
+        # 删除完全空的行
+        data = data.dropna(how='all')
+
+        return data
+
+    def _apply_basic_mapping(self, raw_data: pd.DataFrame, query: StandardQuery) -> pd.DataFrame:
+        """
+        应用基础字段映射（降级方案）
+
+        Args:
+            raw_data: 原始数据
+            query: 查询对象
+
+        Returns:
+            基础映射后的数据
+        """
+        try:
+            # 获取基础字段映射
             field_mapping = self.field_mappings.get(query.data_type, {})
 
             # 应用字段映射
@@ -517,19 +725,120 @@ class TETDataPipeline:
             return standardized_data
 
         except Exception as e:
-            self.logger.error(f"数据标准化失败: {e}")
-            return raw_data  # 返回原始数据作为降级
+            self.logger.error(f"基础映射失败: {e}")
+            return raw_data
 
-    def _clean_data(self, data: pd.DataFrame) -> pd.DataFrame:
-        """清洗数据"""
-        # 替换空值
-        for null_val in self.null_values:
-            data = data.replace(null_val, pd.NA)
+    def _standardize_data_types(self, data: pd.DataFrame, data_type: DataType) -> pd.DataFrame:
+        """
+        标准化数据类型（增强版本）
 
-        # 删除完全空的行
-        data = data.dropna(how='all')
+        Args:
+            data: 映射后的数据
+            data_type: 数据类型
 
+        Returns:
+            类型标准化后的数据
+        """
+        standardized_data = data.copy()
+
+        try:
+            if data_type == DataType.HISTORICAL_KLINE:
+                # K线数据类型转换
+                numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'amount']
+                for col in numeric_columns:
+                    if col in standardized_data.columns:
+                        standardized_data[col] = pd.to_numeric(standardized_data[col], errors='coerce')
+
+                # 处理时间列
+                if 'datetime' in standardized_data.columns:
+                    standardized_data['datetime'] = pd.to_datetime(standardized_data['datetime'], errors='coerce')
+                    if not isinstance(standardized_data.index, pd.DatetimeIndex):
+                        standardized_data.set_index('datetime', inplace=True)
+
+            elif data_type == DataType.REAL_TIME_QUOTE:
+                # 实时数据类型转换
+                numeric_columns = ['current_price', 'bid_price', 'ask_price', 'volume', 'turnover', 'change', 'change_percent']
+                for col in numeric_columns:
+                    if col in standardized_data.columns:
+                        standardized_data[col] = pd.to_numeric(standardized_data[col], errors='coerce')
+
+            elif data_type == DataType.FINANCIAL_STATEMENT:
+                # 财务报表数据类型转换
+                numeric_columns = [
+                    'total_assets', 'total_liabilities', 'shareholders_equity',
+                    'operating_revenue', 'net_profit', 'eps', 'operating_cash_flow',
+                    'roe', 'roa', 'gross_profit_margin', 'net_profit_margin',
+                    'current_ratio', 'debt_to_equity', 'debt_to_assets'
+                ]
+                for col in numeric_columns:
+                    if col in standardized_data.columns:
+                        standardized_data[col] = pd.to_numeric(standardized_data[col], errors='coerce')
+
+                # 处理日期列
+                if 'report_date' in standardized_data.columns:
+                    standardized_data['report_date'] = pd.to_datetime(standardized_data['report_date'], errors='coerce')
+
+            elif data_type == DataType.MACRO_ECONOMIC:
+                # 宏观经济数据类型转换
+                numeric_columns = ['value', 'mom_change', 'yoy_change', 'qoq_change']
+                for col in numeric_columns:
+                    if col in standardized_data.columns:
+                        standardized_data[col] = pd.to_numeric(standardized_data[col], errors='coerce')
+
+                # 处理日期列
+                if 'data_date' in standardized_data.columns:
+                    standardized_data['data_date'] = pd.to_datetime(standardized_data['data_date'], errors='coerce')
+
+            return standardized_data
+
+        except Exception as e:
+            self.logger.error(f"数据类型标准化失败: {e}")
         return data
+
+    def _calculate_quality_score(self, data: pd.DataFrame, data_type: DataType) -> float:
+        """
+        计算数据质量评分
+
+        Args:
+            data: 数据
+            data_type: 数据类型
+
+        Returns:
+            质量评分 (0-1)
+        """
+        try:
+            if data.empty:
+                return 0.0
+
+            # 基础质量指标
+            total_cells = data.shape[0] * data.shape[1]
+            null_cells = data.isnull().sum().sum()
+            completeness = 1 - (null_cells / total_cells) if total_cells > 0 else 0
+
+            # 数据类型一致性检查
+            consistency_score = 1.0
+            required_fields = self.field_mapping_engine._get_required_fields(data_type)
+
+            for field in required_fields:
+                if field in data.columns:
+                    # 检查数值字段的有效性
+                    if field in ['open', 'high', 'low', 'close', 'volume', 'value']:
+                        try:
+                            numeric_data = pd.to_numeric(data[field], errors='coerce')
+                            valid_ratio = numeric_data.notna().sum() / len(data)
+                            consistency_score *= valid_ratio
+                        except:
+                            consistency_score *= 0.5
+                else:
+                    consistency_score *= 0.8  # 缺少必需字段
+
+            # 综合评分
+            quality_score = (completeness * 0.6 + consistency_score * 0.4)
+            return min(max(quality_score, 0.0), 1.0)
+
+        except Exception as e:
+            self.logger.error(f"质量评分计算失败: {e}")
+            return 0.5  # 默认中等质量
 
     def _convert_data_types(self, data: pd.DataFrame, data_type: DataType) -> pd.DataFrame:
         """转换数据类型"""

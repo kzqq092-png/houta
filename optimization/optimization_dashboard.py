@@ -109,20 +109,30 @@ class PerformanceChart(QWidget):
 
         try:
             # 获取统一图表服务
+            from core.services.unified_chart_service import get_unified_chart_service
             chart_service = get_unified_chart_service()
 
             # 配置图表类型
-            self.chart_widget.set_chart_type('line')
+            if hasattr(self.chart_widget, 'set_chart_type'):
+                self.chart_widget.set_chart_type('line')
 
             # 应用主题
-            chart_service.apply_theme(self.chart_widget, 'dark')
+            if chart_service and hasattr(chart_service, 'apply_theme'):
+                chart_service.apply_theme(self.chart_widget, 'dark')
 
             # 启用优化
-            self.chart_widget.enable_cache(True)
-            self.chart_widget.enable_async_rendering(True)
+            if hasattr(self.chart_widget, 'enable_cache'):
+                self.chart_widget.enable_cache(True)
+            if hasattr(self.chart_widget, 'enable_async_rendering'):
+                self.chart_widget.enable_async_rendering(True)
 
+        except ImportError as e:
+            print(f"图表配置失败: 无法导入统一图表服务 - {e}")
+            print("请检查 core.services.unified_chart_service 模块是否存在")
         except Exception as e:
             print(f"图表配置失败: {e}")
+            import traceback
+            print(f"详细错误信息: {traceback.format_exc()}")
 
     def plot_performance_history(self, pattern_name: str, history_data: List[Dict]):
         """绘制性能历史图表"""

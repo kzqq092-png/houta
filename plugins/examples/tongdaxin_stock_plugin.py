@@ -761,6 +761,149 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
 
 
 # 插件工厂函数
+    def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
+        """
+        获取板块资金流数据
+
+        Args:
+            symbol: 板块代码或"sector"表示获取所有板块
+            **kwargs: 其他参数
+
+        Returns:
+            板块资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取板块资金流数据")
+            
+            # TODO: 实现具体的板块资金流数据获取逻辑
+            # 这里提供一个基础的模拟数据结构
+            import pandas as pd
+            from datetime import datetime
+            
+            # 模拟数据 - 实际使用时应替换为真实API调用
+            records = [
+                {
+                    'sector_code': 'BK0001',
+                    'sector_name': '示例板块',
+                    'change_pct': 0.02,
+                    'main_net_inflow': 1000000,
+                    'main_net_inflow_pct': 0.05,
+                    'super_large_net_inflow': 500000,
+                    'super_large_net_inflow_pct': 0.025,
+                    'large_net_inflow': 300000,
+                    'large_net_inflow_pct': 0.015,
+                    'medium_net_inflow': 150000,
+                    'medium_net_inflow_pct': 0.0075,
+                    'small_net_inflow': 50000,
+                    'small_net_inflow_pct': 0.0025
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取板块资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取板块资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_individual_fund_flow_data(self, symbol: str, **kwargs) -> pd.DataFrame:
+        """
+        获取个股资金流数据
+
+        Args:
+            symbol: 股票代码
+            **kwargs: 其他参数
+
+        Returns:
+            个股资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取个股 {symbol} 资金流数据")
+            
+            # TODO: 实现具体的个股资金流数据获取逻辑
+            import pandas as pd
+            from datetime import datetime
+            
+            # 模拟数据 - 实际使用时应替换为真实API调用
+            records = [
+                {
+                    'date': datetime.now().strftime('%Y-%m-%d'),
+                    'symbol': symbol,
+                    'main_net_inflow': 500000,
+                    'main_net_inflow_pct': 0.03,
+                    'super_large_net_inflow': 250000,
+                    'super_large_net_inflow_pct': 0.015,
+                    'large_net_inflow': 150000,
+                    'large_net_inflow_pct': 0.009,
+                    'medium_net_inflow': 75000,
+                    'medium_net_inflow_pct': 0.0045,
+                    'small_net_inflow': 25000,
+                    'small_net_inflow_pct': 0.0015
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取个股资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取个股资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_main_fund_flow_data(self, symbol: str = "index", **kwargs) -> pd.DataFrame:
+        """
+        获取主力资金流数据（大盘指数）
+
+        Args:
+            symbol: 指数代码或"index"表示获取主要指数
+            **kwargs: 其他参数
+
+        Returns:
+            主力资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取主力资金流数据")
+            
+            # TODO: 实现具体的主力资金流数据获取逻辑
+            import pandas as pd
+            from datetime import datetime
+            
+            # 模拟数据 - 实际使用时应替换为真实API调用
+            records = [
+                {
+                    'index_code': '000001',
+                    'index_name': '上证指数',
+                    'current_price': 3000.0,
+                    'change_pct': 0.01,
+                    'main_net_inflow': 2000000,
+                    'main_net_inflow_pct': 0.02,
+                    'super_large_net_inflow': 1000000,
+                    'super_large_net_inflow_pct': 0.01,
+                    'large_net_inflow': 600000,
+                    'large_net_inflow_pct': 0.006,
+                    'medium_net_inflow': 300000,
+                    'medium_net_inflow_pct': 0.003,
+                    'small_net_inflow': 100000,
+                    'small_net_inflow_pct': 0.001
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取主力资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取主力资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+
 def create_plugin() -> IDataSourcePlugin:
     """创建插件实例"""
     return TongdaxinStockPlugin()

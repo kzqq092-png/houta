@@ -226,24 +226,40 @@ class WebGPUEnvironment:
 
     def _check_browser_webgpu_support(self) -> bool:
         """检查浏览器WebGPU支持"""
-        # 模拟浏览器检测逻辑
-        # 实际项目中需要通过JavaScript接口检测
+        try:
+            # 检查是否在支持WebGPU的环境中运行
+            platform_name = self._environment_info.platform.lower()
 
-        platform_name = self._environment_info.platform.lower()
+            # 检查GPU硬件是否可用
+            from .enhanced_gpu_detection import get_gpu_detector
+            detector = get_gpu_detector()
+            adapters = detector.detect_all_adapters()
 
-        # Windows 10+ 支持更好
-        if "windows" in platform_name:
-            return True
+            if not adapters:
+                logger.warning("未检测到可用的GPU适配器，WebGPU不可用")
+                return False
 
-        # macOS 支持
-        if "darwin" in platform_name:
-            return True
+            # 检查平台支持
+            supported_platforms = ["windows", "darwin", "linux"]
+            platform_supported = any(platform in platform_name for platform in supported_platforms)
 
-        # Linux 支持（需要新内核）
-        if "linux" in platform_name:
-            return True
+            if not platform_supported:
+                logger.warning(f"平台 {platform_name} 可能不支持WebGPU")
+                return False
 
-        return False
+            # 检查GPU是否支持现代图形API
+            for adapter in adapters:
+                # 检查是否有足够的显存
+                if adapter.memory_mb >= 256:  # 至少256MB显存
+                    logger.info(f"✅ 检测到支持WebGPU的GPU: {adapter.name}")
+                    return True
+
+            logger.warning("未找到满足WebGPU要求的GPU适配器")
+            return False
+
+        except Exception as e:
+            logger.error(f"WebGPU支持检测失败: {e}")
+            return False
 
     def _detect_gpu_capabilities(self):
         """检测GPU能力"""
@@ -293,11 +309,12 @@ class WebGPUEnvironment:
                 raise Exception("GPU检测失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 增强GPU检测失败: {e}，使用默认设置")
-            # 回退到默认设置
-            self._gpu_capabilities.adapter_name = "WebGPU Adapter"
-            self._gpu_capabilities.vendor = "Unknown"
-            self._gpu_capabilities.memory_mb = 1024  # 默认假设1GB
+            logger.error(f"❌ 增强GPU检测失败: {e}")
+            # 不使用模拟数据，而是报告真实的检测失败状态
+            self._gpu_capabilities.adapter_name = "GPU检测失败"
+            self._gpu_capabilities.vendor = "检测失败"
+            self._gpu_capabilities.memory_mb = 0
+            raise Exception(f"无法检测GPU硬件信息: {e}")
 
         # 设置WebGPU特性
         self._gpu_capabilities.max_texture_size = 8192
@@ -311,12 +328,33 @@ class WebGPUEnvironment:
 
     def _detect_webgl_capabilities(self):
         """检测WebGL能力"""
-        # 模拟WebGL能力检测
-        self._gpu_capabilities.adapter_name = "WebGL Adapter"
-        self._gpu_capabilities.vendor = "Unknown"
-        self._gpu_capabilities.memory_mb = 512  # WebGL通常限制更多
-        self._gpu_capabilities.max_texture_size = 4096
-        self._gpu_capabilities.supports_compute = False
+        try:
+            # 尝试使用增强的GPU检测获取真实硬件信息
+            from .enhanced_gpu_detection import get_gpu_detector
+
+            detector = get_gpu_detector()
+            adapters = detector.detect_all_adapters()
+
+            if adapters:
+                # 选择第一个可用的适配器
+                adapter = adapters[0]
+                self._gpu_capabilities.adapter_name = f"{adapter.name} (WebGL)"
+                self._gpu_capabilities.vendor = adapter.vendor
+                self._gpu_capabilities.memory_mb = adapter.memory_mb
+                logger.info(f"✅ WebGL检测到GPU: {adapter.name} ({adapter.vendor})")
+            else:
+                raise Exception("未检测到可用的GPU适配器")
+
+        except Exception as e:
+            logger.error(f"❌ WebGL GPU检测失败: {e}")
+            # 不使用模拟数据，报告检测失败
+            self._gpu_capabilities.adapter_name = "WebGL GPU检测失败"
+            self._gpu_capabilities.vendor = "检测失败"
+            self._gpu_capabilities.memory_mb = 0
+
+        # 设置WebGL特性（这些是WebGL标准特性，不是模拟数据）
+        self._gpu_capabilities.max_texture_size = 4096  # WebGL标准最小值
+        self._gpu_capabilities.supports_compute = False  # WebGL不支持计算着色器
         self._gpu_capabilities.webgl_extensions = [
             "OES_texture_float",
             "OES_texture_half_float",

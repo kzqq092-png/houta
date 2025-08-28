@@ -592,6 +592,200 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
         except Exception as e:
             self.logger.error(f"实时数据获取失败: {e}")
             return {}
+
+    def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
+        """
+        获取板块资金流数据
+
+        Args:
+            symbol: 板块代码或"sector"表示获取所有板块
+            **kwargs: 其他参数
+
+        Returns:
+            板块资金流数据DataFrame
+        """
+        try:
+            self.logger.info("获取东方财富板块资金流数据")
+
+            # 东方财富板块资金流API
+            url = f"{self.config['base_url']}/api/qt/clist/get"
+            params = {
+                'pn': 1,
+                'pz': 100,
+                'po': 1,
+                'np': 1,
+                'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
+                'fltt': 2,
+                'invt': 2,
+                'fid': 'f62',
+                'fs': 'm:90+t:2',
+                'fields': 'f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87'
+            }
+
+            response = self.session.get(url, params=params, timeout=self.config['timeout'])
+            response.raise_for_status()
+
+            data = response.json()
+            if not data.get('data') or not data['data'].get('diff'):
+                self.logger.warning("未获取到板块资金流数据")
+                return pd.DataFrame()
+
+            # 解析数据
+            records = []
+            for item in data['data']['diff']:
+                record = {
+                    'sector_code': item.get('f12', ''),
+                    'sector_name': item.get('f14', ''),
+                    'change_pct': item.get('f3', 0) / 100 if item.get('f3') else 0,
+                    'main_net_inflow': item.get('f62', 0),
+                    'main_net_inflow_pct': item.get('f184', 0) / 100 if item.get('f184') else 0,
+                    'super_large_net_inflow': item.get('f66', 0),
+                    'super_large_net_inflow_pct': item.get('f69', 0) / 100 if item.get('f69') else 0,
+                    'large_net_inflow': item.get('f72', 0),
+                    'large_net_inflow_pct': item.get('f75', 0) / 100 if item.get('f75') else 0,
+                    'medium_net_inflow': item.get('f78', 0),
+                    'medium_net_inflow_pct': item.get('f81', 0) / 100 if item.get('f81') else 0,
+                    'small_net_inflow': item.get('f84', 0),
+                    'small_net_inflow_pct': item.get('f87', 0) / 100 if item.get('f87') else 0
+                }
+                records.append(record)
+
+            df = pd.DataFrame(records)
+            self.logger.info(f"成功获取板块资金流数据，共 {len(df)} 条记录")
+            return df
+
+        except Exception as e:
+            self.logger.error(f"获取板块资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_individual_fund_flow_data(self, symbol: str, **kwargs) -> pd.DataFrame:
+        """
+        获取个股资金流数据
+
+        Args:
+            symbol: 股票代码
+            **kwargs: 其他参数
+
+        Returns:
+            个股资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"获取个股 {symbol} 资金流数据")
+
+            # 东方财富个股资金流API
+            url = f"{self.config['base_url']}/api/qt/stock/fflow/kline/get"
+            params = {
+                'lmt': 100,
+                'klt': 101,
+                'secid': f"1.{symbol}" if symbol.startswith('6') else f"0.{symbol}",
+                'fields1': 'f1,f2,f3,f7',
+                'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63'
+            }
+
+            response = self.session.get(url, params=params, timeout=self.config['timeout'])
+            response.raise_for_status()
+
+            data = response.json()
+            if not data.get('data') or not data['data'].get('klines'):
+                self.logger.warning(f"未获取到个股 {symbol} 资金流数据")
+                return pd.DataFrame()
+
+            # 解析数据
+            records = []
+            for kline in data['data']['klines']:
+                parts = kline.split(',')
+                if len(parts) >= 13:
+                    record = {
+                        'date': parts[0],
+                        'main_net_inflow': float(parts[1]) if parts[1] != '-' else 0,
+                        'small_net_inflow': float(parts[2]) if parts[2] != '-' else 0,
+                        'medium_net_inflow': float(parts[3]) if parts[3] != '-' else 0,
+                        'large_net_inflow': float(parts[4]) if parts[4] != '-' else 0,
+                        'super_large_net_inflow': float(parts[5]) if parts[5] != '-' else 0,
+                        'main_net_inflow_pct': float(parts[6]) if parts[6] != '-' else 0,
+                        'small_net_inflow_pct': float(parts[7]) if parts[7] != '-' else 0,
+                        'medium_net_inflow_pct': float(parts[8]) if parts[8] != '-' else 0,
+                        'large_net_inflow_pct': float(parts[9]) if parts[9] != '-' else 0,
+                        'super_large_net_inflow_pct': float(parts[10]) if parts[10] != '-' else 0,
+                        'close_price': float(parts[11]) if parts[11] != '-' else 0,
+                        'change_pct': float(parts[12]) if parts[12] != '-' else 0
+                    }
+                    records.append(record)
+
+            df = pd.DataFrame(records)
+            self.logger.info(f"成功获取个股资金流数据，共 {len(df)} 条记录")
+            return df
+
+        except Exception as e:
+            self.logger.error(f"获取个股资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_main_fund_flow_data(self, symbol: str = "index", **kwargs) -> pd.DataFrame:
+        """
+        获取主力资金流数据（大盘指数）
+
+        Args:
+            symbol: 指数代码或"index"表示获取主要指数
+            **kwargs: 其他参数
+
+        Returns:
+            主力资金流数据DataFrame
+        """
+        try:
+            self.logger.info("获取主力资金流数据")
+
+            # 东方财富大盘资金流API
+            url = f"{self.config['base_url']}/api/qt/ulist.np/get"
+            params = {
+                'fltt': 2,
+                'invt': 2,
+                'fields': 'f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87',
+                'secids': '1.000001,0.399001,1.000300'  # 上证指数、深证成指、沪深300
+            }
+
+            response = self.session.get(url, params=params, timeout=self.config['timeout'])
+            response.raise_for_status()
+
+            data = response.json()
+            if not data.get('data') or not data['data'].get('diff'):
+                self.logger.warning("未获取到主力资金流数据")
+                return pd.DataFrame()
+
+            # 解析数据
+            records = []
+            for item in data['data']['diff']:
+                record = {
+                    'index_code': item.get('f12', ''),
+                    'index_name': item.get('f14', ''),
+                    'current_price': item.get('f2', 0),
+                    'change_pct': item.get('f3', 0) / 100 if item.get('f3') else 0,
+                    'main_net_inflow': item.get('f62', 0),
+                    'main_net_inflow_pct': item.get('f184', 0) / 100 if item.get('f184') else 0,
+                    'super_large_net_inflow': item.get('f66', 0),
+                    'super_large_net_inflow_pct': item.get('f69', 0) / 100 if item.get('f69') else 0,
+                    'large_net_inflow': item.get('f72', 0),
+                    'large_net_inflow_pct': item.get('f75', 0) / 100 if item.get('f75') else 0,
+                    'medium_net_inflow': item.get('f78', 0),
+                    'medium_net_inflow_pct': item.get('f81', 0) / 100 if item.get('f81') else 0,
+                    'small_net_inflow': item.get('f84', 0),
+                    'small_net_inflow_pct': item.get('f87', 0) / 100 if item.get('f87') else 0
+                }
+                records.append(record)
+
+            df = pd.DataFrame(records)
+            self.logger.info(f"成功获取主力资金流数据，共 {len(df)} 条记录")
+            return df
+
+        except Exception as e:
+            self.logger.error(f"获取主力资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
 # 插件工厂函数
 
 

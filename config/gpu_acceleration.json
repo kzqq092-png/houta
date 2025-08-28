@@ -1,0 +1,41 @@
+{
+    "gpu_acceleration": {
+        "enabled": true,
+        "auto_detect": true,
+        "preferred_backend": "auto",
+        "backends": {
+            "cuda": {
+                "enabled": true,
+                "device_id": 0,
+                "memory_fraction": 0.8,
+                "allow_growth": true
+            },
+            "opencl": {
+                "enabled": true,
+                "platform_id": 0,
+                "device_id": 0
+            },
+            "numba_cuda": {
+                "enabled": true,
+                "device_id": 0,
+                "max_threads_per_block": 512
+            }
+        },
+        "data_processing": {
+            "batch_size": 10000,
+            "use_gpu_for_large_datasets": true,
+            "min_dataset_size_for_gpu": 1000,
+            "parallel_workers": 4
+        },
+        "performance": {
+            "enable_profiling": false,
+            "log_performance_metrics": true,
+            "benchmark_on_startup": false
+        },
+        "fallback": {
+            "auto_fallback_on_error": true,
+            "cpu_threads": 4,
+            "memory_limit_mb": 2048
+        }
+    }
+} 

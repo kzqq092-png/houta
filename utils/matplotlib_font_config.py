@@ -70,7 +70,7 @@ class MatplotlibFontConfig:
 
         # 检查是否已经配置过
         if not force_config and cls._is_chinese_font_configured():
-            print("✅ matplotlib中文字体已配置")
+            print("SUCCESS: matplotlib中文字体已配置")
             return True
 
         try:
@@ -84,14 +84,14 @@ class MatplotlibFontConfig:
 
             # 验证配置
             if cls._test_chinese_display():
-                print(f"✅ matplotlib中文字体配置成功，使用字体: {fonts[0]}")
+                print(f"SUCCESS: matplotlib中文字体配置成功，使用字体: {fonts[0]}")
                 return True
             else:
                 print("⚠️ matplotlib中文字体配置可能有问题")
                 return False
 
         except Exception as e:
-            print(f"❌ matplotlib字体配置失败: {e}")
+            print(f"ERROR: matplotlib字体配置失败: {e}")
             return False
 
     @classmethod
@@ -155,9 +155,9 @@ class MatplotlibFontConfig:
 
         try:
             mpl.rcdefaults()
-            print("✅ matplotlib字体配置已重置为默认值")
+            print("SUCCESS: matplotlib字体配置已重置为默认值")
         except Exception as e:
-            print(f"❌ 重置字体配置失败: {e}")
+            print(f"ERROR: 重置字体配置失败: {e}")
 
 
 def configure_matplotlib_chinese_font(font_size: int = 10, force_config: bool = False) -> bool:

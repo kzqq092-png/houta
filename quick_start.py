@@ -43,7 +43,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class HIkyuuQuickStart:
+class FactorWeaveQuantLauncher:
     """
     FactorWeave-Quant  2.0 快速启动器
 
@@ -117,10 +117,10 @@ class HIkyuuQuickStart:
 
         try:
             # 导入主应用程序
-            from main import HIkyuuUIApplication
+            from main import FactorWeaveQuantApplication
 
             # 创建并运行应用程序
-            app = HIkyuuUIApplication()
+            app = FactorWeaveQuantApplication()
             exit_code = app.run()
 
             return exit_code
@@ -773,7 +773,7 @@ class HIkyuuQuickStart:
             print("🚀 正在启动FactorWeave-Quant  2.0完整界面...")
 
             # 创建新的启动器实例以GUI模式运行
-            gui_launcher = HIkyuuQuickStart(mode="gui")
+            gui_launcher = FactorWeaveQuantLauncher(mode="gui")
             return gui_launcher.run()
 
         except Exception as e:
@@ -1556,7 +1556,7 @@ def main():
         log_dir.mkdir(exist_ok=True)
 
         # 创建并运行启动器
-        launcher = HIkyuuQuickStart(mode=args.mode)
+        launcher = FactorWeaveQuantLauncher(mode=args.mode)
         exit_code = launcher.run()
 
         sys.exit(exit_code or 0)

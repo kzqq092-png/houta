@@ -372,7 +372,7 @@ class PluginDatabaseManager:
             logger.error(f"获取插件状态失败: {e}")
             return None
 
-    def get_all_plugins(self) -> List[Dict[str, Any]]:
+    def get_all_plugins(self) -> List[PluginRecord]:
         """获取所有插件信息"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -397,7 +397,29 @@ class PluginDatabaseManager:
                 except:
                     plugin_dict['tags'] = []
 
-                plugins.append(plugin_dict)
+                # 创建PluginRecord对象
+                plugin_record = PluginRecord(
+                    id=plugin_dict.get('id'),
+                    name=plugin_dict.get('name', ''),
+                    display_name=plugin_dict.get('display_name', ''),
+                    version=plugin_dict.get('version', '1.0.0'),
+                    plugin_type=plugin_dict.get('plugin_type', PluginType.ANALYSIS.value),
+                    status=plugin_dict.get('status', PluginStatus.UNLOADED.value),
+                    description=plugin_dict.get('description', ''),
+                    author=plugin_dict.get('author', ''),
+                    email=plugin_dict.get('email', ''),
+                    homepage=plugin_dict.get('homepage', ''),
+                    repository=plugin_dict.get('repository', ''),
+                    license=plugin_dict.get('license', 'MIT'),
+                    tags=json.dumps(plugin_dict.get('tags', [])),
+                    install_path=plugin_dict.get('install_path', ''),
+                    entry_point=plugin_dict.get('entry_point', ''),
+                    created_at=plugin_dict.get('created_at'),
+                    updated_at=plugin_dict.get('updated_at'),
+                    last_enabled_at=plugin_dict.get('last_enabled_at'),
+                    priority=plugin_dict.get('priority', 100)
+                )
+                plugins.append(plugin_record)
 
             conn.close()
             return plugins

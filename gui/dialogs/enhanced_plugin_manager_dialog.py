@@ -4132,7 +4132,7 @@ class EnhancedPluginManagerDialog(QDialog):
     def _create_indicator_strategy_tab(self, tab: QWidget):
         """创建指标/策略插件管理标签页（V2）。"""
         layout = QVBoxLayout(tab)
-        title_label = QLabel("📐 指标/策略 插件管理（V2）")
+        title_label = QLabel("📐 指标/策略 插件管理")
         title_label.setStyleSheet("font-weight: bold; font-size: 16px;")
         layout.addWidget(title_label)
 
@@ -4163,6 +4163,7 @@ class EnhancedPluginManagerDialog(QDialog):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.indicator_strategy_table = table
         layout.addWidget(table)
 

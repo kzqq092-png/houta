@@ -54,9 +54,10 @@ class SystemResourceService:
                         disk_usage = psutil.disk_usage('/')
                     disk_percent = disk_usage.percent
                 except (FileNotFoundError, SystemError, PermissionError) as e:
-                    # 如果获取失败，使用默认值
+                    # 如果获取失败，记录错误并使用0值
                     disk_percent = 0.0
-                    self.logger.warning(f"无法获取磁盘使用率: {str(e)}")
+                    self.logger.error(f"无法获取磁盘使用率，权限或路径错误: {str(e)}")
+                    self.logger.error("请检查系统权限或磁盘路径配置")
 
                 # 创建事件
                 event = SystemResourceUpdated(

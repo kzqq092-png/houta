@@ -698,10 +698,11 @@ class AutoTuner:
 class UnifiedPerformanceMonitor:
     """统一性能监控系统 - 集成所有功能"""
 
-    def __init__(self, auto_tune: bool = True, monitor_interval: int = 60):
+    def __init__(self, auto_tune: bool = True, monitor_interval: int = 60, debug_mode: bool = False):
         """初始化统一性能监控器"""
         self.auto_tune = auto_tune
         self.monitor_interval = monitor_interval
+        self.debug_mode = debug_mode
 
         # 核心组件
         self.stats: Dict[str, PerformanceStats] = {}

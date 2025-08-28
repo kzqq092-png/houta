@@ -41,7 +41,7 @@ class Cache:
         if backend == "diskcache":
             if not DISKCACHE_AVAILABLE:
                 # 使用内存缓存作为回退
-                print("⚠️ diskcache 不可用，使用内存缓存")
+                print("WARNING: diskcache 不可用，使用内存缓存")
                 self.cache = {}
                 self._memory_cache = True
             else:

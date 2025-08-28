@@ -226,8 +226,99 @@ class PluginManager(QObject):
             from core.services.plugin_database_service import PluginDatabaseService
             self.db_service = PluginDatabaseService()
             logger.info("✅ 插件数据库服务初始化成功")
+
+            # 加载数据库中已启用的插件
+            self._load_enabled_plugins_from_db()
+
         except Exception as e:
             logger.warning(f"⚠️ 插件数据库服务初始化失败: {e}")
+
+    def _load_enabled_plugins_from_db(self):
+        """从数据库加载已启用的插件"""
+        if not self.db_service:
+            return
+
+        try:
+            # 获取所有插件信息
+            all_plugins = self.db_service.get_all_plugins()
+            enabled_count = 0
+
+            for plugin_data in all_plugins:
+                plugin_name = plugin_data.get('name', '')
+                plugin_status = plugin_data.get('status', '')
+
+                if plugin_status == 'enabled':
+                    # 解析依赖列表
+                    dependencies_str = plugin_data.get('dependencies', '[]')
+                    try:
+                        import json
+                        dependencies = json.loads(dependencies_str) if dependencies_str else []
+                    except:
+                        dependencies = []
+
+                    # 创建插件信息对象 - 使用正确的字段名称
+                    plugin_info = PluginInfo(
+                        name=plugin_name,
+                        version=plugin_data.get('version', '1.0.0'),
+                        description=plugin_data.get('description', ''),
+                        author=plugin_data.get('author', ''),
+                        path=plugin_data.get('install_path', ''),
+                        status=PluginStatus.ENABLED,
+                        config={},  # 空配置字典
+                        dependencies=dependencies,
+                        plugin_type=PluginType.ANALYSIS,  # 默认类型
+                        category=PluginCategory.COMMUNITY  # 默认分类
+                    )
+
+                    # 添加到enhanced_plugins
+                    self.enhanced_plugins[plugin_name] = plugin_info
+
+                    # 尝试加载插件实例（如果路径存在）
+                    try:
+                        self._load_plugin_instance(plugin_name, plugin_info)
+                        enabled_count += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ 加载插件实例失败 {plugin_name}: {e}")
+
+            if enabled_count > 0:
+                logger.info(f"✅ 从数据库加载了 {enabled_count} 个已启用的插件")
+            else:
+                logger.info("📊 数据库中没有已启用的插件")
+
+        except Exception as e:
+            logger.error(f"❌ 从数据库加载插件失败: {e}")
+
+    def _load_plugin_instance(self, plugin_name: str, plugin_info: PluginInfo):
+        """加载插件实例"""
+        try:
+            # 对于情绪数据源插件，创建虚拟实例
+            if 'sentiment_data_sources' in plugin_name:
+                # 创建一个简单的插件实例对象
+                class VirtualSentimentPlugin:
+                    def __init__(self, name, info):
+                        self.name = name
+                        self.info = info
+                        self.enabled = True
+
+                    def get_name(self):
+                        return self.name
+
+                    def get_info(self):
+                        return self.info
+
+                virtual_instance = VirtualSentimentPlugin(plugin_name, plugin_info)
+                self.plugin_instances[plugin_name] = virtual_instance
+                logger.debug(f"✅ 创建虚拟插件实例: {plugin_name}")
+                return True
+
+            # 对于其他插件类型，可以添加更多的加载逻辑
+            # 这里暂时创建一个基本的插件实例
+            self.plugin_instances[plugin_name] = plugin_info
+            return True
+
+        except Exception as e:
+            logger.warning(f"⚠️ 创建插件实例失败 {plugin_name}: {e}")
+            return False
 
     def _sync_plugin_state_with_db(self, plugin_name: str, plugin_info: PluginInfo):
         """同步插件状态与数据库"""

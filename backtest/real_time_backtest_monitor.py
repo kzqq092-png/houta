@@ -114,7 +114,7 @@ class RealTimeBacktestMonitor:
         self.alert_thresholds = self._initialize_alert_thresholds()
 
         # 数据库连接
-        self.db_path = Path("data/backtest_monitor.db")
+        self.db_path = Path("db/backtest_monitor.db")
         self._initialize_database()
 
         # 图表配置

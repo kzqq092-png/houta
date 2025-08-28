@@ -30,7 +30,7 @@ import sqlite3
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
+    os.path.dirname(__file__)), 'db', 'factorweave_system.db')
 
 
 class ConfigManager(QObject):
@@ -127,12 +127,38 @@ class ConfigManager(QObject):
         else:
             return {}
 
+    def delete(self, key: str) -> bool:
+        """删除配置项"""
+        if self._config_service:
+            return self._config_service.delete(key) if hasattr(self._config_service, 'delete') else False
+        elif self.conn:
+            # SQLite备用模式
+            cursor = self.conn.cursor()
+            cursor.execute('DELETE FROM config WHERE key=?', (key,))
+            self.conn.commit()
+            return cursor.rowcount > 0
+        else:
+            return False
+
     def validate(self, config: Optional[Dict[str, Any]] = None) -> bool:
         """验证配置"""
         if self._config_service:
             return self._config_service.validate(config)
         else:
             return True
+
+    # 兼容性方法别名
+    def set_config(self, key: str, value):
+        """设置配置值（兼容性方法）"""
+        return self.set(key, value)
+
+    def get_config(self, key: str, default=None):
+        """获取配置值（兼容性方法）"""
+        return self.get(key, default)
+
+    def delete_config(self, key: str) -> bool:
+        """删除配置项（兼容性方法）"""
+        return self.delete(key)
 
     @property
     def trading(self):

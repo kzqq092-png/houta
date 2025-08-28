@@ -18,6 +18,7 @@ from .database_admin_dialog import DatabaseAdminDialog
 from .interval_stat_dialog import IntervalStatDialog
 from .interval_stat_settings_dialog import IntervalStatSettingsDialog
 from .system_optimizer_dialog import SystemOptimizerDialog, show_system_optimizer_dialog
+from .startup_guides_dialog import StartupGuidesDialog
 
 __all__ = [
     'SettingsDialog',
@@ -35,5 +36,6 @@ __all__ = [
     'IntervalStatDialog',
     'IntervalStatSettingsDialog',
     'SystemOptimizerDialog',
-    'show_system_optimizer_dialog'
+    'show_system_optimizer_dialog',
+    'StartupGuidesDialog'
 ]

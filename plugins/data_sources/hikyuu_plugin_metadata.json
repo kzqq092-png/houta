@@ -1,14 +1,14 @@
 {
   "plugin_info": {
-    "id": "hikyuu_data_source",
-    "name": "HIkyuu数据源插件",
+    "id": "factorweave_data_source",
+    "name": "FactorWeave数据源插件",
     "version": "1.0.0",
-    "description": "基于HIkyuu框架的高性能量化数据源，支持股票、指数、基金等多资产类型数据获取",
-    "author": "HIkyuu-UI Team",
-    "homepage": "https://github.com/fasiondog/hikyuu",
-    "repository": "https://github.com/fasiondog/hikyuu",
+    "description": "基于FactorWeave框架的高性能量化数据源，支持股票、指数、基金等多资产类型数据获取",
+    "author": "FactorWeave-Quant Team",
+    "homepage": "https://github.com/factorweave/factorweave-quant",
+    "repository": "https://github.com/factorweave/factorweave-quant",
     "license": "MIT",
-    "keywords": ["hikyuu", "quantitative", "data-source", "stock", "trading"],
+    "keywords": ["factorweave", "quantitative", "data-source", "stock", "trading"],
     "category": "data_source",
     "type": "data_source"
   },
@@ -76,7 +76,7 @@
         "data_dir": {
           "type": "string",
           "default": "data",
-          "description": "HIkyuu数据目录路径"
+          "description": "FactorWeave数据目录路径"
         },
         "preload_day_count": {
           "type": "integer",
@@ -141,53 +141,41 @@
   },
   "installation": {
     "install_command": "pip install hikyuu",
-    "verify_command": "python -c \"import hikyuu; print('HIkyuu installed successfully')\"",
+    "verify_command": "python -c \"import hikyuu; print('FactorWeave数据源安装成功')\"",
     "setup_instructions": [
       "1. 安装HIkyuu: pip install hikyuu",
-      "2. 配置数据目录路径",
-      "3. 首次运行会自动下载和初始化数据",
-      "4. 确保有足够的磁盘空间（建议至少10GB）"
+      "2. 配置数据目录",
+      "3. 启用插件"
     ]
   },
   "documentation": {
-    "readme_url": "https://hikyuu.readthedocs.io/",
-    "api_docs_url": "https://hikyuu.readthedocs.io/en/latest/api.html",
+    "readme_url": "https://factorweave.readthedocs.io/",
+    "api_docs_url": "https://factorweave.readthedocs.io/en/latest/api.html",
+    "tutorials": [
+      {
+        "title": "快速开始",
+        "url": "https://factorweave.readthedocs.io/quickstart/"
+      },
+      {
+        "title": "数据源配置",
+        "url": "https://factorweave.readthedocs.io/datasource/"
+      }
+    ],
     "examples": [
       {
-        "title": "获取股票K线数据",
-        "description": "演示如何获取股票的历史K线数据",
-        "code": "plugin.get_kdata('sh000001', freq='D', count=100)"
+        "title": "基础数据获取",
+        "file": "examples/basic_data.py"
       },
       {
-        "title": "获取实时行情",
-        "description": "演示如何获取股票的实时行情数据", 
-        "code": "plugin.get_real_time_quotes(['sh000001', 'sz399001'])"
-      },
-      {
-        "title": "获取股票列表",
-        "description": "演示如何获取指定市场的股票列表",
-        "code": "plugin.get_asset_list(AssetType.STOCK, market='SH')"
+        "title": "实时行情订阅",
+        "file": "examples/realtime_quotes.py"
       }
     ]
   },
-  "changelog": [
-    {
-      "version": "1.0.0",
-      "date": "2024-08-16",
-      "changes": [
-        "初始版本发布",
-        "支持股票、指数、基金数据获取",
-        "支持多种K线频率",
-        "支持实时行情数据",
-        "支持基本面数据获取",
-        "完整的连接管理和健康检查"
-      ]
-    }
-  ],
   "support": {
-    "issues_url": "https://github.com/fasiondog/hikyuu/issues",
-    "documentation_url": "https://hikyuu.readthedocs.io/",
-    "community_url": "https://github.com/fasiondog/hikyuu/discussions",
-    "email": "support@hikyuu.org"
+    "issues_url": "https://github.com/factorweave/factorweave-quant/issues",
+    "documentation_url": "https://factorweave.readthedocs.io/",
+    "community_url": "https://github.com/factorweave/factorweave-quant/discussions",
+    "email": "support@factorweave.org"
   }
 } 

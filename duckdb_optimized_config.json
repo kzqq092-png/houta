@@ -1,0 +1,63 @@
+{
+  "system_info": {
+    "memory_gb": 8.0,
+    "cpu_cores": 4,
+    "cpu_freq_mhz": 2400,
+    "disk_free_gb": 100.0,
+    "disk_total_gb": 500.0
+  },
+  "memory": {
+    "memory_limit": "4.0GB",
+    "max_memory": "4.4GB",
+    "buffer_pool_size": "1GB",
+    "temp_memory_limit": "2GB",
+    "memory_limit_ratio": 0.5
+  },
+  "threads": {
+    "threads": 4,
+    "io_threads": 2,
+    "parallel_tasks": 4,
+    "worker_threads": 3
+  },
+  "storage": {
+    "checkpoint_threshold": "512MB",
+    "wal_autocheckpoint": 5000,
+    "temp_directory_size": "20GB",
+    "enable_fsync": true,
+    "enable_mmap": true
+  },
+  "query": {
+    "enable_optimizer": true,
+    "enable_profiling": false,
+    "enable_progress_bar": true,
+    "enable_object_cache": true,
+    "max_expression_depth": 1000,
+    "enable_external_access": true,
+    "enable_httpfs": true,
+    "enable_parquet_statistics": true,
+    "preserve_insertion_order": false,
+    "enable_verification": false
+  },
+  "advanced": {
+    "force_parallelism": true,
+    "enable_join_order_optimizer": true,
+    "enable_unnest_rewriter": true,
+    "enable_object_cache_map": true,
+    "buffer_manager_track_eviction_timestamps": true,
+    "enable_auto_analyze": true,
+    "auto_analyze_sample_size": 100000,
+    "enable_compression": true,
+    "compression_level": 6,
+    "http_timeout": 30000,
+    "http_retries": 3,
+    "enable_extensions": [
+      "httpfs",
+      "parquet",
+      "json"
+    ],
+    "log_query_path": "",
+    "enable_detailed_profiling": false
+  },
+  "generated_at": "2025-08-21T18:12:39.971430",
+  "version": "2024.1"
+}

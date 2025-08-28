@@ -8,16 +8,26 @@
 import logging
 from typing import Dict, Any, Optional, List, Union
 import asyncio
+import traceback
+import sys
+import os
 from datetime import datetime
 import pandas as pd
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QFileDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QStatusBar, QMenuBar, QMessageBox, QDockWidget, QLabel, QPushButton, QFrame
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QThread, Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot
+
+from core.performance.unified_monitor import AutoTuner
+from core.plugin_manager import PluginManager
+from gui.dialogs.converter_dialog import ConverterDialog
+from gui.dialogs.data_quality_dialog import DataQualityDialog
+from gui.dialogs.data_usage_terms_dialog import DataUsageTermsDialog
+from gui.tools.currency_converter import CurrencyConverter
 
 from .base_coordinator import BaseCoordinator
 from ..events import (
@@ -755,26 +765,52 @@ class MainWindowCoordinator(BaseCoordinator):
             )
             logger.info(f"分析数据加载完成: {event.stock_code}")
 
-            # 3. 存储到中央数据状态
+            # 3. 存储到中央数据状态 - 增强数据验证和日志
+            logger.info(f"=== 准备中央数据状态 ===")
+            logger.info(f"K线数据类型: {type(kline_data)}")
+            if hasattr(kline_data, 'shape'):
+                logger.info(f"K线数据形状: {kline_data.shape}")
+            elif hasattr(kline_data, '__len__'):
+                logger.info(f"K线数据长度: {len(kline_data)}")
+
             self._current_stock_data = {
                 'stock_code': event.stock_code,
                 'stock_name': event.stock_name,
                 'market': event.market,
-                'kline_data': kline_data,
+                'kline_data': kline_data,  # 确保使用正确的键名
+                'kdata': kline_data,       # 向后兼容
                 'analysis': analysis_data,
                 'period': period,
                 'time_range': time_range,
                 'chart_type': chart_type
             }
+
+            # 验证数据完整性
+            if analysis_data:
+                logger.info(f"分析数据包含键: {list(analysis_data.keys()) if isinstance(analysis_data, dict) else 'Not a dict'}")
+                # 如果分析数据中包含指标数据，添加到主数据中
+                if isinstance(analysis_data, dict):
+                    if 'indicators' in analysis_data:
+                        self._current_stock_data['indicators'] = analysis_data['indicators']
+                        self._current_stock_data['indicators_data'] = analysis_data['indicators']
+                    if 'technical_analysis' in analysis_data:
+                        self._current_stock_data['technical_analysis'] = analysis_data['technical_analysis']
+
+            logger.info(f"中央数据状态键: {list(self._current_stock_data.keys())}")
             logger.info(f"数据已存储到中央状态，准备发布UIDataReadyEvent事件: {event.stock_code}")
 
-            # 4. 发布数据准备就绪事件
+            # 4. 发布数据准备就绪事件 - 增强事件数据
+            logger.info(f"=== 创建UIDataReadyEvent ===")
             data_ready_event = UIDataReadyEvent(
                 source="MainWindowCoordinator",
                 stock_code=event.stock_code,
                 stock_name=event.stock_name,
                 ui_data=self._current_stock_data
             )
+
+            # 验证事件数据
+            logger.info(f"UIDataReadyEvent.ui_data键: {list(data_ready_event.ui_data.keys()) if data_ready_event.ui_data else 'None'}")
+
             self.event_bus.publish(data_ready_event)
             logger.info(f"已发布UIDataReadyEvent事件: {event.stock_code}")
 
@@ -791,7 +827,6 @@ class MainWindowCoordinator(BaseCoordinator):
             self.show_message(
                 f"加载 {event.stock_name} 数据失败", level='error')
 
-            import traceback
             error_event = ErrorEvent(
                 source='MainWindowCoordinator',
                 error_type=type(e).__name__,
@@ -942,7 +977,6 @@ class MainWindowCoordinator(BaseCoordinator):
             self.show_message(
                 f"加载 {event.name} 数据失败", level='error')
 
-            import traceback
             error_event = ErrorEvent(
                 source='MainWindowCoordinator',
                 error_type=type(e).__name__,
@@ -2019,12 +2053,13 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             self.center_dialog(dialog)
             dialog.exec_()
 
-        except ImportError:
+        except ImportError as e:
+            logger.warning(f"启动向导对话框导入失败: {e}")
             # 如果启动向导对话框不存在，创建一个简单的消息框
             QMessageBox.information(
                 self._main_window,
                 "启动向导",
-                "欢迎使用FactorWeave-Quant ‌ 2.0！\n\n"
+                "欢迎使用FactorWeave-Quant 2.0！\n\n"
                 "主要功能：\n"
                 "1. 股票数据查看和分析\n"
                 "2. 技术指标计算和显示\n"
@@ -2042,25 +2077,28 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         try:
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
-            # 使用系统数据库路径
-            db_path = "db/hikyuu_system.db"  # 使用相对路径
+            # 直接打开数据库管理对话框，让用户在统一界面中选择数据库
+            # 使用默认数据库路径，用户可以在界面中切换
+            default_db = "db/hikyuu_system.db"
 
-            dialog = DatabaseAdminDialog(db_path, self._main_window)
+            dialog = DatabaseAdminDialog(default_db, self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
 
+            logger.info("打开数据库管理界面")
+
         except ImportError:
-            # 如果数据库管理对话框不存在，创建一个简单的消息框
             QMessageBox.information(
                 self._main_window,
                 "数据库管理",
                 "数据库管理功能包括：\n\n"
-                "1. 数据库连接管理\n"
-                "2. 数据表维护\n"
-                "3. 数据备份恢复\n"
-                "4. 性能监控\n"
-                "5. 索引优化\n\n"
-                "此功能正在开发中..."
+                "1. 数据库文件自动扫描和选择\n"
+                "2. 数据表维护和查询\n"
+                "3. 数据导入导出和批量操作\n"
+                "4. 权限管理和云端同步\n"
+                "5. 表结构管理和数据统计\n"
+                "6. 慢SQL记录和性能监控\n\n"
+                "数据库管理功能正在开发中..."
             )
         except Exception as e:
             logger.error(f"打开数据库管理失败: {e}")
@@ -2284,13 +2322,16 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             QMessageBox.warning(self._main_window, "错误", f"无法切换性能仪表板: {e}")
 
     def _on_performance_center(self):
-        """打开现代化性能监控中心"""
+        """打开性能监控中心"""
         try:
             from gui.widgets.modern_performance_widget import show_modern_performance_monitor
+
+            # 显示现代化性能监控界面（移除智能洞察功能）
             performance_widget = show_modern_performance_monitor(self._main_window)
-            performance_widget.setWindowTitle("HIkyuu-UI 性能监控中心 - Professional Edition")
+            performance_widget.setWindowTitle("FactorWeave-Quant 性能监控中心 - Professional Edition")
+
             performance_widget.show()
-            logger.info("现代化性能监控中心已打开")
+            logger.info("性能监控中心已打开")
         except Exception as e:
             logger.error(f"打开性能监控中心失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法打开性能监控中心: {e}")
@@ -2543,6 +2584,144 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             logger.error(f"数据质量检查失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法启动数据质量检查: {e}")
 
+    # ==================== DuckDB专业数据导入功能 ====================
+
+    def _on_duckdb_import(self) -> None:
+        """打开DuckDB专业数据导入界面"""
+        try:
+            from gui.widgets.data_import_widget import DataImportWidget
+
+            # 创建数据导入窗口
+            import_window = QMainWindow(self._main_window)
+            import_window.setWindowTitle("DuckDB专业数据导入系统")
+            import_window.setWindowIcon(QIcon("icons/import.png"))
+            import_window.resize(1200, 800)
+
+            # 创建导入组件
+            import_widget = DataImportWidget(import_window)
+            import_window.setCentralWidget(import_widget)
+
+            # 居中显示
+            self.center_dialog(import_window)
+            import_window.show()
+
+            logger.info("打开DuckDB专业数据导入界面")
+
+        except Exception as e:
+            logger.error(f"打开DuckDB导入界面失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开DuckDB导入界面: {e}")
+
+    def _on_import_monitor(self) -> None:
+        """打开数据导入监控仪表板"""
+        try:
+            from gui.widgets.data_import_dashboard import DataImportDashboard
+
+            # 创建监控仪表板窗口
+            monitor_window = QMainWindow(self._main_window)
+            monitor_window.setWindowTitle("数据导入实时监控仪表板")
+            monitor_window.setWindowIcon(QIcon("icons/monitor.png"))
+            monitor_window.resize(1400, 900)
+
+            # 创建仪表板组件
+            dashboard_widget = DataImportDashboard(monitor_window)
+            monitor_window.setCentralWidget(dashboard_widget)
+
+            # 居中显示
+            self.center_dialog(monitor_window)
+            monitor_window.show()
+
+            logger.info("打开数据导入监控仪表板")
+
+        except Exception as e:
+            logger.error(f"打开导入监控仪表板失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开导入监控仪表板: {e}")
+
+    def _on_batch_import(self) -> None:
+        """批量数据导入"""
+        try:
+            from gui.dialogs.batch_import_dialog import BatchImportDialog
+
+            dialog = BatchImportDialog(self._main_window)
+            self.center_dialog(dialog)
+
+            if dialog.exec_() == dialog.Accepted:
+                # 处理批量导入结果
+                QMessageBox.information(self._main_window, "成功", "批量导入任务已启动")
+
+            logger.info("启动批量数据导入")
+
+        except ImportError:
+            # 如果对话框不存在，显示开发中提示
+            QMessageBox.information(self._main_window, "提示", "批量导入功能正在开发中")
+            logger.info("批量导入功能正在开发中")
+        except Exception as e:
+            logger.error(f"批量导入失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动批量导入: {e}")
+
+    def _on_scheduled_import(self) -> None:
+        """定时导入任务管理"""
+        try:
+            from gui.dialogs.scheduled_import_dialog import ScheduledImportDialog
+
+            dialog = ScheduledImportDialog(self._main_window)
+            self.center_dialog(dialog)
+            dialog.exec_()
+
+            logger.info("打开定时导入任务管理")
+
+        except ImportError:
+            # 如果对话框不存在，显示开发中提示
+            QMessageBox.information(self._main_window, "提示", "定时导入任务管理功能正在开发中")
+            logger.info("定时导入任务管理功能正在开发中")
+        except Exception as e:
+            logger.error(f"打开定时导入任务管理失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开定时导入任务管理: {e}")
+
+    def _on_import_history(self) -> None:
+        """查看导入历史记录"""
+        try:
+            from gui.dialogs.import_history_dialog import ImportHistoryDialog
+
+            dialog = ImportHistoryDialog(self._main_window)
+            self.center_dialog(dialog)
+            dialog.exec_()
+
+            logger.info("查看导入历史记录")
+
+        except ImportError:
+            # 如果对话框不存在，显示开发中提示
+            QMessageBox.information(self._main_window, "提示", "导入历史记录功能正在开发中")
+            logger.info("导入历史记录功能正在开发中")
+        except Exception as e:
+            logger.error(f"查看导入历史记录失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法查看导入历史记录: {e}")
+
+    def _on_export_data(self) -> None:
+        """导出数据"""
+        try:
+            from gui.dialogs.data_export_dialog import DataExportDialog
+
+            dialog = DataExportDialog(self._main_window)
+            self.center_dialog(dialog)
+            dialog.exec_()
+
+            logger.info("启动数据导出")
+
+        except ImportError:
+            # 如果对话框不存在，使用简单的文件保存对话框
+            file_path, _ = QFileDialog.getSaveFileName(
+                self._main_window,
+                "导出数据",
+                "",
+                "CSV文件 (*.csv);;Excel文件 (*.xlsx);;JSON文件 (*.json);;所有文件 (*)"
+            )
+            if file_path:
+                QMessageBox.information(self._main_window, "提示", "数据导出功能正在开发中")
+                logger.info(f"导出数据到: {file_path}")
+        except Exception as e:
+            logger.error(f"导出数据失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法导出数据: {e}")
+
     def _on_check_update(self) -> None:
         """检查更新"""
         try:
@@ -2663,30 +2842,6 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         except Exception as e:
             logger.error(f"启动优化失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法启动优化: {e}")
-
-    def _on_webgpu_status(self) -> None:
-        """查看WebGPU状态"""
-        try:
-            # 检查WebGPU状态
-            status_info = {
-                "WebGPU支持": "检测中...",
-                "硬件加速": "未知",
-                "GPU设备": "未检测到",
-                "兼容性": "测试中"
-            }
-
-            message = "🖥️ WebGPU状态检查\n\n"
-            for key, value in status_info.items():
-                message += f"• {key}: {value}\n"
-
-            message += "\n💡 WebGPU功能正在开发中，当前显示为模拟数据。"
-
-            QMessageBox.information(self._main_window, "WebGPU状态", message)
-            logger.info("查看WebGPU状态")
-
-        except Exception as e:
-            logger.error(f"查看WebGPU状态失败: {e}")
-            QMessageBox.warning(self._main_window, "错误", f"无法查看WebGPU状态: {e}")
 
     def _on_save_as_file(self) -> None:
         """另存为文件"""

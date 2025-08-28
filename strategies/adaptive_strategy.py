@@ -17,16 +17,16 @@ from core.stop_loss import AdaptiveStopLoss
 from core.take_profit import AdaptiveTakeProfit
 
 
-@register_strategy("AdaptiveHikyuu", metadata={
-    "description": "基于HIkyuu框架的自适应止损止盈策略",
+@register_strategy("AdaptiveFactorWeave", metadata={
+    "description": "基于FactorWeave框架的自适应止损止盈策略",
     "author": "FactorWeave 团队",
     "version": "2.0.0",
     "category": "adaptive"
 })
-class AdaptiveHikuuStrategy(BaseStrategy):
-    """自适应HIkyuu策略"""
+class AdaptiveFactorWeaveStrategy(BaseStrategy):
+    """自适应FactorWeave策略"""
 
-    def __init__(self, name: str = "AdaptiveHikyuu"):
+    def __init__(self, name: str = "AdaptiveFactorWeave"):
         super().__init__(name, StrategyType.CUSTOM)
         self._init_default_parameters()
         self._system = None

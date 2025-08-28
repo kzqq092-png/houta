@@ -495,3 +495,195 @@ class DistributedService:
             "running_tasks": len(self.task_scheduler.running_tasks),
             "completed_tasks": len(self.task_scheduler.completed_tasks)
         }
+
+    def get_load_balanced_node(self, task_requirements: Optional[Dict[str, Any]] = None) -> Optional[NodeInfo]:
+        """
+        获取负载均衡的节点
+
+        Args:
+            task_requirements: 任务需求，包含：
+                - cpu_required: 所需CPU核心数
+                - memory_required: 所需内存（GB）
+                - gpu_required: 是否需要GPU
+                - capabilities: 所需能力列表
+
+        Returns:
+            最适合的节点信息，如果没有可用节点则返回None
+        """
+        try:
+            active_nodes = [n for n in self.task_scheduler.nodes.values() if n.status == "active"]
+
+            if not active_nodes:
+                logger.warning("没有可用的活跃节点")
+                return None
+
+            # 如果没有特殊要求，使用简单的负载均衡
+            if not task_requirements:
+                return self._simple_load_balance(active_nodes)
+
+            # 根据任务需求过滤节点
+            suitable_nodes = self._filter_nodes_by_requirements(active_nodes, task_requirements)
+
+            if not suitable_nodes:
+                logger.warning("没有满足要求的节点")
+                return None
+
+            # 在合适的节点中进行负载均衡
+            return self._advanced_load_balance(suitable_nodes, task_requirements)
+
+        except Exception as e:
+            logger.error(f"负载均衡选择节点失败: {e}")
+            return None
+
+    def _simple_load_balance(self, nodes: List[NodeInfo]) -> NodeInfo:
+        """简单的负载均衡（基于任务数量）"""
+        return min(nodes, key=lambda n: n.task_count)
+
+    def _filter_nodes_by_requirements(self, nodes: List[NodeInfo], requirements: Dict[str, Any]) -> List[NodeInfo]:
+        """根据任务需求过滤节点"""
+        suitable_nodes = []
+
+        for node in nodes:
+            # 检查CPU需求
+            cpu_required = requirements.get('cpu_required', 1)
+            if node.cpu_count < cpu_required:
+                continue
+
+            # 检查内存需求
+            memory_required = requirements.get('memory_required', 1.0)  # GB
+            available_memory = node.memory_total * (1 - node.memory_usage / 100) / (1024**3)
+            if available_memory < memory_required:
+                continue
+
+            # 检查GPU需求
+            gpu_required = requirements.get('gpu_required', False)
+            if gpu_required and not hasattr(node, 'gpu_count'):
+                continue
+
+            # 检查能力需求
+            required_capabilities = requirements.get('capabilities', [])
+            if required_capabilities and not all(cap in node.capabilities for cap in required_capabilities):
+                continue
+
+            suitable_nodes.append(node)
+
+        return suitable_nodes
+
+    def _advanced_load_balance(self, nodes: List[NodeInfo], requirements: Dict[str, Any]) -> NodeInfo:
+        """高级负载均衡（综合评分）"""
+        best_node = None
+        best_score = float('inf')
+
+        for node in nodes:
+            score = self._calculate_node_score(node, requirements)
+            if score < best_score:
+                best_score = score
+                best_node = node
+
+        return best_node
+
+    def _calculate_node_score(self, node: NodeInfo, requirements: Dict[str, Any]) -> float:
+        """计算节点评分（分数越低越好）"""
+        score = 0.0
+
+        # 任务负载评分（30%权重）
+        task_load_score = node.task_count / max(node.cpu_count, 1)
+        score += task_load_score * 0.3
+
+        # CPU使用率评分（25%权重）
+        cpu_score = node.cpu_usage / 100.0
+        score += cpu_score * 0.25
+
+        # 内存使用率评分（25%权重）
+        memory_score = node.memory_usage / 100.0
+        score += memory_score * 0.25
+
+        # 网络延迟评分（20%权重）
+        # 这里简化处理，实际应该测量网络延迟
+        network_score = 0.1  # 假设网络延迟较低
+        score += network_score * 0.2
+
+        return score
+
+    def submit_data_import_task(self, import_config: Dict[str, Any]) -> str:
+        """
+        提交数据导入任务（支持负载均衡）
+
+        Args:
+            import_config: 导入配置，包含：
+                - data_sources: 数据源列表
+                - batch_size: 批次大小
+                - parallel_workers: 并行工作数
+                - use_gpu: 是否使用GPU
+
+        Returns:
+            任务ID
+        """
+        # 根据导入配置确定任务需求
+        task_requirements = {
+            'cpu_required': import_config.get('parallel_workers', 2),
+            'memory_required': import_config.get('batch_size', 1000) / 1000.0,  # 估算内存需求
+            'gpu_required': import_config.get('use_gpu', False),
+            'capabilities': ['data_import', 'analysis']
+        }
+
+        # 选择最佳节点
+        target_node = self.get_load_balanced_node(task_requirements)
+
+        task = DistributedTask(
+            task_id=str(uuid.uuid4()),
+            task_type="data_import",
+            task_data=import_config,
+            priority=3  # 中等优先级
+        )
+
+        # 如果有指定节点，设置任务分配
+        if target_node:
+            task.assigned_node = target_node.node_id
+            logger.info(f"数据导入任务 {task.task_id} 分配到节点 {target_node.node_id}")
+
+        return self.task_scheduler.submit_task(task)
+
+    def get_cluster_performance_metrics(self) -> Dict[str, Any]:
+        """获取集群性能指标"""
+        try:
+            active_nodes = [n for n in self.task_scheduler.nodes.values() if n.status == "active"]
+
+            if not active_nodes:
+                return {
+                    'total_nodes': 0,
+                    'active_nodes': 0,
+                    'cluster_cpu_usage': 0.0,
+                    'cluster_memory_usage': 0.0,
+                    'total_tasks': 0,
+                    'load_distribution': {}
+                }
+
+            # 计算集群指标
+            total_cpu_usage = sum(n.cpu_usage for n in active_nodes) / len(active_nodes)
+            total_memory_usage = sum(n.memory_usage for n in active_nodes) / len(active_nodes)
+            total_tasks = sum(n.task_count for n in active_nodes)
+
+            # 负载分布
+            load_distribution = {}
+            for node in active_nodes:
+                load_distribution[node.node_id] = {
+                    'cpu_usage': node.cpu_usage,
+                    'memory_usage': node.memory_usage,
+                    'task_count': node.task_count,
+                    'load_score': self._calculate_node_score(node, {})
+                }
+
+            return {
+                'total_nodes': len(self.task_scheduler.nodes),
+                'active_nodes': len(active_nodes),
+                'cluster_cpu_usage': total_cpu_usage,
+                'cluster_memory_usage': total_memory_usage,
+                'total_tasks': total_tasks,
+                'load_distribution': load_distribution,
+                'timestamp': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"获取集群性能指标失败: {e}")
+            return {}

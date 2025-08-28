@@ -61,7 +61,7 @@ def get_config() -> Dict[str, Any]:
             # 返回默认配置
             return {
                 'strategy_database': {
-                    'path': 'data/strategies.db'
+                    'path': 'db/strategies.db'
                 },
                 'strategy_engine': {
                     'max_workers': 4,
@@ -70,7 +70,7 @@ def get_config() -> Dict[str, Any]:
                 },
                 'strategy_system': {
                     'database': {
-                        'path': 'data/strategies.db'
+                        'path': 'db/strategies.db'
                     },
                     'engine': {
                         'max_workers': 4,

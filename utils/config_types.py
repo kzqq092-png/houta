@@ -342,7 +342,7 @@ class LoggingConfig(QObject):
         # 设置默认值
         self.level = kwargs.get("level", "INFO")
         self.save_to_file = kwargs.get("save_to_file", True)
-        self.log_file = kwargs.get("log_file", "hikyuu_ui.log")
+        self.log_file = kwargs.get("log_file", "factorweave_quant.log")
         self.max_bytes = kwargs.get("max_bytes", 10 * 1024 * 1024)  # 10MB
         self.backup_count = kwargs.get("backup_count", 5)
         self.console_output = kwargs.get("console_output", True)
@@ -439,7 +439,7 @@ class LoggingConfig(QObject):
         # 更新配置
         config.level = data.get("level", "INFO")
         config.save_to_file = data.get("save_to_file", True)
-        config.log_file = data.get("log_file", "hikyuu_ui.log")
+        config.log_file = data.get("log_file", "factorweave_quant.log")
         config.max_bytes = data.get("max_bytes", 10 * 1024 * 1024)
         config.backup_count = data.get("backup_count", 5)
         config.console_output = data.get("console_output", True)

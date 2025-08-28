@@ -154,8 +154,14 @@ class PatternManager:
                     try:
                         raw_category = row[3]
                         # 解析参数
-                        parameters = json.loads(
-                            row[13]) if len(row) > 13 and row[13] else {}
+                        parameters_raw = row[13] if len(row) > 13 and row[13] else '{}'
+                        if isinstance(parameters_raw, str):
+                            parameters = json.loads(parameters_raw)
+                        elif isinstance(parameters_raw, (int, float)):
+                            # 如果是数字，转换为字符串再解析
+                            parameters = json.loads(str(parameters_raw)) if str(parameters_raw).strip() else {}
+                        else:
+                            parameters = parameters_raw if isinstance(parameters_raw, dict) else {}
 
                         # 转换枚举类型
                         signal_enum = SignalType.from_string(row[4])

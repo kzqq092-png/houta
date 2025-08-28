@@ -132,6 +132,57 @@ class UIMixin:
             else:
                 print(f"UIMixin show_no_data错误: {str(e)}")
 
+    def show_message(self, message: str, color: str = 'gray', fontsize: int = 16):
+        """显示消息状态
+
+        Args:
+            message: 显示的消息文本
+            color: 文字颜色
+            fontsize: 字体大小
+        """
+        try:
+            # 清除现有图表
+            if hasattr(self, 'figure'):
+                self.figure.clear()
+
+            # 创建新的子图用于显示消息
+            ax = self.figure.add_subplot(111)
+            ax.text(0.5, 0.5, message,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    transform=ax.transAxes,
+                    fontsize=fontsize,
+                    color=color)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.axis('off')
+
+            # 更新画布
+            if hasattr(self, 'canvas'):
+                self.canvas.draw()
+
+        except Exception as e:
+            if hasattr(self, 'log_manager') and self.log_manager:
+                self.log_manager.error(f"显示消息状态失败: {str(e)}")
+            else:
+                print(f"UIMixin show_message错误: {str(e)}")
+
+    def show_error(self, error_message: str):
+        """显示错误消息
+
+        Args:
+            error_message: 错误消息文本
+        """
+        self.show_message(f"错误: {error_message}", color='red', fontsize=14)
+
+    def show_loading(self, message: str = "正在加载..."):
+        """显示加载消息
+
+        Args:
+            message: 加载消息文本
+        """
+        self.show_message(message, color='blue', fontsize=14)
+
     def resizeEvent(self, event):
         """窗口大小变化事件处理"""
         try:

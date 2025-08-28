@@ -99,24 +99,40 @@ class WebGPUStatusDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        # GPU信息组
+        # GPU信息组 - 显示所有检测到的GPU
         gpu_group = QGroupBox("GPU硬件信息")
-        gpu_layout = QGridLayout(gpu_group)
+        gpu_layout = QVBoxLayout(gpu_group)
 
-        self.gpu_adapter_label = QLabel("未知")
-        self.gpu_vendor_label = QLabel("未知")
-        self.gpu_memory_label = QLabel("未知")
+        # 创建GPU信息表格
+        self.gpu_table = QTableWidget()
+        self.gpu_table.setColumnCount(5)
+        self.gpu_table.setHorizontalHeaderLabels(["适配器名称", "厂商", "显存(MB)", "类型", "状态"])
+        self.gpu_table.horizontalHeader().setStretchLastSection(True)
+        self.gpu_table.setAlternatingRowColors(True)
+        self.gpu_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.gpu_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        gpu_layout.addWidget(self.gpu_table)
+
+        # 当前使用的GPU信息
+        current_gpu_group = QGroupBox("当前使用的GPU")
+        current_gpu_layout = QGridLayout(current_gpu_group)
+
+        self.current_gpu_adapter_label = QLabel("未知")
+        self.current_gpu_vendor_label = QLabel("未知")
+        self.current_gpu_memory_label = QLabel("未知")
         self.gpu_texture_label = QLabel("未知")
 
-        gpu_layout.addWidget(QLabel("适配器名称:"), 0, 0)
-        gpu_layout.addWidget(self.gpu_adapter_label, 0, 1)
-        gpu_layout.addWidget(QLabel("厂商:"), 1, 0)
-        gpu_layout.addWidget(self.gpu_vendor_label, 1, 1)
-        gpu_layout.addWidget(QLabel("显存:"), 2, 0)
-        gpu_layout.addWidget(self.gpu_memory_label, 2, 1)
-        gpu_layout.addWidget(QLabel("最大纹理:"), 3, 0)
-        gpu_layout.addWidget(self.gpu_texture_label, 3, 1)
+        current_gpu_layout.addWidget(QLabel("适配器名称:"), 0, 0)
+        current_gpu_layout.addWidget(self.current_gpu_adapter_label, 0, 1)
+        current_gpu_layout.addWidget(QLabel("厂商:"), 1, 0)
+        current_gpu_layout.addWidget(self.current_gpu_vendor_label, 1, 1)
+        current_gpu_layout.addWidget(QLabel("显存:"), 2, 0)
+        current_gpu_layout.addWidget(self.current_gpu_memory_label, 2, 1)
+        current_gpu_layout.addWidget(QLabel("最大纹理:"), 3, 0)
+        current_gpu_layout.addWidget(self.gpu_texture_label, 3, 1)
 
+        gpu_layout.addWidget(current_gpu_group)
         layout.addWidget(gpu_group)
 
         # 环境信息组
@@ -331,17 +347,8 @@ class WebGPUStatusDialog(QDialog):
         # 直接调用渲染器测试
         if self._webgpu_renderer and hasattr(self._webgpu_renderer, 'benchmark_rendering'):
             try:
-                # 创建测试数据
-                import pandas as pd
-                import numpy as np
-
-                test_data = pd.DataFrame({
-                    'open': np.random.rand(1000) * 100,
-                    'high': np.random.rand(1000) * 100,
-                    'low': np.random.rand(1000) * 100,
-                    'close': np.random.rand(1000) * 100,
-                    'volume': np.random.rand(1000) * 10000
-                })
+                # 获取真实的股票数据进行测试
+                test_data = self._get_real_stock_data_for_test()
 
                 self.benchmark_btn.setEnabled(False)
                 self.benchmark_btn.setText("测试中...")
@@ -408,30 +415,288 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
             env_data = self._status_data.get('environment', {})
             gpu_data = env_data.get('gpu_capabilities', {})
 
-            self.gpu_adapter_label.setText(gpu_data.get('adapter_name', '未知'))
-            self.gpu_vendor_label.setText(gpu_data.get('vendor', '未知'))
-            self.gpu_memory_label.setText(f"{gpu_data.get('memory_mb', 0)}MB")
+            # 更新所有GPU信息表格
+            self._update_gpu_table()
+
+            # 显示当前使用的GPU信息
+            adapter_name = gpu_data.get('adapter_name', '未检测到')
+            vendor = gpu_data.get('vendor', '未检测到')
+            memory_mb = gpu_data.get('memory_mb', 0)
+
+            self.current_gpu_adapter_label.setText(adapter_name)
+            self.current_gpu_vendor_label.setText(vendor)
+
+            # 如果内存为0，说明检测失败
+            if memory_mb == 0:
+                self.current_gpu_memory_label.setText("检测失败")
+                self.current_gpu_memory_label.setStyleSheet("color: red;")
+            else:
+                self.current_gpu_memory_label.setText(f"{memory_mb}MB")
+                self.current_gpu_memory_label.setStyleSheet("")
+
             self.gpu_texture_label.setText(f"{gpu_data.get('max_texture_size', 0)}")
 
-            self.platform_label.setText(self._status_data.get('environment', {}).get('platform', '未知'))
-            self.screen_label.setText("未知")  # 需要从环境数据获取
-            self.support_level_label.setText(env_data.get('support_level', '未知'))
+            self.platform_label.setText(self._status_data.get('environment', {}).get('platform', '未检测到'))
+
+            # 获取屏幕信息
+            screen_info = "未检测到"
+            try:
+                from PyQt5.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app:
+                    screen = app.primaryScreen()
+                    geometry = screen.geometry()
+                    screen_info = f"{geometry.width()}x{geometry.height()}"
+            except:
+                pass
+            self.screen_label.setText(screen_info)
+
+            support_level = env_data.get('support_level', '未检测到')
+            self.support_level_label.setText(support_level)
+
+            # 如果检测失败，设置警告样式
+            if "检测失败" in adapter_name or "检测失败" in vendor:
+                self.current_gpu_adapter_label.setStyleSheet("color: red;")
+                self.current_gpu_vendor_label.setStyleSheet("color: red;")
+            else:
+                self.current_gpu_adapter_label.setStyleSheet("")
+                self.current_gpu_vendor_label.setStyleSheet("")
 
         except Exception as e:
             logger.error(f"更新环境信息失败: {e}")
+
+    def _update_gpu_table(self):
+        """更新GPU信息表格"""
+        try:
+            # 获取所有GPU适配器信息
+            from core.webgpu.enhanced_gpu_detection import get_gpu_detector
+            detector = get_gpu_detector()
+            adapters = detector.detect_all_adapters()
+
+            # 设置表格行数
+            self.gpu_table.setRowCount(len(adapters))
+
+            for i, adapter in enumerate(adapters):
+                # 适配器名称
+                name_item = QTableWidgetItem(adapter.name)
+                self.gpu_table.setItem(i, 0, name_item)
+
+                # 厂商
+                vendor_item = QTableWidgetItem(adapter.vendor)
+                self.gpu_table.setItem(i, 1, vendor_item)
+
+                # 显存
+                memory_item = QTableWidgetItem(f"{adapter.memory_mb}")
+                self.gpu_table.setItem(i, 2, memory_item)
+
+                # GPU类型
+                type_item = QTableWidgetItem(adapter.gpu_type.value)
+                self.gpu_table.setItem(i, 3, type_item)
+
+                # 状态
+                status = "可用"
+                if adapter.memory_mb < 256:
+                    status = "显存不足"
+                elif adapter.gpu_type.value == "unknown":
+                    status = "类型未知"
+                elif adapter.performance_score < 50:
+                    status = "性能较低"
+
+                status_item = QTableWidgetItem(status)
+
+                # 根据状态设置颜色
+                if status == "可用":
+                    status_item.setBackground(QColor(200, 255, 200))  # 浅绿色
+                elif status == "显存不足":
+                    status_item.setBackground(QColor(255, 200, 200))  # 浅红色
+                else:
+                    status_item.setBackground(QColor(255, 255, 200))  # 浅黄色
+
+                self.gpu_table.setItem(i, 4, status_item)
+
+            # 调整列宽
+            self.gpu_table.resizeColumnsToContents()
+
+        except Exception as e:
+            logger.error(f"更新GPU表格失败: {e}")
+            # 如果检测失败，显示错误信息
+            self.gpu_table.setRowCount(1)
+            error_item = QTableWidgetItem("GPU检测失败")
+            error_item.setBackground(QColor(255, 200, 200))
+            self.gpu_table.setItem(0, 0, error_item)
+            for col in range(1, 5):
+                self.gpu_table.setItem(0, col, QTableWidgetItem("N/A"))
+
+    def _get_real_stock_data_for_test(self):
+        """获取真实的股票数据用于性能测试"""
+        try:
+            import pandas as pd
+            import numpy as np
+
+            # 尝试从HIkyuu获取真实股票数据
+            try:
+                import hikyuu as hku
+
+                # 获取一个常见的股票代码进行测试
+                stock_codes = ["000001", "000002", "600000", "600036"]  # 平安银行、万科A、浦发银行、招商银行
+
+                for code in stock_codes:
+                    try:
+                        stock = hku.getStock(f"sz{code}")
+                        if not stock.isNull():
+                            # 获取最近1000个交易日的数据
+                            kdata = stock.getKData(-1000)
+                            if len(kdata) > 100:  # 确保有足够的数据
+                                # 转换为DataFrame格式
+                                data = []
+                                for i in range(len(kdata)):
+                                    record = kdata[i]
+                                    data.append({
+                                        'open': float(record.openPrice),
+                                        'high': float(record.highPrice),
+                                        'low': float(record.lowPrice),
+                                        'close': float(record.closePrice),
+                                        'volume': float(record.transCount)
+                                    })
+
+                                test_data = pd.DataFrame(data)
+                                logger.info(f"✅ 使用真实股票数据进行性能测试: {code}, {len(test_data)}条记录")
+                                return test_data
+                    except Exception as e:
+                        logger.debug(f"获取股票{code}数据失败: {e}")
+                        continue
+
+            except ImportError:
+                logger.debug("HIkyuu模块不可用，使用备用数据源")
+
+            # 如果HIkyuu不可用，尝试使用其他数据源
+            try:
+                from core.services.unified_data_manager import UnifiedDataManager
+                data_manager = UnifiedDataManager()
+
+                # 尝试获取缓存的股票数据
+                stock_data = data_manager.get_cached_stock_data("000001", limit=1000)
+                if stock_data is not None and len(stock_data) > 100:
+                    logger.info(f"✅ 使用缓存股票数据进行性能测试: {len(stock_data)}条记录")
+                    return stock_data
+
+            except Exception as e:
+                logger.debug(f"获取缓存数据失败: {e}")
+
+            # 如果都失败了，生成基于真实股票特征的模拟数据
+            logger.warning("⚠️ 无法获取真实股票数据，生成基于真实特征的测试数据")
+            return self._generate_realistic_stock_data()
+
+        except Exception as e:
+            logger.error(f"获取测试数据失败: {e}")
+            return self._generate_realistic_stock_data()
+
+    def _generate_realistic_stock_data(self):
+        """生成基于真实股票特征的测试数据"""
+        import pandas as pd
+        import numpy as np
+
+        # 生成更真实的股票数据，模拟真实的价格走势
+        np.random.seed(42)  # 固定种子，确保测试结果可重复
+
+        n_points = 1000
+        base_price = 10.0
+
+        # 生成价格序列，使用随机游走模型
+        price_changes = np.random.normal(0, 0.02, n_points)  # 2%的日波动
+        prices = [base_price]
+
+        for change in price_changes[:-1]:
+            new_price = prices[-1] * (1 + change)
+            prices.append(max(0.1, new_price))  # 确保价格不为负
+
+        prices = np.array(prices)
+
+        # 生成OHLC数据
+        data = []
+        for i in range(n_points):
+            close_price = prices[i]
+
+            # 生成合理的OHLC关系
+            daily_range = close_price * np.random.uniform(0.01, 0.05)  # 1-5%的日内波动
+
+            high = close_price + np.random.uniform(0, daily_range)
+            low = close_price - np.random.uniform(0, daily_range)
+
+            if i == 0:
+                open_price = close_price
+            else:
+                # 开盘价接近前一日收盘价，但有跳空
+                gap = np.random.normal(0, 0.01)  # 1%的跳空
+                open_price = prices[i-1] * (1 + gap)
+
+            # 确保OHLC关系正确
+            high = max(high, open_price, close_price)
+            low = min(low, open_price, close_price)
+
+            # 生成成交量（与价格波动相关）
+            volatility = abs(close_price - open_price) / open_price
+            base_volume = 10000
+            volume = base_volume * (1 + volatility * 5) * np.random.uniform(0.5, 2.0)
+
+            data.append({
+                'open': round(open_price, 2),
+                'high': round(high, 2),
+                'low': round(low, 2),
+                'close': round(close_price, 2),
+                'volume': int(volume)
+            })
+
+        test_data = pd.DataFrame(data)
+        logger.info(f"✅ 生成基于真实特征的测试数据: {len(test_data)}条记录")
+        return test_data
 
     def _update_compatibility_tab(self):
         """更新兼容性选项卡"""
         try:
             compat_data = self._status_data.get('compatibility', {})
 
-            self.compat_level_label.setText(compat_data.get('level', '未知'))
-            self.compat_score_label.setText(f"{compat_data.get('performance_score', 0):.1f}/100")
+            # 显示兼容性级别
+            level = compat_data.get('level', '未检测到')
+            self.compat_level_label.setText(level)
+
+            # 根据兼容性级别设置颜色
+            if level in ['excellent', 'good']:
+                self.compat_level_label.setStyleSheet("color: green;")
+            elif level in ['fair']:
+                self.compat_level_label.setStyleSheet("color: orange;")
+            elif level in ['poor', 'incompatible']:
+                self.compat_level_label.setStyleSheet("color: red;")
+            else:
+                self.compat_level_label.setStyleSheet("color: gray;")
+
+            # 显示性能评分
+            score = compat_data.get('performance_score', 0)
+            self.compat_score_label.setText(f"{score:.1f}/100")
+
+            # 根据评分设置颜色
+            if score >= 80:
+                self.compat_score_label.setStyleSheet("color: green;")
+            elif score >= 60:
+                self.compat_score_label.setStyleSheet("color: orange;")
+            elif score > 0:
+                self.compat_score_label.setStyleSheet("color: red;")
+            else:
+                self.compat_score_label.setStyleSheet("color: gray;")
 
             # 获取推荐建议
+            recommendations = []
             if hasattr(self._webgpu_renderer, 'get_webgpu_recommendations'):
                 recommendations = self._webgpu_renderer.get_webgpu_recommendations()
-                self.recommendations_text.setText('\n'.join(recommendations))
+
+            # 如果没有推荐建议，显示默认信息
+            if not recommendations:
+                if score == 0:
+                    recommendations = ["GPU硬件检测失败，无法提供优化建议"]
+                else:
+                    recommendations = ["系统运行正常，暂无优化建议"]
+
+            self.recommendations_text.setText('\n'.join(recommendations))
 
         except Exception as e:
             logger.error(f"更新兼容性信息失败: {e}")

@@ -1,0 +1,374 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DuckDB性能优化器
+
+基于2024年最新DuckDB最佳实践的性能优化器
+"""
+
+import duckdb
+import psutil
+import logging
+from dataclasses import dataclass
+from enum import Enum
+from typing import Dict, List, Any, Optional
+from pathlib import Path
+import time
+import threading
+
+logger = logging.getLogger(__name__)
+
+
+class WorkloadType(Enum):
+    """工作负载类型"""
+    OLAP = "olap"      # 分析型工作负载
+    OLTP = "oltp"      # 事务型工作负载
+    MIXED = "mixed"    # 混合工作负载
+
+
+@dataclass
+class DuckDBConfig:
+    """DuckDB配置参数"""
+    memory_limit: str           # 内存限制，如 "8GB"
+    threads: int               # 线程数
+    max_memory: str           # 最大内存，如 "16GB"
+    temp_directory: str       # 临时目录
+    enable_object_cache: bool  # 启用对象缓存
+    enable_progress_bar: bool  # 启用进度条
+    checkpoint_threshold: str  # 检查点阈值
+    wal_autocheckpoint: int   # WAL自动检查点
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'memory_limit': self.memory_limit,
+            'threads': self.threads,
+            'max_memory': self.max_memory,
+            'temp_directory': self.temp_directory,
+            'enable_object_cache': self.enable_object_cache,
+            'enable_progress_bar': self.enable_progress_bar,
+            'checkpoint_threshold': self.checkpoint_threshold,
+            'wal_autocheckpoint': self.wal_autocheckpoint
+        }
+
+
+class DuckDBPerformanceOptimizer:
+    """DuckDB性能优化器"""
+
+    def __init__(self, db_path: str):
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self.conn = None
+        self.current_config: Optional[DuckDBConfig] = None
+        self._lock = threading.Lock()
+
+        # 获取系统信息
+        self.system_memory_gb = psutil.virtual_memory().total / (1024**3)
+        self.cpu_cores = psutil.cpu_count(logical=True)
+
+        logger.info(f"系统信息: 内存={self.system_memory_gb:.1f}GB, CPU核心={self.cpu_cores}")
+
+    def get_connection(self) -> duckdb.DuckDBPyConnection:
+        """获取优化的DuckDB连接"""
+        with self._lock:
+            if self.conn is None:
+                self.conn = duckdb.connect(str(self.db_path))
+                logger.info(f"创建DuckDB连接: {self.db_path}")
+            return self.conn
+
+    def optimize_for_workload(self, workload_type: WorkloadType) -> bool:
+        """为特定工作负载优化配置"""
+        try:
+            logger.info(f"为{workload_type.value}工作负载优化DuckDB配置")
+
+            # 生成优化配置
+            config = self._generate_config_for_workload(workload_type)
+
+            # 应用配置
+            success = self._apply_config(config)
+
+            if success:
+                self.current_config = config
+                logger.info(f"✅ {workload_type.value}工作负载优化完成")
+            else:
+                logger.error(f"❌ {workload_type.value}工作负载优化失败")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"工作负载优化失败: {e}")
+            return False
+
+    def _generate_config_for_workload(self, workload_type: WorkloadType) -> DuckDBConfig:
+        """为工作负载生成配置"""
+
+        # 基础内存配置（保守策略，使用70%系统内存）
+        memory_limit_gb = max(2.0, self.system_memory_gb * 0.7)
+        max_memory_gb = max(4.0, self.system_memory_gb * 0.8)
+
+        # 线程配置
+        if workload_type == WorkloadType.OLAP:
+            # OLAP: 使用更多线程进行并行分析
+            threads = min(self.cpu_cores, 16)  # 最多16线程
+        elif workload_type == WorkloadType.OLTP:
+            # OLTP: 使用较少线程减少竞争
+            threads = min(self.cpu_cores // 2, 8)  # 最多8线程
+        else:  # MIXED
+            # 混合: 平衡配置
+            threads = min(self.cpu_cores, 12)  # 最多12线程
+
+        # 临时目录配置
+        temp_dir = str(self.db_path.parent / "temp")
+        Path(temp_dir).mkdir(exist_ok=True)
+
+        # 检查点配置
+        if workload_type == WorkloadType.OLAP:
+            checkpoint_threshold = "1GB"  # OLAP较大的检查点
+            wal_autocheckpoint = 10000
+        elif workload_type == WorkloadType.OLTP:
+            checkpoint_threshold = "256MB"  # OLTP较小的检查点
+            wal_autocheckpoint = 1000
+        else:  # MIXED
+            checkpoint_threshold = "512MB"
+            wal_autocheckpoint = 5000
+
+        config = DuckDBConfig(
+            memory_limit=f"{memory_limit_gb:.1f}GB",
+            threads=threads,
+            max_memory=f"{max_memory_gb:.1f}GB",
+            temp_directory=temp_dir,
+            enable_object_cache=True,
+            enable_progress_bar=True,
+            checkpoint_threshold=checkpoint_threshold,
+            wal_autocheckpoint=wal_autocheckpoint
+        )
+
+        logger.info(f"内存配置: {config.memory_limit} (系统内存: {self.system_memory_gb:.1f}GB)")
+        logger.info(f"线程配置: {config.threads} (CPU核心: {self.cpu_cores})")
+
+        return config
+
+    def _apply_config(self, config: DuckDBConfig) -> bool:
+        """应用配置到DuckDB"""
+        try:
+            conn = self.get_connection()
+
+            # 应用配置参数
+            config_commands = [
+                f"SET memory_limit = '{config.memory_limit}'",
+                f"SET threads = {config.threads}",
+                f"SET max_memory = '{config.max_memory}'",
+                f"SET temp_directory = '{config.temp_directory}'",
+                f"SET enable_object_cache = {str(config.enable_object_cache).lower()}",
+                f"SET enable_progress_bar = {str(config.enable_progress_bar).lower()}",
+                f"SET checkpoint_threshold = '{config.checkpoint_threshold}'",
+                f"SET wal_autocheckpoint = {config.wal_autocheckpoint}"
+            ]
+
+            for cmd in config_commands:
+                try:
+                    conn.execute(cmd)
+                    logger.debug(f"应用配置: {cmd}")
+                except Exception as e:
+                    # 某些配置可能不被支持，记录警告但继续
+                    logger.warning(f"配置应用失败: {cmd} - {e}")
+
+            # 验证关键配置
+            try:
+                # 验证内存配置
+                result = conn.execute("SELECT current_setting('memory_limit')").fetchone()
+                if result:
+                    logger.info(f"当前内存限制: {result[0]}")
+
+                # 验证线程配置
+                result = conn.execute("SELECT current_setting('threads')").fetchone()
+                if result:
+                    logger.info(f"当前线程数: {result[0]}")
+
+            except Exception as e:
+                logger.warning(f"配置验证失败: {e}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"应用DuckDB配置失败: {e}")
+            return False
+
+    def get_performance_recommendations(self) -> List[str]:
+        """获取性能优化建议"""
+        recommendations = []
+
+        try:
+            # 基于系统资源的建议
+            if self.system_memory_gb < 8:
+                recommendations.append("系统内存较少(<8GB)，建议增加内存或减少并发查询")
+            elif self.system_memory_gb > 32:
+                recommendations.append("系统内存充足(>32GB)，可以考虑增加内存缓存配置")
+
+            if self.cpu_cores < 4:
+                recommendations.append("CPU核心较少(<4核)，建议减少并行度或升级CPU")
+            elif self.cpu_cores > 16:
+                recommendations.append("CPU核心充足(>16核)，可以考虑增加并行查询线程")
+
+            # 基于当前配置的建议
+            if self.current_config:
+                config = self.current_config
+
+                # 内存配置建议
+                memory_gb = float(config.memory_limit.replace('GB', ''))
+                if memory_gb / self.system_memory_gb > 0.8:
+                    recommendations.append("内存配置较高(>80%系统内存)，注意监控内存使用")
+                elif memory_gb / self.system_memory_gb < 0.5:
+                    recommendations.append("内存配置保守(<50%系统内存)，可以考虑增加内存限制")
+
+                # 线程配置建议
+                if config.threads > self.cpu_cores:
+                    recommendations.append("线程数超过CPU核心数，可能导致上下文切换开销")
+                elif config.threads < self.cpu_cores // 2:
+                    recommendations.append("线程数较少，可以考虑增加并行度")
+
+            # 通用优化建议
+            recommendations.extend([
+                "定期执行VACUUM和ANALYZE以维护统计信息",
+                "为频繁查询的列创建适当的索引",
+                "使用列式存储格式(Parquet)存储大数据集",
+                "考虑数据分区策略以提升查询性能",
+                "监控查询执行计划，优化慢查询"
+            ])
+
+        except Exception as e:
+            logger.error(f"生成性能建议失败: {e}")
+            recommendations.append("无法生成性能建议，请检查系统配置")
+
+        return recommendations
+
+    def benchmark_configuration(self, test_queries: List[str] = None) -> Dict[str, Any]:
+        """基准测试当前配置"""
+        if test_queries is None:
+            test_queries = [
+                "SELECT 1",
+                "SELECT COUNT(*) FROM (SELECT 1 as x FROM generate_series(1, 10000))",
+                "SELECT x, x*2, x*3 FROM generate_series(1, 1000) as t(x) ORDER BY x DESC LIMIT 100"
+            ]
+
+        results = {
+            'config': self.current_config.to_dict() if self.current_config else None,
+            'system_info': {
+                'memory_gb': self.system_memory_gb,
+                'cpu_cores': self.cpu_cores
+            },
+            'query_results': [],
+            'summary': {}
+        }
+
+        try:
+            conn = self.get_connection()
+
+            total_time = 0
+            successful_queries = 0
+
+            for i, query in enumerate(test_queries):
+                start_time = time.time()
+                try:
+                    result = conn.execute(query).fetchall()
+                    execution_time = time.time() - start_time
+
+                    results['query_results'].append({
+                        'query_index': i + 1,
+                        'query': query[:100] + "..." if len(query) > 100 else query,
+                        'execution_time': execution_time,
+                        'result_count': len(result),
+                        'success': True
+                    })
+
+                    total_time += execution_time
+                    successful_queries += 1
+
+                except Exception as e:
+                    execution_time = time.time() - start_time
+                    results['query_results'].append({
+                        'query_index': i + 1,
+                        'query': query[:100] + "..." if len(query) > 100 else query,
+                        'execution_time': execution_time,
+                        'error': str(e),
+                        'success': False
+                    })
+
+            # 计算汇总统计
+            results['summary'] = {
+                'total_queries': len(test_queries),
+                'successful_queries': successful_queries,
+                'success_rate': successful_queries / len(test_queries) * 100,
+                'total_time': total_time,
+                'average_time': total_time / successful_queries if successful_queries > 0 else 0
+            }
+
+        except Exception as e:
+            logger.error(f"基准测试失败: {e}")
+            results['error'] = str(e)
+
+        return results
+
+    def close(self):
+        """关闭连接"""
+        with self._lock:
+            if self.conn:
+                try:
+                    self.conn.close()
+                    logger.info("DuckDB连接已关闭")
+                except Exception as e:
+                    logger.warning(f"关闭DuckDB连接失败: {e}")
+                finally:
+                    self.conn = None
+
+
+def get_optimized_duckdb_connection(
+    db_path: str,
+    workload_type: WorkloadType = WorkloadType.OLAP
+) -> duckdb.DuckDBPyConnection:
+    """获取优化的DuckDB连接"""
+    optimizer = DuckDBPerformanceOptimizer(db_path)
+    optimizer.optimize_for_workload(workload_type)
+    return optimizer.get_connection()
+
+
+def create_performance_optimized_config(
+    workload_type: WorkloadType = WorkloadType.OLAP,
+    custom_memory_gb: Optional[float] = None,
+    custom_threads: Optional[int] = None
+) -> DuckDBConfig:
+    """创建性能优化配置"""
+
+    # 获取系统信息
+    system_memory_gb = psutil.virtual_memory().total / (1024**3)
+    cpu_cores = psutil.cpu_count(logical=True)
+
+    # 使用自定义配置或自动配置
+    if custom_memory_gb:
+        memory_limit_gb = custom_memory_gb
+        max_memory_gb = custom_memory_gb * 1.2
+    else:
+        memory_limit_gb = max(2.0, system_memory_gb * 0.7)
+        max_memory_gb = max(4.0, system_memory_gb * 0.8)
+
+    if custom_threads:
+        threads = custom_threads
+    else:
+        if workload_type == WorkloadType.OLAP:
+            threads = min(cpu_cores, 16)
+        elif workload_type == WorkloadType.OLTP:
+            threads = min(cpu_cores // 2, 8)
+        else:  # MIXED
+            threads = min(cpu_cores, 12)
+
+    return DuckDBConfig(
+        memory_limit=f"{memory_limit_gb:.1f}GB",
+        threads=threads,
+        max_memory=f"{max_memory_gb:.1f}GB",
+        temp_directory="temp",
+        enable_object_cache=True,
+        enable_progress_bar=True,
+        checkpoint_threshold="512MB",
+        wal_autocheckpoint=5000
+    )

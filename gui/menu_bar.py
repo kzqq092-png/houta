@@ -321,9 +321,41 @@ class MainMenuBar(QMenuBar):
 
             self.data_menu.addSeparator()
 
-            # 数据管理
-            self.import_data_action = QAction("导入数据", self)
-            self.import_data_action.setStatusTip("导入外部数据")
+            # 数据导入子菜单 - 专业级DuckDB导入系统
+            self.data_import_menu = self.data_menu.addMenu("🚀 数据导入")
+
+            # DuckDB专业导入
+            self.duckdb_import_action = QAction("DuckDB数据导入", self)
+            self.duckdb_import_action.setStatusTip("打开专业级DuckDB数据导入界面")
+            self.duckdb_import_action.setShortcut("Ctrl+Shift+I")
+            self.data_import_menu.addAction(self.duckdb_import_action)
+
+            # 数据导入监控
+            self.import_monitor_action = QAction("导入监控仪表板", self)
+            self.import_monitor_action.setStatusTip("实时监控数据导入状态和性能")
+            self.import_monitor_action.setShortcut("Ctrl+Shift+M")
+            self.data_import_menu.addAction(self.import_monitor_action)
+
+            self.data_import_menu.addSeparator()
+
+            # 批量导入
+            self.batch_import_action = QAction("批量数据导入", self)
+            self.batch_import_action.setStatusTip("批量导入多个数据源")
+            self.data_import_menu.addAction(self.batch_import_action)
+
+            # 定时导入任务
+            self.scheduled_import_action = QAction("定时导入任务", self)
+            self.scheduled_import_action.setStatusTip("配置和管理定时导入任务")
+            self.data_import_menu.addAction(self.scheduled_import_action)
+
+            # 导入历史
+            self.import_history_action = QAction("导入历史记录", self)
+            self.import_history_action.setStatusTip("查看历史导入记录和统计")
+            self.data_import_menu.addAction(self.import_history_action)
+
+            # 传统数据管理
+            self.import_data_action = QAction("简单导入数据", self)
+            self.import_data_action.setStatusTip("导入外部数据（传统方式）")
             self.data_menu.addAction(self.import_data_action)
 
             self.export_data_action = QAction("导出数据", self)
@@ -344,6 +376,19 @@ class MainMenuBar(QMenuBar):
 
             # 连接信号到coordinator
             if self.coordinator:
+                # DuckDB专业导入功能
+                self.duckdb_import_action.triggered.connect(
+                    lambda: self.coordinator._on_duckdb_import() if hasattr(self.coordinator, '_on_duckdb_import') else None)
+                self.import_monitor_action.triggered.connect(
+                    lambda: self.coordinator._on_import_monitor() if hasattr(self.coordinator, '_on_import_monitor') else None)
+                self.batch_import_action.triggered.connect(
+                    lambda: self.coordinator._on_batch_import() if hasattr(self.coordinator, '_on_batch_import') else None)
+                self.scheduled_import_action.triggered.connect(
+                    lambda: self.coordinator._on_scheduled_import() if hasattr(self.coordinator, '_on_scheduled_import') else None)
+                self.import_history_action.triggered.connect(
+                    lambda: self.coordinator._on_import_history() if hasattr(self.coordinator, '_on_import_history') else None)
+
+                # 传统数据管理功能
                 self.import_data_action.triggered.connect(
                     lambda: self.coordinator._on_import_data() if hasattr(self.coordinator, '_on_import_data') else None)
                 self.export_data_action.triggered.connect(
@@ -525,6 +570,11 @@ class MainMenuBar(QMenuBar):
             self.advanced_menu.addAction(self.cloud_api_action)
             self.advanced_menu.addAction(self.indicator_market_action)
             self.advanced_menu.addAction(self.batch_analysis_action)
+
+            # GPU加速配置
+            self.gpu_config_action = QAction("⚡ GPU加速配置", self)
+            self.gpu_config_action.setStatusTip("配置GPU加速设置")
+            self.advanced_menu.addAction(self.gpu_config_action)
 
             self.advanced_menu.addSeparator()
 
@@ -967,7 +1017,7 @@ class MainMenuBar(QMenuBar):
                 ('calculator_action', '_on_calculator'),
                 ('converter_action', '_on_converter'),
                 ('system_optimizer_action', '_on_system_optimizer'),
-                ('webgpu_status_action', '_on_webgpu_status'),
+                ('webgpu_status_action', 'show_webgpu_status'),
                 ('advanced_search_action', '_on_advanced_search'),
                 ('settings_action', '_on_settings'),
 

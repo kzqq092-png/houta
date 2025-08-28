@@ -26,7 +26,7 @@ from PyQt5.QtGui import *
 _theme_manager_instance: Optional['ThemeManager'] = None
 
 DB_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'db', 'hikyuu_system.db')
+    os.path.dirname(__file__)), 'db', 'factorweave_system.db')
 
 
 def safe_read_file(filepath):
@@ -308,6 +308,63 @@ class ThemeManager(QObject):
     def get_all_themes(self):
         # 返回所有主题名称（数据库）
         return [row[0] for row in self._get_all_themes_from_db()]
+
+    def get_available_themes(self):
+        """获取可用主题列表（兼容性方法）
+
+        Returns:
+            dict: 主题名称到主题信息的映射
+        """
+        try:
+            themes = {}
+            # 获取数据库中的主题
+            db_themes = self._get_all_themes_from_db()
+            for name, type_, content, origin, created_at, updated_at in db_themes:
+                themes[name] = {
+                    'name': name,
+                    'type': type_,
+                    'origin': origin,
+                    'created_at': created_at,
+                    'updated_at': updated_at,
+                    'description': f'{type_.upper()}主题' if type_ else '未知类型主题'
+                }
+
+            # 添加内置主题
+            builtin_themes = {
+                'default': {
+                    'name': 'default',
+                    'type': 'builtin',
+                    'origin': 'system',
+                    'description': '默认主题'
+                },
+                'dark': {
+                    'name': 'dark',
+                    'type': 'builtin',
+                    'origin': 'system',
+                    'description': '深色主题'
+                },
+                'light': {
+                    'name': 'light',
+                    'type': 'builtin',
+                    'origin': 'system',
+                    'description': '浅色主题'
+                }
+            }
+
+            # 合并主题，数据库主题优先
+            for name, info in builtin_themes.items():
+                if name not in themes:
+                    themes[name] = info
+
+            return themes
+
+        except Exception as e:
+            # 如果出错，返回基本的内置主题
+            return {
+                'default': {'name': 'default', 'type': 'builtin', 'description': '默认主题'},
+                'dark': {'name': 'dark', 'type': 'builtin', 'description': '深色主题'},
+                'light': {'name': 'light', 'type': 'builtin', 'description': '浅色主题'}
+            }
 
     def apply_qss_theme_content(self, qss):
         # 全局滚动条样式

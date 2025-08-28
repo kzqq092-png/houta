@@ -385,6 +385,112 @@ class AKShareStockPlugin(IDataSourcePlugin):
             self.logger.error(traceback.format_exc())
             return pd.DataFrame()
 
+    def get_individual_fund_flow_data(self, symbol: str, **kwargs) -> pd.DataFrame:
+        """
+        获取个股资金流数据
+
+        Args:
+            symbol: 股票代码
+            **kwargs: 其他参数
+
+        Returns:
+            个股资金流数据DataFrame
+        """
+        try:
+            if not AKSHARE_AVAILABLE:
+                self.logger.error("AKShare库不可用")
+                return pd.DataFrame()
+
+            # 获取个股资金流数据
+            self.logger.info(f"获取个股资金流数据")
+            df = ak.stock_individual_fund_flow_rank(indicator="今日")
+
+            if df is None or df.empty:
+                self.logger.warning(f"未获取到个股资金流数据: {symbol}")
+                return pd.DataFrame()
+
+            # 标准化列名
+            column_mapping = {
+                '股票代码': 'symbol',
+                '股票名称': 'name',
+                '涨跌幅': 'change_pct',
+                '主力净流入-净额': 'main_net_inflow',
+                '主力净流入-净占比': 'main_net_inflow_pct',
+                '超大单净流入-净额': 'super_large_net_inflow',
+                '超大单净流入-净占比': 'super_large_net_inflow_pct',
+                '大单净流入-净额': 'large_net_inflow',
+                '大单净流入-净占比': 'large_net_inflow_pct',
+                '中单净流入-净额': 'medium_net_inflow',
+                '中单净流入-净占比': 'medium_net_inflow_pct',
+                '小单净流入-净额': 'small_net_inflow',
+                '小单净流入-净占比': 'small_net_inflow_pct'
+            }
+
+            # 重命名存在的列
+            for old_name, new_name in column_mapping.items():
+                if old_name in df.columns:
+                    df = df.rename(columns={old_name: new_name})
+
+            self.logger.info(f"成功获取个股资金流数据，共 {len(df)} 条记录")
+            return df
+
+        except Exception as e:
+            self.logger.error(f"获取个股资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_main_fund_flow_data(self, symbol: str = "index", **kwargs) -> pd.DataFrame:
+        """
+        获取主力资金流数据（大盘指数）
+
+        Args:
+            symbol: 指数代码或"index"表示获取主要指数
+            **kwargs: 其他参数
+
+        Returns:
+            主力资金流数据DataFrame
+        """
+        try:
+            if not AKSHARE_AVAILABLE:
+                self.logger.error("AKShare库不可用")
+                return pd.DataFrame()
+
+            # 获取主力资金流数据
+            self.logger.info(f"获取主力资金流数据: {symbol}")
+            df = ak.stock_market_fund_flow()
+
+            if df is None or df.empty:
+                self.logger.warning("未获取到主力资金流数据")
+                return pd.DataFrame()
+
+            # 标准化列名
+            column_mapping = {
+                '指数名称': 'index_name',
+                '指数代码': 'index_code',
+                '涨跌幅': 'change_pct',
+                '主力净流入-净额': 'main_net_inflow',
+                '主力净流入-净占比': 'main_net_inflow_pct',
+                '超大单净流入-净额': 'super_large_net_inflow',
+                '超大单净流入-净占比': 'super_large_net_inflow_pct',
+                '大单净流入-净额': 'large_net_inflow',
+                '大单净流入-净占比': 'large_net_inflow_pct'
+            }
+
+            # 重命名存在的列
+            for old_name, new_name in column_mapping.items():
+                if old_name in df.columns:
+                    df = df.rename(columns={old_name: new_name})
+
+            self.logger.info(f"成功获取主力资金流数据，共 {len(df)} 条记录")
+            return df
+
+        except Exception as e:
+            self.logger.error(f"获取主力资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
     def get_real_time_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
         """获取实时行情"""
         try:

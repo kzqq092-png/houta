@@ -76,7 +76,10 @@ class ServiceBootstrap:
             # 5. 注册监控服务
             self._register_monitoring_services()
 
-            # 6. 执行插件发现和注册（在所有服务注册完成后）
+            # 6. 注册高级服务（GPU加速等）
+            self._register_advanced_services()
+
+            # 7. 执行插件发现和注册（在所有服务注册完成后）
             self._post_initialization_plugin_discovery()
 
             return True
@@ -567,10 +570,60 @@ class ServiceBootstrap:
 
     def _post_initialization_plugin_discovery(self) -> None:
         """
-        在所有服务注册完成后执行插件发现和注册
+        在所有服务注册完成后执行异步插件发现和注册
         """
-        logger.info("执行插件发现和注册...")
+        logger.info("启动异步插件发现和注册...")
         try:
+            # 导入异步插件发现服务
+            from .async_plugin_discovery import get_async_plugin_discovery_service
+
+            # 获取插件管理器和数据管理器
+            plugin_manager = self.service_container.resolve(PluginManager)
+            data_manager = None
+            if self.service_container.is_registered(UnifiedDataManager):
+                data_manager = self.service_container.resolve(UnifiedDataManager)
+
+            # 获取异步插件发现服务
+            async_discovery = get_async_plugin_discovery_service()
+
+            # 连接信号处理进度更新
+            async_discovery.progress_updated.connect(self._on_plugin_discovery_progress)
+            async_discovery.discovery_completed.connect(self._on_plugin_discovery_completed)
+            async_discovery.discovery_failed.connect(self._on_plugin_discovery_failed)
+
+            # 启动异步插件发现
+            async_discovery.start_discovery(plugin_manager, data_manager)
+            logger.info("✓ 异步插件发现服务已启动")
+
+        except Exception as e:
+            logger.error(f"❌ 启动异步插件发现失败: {e}")
+            logger.error(traceback.format_exc())
+
+            # 降级到同步模式
+            logger.info("降级到同步插件发现模式...")
+            self._fallback_sync_plugin_discovery()
+
+    def _on_plugin_discovery_progress(self, progress: int, message: str):
+        """插件发现进度更新"""
+        logger.info(f"插件发现进度: {progress}% - {message}")
+
+    def _on_plugin_discovery_completed(self, result: dict):
+        """插件发现完成"""
+        logger.info("✓ 异步插件发现和注册完成")
+        logger.info(f"发现结果: {result}")
+
+    def _on_plugin_discovery_failed(self, error_msg: str):
+        """插件发现失败"""
+        logger.error(f"❌ 异步插件发现失败: {error_msg}")
+        # 可以选择降级到同步模式
+        logger.info("尝试降级到同步插件发现模式...")
+        self._fallback_sync_plugin_discovery()
+
+    def _fallback_sync_plugin_discovery(self):
+        """降级到同步插件发现模式"""
+        try:
+            logger.info("执行同步插件发现...")
+
             # 1. 插件管理器插件发现
             plugin_manager = self.service_container.resolve(PluginManager)
             plugin_manager.discover_and_register_plugins()
@@ -588,7 +641,35 @@ class ServiceBootstrap:
                 logger.warning("⚠️ UnifiedDataManager未注册")
 
         except Exception as e:
-            logger.error(f"❌ 插件发现和注册失败: {e}")
+            logger.error(f"❌ 同步插件发现失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_advanced_services(self) -> None:
+        """注册高级服务（GPU加速等）"""
+        logger.info("注册高级服务...")
+
+        # GPU加速服务
+        try:
+            from .gpu_acceleration_manager import GPUAccelerationManager
+
+            def create_gpu_service():
+                """创建GPU加速服务实例"""
+                return GPUAccelerationManager()
+
+            self.service_container.register_factory(
+                GPUAccelerationManager,
+                create_gpu_service,
+                scope=ServiceScope.SINGLETON
+            )
+
+            # 立即解析以触发初始化
+            gpu_service = self.service_container.resolve(GPUAccelerationManager)
+            logger.info("✓ GPU加速服务注册完成")
+
+        except ImportError:
+            logger.warning("⚠️ GPU加速模块不可用，跳过注册")
+        except Exception as e:
+            logger.error(f"❌ GPU加速服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
 

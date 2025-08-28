@@ -462,10 +462,9 @@ class MainWindowCoordinator(QObject):
             def run_quality_check():
                 try:
                     # 获取K线数据
-                    from core.services.data_service import DataService
-                    data_service = self.service_container.get_service(
-                        'data_service')
-                    kdata = data_service.get_kdata(stock_code)
+                    from core.services.unified_data_manager import get_unified_data_manager
+                    data_manager = get_unified_data_manager()
+                    kdata = data_manager.get_kdata(stock_code) if data_manager else None
 
                     if kdata is None or kdata.empty:
                         progress.close()

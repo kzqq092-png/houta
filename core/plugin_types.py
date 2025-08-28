@@ -75,6 +75,9 @@ class AssetType(Enum):
     STOCK_US = "stock_us"                    # 美股
     STOCK_HK = "stock_hk"                    # 港股
 
+    # 扩展：宏观经济数据类型
+    MACRO = "macro"                          # 宏观经济数据
+
 
 class DataType(Enum):
     """
@@ -112,6 +115,10 @@ class DataType(Enum):
     REAL_TIME_FUND_FLOW = "real_time_fund_flow"    # 实时资金流
     REAL_TIME_SECTOR = "real_time_sector"    # 实时板块数据
     INTRADAY_DATA = "intraday_data"          # 分时数据
+
+    # Stage 3 新增：财务和宏观经济数据类型
+    FINANCIAL_STATEMENT = "financial_statement"    # 财务报表
+    MACRO_ECONOMIC = "macro_economic"              # 宏观经济数据
 
 
 class DataSourceProvider(Enum):

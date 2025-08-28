@@ -184,11 +184,17 @@ class ChartWidget(QWidget, BaseMixin, UIMixin, RenderingMixin, IndicatorMixin,
 
     def _bind_events(self):
         """绑定所有事件监听"""
-        if hasattr(self, 'event_bus') and self.event_bus:
-            self.event_bus.subscribe(PatternSignalsDisplayEvent, self._handle_pattern_signals_display)
-            self.log_manager.info("成功订阅 PatternSignalsDisplayEvent")
-        else:
-            self.log_manager.warning("无法订阅 PatternSignalsDisplayEvent，因为 event_bus 不可用。")
+        try:
+            if hasattr(self, 'event_bus') and self.event_bus:
+                self.event_bus.subscribe(PatternSignalsDisplayEvent, self._handle_pattern_signals_display)
+                self.log_manager.info("成功订阅 PatternSignalsDisplayEvent")
+            else:
+                self.log_manager.error("event_bus 不可用，无法订阅 PatternSignalsDisplayEvent")
+                self.log_manager.error("请检查事件总线初始化是否正确")
+        except Exception as e:
+            self.log_manager.error(f"事件订阅失败: {e}")
+            import traceback
+            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
 
     def _handle_pattern_signals_display(self, event: PatternSignalsDisplayEvent):
         """处理形态信号显示事件"""

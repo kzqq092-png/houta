@@ -8,6 +8,7 @@ WebGPU → OpenGL → Canvas 2D → matplotlib
 """
 
 import logging
+import time
 from typing import Dict, Any, Optional, Protocol, List
 from abc import ABC, abstractmethod
 from enum import Enum

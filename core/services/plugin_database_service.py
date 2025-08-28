@@ -159,7 +159,40 @@ class PluginDatabaseService(QObject):
                 return self._plugins_cache
 
             # 从数据库获取
-            plugins = self.db_manager.get_all_plugins()
+            plugin_records = self.db_manager.get_all_plugins()
+
+            # 将PluginRecord对象转换为字典
+            plugins = []
+            for record in plugin_records:
+                plugin_dict = {
+                    'id': record.id,
+                    'name': record.name,
+                    'display_name': record.display_name,
+                    'version': record.version,
+                    'plugin_type': record.plugin_type,
+                    'status': record.status,
+                    'description': record.description,
+                    'author': record.author,
+                    'email': record.email,
+                    'homepage': record.homepage,
+                    'repository': record.repository,
+                    'license': record.license,
+                    'tags': record.tags,
+                    'install_path': record.install_path,
+                    'entry_point': record.entry_point,
+                    'config_schema': record.config_schema,
+                    'dependencies': record.dependencies,
+                    'compatibility': record.compatibility,
+                    'created_at': record.created_at,
+                    'updated_at': record.updated_at,
+                    'last_enabled_at': record.last_enabled_at,
+                    'install_size': record.install_size,
+                    'checksum': record.checksum,
+                    'remote_url': record.remote_url,
+                    'auto_update': record.auto_update,
+                    'priority': record.priority
+                }
+                plugins.append(plugin_dict)
 
             # 更新缓存
             self._plugins_cache = plugins

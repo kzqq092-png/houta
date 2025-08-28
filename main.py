@@ -60,14 +60,14 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('logs/hikyuu_ui.log', encoding='utf-8')
+        logging.FileHandler('logs/factorweave_quant.log', encoding='utf-8')
     ]
 )
 
 logger = logging.getLogger(__name__)
 
 
-class HIkyuuUIApplication:
+class FactorWeaveQuantApplication:
     """
     FactorWeave-Quant ‌ 应用程序主类
 
@@ -375,19 +375,19 @@ def main():
             event_loop = QEventLoop(app)
             asyncio.set_event_loop(event_loop)
 
-            hikyuu_app = HIkyuuUIApplication()
-            hikyuu_app.app = app  # Pass app instance
+            factorweave_app = FactorWeaveQuantApplication()
+            factorweave_app.app = app  # Pass app instance
 
             # 优雅地退出
             app.aboutToQuit.connect(event_loop.stop)
 
-            if hikyuu_app.run() != 0:
+            if factorweave_app.run() != 0:
                 logger.error("Application setup failed. Exiting.")
                 sys.exit(1)
 
             event_loop.run_forever()  # 运行事件循环
 
-            hikyuu_app._cleanup()
+            factorweave_app._cleanup()
             logger.info("Application shutdown complete.")
             # sys.exit(0) # Let the application exit naturally
 
@@ -395,7 +395,7 @@ def main():
             # Fallback for systems without qasync
             logger.error(
                 "qasync is not installed. Please install it with 'pip install qasync'")
-            app = HIkyuuUIApplication()
+            app = FactorWeaveQuantApplication()
             # This part will likely not work correctly without an event loop manager.
             exit_code = app.run()
             sys.exit(exit_code)

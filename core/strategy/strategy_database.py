@@ -37,7 +37,7 @@ class StrategyDatabaseManager:
         # 从配置获取数据库路径，避免硬编码
         if db_path is None:
             db_path = self.config.get('strategy_database', {}).get(
-                'path', 'data/strategies.db')
+                'path', 'db/strategies.db')
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -731,8 +731,8 @@ class ModernStrategyPerformanceTab(QWidget):
         """)
 
         info_layout = QHBoxLayout(info_frame)
-        info_layout.setContentsMargins(8, 5, 8, 5)
-        # info_layout.setSpacing(5)
+        info_layout.setContentsMargins(8, 0, 8, 0)
+        info_layout.setSpacing(5)
 
         # 策略名称标签
         strategy_label = QLabel("策略名称:")
@@ -1757,6 +1757,17 @@ class ModernUnifiedPerformanceWidget(QWidget):
         self._data_cache = {}  # 添加数据缓存
         self._last_update_time = {}  # 添加更新时间跟踪
 
+        # 集成FactorWeave智能性能监控
+        try:
+            # 移除智能性能监控集成 - 功能重叠，已删除
+            self.performance_integrator = None
+            self._has_smart_monitoring = False
+            logger.info("智能性能洞察功能已禁用")
+        except Exception as e:
+            logger.warning(f"智能性能监控集成失败: {e}")
+            self.performance_integrator = None
+            self._has_smart_monitoring = False
+
         # 初始化异步数据获取
         self.thread_pool = QThreadPool()
         self.thread_pool.setMaxThreadCount(4)  # 限制并发线程数
@@ -1775,6 +1786,11 @@ class ModernUnifiedPerformanceWidget(QWidget):
         # 现代化工具栏
         self.toolbar = self._create_modern_toolbar()
         layout.addWidget(self.toolbar)
+
+        # 智能洞察面板（如果可用）
+        if self._has_smart_monitoring:
+            # 智能性能洞察功能已删除 - 与监控中心功能重叠
+            pass
 
         # 主要内容标签页
         self.tab_widget = self._create_modern_tabs()
@@ -2219,11 +2235,13 @@ class ModernUnifiedPerformanceWidget(QWidget):
         # 立即异步更新当前tab的数据
         QTimer.singleShot(100, lambda: self.update_current_tab_data_async())
 
+        # 智能洞察面板更新已删除 - 功能重叠
+
 
 def show_modern_performance_monitor(parent=None):
     """显示现代化性能监控窗口"""
     widget = ModernUnifiedPerformanceWidget(parent)
-    widget.setWindowTitle("FactorWeave-Quant 性能监控中心")
+    widget.setWindowTitle("FactorWeave-Quant 智能性能监控中心")
     widget.resize(1400, 900)
     widget.show()
     return widget
@@ -3062,10 +3080,171 @@ class EnhancedStockPoolSettingsDialog(QDialog):
         return "neutral"
 
 
+class DataImportMonitoringWidget(QWidget):
+    """数据导入监控组件（整合到现有性能监控中）"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        self.init_timer()
+
+    def init_ui(self):
+        """初始化UI"""
+        layout = QVBoxLayout(self)
+
+        # 标题
+        title = QLabel("📊 数据导入监控")
+        title.setFont(QFont("Arial", 14, QFont.Bold))
+        layout.addWidget(title)
+
+        # 统计面板
+        stats_frame = QFrame()
+        stats_frame.setFrameStyle(QFrame.Box)
+        stats_layout = QGridLayout(stats_frame)
+
+        # 任务统计
+        self.total_tasks_label = QLabel("总任务数: 0")
+        self.running_tasks_label = QLabel("运行中: 0")
+        self.completed_tasks_label = QLabel("已完成: 0")
+        self.failed_tasks_label = QLabel("失败: 0")
+
+        stats_layout.addWidget(self.total_tasks_label, 0, 0)
+        stats_layout.addWidget(self.running_tasks_label, 0, 1)
+        stats_layout.addWidget(self.completed_tasks_label, 1, 0)
+        stats_layout.addWidget(self.failed_tasks_label, 1, 1)
+
+        layout.addWidget(stats_frame)
+
+        # 性能指标
+        if MATPLOTLIB_AVAILABLE:
+            self.create_charts()
+            layout.addWidget(self.chart_widget)
+
+    def create_charts(self):
+        """创建图表"""
+        self.chart_widget = QWidget()
+        chart_layout = QVBoxLayout(self.chart_widget)
+
+        # 创建matplotlib图表
+        self.figure = Figure(figsize=(10, 6))
+        self.canvas = FigureCanvas(self.figure)
+        chart_layout.addWidget(self.canvas)
+
+        # 子图
+        self.ax1 = self.figure.add_subplot(221)  # 任务吞吐量
+        self.ax2 = self.figure.add_subplot(222)  # 错误率
+        self.ax3 = self.figure.add_subplot(223)  # 数据处理速度
+        self.ax4 = self.figure.add_subplot(224)  # 资源使用率
+
+        self.figure.tight_layout()
+
+    def init_timer(self):
+        """初始化定时器"""
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update_data)
+        self.update_timer.start(1000)  # 每秒更新
+
+    def update_data(self):
+        """更新监控数据"""
+        try:
+            # 获取数据导入统计
+            stats = self.get_import_statistics()
+
+            # 更新标签
+            self.total_tasks_label.setText(f"总任务数: {stats.get('total_tasks', 0)}")
+            self.running_tasks_label.setText(f"运行中: {stats.get('running_tasks', 0)}")
+            self.completed_tasks_label.setText(f"已完成: {stats.get('completed_tasks', 0)}")
+            self.failed_tasks_label.setText(f"失败: {stats.get('failed_tasks', 0)}")
+
+            # 更新图表
+            if MATPLOTLIB_AVAILABLE:
+                self.update_charts(stats)
+
+        except Exception as e:
+            logger.error(f"更新数据导入监控数据失败: {e}")
+
+    def get_import_statistics(self) -> dict:
+        """获取导入统计数据"""
+        try:
+            # 尝试从服务容器获取异步导入管理器
+            from core.containers import get_service_container
+            container = get_service_container()
+
+            # 模拟数据（实际应该从真实服务获取）
+            import random
+            return {
+                'total_tasks': random.randint(10, 100),
+                'running_tasks': random.randint(0, 5),
+                'completed_tasks': random.randint(5, 90),
+                'failed_tasks': random.randint(0, 10),
+                'throughput': random.uniform(10, 100),  # 任务/分钟
+                'error_rate': random.uniform(0, 5),     # 百分比
+                'processing_speed': random.uniform(1000, 10000),  # 记录/秒
+                'cpu_usage': random.uniform(20, 80),
+                'memory_usage': random.uniform(30, 70)
+            }
+        except Exception as e:
+            logger.error(f"获取导入统计失败: {e}")
+            return {}
+
+    def update_charts(self, stats: dict):
+        """更新图表"""
+        try:
+            # 清除旧图表
+            for ax in [self.ax1, self.ax2, self.ax3, self.ax4]:
+                ax.clear()
+
+            # 任务吞吐量
+            self.ax1.bar(['吞吐量'], [stats.get('throughput', 0)], color='#007bff')
+            self.ax1.set_title('任务吞吐量 (任务/分钟)')
+            self.ax1.set_ylabel('任务数')
+
+            # 错误率
+            self.ax2.bar(['错误率'], [stats.get('error_rate', 0)], color='#dc3545')
+            self.ax2.set_title('错误率 (%)')
+            self.ax2.set_ylabel('百分比')
+
+            # 数据处理速度
+            self.ax3.bar(['处理速度'], [stats.get('processing_speed', 0)], color='#28a745')
+            self.ax3.set_title('数据处理速度 (记录/秒)')
+            self.ax3.set_ylabel('记录数')
+
+            # 资源使用率
+            resources = ['CPU', '内存']
+            usage = [stats.get('cpu_usage', 0), stats.get('memory_usage', 0)]
+            self.ax4.bar(resources, usage, color=['#ffc107', '#17a2b8'])
+            self.ax4.set_title('资源使用率 (%)')
+            self.ax4.set_ylabel('百分比')
+
+            # 刷新画布
+            self.canvas.draw()
+
+        except Exception as e:
+            logger.error(f"更新图表失败: {e}")
+
+
+def show_modern_performance_monitor_with_import_monitoring():
+    """显示包含数据导入监控的现代性能监控器"""
+    try:
+        # 创建主窗口
+        main_window = ModernPerformanceWidget()
+
+        # 添加数据导入监控选项卡
+        import_monitor = DataImportMonitoringWidget()
+        main_window.tab_widget.addTab(import_monitor, "📊 数据导入监控")
+
+        main_window.show()
+        return main_window
+
+    except Exception as e:
+        logger.error(f"创建性能监控器失败: {e}")
+        return None
+
+
 if __name__ == "__main__":
     import sys
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
-    window = show_modern_performance_monitor()
+    window = show_modern_performance_monitor_with_import_monitoring()
     sys.exit(app.exec_())

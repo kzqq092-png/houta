@@ -3229,7 +3229,7 @@
     },
     "600615": {
       "code": "600615",
-      "name": "丰华股份",
+      "name": "鑫源智造",
       "csrc_industry": "",
       "exchange_industry": "",
       "market": "SH"
@@ -9753,7 +9753,7 @@
     },
     "603825": {
       "code": "603825",
-      "name": "华扬联众",
+      "name": "ST华扬",
       "csrc_industry": "",
       "exchange_industry": "",
       "market": "SH"
@@ -11236,5 +11236,5 @@
       "market": "SH"
     }
   },
-  "last_update": "2025-08-20T23:10:55.448701"
+  "last_update": "2025-08-27T22:02:06.013145"
 }

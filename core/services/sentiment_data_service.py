@@ -85,6 +85,9 @@ class SentimentDataService(QObject):
         # 手动导入并注册核心插件
         self._manual_register_core_plugins()
 
+        # 自动发现并选中已启用的插件
+        self._auto_discover_and_select_enabled_plugins()
+
     def _manual_register_core_plugins(self):
         """手动导入并注册核心的情绪数据插件，确保关键数据源可用"""
         try:
@@ -1089,3 +1092,34 @@ class SentimentDataService(QObject):
             'auto_refresh_enabled': self.config.enable_auto_refresh,
             'auto_refresh_interval': self.config.auto_refresh_interval_minutes
         }
+
+    def _auto_discover_and_select_enabled_plugins(self):
+        """自动发现并选中已启用的插件"""
+        try:
+            # 从数据库获取已启用的情绪插件
+            from core.services.plugin_database_service import PluginDatabaseService
+            db_service = PluginDatabaseService()
+            all_plugins = db_service.get_all_plugins()
+
+            enabled_sentiment_plugins = []
+            for plugin_data in all_plugins:
+                plugin_name = plugin_data.get('name', '')
+                plugin_status = plugin_data.get('status', '')
+
+                if (plugin_status == 'enabled' and
+                        'sentiment_data_sources' in plugin_name):
+                    enabled_sentiment_plugins.append(plugin_name)
+
+            # 选中所有已启用的情绪插件
+            for plugin_name in enabled_sentiment_plugins:
+                if plugin_name not in self._selected_plugins:
+                    self._selected_plugins.append(plugin_name)
+                    self.log_manager.info(f"✅ 自动选中已启用的情绪插件: {plugin_name}")
+
+            if enabled_sentiment_plugins:
+                self.log_manager.info(f"🎯 已选中 {len(enabled_sentiment_plugins)} 个情绪插件")
+            else:
+                self.log_manager.warning("⚠️ 没有找到已启用的情绪插件")
+
+        except Exception as e:
+            self.log_manager.error(f"❌ 自动发现插件失败: {e}")

@@ -302,7 +302,70 @@ class UnifiedDataManager:
             'cache_misses': 0
         }
 
+        # DuckDB集成支持 - 直接集成到现有管理器
+        self._init_duckdb_integration()
+
         logger.info("统一数据管理器初始化完成")
+
+    def _init_duckdb_integration(self):
+        """
+        集成DuckDB功能到现有数据管理器
+
+        在现有架构基础上增加DuckDB支持，不破坏现有功能
+        """
+        try:
+            # 导入DuckDB核心组件
+            from ..database.duckdb_operations import get_duckdb_operations
+            from ..database.duckdb_manager import get_connection_manager
+            from ..database.table_manager import get_table_manager
+            from ..integration.data_router import DataRouter
+            from ..performance.cache_manager import MultiLevelCacheManager
+
+            # 初始化DuckDB组件
+            self.duckdb_operations = get_duckdb_operations()
+            self.duckdb_manager = get_connection_manager()
+            self.table_manager = get_table_manager()
+
+            # 智能数据路由器
+            self.data_router = DataRouter()
+
+            # 多级缓存管理器（增强现有缓存）
+            from ..performance.cache_manager import CacheLevel
+            cache_config = {
+                'levels': [CacheLevel.MEMORY, CacheLevel.DISK],
+                'default_ttl_minutes': 30,
+                'memory': {
+                    'max_size': 1000,
+                    'max_memory_mb': 100
+                },
+                'disk': {
+                    'cache_dir': 'cache/duckdb',
+                    'max_size_mb': 500
+                }
+            }
+            self.multi_cache = MultiLevelCacheManager(cache_config)
+
+            # DuckDB可用标志
+            self.duckdb_available = True
+
+            logger.info("✅ DuckDB功能集成成功")
+
+        except ImportError as e:
+            logger.warning(f"⚠️ DuckDB模块导入失败，将使用传统模式: {e}")
+            self.duckdb_operations = None
+            self.duckdb_manager = None
+            self.table_manager = None
+            self.data_router = None
+            self.multi_cache = None
+            self.duckdb_available = False
+        except Exception as e:
+            logger.warning(f"⚠️ DuckDB功能集成失败，将使用传统模式: {e}")
+            self.duckdb_operations = None
+            self.duckdb_manager = None
+            self.table_manager = None
+            self.data_router = None
+            self.multi_cache = None
+            self.duckdb_available = False
 
     def _initialize_data_sources(self):
         """初始化数据源"""
@@ -386,6 +449,9 @@ class UnifiedDataManager:
                 try:
                     from ..tet_data_pipeline import StandardQuery
                     from ..plugin_types import AssetType, DataType
+                    import asyncio
+                    from concurrent.futures import ThreadPoolExecutor, TimeoutError
+                    import threading
 
                     # 创建标准化查询请求
                     query = StandardQuery(
@@ -396,8 +462,22 @@ class UnifiedDataManager:
                         provider=self._current_source  # 指定当前数据源
                     )
 
-                    # 通过TET管道处理请求
-                    result = self.tet_pipeline.process(query)
+                    # 使用线程池执行，避免阻塞UI - 设置超时
+                    def _process_with_timeout():
+                        try:
+                            return self.tet_pipeline.process(query)
+                        except Exception as e:
+                            logger.error(f"TET管道处理异常: {e}")
+                            return None
+
+                    # 在后台线程中执行，设置5秒超时
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(_process_with_timeout)
+                        try:
+                            result = future.result(timeout=5.0)  # 5秒超时
+                        except TimeoutError:
+                            logger.warning("⚠️ TET管道处理超时，降级到传统模式")
+                            result = None
 
                     if result and result.data is not None:
                         # 转换为DataFrame格式
@@ -571,7 +651,7 @@ class UnifiedDataManager:
 
     def get_kdata(self, stock_code: str, period: str = 'D', count: int = 365) -> pd.DataFrame:
         """
-        获取K线数据 - 统一接口
+        获取K线数据 - 统一接口（增强版：集成DuckDB智能路由）
 
         Args:
             stock_code: 股票代码
@@ -584,13 +664,28 @@ class UnifiedDataManager:
         try:
             cache_key = f"kdata_{stock_code}_{period}_{count}"
 
-            # 尝试从缓存获取
-            if self.cache_manager:
-                cached_data = self.cache_manager.get(cache_key)
-                if cached_data is not None and not cached_data.empty:
-                    return cached_data
+            # 1. 多级缓存检查（增强缓存策略）
+            cached_data = self._get_cached_data(cache_key)
+            if cached_data is not None and not cached_data.empty:
+                return cached_data
 
-            # 根据当前数据源获取数据
+            # 2. DuckDB智能路由决策
+            if self.duckdb_available and self.data_router:
+                backend = self.data_router.route('kline_data',
+                                                 symbol=stock_code,
+                                                 row_count=count,
+                                                 period=period)
+
+                # 大数据量使用DuckDB
+                if backend.value == 'duckdb' and count > 1000:
+                    df = self._get_kdata_from_duckdb(stock_code, period, count)
+                    if not df.empty:
+                        self._cache_data(cache_key, df)
+                        return df
+                    # DuckDB失败时降级到传统方式
+                    logger.warning(f"DuckDB获取失败，降级到传统方式: {stock_code}")
+
+            # 3. 传统数据获取方式（保持现有逻辑）
             if self._current_source == 'hikyuu' and self._hikyuu_available:
                 df = self._get_hikyuu_kdata(stock_code, period, count)
             elif self._current_source in self._data_sources:
@@ -598,19 +693,112 @@ class UnifiedDataManager:
             else:
                 df = pd.DataFrame()
 
-            # 数据标准化和清洗
+            # 4. 数据标准化和清洗
             if not df.empty:
                 df = self._standardize_kdata_format(df, stock_code)
 
-                # 缓存数据
-                if self.cache_manager:
-                    self.cache_manager.set(cache_key, df)
+                # 5. 智能存储：大数据存储到DuckDB
+                if self.duckdb_available and len(df) > 1000:
+                    self._store_to_duckdb(df, stock_code, period)
+
+                # 6. 缓存数据
+                self._cache_data(cache_key, df)
 
             return df
 
         except Exception as e:
             logger.error(f"获取K线数据失败: {stock_code} - {e}")
             return pd.DataFrame()
+
+    def _get_cached_data(self, cache_key: str) -> Optional[pd.DataFrame]:
+        """增强缓存获取 - 支持多级缓存"""
+        try:
+            # 优先从多级缓存获取
+            if self.duckdb_available and self.multi_cache:
+                cached_data = self.multi_cache.get(cache_key)
+                if cached_data is not None:
+                    return cached_data
+
+            # 回退到传统缓存
+            if self.cache_manager:
+                return self.cache_manager.get(cache_key)
+
+            return None
+        except Exception as e:
+            logger.warning(f"缓存获取失败: {e}")
+            return None
+
+    def _cache_data(self, cache_key: str, data: pd.DataFrame):
+        """增强缓存存储 - 支持多级缓存"""
+        try:
+            # 存储到多级缓存
+            if self.duckdb_available and self.multi_cache:
+                self.multi_cache.set(cache_key, data, ttl=self._cache_ttl)
+
+            # 同时存储到传统缓存（向后兼容）
+            if self.cache_manager:
+                self.cache_manager.set(cache_key, data)
+
+        except Exception as e:
+            logger.warning(f"缓存存储失败: {e}")
+
+    def _get_kdata_from_duckdb(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
+        """从DuckDB获取K线数据"""
+        try:
+            if not self.duckdb_operations:
+                return pd.DataFrame()
+
+            # 构建查询
+            table_name = f"kline_data_{period.lower()}"
+            query = f"""
+                SELECT * FROM {table_name} 
+                WHERE symbol = ? 
+                ORDER BY datetime DESC 
+                LIMIT ?
+            """
+
+            result = self.duckdb_operations.execute_query(
+                database_path="db/hikyuu_analytics.db",
+                query=query,
+                params=[stock_code, count]
+            )
+
+            if result.success and result.data:
+                df = pd.DataFrame(result.data)
+                logger.info(f"✅ 从DuckDB获取K线数据成功: {stock_code}, {len(df)}条")
+                return df
+
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"DuckDB数据获取失败: {e}")
+            return pd.DataFrame()
+
+    def _store_to_duckdb(self, data: pd.DataFrame, stock_code: str, period: str):
+        """存储数据到DuckDB"""
+        try:
+            if not self.duckdb_operations or data.empty:
+                return
+
+            table_name = f"kline_data_{period.lower()}"
+
+            # 确保表存在
+            if self.table_manager:
+                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", table_name)
+
+            # 插入数据（使用upsert避免重复）
+            result = self.duckdb_operations.insert_dataframe(
+                database_path="db/hikyuu_analytics.db",
+                table_name=table_name,
+                data=data,
+                upsert=True
+            )
+
+            if result.success:
+                logger.info(f"✅ 数据存储到DuckDB成功: {stock_code}, {len(data)}条")
+
+        except Exception as e:
+            logger.warning(f"DuckDB数据存储失败: {e}")
 
     def _get_hikyuu_kdata(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
         """通过插件系统获取K线数据（重构版）"""
@@ -706,32 +894,73 @@ class UnifiedDataManager:
 
             ktype = ktype_map.get(period, hku.Query.DAY)
 
-            # 构建查询
+            # 构建查询 - 修复HIkyuu Query构造函数兼容性问题
             if count > 0:
-                # 获取最近N条记录 - 使用更安全的方式
+                # 获取最近N条记录 - 使用HIkyuu正确的构造函数
                 try:
-                    # 直接使用count参数，让HIkyuu自动处理日期
-                    query = hku.Query(-count, ktype)  # 负数表示最近N条
+                    # HIkyuu Query构造函数: Query(start: int, end: int, ktype: str, recover_type)
+                    # 负数表示最近N条记录，ktype必须作为字符串传入
+                    ktype_str = {
+                        hku.Query.DAY: 'DAY',
+                        hku.Query.WEEK: 'WEEK',
+                        hku.Query.MONTH: 'MONTH',
+                        hku.Query.MIN: 'MIN',
+                        hku.Query.MIN5: 'MIN5',
+                        hku.Query.MIN15: 'MIN15',
+                        hku.Query.MIN30: 'MIN30',
+                        hku.Query.MIN60: 'MIN60'
+                    }.get(ktype, 'DAY')
+
+                    query = hku.Query(-count, ktype=ktype_str)
                 except Exception as date_e:
                     logger.warning(f"使用count查询失败，尝试日期范围查询: {date_e}")
                     # 降级到日期范围查询
-                    end_date = stock.last_datetime
-                    # 更保守的日期估算：交易日通常少于自然日
-                    days_back = min(count * 2, 365 * 5)  # 最多回溯5年
                     try:
-                        from datetime import timedelta
-                        # 使用Python datetime计算，再转为HIkyuu Datetime
-                        end_py = end_date.datetime()
-                        start_py = end_py - timedelta(days=days_back)
-                        start_date = hku.Datetime(start_py)
-                        query = hku.Query(start_date, end_date, ktype)
+                        end_date = stock.last_datetime
+                        if end_date.isNull():
+                            # 如果股票没有数据，使用当前日期
+                            end_date = hku.Datetime.now()
+
+                        # 计算开始日期 - 使用HIkyuu的日期运算
+                        # 估算交易日数量：一年约252个交易日
+                        trading_days_back = min(count * 2, 252 * 5)  # 最多5年
+                        start_date = end_date - hku.TimeDelta(trading_days_back)
+
+                        # 使用日期范围构造Query，ktype作为字符串
+                        ktype_str = {
+                            hku.Query.DAY: 'DAY',
+                            hku.Query.WEEK: 'WEEK',
+                            hku.Query.MONTH: 'MONTH',
+                            hku.Query.MIN: 'MIN',
+                            hku.Query.MIN5: 'MIN5',
+                            hku.Query.MIN15: 'MIN15',
+                            hku.Query.MIN30: 'MIN30',
+                            hku.Query.MIN60: 'MIN60'
+                        }.get(ktype, 'DAY')
+
+                        query = hku.Query(start_date, end_date, ktype_str)
                     except Exception as fallback_e:
                         logger.error(f"日期计算失败: {fallback_e}")
-                        # 最后的降级：只获取一年数据
-                        query = hku.Query(-252, ktype)  # 一年约252个交易日
+                        # 最后的降级：使用简单的整数构造
+                        try:
+                            query = hku.Query(-252, ktype='DAY')
+                        except:
+                            # 如果还是失败，使用最基本的构造
+                            query = hku.Query()
             else:
                 # 获取所有数据
-                query = hku.Query(stock.start_datetime, stock.last_datetime, ktype)
+                ktype_str = {
+                    hku.Query.DAY: 'DAY',
+                    hku.Query.WEEK: 'WEEK',
+                    hku.Query.MONTH: 'MONTH',
+                    hku.Query.MIN: 'MIN',
+                    hku.Query.MIN5: 'MIN5',
+                    hku.Query.MIN15: 'MIN15',
+                    hku.Query.MIN30: 'MIN30',
+                    hku.Query.MIN60: 'MIN60'
+                }.get(ktype, 'DAY')
+
+                query = hku.Query(stock.start_datetime, stock.last_datetime, ktype_str)
 
             # 获取K线数据
             kdata = stock.getKData(query)
@@ -1345,22 +1574,42 @@ class UnifiedDataManager:
             bool: 注册是否成功
         """
         try:
+            # 检查TET管道是否可用
+            if not (hasattr(self, 'tet_pipeline') and self.tet_pipeline):
+                logger.warning("⚠️ TET数据管道不可用，无法注册插件")
+                return False
+
             # 注册到TET管道的路由器
-            if hasattr(self, 'tet_pipeline') and self.tet_pipeline and hasattr(self.tet_pipeline, 'router'):
+            if hasattr(self.tet_pipeline, 'router'):
                 router = self.tet_pipeline.router
-                success = router.register_data_source(plugin_id, adapter, priority, weight)
-                if success:
+                router_success = router.register_data_source(plugin_id, adapter, priority, weight)
+                if router_success:
                     logger.info(f"✅ 插件 {plugin_id} 已注册到TET数据管道路由器")
-                    return True
                 else:
                     logger.error(f"❌ 插件 {plugin_id} 注册到TET数据管道路由器失败")
                     return False
             else:
-                logger.warning("⚠️ TET数据管道不可用，无法注册插件")
+                logger.error("❌ TET数据管道缺少路由器")
                 return False
+
+            # 关键修复：同时注册到TET管道的适配器字典
+            if hasattr(self.tet_pipeline, '_adapters'):
+                self.tet_pipeline._adapters[plugin_id] = adapter
+                logger.info(f"✅ 插件 {plugin_id} 已注册到TET管道适配器字典")
+            else:
+                logger.warning("⚠️ TET管道缺少_adapters属性")
+
+            # 如果适配器有对应的插件实例，也注册到_plugins字典
+            if hasattr(adapter, 'plugin') and hasattr(self.tet_pipeline, '_plugins'):
+                self.tet_pipeline._plugins[plugin_id] = adapter.plugin
+                logger.info(f"✅ 插件 {plugin_id} 已注册到TET管道插件字典")
+
+            return True
 
         except Exception as e:
             logger.error(f"❌ 注册数据源插件失败 {plugin_id}: {e}")
+            import traceback
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             return False
 
     def _legacy_get_stock_data(self, symbol: str, period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
@@ -1521,7 +1770,7 @@ class UnifiedDataManager:
             return pd.DataFrame()
 
     async def _get_financial_data(self, stock_code: str) -> Dict[str, Any]:
-        """获取财务数据
+        """获取财务数据（增强版：集成DuckDB存储）
 
         Args:
             stock_code: 股票代码
@@ -1532,13 +1781,204 @@ class UnifiedDataManager:
         try:
             logger.info(f"获取财务数据: {stock_code}")
 
-            # 获取财务数据可能需要特定的服务
-            # 这里仅作为示例实现，返回空字典
+            cache_key = f"financial_{stock_code}"
+
+            # 1. 尝试从DuckDB获取财务数据
+            if self.duckdb_available and self.duckdb_operations:
+                financial_data = await self._get_financial_from_duckdb(stock_code)
+                if financial_data:
+                    return financial_data
+
+            # 2. 通过TET管道获取财务数据
+            if self.tet_enabled and self.tet_pipeline:
+                try:
+                    from ..tet_data_pipeline import StandardQuery
+                    from ..plugin_types import AssetType, DataType
+
+                    query = StandardQuery(
+                        symbol=stock_code,
+                        asset_type=AssetType.STOCK,
+                        data_type=DataType.FINANCIAL_STATEMENT,
+                        provider=self._current_source
+                    )
+
+                    result = self.tet_pipeline.process(query)
+                    if result and result.data:
+                        # 存储到DuckDB
+                        if self.duckdb_available:
+                            await self._store_financial_to_duckdb(stock_code, result.data)
+                        return result.data
+
+                except Exception as e:
+                    logger.warning(f"TET管道获取财务数据失败: {e}")
+
+            # 3. 回退到传统方式（保持兼容性）
             return {}
 
         except Exception as e:
             logger.error(f"获取财务数据失败: {e}", exc_info=True)
             return {}
+
+    async def _get_financial_from_duckdb(self, stock_code: str) -> Optional[Dict[str, Any]]:
+        """从DuckDB获取财务数据"""
+        try:
+            query = """
+                SELECT * FROM financial_statements 
+                WHERE symbol = ? 
+                ORDER BY report_date DESC 
+                LIMIT 1
+            """
+
+            result = self.duckdb_operations.execute_query(
+                database_path="db/hikyuu_analytics.db",
+                query=query,
+                params=[stock_code]
+            )
+
+            if result.success and result.data:
+                return result.data[0] if result.data else None
+
+            return None
+
+        except Exception as e:
+            logger.error(f"DuckDB财务数据获取失败: {e}")
+            return None
+
+    async def _store_financial_to_duckdb(self, stock_code: str, data: Dict[str, Any]):
+        """存储财务数据到DuckDB"""
+        try:
+            if not data:
+                return
+
+            # 确保财务数据表存在
+            if self.table_manager:
+                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", "financial_statements")
+
+            # 转换为DataFrame并存储
+            df = pd.DataFrame([data])
+            result = self.duckdb_operations.insert_dataframe(
+                database_path="db/hikyuu_analytics.db",
+                table_name="financial_statements",
+                data=df,
+                upsert=True
+            )
+
+            if result.success:
+                logger.info(f"✅ 财务数据存储到DuckDB成功: {stock_code}")
+
+        except Exception as e:
+            logger.warning(f"DuckDB财务数据存储失败: {e}")
+
+    def get_macro_economic_data(self, indicator: str, period: str = 'M', count: int = 100) -> pd.DataFrame:
+        """
+        获取宏观经济数据（新增方法：集成DuckDB存储）
+
+        Args:
+            indicator: 经济指标名称 (GDP, CPI, PMI等)
+            period: 数据周期 (M/Q/Y)
+            count: 数据条数
+
+        Returns:
+            宏观经济数据DataFrame
+        """
+        try:
+            cache_key = f"macro_{indicator}_{period}_{count}"
+
+            # 1. 多级缓存检查
+            cached_data = self._get_cached_data(cache_key)
+            if cached_data is not None and not cached_data.empty:
+                return cached_data
+
+            # 2. 从DuckDB获取
+            if self.duckdb_available and self.duckdb_operations:
+                df = self._get_macro_from_duckdb(indicator, period, count)
+                if not df.empty:
+                    self._cache_data(cache_key, df)
+                    return df
+
+            # 3. 通过TET管道获取
+            if self.tet_enabled and self.tet_pipeline:
+                try:
+                    from ..tet_data_pipeline import StandardQuery
+                    from ..plugin_types import AssetType, DataType
+
+                    query = StandardQuery(
+                        symbol=indicator,
+                        asset_type=AssetType.MACRO,
+                        data_type=DataType.MACRO_ECONOMIC,
+                        period=period,
+                        provider=self._current_source,
+                        extra_params={'count': count}
+                    )
+
+                    result = self.tet_pipeline.process(query)
+                    if result and result.data is not None:
+                        if isinstance(result.data, pd.DataFrame) and not result.data.empty:
+                            # 存储到DuckDB
+                            self._store_macro_to_duckdb(result.data, indicator, period)
+                            self._cache_data(cache_key, result.data)
+                            return result.data
+
+                except Exception as e:
+                    logger.warning(f"TET管道获取宏观数据失败: {e}")
+
+            # 4. 返回空DataFrame
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"获取宏观经济数据失败: {indicator} - {e}")
+            return pd.DataFrame()
+
+    def _get_macro_from_duckdb(self, indicator: str, period: str, count: int) -> pd.DataFrame:
+        """从DuckDB获取宏观经济数据"""
+        try:
+            query = """
+                SELECT * FROM macro_economic_data 
+                WHERE indicator = ? AND frequency = ?
+                ORDER BY release_date DESC 
+                LIMIT ?
+            """
+
+            result = self.duckdb_operations.execute_query(
+                database_path="db/hikyuu_analytics.db",
+                query=query,
+                params=[indicator, period, count]
+            )
+
+            if result.success and result.data:
+                df = pd.DataFrame(result.data)
+                logger.info(f"✅ 从DuckDB获取宏观数据成功: {indicator}, {len(df)}条")
+                return df
+
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"DuckDB宏观数据获取失败: {e}")
+            return pd.DataFrame()
+
+    def _store_macro_to_duckdb(self, data: pd.DataFrame, indicator: str, period: str):
+        """存储宏观经济数据到DuckDB"""
+        try:
+            if not self.duckdb_operations or data.empty:
+                return
+
+            # 确保宏观数据表存在
+            if self.table_manager:
+                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", "macro_economic_data")
+
+            # 插入数据
+            result = self.duckdb_operations.insert_dataframe(
+                database_path="db/hikyuu_analytics.db",
+                table_name="macro_economic_data",
+                data=data,
+                upsert=True
+            )
+
+            if result.success:
+                logger.info(f"✅ 宏观数据存储到DuckDB成功: {indicator}, {len(data)}条")
+
+        except Exception as e:
+            logger.warning(f"DuckDB宏观数据存储失败: {e}")
 
     async def _get_news(self, stock_code: str) -> Dict[str, Any]:
         """获取新闻数据
@@ -2375,7 +2815,67 @@ class UnifiedDataManager:
             logger.info(f"✅ 手动注册了 {registered_count} 个核心数据源插件")
             self._plugins_discovered = True
         else:
-            logger.warning("⚠️ 未能注册任何数据源插件")
+            logger.warning("⚠️ 未能注册任何数据源插件，创建基本回退数据源")
+            # 创建基本回退数据源，避免TET管道完全无法工作
+            self._create_fallback_data_source()
+            self._plugins_discovered = True
+
+    def _create_fallback_data_source(self) -> None:
+        """创建基本回退数据源，确保TET管道有可用的数据源"""
+        try:
+            # 创建一个简单的回退数据源类
+            class FallbackDataSource:
+                def __init__(self):
+                    self.name = "fallback_hikyuu"
+                    self.priority = 999  # 最低优先级
+
+                def get_asset_list(self, asset_type: str = "stock", market: str = None) -> List[Dict]:
+                    """使用HIkyuu获取资产列表"""
+                    try:
+                        # 直接调用HIkyuu获取股票列表
+                        from hikyuu import StockManager
+                        sm = StockManager.instance()
+                        stocks = []
+
+                        for stock in sm:
+                            if stock.valid and stock.type in [1, 2]:  # 股票类型
+                                stocks.append({
+                                    'symbol': stock.market_code + stock.code,
+                                    'name': stock.name,
+                                    'market': stock.market_code,
+                                    'code': stock.code,
+                                    'type': 'stock'
+                                })
+
+                        return stocks[:100]  # 限制返回数量
+                    except Exception as e:
+                        logger.warning(f"回退数据源获取资产列表失败: {e}")
+                        return []
+
+                def get_kdata(self, symbol: str, **kwargs) -> pd.DataFrame:
+                    """获取K线数据"""
+                    return pd.DataFrame()  # 返回空DataFrame
+
+                def health_check(self) -> bool:
+                    """健康检查"""
+                    return True
+
+            # 注册回退数据源
+            fallback_source = FallbackDataSource()
+            success = self.register_data_source_plugin(
+                "fallback_hikyuu",
+                fallback_source,
+                priority=999,  # 最低优先级
+                weight=0.1
+            )
+
+            if success:
+                logger.info("✅ 创建回退数据源成功")
+            else:
+                logger.warning("⚠️ 创建回退数据源失败")
+
+        except Exception as e:
+            logger.error(f"❌ 创建回退数据源异常: {e}")
 
     def _extend_akshare_plugin_for_sector_flow(self, akshare_plugin) -> None:
         """扩展AkShare插件以支持SECTOR_FUND_FLOW数据类型"""
@@ -2420,5 +2920,55 @@ class UnifiedDataManager:
         if hasattr(self, 'tet_pipeline') and self.tet_pipeline:
             return self.tet_pipeline.router
         return None
+
+    def set_asset_routing_priorities(self, asset_type: AssetType, priorities: List[str]) -> bool:
+        """
+        设置资产类型的数据源路由优先级
+
+        Args:
+            asset_type: 资产类型
+            priorities: 数据源优先级列表
+
+        Returns:
+            bool: 设置是否成功
+        """
+        try:
+            router = self.data_source_router
+            if router is None:
+                logger.error("数据源路由器不可用，无法设置优先级")
+                return False
+
+            # 调用路由器的set_asset_priorities方法
+            router.set_asset_priorities(asset_type, priorities)
+            logger.info(f"✅ 成功设置{asset_type.value}的路由优先级: {priorities}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 设置资产路由优先级失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_asset_routing_priorities(self, asset_type: AssetType) -> List[str]:
+        """
+        获取资产类型的数据源路由优先级
+
+        Args:
+            asset_type: 资产类型
+
+        Returns:
+            List[str]: 数据源优先级列表
+        """
+        try:
+            router = self.data_source_router
+            if router is None:
+                logger.warning("数据源路由器不可用，返回空优先级列表")
+                return []
+
+            return router.asset_priorities.get(asset_type, [])
+
+        except Exception as e:
+            logger.error(f"❌ 获取资产路由优先级失败: {e}")
+            return []
 
 # 数据策略类

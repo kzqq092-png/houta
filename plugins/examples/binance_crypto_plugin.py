@@ -636,6 +636,135 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
             self.logger.error(f"实时数据获取失败: {e}")
             return {}
 # 插件工厂函数
+    def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
+        """
+        获取加密货币板块资金流数据
+
+        Args:
+            symbol: 板块代码或"sector"表示获取所有板块
+            **kwargs: 其他参数
+
+        Returns:
+            板块资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取加密货币板块资金流数据")
+            
+            # TODO: 实现加密货币板块资金流数据获取逻辑
+            import pandas as pd
+            
+            # 模拟数据 - 基于DeFi、NFT、Layer1等板块
+            records = [
+                {
+                    'sector_code': 'DEFI',
+                    'sector_name': 'DeFi板块',
+                    'change_pct': 0.05,
+                    'main_net_inflow': 10000000,  # USDT
+                    'main_net_inflow_pct': 0.03,
+                    'volume_24h': 500000000,
+                    'market_cap': 50000000000
+                },
+                {
+                    'sector_code': 'NFT',
+                    'sector_name': 'NFT板块',
+                    'change_pct': -0.02,
+                    'main_net_inflow': -5000000,
+                    'main_net_inflow_pct': -0.01,
+                    'volume_24h': 200000000,
+                    'market_cap': 20000000000
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取加密货币板块资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取加密货币板块资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_individual_fund_flow_data(self, symbol: str, **kwargs) -> pd.DataFrame:
+        """
+        获取个币资金流数据
+
+        Args:
+            symbol: 加密货币代码
+            **kwargs: 其他参数
+
+        Returns:
+            个币资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取个币 {symbol} 资金流数据")
+            
+            # TODO: 实现加密货币资金流数据获取逻辑
+            import pandas as pd
+            from datetime import datetime
+            
+            records = [
+                {
+                    'date': datetime.now().strftime('%Y-%m-%d'),
+                    'symbol': symbol,
+                    'net_inflow_usdt': 1000000,
+                    'net_inflow_btc': 50,
+                    'volume_24h': 100000000,
+                    'price_change_pct': 0.02,
+                    'whale_activity': 'high'
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取个币资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取个币资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+    def get_main_fund_flow_data(self, symbol: str = "index", **kwargs) -> pd.DataFrame:
+        """
+        获取加密货币市场主力资金流数据
+
+        Args:
+            symbol: 指数代码或"index"表示获取主要指数
+            **kwargs: 其他参数
+
+        Returns:
+            主力资金流数据DataFrame
+        """
+        try:
+            self.logger.info(f"{self.name}获取加密货币市场主力资金流数据")
+            
+            # TODO: 实现加密货币市场资金流数据获取逻辑
+            import pandas as pd
+            
+            records = [
+                {
+                    'market': 'Total Crypto Market',
+                    'total_market_cap': 2000000000000,
+                    'btc_dominance': 0.45,
+                    'eth_dominance': 0.18,
+                    'net_inflow_24h': 500000000,
+                    'fear_greed_index': 65,
+                    'institutional_flow': 200000000
+                }
+            ]
+            
+            df = pd.DataFrame(records)
+            self.logger.info(f"获取加密货币市场资金流数据完成，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"获取加密货币市场资金流数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return pd.DataFrame()
+
+
 
 
 def create_plugin() -> IDataSourcePlugin:

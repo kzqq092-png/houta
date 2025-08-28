@@ -853,6 +853,11 @@ class ChartRenderer(QObject):
     def _render_candlesticks_efficient(self, ax, data: pd.DataFrame, style: Dict[str, Any], x: np.ndarray = None):
         """使用collections高效渲染K线，支持等距序号X轴，空心样式"""
         try:
+            # 添加ax有效性检查
+            if ax is None:
+                logger.warning("_render_candlesticks_efficient: ax参数为None，跳过渲染")
+                return
+
             # 添加数据有效性检查
             if data is None or data.empty:
                 logger.warning("_render_candlesticks_efficient: 数据为空")
@@ -875,9 +880,18 @@ class ChartRenderer(QObject):
                 xvals = x
             else:
                 try:
-                    xvals = mdates.date2num(data.index.to_pydatetime())
+                    # 检查索引类型
+                    if hasattr(data.index, 'to_pydatetime'):
+                        xvals = mdates.date2num(data.index.to_pydatetime())
+                    elif pd.api.types.is_datetime64_any_dtype(data.index):
+                        # 如果是datetime类型但没有to_pydatetime方法
+                        xvals = mdates.date2num(pd.to_datetime(data.index).to_pydatetime())
+                    else:
+                        # 如果不是日期索引，使用序号
+                        logger.debug(f"索引类型不是日期类型: {type(data.index)}，使用序号作为X轴")
+                        xvals = np.arange(len(data))
                 except Exception as e:
-                    logger.warning(f"转换日期失败，使用序号作为X轴: {e}")
+                    logger.debug(f"转换日期失败，使用序号作为X轴: {e}")
                     xvals = np.arange(len(data))
 
             verts_up, verts_down, segments_up, segments_down = [], [], [], []
