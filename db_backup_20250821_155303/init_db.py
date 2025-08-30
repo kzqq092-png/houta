@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'hikyuu_system.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'factorweave_system.db')
 
 
 def init_db():

@@ -63,7 +63,7 @@
                 <mxCell id="data-layer" value="数据持久化层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;fontStyle=1;fontColor=#060505;" parent="1" vertex="1">
                     <mxGeometry x="50" y="700" width="1500" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="database" value="SQLite数据库&lt;br&gt;hikyuu_system.db" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#060505;rounded=1;" parent="1" vertex="1">
+                <mxCell id="database" value="SQLite数据库&lt;br&gt;factorweave_system.db" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#060505;rounded=1;" parent="1" vertex="1">
                     <mxGeometry x="120" y="780" width="120" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="config-files" value="配置文件&lt;br&gt;YAML/JSON" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#060505;rounded=1;" parent="1" vertex="1">

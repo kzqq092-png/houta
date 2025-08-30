@@ -1623,7 +1623,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
             # 使用系统数据库路径
-            db_path = "db/hikyuu_system.db"  # 使用相对路径
+            db_path = "db/factorweave_system.db"  # 使用相对路径
 
             dialog = DatabaseAdminDialog(db_path, self._main_window)
             self.center_dialog(dialog)

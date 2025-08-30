@@ -144,19 +144,53 @@ class AKShareStockPlugin(IDataSourcePlugin):
         try:
             if not AKSHARE_AVAILABLE:
                 self.last_error = "AKShare库未安装"
+                self.logger.error("AKShare库未安装")
                 return False
 
-            # AKShare不需要显式连接，测试一个简单的API调用
-            test_data = ak.stock_zh_a_spot_em()
-            if test_data is not None and not test_data.empty:
-                self.logger.info("AKShare数据源连接成功")
-                return True
-            else:
-                self.last_error = "AKShare API测试失败"
+            if not REQUESTS_AVAILABLE:
+                self.last_error = "requests库未安装"
+                self.logger.error("requests库未安装")
                 return False
+
+                # 使用线程超时机制（Windows兼容）
+            import time
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+            def test_akshare_connection():
+                """测试AKShare连接"""
+                # 使用更简单的API进行测试，减少网络请求
+                return ak.tool_trade_date_hist_sina()  # 获取交易日历，数据量小
+
+                self.logger.info("正在测试AKShare连接...")
+
+            # 使用线程池执行，设置10秒超时
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(test_akshare_connection)
+                try:
+                    test_data = future.result(timeout=10.0)
+
+                    if test_data is not None and not test_data.empty:
+                        self.logger.info("AKShare数据源连接成功")
+                        self.connection_time = time.time()
+                        self.last_activity = time.time()
+                        return True
+                    else:
+                        self.last_error = "AKShare API返回空数据"
+                        self.logger.warning("AKShare API返回空数据")
+                        return False
+
+                except FutureTimeoutError:
+                    self.last_error = "AKShare API调用超时"
+                    self.logger.error("AKShare API调用超时")
+                    return False
+
         except Exception as e:
             self.last_error = str(e)
             self.logger.error(f"连接失败: {e}")
+            # 如果是网络相关错误，提供更友好的错误信息
+            if "Connection" in str(e) or "timeout" in str(e).lower():
+                self.last_error = f"网络连接失败: {e}"
+                self.logger.error("网络连接失败，请检查网络连接或稍后重试")
             return False
 
     def disconnect(self) -> bool:
@@ -236,46 +270,131 @@ class AKShareStockPlugin(IDataSourcePlugin):
         """获取资产列表"""
         try:
             if asset_type != AssetType.STOCK:
+                self.logger.warning(f"不支持的资产类型: {asset_type}")
                 return []
 
-            # 获取A股列表
-            stock_df = ak.stock_zh_a_spot_em()
-            if stock_df is None or stock_df.empty:
+            if not AKSHARE_AVAILABLE:
+                self.logger.error("AKShare库不可用")
                 return []
 
-            # 转换为标准格式
-            asset_list = []
-            for _, row in stock_df.iterrows():
-                symbol = row.get('代码', '')
-                name = row.get('名称', '')
+            # 检查缓存
+            cache_key = f"asset_list_{asset_type.value}_{market or 'all'}"
+            if self._stock_list_cache and self._cache_timestamp:
+                import time
+                if time.time() - self._cache_timestamp < self._cache_duration:
+                    cached_data = self._stock_list_cache.get(cache_key)
+                    if cached_data:
+                        self.logger.info(f"从缓存获取资产列表: {len(cached_data)} 只股票")
+                        return cached_data
 
-                # 判断市场
-                if symbol.startswith('000') or symbol.startswith('002') or symbol.startswith('300'):
-                    exchange = 'SZ'
-                elif symbol.startswith('600') or symbol.startswith('601') or symbol.startswith('603'):
-                    exchange = 'SH'
-                elif symbol.startswith('8') or symbol.startswith('4'):
-                    exchange = 'BJ'
-                else:
-                    exchange = 'Unknown'
+            self.logger.info(f"正在获取A股列表，市场筛选: {market or '全部'}")
 
-                if market and exchange != market:
-                    continue
+            # 使用线程超时机制（Windows兼容）
+            import time
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
-                asset_info = {
-                    "symbol": symbol,
-                    "name": name,
-                    "market": exchange,
-                    "asset_type": asset_type.value,
-                    "currency": "CNY",
-                    "exchange": exchange
-                }
-                asset_list.append(asset_info)
+            def get_akshare_stock_list():
+                """获取AKShare股票列表"""
+                return ak.stock_zh_a_spot_em()
 
-            return asset_list
+            # 使用线程池执行，设置15秒超时
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(get_akshare_stock_list)
+                try:
+                    stock_df = future.result(timeout=15.0)
+
+                    if stock_df is None or stock_df.empty:
+                        self.logger.warning("AKShare返回空的股票列表")
+                        return self._get_fallback_stock_list(market)
+
+                    # 转换为标准格式
+                    asset_list = []
+                    processed_count = 0
+
+                    for _, row in stock_df.iterrows():
+                        symbol = str(row.get('代码', '')).strip()
+                        name = str(row.get('名称', '')).strip()
+
+                        if not symbol or not name:
+                            continue
+
+                        # 判断市场
+                        if symbol.startswith(('000', '002', '300')):
+                            exchange = 'SZ'
+                        elif symbol.startswith(('600', '601', '603', '688')):
+                            exchange = 'SH'
+                        elif symbol.startswith(('8', '4')):
+                            exchange = 'BJ'
+                        else:
+                            exchange = 'Unknown'
+
+                        # 市场筛选
+                        if market and exchange.upper() != market.upper():
+                            continue
+
+                        asset_info = {
+                            "symbol": symbol,
+                            "name": name,
+                            "market": exchange,
+                            "asset_type": asset_type.value,
+                            "currency": "CNY",
+                            "exchange": exchange
+                        }
+                        asset_list.append(asset_info)
+                        processed_count += 1
+
+                    # 缓存结果
+                    if not hasattr(self, '_stock_list_cache') or self._stock_list_cache is None:
+                        self._stock_list_cache = {}
+                    self._stock_list_cache[cache_key] = asset_list
+                    self._cache_timestamp = time.time()
+
+                    self.logger.info(f"成功获取A股列表: {processed_count} 只股票")
+                    return asset_list
+
+                except FutureTimeoutError:
+                    self.logger.error("获取股票列表超时，使用备用列表")
+                    return self._get_fallback_stock_list(market)
+
         except Exception as e:
             self.logger.error(f"获取资产列表失败: {e}")
+            # 网络错误时返回备用列表
+            if "Connection" in str(e) or "timeout" in str(e).lower():
+                self.logger.info("网络连接问题，使用备用股票列表")
+                return self._get_fallback_stock_list(market)
             return []
+
+    def _get_fallback_stock_list(self, market: str = None) -> List[Dict[str, Any]]:
+        """获取备用股票列表（离线数据）"""
+        fallback_stocks = [
+            # 主板蓝筹股
+            {"symbol": "000001", "name": "平安银行", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+            {"symbol": "000002", "name": "万科A", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+            {"symbol": "000858", "name": "五粮液", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+            {"symbol": "002415", "name": "海康威视", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+            {"symbol": "002594", "name": "比亚迪", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+            {"symbol": "300750", "name": "宁德时代", "market": "SZ", "asset_type": "stock", "currency": "CNY", "exchange": "SZ"},
+
+            {"symbol": "600000", "name": "浦发银行", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "600036", "name": "招商银行", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "600519", "name": "贵州茅台", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "600887", "name": "伊利股份", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "601318", "name": "中国平安", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "601398", "name": "工商银行", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "601939", "name": "建设银行", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "603259", "name": "药明康德", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+
+            # 科创板代表
+            {"symbol": "688981", "name": "中芯国际", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+            {"symbol": "688036", "name": "传音控股", "market": "SH", "asset_type": "stock", "currency": "CNY", "exchange": "SH"},
+        ]
+
+        # 根据市场筛选
+        if market:
+            fallback_stocks = [s for s in fallback_stocks if s["market"].upper() == market.upper()]
+
+        self.logger.info(f"返回备用股票列表: {len(fallback_stocks)} 只股票")
+        return fallback_stocks
 
     def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
                   end_date: str = None, count: int = None) -> pd.DataFrame:

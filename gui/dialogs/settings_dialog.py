@@ -298,7 +298,7 @@ class SettingsDialog(QDialog):
         try:
             if self.config_service:
                 # 加载基本设置
-                config = self.config_service.get_all_config()
+                config = self.config_service.get_all()
 
                 # 设置当前主题
                 if self.theme_service:

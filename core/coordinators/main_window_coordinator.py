@@ -250,138 +250,6 @@ class MainWindowCoordinator(BaseCoordinator):
             logger.error(f"Failed to setup menu bar: {e}")
             raise
 
-    def _create_menu_bar(self) -> None:
-        """创建菜单栏 - 已废弃，使用_setup_menu_bar替代"""
-        try:
-            menu_bar = self._main_window.menuBar()
-
-            # 文件菜单
-            file_menu = menu_bar.addMenu('文件(&F)')
-            file_menu.addAction('新建', self._on_new_file)
-            file_menu.addAction('打开', self._on_open_file)
-            file_menu.addAction('保存', self._on_save_file)
-            file_menu.addSeparator()
-            file_menu.addAction('退出', self._on_exit)
-
-            # 编辑菜单
-            edit_menu = menu_bar.addMenu('编辑(&E)')
-            edit_menu.addAction('撤销', self._on_undo)
-            edit_menu.addAction('重做', self._on_redo)
-            edit_menu.addSeparator()
-            edit_menu.addAction('复制', self._on_copy)
-            edit_menu.addAction('粘贴', self._on_paste)
-
-            # 视图菜单
-            view_menu = menu_bar.addMenu('视图(&V)')
-            view_menu.addAction('刷新', self._on_refresh)
-            view_menu.addSeparator()
-
-            # 主题子菜单
-            theme_menu = view_menu.addMenu('主题')
-            theme_menu.addAction(
-                '默认主题', lambda: self._on_theme_changed('default'))
-            theme_menu.addAction(
-                '深色主题', lambda: self._on_theme_changed('dark'))
-            theme_menu.addAction(
-                '浅色主题', lambda: self._on_theme_changed('light'))
-
-            # 新增：性能仪表板菜单项
-            self.performance_panel_action = view_menu.addAction("性能仪表板")
-            self.performance_panel_action.setCheckable(True)
-            self.performance_panel_action.setChecked(False)
-            self.performance_panel_action.triggered.connect(
-                self._toggle_performance_panel)
-
-            # 工具菜单
-            tools_menu = menu_bar.addMenu('工具(&T)')
-            tools_menu.addAction('高级搜索', self._on_advanced_search)
-            tools_menu.addAction('数据导出', self._on_export_data)
-            tools_menu.addSeparator()
-
-            # 计算工具子菜单
-            calc_menu = tools_menu.addMenu('计算工具')
-            calc_menu.addAction('计算器', self._on_calculator)
-            calc_menu.addAction('单位转换器', self._on_converter)
-            calc_menu.addAction('费率计算器', self._on_commission_calculator)
-            calc_menu.addAction('汇率转换器', self._on_currency_converter)
-
-            tools_menu.addSeparator()
-
-            # 缓存管理子菜单
-            cache_menu = tools_menu.addMenu('缓存管理')
-            cache_menu.addAction('清理数据缓存', self._on_clear_data_cache)
-            cache_menu.addAction('清理负缓存', self._on_clear_negative_cache)
-            cache_menu.addAction('清理所有缓存', self._on_clear_all_cache)
-
-            tools_menu.addSeparator()
-            tools_menu.addAction('系统维护工具', self._on_system_optimizer)
-            tools_menu.addAction('系统设置', self._on_settings)
-
-            # 高级功能菜单
-            advanced_menu = menu_bar.addMenu('高级功能(&A)')
-
-            # 插件管理
-            advanced_menu.addAction('插件管理', self._on_plugin_manager)
-
-            # 插件市场
-            advanced_menu.addAction('插件市场', self._on_plugin_market)
-
-            advanced_menu.addSeparator()
-
-            # 节点管理
-            advanced_menu.addAction('节点管理', self._on_node_management)
-
-            # 云端API
-            advanced_menu.addAction('云端API', self._on_cloud_api)
-
-            # 指标市场
-            advanced_menu.addAction('指标市场', self._on_indicator_market)
-
-            # 批量分析
-            advanced_menu.addAction('批量分析', self._on_batch_analysis)
-
-            # 策略管理
-            advanced_menu.addAction('策略管理', self._on_strategy_management)
-
-            advanced_menu.addSeparator()
-
-            # 优化系统子菜单
-            optimization_menu = advanced_menu.addMenu('优化系统')
-            optimization_menu.addAction(
-                '优化仪表板', self._on_optimization_dashboard)
-            optimization_menu.addAction(
-                '一键优化', self._on_one_click_optimization)
-            optimization_menu.addAction(
-                '智能优化', self._on_intelligent_optimization)
-            optimization_menu.addAction(
-                '性能评估', self._on_performance_evaluation)
-            optimization_menu.addAction('版本管理', self._on_version_management)
-
-            # 数据质量检查子菜单
-            quality_menu = advanced_menu.addMenu('数据质量检查')
-            quality_menu.addAction(
-                '单股质量检查', self._on_single_stock_quality_check)
-            quality_menu.addAction('批量质量检查', self._on_batch_quality_check)
-            quality_menu.addSeparator()
-            quality_menu.addAction('数据库管理', self._on_database_admin)
-
-            # 帮助菜单
-            help_menu = menu_bar.addMenu('帮助(&H)')
-            help_menu.addAction('启动向导', self._on_startup_guides)
-            help_menu.addSeparator()
-            help_menu.addAction('用户手册', self._on_help)
-            help_menu.addAction('快捷键', self._on_shortcuts)
-            help_menu.addSeparator()
-            help_menu.addAction('数据使用条款', self._on_show_data_usage_terms)
-            help_menu.addSeparator()
-            help_menu.addAction('关于', self._on_about)
-
-            logger.info("Menu bar created successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to create menu bar: {e}")
-            raise
-
     def _create_panels(self) -> None:
         """创建所有UI面板"""
         try:
@@ -1311,20 +1179,6 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to handle search results: {e}")
 
-    def _on_export_data(self) -> None:
-        """数据导出"""
-        try:
-            from gui.dialogs.data_export_dialog import DataExportDialog
-
-            dialog = DataExportDialog(self._main_window)
-            self.center_dialog(dialog)
-            dialog.exec_()
-
-        except Exception as e:
-            logger.error(f"数据导出失败: {e}")
-            QMessageBox.critical(self._main_window, "错误",
-                                 f"打开数据导出对话框失败: {str(e)}")
-
     def _on_data_export(self) -> None:
         """数据导出（别名方法）"""
         self._on_export_data()
@@ -1467,6 +1321,16 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
 
     def _on_plugin_manager(self) -> None:
         """增强版插件管理器 - 统一的插件管理界面"""
+        # 防止重复打开 - 检查是否已有插件管理对话框实例
+        if hasattr(self, '_plugin_manager_dialog') and self._plugin_manager_dialog is not None:
+            if self._plugin_manager_dialog.isVisible():
+                self._plugin_manager_dialog.raise_()
+                self._plugin_manager_dialog.activateWindow()
+                logger.info("插件管理对话框已存在，激活现有窗口")
+                return
+            else:
+                self._plugin_manager_dialog = None
+
         try:
             from gui.dialogs.enhanced_plugin_manager_dialog import EnhancedPluginManagerDialog
             from core.plugin_manager import PluginManager
@@ -1559,23 +1423,26 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             logger.info(f"📋 插件管理器状态: {plugin_status}, 情绪数据服务: {sentiment_status}")
 
             # 创建并显示增强版对话框
-            dialog = EnhancedPluginManagerDialog(
+            self._plugin_manager_dialog = EnhancedPluginManagerDialog(
                 plugin_manager=plugin_manager,
                 sentiment_service=sentiment_service,
                 parent=self._main_window
             )
 
             # 设置对话框属性
-            dialog.setWindowTitle("HIkyuu 插件管理器")
-            dialog.setMinimumSize(1000, 700)
+            self._plugin_manager_dialog.setWindowTitle("HIkyuu 插件管理器")
+            self._plugin_manager_dialog.setMinimumSize(1000, 700)
+
+            # 连接对话框的关闭信号
+            self._plugin_manager_dialog.finished.connect(self._on_plugin_manager_dialog_closed)
 
             # 居中显示
             if hasattr(self, 'center_dialog'):
-                self.center_dialog(dialog)
+                self.center_dialog(self._plugin_manager_dialog)
 
             # 显示对话框
-            result = dialog.exec_()
-            logger.info(f"插件管理器对话框关闭，返回值: {result}")
+            self._plugin_manager_dialog.show()
+            logger.info("插件管理器对话框已显示")
 
         except ImportError as e:
             error_msg = f"插件管理器模块导入失败: {e}"
@@ -1594,6 +1461,15 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
                 "错误",
                 f"{error_msg}\n\n请查看日志获取详细信息。"
             )
+            # 清理可能的无效引用
+            if hasattr(self, '_plugin_manager_dialog'):
+                self._plugin_manager_dialog = None
+
+    def _on_plugin_manager_dialog_closed(self):
+        """插件管理对话框关闭时的回调"""
+        logger.info("插件管理对话框已关闭，清理引用")
+        if hasattr(self, '_plugin_manager_dialog'):
+            self._plugin_manager_dialog = None
 
     def _on_plugin_market(self) -> None:
         """插件市场"""
@@ -1643,17 +1519,41 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
 
     def _on_strategy_management(self) -> None:
         """策略管理"""
+        # 防止重复打开 - 检查是否已有策略管理对话框实例
+        if hasattr(self, '_strategy_manager_dialog') and self._strategy_manager_dialog is not None:
+            if self._strategy_manager_dialog.isVisible():
+                self._strategy_manager_dialog.raise_()
+                self._strategy_manager_dialog.activateWindow()
+                logger.info("策略管理对话框已存在，激活现有窗口")
+                return
+            else:
+                self._strategy_manager_dialog = None
+
         try:
             from gui.dialogs.strategy_manager_dialog import StrategyManagerDialog
 
-            dialog = StrategyManagerDialog(self._main_window)
-            self.center_dialog(dialog)
-            dialog.exec_()
+            # 创建策略管理对话框实例并保存引用
+            self._strategy_manager_dialog = StrategyManagerDialog(self._main_window)
+
+            # 连接对话框的关闭信号
+            self._strategy_manager_dialog.finished.connect(self._on_strategy_manager_dialog_closed)
+
+            self.center_dialog(self._strategy_manager_dialog)
+            self._strategy_manager_dialog.show()
 
         except Exception as e:
             logger.error(f"策略管理失败: {e}")
             QMessageBox.critical(self._main_window, "错误",
                                  f"打开策略管理对话框失败: {str(e)}")
+            # 清理可能的无效引用
+            if hasattr(self, '_strategy_manager_dialog'):
+                self._strategy_manager_dialog = None
+
+    def _on_strategy_manager_dialog_closed(self):
+        """策略管理对话框关闭时的回调"""
+        logger.info("策略管理对话框已关闭，清理引用")
+        if hasattr(self, '_strategy_manager_dialog'):
+            self._strategy_manager_dialog = None
 
     def _on_trading_monitor(self) -> None:
         """交易监控"""
@@ -1959,7 +1859,8 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         try:
             from gui.dialogs.data_quality_dialog import DataQualityDialog
 
-            dialog = DataQualityDialog(self._main_window, mode='single')
+            # DataQualityDialog 接受 stock_code 参数，不是 mode 参数
+            dialog = DataQualityDialog(self._main_window, stock_code=None)
             self.center_dialog(dialog)
             dialog.exec_()
 
@@ -1971,8 +1872,10 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
     def _on_batch_quality_check(self) -> None:
         """批量质量检查"""
         try:
+            from gui.dialogs.data_quality_dialog import DataQualityDialog
 
-            dialog = DataQualityDialog(self._main_window, mode='batch')
+            # 批量质量检查也使用相同的对话框
+            dialog = DataQualityDialog(self._main_window, stock_code=None)
             self.center_dialog(dialog)
             dialog.exec_()
 
@@ -2075,17 +1978,16 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
     def _on_database_admin(self) -> None:
         """数据库管理"""
         try:
+            logger.info("打开数据库管理界面")
+
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
-            # 直接打开数据库管理对话框，让用户在统一界面中选择数据库
-            # 使用默认数据库路径，用户可以在界面中切换
-            default_db = "db/hikyuu_system.db"
+            # 使用默认数据库路径
+            default_db = "db/factorweave_system.db"
 
             dialog = DatabaseAdminDialog(default_db, self._main_window)
             self.center_dialog(dialog)
             dialog.exec_()
-
-            logger.info("打开数据库管理界面")
 
         except ImportError:
             QMessageBox.information(
@@ -2701,11 +2603,17 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         try:
             from gui.dialogs.data_export_dialog import DataExportDialog
 
-            dialog = DataExportDialog(self._main_window)
-            self.center_dialog(dialog)
-            dialog.exec_()
+            # 使用通用对话框管理方法
+            dialog = self._manage_dialog(
+                'data_export',
+                DataExportDialog,
+                self._main_window
+            )
 
-            logger.info("启动数据导出")
+            if dialog is not None:  # 如果创建了新对话框
+                self.center_dialog(dialog)
+                dialog.show()
+                logger.info("启动数据导出")
 
         except ImportError:
             # 如果对话框不存在，使用简单的文件保存对话框
@@ -3072,27 +2980,39 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             logger.error(f"数据使用条款失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法查看数据使用条款: {e}")
 
-    def _on_toggle_toolbar(self) -> None:
+    def _on_toggle_toolbar(self, checked=None) -> None:
         """切换工具栏显示/隐藏"""
         try:
             toolbar = self._main_window.toolBar()
             if toolbar:
-                is_visible = toolbar.isVisible()
-                toolbar.setVisible(not is_visible)
-                logger.info(f"工具栏已{'隐藏' if is_visible else '显示'}")
+                if checked is not None:
+                    # 从复选框菜单项调用，使用传入的状态
+                    toolbar.setVisible(checked)
+                    logger.info(f"工具栏已{'显示' if checked else '隐藏'}")
+                else:
+                    # 直接调用，切换当前状态
+                    is_visible = toolbar.isVisible()
+                    toolbar.setVisible(not is_visible)
+                    logger.info(f"工具栏已{'隐藏' if is_visible else '显示'}")
             else:
                 logger.warning("工具栏不存在")
         except Exception as e:
             logger.error(f"切换工具栏失败: {e}")
 
-    def _on_toggle_statusbar(self) -> None:
+    def _on_toggle_statusbar(self, checked=None) -> None:
         """切换状态栏显示/隐藏"""
         try:
             statusbar = self._main_window.statusBar()
             if statusbar:
-                is_visible = statusbar.isVisible()
-                statusbar.setVisible(not is_visible)
-                logger.info(f"状态栏已{'隐藏' if is_visible else '显示'}")
+                if checked is not None:
+                    # 从复选框菜单项调用，使用传入的状态
+                    statusbar.setVisible(checked)
+                    logger.info(f"状态栏已{'显示' if checked else '隐藏'}")
+                else:
+                    # 直接调用，切换当前状态
+                    is_visible = statusbar.isVisible()
+                    statusbar.setVisible(not is_visible)
+                    logger.info(f"状态栏已{'隐藏' if is_visible else '显示'}")
             else:
                 logger.warning("状态栏不存在")
         except Exception as e:

@@ -60,7 +60,7 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 # 数据库路径
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'hikyuu_system.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.db')
 
 
 def get_unified_data_manager() -> Optional['UnifiedDataManager']:
@@ -224,6 +224,7 @@ class UnifiedDataManager:
 
         # 插件化数据源管理
         self._plugin_data_sources = {}
+        self._registered_data_sources = {}  # 存储已注册的数据源信息
         self._data_source_priorities = {
             'stock': ['hikyuu', 'eastmoney', 'sina', 'tonghuashun'],
             'futures': [],
@@ -758,7 +759,7 @@ class UnifiedDataManager:
             """
 
             result = self.duckdb_operations.execute_query(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 query=query,
                 params=[stock_code, count]
             )
@@ -784,11 +785,11 @@ class UnifiedDataManager:
 
             # 确保表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", table_name)
+                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", table_name)
 
             # 插入数据（使用upsert避免重复）
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 table_name=table_name,
                 data=data,
                 upsert=True
@@ -1604,6 +1605,19 @@ class UnifiedDataManager:
                 self.tet_pipeline._plugins[plugin_id] = adapter.plugin
                 logger.info(f"✅ 插件 {plugin_id} 已注册到TET管道插件字典")
 
+            # 记录已注册的数据源信息
+            plugin_info = {
+                'plugin_id': plugin_id,
+                'adapter': adapter,
+                'priority': priority,
+                'weight': weight,
+                'display_name': getattr(adapter, 'display_name', plugin_id),
+                'supported_assets': getattr(adapter, 'supported_assets', []),
+                'status': 'active'
+            }
+            self._registered_data_sources[plugin_id] = plugin_info
+            logger.info(f"✅ 数据源 {plugin_id} 信息已记录")
+
             return True
 
         except Exception as e:
@@ -1611,6 +1625,48 @@ class UnifiedDataManager:
             import traceback
             logger.error(f"详细错误信息: {traceback.format_exc()}")
             return False
+
+    def get_registered_data_sources(self) -> Dict[str, Dict[str, Any]]:
+        """
+        获取所有已注册的数据源
+
+        Returns:
+            Dict[str, Dict[str, Any]]: 已注册的数据源信息
+        """
+        return self._registered_data_sources.copy()
+
+    def get_available_data_source_names(self) -> List[str]:
+        """
+        获取可用数据源名称列表
+
+        Returns:
+            List[str]: 数据源名称列表
+        """
+        # 基础数据源
+        base_sources = ['HIkyuu', '东方财富', '新浪财经', '同花顺']
+
+        # 添加已注册的插件数据源
+        plugin_sources = []
+        for plugin_id, info in self._registered_data_sources.items():
+            display_name = info.get('display_name', plugin_id)
+            if display_name not in base_sources:
+                plugin_sources.append(display_name)
+
+        # 合并并去重
+        all_sources = base_sources + plugin_sources
+        return list(dict.fromkeys(all_sources))  # 保持顺序的去重
+
+    def get_data_source_info(self, plugin_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取指定数据源的详细信息
+
+        Args:
+            plugin_id: 数据源插件ID
+
+        Returns:
+            Optional[Dict[str, Any]]: 数据源信息或None
+        """
+        return self._registered_data_sources.get(plugin_id)
 
     def _legacy_get_stock_data(self, symbol: str, period: str = "D", **kwargs) -> Optional[pd.DataFrame]:
         """传统方式获取股票数据"""
@@ -1830,7 +1886,7 @@ class UnifiedDataManager:
             """
 
             result = self.duckdb_operations.execute_query(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 query=query,
                 params=[stock_code]
             )
@@ -1852,12 +1908,12 @@ class UnifiedDataManager:
 
             # 确保财务数据表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", "financial_statements")
+                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", "financial_statements")
 
             # 转换为DataFrame并存储
             df = pd.DataFrame([data])
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 table_name="financial_statements",
                 data=df,
                 upsert=True
@@ -1940,7 +1996,7 @@ class UnifiedDataManager:
             """
 
             result = self.duckdb_operations.execute_query(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 query=query,
                 params=[indicator, period, count]
             )
@@ -1964,11 +2020,11 @@ class UnifiedDataManager:
 
             # 确保宏观数据表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/hikyuu_analytics.db", "macro_economic_data")
+                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", "macro_economic_data")
 
             # 插入数据
             result = self.duckdb_operations.insert_dataframe(
-                database_path="db/hikyuu_analytics.db",
+                database_path="db/kline_stock.duckdb",
                 table_name="macro_economic_data",
                 data=data,
                 upsert=True

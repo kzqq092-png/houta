@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 统一数据库初始化脚本
-在 hikyuu_system.db 中创建完整的指标系统表结构，支持技术指标和形态识别
+在 factorweave_system.db 中创建完整的指标系统表结构，支持技术指标和形态识别
 """
 
 import sqlite3
@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'hikyuu_system.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'factorweave_system.db')
 
 
 def backup_database():

@@ -39,7 +39,7 @@ class AlgorithmVersion:
 class VersionManager:
     """算法版本管理器"""
 
-    def __init__(self, db_path: str = 'db/hikyuu_system.db'):
+    def __init__(self, db_path: str = 'db/factorweave_system.db'):
         self.db_manager = OptimizationDatabaseManager(db_path)
         self.max_versions_per_pattern = 10  # 每个形态最多保留10个版本
 
@@ -523,7 +523,7 @@ class VersionManager:
             return None
 
 
-def create_version_manager(db_path: str = 'db/hikyuu_system.db') -> VersionManager:
+def create_version_manager(db_path: str = 'db/factorweave_system.db') -> VersionManager:
     """创建版本管理器实例"""
     return VersionManager(db_path)
 

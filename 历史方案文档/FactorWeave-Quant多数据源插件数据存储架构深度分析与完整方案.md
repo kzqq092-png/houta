@@ -83,7 +83,7 @@ SQLite (OLTP)              │  DuckDB (OLAP)
 ```
 
 #### 3.2 现有数据库文件
-- **hikyuu_system.db** (180KB) - SQLite系统数据库
+- **factorweave_system.db** (180KB) - SQLite系统数据库
 - **factorweave_system.db** (3.0MB) - FactorWeave系统数据库
 - **factorweave_analytics.db** (3.2MB) - DuckDB分析数据库
 

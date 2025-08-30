@@ -81,6 +81,41 @@ class DataImportWidget(QWidget):
 
         logger.info("数据导入界面初始化完成")
 
+    def _populate_data_sources(self):
+        """动态获取并填充数据源列表"""
+        try:
+            # 尝试从服务容器获取统一数据管理器
+            try:
+                from core.containers import get_service_container
+                from core.services.unified_data_manager import UnifiedDataManager
+
+                service_container = get_service_container()
+                if service_container.is_registered(UnifiedDataManager):
+                    data_manager = service_container.resolve(UnifiedDataManager)
+
+                    # 获取可用数据源名称
+                    available_sources = data_manager.get_available_data_source_names()
+                    if available_sources:
+                        self.data_source_combo.addItems(available_sources)
+                        logger.info(f"✅ 动态加载数据源: {available_sources}")
+                        return
+                    else:
+                        logger.warning("⚠️ 未找到可用数据源，使用默认列表")
+                else:
+                    logger.warning("⚠️ 服务容器中未找到数据管理器")
+            except Exception as e:
+                logger.warning(f"⚠️ 获取数据管理器失败: {e}")
+
+            # 降级到默认数据源列表
+            default_sources = ["HIkyuu", "东方财富", "新浪财经", "同花顺", "Wind万得"]
+            self.data_source_combo.addItems(default_sources)
+            logger.info(f"📋 使用默认数据源列表: {default_sources}")
+
+        except Exception as e:
+            logger.error(f"❌ 填充数据源列表失败: {e}")
+            # 最后的降级方案
+            self.data_source_combo.addItems(["HIkyuu", "东方财富"])
+
     def _init_execution_engine_async(self):
         """异步初始化执行引擎"""
         def init_engine():
@@ -160,6 +195,9 @@ class DataImportWidget(QWidget):
             self.config_manager = None
             self.execution_engine = None
             logger.error("数据导入组件不可用，请检查系统依赖")
+
+        # 初始化任务状态跟踪
+        self.running_tasks = set()  # 跟踪正在运行的任务
 
         # 初始化异步数据导入管理器
         try:
@@ -319,7 +357,7 @@ class DataImportWidget(QWidget):
         # 数据源
         basic_layout.addWidget(QLabel("数据源:"), 1, 0)
         self.data_source_combo = QComboBox()
-        self.data_source_combo.addItems(["HIkyuu", "Wind万得", "东方财富", "新浪财经", "同花顺"])
+        self._populate_data_sources()  # 动态获取数据源
         basic_layout.addWidget(self.data_source_combo, 1, 1)
 
         # 资产类型
@@ -468,10 +506,22 @@ class DataImportWidget(QWidget):
         self.sources_table.setHorizontalHeaderLabels(["名称", "类型", "状态", "操作"])
         sources_layout.addWidget(self.sources_table)
 
-        # 添加数据源按钮
+        # 填充数据源配置表
+        self._populate_data_source_table()
+
+        # 操作按钮
+        button_layout = QHBoxLayout()
+
         add_source_button = QPushButton("➕ 添加数据源")
         add_source_button.clicked.connect(self._add_data_source)
-        sources_layout.addWidget(add_source_button)
+        button_layout.addWidget(add_source_button)
+
+        refresh_button = QPushButton("🔄 刷新")
+        refresh_button.clicked.connect(self._refresh_data_sources)
+        button_layout.addWidget(refresh_button)
+
+        button_layout.addStretch()
+        sources_layout.addLayout(button_layout)
 
         layout.addWidget(sources_group)
 
@@ -676,13 +726,23 @@ class DataImportWidget(QWidget):
         """任务选择事件"""
         current_item = self.task_list.currentItem()
         if current_item:
-            self.start_button.setEnabled(True)
-            self.stop_button.setEnabled(True)
-            self.delete_button.setEnabled(True)
+            task_id = current_item.data(Qt.UserRole)
+
+            # 根据任务状态设置按钮状态
+            is_running = task_id in self.running_tasks
+            self.start_button.setEnabled(not is_running)
+            self.stop_button.setEnabled(is_running)
+            self.delete_button.setEnabled(not is_running)
 
             # 加载任务详情
-            task_id = current_item.data(Qt.UserRole)
             self._load_task_details(task_id)
+
+            logger.info(f"选择任务: {task_id}, 运行状态: {is_running}")
+        else:
+            # 没有选择任务时禁用所有按钮
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(False)
+            self.delete_button.setEnabled(False)
 
     def _load_task_details(self, task_id: str):
         """加载任务详情"""
@@ -776,23 +836,35 @@ class DataImportWidget(QWidget):
                 if task_config:
                     # 启动异步导入
                     actual_task_id = self.async_import_manager.start_import(task_config)
+
+                    # 更新任务状态
+                    self.running_tasks.add(task_id)
+                    self.start_button.setEnabled(False)
+                    self.stop_button.setEnabled(True)
+
                     self._log_message(f"异步导入任务 {actual_task_id} 启动成功")
+                    logger.info(f"任务 {task_id} 已添加到运行列表")
                     return
                 else:
                     self._log_message(f"获取任务配置失败: {task_id}")
             except Exception as e:
                 self._log_message(f"异步导入启动失败: {e}")
+                logger.error(f"异步导入启动异常: {e}")
                 # 降级到同步模式
 
         # 降级到同步执行引擎
         if self.execution_engine:
             success = self.execution_engine.start_task(task_id)
             if success:
+                # 更新任务状态
+                self.running_tasks.add(task_id)
                 self.start_button.setEnabled(False)
                 self.stop_button.setEnabled(True)
                 self._log_message(f"任务 {task_id} 启动成功（同步模式）")
+                logger.info(f"同步任务 {task_id} 已添加到运行列表")
             else:
                 QMessageBox.warning(self, "错误", f"任务 {task_id} 启动失败")
+                logger.error(f"同步任务 {task_id} 启动失败")
         else:
             # 执行引擎尚未初始化完成
             self._log_message(f"⏳ 数据导入引擎正在初始化中，请稍后重试: {task_id}", "warning")
@@ -801,11 +873,14 @@ class DataImportWidget(QWidget):
     def _get_task_config(self, task_id: str) -> dict:
         """获取任务配置"""
         try:
+            logger.info(f"🔍 开始获取任务配置: {task_id}")
+
             if self.config_manager:
+                logger.info(f"📋 使用配置管理器获取任务配置")
                 # 从配置管理器获取任务配置
                 task_config = self.config_manager.get_import_task(task_id)
                 if task_config:
-                    return {
+                    config_dict = {
                         'task_id': task_id,
                         'mode': getattr(task_config, 'mode', 'incremental'),
                         'data_sources': getattr(task_config, 'symbols', ['default']),
@@ -815,18 +890,26 @@ class DataImportWidget(QWidget):
                         },
                         'frequency': getattr(task_config, 'frequency', 'daily')
                     }
+                    logger.info(f"✅ 从配置管理器获取到任务配置: {config_dict}")
+                    return config_dict
+                else:
+                    logger.warning(f"⚠️ 配置管理器中未找到任务: {task_id}")
 
             # 如果没有配置管理器，创建默认配置
-            return {
+            default_config = {
                 'task_id': task_id,
                 'mode': 'incremental',
                 'data_sources': ['default'],
                 'date_range': {},
                 'frequency': 'daily'
             }
+            logger.info(f"📋 使用默认配置: {default_config}")
+            return default_config
 
         except Exception as e:
-            logger.error(f"获取任务配置失败: {e}")
+            logger.error(f"❌ 获取任务配置失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
             return None
 
     def _stop_task(self):
@@ -925,16 +1008,71 @@ class DataImportWidget(QWidget):
         class StockListWorker(QThread):
             stocks_loaded = pyqtSignal(list)
             error_occurred = pyqtSignal(str)
+            progress_updated = pyqtSignal(str)  # 新增进度信号
 
             def run(self):
+                import time
+                start_time = time.time()
+
                 try:
+                    self.progress_updated.emit("正在连接数据源...")
+
+                    # 设置总体超时时间（30秒）
+                    timeout_seconds = 30
+
                     # 使用真实数据提供器获取股票列表
                     from core.real_data_provider import RealDataProvider
 
-                    real_provider = RealDataProvider()
-                    stock_codes = real_provider.get_real_stock_list(market='all', limit=500)  # 增加到500只
+                    self.progress_updated.emit("正在获取股票列表...")
+
+                    # 使用线程超时机制（Windows兼容）
+                    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+                    def create_real_provider():
+                        """在单独线程中创建RealDataProvider"""
+                        return RealDataProvider()
+
+                    def get_stock_list(provider):
+                        """在单独线程中获取股票列表"""
+                        return provider.get_real_stock_list(market='all', limit=500)
+
+                    # 使用线程池执行，设置超时
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        # 步骤1：创建RealDataProvider（5秒超时）
+                        try:
+                            future = executor.submit(create_real_provider)
+                            real_provider = future.result(timeout=5.0)
+                            self.progress_updated.emit("数据源连接成功...")
+                        except FutureTimeoutError:
+                            self.progress_updated.emit("初始化超时，使用离线列表...")
+                            raise TimeoutError("RealDataProvider初始化超时")
+                        except Exception as e:
+                            self.progress_updated.emit("初始化失败，使用离线列表...")
+                            raise Exception(f"RealDataProvider初始化失败: {e}")
+
+                        # 检查总体超时
+                        if time.time() - start_time > timeout_seconds:
+                            raise TimeoutError("获取股票列表超时")
+
+                        # 步骤2：获取股票列表（10秒超时）
+                        try:
+                            future = executor.submit(get_stock_list, real_provider)
+                            stock_codes = future.result(timeout=10.0)
+                            self.progress_updated.emit("股票列表获取成功...")
+                        except FutureTimeoutError:
+                            self.progress_updated.emit("获取超时，使用离线列表...")
+                            raise TimeoutError("获取股票列表超时")
+                        except Exception as e:
+                            self.progress_updated.emit("获取失败，使用离线列表...")
+                            raise Exception(f"获取股票列表失败: {e}")
 
                     if not stock_codes:
+                        self.progress_updated.emit("尝试备用数据源...")
+
+                        # 检查是否超时
+                        if time.time() - start_time > timeout_seconds:
+                            raise TimeoutError("获取股票列表超时")
+
                         # 如果真实数据提供器失败，尝试使用统一数据管理器
                         from core.services.unified_data_manager import UnifiedDataManager
                         data_manager = UnifiedDataManager()
@@ -943,22 +1081,62 @@ class DataImportWidget(QWidget):
                         if not stock_df.empty and 'code' in stock_df.columns:
                             stock_codes = stock_df['code'].tolist()[:500]  # 限制500只
                         else:
+                            self.progress_updated.emit("使用离线股票列表...")
                             logger.warning("无法获取真实股票列表，使用默认股票池")
-                            stock_codes = [
-                                "000001", "000002", "000858", "002415", "000725", "000776",
-                                "600000", "600036", "600519", "600887", "600276", "600585",
-                                "002304", "002594", "002714", "300059", "300124", "300750"
-                            ]
+                            stock_codes = self._get_default_stock_list()
+
+                    # 检查获取到的股票数量
+                    if len(stock_codes) == 0:
+                        self.progress_updated.emit("使用离线股票列表...")
+                        stock_codes = self._get_default_stock_list()
+
+                    elapsed_time = time.time() - start_time
+                    logger.info(f"股票列表获取完成，耗时: {elapsed_time:.2f}秒，获取到: {len(stock_codes)}只股票")
 
                     self.stocks_loaded.emit(stock_codes)
 
+                except TimeoutError as e:
+                    logger.error(f"获取股票列表超时: {e}")
+                    self.progress_updated.emit("获取超时，使用离线列表...")
+                    # 超时时使用默认列表
+                    default_stocks = self._get_default_stock_list()
+                    self.stocks_loaded.emit(default_stocks)
+
                 except Exception as e:
-                    self.error_occurred.emit(str(e))
+                    logger.error(f"获取股票列表失败: {e}")
+                    error_msg = str(e)
+
+                    # 提供更友好的错误信息
+                    if "Connection" in error_msg or "timeout" in error_msg.lower():
+                        error_msg = "网络连接失败，已使用离线股票列表"
+                        # 网络错误时也提供默认列表
+                        default_stocks = self._get_default_stock_list()
+                        self.stocks_loaded.emit(default_stocks)
+                    elif "akshare" in error_msg.lower():
+                        error_msg = "AKShare数据源暂时不可用，已使用离线股票列表"
+                        default_stocks = self._get_default_stock_list()
+                        self.stocks_loaded.emit(default_stocks)
+                    else:
+                        self.error_occurred.emit(error_msg)
+
+            def _get_default_stock_list(self):
+                """获取默认股票列表"""
+                return [
+                    # 主板蓝筹股
+                    "000001", "000002", "000858", "002415", "000725", "000776", "002594", "300750",
+                    "600000", "600036", "600519", "600887", "600276", "600585", "601318", "601398",
+                    "601939", "603259", "002304", "002714", "300059", "300124",
+                    # 科创板
+                    "688981", "688036", "688111", "688169",
+                    # 创业板
+                    "300015", "300142", "300347", "300408", "300498"
+                ]
 
         # 创建并启动工作线程
         self.stock_worker = StockListWorker()
         self.stock_worker.stocks_loaded.connect(self._on_stocks_loaded)
         self.stock_worker.error_occurred.connect(self._on_stock_load_error)
+        self.stock_worker.progress_updated.connect(self._on_stock_load_progress)  # 连接进度信号
         self.stock_worker.start()
 
     def _on_stocks_loaded(self, stock_codes):
@@ -1000,6 +1178,11 @@ class DataImportWidget(QWidget):
         logger.error(f"获取股票列表失败: {error_msg}")
         QMessageBox.warning(self, "错误", f"获取股票列表失败: {error_msg}")
         self._restore_add_button_state()
+
+    def _on_stock_load_progress(self, progress_msg):
+        """股票列表加载进度更新"""
+        self.progress_bar.setFormat(progress_msg)
+        logger.info(f"股票列表加载进度: {progress_msg}")
 
     def _restore_add_button_state(self):
         """恢复添加按钮状态"""
@@ -1299,6 +1482,134 @@ class DataImportWidget(QWidget):
             else:
                 QMessageBox.warning(self, "错误", "配置导出失败")
 
+    def _populate_data_source_table(self):
+        """填充数据源配置表"""
+        try:
+            # 获取统一数据管理器
+            from core.containers import get_service_container
+            from core.services.unified_data_manager import UnifiedDataManager
+
+            service_container = get_service_container()
+            if not service_container.is_registered(UnifiedDataManager):
+                logger.warning("⚠️ 数据管理器不可用，无法获取数据源配置")
+                return
+
+            data_manager = service_container.resolve(UnifiedDataManager)
+            registered_sources = data_manager.get_registered_data_sources()
+
+            # 设置表格行数
+            self.sources_table.setRowCount(len(registered_sources))
+
+            # 填充数据
+            for row, (plugin_id, info) in enumerate(registered_sources.items()):
+                # 名称
+                name_item = QTableWidgetItem(info.get('display_name', plugin_id))
+                self.sources_table.setItem(row, 0, name_item)
+
+                # 类型
+                plugin_type = "数据源插件"
+                if hasattr(info.get('adapter'), 'plugin_type'):
+                    adapter_type = info['adapter'].plugin_type
+                    # 如果是枚举类型，获取其值或名称
+                    if hasattr(adapter_type, 'value'):
+                        plugin_type = str(adapter_type.value)
+                    elif hasattr(adapter_type, 'name'):
+                        plugin_type = str(adapter_type.name)
+                    else:
+                        plugin_type = str(adapter_type)
+                type_item = QTableWidgetItem(plugin_type)
+                self.sources_table.setItem(row, 1, type_item)
+
+                # 状态
+                status = info.get('status', 'unknown')
+                status_item = QTableWidgetItem(status)
+                if status == 'active':
+                    status_item.setBackground(QColor(144, 238, 144))  # 浅绿色
+                else:
+                    status_item.setBackground(QColor(255, 182, 193))  # 浅红色
+                self.sources_table.setItem(row, 2, status_item)
+
+                # 操作按钮
+                action_widget = QWidget()
+                action_layout = QHBoxLayout(action_widget)
+                action_layout.setContentsMargins(2, 2, 2, 2)
+
+                config_btn = QPushButton("配置")
+                config_btn.setFixedSize(50, 25)
+                config_btn.clicked.connect(lambda checked, pid=plugin_id: self._configure_data_source(pid))
+
+                test_btn = QPushButton("测试")
+                test_btn.setFixedSize(50, 25)
+                test_btn.clicked.connect(lambda checked, pid=plugin_id: self._test_data_source(pid))
+
+                action_layout.addWidget(config_btn)
+                action_layout.addWidget(test_btn)
+                action_layout.addStretch()
+
+                self.sources_table.setCellWidget(row, 3, action_widget)
+
+            # 调整列宽
+            self.sources_table.resizeColumnsToContents()
+
+            logger.info(f"✅ 数据源配置表已填充，共 {len(registered_sources)} 个数据源")
+
+        except Exception as e:
+            logger.error(f"❌ 填充数据源配置表失败: {e}")
+
+    def _configure_data_source(self, plugin_id: str):
+        """配置数据源"""
+        QMessageBox.information(self, "配置数据源", f"配置数据源 {plugin_id} 的功能开发中...")
+
+    def _test_data_source(self, plugin_id: str):
+        """测试数据源连接"""
+        try:
+            from core.containers import get_service_container
+            from core.services.unified_data_manager import UnifiedDataManager
+
+            service_container = get_service_container()
+            data_manager = service_container.resolve(UnifiedDataManager)
+
+            # 获取数据源信息
+            source_info = data_manager.get_data_source_info(plugin_id)
+            if source_info:
+                QMessageBox.information(
+                    self,
+                    "测试结果",
+                    f"数据源 {plugin_id} 连接正常\n"
+                    f"显示名称: {source_info.get('display_name', 'N/A')}\n"
+                    f"优先级: {source_info.get('priority', 'N/A')}\n"
+                    f"状态: {source_info.get('status', 'N/A')}"
+                )
+            else:
+                QMessageBox.warning(self, "测试失败", f"未找到数据源 {plugin_id} 的信息")
+
+        except Exception as e:
+            logger.error(f"❌ 测试数据源失败: {e}")
+            QMessageBox.critical(self, "测试失败", f"测试数据源连接失败:\n{str(e)}")
+
+    def _refresh_data_sources(self):
+        """刷新数据源列表"""
+        try:
+            # 刷新数据源配置表
+            self._populate_data_source_table()
+
+            # 刷新任务管理中的数据源下拉框
+            current_text = self.data_source_combo.currentText()
+            self.data_source_combo.clear()
+            self._populate_data_sources()
+
+            # 尝试恢复之前的选择
+            index = self.data_source_combo.findText(current_text)
+            if index >= 0:
+                self.data_source_combo.setCurrentIndex(index)
+
+            logger.info("✅ 数据源列表已刷新")
+            QMessageBox.information(self, "刷新完成", "数据源列表已更新")
+
+        except Exception as e:
+            logger.error(f"❌ 刷新数据源失败: {e}")
+            QMessageBox.critical(self, "刷新失败", f"刷新数据源列表失败:\n{str(e)}")
+
     def _add_data_source(self):
         """添加数据源"""
         QMessageBox.information(self, "提示", "数据源配置功能开发中...")
@@ -1329,20 +1640,36 @@ class DataImportWidget(QWidget):
         """任务完成处理"""
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+
+        # 从运行列表中移除任务
+        self.running_tasks.discard(task_id)
+
+        # 更新按钮状态
+        current_item = self.task_list.currentItem()
+        if current_item and current_item.data(Qt.UserRole) == task_id:
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
 
         self._log_message(f"任务 {task_id} 执行完成")
+        logger.info(f"任务 {task_id} 已从运行列表中移除")
         self._update_monitor_stats()
 
     def _on_task_failed(self, task_id: str, error_message: str):
         """任务失败处理"""
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+
+        # 从运行列表中移除任务
+        self.running_tasks.discard(task_id)
+
+        # 更新按钮状态
+        current_item = self.task_list.currentItem()
+        if current_item and current_item.data(Qt.UserRole) == task_id:
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
 
         self._log_message(f"任务 {task_id} 执行失败: {error_message}")
+        logger.info(f"失败任务 {task_id} 已从运行列表中移除")
         QMessageBox.warning(self, "任务失败", f"任务执行失败:\n{error_message}")
 
     # ==================== 异步导入信号处理 ====================
@@ -1370,8 +1697,15 @@ class DataImportWidget(QWidget):
         """异步导入完成"""
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+
+        # 从运行列表中移除任务
+        self.running_tasks.discard(task_id)
+
+        # 更新按钮状态
+        current_item = self.task_list.currentItem()
+        if current_item and current_item.data(Qt.UserRole) == task_id:
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
 
         imported_count = result.get('imported_count', 0)
         failed_count = result.get('failed_count', 0)
@@ -1379,6 +1713,7 @@ class DataImportWidget(QWidget):
         self._log_message(f"✅ 异步导入任务完成: {task_id}")
         self._log_message(f"   - 成功导入: {imported_count} 条记录")
         self._log_message(f"   - 失败记录: {failed_count} 条")
+        logger.info(f"异步任务 {task_id} 已从运行列表中移除")
 
         # 更新监控统计
         self._update_monitor_stats()
@@ -1387,10 +1722,18 @@ class DataImportWidget(QWidget):
         """异步导入失败"""
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+
+        # 从运行列表中移除任务
+        self.running_tasks.discard(task_id)
+
+        # 更新按钮状态
+        current_item = self.task_list.currentItem()
+        if current_item and current_item.data(Qt.UserRole) == task_id:
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
 
         self._log_message(f"❌ 异步导入任务失败: {task_id} - {error_msg}", "error")
+        logger.info(f"失败的异步任务 {task_id} 已从运行列表中移除")
         QMessageBox.warning(self, "异步导入失败", f"异步导入任务失败:\n{error_msg}")
 
     def _on_async_data_chunk_imported(self, task_id: str, imported: int, total: int):

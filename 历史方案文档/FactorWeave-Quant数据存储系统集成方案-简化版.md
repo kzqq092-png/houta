@@ -255,7 +255,7 @@ plugins/*/plugin.py -> 继承新基类
             "threads": "auto"
         },
         "sqlite": {
-            "path": "db/hikyuu_system.db"
+            "path": "db/factorweave_system.db"
         }
     },
     "cache": {

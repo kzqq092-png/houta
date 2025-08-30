@@ -151,7 +151,7 @@ class MasterDatabaseInitializer:
         import sqlite3
 
         try:
-            db_path = self.db_dir / "hikyuu_system.db"
+            db_path = self.db_dir / "factorweave_system.db"
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
 

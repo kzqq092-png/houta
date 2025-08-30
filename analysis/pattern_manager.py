@@ -28,7 +28,7 @@ class PatternManager:
         """
         if db_path is None:
             self.db_path = os.path.join(os.path.dirname(
-                __file__), '..', 'db', 'hikyuu_system.db')
+                __file__), '..', 'db', 'factorweave_system.db')
         else:
             self.db_path = db_path
 

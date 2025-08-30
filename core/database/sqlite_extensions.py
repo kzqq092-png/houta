@@ -78,7 +78,7 @@ class PerformanceStatistic:
 class SQLiteExtensionManager:
     """SQLite扩展管理器"""
 
-    def __init__(self, db_path: str = "db/hikyuu_system.db"):
+    def __init__(self, db_path: str = "db/factorweave_system.db"):
         """
         初始化SQLite扩展管理器
 
@@ -732,7 +732,7 @@ _sqlite_extension_manager: Optional[SQLiteExtensionManager] = None
 _manager_lock = threading.Lock()
 
 
-def get_sqlite_extension_manager(db_path: str = "db/hikyuu_system.db") -> SQLiteExtensionManager:
+def get_sqlite_extension_manager(db_path: str = "db/factorweave_system.db") -> SQLiteExtensionManager:
     """获取全局SQLite扩展管理器实例"""
     global _sqlite_extension_manager
 

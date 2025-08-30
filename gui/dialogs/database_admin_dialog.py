@@ -325,7 +325,11 @@ class DatabaseAdminDialog(QDialog):
         self.restore_splitter_state = restore_splitter_state
         main_layout.addWidget(main_splitter)
         # 连接数据库
-        self.db = QSqlDatabase.addDatabase("QSQLITE", "dbadmin")
+        # 使用唯一的连接名称，避免冲突
+        import time
+        self.connection_name = f"dbadmin_{int(time.time() * 1000)}"
+
+        self.db = QSqlDatabase.addDatabase("QSQLITE", self.connection_name)
         self.db.setDatabaseName(self.db_path)
         self.db.open()
         tables = self.db.tables()
@@ -1495,3 +1499,30 @@ class DatabaseAdminDialog(QDialog):
             # 限制记录数量，避免内存占用过大
             if len(self.slow_queries) > 1000:
                 self.slow_queries = self.slow_queries[-500:]  # 保留最近500条
+
+    def closeEvent(self, event):
+        """对话框关闭事件处理"""
+        try:
+            # 首先清理所有使用数据库连接的对象
+            if hasattr(self, 'model') and self.model:
+                # 清理 QSqlTableModel
+                self.model.clear()
+                self.table_view.setModel(None)
+                self.model.deleteLater()
+                self.model = None
+
+            # 关闭数据库连接
+            if hasattr(self, 'db') and self.db and self.db.isOpen():
+                self.db.close()
+
+            # 移除数据库连接（使用唯一的连接名称）
+            if hasattr(self, 'connection_name') and QSqlDatabase.contains(self.connection_name):
+                QSqlDatabase.removeDatabase(self.connection_name)
+
+            print(f"数据库连接 {getattr(self, 'connection_name', 'unknown')} 已正确清理")
+
+        except Exception as e:
+            print(f"关闭数据库连接时出错: {e}")
+
+        # 调用父类的关闭事件
+        super().closeEvent(event)

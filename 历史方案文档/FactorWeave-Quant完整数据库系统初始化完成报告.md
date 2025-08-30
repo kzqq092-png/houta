@@ -41,7 +41,7 @@ FactorWeave-Quant 数据库架构
 
 ## 📊 详细实现内容
 
-### 1. SQLite系统数据库 (hikyuu_system.db)
+### 1. SQLite系统数据库 (factorweave_system.db)
 
 #### 核心表结构
 | 表名 | 用途 | 记录数 |
@@ -196,7 +196,7 @@ FactorWeave-Quant 数据库架构
 ### 数据库连接配置
 ```python
 # SQLite连接 (OLTP)
-sqlite_path = "db/hikyuu_system.db"
+sqlite_path = "db/factorweave_system.db"
 connection_mode = "WAL"
 
 # DuckDB连接 (OLAP)  

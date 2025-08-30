@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 统一指标服务
-整合技术指标和形态识别功能，使用 hikyuu_system.db 作为唯一数据源
+整合技术指标和形态识别功能，使用 factorweave_system.db 作为唯一数据源
 支持指标计算、形态识别、参数管理等全部功能
 """
 
@@ -31,7 +31,7 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 # 统一数据库路径
-UNIFIED_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'hikyuu_system.db')
+UNIFIED_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'factorweave_system.db')
 
 # 尝试导入TA-Lib
 try:

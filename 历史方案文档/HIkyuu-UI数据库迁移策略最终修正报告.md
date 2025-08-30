@@ -236,7 +236,7 @@ SELECT * FROM sqlite_table;
 ### 2. 技术架构简化
 ```
 简化的双层数据库架构:
-├── hikyuu_system.db (SQLite) - 配置、事务、用户数据
+├── factorweave_system.db (SQLite) - 配置、事务、用户数据
 └── hikyuu_analytics.db (DuckDB) - 分析、策略、指标数据
 ```
 

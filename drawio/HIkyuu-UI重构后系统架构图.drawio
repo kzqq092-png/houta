@@ -76,7 +76,7 @@
                 <mxCell id="database-layer" value="数据库层 (Database Layer) - 保持不变" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;fontColor=#080808;" parent="3" vertex="1">
                     <mxGeometry width="1000" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="system-db-new" value="hikyuu_system.db&#10;系统配置" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#080808;" parent="3" vertex="1">
+                <mxCell id="system-db-new" value="factorweave_system.db&#10;系统配置" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#080808;" parent="3" vertex="1">
                     <mxGeometry x="30" y="60" width="120" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="indicators-db-new" value="indicators.db&#10;指标定义" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#080808;" parent="3" vertex="1">

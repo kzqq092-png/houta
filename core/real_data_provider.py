@@ -34,7 +34,7 @@ class RealDataProvider:
             self.data_manager = get_data_manager()
         except ImportError:
             from .services.unified_data_manager import get_unified_data_manager
-        self.data_manager = get_unified_data_manager()
+            self.data_manager = get_unified_data_manager()
 
         # 缓存管理
         self._cache = {}

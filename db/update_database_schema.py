@@ -24,7 +24,7 @@ class DatabaseSchemaUpdater:
 
     def __init__(self):
         self.db_dir = Path(__file__).parent
-        self.sqlite_db_path = self.db_dir / "hikyuu_system.db"
+        self.sqlite_db_path = self.db_dir / "factorweave_system.db"
         self.factorweave_db_path = self.db_dir / "factorweave_system.db"
         self.duckdb_analytics_path = self.db_dir / "factorweave_analytics.duckdb"
 

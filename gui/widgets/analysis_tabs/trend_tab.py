@@ -98,7 +98,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
         # 配置数据库管理
         from pathlib import Path
         project_root = Path(__file__).parent.parent.parent.parent
-        self.db_path = project_root / "db" / "hikyuu_system.db"
+        self.db_path = project_root / "db" / "factorweave_system.db"
 
         # 在父类初始化前加载设置（UI创建时需要用到）
         self.alert_settings = self._load_alert_settings_from_db_safe()

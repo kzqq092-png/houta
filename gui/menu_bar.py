@@ -196,23 +196,9 @@ class MainMenuBar(QMenuBar):
 
             # 连接信号到coordinator
             if self.coordinator:
-                # 工具栏和状态栏切换
-                self.toolbar_action.triggered.connect(
-                    lambda checked: self.coordinator._main_window.toolBar().setVisible(checked))
-                self.statusbar_action.triggered.connect(
-                    lambda checked: self.coordinator._main_window.statusBar().setVisible(checked))
+                # 视图菜单和刷新功能的信号连接已移至统一的信号连接处理中，避免重复连接
 
-                # 刷新功能
-                self.refresh_action.triggered.connect(
-                    lambda: self.coordinator._on_refresh() if hasattr(self.coordinator, '_on_refresh') else None)
-
-                # 主题切换
-                self.default_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('default') if hasattr(self.coordinator, '_on_theme_changed') else None)
-                self.light_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('light') if hasattr(self.coordinator, '_on_theme_changed') else None)
-                self.dark_theme_action.triggered.connect(
-                    lambda: self.coordinator._on_theme_changed('dark') if hasattr(self.coordinator, '_on_theme_changed') else None)
+                # 主题切换信号连接已移至统一的信号连接处理中，避免重复连接
 
                 # 性能仪表板信号连接已移至性能监控菜单
                 pass
@@ -388,15 +374,8 @@ class MainMenuBar(QMenuBar):
                 self.import_history_action.triggered.connect(
                     lambda: self.coordinator._on_import_history() if hasattr(self.coordinator, '_on_import_history') else None)
 
-                # 传统数据管理功能
-                self.import_data_action.triggered.connect(
-                    lambda: self.coordinator._on_import_data() if hasattr(self.coordinator, '_on_import_data') else None)
-                self.export_data_action.triggered.connect(
-                    lambda: self.coordinator._on_export_data() if hasattr(self.coordinator, '_on_export_data') else None)
-                self.database_admin_action.triggered.connect(
-                    lambda: self.coordinator._on_database_admin() if hasattr(self.coordinator, '_on_database_admin') else None)
-                self.data_quality_action.triggered.connect(
-                    lambda: self.coordinator._on_data_quality_check() if hasattr(self.coordinator, '_on_data_quality_check') else None)
+                # 传统数据管理功能的信号连接已移至统一的信号连接处理中
+                # 避免重复连接导致方法被调用多次
 
         except Exception as e:
             if self.log_manager:
@@ -425,7 +404,7 @@ class MainMenuBar(QMenuBar):
             # WebGPU状态
             self.webgpu_status_action = QAction("WebGPU状态", self)
             self.webgpu_status_action.setStatusTip("查看WebGPU硬件加速状态")
-            self.webgpu_status_action.triggered.connect(self.show_webgpu_status)
+            # 信号连接已移至统一的信号连接处理中，避免重复连接
             self.tools_menu.addAction(self.webgpu_status_action)
 
             self.tools_menu.addSeparator()
@@ -628,13 +607,7 @@ class MainMenuBar(QMenuBar):
         try:
             self.toggle_log_action = QAction("显示/隐藏日志", self)
             self.toggle_log_action.setStatusTip("显示或隐藏日志输出区")
-            if self.coordinator and hasattr(self.coordinator, 'toggle_log_panel'):
-                self.toggle_log_action.triggered.connect(
-                    lambda: self.coordinator.toggle_log_panel())
-            else:
-                # 保持向后兼容
-                self.toggle_log_action.triggered.connect(
-                    lambda: self.parent.toggle_log_panel() if hasattr(self.parent, 'toggle_log_panel') else None)
+            # 信号连接已移至统一的信号连接处理中，避免重复连接
             self.debug_menu.addAction(self.toggle_log_action)
         except Exception as e:
             if self.log_manager:
@@ -1043,7 +1016,7 @@ class MainMenuBar(QMenuBar):
                 ('performance_evaluation_action', '_on_performance_evaluation'),
 
                 # 调试功能
-                ('toggle_log_action', '_on_toggle_log'),
+                ('toggle_log_action', '_toggle_log_panel'),
 
                 # 帮助菜单
                 ('help_action', '_on_help'),
