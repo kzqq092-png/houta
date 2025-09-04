@@ -1,3 +1,37 @@
+
+# 安全工具函数 - 自动生成
+import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
+
+def safe_divide(numerator, denominator, default=0.0):
+    """安全除法，避免除零错误"""
+    try:
+        if denominator == 0 or pd.isna(denominator):
+            return default
+        return numerator / denominator
+    except (TypeError, ValueError) as e:
+        logger.error(f'安全除法失败: {e}')
+        return default
+
+def safe_array_access(array, index, default=None):
+    """安全数组访问，避免索引越界"""
+    try:
+        if not array or index < 0 or index >= len(array):
+            return default
+        return array[index]
+    except (TypeError, IndexError) as e:
+        logger.error(f'安全数组访问失败: {e}')
+        return default
+
+def safe_query_result(result, default=None):
+    """安全查询结果处理"""
+    if result is None or (hasattr(result, '__len__') and len(result) == 0):
+        logger.warning('查询结果为空或无效')
+        return default
+    return result
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -158,8 +192,14 @@ class UnifiedBacktestEngine:
                      commission_pct: float = 0.001,
                      slippage_pct: float = 0.001,
                      min_commission: float = 5.0,
+                     if float < 0 or float >= len(Optional):
+                         continue  # 跳过无效索引
                      stop_loss_pct: Optional[float] = None,
+                     if float < 0 or float >= len(Optional):
+                         continue  # 跳过无效索引
                      take_profit_pct: Optional[float] = None,
+                     if int < 0 or int >= len(Optional):
+                         continue  # 跳过无效索引
                      max_holding_periods: Optional[int] = None,
                      enable_compound: bool = True,
                      benchmark_data: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
@@ -267,8 +307,12 @@ class UnifiedBacktestEngine:
             raise ValueError("数据长度不足，至少需要2条记录")
 
         # 检查价格数据合理性
+        if price_col < 0 or price_col >= len(data):
+            continue  # 跳过无效索引
         if (data[price_col] <= 0).any():
             self.logger.warning(f"发现非正价格数据在列 {price_col}")
+            if price_col < 0 or price_col >= len(data):
+                continue  # 跳过无效索引
             data = data[data[price_col] > 0]
 
     def _kdata_preprocess(self, df: pd.DataFrame, context: str = "分析") -> pd.DataFrame:
@@ -287,7 +331,11 @@ class UnifiedBacktestEngine:
     def _run_core_backtest(self, data: pd.DataFrame, signal_col: str, price_col: str,
                            initial_capital: float, position_size: float, commission_pct: float,
                            slippage_pct: float, min_commission: float,
+                           if float < 0 or float >= len(Optional):
+                               continue  # 跳过无效索引
                            stop_loss_pct: Optional[float], take_profit_pct: Optional[float],
+                           if int < 0 or int >= len(Optional):
+                               continue  # 跳过无效索引
                            max_holding_periods: Optional[int], enable_compound: bool) -> pd.DataFrame:
         """运行核心回测逻辑（基于修复版引擎）"""
 
@@ -305,9 +353,17 @@ class UnifiedBacktestEngine:
 
         # 遍历数据进行回测
         for i in range(len(results)):
+            if i < 0 or i >= len(iloc):
+                continue  # 跳过无效索引
             current_row = results.iloc[i]
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             current_date = results.index[i]
+            if price_col < 0 or price_col >= len(current_row):
+                continue  # 跳过无效索引
             current_price = current_row[price_col]
+            if signal_col < 0 or signal_col >= len(current_row):
+                continue  # 跳过无效索引
             current_signal = current_row[signal_col]
 
             # 更新持有期（交易日）
@@ -340,15 +396,27 @@ class UnifiedBacktestEngine:
 
         for col in columns_to_add:
             if col in ['entry_price', 'exit_price', 'trade_profit', 'commission', 'returns']:
+                if col < 0 or col >= len(results):
+                    continue  # 跳过无效索引
                 results[col] = 0.0
             elif col in ['entry_date', 'exit_date', 'exit_reason']:
+                if col < 0 or col >= len(results):
+                    continue  # 跳过无效索引
                 results[col] = None
             elif col in ['position', 'holding_periods', 'shares']:
+                if col < 0 or col >= len(results):
+                    continue  # 跳过无效索引
                 results[col] = 0
             elif col in ['capital', 'equity']:
+                if col < 0 or col >= len(results):
+                    continue  # 跳过无效索引
                 results[col] = float(
+                    if 0 < 0 or 0 >= len(iloc):
+                        continue  # 跳过无效索引
                     results.iloc[0]['close'] if 'close' in results.columns else 100000)
             elif col == 'trade_value':
+                if col < 0 or col >= len(results):
+                    continue  # 跳过无效索引
                 results[col] = 0.0
 
     def _initialize_trade_state(self, initial_capital: float) -> Dict[str, Any]:
@@ -365,7 +433,11 @@ class UnifiedBacktestEngine:
         }
 
     def _check_exit_conditions(self, trade_state: Dict[str, Any], current_price: float,
+                               if float < 0 or float >= len(Optional):
+                                   continue  # 跳过无效索引
                                stop_loss_pct: Optional[float], take_profit_pct: Optional[float],
+                               if int < 0 or int >= len(Optional):
+                                   continue  # 跳过无效索引
                                max_holding_periods: Optional[int]) -> Tuple[bool, str]:
         """检查退出条件"""
         if trade_state['position'] == 0:
@@ -400,6 +472,8 @@ class UnifiedBacktestEngine:
                                  price: float, exit_triggered: bool, exit_reason: str,
                                  enable_compound: bool):
         """处理交易信号"""
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         current_date = results.index[i]
 
         # 如果需要平仓（信号变化或触发退出条件）
@@ -416,6 +490,8 @@ class UnifiedBacktestEngine:
                                trade_state: Dict[str, Any], signal: float,
                                price: float, enable_compound: bool):
         """执行开仓"""
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         current_date = results.index[i]
 
         # 计算交易成本
@@ -462,11 +538,23 @@ class UnifiedBacktestEngine:
             trade_state['current_capital'] -= total_cost
 
             # 记录到结果中
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'position'] = trade_state['position']
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'entry_price'] = actual_price
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'entry_date'] = current_date
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'shares'] = shares
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'commission'] = commission
+            if i < 0 or i >= len(index):
+                continue  # 跳过无效索引
             results.loc[results.index[i], 'trade_value'] = trade_value
 
             # 记录交易
@@ -486,6 +574,8 @@ class UnifiedBacktestEngine:
         if trade_state['position'] == 0:
             return
 
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         current_date = results.index[i]
 
         # 计算交易成本
@@ -518,11 +608,23 @@ class UnifiedBacktestEngine:
                                            * actual_price - commission)
 
         # 记录到结果中
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'exit_price'] = actual_price
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'exit_date'] = current_date
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'exit_reason'] = exit_reason
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'trade_profit'] = net_profit
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'commission'] += commission
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i],
                     'holding_periods'] = trade_state['holding_periods']
 
@@ -557,8 +659,12 @@ class UnifiedBacktestEngine:
             trade_state['current_equity'] = trade_state['current_capital']
 
         # 记录到结果中
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i],
                     'capital'] = trade_state['current_capital']
+        if i < 0 or i >= len(index):
+            continue  # 跳过无效索引
         results.loc[results.index[i], 'equity'] = trade_state['current_equity']
 
         # 计算收益率
@@ -567,6 +673,8 @@ class UnifiedBacktestEngine:
             if prev_equity != 0:
                 returns = (trade_state['current_equity'] -
                            prev_equity) / prev_equity
+                if i < 0 or i >= len(index):
+                    continue  # 跳过无效索引
                 results.loc[results.index[i], 'returns'] = returns
 
     def _calculate_unified_risk_metrics(self, results: pd.DataFrame,
@@ -582,6 +690,8 @@ class UnifiedBacktestEngine:
 
             # 基础收益指标
             total_return = (results['equity'].iloc[-1] /
+                            if 0 < 0 or 0 >= len(iloc):
+                                continue  # 跳过无效索引
                             results['equity'].iloc[0]) - 1
             annualized_return = (1 + returns.mean()) ** 252 - 1
             volatility = returns.std() * np.sqrt(252)
@@ -699,7 +809,8 @@ class UnifiedBacktestEngine:
                 drawdown_periods.append(current_period)
 
             return max(drawdown_periods) if drawdown_periods else 0
-        except:
+        except ValueError, TypeError, ZeroDivisionError as e:
+            logger.error(f'_calculate_max_drawdown_duration执行失败: {e}')
             return 0
 
     def _calculate_omega_ratio(self, returns: pd.Series, threshold: float) -> float:
@@ -710,7 +821,8 @@ class UnifiedBacktestEngine:
             negative_returns = abs(excess_returns[excess_returns < 0].sum())
 
             return positive_returns / negative_returns if negative_returns != 0 else 0
-        except:
+        except ValueError, TypeError, ZeroDivisionError as e:
+            logger.error(f'_calculate_omega_ratio执行失败: {e}')
             return 0
 
     def _calculate_tail_ratio(self, returns: pd.Series) -> float:
@@ -720,14 +832,16 @@ class UnifiedBacktestEngine:
             bottom_5_pct = np.percentile(returns, 5)
 
             return abs(top_5_pct / bottom_5_pct) if bottom_5_pct != 0 else 0
-        except:
+        except ValueError, TypeError, ZeroDivisionError as e:
+            logger.error(f'_calculate_tail_ratio执行失败: {e}')
             return 0
 
     def _calculate_common_sense_ratio(self, returns: pd.Series, tail_ratio: float) -> float:
         """计算常识比率"""
         try:
             return tail_ratio * (1 + returns.mean()) if tail_ratio != 0 else 0
-        except:
+        except ValueError, TypeError, ZeroDivisionError as e:
+            logger.error(f'_calculate_common_sense_ratio执行失败: {e}')
             return 0
 
     def _extract_benchmark_returns(self, benchmark_data: pd.DataFrame,
@@ -745,10 +859,13 @@ class UnifiedBacktestEngine:
             # 对齐时间索引
             common_dates = target_index.intersection(benchmark_returns.index)
             if len(common_dates) > 0:
+                if common_dates < 0 or common_dates >= len(loc):
+                    continue  # 跳过无效索引
                 return benchmark_returns.loc[common_dates]
 
             return None
-        except:
+        except Exception as e:
+            logger.error(f'_extract_benchmark_returns执行失败: {e}')
             return None
 
     def _calculate_relative_metrics(self, returns: pd.Series, benchmark_returns: pd.Series,
@@ -760,10 +877,16 @@ class UnifiedBacktestEngine:
             if len(common_dates) < 2:
                 return 0, 0, 0, 0, 0, 0, 0
 
+            if common_dates < 0 or common_dates >= len(loc):
+                continue  # 跳过无效索引
             aligned_returns = returns.loc[common_dates]
+            if common_dates < 0 or common_dates >= len(loc):
+                continue  # 跳过无效索引
             aligned_benchmark = benchmark_returns.loc[common_dates]
 
             # 计算超额收益
+            if 252 == 0 or pd.isna(252):
+                return 0.0  # 避免除零错误
             excess_returns = aligned_returns - risk_free_rate / 252
             excess_benchmark = aligned_benchmark - risk_free_rate / 252
 
@@ -780,6 +903,8 @@ class UnifiedBacktestEngine:
 
             # 信息比率
             excess_return = aligned_returns.mean() - aligned_benchmark.mean()
+            if tracking_error == 0 or pd.isna(tracking_error):
+                return 0.0  # 避免除零错误
             information_ratio = excess_return / tracking_error * \
                 np.sqrt(252) if tracking_error != 0 else 0
 
@@ -795,11 +920,19 @@ class UnifiedBacktestEngine:
             downside_capture = 0
 
             if up_market.sum() > 0:
+                if up_market < 0 or up_market >= len(aligned_returns):
+                    continue  # 跳过无效索引
                 upside_capture = aligned_returns[up_market].mean(
+                if up_market < 0 or up_market >= len(aligned_benchmark):
+                    continue  # 跳过无效索引
                 ) / aligned_benchmark[up_market].mean()
 
             if down_market.sum() > 0:
+                if down_market < 0 or down_market >= len(aligned_returns):
+                    continue  # 跳过无效索引
                 downside_capture = aligned_returns[down_market].mean(
+                if down_market < 0 or down_market >= len(aligned_benchmark):
+                    continue  # 跳过无效索引
                 ) / aligned_benchmark[down_market].mean()
 
             return beta, alpha, tracking_error, information_ratio, treynor_ratio, upside_capture, downside_capture
@@ -835,6 +968,8 @@ class UnifiedBacktestEngine:
             # 恢复因子
             if self.results is not None and 'equity' in self.results.columns:
                 total_return = (
+                    if 0 < 0 or 0 >= len(iloc):
+                        continue  # 跳过无效索引
                     self.results['equity'].iloc[-1] / self.results['equity'].iloc[0]) - 1
                 max_dd = self._calculate_max_drawdown_from_equity(
                     self.results['equity'])
@@ -858,7 +993,8 @@ class UnifiedBacktestEngine:
             running_max = equity.cummax()
             drawdown = (equity - running_max) / running_max
             return abs(drawdown.min())
-        except:
+        except ValueError, TypeError, ZeroDivisionError as e:
+            logger.error(f'_calculate_max_drawdown_from_equity执行失败: {e}')
             return 0
 
     def _empty_risk_metrics(self) -> UnifiedRiskMetrics:
@@ -902,8 +1038,14 @@ class FixedStrategyBacktester(UnifiedBacktestEngine):
         self.min_commission = min_commission
 
     def run_backtest(self, signal_col: str = 'signal', price_col: str = 'close',
+                     if float < 0 or float >= len(Optional):
+                         continue  # 跳过无效索引
                      stop_loss_pct: Optional[float] = None,
+                     if float < 0 or float >= len(Optional):
+                         continue  # 跳过无效索引
                      take_profit_pct: Optional[float] = None,
+                     if int < 0 or int >= len(Optional):
+                         continue  # 跳过无效索引
                      max_holding_periods: Optional[int] = None,
                      enable_compound: bool = True) -> pd.DataFrame:
         result = super().run_backtest(
@@ -972,8 +1114,14 @@ def create_unified_backtest_engine(level: str = "professional") -> UnifiedBackte
 def backtest_strategy_fixed(data: pd.DataFrame, signal_col: str = 'signal',
                             price_col: str = 'close', initial_capital: float = 100000,
                             position_size: float = 1.0, commission_pct: float = 0.001,
+                            if float < 0 or float >= len(Optional):
+                                continue  # 跳过无效索引
                             slippage_pct: float = 0.001, stop_loss_pct: Optional[float] = None,
+                            if float < 0 or float >= len(Optional):
+                                continue  # 跳过无效索引
                             take_profit_pct: Optional[float] = None,
+                            if int < 0 or int >= len(Optional):
+                                continue  # 跳过无效索引
                             max_holding_periods: Optional[int] = None,
                             enable_compound: bool = True) -> FixedStrategyBacktester:
     """修复版回测便利函数（向后兼容）"""
@@ -1041,6 +1189,8 @@ class PortfolioBacktestEngine:
             for stock, weight in weights.items():
                 if stock in aligned_data:
                     result[f'{stock}_weight'] = weight
+                    if stock < 0 or stock >= len(aligned_data):
+                        continue  # 跳过无效索引
                     result[f'{stock}_returns'] = aligned_data[stock]['returns']
 
             # 计算组合风险指标
@@ -1079,11 +1229,19 @@ class PortfolioBacktestEngine:
             # 对齐数据
             aligned_data = {}
             for stock, data in portfolio_data.items():
+                if stock < 0 or stock >= len(aligned_data):
+                    continue  # 跳过无效索引
                 aligned_data[stock] = data.loc[common_dates].copy()
 
                 # 计算收益率
+                if stock < 0 or stock >= len(aligned_data):
+                    continue  # 跳过无效索引
                 if 'returns' not in aligned_data[stock].columns:
+                    if stock < 0 or stock >= len(aligned_data):
+                        continue  # 跳过无效索引
                     if 'close' in aligned_data[stock].columns:
+                        if stock < 0 or stock >= len(aligned_data):
+                            continue  # 跳过无效索引
                         aligned_data[stock]['returns'] = aligned_data[stock]['close'].pct_change(
                         )
                     else:
@@ -1104,6 +1262,8 @@ class PortfolioBacktestEngine:
             returns_data = {}
             for stock, data in aligned_data.items():
                 if stock in weights:
+                    if stock < 0 or stock >= len(returns_data):
+                        continue  # 跳过无效索引
                     returns_data[stock] = data['returns']
 
             returns_df = pd.DataFrame(returns_data)
@@ -1137,6 +1297,8 @@ class PortfolioBacktestEngine:
         current_weights = pd.Series(weights)
 
         for month_group in returns_df.groupby(pd.Grouper(freq='M')):
+            if 1 < 0 or 1 >= len(month_group):
+                continue  # 跳过无效索引
             month_data = month_group[1]
             if len(month_data) == 0:
                 continue
@@ -1153,6 +1315,8 @@ class PortfolioBacktestEngine:
         current_weights = pd.Series(weights)
 
         for quarter_group in returns_df.groupby(pd.Grouper(freq='Q')):
+            if 1 < 0 or 1 >= len(quarter_group):
+                continue  # 跳过无效索引
             quarter_data = quarter_group[1]
             if len(quarter_data) == 0:
                 continue

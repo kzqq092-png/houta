@@ -1,0 +1,1636 @@
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QTableView, QPushButton, QMessageBox, QLineEdit, QLabel, QFileDialog, QStyledItemDelegate, QSpinBox, QDoubleSpinBox, QDateEdit, QCheckBox, QComboBox, QInputDialog, QSplitter, QHeaderView, QWidget
+from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
+from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
+from PyQt5.QtGui import QFont, QColor, QBrush
+import os
+import csv
+import json
+import requests
+import time
+import logging
+import glob
+from datetime import datetime
+
+
+class DatabaseScanThread(QThread):
+    """数据库扫描线程"""
+    scan_completed = pyqtSignal(dict)
+    scan_error = pyqtSignal(str)
+
+    def run(self):
+        """执行数据库扫描"""
+        try:
+            databases = {
+                'sqlite': [],
+                'duckdb': []
+            }
+
+            # 只扫描db目录
+            db_dir = os.path.join(os.getcwd(), 'db')
+            if not os.path.exists(db_dir):
+                self.scan_completed.emit(databases)
+                return
+
+            # 扫描db目录中的数据库文件
+            scan_patterns = [
+                os.path.join(db_dir, "*.db"),
+                os.path.join(db_dir, "*.sqlite"),
+                os.path.join(db_dir, "*.sqlite3"),
+                os.path.join(db_dir, "*.duckdb"),
+            ]
+
+            for pattern in scan_patterns:
+                for file_path in glob.glob(pattern):
+                    if os.path.isfile(file_path):
+                        file_size = os.path.getsize(file_path)
+                        # 跳过空文件或过小的文件
+                        if file_size < 1024:  # 小于1KB
+                            continue
+
+                        # 根据扩展名分类
+                        ext = os.path.splitext(file_path)[1].lower()
+                        if ext in ['.db', '.sqlite', '.sqlite3']:
+                            # 检查是否真的是SQLite文件
+                            if self._is_sqlite_file(file_path):
+                                databases['sqlite'].append({
+                                    'path': file_path,
+                                    'name': os.path.basename(file_path),
+                                    'size': self._format_file_size(file_size)
+                                })
+                        elif ext == '.duckdb':
+                            # 标准DuckDB文件
+                            if self._is_duckdb_file(file_path):
+                                databases['duckdb'].append({
+                                    'path': file_path,
+                                    'name': os.path.basename(file_path),
+                                    'size': self._format_file_size(file_size)
+                                })
+
+            self.scan_completed.emit(databases)
+
+        except Exception as e:
+            self.scan_error.emit(str(e))
+
+    def _is_sqlite_file(self, file_path):
+        """检查文件是否为有效的SQLite数据库"""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(file_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _is_duckdb_file(self, file_path):
+        """检查文件是否为有效的DuckDB数据库"""
+        try:
+            import duckdb
+            conn = duckdb.connect(file_path)
+            conn.execute("SHOW TABLES;")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _format_file_size(self, size_bytes):
+        """格式化文件大小"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+
+class TypeDelegate(QStyledItemDelegate):
+    def __init__(self, field_types, parent=None, field_permissions=None, table_name=None):
+        super().__init__(parent)
+        self.field_types = field_types
+        self.field_permissions = field_permissions or {}
+        self.table_name = table_name
+
+    def createEditor(self, parent, option, index):
+        field = index.model().headerData(index.column(), Qt.Horizontal)
+        # 字段级只读限制
+        if self.field_permissions.get(self.table_name, {}).get(field) == 'readonly':
+            return None
+        ftype = self.field_types.get(field, '').lower()
+        if 'int' in ftype:
+            editor = QSpinBox(parent)
+            editor.setMinimum(-2**31)
+            editor.setMaximum(2**31-1)
+            return editor
+        elif 'real' in ftype or 'float' in ftype or 'double' in ftype:
+            editor = QDoubleSpinBox(parent)
+            editor.setDecimals(6)
+            editor.setMinimum(-1e12)
+            editor.setMaximum(1e12)
+            return editor
+        elif 'date' in ftype:
+            editor = QDateEdit(parent)
+            editor.setCalendarPopup(True)
+            editor.setDisplayFormat('yyyy-MM-dd')
+            return editor
+        elif 'bool' in ftype or 'tinyint(1)' in ftype:
+            editor = QCheckBox(parent)
+            return editor
+        else:
+            return super().createEditor(parent, option, index)
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        field = index.model().headerData(index.column(), Qt.Horizontal)
+        ftype = self.field_types.get(field, '').lower()
+        if isinstance(editor, QSpinBox):
+            editor.setValue(int(value) if value not in (None, '') else 0)
+        elif isinstance(editor, QDoubleSpinBox):
+            editor.setValue(float(value) if value not in (None, '') else 0.0)
+        elif isinstance(editor, QDateEdit):
+            if value:
+                editor.setDate(QDate.fromString(str(value)[:10], 'yyyy-MM-dd'))
+            else:
+                editor.setDate(QDate.currentDate())
+        elif isinstance(editor, QCheckBox):
+            editor.setChecked(
+                bool(int(value)) if value not in (None, '') else False)
+        else:
+            super().setEditorData(editor, index)
+
+    def setModelData(self, editor, model, index):
+        field = model.headerData(index.column(), Qt.Horizontal)
+        # 字段级只读限制
+        if self.field_permissions.get(self.table_name, {}).get(field) == 'readonly':
+            return
+        ftype = self.field_types.get(field, '').lower()
+        if isinstance(editor, QSpinBox):
+            model.setData(index, editor.value())
+        elif isinstance(editor, QDoubleSpinBox):
+            model.setData(index, editor.value())
+        elif isinstance(editor, QDateEdit):
+            model.setData(index, editor.date().toString('yyyy-MM-dd'))
+        elif isinstance(editor, QCheckBox):
+            model.setData(index, 1 if editor.isChecked() else 0)
+        else:
+            super().setModelData(editor, model, index)
+
+
+class DatabaseAdminDialog(QDialog):
+    def __init__(self, db_path, parent=None, mode='admin'):
+        super().__init__(parent)
+        self.field_permissions = {}  # 提前初始化，防止AttributeError
+        self.setWindowTitle("数据库管理后台")
+        self.resize(1000, 650)
+        self.db_path = db_path
+        self.mode = mode  # 'readonly', 'write', 'admin'
+        self.current_table = None
+        self.page_size = 50
+        self.current_page = 0
+        self.log = []
+
+        # 慢SQL记录功能
+        self.slow_query_threshold = 500  # 慢查询阈值(毫秒)
+        self.slow_queries = []  # 慢查询记录
+
+        # 数据库文件管理
+        self.available_databases = {
+            'sqlite': [],
+            'duckdb': []
+        }
+        self.current_db_type = 'sqlite'  # 默认类型
+        self.selected_db_path = db_path  # 当前选择的数据库路径
+
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+
+        # 数据库连接区域 - 集成到顶部
+        self._create_database_connection_panel(main_layout)
+
+        main_splitter = QSplitter(Qt.Horizontal)
+        # 左侧表名列表
+        self.table_list = QListWidget()
+        self.table_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.table_list.setWordWrap(True)
+        self.table_list.itemClicked.connect(self.load_table)
+        # 修复1：设置最小宽度和初始宽度，防止表名被遮挡
+        self.table_list.setMinimumWidth(140)
+        self.table_list.setMaximumWidth(320)
+        self.table_list.setFixedWidth(180)  # 可根据实际表名长度调整
+        main_splitter.addWidget(self.table_list)
+        # 右侧内容区
+        right_widget = QWidget(self)
+        right_layout = QVBoxLayout(right_widget)
+        # 搜索栏
+        search_layout = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("字段/内容搜索...支持模糊")
+        self.search_edit.textChanged.connect(self.apply_search)
+        search_layout.addWidget(QLabel("搜索:"))
+        search_layout.addWidget(self.search_edit)
+        right_layout.addLayout(search_layout)
+        # 表格
+        self.table_view = QTableView()
+        self.table_view.setAlternatingRowColors(True)
+        self.table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.table_view.setSelectionMode(QTableView.ExtendedSelection)
+        self.table_view.setFont(QFont("Consolas", 10))
+        # self.table_view.horizontalHeader().setStyleSheet("font-weight:bold; padding: 4px; background: #E3F2FD; border: none;")
+        self.table_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Interactive)  # 允许拖拽列宽
+        self.table_view.horizontalHeader().setStretchLastSection(False)  # 修复3：最右侧显示网格线
+        self.table_view.setShowGrid(True)  # 显示单元格网格线
+        self.table_view.setWordWrap(False)  # 防止表头字段名被遮挡
+        self.table_view.setHorizontalScrollMode(QTableView.ScrollPerPixel)
+        self.table_view.setVerticalScrollMode(QTableView.ScrollPerPixel)
+        right_layout.addWidget(self.table_view, 8)
+        # 主题表特殊说明
+        self.theme_hint = QLabel()
+        self.theme_hint.setStyleSheet(
+            "color:#1976D2;font-size:13px;background:#E3F2FD;border-radius:4px;padding:4px;")
+        self.theme_hint.setVisible(False)
+        right_layout.addWidget(self.theme_hint)
+        # 分页
+        page_layout = QHBoxLayout()
+        self.prev_btn = QPushButton("上一页")
+        self.next_btn = QPushButton("下一页")
+        self.page_label = QLabel()
+        self.prev_btn.clicked.connect(self.prev_page)
+        self.next_btn.clicked.connect(self.next_page)
+        page_layout.addWidget(self.prev_btn)
+        page_layout.addWidget(self.page_label)
+        page_layout.addWidget(self.next_btn)
+        right_layout.addLayout(page_layout)
+        # 操作按钮
+        btn_layout = QHBoxLayout()
+        self.add_btn = QPushButton("新增")
+        self.del_btn = QPushButton("删除")
+        self.save_btn = QPushButton("保存修改")
+        self.import_btn = QPushButton("导入CSV")
+        self.export_btn = QPushButton("导出CSV")
+        self.batch_btn = QPushButton("批量修改")
+        self.log_btn = QPushButton("查看权限变更日志")
+        self.perm_btn = QPushButton("字段权限管理")
+        self.upload_btn = QPushButton("上传权限到云端")
+        self.download_btn = QPushButton("从云端拉取权限")
+        self.schema_btn = QPushButton("表结构管理")
+        self.stats_btn = QPushButton("数据统计")
+        self.slow_sql_btn = QPushButton("慢SQL记录")
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItems(["中文", "English"])
+        self.lang_combo.currentTextChanged.connect(self.switch_language)
+        self.log_btn.clicked.connect(self.show_permission_log)
+        self.perm_btn.clicked.connect(self.show_permission_manager)
+        self.upload_btn.clicked.connect(self.upload_permissions_to_cloud)
+        self.download_btn.clicked.connect(self.download_permissions_from_cloud)
+        self.schema_btn.clicked.connect(self.show_schema_manager)
+        self.stats_btn.clicked.connect(self.show_table_stats)
+        self.slow_sql_btn.clicked.connect(self.show_slow_queries)
+        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.del_btn)
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.import_btn)
+        btn_layout.addWidget(self.export_btn)
+        btn_layout.addWidget(self.batch_btn)
+        btn_layout.addWidget(self.perm_btn)
+        btn_layout.addWidget(self.log_btn)
+        btn_layout.addWidget(self.upload_btn)
+        btn_layout.addWidget(self.download_btn)
+        btn_layout.addWidget(self.schema_btn)
+        btn_layout.addWidget(self.stats_btn)
+        btn_layout.addWidget(self.slow_sql_btn)
+        btn_layout.addWidget(self.lang_combo)
+        right_layout.addLayout(btn_layout)
+        main_splitter.addWidget(right_widget)
+        # 修复2：设置分割条初始宽度和拉伸策略，防止自动回弹
+        main_splitter.setSizes([180, 820])  # 总宽度1000，左180右820
+        main_splitter.setStretchFactor(0, 0)
+        main_splitter.setStretchFactor(1, 1)
+        main_splitter.setCollapsible(0, False)
+        main_splitter.setCollapsible(1, False)
+        # 修复4：分割条拖动事件，记忆并恢复宽度
+
+        def save_splitter_state():
+            self._splitter_sizes = main_splitter.sizes()
+
+        def restore_splitter_state():
+            if hasattr(self, '_splitter_sizes'):
+                main_splitter.setSizes(self._splitter_sizes)
+        main_splitter.splitterMoved.connect(
+            lambda pos, idx: save_splitter_state())
+        self.restore_splitter_state = restore_splitter_state
+        main_layout.addWidget(main_splitter)
+        # 连接数据库
+        # 使用唯一的连接名称，避免冲突
+        import time
+        self.connection_name = f"dbadmin_{int(time.time() * 1000)}"
+
+        self.db = QSqlDatabase.addDatabase("QSQLITE", self.connection_name)
+        self.db.setDatabaseName(self.db_path)
+        self.db.open()
+        tables = self.db.tables()
+        self.table_list.addItems(tables)
+        # 自动高亮themes表
+        if "themes" in tables:
+            items = self.table_list.findItems("themes", Qt.MatchExactly)
+            if items:
+                self.table_list.setCurrentItem(items[0])
+                self.load_table(items[0])
+                self.theme_hint.setText(
+                    "\u2605 主题表(themes)：用于管理UI主题，支持QSS/JSON类型，建议通过主题管理界面操作。可直接编辑、导入导出主题内容。\n字段说明：name=主题名，type=类型(qss/json)，content=内容，origin=来源，created_at/updated_at=时间。\n如需批量导入QSS主题，可将QSS文件放入QSSTheme目录，重启后自动导入。")
+                self.theme_hint.setVisible(True)
+        else:
+            self.theme_hint.setVisible(False)
+        # 事件绑定
+        self.add_btn.clicked.connect(self.add_row)
+        self.del_btn.clicked.connect(self.del_row)
+        self.save_btn.clicked.connect(self.save_changes)
+        self.import_btn.clicked.connect(self.import_csv)
+        self.export_btn.clicked.connect(self.export_csv)
+        self.batch_btn.clicked.connect(self.show_batch_modify)
+        # 权限管理
+        if self.mode == 'readonly':
+            self.add_btn.setEnabled(False)
+            self.del_btn.setEnabled(False)
+            self.save_btn.setEnabled(False)
+            self.import_btn.setEnabled(False)
+        # 日志
+        self.log = []
+        self.log_window = None
+        # 字段权限配置（示例，可扩展为从配置文件/数据库读取）
+        self.load_field_permissions()
+        # 表格美化
+        # 左侧表名高亮
+        # 分页控件美化
+        self.page_label.setStyleSheet(
+            "font-size:13px;color:#1976D2;background:#E3F2FD;border-radius:4px;padding:2px 8px;")
+        # 空数据提示（在refresh_table中动态显示）
+
+    def load_field_permissions(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.field_permissions = json.load(f)
+            except Exception:
+                self.field_permissions = {}
+        else:
+            self.field_permissions = {}
+
+    def save_field_permissions(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        log_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions_log.json')
+        # 记录变更日志
+        old = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    old = json.load(f)
+            except Exception:
+                old = {}
+        diff = []
+        for table, fields in self.field_permissions.items():
+            for field, perm in fields.items():
+                old_perm = old.get(table, {}).get(field, None)
+                if old_perm != perm:
+                    diff.append({"table": table, "field": field,
+                                "old": old_perm, "new": perm})
+        if diff:
+            log_entry = {"time": QDate.currentDate().toString(
+                'yyyy-MM-dd'), "diff": diff}
+            logs = []
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, 'r', encoding='utf-8') as f:
+                        logs = json.load(f)
+                except Exception:
+                    logs = []
+            logs.append(log_entry)
+            with open(log_path, 'w', encoding='utf-8') as f:
+                json.dump(logs, f, ensure_ascii=False, indent=2)
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(self.field_permissions, f, ensure_ascii=False, indent=2)
+
+    def load_table(self, item):
+        self.current_table = item.text()
+        self.current_page = 0
+        self.refresh_table()
+
+    def refresh_table(self):
+        table_name = self.current_table
+        if not table_name:
+            return
+        self.model = QSqlTableModel(self, self.db)
+        self.model.setTable(table_name)
+        self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+        self.model.select()
+        # 字段类型与主键信息
+        self.field_types = {}
+        self.pk_fields = set()
+        query = self.db.exec(f"PRAGMA table_info({table_name})")
+        while query.next():
+            name = query.value(1)
+            ftype = query.value(2)
+            pk = query.value(5)
+            self.field_types[name] = ftype
+            if pk:
+                self.pk_fields.add(name)
+        # 字段级权限适配
+        perms = self.field_permissions.get(table_name, {})
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if perms.get(name) == 'hidden':
+                self.table_view.setColumnHidden(col, True)
+            else:
+                self.table_view.setColumnHidden(col, False)
+        self.table_view.setModel(self.model)
+        self.table_view.setItemDelegate(TypeDelegate(
+            self.field_types, self.table_view, self.field_permissions, table_name))
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if name in self.pk_fields:
+                self.table_view.setColumnWidth(col, 120)
+        self.apply_search()
+        self.update_page_label()
+        # 空数据提示
+        if self.model.rowCount() == 0:
+            label = QLabel("暂无数据", self.table_view)
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("color: #90A4AE; font-size: 16px;")
+            self.table_view.setIndexWidget(self.model.index(0, 0), label)
+
+    def add_row(self):
+        if hasattr(self, 'model'):
+            self.model.insertRow(self.model.rowCount())
+            self.log.append(f"新增行于表 {self.current_table}")
+
+    def del_row(self):
+        if hasattr(self, 'model'):
+            idxs = self.table_view.selectionModel().selectedRows()
+            if not idxs:
+                return
+            if QMessageBox.question(self, "确认删除", f"确定要删除选中{len(idxs)}行吗？") == QMessageBox.Yes:
+                for idx in sorted(idxs, key=lambda x: -x.row()):
+                    self.model.removeRow(idx.row())
+                self.log.append(f"批量删除{len(idxs)}行于表 {self.current_table}")
+
+    def save_changes(self):
+        if hasattr(self, 'model'):
+            if not self.model.submitAll():
+                QMessageBox.warning(
+                    self, "保存失败", self.model.lastError().text())
+            else:
+                QMessageBox.information(self, "保存成功", "所有更改已保存！")
+                self.log.append(f"保存更改于表 {self.current_table}")
+
+    def import_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "导入CSV", "", "CSV Files (*.csv)")
+        if not path:
+            return
+        with open(path, encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            for row in reader:
+                self.model.insertRow(self.model.rowCount())
+                for col, val in enumerate(row):
+                    self.model.setData(self.model.index(
+                        self.model.rowCount()-1, col), val)
+        QMessageBox.information(self, "导入完成", "CSV数据已导入，记得保存！")
+        self.log.append(f"导入CSV到表 {self.current_table}")
+
+    def export_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出CSV", f"{self.current_table}.csv", "CSV Files (*.csv)")
+        if not path:
+            return
+        with open(path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            headers = [self.model.headerData(
+                i, Qt.Horizontal) for i in range(self.model.columnCount())]
+            writer.writerow(headers)
+            for row in range(self.model.rowCount()):
+                writer.writerow([self.model.data(self.model.index(row, col))
+                                for col in range(self.model.columnCount())])
+        QMessageBox.information(self, "导出完成", "CSV数据已导出！")
+        self.log.append(f"导出CSV于表 {self.current_table}")
+
+    def apply_search(self):
+        if not hasattr(self, 'model') or not self.current_table:
+            return
+        text = self.search_edit.text().strip()
+        if not text:
+            self.model.setFilter("")
+        else:
+            filters = []
+            for col in range(self.model.columnCount()):
+                name = self.model.headerData(col, Qt.Horizontal)
+                filters.append(f"{name} LIKE '%{text}%'")
+            self.model.setFilter(" OR ".join(filters))
+        self.model.select()
+        self.update_page_label()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.refresh_table()
+
+    def next_page(self):
+        self.current_page += 1
+        self.refresh_table()
+
+    def update_page_label(self):
+        total = self.model.rowCount()
+        self.page_label.setText(
+            f"第{self.current_page+1}页 / 共{(total-1)//self.page_size+1}页  共{total}行")
+
+    def show_log(self):
+        if self.log_window is None:
+            self.log_window = QDialog(self)
+            self.log_window.setWindowTitle("操作日志")
+            vbox = QVBoxLayout(self.log_window)
+            self.log_text = QLineEdit()
+            self.log_text.setReadOnly(True)
+            vbox.addWidget(self.log_text)
+            export_btn = QPushButton("导出日志")
+            export_btn.clicked.connect(self.export_log)
+            vbox.addWidget(export_btn)
+            rollback_btn = QPushButton("撤销最近操作")
+            rollback_btn.clicked.connect(self.rollback_last)
+            vbox.addWidget(rollback_btn)
+        self.log_text.setText("\n".join(self.log))
+        self.log_window.exec_()
+
+    def export_log(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出日志", "dbadmin_log.txt", "Text Files (*.txt)")
+        if path:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(self.log))
+            QMessageBox.information(self, "导出完成", "日志已导出！")
+
+    def rollback_last(self):
+        # 简单实现：撤销最近一次新增/删除/导入操作（仅内存，未保存前有效）
+        if not self.log:
+            QMessageBox.information(self, "无操作可撤销", "没有可撤销的操作！")
+            return
+        last = self.log[-1]
+        if "新增行" in last:
+            if hasattr(self, 'model'):
+                self.model.removeRow(self.model.rowCount()-1)
+                self.log.append("撤销："+last)
+        elif "批量删除" in last:
+            QMessageBox.information(self, "暂不支持批量回滚", "批量删除暂不支持自动回滚，请手动恢复。")
+        elif "导入CSV" in last:
+            QMessageBox.information(self, "暂不支持导入回滚", "导入操作暂不支持自动回滚，请手动删除。")
+        else:
+            QMessageBox.information(self, "无法撤销", "该操作无法自动撤销。")
+
+    def show_permission_manager(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("字段权限管理")
+        vbox = QVBoxLayout(dlg)
+        table_combo = QListWidget()
+        table_combo.addItems(self.db.tables())
+        vbox.addWidget(QLabel("选择表："))
+        vbox.addWidget(table_combo)
+        field_list = QListWidget()
+        vbox.addWidget(QLabel("字段权限："))
+        vbox.addWidget(field_list)
+        perm_combo = QComboBox()
+        perm_combo.addItems(["可写", "只读", "隐藏"])
+        vbox.addWidget(QLabel("设置权限："))
+        vbox.addWidget(perm_combo)
+        save_btn = QPushButton("保存权限")
+        vbox.addWidget(save_btn)
+
+        def load_fields():
+            field_list.clear()
+            table = table_combo.currentItem().text() if table_combo.currentItem() else None
+            if not table:
+                return
+            model = QSqlTableModel(self, self.db)
+            model.setTable(table)
+            model.select()
+            for col in range(model.columnCount()):
+                name = model.headerData(col, Qt.Horizontal)
+                field_list.addItem(name)
+        table_combo.currentItemChanged.connect(lambda *_: load_fields())
+
+        def set_perm():
+            table = table_combo.currentItem().text() if table_combo.currentItem() else None
+            perm = perm_combo.currentText()
+            for item in field_list.selectedItems():
+                field = item.text()
+                if table not in self.field_permissions:
+                    self.field_permissions[table] = {}
+                if perm == "可写":
+                    self.field_permissions[table][field] = "write"
+                elif perm == "只读":
+                    self.field_permissions[table][field] = "readonly"
+                elif perm == "隐藏":
+                    self.field_permissions[table][field] = "hidden"
+            QMessageBox.information(dlg, "权限设置", "权限已设置，记得保存！")
+        perm_combo.currentTextChanged.connect(lambda _: set_perm())
+        save_btn.clicked.connect(lambda: (
+            self.save_field_permissions(), QMessageBox.information(dlg, "保存成功", "权限已保存！")))
+        load_fields()
+        dlg.exec_()
+
+    def show_batch_modify(self):
+        if not hasattr(self, 'model') or not self.current_table:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("批量字段修改/查找替换")
+        vbox = QVBoxLayout(dlg)
+        # 字段选择
+        field_label = QLabel("字段:")
+        vbox.addWidget(field_label)
+        field_combo = QListWidget()
+        for col in range(self.model.columnCount()):
+            name = self.model.headerData(col, Qt.Horizontal)
+            if self.field_permissions.get(self.current_table, {}).get(name) != 'hidden':
+                field_combo.addItem(name)
+        vbox.addWidget(field_combo)
+        # 填充值
+        fill_label = QLabel("填充值:")
+        vbox.addWidget(fill_label)
+        fill_edit = QLineEdit()
+        vbox.addWidget(fill_edit)
+        # 查找替换
+        find_label = QLabel("查找:")
+        vbox.addWidget(find_label)
+        find_edit = QLineEdit()
+        replace_label = QLabel("替换为:")
+        vbox.addWidget(replace_label)
+        replace_edit = QLineEdit()
+        vbox.addWidget(find_edit)
+        vbox.addWidget(replace_edit)
+        # 条件筛选
+        cond_label = QLabel("条件(如 a=1,b=2,支持正则):")
+        vbox.addWidget(cond_label)
+        cond_edit = QLineEdit()
+        vbox.addWidget(cond_edit)
+        # 应用按钮
+        apply_btn = QPushButton("应用")
+        vbox.addWidget(apply_btn)
+
+        def do_batch():
+            import re
+            selected_fields = [item.text()
+                               for item in field_combo.selectedItems()]
+            if not selected_fields:
+                QMessageBox.warning(dlg, "请选择字段", "请至少选择一个字段")
+                return
+            fill_val = fill_edit.text()
+            find_val = find_edit.text()
+            replace_val = replace_edit.text()
+            cond = cond_edit.text().strip()
+            # 多条件解析
+            conds = []
+            if cond:
+                for part in cond.split(','):
+                    if '=' in part:
+                        k, v = part.split('=', 1)
+                        conds.append((k.strip(), v.strip()))
+            idxs = self.table_view.selectionModel().selectedRows()
+            if not idxs:
+                idxs = [self.model.index(row, 0)
+                        for row in range(self.model.rowCount())]
+            for idx in idxs:
+                row = idx.row()
+                # 多条件判断
+                match = True
+                for k, v in conds:
+                    col_idx = None
+                    for col in range(self.model.columnCount()):
+                        if self.model.headerData(col, Qt.Horizontal) == k:
+                            col_idx = col
+                            break
+                    if col_idx is not None:
+                        cell_val = str(self.model.data(
+                            self.model.index(row, col_idx)))
+                        # 支持正则
+                        try:
+                            if not re.fullmatch(v, cell_val):
+                                match = False
+                                break
+                        except Exception:
+                            if cell_val != v:
+                                match = False
+                                break
+                if not match:
+                    continue
+                for col in range(self.model.columnCount()):
+                    name = self.model.headerData(col, Qt.Horizontal)
+                    # 字段级只读限制
+                    if self.field_permissions.get(self.current_table, {}).get(name) == 'readonly':
+                        continue
+                    if name in selected_fields:
+                        if fill_val:
+                            self.model.setData(
+                                self.model.index(row, col), fill_val)
+                        if find_val:
+                            val0 = str(self.model.data(
+                                self.model.index(row, col)))
+                            if find_val in val0:
+                                self.model.setData(self.model.index(
+                                    row, col), val0.replace(find_val, replace_val))
+            self.log.append(
+                f"批量修改字段 {selected_fields} 于表 {self.current_table}")
+            QMessageBox.information(dlg, "批量修改完成", "批量操作已完成，记得保存！")
+            dlg.accept()
+        apply_btn.clicked.connect(do_batch)
+        dlg.exec_()
+
+    def upload_permissions_to_cloud(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        url = 'https://your-cloud-api/upload'  # 替换为你的云端API
+        try:
+            with open(config_path, 'rb') as f:
+                files = {'file': ('db_field_permissions.json', f)}
+                r = requests.post(url, files=files)
+            if r.status_code == 200:
+                QMessageBox.information(self, "上传成功", "权限配置已上传到云端！")
+            else:
+                QMessageBox.warning(self, "上传失败", f"云端返回: {r.text}")
+        except Exception as e:
+            QMessageBox.warning(self, "上传失败", str(e))
+
+    def download_permissions_from_cloud(self):
+        config_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions.json')
+        url = 'https://your-cloud-api/download'  # 替换为你的云端API
+        try:
+            r = requests.get(url)
+            if r.status_code == 200:
+                with open(config_path, 'wb') as f:
+                    f.write(r.content)
+                self.load_field_permissions()
+                QMessageBox.information(self, "下载成功", "权限配置已从云端拉取并生效！")
+            else:
+                QMessageBox.warning(self, "下载失败", f"云端返回: {r.text}")
+        except Exception as e:
+            QMessageBox.warning(self, "下载失败", str(e))
+
+    def show_permission_log(self):
+        log_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_permissions_log.json')
+        dlg = QDialog(self)
+        dlg.setWindowTitle("权限变更日志")
+        vbox = QVBoxLayout(dlg)
+        log_list = QListWidget()
+        vbox.addWidget(log_list)
+        rollback_btn = QPushButton("回滚到选中版本")
+        vbox.addWidget(rollback_btn)
+        logs = []
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+                for i, entry in enumerate(logs):
+                    time = entry.get('time', '')
+                    for d in entry.get('diff', []):
+                        log_list.addItem(
+                            f"[{i}] [{time}] {d['table']}.{d['field']}: {d['old']} -> {d['new']}")
+            except Exception as e:
+                log_list.addItem(f"日志读取失败: {str(e)}")
+        else:
+            log_list.addItem("暂无日志记录")
+
+        def do_rollback():
+            idx = log_list.currentRow()
+            if idx < 0 or idx >= len(logs):
+                QMessageBox.warning(dlg, "未选择", "请先选择要回滚的版本")
+                return
+            # 回滚到选中日志之前的权限配置
+            config_path = os.path.join(os.path.dirname(
+                __file__), 'db_field_permissions.json')
+            # 重新构建权限配置
+            perms = {}
+            for i in range(idx+1):
+                for d in logs[i].get('diff', []):
+                    table, field, new = d['table'], d['field'], d['new']
+                    if table not in perms:
+                        perms[table] = {}
+                    perms[table][field] = new
+            self.field_permissions = perms
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.field_permissions, f,
+                          ensure_ascii=False, indent=2)
+            self.load_field_permissions()
+            QMessageBox.information(dlg, "回滚成功", f"已回滚到第{idx+1}个版本，权限已生效！")
+        rollback_btn.clicked.connect(do_rollback)
+        dlg.exec_()
+
+    def show_schema_manager(self):
+        table = self.current_table
+        if not table:
+            QMessageBox.warning(self, "未选择表", "请先选择要管理结构的表")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"表结构管理 - {table}")
+        vbox = QVBoxLayout(dlg)
+        # 字段注释加载
+        comment_path = os.path.join(os.path.dirname(
+            __file__), 'db_field_comments.json')
+        comments = {}
+        if os.path.exists(comment_path):
+            try:
+                with open(comment_path, 'r', encoding='utf-8') as f:
+                    comments = json.load(f)
+            except Exception:
+                comments = {}
+        if table not in comments:
+            comments[table] = {}
+        # 字段列表
+        field_list = QListWidget()
+        model = QSqlTableModel(self, self.db)
+        model.setTable(table)
+        model.select()
+        for col in range(model.columnCount()):
+            name = model.headerData(col, Qt.Horizontal)
+            comment = comments[table].get(name, "")
+            field_list.addItem(f"{name}  # {comment}" if comment else name)
+        vbox.addWidget(QLabel("字段列表："))
+        vbox.addWidget(field_list)
+        # 字段操作
+        add_btn = QPushButton("新增字段")
+        del_btn = QPushButton("删除字段")
+        type_btn = QPushButton("修改类型")
+        comment_btn = QPushButton("编辑注释")
+        vbox.addWidget(add_btn)
+        vbox.addWidget(del_btn)
+        vbox.addWidget(type_btn)
+        vbox.addWidget(comment_btn)
+
+        drop_table_btn = QPushButton("删除整表")
+        vbox.addWidget(drop_table_btn)
+
+        def add_field():
+            name, ok = QInputDialog.getText(dlg, "新增字段", "字段名：")
+            if not ok or not name:
+                return
+            ftype, ok = QInputDialog.getText(
+                dlg, "字段类型", "类型(如 TEXT, INTEGER, REAL)：")
+            if not ok or not ftype:
+                return
+            sql = f"ALTER TABLE {table} ADD COLUMN {name} {ftype}"
+            try:
+                self.db.exec(sql)
+                QMessageBox.information(dlg, "成功", f"已添加字段 {name}")
+                self.refresh_table()
+                field_list.addItem(name)
+            except Exception as e:
+                QMessageBox.warning(dlg, "失败", str(e))
+
+        def del_field():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            QMessageBox.information(
+                dlg, "提示", f"SQLite不支持直接删除字段，请用导出-重建表-导入数据方式实现。")
+
+        def change_type():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            ftype, ok = QInputDialog.getText(
+                dlg, "修改类型", f"字段 {name} 新类型：")
+            if not ok or not ftype:
+                return
+            QMessageBox.information(dlg, "提示", "SQLite不支持直接修改字段类型，请用导出-重建表-导入数据方式实现。")
+
+        def drop_table():
+            reply = QMessageBox.question(
+                dlg, "确认删除",
+                f"确定要删除整张表 {table} 吗？该操作不可恢复！",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+            try:
+                # 关闭可能的外键约束影响
+                self.db.exec("PRAGMA foreign_keys = OFF;")
+                self.db.exec(f"DROP TABLE IF EXISTS {table};")
+                self.db.exec("PRAGMA foreign_keys = ON;")
+                QMessageBox.information(dlg, "成功", f"已删除表 {table}")
+                self.refresh_table()
+                dlg.accept()
+            except Exception as e:
+                QMessageBox.critical(dlg, "删除失败", str(e))
+
+        def edit_comment():
+            item = field_list.currentItem()
+            if not item:
+                return
+            name = item.text().split('  #')[0]
+            old_comment = comments[table].get(name, "")
+            new_comment, ok = QInputDialog.getText(
+                dlg, "编辑注释", f"字段 {name} 注释：", text=old_comment)
+            if not ok:
+                return
+            comments[table][name] = new_comment
+            with open(comment_path, 'w', encoding='utf-8') as f:
+                json.dump(comments, f, ensure_ascii=False, indent=2)
+            # 刷新显示
+            field_list.clear()
+            for col in range(model.columnCount()):
+                fname = model.headerData(col, Qt.Horizontal)
+                cmt = comments[table].get(fname, "")
+                field_list.addItem(f"{fname}  # {cmt}" if cmt else fname)
+        add_btn.clicked.connect(add_field)
+        del_btn.clicked.connect(del_field)
+        type_btn.clicked.connect(change_type)
+        comment_btn.clicked.connect(edit_comment)
+        drop_table_btn.clicked.connect(drop_table)
+
+        dlg.exec_()
+
+    def show_table_stats(self):
+        table = self.current_table
+        if not table:
+            QMessageBox.warning(self, "未选择表", "请先选择要统计的表")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"数据统计 - {table}")
+        vbox = QVBoxLayout(dlg)
+        model = QSqlTableModel(self, self.db)
+        model.setTable(table)
+        model.select()
+        row_count = model.rowCount()
+        vbox.addWidget(QLabel(f"行数：{row_count}"))
+        for col in range(model.columnCount()):
+            name = model.headerData(col, Qt.Horizontal)
+            values = set()
+            for row in range(row_count):
+                values.add(str(model.data(model.index(row, col))))
+            vbox.addWidget(QLabel(f"字段 {name} - 唯一值: {len(values)}"))
+        dlg.exec_()
+
+    def switch_language(self, lang):
+        # 简单实现：按钮、标签、提示等中英文切换
+        zh = lang == "中文"
+        self.add_btn.setText("新增" if zh else "Add")
+        self.del_btn.setText("删除" if zh else "Delete")
+        self.save_btn.setText("保存修改" if zh else "Save")
+        self.import_btn.setText("导入CSV" if zh else "Import CSV")
+        self.export_btn.setText("导出CSV" if zh else "Export CSV")
+        self.batch_btn.setText("批量修改" if zh else "Batch Edit")
+        self.log_btn.setText("权限变更日志" if zh else "Perm Log")
+        self.perm_btn.setText("字段权限管理" if zh else "Field Perm")
+        self.upload_btn.setText("传权限到云" if zh else "Upload Perm")
+        self.download_btn.setText("云端拉取权" if zh else "Download Perm")
+        self.schema_btn.setText("表结构管理" if zh else "Schema")
+        self.stats_btn.setText("数据统计" if zh else "Stats")
+        self.page_label.setText(self.page_label.text().replace("页", "Page").replace("共", "Total").replace(
+            "行", "Rows") if not zh else self.page_label.text().replace("Page", "页").replace("Total", "共").replace("Rows", "行"))
+
+    def _create_database_connection_panel(self, main_layout):
+        """创建数据库连接面板 - 专业紧凑的布局"""
+        from PyQt5.QtWidgets import QGroupBox, QGridLayout, QFrame
+
+        # 创建紧凑的分组框
+        db_group = QGroupBox("数据库连接管理")
+        db_group.setFixedHeight(110)
+        db_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 1ex;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+
+        # 使用紧凑的网格布局
+        db_layout = QGridLayout(db_group)
+        db_layout.setSpacing(2)  # 减少间距
+        db_layout.setContentsMargins(15, 0, 15, 0)  # 紧凑的边距
+
+        # 第一行：类型选择和连接状态（紧凑布局）
+        type_label = QLabel("类型:")
+        type_label.setFixedWidth(40)
+        db_layout.addWidget(type_label, 0, 0)
+
+        self.db_type_combo = QComboBox()
+        self.db_type_combo.addItems(["SQLite", "DuckDB"])
+        self.db_type_combo.setFixedWidth(100)
+        self.db_type_combo.currentTextChanged.connect(self._on_database_type_changed)
+        db_layout.addWidget(self.db_type_combo, 0, 1)
+
+        # 连接状态指示器
+        status_label = QLabel("状态:")
+        status_label.setFixedWidth(30)
+        db_layout.addWidget(status_label, 0, 2)
+
+        self.current_db_label = QLabel(os.path.basename(self.selected_db_path) if self.selected_db_path else "未连接")
+        self.current_db_label.setStyleSheet("""
+            QLabel {
+                color: #2196F3;
+                font-weight: bold;
+                padding: 2px 6px;
+                border: 1px solid #2196F3;
+                border-radius: 3px;
+                background-color: #E3F2FD;
+            }
+        """)
+        self.current_db_label.setFixedWidth(180)
+        db_layout.addWidget(self.current_db_label, 0, 3)
+
+        # 第二行：文件选择（占用更多空间）
+        file_label = QLabel("文件:")
+        file_label.setFixedWidth(30)
+        db_layout.addWidget(file_label, 0, 4)
+
+        self.db_file_combo = QComboBox()
+        self.db_file_combo.setFixedWidth(500)
+        self.db_file_combo.setEditable(False)
+        self.db_file_combo.setStyleSheet("""
+            QComboBox {
+                padding: 4px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+        """)
+        db_layout.addWidget(self.db_file_combo, 0, 5)
+        # 连接按钮（突出显示）
+        self.connect_btn = QPushButton("连接")
+        self.connect_btn.setFixedWidth(150)
+        self.connect_btn.clicked.connect(self._connect_to_selected_database)
+        self.connect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        db_layout.addWidget(self.connect_btn, 0, 6)
+
+        # 第三行：操作按钮（紧凑排列）
+        btn_frame = QFrame()
+        btn_layout = QHBoxLayout(btn_frame)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(6)
+
+        # 扫描按钮
+        self.scan_btn = QPushButton("扫描")
+        self.scan_btn.clicked.connect(self._scan_databases_async)
+        self.scan_btn.setStyleSheet("""
+            QPushButton {
+                padding: 4px 8px;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                background-color: #f8f9fa;
+                min-width: 50px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        btn_layout.addWidget(self.scan_btn)
+
+        # 浏览按钮
+        self.browse_btn = QPushButton("浏览")
+        self.browse_btn.clicked.connect(self.browse_database_file)
+        self.browse_btn.setStyleSheet(self.scan_btn.styleSheet())
+        btn_layout.addWidget(self.browse_btn)
+
+        # 筛选输入框
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setPlaceholderText("筛选文件...")
+        self.filter_edit.textChanged.connect(self._filter_database_files)
+        self.filter_edit.setStyleSheet("""
+            QLineEdit {
+                padding: 4px;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                min-width: 120px;
+            }
+        """)
+        btn_layout.addWidget(self.filter_edit)
+
+        # 刷新按钮
+        self.refresh_btn = QPushButton("刷新")
+        self.refresh_btn.clicked.connect(self._scan_databases_async)
+        self.refresh_btn.setStyleSheet(self.scan_btn.styleSheet())
+        btn_layout.addWidget(self.refresh_btn)
+
+        btn_layout.addStretch()  # 推到左边
+
+        db_layout.addWidget(btn_frame, 2, 0, 1, 4)  # 跨越所有列
+
+        # 设置列的拉伸比例
+        db_layout.setColumnStretch(1, 1)  # 文件选择框可拉伸
+        db_layout.setColumnStretch(2, 1)  # 状态标签可拉伸
+
+        main_layout.addWidget(db_group)
+
+    def _connect_to_selected_database(self):
+        """连接到选择的数据库"""
+        selected_path = None
+
+        # 获取选择的路径
+        if self.db_file_combo.currentData():
+            selected_path = self.db_file_combo.currentData()
+        elif self.db_file_combo.currentText():
+            # 如果是手动输入的路径
+            input_path = self.db_file_combo.currentText()
+            if os.path.exists(input_path):
+                selected_path = input_path
+
+        if not selected_path:
+            QMessageBox.warning(self, "警告", "请选择一个有效的数据库文件")
+            return
+
+        try:
+            # 验证数据库文件
+            if self.current_db_type == 'sqlite':
+                if not self._is_sqlite_file(selected_path):
+                    QMessageBox.warning(self, "错误", "选择的文件不是有效的SQLite数据库")
+                    return
+            else:
+                if not self._is_duckdb_file(selected_path):
+                    QMessageBox.warning(self, "错误", "选择的文件不是有效的DuckDB数据库")
+                    return
+
+            # 更新当前连接
+            self.selected_db_path = selected_path
+            self.db_path = selected_path
+            self.current_db_label.setText(os.path.basename(selected_path))
+
+            # 重新连接数据库并加载表列表
+            self._reload_database_tables()
+
+            QMessageBox.information(self, "成功", f"已连接到数据库: {os.path.basename(selected_path)}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "连接失败", f"连接数据库失败: {str(e)}")
+
+    def _reload_database_tables(self):
+        """重新连接数据库并加载表列表 - 支持 SQLite 和 DuckDB"""
+        try:
+            # 清空当前表列表
+            self.table_list.clear()
+            
+            if self.current_db_type == 'duckdb':
+                # DuckDB 处理
+                import duckdb
+                conn = duckdb.connect(self.db_path)
+                
+                # 获取表列表
+                tables_result = conn.execute("SHOW TABLES").fetchall()
+                tables = [table[0] for table in tables_result]
+                
+                # 存储 DuckDB 连接供后续使用
+                self._duckdb_conn = conn
+                
+            else:
+                # SQLite 处理（原有逻辑）
+                # 关闭当前数据库连接
+                if hasattr(self, 'db') and self.db.isOpen():
+                    self.db.close()
+
+                # 重新连接数据库
+                self.db.setDatabaseName(self.db_path)
+                if not self.db.open():
+                    raise Exception(f"无法打开数据库: {self.db.lastError().text()}")
+
+                # 获取表列表
+                tables = self.db.tables()
+            
+            # 添加表到列表
+            self.table_list.addItems(tables)
+
+            # 如果有表，选择第一个
+            if tables:
+                self.table_list.setCurrentRow(0)
+                first_item = self.table_list.item(0)
+                if first_item:
+                    self.load_table(first_item)
+
+            # 更新主题提示（仅对 SQLite）
+            if self.current_db_type == 'sqlite' and "themes" in tables:
+                items = self.table_list.findItems("themes", Qt.MatchExactly)
+                if items:
+                    self.table_list.setCurrentItem(items[0])
+                    self.load_table(items[0])
+                    self.theme_hint.setText(
+                        "⭐ 主题表(themes)：用于管理UI主题，支持QSS/JSON类型，建议通过主题管理界面操作。可直接编辑、导入导出主题内容。\n字段说明：name=主题名，type=类型(qss/json)，content=内容，origin=来源，created_at/updated_at=时间。\n如需批量导入QSS主题，可将QSS文件放入QSSTheme目录，重启后自动导入。")
+                    self.theme_hint.setVisible(True)
+            else:
+                self.theme_hint.setVisible(False)
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"重新加载数据库表失败: {str(e)}")
+
+    def load_table(self, item):
+        """加载表数据 - 支持 SQLite 和 DuckDB"""
+        if not item:
+            return
+            
+        table_name = item.text()
+        self.current_table = table_name
+        
+        try:
+            if self.current_db_type == 'duckdb':
+                # DuckDB 处理
+                if hasattr(self, '_duckdb_conn'):
+                    # 获取表结构
+                    schema_result = self._duckdb_conn.execute(f"DESCRIBE {table_name}").fetchall()
+                    
+                    # 获取数据（分页）
+                    offset = self.current_page * self.page_size
+                    data_result = self._duckdb_conn.execute(
+                        f"SELECT * FROM {table_name} LIMIT {self.page_size} OFFSET {offset}"
+                    ).fetchall()
+                    
+                    # 获取总行数
+                    count_result = self._duckdb_conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                    total_rows = count_result[0] if count_result else 0
+                    
+                    # 创建自定义模型显示数据
+                    self._create_duckdb_table_model(schema_result, data_result, total_rows)
+                    
+            else:
+                # SQLite 处理（原有逻辑）
+                if hasattr(self, 'model'):
+                    self.model.deleteLater()
+                
+                self.model = QSqlTableModel(self, self.db)
+                self.model.setTable(table_name)
+                self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
+                self.model.select()
+                
+                self.table_view.setModel(self.model)
+                
+                # 更新分页信息
+                total_rows = self.model.rowCount()
+                
+            # 更新页面信息
+            total_pages = (total_rows + self.page_size - 1) // self.page_size
+            self.page_label.setText(f"第 {self.current_page + 1} 页，共 {total_pages} 页，总计 {total_rows} 行")
+            
+            # 更新按钮状态
+            self.prev_btn.setEnabled(self.current_page > 0)
+            self.next_btn.setEnabled(self.current_page < total_pages - 1)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"加载表 {table_name} 失败: {str(e)}")
+
+    def _create_duckdb_table_model(self, schema_result, data_result, total_rows):
+        """为 DuckDB 创建自定义表模型"""
+        from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant
+        
+        class DuckDBTableModel(QAbstractTableModel):
+            def __init__(self, schema, data, parent=None):
+                super().__init__(parent)
+                self.schema = schema  # [(column_name, data_type, null, key, default, extra), ...]
+                self.data = data
+                self.headers = [col[0] for col in schema]
+                
+            def rowCount(self, parent=None):
+                return len(self.data)
+                
+            def columnCount(self, parent=None):
+                return len(self.headers)
+                
+            def data(self, index, role=Qt.DisplayRole):
+                if not index.isValid():
+                    return QVariant()
+                    
+                if role == Qt.DisplayRole:
+                    return str(self.data[index.row()][index.column()])
+                    
+                return QVariant()
+                
+            def headerData(self, section, orientation, role=Qt.DisplayRole):
+                if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+                    return self.headers[section]
+                return QVariant()
+        
+        # 创建并设置模型
+        if hasattr(self, 'model'):
+            self.model.deleteLater()
+            
+        self.model = DuckDBTableModel(schema_result, data_result)
+        self.table_view.setModel(self.model)
+
+    def _filter_database_files(self):
+        """筛选数据库文件"""
+        filter_text = self.filter_edit.text().lower()
+
+        # 清空当前列表
+        self.db_file_combo.clear()
+
+        # 根据筛选条件添加文件
+        db_type = self.current_db_type
+        if db_type in self.available_databases:
+            for db_info in self.available_databases[db_type]:
+                if not filter_text or filter_text in db_info['name'].lower():
+                    display_text = f"{db_info['name']} ({db_info['size']}) - {os.path.dirname(db_info['path'])}"
+                    self.db_file_combo.addItem(display_text, db_info['path'])
+
+    def _scan_databases_async(self):
+        """异步扫描db目录中的数据库文件"""
+        from PyQt5.QtCore import QThread, pyqtSignal
+
+        # 如果已有扫描线程在运行，先停止
+        if hasattr(self, '_scan_thread') and self._scan_thread.isRunning():
+            return
+
+        # 禁用扫描按钮
+        self.scan_btn.setEnabled(False)
+        self.refresh_btn.setEnabled(False)
+        self.scan_btn.setText("扫描中...")
+
+        # 创建扫描线程
+        self._scan_thread = DatabaseScanThread()
+        self._scan_thread.scan_completed.connect(self._on_scan_completed)
+        self._scan_thread.scan_error.connect(self._on_scan_error)
+        self._scan_thread.start()
+
+    def _on_scan_completed(self, databases):
+        """扫描完成回调"""
+        self.available_databases = databases
+        self.update_database_file_list()
+
+        # 恢复按钮状态
+        self.scan_btn.setEnabled(True)
+        self.refresh_btn.setEnabled(True)
+        self.scan_btn.setText("扫描")
+
+        # 显示扫描结果
+        sqlite_count = len(databases['sqlite'])
+        duckdb_count = len(databases['duckdb'])
+        QMessageBox.information(self, "扫描完成",
+                                f"在db目录中找到:\n"
+                                f"SQLite文件: {sqlite_count} 个\n"
+                                f"DuckDB文件: {duckdb_count} 个")
+
+    def _on_scan_error(self, error_msg):
+        """扫描错误回调"""
+        # 恢复按钮状态
+        self.scan_btn.setEnabled(True)
+        self.refresh_btn.setEnabled(True)
+        self.scan_btn.setText("扫描")
+
+        QMessageBox.warning(self, "扫描失败", f"扫描数据库文件时出错:\n{error_msg}")
+
+    def scan_system_databases(self):
+        """保持向后兼容的同步扫描方法"""
+        self._scan_databases_async()
+
+    def _is_sqlite_file(self, file_path):
+        """检查文件是否为有效的SQLite数据库"""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(file_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _is_duckdb_file(self, file_path):
+        """检查文件是否为有效的DuckDB数据库"""
+        try:
+            import duckdb
+            conn = duckdb.connect(file_path)
+            conn.execute("SHOW TABLES;")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def _format_file_size(self, size_bytes):
+        """格式化文件大小"""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+    def update_database_file_list(self):
+        """更新数据库文件列表"""
+        if not hasattr(self, 'db_file_combo'):
+            return
+
+        self.db_file_combo.clear()
+
+        # 根据当前选择的数据库类型显示文件
+        db_type = self.current_db_type
+        if db_type in self.available_databases:
+            for db_info in self.available_databases[db_type]:
+                display_text = f"{db_info['name']} ({db_info['size']}) - {os.path.dirname(db_info['path'])}"
+                self.db_file_combo.addItem(display_text, db_info['path'])
+
+        # 应用当前的筛选条件
+        if hasattr(self, 'filter_edit') and self.filter_edit.text():
+            self._filter_database_files()
+
+    def _on_database_type_changed(self, type_text):
+        """数据库类型切换处理"""
+        self.current_db_type = 'sqlite' if type_text == 'SQLite' else 'duckdb'
+        self.update_database_file_list()
+
+    def browse_database_file(self):
+        """浏览选择数据库文件"""
+        from PyQt5.QtWidgets import QFileDialog
+
+        if self.current_db_type == 'sqlite':
+            file_filter = "SQLite数据库 (*.db *.sqlite *.sqlite3);;所有文件 (*.*)"
+        else:
+            file_filter = "DuckDB数据库 (*.duckdb);;所有文件 (*.*)"
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择数据库文件", "", file_filter
+        )
+
+        if file_path:
+            # 添加到对应类型的列表中
+            file_size = os.path.getsize(file_path)
+            db_info = {
+                'path': file_path,
+                'name': os.path.basename(file_path),
+                'size': self._format_file_size(file_size)
+            }
+
+            # 检查是否已存在
+            existing_paths = [db['path'] for db in self.available_databases[self.current_db_type]]
+            if file_path not in existing_paths:
+                self.available_databases[self.current_db_type].append(db_info)
+                self.update_database_file_list()
+
+            # 选中新添加的文件
+            for i in range(self.db_file_combo.count()):
+                if self.db_file_combo.itemData(i) == file_path:
+                    self.db_file_combo.setCurrentIndex(i)
+                    break
+
+    def show_slow_queries(self):
+        """显示慢SQL记录"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout, QLabel
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("慢SQL记录")
+        dialog.resize(800, 600)
+
+        layout = QVBoxLayout(dialog)
+
+        # 统计信息
+        stats_label = QLabel(f"慢查询阈值: {self.slow_query_threshold}ms | 记录数量: {len(self.slow_queries)}")
+        layout.addWidget(stats_label)
+
+        # 慢查询列表
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+
+        if not self.slow_queries:
+            text_edit.setPlainText("暂无慢查询记录")
+        else:
+            content = []
+            for i, query_info in enumerate(self.slow_queries, 1):
+                content.append(f"=== 慢查询 #{i} ===")
+                content.append(f"时间: {query_info['timestamp']}")
+                content.append(f"耗时: {query_info['duration']}ms")
+                content.append(f"SQL: {query_info['sql']}")
+                if query_info.get('error'):
+                    content.append(f"错误: {query_info['error']}")
+                content.append("")
+
+            text_edit.setPlainText("\n".join(content))
+
+        layout.addWidget(text_edit)
+
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+
+        clear_btn = QPushButton("清空记录")
+        clear_btn.clicked.connect(lambda: self._clear_slow_queries(text_edit, stats_label))
+        btn_layout.addWidget(clear_btn)
+
+        export_btn = QPushButton("导出记录")
+        export_btn.clicked.connect(lambda: self._export_slow_queries())
+        btn_layout.addWidget(export_btn)
+
+        btn_layout.addStretch()
+
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+
+        dialog.exec_()
+
+    def _clear_slow_queries(self, text_edit, stats_label):
+        """清空慢查询记录"""
+        self.slow_queries.clear()
+        text_edit.setPlainText("暂无慢查询记录")
+        stats_label.setText(f"慢查询阈值: {self.slow_query_threshold}ms | 记录数量: 0")
+
+    def _export_slow_queries(self):
+        """导出慢查询记录"""
+        from PyQt5.QtWidgets import QFileDialog
+        import json
+
+        if not self.slow_queries:
+            QMessageBox.information(self, "提示", "暂无慢查询记录可导出")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "导出慢查询记录", f"slow_queries_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            "JSON文件 (*.json);;文本文件 (*.txt)"
+        )
+
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    if file_path.endswith('.json'):
+                        json.dump(self.slow_queries, f, ensure_ascii=False, indent=2)
+                    else:
+                        for i, query_info in enumerate(self.slow_queries, 1):
+                            f.write(f"=== 慢查询 #{i} ===\n")
+                            f.write(f"时间: {query_info['timestamp']}\n")
+                            f.write(f"耗时: {query_info['duration']}ms\n")
+                            f.write(f"SQL: {query_info['sql']}\n")
+                            if query_info.get('error'):
+                                f.write(f"错误: {query_info['error']}\n")
+                            f.write("\n")
+
+                QMessageBox.information(self, "成功", f"慢查询记录已导出到: {file_path}")
+            except Exception as e:
+                QMessageBox.warning(self, "错误", f"导出失败: {str(e)}")
+
+    def record_slow_query(self, sql, duration, error=None):
+        """记录慢查询"""
+        if duration >= self.slow_query_threshold:
+            query_info = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'sql': sql,
+                'duration': duration,
+                'error': error
+            }
+            self.slow_queries.append(query_info)
+
+            # 限制记录数量，避免内存占用过大
+            if len(self.slow_queries) > 1000:
+                self.slow_queries = self.slow_queries[-500:]  # 保留最近500条
+
+    def closeEvent(self, event):
+        """对话框关闭事件处理"""
+        try:
+            # 首先清理所有使用数据库连接的对象
+            if hasattr(self, 'model') and self.model:
+                # 清理 QSqlTableModel
+                self.model.clear()
+                self.table_view.setModel(None)
+                self.model.deleteLater()
+                self.model = None
+
+            # 关闭数据库连接
+            if hasattr(self, 'db') and self.db and self.db.isOpen():
+                self.db.close()
+
+            # 移除数据库连接（使用唯一的连接名称）
+            if hasattr(self, 'connection_name') and QSqlDatabase.contains(self.connection_name):
+                QSqlDatabase.removeDatabase(self.connection_name)
+
+            print(f"数据库连接 {getattr(self, 'connection_name', 'unknown')} 已正确清理")
+
+        except Exception as e:
+            print(f"关闭数据库连接时出错: {e}")
+
+        # 调用父类的关闭事件
+        super().closeEvent(event)

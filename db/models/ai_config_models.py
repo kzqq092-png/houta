@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class AIPredictionConfigManager:
     """AI预测配置管理器"""
 
-    def __init__(self, db_path: str = "db/factorweave_system.db"):
+    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
         """
         初始化配置管理器
 

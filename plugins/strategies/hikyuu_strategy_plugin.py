@@ -20,8 +20,12 @@ try:
     import hikyuu as hku
     from hikyuu import *
     from hikyuu.trade_sys import *
-    # 确保导入所有需要的组件
-    from hikyuu.trade_sys import SL_FixedPercent, TP_FixedPercent
+    # 尝试导入止损止盈组件，如果失败则使用替代方案
+    try:
+        from hikyuu.trade_sys import SL_FixedPercent, TP_FixedPercent
+    except ImportError:
+        # 如果特定组件不可用，尝试使用其他方式
+        logging.warning("部分HIkyuu组件不可用，将使用基础功能")
     HIKYUU_AVAILABLE = True
 except ImportError as e:
     HIKYUU_AVAILABLE = False
@@ -139,13 +143,19 @@ class FactorWeaveTradingSystemAdapter:
             if 'stop_loss' in strategy_config:
                 sl_config = strategy_config['stop_loss']
                 if sl_config['type'] == 'FixedPercent':
-                    sys.sl = SL_FixedPercent(sl_config.get('percent', 0.03))
+                    try:
+                        sys.sl = SL_FixedPercent(sl_config.get('percent', 0.03))
+                    except NameError:
+                        logger.warning("SL_FixedPercent不可用，跳过止损配置")
 
             # 配置止盈
             if 'take_profit' in strategy_config:
                 tp_config = strategy_config['take_profit']
                 if tp_config['type'] == 'FixedPercent':
-                    sys.tp = TP_FixedPercent(tp_config.get('percent', 0.2))
+                    try:
+                        sys.tp = TP_FixedPercent(tp_config.get('percent', 0.2))
+                    except NameError:
+                        logger.warning("TP_FixedPercent不可用，跳过止盈配置")
 
             self.trading_system = sys
             return sys
@@ -248,12 +258,12 @@ class FactorWeaveTradingSystemAdapter:
         )
 
 
-class FactorWeaveStrategyPlugin(IStrategyPlugin):
+class HikyuuStrategyPlugin(IStrategyPlugin):
     """HIkyuu策略插件"""
 
     def __init__(self):
-        self.signal_adapter = HikyuuSignalAdapter()
-        self.trading_adapter = HikyuuTradingSystemAdapter()
+        self.signal_adapter = FactorWeaveSignalAdapter()
+        self.trading_adapter = FactorWeaveTradingSystemAdapter()
         self.strategy_config = {}
         self.current_positions = {}
         self.trade_history = []

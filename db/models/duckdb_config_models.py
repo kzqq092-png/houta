@@ -98,7 +98,7 @@ class DuckDBConfigProfile:
 class DuckDBConfigManager:
     """DuckDB配置管理器"""
 
-    def __init__(self, db_path: str = 'db/factorweave_system.db'):
+    def __init__(self, db_path: str = 'db/factorweave_system.sqlite'):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_tables()

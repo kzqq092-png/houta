@@ -4,6 +4,7 @@
 定义系统中使用的各种事件类型，所有事件都继承自BaseEvent。
 """
 
+from enum import Enum
 from abc import ABC
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -406,4 +407,73 @@ class PatternSignalsDisplayEvent(BaseEvent):
             'pattern_name': self.pattern_name,
             'all_signal_indices': self.all_signal_indices,
             'highlighted_signal_index': self.highlighted_signal_index
+        })
+
+
+# 告警相关事件
+
+
+class AlertLevel(Enum):
+    """告警级别枚举"""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+@dataclass
+class ResourceAlert(BaseEvent):
+    """
+    资源告警事件
+
+    当系统资源（CPU、内存、磁盘等）超过阈值时触发
+    """
+    level: AlertLevel = AlertLevel.WARNING
+    category: str = "系统资源"
+    message: str = ""
+    metric_name: str = ""
+    current_value: float = 0.0
+    threshold: float = 0.0
+    unit: str = "%"
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'level': self.level.value,
+            'category': self.category,
+            'message': self.message,
+            'metric_name': self.metric_name,
+            'current_value': self.current_value,
+            'threshold': self.threshold,
+            'unit': self.unit
+        })
+
+
+@dataclass
+class ApplicationAlert(BaseEvent):
+    """
+    应用告警事件
+
+    当应用指标（响应时间、错误率等）超过阈值时触发
+    """
+    level: AlertLevel = AlertLevel.WARNING
+    category: str = "应用性能"
+    message: str = ""
+    operation_name: str = ""
+    metric_name: str = ""
+    current_value: float = 0.0
+    threshold: float = 0.0
+    unit: str = ""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.data.update({
+            'level': self.level.value,
+            'category': self.category,
+            'message': self.message,
+            'operation_name': self.operation_name,
+            'metric_name': self.metric_name,
+            'current_value': self.current_value,
+            'threshold': self.threshold,
+            'unit': self.unit
         })

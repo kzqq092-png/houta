@@ -132,6 +132,9 @@ class SettingsDialog(QDialog):
         # 创建主题管理选项卡
         self._create_theme_management_tab()
 
+        # 创建DuckDB配置选项卡
+        self._create_duckdb_config_tab()
+
         # 创建按钮
         self._create_buttons(main_layout)
 
@@ -256,6 +259,260 @@ class SettingsDialog(QDialog):
 
         self.tab_widget.addTab(theme_tab, "主题管理")
 
+    def _create_duckdb_config_tab(self) -> None:
+        """创建DuckDB配置选项卡"""
+        duckdb_tab = QWidget()
+        duckdb_layout = QVBoxLayout(duckdb_tab)
+        duckdb_layout.setContentsMargins(10, 10, 10, 10)
+        duckdb_layout.setSpacing(10)
+
+        # DuckDB配置说明
+        info_group = QGroupBox("DuckDB性能配置")
+        info_layout = QVBoxLayout(info_group)
+
+        info_label = QLabel("""
+        <p><b>DuckDB</b> 是系统的高性能分析数据库，用于存储和查询回测结果、性能指标等数据。</p>
+        <p>通过优化DuckDB配置，可以显著提升数据查询和分析性能。</p>
+        <p>配置包括内存限制、线程数、缓存设置等关键参数。</p>
+        """)
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("QLabel { padding: 10px; background-color: #f8f9fa; border-radius: 5px; }")
+        info_layout.addWidget(info_label)
+
+        duckdb_layout.addWidget(info_group)
+
+        # 快速配置组
+        quick_group = QGroupBox("快速配置")
+        quick_layout = QFormLayout(quick_group)
+
+        # 性能模式选择
+        self.performance_mode_combo = QComboBox()
+        self.performance_mode_combo.addItems([
+            "自动优化 (推荐)",
+            "高性能模式",
+            "内存节约模式",
+            "平衡模式"
+        ])
+        quick_layout.addRow("性能模式:", self.performance_mode_combo)
+
+        # 内存限制
+        self.memory_limit_spin = QSpinBox()
+        self.memory_limit_spin.setRange(1, 64)
+        self.memory_limit_spin.setValue(8)
+        self.memory_limit_spin.setSuffix(" GB")
+        quick_layout.addRow("内存限制:", self.memory_limit_spin)
+
+        # 线程数
+        self.thread_count_spin = QSpinBox()
+        self.thread_count_spin.setRange(1, 32)
+        self.thread_count_spin.setValue(4)
+        quick_layout.addRow("线程数:", self.thread_count_spin)
+
+        duckdb_layout.addWidget(quick_group)
+
+        # 操作按钮组
+        button_group = QGroupBox("配置管理")
+        button_layout = QVBoxLayout(button_group)
+
+        # 打开高级配置按钮
+        self.advanced_config_btn = QPushButton("🔧 高级配置管理")
+        self.advanced_config_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.advanced_config_btn.clicked.connect(self._open_advanced_duckdb_config)
+        button_layout.addWidget(self.advanced_config_btn)
+
+        # 应用快速配置按钮
+        self.apply_quick_config_btn = QPushButton("✅ 应用快速配置")
+        self.apply_quick_config_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #1e7e34;
+            }
+        """)
+        self.apply_quick_config_btn.clicked.connect(self._apply_quick_duckdb_config)
+        button_layout.addWidget(self.apply_quick_config_btn)
+
+        # 重置为默认按钮
+        self.reset_duckdb_btn = QPushButton("🔄 重置为默认")
+        self.reset_duckdb_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #545b62;
+            }
+        """)
+        self.reset_duckdb_btn.clicked.connect(self._reset_duckdb_config)
+        button_layout.addWidget(self.reset_duckdb_btn)
+
+        duckdb_layout.addWidget(button_group)
+
+        # 状态显示
+        self.duckdb_status_label = QLabel("状态: 配置正常")
+        self.duckdb_status_label.setStyleSheet("""
+            QLabel {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+                padding: 8px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+        """)
+        duckdb_layout.addWidget(self.duckdb_status_label)
+
+        duckdb_layout.addStretch()
+        self.tab_widget.addTab(duckdb_tab, "DuckDB配置")
+
+    def _open_advanced_duckdb_config(self) -> None:
+        """打开高级DuckDB配置对话框"""
+        try:
+            from gui.dialogs.duckdb_config_dialog import show_duckdb_config_dialog
+            show_duckdb_config_dialog(self)
+            self._update_duckdb_status()
+        except Exception as e:
+            logger.error(f"打开DuckDB高级配置失败: {e}")
+            QMessageBox.warning(self, "错误", f"无法打开DuckDB高级配置: {str(e)}")
+
+    def _apply_quick_duckdb_config(self) -> None:
+        """应用快速DuckDB配置"""
+        try:
+            # 获取快速配置参数
+            mode = self.performance_mode_combo.currentText()
+            memory_gb = self.memory_limit_spin.value()
+            threads = self.thread_count_spin.value()
+
+            # 根据模式调整参数
+            if "高性能模式" in mode:
+                memory_gb = min(memory_gb * 2, 32)  # 增加内存
+                threads = min(threads * 2, 16)     # 增加线程
+            elif "内存节约模式" in mode:
+                memory_gb = max(memory_gb // 2, 2)  # 减少内存
+                threads = max(threads // 2, 2)     # 减少线程
+
+            # 应用配置到DuckDB性能优化器
+            from core.database.duckdb_performance_optimizer import DuckDBPerformanceOptimizer, WorkloadType
+
+            # 创建临时优化器来应用配置
+            optimizer = DuckDBPerformanceOptimizer("db/factorweave_analytics.duckdb")
+
+            # 根据模式选择工作负载类型
+            if "高性能模式" in mode:
+                workload = WorkloadType.OLAP
+            elif "内存节约模式" in mode:
+                workload = WorkloadType.OLTP
+            else:
+                workload = WorkloadType.MIXED
+
+            # 应用配置
+            config = optimizer.create_optimized_config(workload)
+            config.memory_limit = f"{memory_gb}GB"
+            config.threads = threads
+
+            # 更新状态
+            self.duckdb_status_label.setText(f"状态: 已应用 {mode} (内存: {memory_gb}GB, 线程: {threads})")
+            self.duckdb_status_label.setStyleSheet("""
+                QLabel {
+                    background-color: #d1ecf1;
+                    color: #0c5460;
+                    border: 1px solid #bee5eb;
+                    padding: 8px;
+                    border-radius: 5px;
+                    font-weight: bold;
+                }
+            """)
+
+            QMessageBox.information(self, "成功", f"DuckDB配置已应用:\n模式: {mode}\n内存: {memory_gb}GB\n线程: {threads}")
+
+        except Exception as e:
+            logger.error(f"应用DuckDB快速配置失败: {e}")
+            QMessageBox.warning(self, "错误", f"应用配置失败: {str(e)}")
+
+    def _reset_duckdb_config(self) -> None:
+        """重置DuckDB配置为默认值"""
+        try:
+            # 重置UI控件
+            self.performance_mode_combo.setCurrentIndex(0)  # 自动优化
+            self.memory_limit_spin.setValue(8)
+            self.thread_count_spin.setValue(4)
+
+            # 更新状态
+            self.duckdb_status_label.setText("状态: 已重置为默认配置")
+            self.duckdb_status_label.setStyleSheet("""
+                QLabel {
+                    background-color: #fff3cd;
+                    color: #856404;
+                    border: 1px solid #ffeaa7;
+                    padding: 8px;
+                    border-radius: 5px;
+                    font-weight: bold;
+                }
+            """)
+
+            QMessageBox.information(self, "成功", "DuckDB配置已重置为默认值")
+
+        except Exception as e:
+            logger.error(f"重置DuckDB配置失败: {e}")
+            QMessageBox.warning(self, "错误", f"重置配置失败: {str(e)}")
+
+    def _update_duckdb_status(self) -> None:
+        """更新DuckDB状态显示"""
+        try:
+            # 检查DuckDB连接状态
+            from core.database.factorweave_analytics_db import FactorWeaveAnalyticsDB
+
+            # 尝试连接数据库
+            db = FactorWeaveAnalyticsDB()
+            if hasattr(db, 'conn') and db.conn:
+                self.duckdb_status_label.setText("状态: DuckDB连接正常，配置已生效")
+                self.duckdb_status_label.setStyleSheet("""
+                    QLabel {
+                        background-color: #d4edda;
+                        color: #155724;
+                        border: 1px solid #c3e6cb;
+                        padding: 8px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                """)
+            else:
+                self.duckdb_status_label.setText("状态: DuckDB连接异常")
+                self.duckdb_status_label.setStyleSheet("""
+                    QLabel {
+                        background-color: #f8d7da;
+                        color: #721c24;
+                        border: 1px solid #f5c6cb;
+                        padding: 8px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                """)
+
+        except Exception as e:
+            logger.error(f"更新DuckDB状态失败: {e}")
+            self.duckdb_status_label.setText(f"状态: 检查失败 - {str(e)}")
+
     def _create_buttons(self, layout: QVBoxLayout) -> None:
         """创建对话框按钮"""
         button_box = QDialogButtonBox(
@@ -325,8 +582,25 @@ class SettingsDialog(QDialog):
                 self.cache_size_spin.setValue(
                     data_config.get('cache_size', 1000))
 
+                # 加载DuckDB配置
+                duckdb_config = config.get('duckdb', {})
+                if hasattr(self, 'performance_mode_combo'):
+                    mode = duckdb_config.get('performance_mode', '自动优化 (推荐)')
+                    index = self.performance_mode_combo.findText(mode)
+                    if index >= 0:
+                        self.performance_mode_combo.setCurrentIndex(index)
+
+                    self.memory_limit_spin.setValue(
+                        duckdb_config.get('memory_limit_gb', 8))
+                    self.thread_count_spin.setValue(
+                        duckdb_config.get('thread_count', 4))
+
         except Exception as e:
             logger.error(f"Failed to load current settings: {e}")
+
+        # 更新DuckDB状态
+        if hasattr(self, 'duckdb_status_label'):
+            self._update_duckdb_status()
 
     def _on_theme_selected(self) -> None:
         """主题选择事件"""

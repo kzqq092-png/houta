@@ -54,7 +54,7 @@ class RiskMetric:
 class RiskEvaluator:
     """风险评估器"""
 
-    def __init__(self, db_path: str = 'db/factorweave_system.db'):
+    def __init__(self, db_path: str = 'db/factorweave_system.sqlite'):
         """
         初始化风险评估器
 
@@ -643,7 +643,7 @@ class RiskEvaluator:
         return recommendations.get(level, "需要进一步评估")
 
 
-def create_risk_evaluator(db_path: str = 'db/factorweave_system.db') -> RiskEvaluator:
+def create_risk_evaluator(db_path: str = 'db/factorweave_system.sqlite') -> RiskEvaluator:
     """
     创建风险评估器实例
 

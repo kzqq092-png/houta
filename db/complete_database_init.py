@@ -34,8 +34,8 @@ class CompleteDatabaseInitializer:
 
     def __init__(self):
         self.db_dir = Path(__file__).parent
-        self.sqlite_db_path = self.db_dir / "factorweave_system.db"
-        self.factorweave_db_path = self.db_dir / "factorweave_system.db"
+        self.sqlite_db_path = self.db_dir / "factorweave_system.sqlite"
+        self.factorweave_db_path = self.db_dir / "factorweave_system.sqlite"
         self.duckdb_analytics_path = self.db_dir / "factorweave_analytics.duckdb"
 
     def initialize_all_databases(self):

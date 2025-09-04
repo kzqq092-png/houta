@@ -47,7 +47,7 @@ class EnhancedPatternRecognizer:
         """从数据库构建形态名称映射"""
         try:
             import sqlite3
-            conn = sqlite3.connect('db/factorweave_system.db')
+            conn = sqlite3.connect('db/factorweave_system.sqlite')
             cursor = conn.cursor()
             cursor.execute("SELECT name, english_name FROM pattern_types")
             mapping = {row[0]: row[1] for row in cursor.fetchall()}

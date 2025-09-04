@@ -522,12 +522,7 @@ class MainMenuBar(QMenuBar):
 
             self.performance_menu.addSeparator()
 
-            # 性能仪表板 (兼容旧功能)
-            self.performance_dashboard_action = QAction("性能仪表板(&D)", self)
-            self.performance_dashboard_action.setCheckable(True)
-            self.performance_dashboard_action.setChecked(False)
-            self.performance_dashboard_action.setStatusTip("显示/隐藏性能仪表板面板")
-            self.performance_menu.addAction(self.performance_dashboard_action)
+            # 性能仪表板已删除 - 根据用户要求移除
 
             # 注意：信号连接将在connect_signals方法中统一处理
 
@@ -1002,7 +997,7 @@ class MainMenuBar(QMenuBar):
                 ('algorithm_performance_action', '_on_algorithm_performance'),
                 ('auto_tuning_action', '_on_auto_tuning'),
                 ('performance_report_action', '_on_performance_report'),
-                ('performance_dashboard_action', '_toggle_performance_panel'),
+                # 性能仪表板信号连接已删除 - 根据用户要求移除
 
                 # 插件管理功能 - 使用MenuBar中的直接方法
                 ('data_source_plugin_action', 'show_data_source_plugin_manager'),

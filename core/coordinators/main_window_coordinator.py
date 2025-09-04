@@ -41,8 +41,8 @@ from ..services import (
     ThemeService, ConfigService, UnifiedDataManager
 )
 from optimization.optimization_dashboard import create_optimization_dashboard
-from gui.panels.performance_dashboard_panel import PerformanceDashboardPanel
-from core.metrics.repository import MetricsRepository
+from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
+
 from core.performance import measure_performance
 from gui.menu_bar import MainMenuBar
 
@@ -321,22 +321,7 @@ class MainWindowCoordinator(BaseCoordinator):
             # 设置分割器的初始大小
             vertical_splitter.setSizes([700, 200])  # 主区域和底部面板的比例
 
-            # 创建性能仪表板
-            repository = self.service_container.resolve(MetricsRepository)
-            performance_panel = PerformanceDashboardPanel(
-                self.event_bus, repository)
-
-            # 将其放入一个可停靠的窗口
-            self._performance_dock = QDockWidget("性能仪表板", self._main_window)
-            self._performance_dock.setWidget(performance_panel)
-            self._performance_dock.setAllowedAreas(
-                Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea)
-            self._main_window.addDockWidget(
-                Qt.BottomDockWidgetArea, self._performance_dock)
-            # 默认隐藏性能仪表板
-            self._performance_dock.setVisible(False)
-
-            self._panels['performance_dashboard'] = performance_panel
+            # 性能仪表板停靠窗口已删除 - 根据用户要求移除
 
             logger.info("Performance dashboard panel created and docked")
 
@@ -1983,7 +1968,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             from gui.dialogs.database_admin_dialog import DatabaseAdminDialog
 
             # 使用默认数据库路径
-            default_db = "db/factorweave_system.db"
+            default_db = "db/factorweave_system.sqlite"
 
             dialog = DatabaseAdminDialog(default_db, self._main_window)
             self.center_dialog(dialog)
@@ -2189,39 +2174,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             QMessageBox.critical(self._main_window, "错误",
                                  f"无法显示数据使用条款: {str(e)}")
 
-    def _toggle_performance_panel(self, checked: bool = None):
-        """智能切换性能仪表板显示/隐藏"""
-        try:
-            # 优先使用_performance_dock（如果存在）
-            if hasattr(self, '_performance_dock') and self._performance_dock:
-                if checked is not None:
-                    # 被菜单调用时使用checked参数
-                    self._performance_dock.setVisible(checked)
-                else:
-                    # 被快捷键等调用时自动切换
-                    is_visible = self._performance_dock.isVisible()
-                    self._performance_dock.setVisible(not is_visible)
-                logger.info(f"性能仪表板已{'显示' if self._performance_dock.isVisible() else '隐藏'}")
-                return
-
-            # 降级使用_performance_panel
-            if hasattr(self, '_performance_panel') and self._performance_panel:
-                if checked is not None:
-                    self._performance_panel.setVisible(checked)
-                else:
-                    is_visible = self._performance_panel.isVisible()
-                    self._performance_panel.setVisible(not is_visible)
-                logger.info(f"性能仪表板已{'显示' if self._performance_panel.isVisible() else '隐藏'}")
-            else:
-                # 创建新的性能仪表板
-                self._performance_panel = PerformanceDashboardPanel(self._main_window)
-                show_panel = checked if checked is not None else True
-                self._performance_panel.setVisible(show_panel)
-                logger.info("性能仪表板已创建并显示")
-
-        except Exception as e:
-            logger.error(f"切换性能仪表板失败: {e}")
-            QMessageBox.warning(self._main_window, "错误", f"无法切换性能仪表板: {e}")
+    # _toggle_performance_panel 方法已删除 - 根据用户要求移除性能仪表板
 
     def _on_performance_center(self):
         """打开性能监控中心"""
@@ -2230,10 +2183,15 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
 
             # 显示现代化性能监控界面（移除智能洞察功能）
             performance_widget = show_modern_performance_monitor(self._main_window)
-            performance_widget.setWindowTitle("FactorWeave-Quant 性能监控中心 - Professional Edition")
 
-            performance_widget.show()
-            logger.info("性能监控中心已打开")
+            if performance_widget is not None:
+                performance_widget.setWindowTitle("FactorWeave-Quant 性能监控中心 - Professional Edition")
+                performance_widget.show()
+                logger.info("性能监控中心已打开")
+            else:
+                logger.error("性能监控中心创建失败，返回None")
+                QMessageBox.warning(self._main_window, "错误", "无法创建性能监控中心窗口")
+
         except Exception as e:
             logger.error(f"打开性能监控中心失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法打开性能监控中心: {e}")
@@ -2243,8 +2201,13 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         try:
             from gui.widgets.modern_performance_widget import show_modern_performance_monitor
             performance_widget = show_modern_performance_monitor(self._main_window)
-            performance_widget.tab_widget.setCurrentIndex(0)  # 切换到系统监控tab
-            performance_widget.show()
+
+            if performance_widget is not None:
+                performance_widget.tab_widget.setCurrentIndex(0)  # 切换到系统监控tab
+                performance_widget.show()
+            else:
+                logger.error("系统性能监控窗口创建失败，返回None")
+                QMessageBox.warning(self._main_window, "错误", "无法创建系统性能监控窗口")
             logger.info("系统性能监控已打开")
         except Exception as e:
             logger.error(f"打开系统性能监控失败: {e}")

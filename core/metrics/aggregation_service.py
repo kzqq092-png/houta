@@ -115,19 +115,19 @@ class MetricsAggregationService:
             if self.repository:
                 self.repository.store_metric(
                     metric_name="cpu_usage",
-                    metric_value=event.cpu_percent,
+                    value=event.cpu_percent,
                     category="system"
                 )
 
                 self.repository.store_metric(
                     metric_name="memory_usage",
-                    metric_value=event.memory_percent,
+                    value=event.memory_percent,
                     category="system"
                 )
 
                 self.repository.store_metric(
                     metric_name="disk_usage",
-                    metric_value=event.disk_percent,
+                    value=event.disk_percent,
                     category="system"
                 )
 
@@ -157,9 +157,9 @@ class MetricsAggregationService:
             if self.repository:
                 self.repository.store_metric(
                     metric_name=f"operation.{operation_name}",
-                    metric_value=event.duration,
+                    value=event.duration,
                     category="application",
-                    tags={
+                    metadata={
                         "success": str(event.was_successful)
                     }
                 )
@@ -299,13 +299,51 @@ class MetricsAggregationService:
 
         if alerts and self.event_bus:
             try:
-                # 修复：使用关键字参数而不是位置参数传递字典
-                self.event_bus.publish("ResourceAlert",
-                                       alerts=alerts,
-                                       timestamp=time.time()
-                                       )
+                # 🔧 修复：使用正确的ResourceAlert事件对象
+                from core.events import ResourceAlert, AlertLevel
+
+                for alert_message in alerts:
+                    # 解析告警信息
+                    if "CPU使用率" in alert_message:
+                        metric_name = "cpu_usage"
+                        current_value = event.cpu_percent
+                        threshold = self.alert_thresholds['cpu']
+                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.ERROR
+                    elif "内存使用率" in alert_message:
+                        metric_name = "memory_usage"
+                        current_value = event.memory_percent
+                        threshold = self.alert_thresholds['memory']
+                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.ERROR
+                    elif "磁盘使用率" in alert_message:
+                        metric_name = "disk_usage"
+                        current_value = event.disk_percent
+                        threshold = self.alert_thresholds['disk']
+                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.CRITICAL
+                    else:
+                        metric_name = "unknown"
+                        current_value = 0.0
+                        threshold = 0.0
+                        level = AlertLevel.WARNING
+
+                    # 创建ResourceAlert事件
+                    resource_alert = ResourceAlert(
+                        level=level,
+                        category="系统资源",
+                        message=alert_message,
+                        metric_name=metric_name,
+                        current_value=current_value,
+                        threshold=threshold,
+                        unit="%"
+                    )
+
+                    # 发布事件
+                    self.event_bus.publish(resource_alert)
+                    logger.info(f"✅ 发布资源告警事件: {alert_message}")
+
             except Exception as e:
                 logger.error(f"发布资源告警事件失败: {e}")
+                import traceback
+                logger.error(f"详细错误信息: {traceback.format_exc()}")
 
     def _check_app_thresholds(self, event: ApplicationMetricRecorded) -> None:
         """
@@ -335,14 +373,57 @@ class MetricsAggregationService:
 
         if alerts and self.event_bus:
             try:
-                # 修复：使用关键字参数而不是位置参数传递字典
-                self.event_bus.publish("ApplicationAlert",
-                                       alerts=alerts,
-                                       operation=event.operation_name,
-                                       timestamp=time.time()
-                                       )
+                # 🔧 修复：使用正确的ApplicationAlert事件对象
+                from core.events import ApplicationAlert, AlertLevel
+
+                for alert_message in alerts:
+                    # 解析告警信息
+                    if "响应时间" in alert_message:
+                        metric_name = "response_time"
+                        current_value = event.duration
+                        threshold = self.alert_thresholds['operation_time']
+                        unit = "秒"
+                        level = AlertLevel.WARNING if current_value < threshold * 2 else AlertLevel.ERROR
+                    elif "错误率" in alert_message:
+                        metric_name = "error_rate"
+                        # 计算当前错误率
+                        with self._lock:
+                            if event.operation_name in self.app_metrics and self.app_metrics[event.operation_name]:
+                                metrics = self.app_metrics[event.operation_name]
+                                error_count = sum(1 for m in metrics if not m.get("success", True))
+                                current_value = error_count / len(metrics) * 100  # 转换为百分比
+                            else:
+                                current_value = 100.0  # 如果没有历史数据，假设100%错误率
+                        threshold = self.alert_thresholds['error_rate'] * 100  # 转换为百分比
+                        unit = "%"
+                        level = AlertLevel.ERROR if current_value > threshold * 2 else AlertLevel.WARNING
+                    else:
+                        metric_name = "unknown"
+                        current_value = 0.0
+                        threshold = 0.0
+                        unit = ""
+                        level = AlertLevel.WARNING
+
+                    # 创建ApplicationAlert事件
+                    app_alert = ApplicationAlert(
+                        level=level,
+                        category="应用性能",
+                        message=alert_message,
+                        operation_name=event.operation_name,
+                        metric_name=metric_name,
+                        current_value=current_value,
+                        threshold=threshold,
+                        unit=unit
+                    )
+
+                    # 发布事件
+                    self.event_bus.publish(app_alert)
+                    logger.info(f"✅ 发布应用告警事件: {alert_message}")
+
             except Exception as e:
                 logger.error(f"发布应用告警事件失败: {e}")
+                import traceback
+                logger.error(f"详细错误信息: {traceback.format_exc()}")
 
     def set_aggregation_interval(self, interval: int) -> None:
         """

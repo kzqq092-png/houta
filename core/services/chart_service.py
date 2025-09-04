@@ -609,7 +609,7 @@ class ChartService(CacheableService, ConfigurableService):
     def _get_data_manager(self):
         """获取数据管理器"""
         try:
-            return self.service_container.resolve('unified_data_manager')
+            return self.service_container.resolve_by_name('unified_data_manager')
         except Exception as e:
             logger.error(f"Failed to resolve data manager: {e}")
             return None

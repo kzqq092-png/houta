@@ -396,7 +396,7 @@ class PluginTableManager:
 class DataQualityMonitor:
     """数据质量监控器"""
 
-    def __init__(self, sqlite_path: str = "db/factorweave_system.db"):
+    def __init__(self, sqlite_path: str = "db/factorweave_system.sqlite"):
         self.sqlite_path = Path(sqlite_path)
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_tables()
@@ -600,7 +600,7 @@ class DataQualityMonitor:
 class FieldMappingManager:
     """字段映射管理器"""
 
-    def __init__(self, sqlite_path: str = "db/factorweave_system.db"):
+    def __init__(self, sqlite_path: str = "db/factorweave_system.sqlite"):
         self.sqlite_path = Path(sqlite_path)
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_tables()

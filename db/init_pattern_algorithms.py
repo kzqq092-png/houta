@@ -8,7 +8,7 @@ import os
 from typing import Dict, Any
 import pandas as pd
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'factorweave_system.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'factorweave_system.sqlite')
 
 
 def init_pattern_algorithms():

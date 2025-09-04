@@ -30,7 +30,7 @@ import sqlite3
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(
-    os.path.dirname(__file__)), 'db', 'factorweave_system.db')
+    os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')
 
 
 class ConfigManager(QObject):

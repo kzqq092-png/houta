@@ -756,14 +756,16 @@ class ProfessionalBacktestWidget(QWidget):
             try:
                 self.validator = ProfessionalBacktestValidator(
                     self.log_manager)
-            except:
+            except Exception as e:
+                logger.error(f'init_backtest_components执行失败: {e}')
                 self.validator = None
 
             # 初始化优化器（如果可用）
             try:
                 self.optimizer = UltraPerformanceOptimizer(
                     log_manager=self.log_manager)
-            except:
+            except Exception as e:
+                logger.error(f'init_backtest_components执行失败: {e}')
                 self.optimizer = None
 
             self.log_manager.log("回测组件初始化完成", LogLevel.INFO)
@@ -785,7 +787,8 @@ class ProfessionalBacktestWidget(QWidget):
                     backtest_level=backtest_level,
                     log_manager=self.log_manager
                 )
-            except:
+            except Exception as e:
+                logger.error(f'start_backtest执行失败: {e}')
                 self.backtest_engine = None
 
             # 创建监控器（如果可用）
@@ -794,7 +797,8 @@ class ProfessionalBacktestWidget(QWidget):
                     monitoring_level=MonitoringLevel.REAL_TIME,
                     log_manager=self.log_manager
                 )
-            except:
+            except Exception as e:
+                logger.error(f'start_backtest执行失败: {e}')
                 self.monitor = None
 
             # 生成模拟数据进行演示

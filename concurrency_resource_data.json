@@ -1,0 +1,1426 @@
+{
+  "thread_safety_analysis": {
+    "shared_variables": [
+      {
+        "variable": "BASIC",
+        "class": "BacktestLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 40
+      },
+      {
+        "variable": "PROFESSIONAL",
+        "class": "BacktestLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 41
+      },
+      {
+        "variable": "INSTITUTIONAL",
+        "class": "BacktestLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 42
+      },
+      {
+        "variable": "INVESTMENT_BANK",
+        "class": "BacktestLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 43
+      },
+      {
+        "variable": "BASIC",
+        "class": "RiskManagementLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 48
+      },
+      {
+        "variable": "STANDARD",
+        "class": "RiskManagementLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 49
+      },
+      {
+        "variable": "ADVANCED",
+        "class": "RiskManagementLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 50
+      },
+      {
+        "variable": "PROFESSIONAL",
+        "class": "RiskManagementLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 51
+      },
+      {
+        "variable": "total_return: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 58
+      },
+      {
+        "variable": "annualized_return: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 59
+      },
+      {
+        "variable": "volatility: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 60
+      },
+      {
+        "variable": "sharpe_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 63
+      },
+      {
+        "variable": "sortino_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 64
+      },
+      {
+        "variable": "calmar_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 65
+      },
+      {
+        "variable": "omega_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 66
+      },
+      {
+        "variable": "max_drawdown: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 69
+      },
+      {
+        "variable": "max_drawdown_duration: int",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 70
+      },
+      {
+        "variable": "var_95: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 71
+      },
+      {
+        "variable": "var_99: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 72
+      },
+      {
+        "variable": "cvar_95: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 73
+      },
+      {
+        "variable": "cvar_99: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 74
+      },
+      {
+        "variable": "skewness: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 77
+      },
+      {
+        "variable": "kurtosis: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 78
+      },
+      {
+        "variable": "beta: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 81
+      },
+      {
+        "variable": "alpha: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 82
+      },
+      {
+        "variable": "tracking_error: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 83
+      },
+      {
+        "variable": "information_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 84
+      },
+      {
+        "variable": "treynor_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 85
+      },
+      {
+        "variable": "downside_deviation: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 88
+      },
+      {
+        "variable": "upside_capture: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 89
+      },
+      {
+        "variable": "downside_capture: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 90
+      },
+      {
+        "variable": "tail_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 93
+      },
+      {
+        "variable": "common_sense_ratio: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 94
+      },
+      {
+        "variable": "win_rate: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 97
+      },
+      {
+        "variable": "profit_factor: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 98
+      },
+      {
+        "variable": "recovery_factor: float",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 99
+      },
+      {
+        "variable": "calculation_time: datetime",
+        "class": "UnifiedRiskMetrics:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 102
+      },
+      {
+        "variable": "BASIC",
+        "class": "MonitoringLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 33
+      },
+      {
+        "variable": "STANDARD",
+        "class": "MonitoringLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 34
+      },
+      {
+        "variable": "ADVANCED",
+        "class": "MonitoringLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 35
+      },
+      {
+        "variable": "REAL_TIME",
+        "class": "MonitoringLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 36
+      },
+      {
+        "variable": "INFO",
+        "class": "AlertLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 41
+      },
+      {
+        "variable": "WARNING",
+        "class": "AlertLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 42
+      },
+      {
+        "variable": "CRITICAL",
+        "class": "AlertLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 43
+      },
+      {
+        "variable": "EMERGENCY",
+        "class": "AlertLevel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 44
+      },
+      {
+        "variable": "BASIC",
+        "class": "BacktestLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 48
+      },
+      {
+        "variable": "PROFESSIONAL",
+        "class": "BacktestLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 49
+      },
+      {
+        "variable": "INSTITUTIONAL",
+        "class": "BacktestLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 50
+      },
+      {
+        "variable": "INVESTMENT_BANK",
+        "class": "BacktestLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 51
+      },
+      {
+        "variable": "BASIC",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 54
+      },
+      {
+        "variable": "STANDARD",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 55
+      },
+      {
+        "variable": "ADVANCED",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 56
+      },
+      {
+        "variable": "REAL_TIME",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 57
+      },
+      {
+        "variable": "UNIFIED_CHART_AVAILABLE",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 63
+      },
+      {
+        "variable": "UNIFIED_CHART_AVAILABLE",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 65
+      },
+      {
+        "variable": "CORE_MODULES_AVAILABLE",
+        "class": "MonitoringLevel:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 71
+      },
+      {
+        "variable": "start_backtest",
+        "class": "ControlPanel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 384
+      },
+      {
+        "variable": "stop_backtest",
+        "class": "ControlPanel",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 385
+      },
+      {
+        "variable": "backtest_completed",
+        "class": "ProfessionalBacktestWidget",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 681
+      },
+      {
+        "variable": "error_occurred",
+        "class": "ProfessionalBacktestWidget",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 682
+      }
+    ],
+    "thread_unsafe_operations": [
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 315,
+        "code": "trade_state['holding_periods'] += 1"
+      },
+      {
+        "operation": "-=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 462,
+        "code": "trade_state['current_capital'] -= total_cost"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 481,
+        "code": "self.trades.append(trade)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 517,
+        "code": "trade_state['current_capital'] += (trade_state['shares']"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 525,
+        "code": "results.loc[results.index[i], 'commission'] += commission"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 692,
+        "code": "current_period += 1"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 695,
+        "code": "drawdown_periods.append(current_period)"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 699,
+        "code": "drawdown_periods.append(current_period)"
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1146,
+        "code": "portfolio_returns.extend(month_returns.tolist())"
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1162,
+        "code": "portfolio_returns.extend(quarter_returns.tolist())"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 288,
+        "code": "self.metrics_history.append(metrics)"
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 289,
+        "code": "self.alerts_history.extend(alerts)"
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 393,
+        "code": "alerts.extend(self._check_metric_alert("
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 399,
+        "code": "alerts.extend(self._check_metric_alert("
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 405,
+        "code": "alerts.extend(self._check_metric_alert("
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 411,
+        "code": "alerts.extend(self._check_metric_alert("
+      },
+      {
+        "operation": "extend(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 417,
+        "code": "alerts.extend(self._check_metric_alert("
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 448,
+        "code": "alerts.append(alert)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 769,
+        "code": "css_class += \" critical\""
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 771,
+        "code": "css_class += \" emergency\""
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 773,
+        "code": "html += f\"\"\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 163,
+        "code": "self.cache[cache_key].append({"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 198,
+        "code": "data.append(("
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 245,
+        "code": "query += \" AND timestamp >= ?\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 246,
+        "code": "params.append(start_time)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 249,
+        "code": "query += \" AND timestamp <= ?\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 250,
+        "code": "params.append(end_time)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 253,
+        "code": "query += \" AND category = ?\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 254,
+        "code": "params.append(category)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 256,
+        "code": "query += \" ORDER BY timestamp DESC LIMIT ?\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 257,
+        "code": "params.append(limit)"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 287,
+        "code": "results.append({"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 508,
+        "code": "result.append({"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 539,
+        "code": "query += \" AND metric_name = ?\""
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 540,
+        "code": "params.append(f\"operation.{operation_name}\")"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 588,
+        "code": "operation_data[key][\"durations\"].append(duration)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 590,
+        "code": "operation_data[key][\"error_count\"] += 1"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 598,
+        "code": "result.append({"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 180,
+        "code": "data.append(self.data_queue.get())"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 665,
+        "code": "self.alerts.append({"
+      },
+      {
+        "operation": "append(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 853,
+        "code": "self.monitoring_data.append(monitoring_data)"
+      },
+      {
+        "operation": "+=",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 859,
+        "code": "iteration += 1"
+      }
+    ],
+    "synchronization_mechanisms": [
+      {
+        "mechanism": "queue.Queue()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 107,
+        "code": "self.data_queue = queue.Queue()"
+      },
+      {
+        "mechanism": "with.*lock:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 158,
+        "code": "with self.cache_lock:"
+      },
+      {
+        "mechanism": "with.*lock:",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 443,
+        "code": "with self.cache_lock:"
+      },
+      {
+        "mechanism": "queue.Queue()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 124,
+        "code": "self.data_queue = queue.Queue()"
+      }
+    ],
+    "race_condition_risks": [
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 243,
+        "code": "if 'datetime' in data.columns: -> data['datetime'] = pd.to_datetime(data['datetime'])"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 342,
+        "code": "if col in ['entry_price', 'exit_price', 'trade_profit', 'commission', 'returns']: -> results[col] = 0.0"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 344,
+        "code": "elif col in ['entry_date', 'exit_date', 'exit_reason']: -> results[col] = None"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 346,
+        "code": "elif col in ['position', 'holding_periods', 'shares']: -> results[col] = 0"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 348,
+        "code": "elif col in ['capital', 'equity']: -> results[col] = float("
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 691,
+        "code": "if in_drawdown: -> current_period += 1"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 737,
+        "code": "if 'close' in benchmark_data.columns: -> benchmark_returns = benchmark_data['close'].pct_change("
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 740,
+        "code": "elif 'returns' in benchmark_data.columns: -> benchmark_returns = benchmark_data['returns'].dropna()"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 836,
+        "code": "if self.results is not None and 'equity' in self.results.columns: -> total_return = ("
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1042,
+        "code": "if stock in aligned_data: -> result[f'{stock}_weight'] = weight"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1069,
+        "code": "if common_dates is None: -> common_dates = set(data.index)"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1086,
+        "code": "if 'close' in aligned_data[stock].columns: -> aligned_data[stock]['returns'] = aligned_data[stock]['close'].pct_change("
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1106,
+        "code": "if stock in weights: -> returns_data[stock] = data['returns']"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 292,
+        "code": "if len(self.metrics_history) > self.chart_config[\"max_points\"]: -> self.metrics_history = self.metrics_history[-self.chart_config[\"max_points\"]:]"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\real_time_backtest_monitor.py",
+        "line": 292,
+        "code": "if len(self.metrics_history) > self.chart_config[\"max_points\"]: -> self.metrics_history = self.metrics_history[-self.chart_config[\"max_points\"]:]"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 152,
+        "code": "if not isinstance(metric_value, (int, float, str, bool)): -> metric_value = json.dumps(metric_value)"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 160,
+        "code": "if cache_key not in self.cache: -> self.cache[cache_key] = []"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 347,
+        "code": "if period == \"minute\": -> start_time = end_time - 60 * 60  # 1小时前"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 580,
+        "code": "if key not in operation_data: -> operation_data[key] = {"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 110,
+        "code": "if isinstance(value, dict) and k in value: -> value = value[k]"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 644,
+        "code": "elif level == 'warning': -> icon = '⚠️'"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 818,
+        "code": "if self.monitoring_thread and self.monitoring_thread.is_alive(): -> self.monitoring_thread.join(timeout=2)"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 856,
+        "code": "if len(self.monitoring_data) > 1000: -> self.monitoring_data = self.monitoring_data[-1000:]"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 856,
+        "code": "if len(self.monitoring_data) > 1000: -> self.monitoring_data = self.monitoring_data[-1000:]"
+      },
+      {
+        "risk_type": "check_then_act",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 998,
+        "code": "if __name__ == \"__main__\": -> app = QApplication(sys.argv)"
+      }
+    ],
+    "thread_safety_score": 0
+  },
+  "resource_management_analysis": {
+    "file_operations": [],
+    "database_connections": [
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 61,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 61,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 62,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 65,
+        "code": "cursor.execute('''"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 77,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 79,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 81,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 85,
+        "code": "cursor.execute('''"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 100,
+        "code": "cursor.execute('''"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 110,
+        "code": "cursor.execute('''"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 192,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 192,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 193,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 260,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 260,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 261,
+        "code": "conn.row_factory = sqlite3.Row"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 262,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 264,
+        "code": "cursor.execute(query, params)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 359,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 359,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 360,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 362,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 378,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 423,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 423,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 424,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 427,
+        "code": "cursor.execute("
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 527,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 527,
+        "code": "conn = sqlite3.connect(self.db_path)"
+      },
+      {
+        "operation": "sqlite3.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 528,
+        "code": "conn.row_factory = sqlite3.Row"
+      },
+      {
+        "operation": "cursor()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 529,
+        "code": "cursor = conn.cursor()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 542,
+        "code": "cursor.execute(query, params)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 115,
+        "code": "self._connect()"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 131,
+        "code": "def _connect(self):"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 161,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "duckdb.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 161,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 166,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "duckdb.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 166,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 176,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "duckdb.",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 176,
+        "code": "self.conn = duckdb.connect(str(self.db_path))"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 200,
+        "code": "self.conn.execute(f\"SET memory_limit = '{memory_limit:.1f}GB'\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 201,
+        "code": "self.conn.execute(f\"SET threads = {threads}\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 202,
+        "code": "self.conn.execute(\"SET enable_object_cache = true\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 203,
+        "code": "self.conn.execute(\"SET enable_progress_bar = true\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 226,
+        "code": "self.conn.execute(f\"CREATE SEQUENCE IF NOT EXISTS {seq_name}\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 229,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 246,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 261,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 277,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 300,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 316,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 347,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 369,
+        "code": "self.conn.execute(\"\"\""
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 436,
+        "code": "self.conn.execute(index_sql)"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 450,
+        "code": "result = self.conn.execute(sql, params).fetchdf()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 452,
+        "code": "result = self.conn.execute(sql).fetchdf()"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 465,
+        "code": "self.conn.execute(sql, params)"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 467,
+        "code": "self.conn.execute(sql)"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 480,
+        "code": "self.conn.execute(f\"INSERT INTO {table_name} SELECT * FROM temp_df\")"
+      },
+      {
+        "operation": "execute(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 572,
+        "code": "result = self.conn.execute("
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 146,
+        "code": "self.timer.timeout.connect(self.update_charts)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 489,
+        "code": "self.start_button.clicked.connect(self.on_start_backtest)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 509,
+        "code": "self.stop_button.clicked.connect(self.stop_backtest.emit)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 633,
+        "code": "clear_button.clicked.connect(self.clear_alerts)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 728,
+        "code": "self.control_panel.start_backtest.connect(self.start_backtest)"
+      },
+      {
+        "operation": "connect(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 729,
+        "code": "self.control_panel.stop_backtest.connect(self.stop_backtest)"
+      }
+    ],
+    "memory_allocations": [
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1034,
+        "code": "result = pd.DataFrame({"
+      },
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1109,
+        "code": "returns_df = pd.DataFrame(returns_data)"
+      },
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 446,
+        "code": "return pd.DataFrame()  # 返回空DataFrame"
+      },
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 184,
+        "code": "df = pd.DataFrame(data)"
+      },
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 886,
+        "code": "demo_data = pd.DataFrame({"
+      },
+      {
+        "operation": "DataFrame(",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\gui\\widgets\\backtest_widget.py",
+        "line": 897,
+        "code": "return pd.DataFrame()"
+      }
+    ],
+    "network_connections": [],
+    "resource_cleanup": [
+      {
+        "cleanup_type": "commit()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 123,
+        "code": "conn.commit()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 124,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "commit()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 211,
+        "code": "conn.commit()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 212,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 295,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "commit()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 388,
+        "code": "conn.commit()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 389,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "commit()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 431,
+        "code": "conn.commit()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 432,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 548,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 608,
+        "code": "conn.close()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 668,
+        "code": "self.conn.close()"
+      },
+      {
+        "cleanup_type": "close()",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 672,
+        "code": "self.optimizer.close()"
+      }
+    ],
+    "context_managers": [
+      {
+        "context_manager": "with statement",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 158,
+        "code": "with self.cache_lock:"
+      },
+      {
+        "context_manager": "with statement",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+        "line": 443,
+        "code": "with self.cache_lock:"
+      },
+      {
+        "context_manager": "with statement",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 90,
+        "code": "with cls._lock:"
+      },
+      {
+        "context_manager": "with statement",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\database\\factorweave_analytics_db.py",
+        "line": 685,
+        "code": "with _db_lock:"
+      }
+    ],
+    "resource_management_score": 23
+  },
+  "concurrency_issues": [],
+  "resource_leaks": [],
+  "memory_management_issues": [],
+  "performance_impact": {
+    "thread_safety_impact": "LOW",
+    "resource_management_impact": "MEDIUM",
+    "memory_impact": "MEDIUM",
+    "overall_impact": "LOW",
+    "bottleneck_areas": []
+  },
+  "safety_recommendations": [
+    {
+      "category": "线程安全",
+      "priority": "HIGH",
+      "title": "实现线程安全机制",
+      "description": "为共享资源添加适当的同步机制",
+      "implementation": [
+        "识别所有共享变量和资源",
+        "使用 threading.Lock() 保护关键区域",
+        "考虑使用线程安全的数据结构",
+        "实现原子操作避免竞态条件"
+      ],
+      "benefits": [
+        "避免数据竞争",
+        "确保数据一致性",
+        "提高系统稳定性"
+      ]
+    },
+    {
+      "category": "资源管理",
+      "priority": "HIGH",
+      "title": "完善资源清理机制",
+      "description": "确保所有资源都能正确释放",
+      "implementation": [
+        "使用上下文管理器 (with 语句)",
+        "在 finally 块中释放资源",
+        "实现 __del__ 方法作为备用清理",
+        "定期检查资源使用情况"
+      ],
+      "benefits": [
+        "防止资源泄漏",
+        "提高系统性能",
+        "避免系统崩溃"
+      ]
+    },
+    {
+      "category": "内存管理",
+      "priority": "MEDIUM",
+      "title": "优化内存使用",
+      "description": "减少内存占用和避免内存泄漏",
+      "implementation": [
+        "使用生成器处理大数据集",
+        "及时清理不需要的变量",
+        "使用弱引用避免循环引用",
+        "监控内存使用情况"
+      ],
+      "benefits": [
+        "降低内存占用",
+        "提高运行效率",
+        "避免内存溢出"
+      ]
+    },
+    {
+      "category": "并发控制",
+      "priority": "MEDIUM",
+      "title": "改进并发设计",
+      "description": "优化多线程和异步处理",
+      "implementation": [
+        "使用线程池管理线程",
+        "实现异步I/O操作",
+        "避免过度并发",
+        "使用队列进行线程间通信"
+      ],
+      "benefits": [
+        "提高并发性能",
+        "减少资源竞争",
+        "提高响应速度"
+      ]
+    }
+  ]
+}

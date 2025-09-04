@@ -30,7 +30,7 @@ class ComprehensivePatternSystemChecker:
     """全面的形态系统检查器"""
 
     def __init__(self):
-        self.db_path = 'db/factorweave_system.db'
+        self.db_path = 'db/factorweave_system.sqlite'
         self.manager = PatternManager()
         self.check_results = {}
         self.missing_algorithms = []

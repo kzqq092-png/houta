@@ -512,6 +512,63 @@ class ServiceBootstrap:
             aggregation_service.start()
             logger.info("✓ 指标聚合服务(MetricsAggregationService)启动完成")
 
+            # 🔧 新增：注册告警事件处理器
+            try:
+                from core.services.alert_event_handler import register_alert_handlers
+                register_alert_handlers(self.event_bus)
+                logger.info("✓ 告警事件处理器注册完成")
+            except Exception as e:
+                logger.error(f"❌ 告警事件处理器注册失败: {e}")
+                logger.error(traceback.format_exc())
+
+            # 🔧 新增：确保告警数据库已初始化
+            try:
+                from db.models.alert_config_models import get_alert_config_database
+                alert_db = get_alert_config_database()
+                logger.info("✓ 告警数据库初始化完成")
+            except Exception as e:
+                logger.error(f"❌ 告警数据库初始化失败: {e}")
+                logger.error(traceback.format_exc())
+
+            # 🔧 新增：注册并启动告警规则引擎服务
+            try:
+                from .alert_rule_engine import AlertRuleEngine, initialize_alert_rule_engine
+                self.service_container.register(
+                    AlertRuleEngine,
+                    scope=ServiceScope.SINGLETON
+                )
+
+                # 自动初始化并启动告警引擎
+                alert_engine = initialize_alert_rule_engine(self.event_bus)
+                alert_engine.start()
+                logger.info("✓ 告警规则引擎服务注册并启动完成")
+            except Exception as e:
+                logger.error(f"❌ 告警规则引擎服务注册失败: {e}")
+
+            # 🔧 新增：注册并启动告警规则热加载服务
+            try:
+                from .alert_rule_hot_loader import AlertRuleHotLoader, initialize_alert_rule_hot_loader
+                self.service_container.register(
+                    AlertRuleHotLoader,
+                    scope=ServiceScope.SINGLETON
+                )
+
+                # 自动初始化并启动热加载服务
+                hot_loader = initialize_alert_rule_hot_loader(check_interval=5)
+                hot_loader.start()
+
+                # 将引擎作为热加载回调
+                try:
+                    alert_engine = initialize_alert_rule_engine(self.event_bus)
+                    hot_loader.add_update_callback(alert_engine.reload_rules_sync)
+                    logger.info("✓ 告警引擎与热加载服务关联完成")
+                except:
+                    pass
+
+                logger.info("✓ 告警规则热加载服务注册并启动完成")
+            except Exception as e:
+                logger.error(f"❌ 告警规则热加载服务注册失败: {e}")
+
         except Exception as e:
             logger.error(f"❌ 监控服务注册失败: {e}")
             logger.error(traceback.format_exc())

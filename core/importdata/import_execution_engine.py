@@ -243,6 +243,35 @@ class DataImportExecutionEngine(QObject):
         with self._task_lock:
             return list(self._running_tasks.keys())
 
+    def stop_all_tasks(self) -> bool:
+        """
+        停止所有正在运行的任务
+
+        Returns:
+            bool: 是否成功停止所有任务
+        """
+        try:
+            with self._task_lock:
+                running_task_ids = list(self._running_tasks.keys())
+
+                if not running_task_ids:
+                    logger.info("没有正在运行的任务需要停止")
+                    return True
+
+                logger.info(f"停止 {len(running_task_ids)} 个正在运行的任务")
+
+                success_count = 0
+                for task_id in running_task_ids:
+                    if self.stop_task(task_id):
+                        success_count += 1
+
+                logger.info(f"成功停止 {success_count}/{len(running_task_ids)} 个任务")
+                return success_count == len(running_task_ids)
+
+        except Exception as e:
+            logger.error(f"停止所有任务失败: {e}")
+            return False
+
     def _execute_task(self, task_config: ImportTaskConfig, result: TaskExecutionResult):
         """
         执行任务的核心逻辑

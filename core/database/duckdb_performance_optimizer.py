@@ -158,7 +158,7 @@ class DuckDBPerformanceOptimizer:
             config_commands = [
                 f"SET memory_limit = '{config.memory_limit}'",
                 f"SET threads = {config.threads}",
-                f"SET max_memory = '{config.max_memory}'",
+                # f"SET max_memory = '{config.max_memory}'",  # 移除不支持的max_memory配置
                 f"SET temp_directory = '{config.temp_directory}'",
                 f"SET enable_object_cache = {str(config.enable_object_cache).lower()}",
                 f"SET enable_progress_bar = {str(config.enable_progress_bar).lower()}",

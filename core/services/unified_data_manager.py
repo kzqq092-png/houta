@@ -60,7 +60,7 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 # 数据库路径
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.sqlite')
 
 
 def get_unified_data_manager() -> Optional['UnifiedDataManager']:

@@ -32,7 +32,7 @@ if not logger.handlers:
 
 # 统一数据库文件路径
 UNIFIED_DB_PATH = os.path.join(
-    os.path.dirname(__file__), '..', 'db', 'factorweave_system.db')
+    os.path.dirname(__file__), '..', 'db', 'factorweave_system.sqlite')
 
 
 class IndicatorService:

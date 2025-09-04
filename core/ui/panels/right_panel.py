@@ -489,22 +489,7 @@ class RightPanel(BasePanel):
                 logger.error(f"❌ 创建实盘交易标签页失败: {e}")
                 logger.error(traceback.format_exc())
 
-        # 添加性能监控标签页
-        try:
-            logger.info("🔄 开始创建性能监控标签页...")
-            from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
-
-            # 创建现代化性能监控标签页
-            self._performance_monitor_tab = ModernUnifiedPerformanceWidget(
-                parent=self._root_frame
-            )
-            tab_widget.addTab(self._performance_monitor_tab, "性能监控")
-            self.add_widget('performance_monitor_tab', self._performance_monitor_tab)
-
-            logger.info("✅ 性能监控标签页创建成功")
-        except Exception as e:
-            logger.error(f"❌ 创建性能监控标签页失败: {e}")
-            logger.error(traceback.format_exc())
+        # 性能监控标签页已删除 - 根据用户要求移除
 
         # 控制按钮框架
         button_frame = QFrame()
@@ -527,11 +512,7 @@ class RightPanel(BasePanel):
         button_layout.addWidget(export_btn)
         self.add_widget('export_btn', export_btn)
 
-        # 性能监控按钮
-        performance_btn = QPushButton("性能监控")
-        performance_btn.clicked.connect(self._show_performance_monitor)
-        button_layout.addWidget(performance_btn)
-        self.add_widget('performance_btn', performance_btn)
+        # 性能监控按钮已删除 - 根据用户要求移除
 
         # 状态标签
         status_label = QLabel("就绪")

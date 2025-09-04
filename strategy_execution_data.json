@@ -1,0 +1,4259 @@
+{
+  "execution_flow_analysis": {
+    "main_execution_methods": [
+      {
+        "name": "run_backtest",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 152,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 2,
+        "potential_issues": []
+      },
+      {
+        "name": "_preprocess_and_validate_data",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 222,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_kdata_preprocess",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 274,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_run_core_backtest",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 287,
+        "complexity": 3,
+        "loop_count": 1,
+        "condition_count": 1,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_check_exit_conditions",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 367,
+        "complexity": 9,
+        "loop_count": 0,
+        "condition_count": 8,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_process_trading_signals",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 398,
+        "complexity": 3,
+        "loop_count": 0,
+        "condition_count": 2,
+        "bare_except_count": 0,
+        "database_calls": 2,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_execute_open_position",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 415,
+        "complexity": 4,
+        "loop_count": 0,
+        "condition_count": 3,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_execute_close_position",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 483,
+        "complexity": 5,
+        "loop_count": 0,
+        "condition_count": 4,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_unified_risk_metrics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 572,
+        "complexity": 5,
+        "loop_count": 0,
+        "condition_count": 4,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 9,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_max_drawdown_duration",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 683,
+        "complexity": 5,
+        "loop_count": 1,
+        "condition_count": 3,
+        "bare_except_count": 1,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": [
+          "裸露异常处理可能隐藏关键错误"
+        ]
+      },
+      {
+        "name": "_calculate_omega_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 705,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 1,
+        "database_calls": 0,
+        "calculation_calls": 2,
+        "potential_issues": [
+          "裸露异常处理可能隐藏关键错误"
+        ]
+      },
+      {
+        "name": "_calculate_tail_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 716,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 1,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": [
+          "裸露异常处理可能隐藏关键错误"
+        ]
+      },
+      {
+        "name": "_calculate_common_sense_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 726,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 1,
+        "database_calls": 0,
+        "calculation_calls": 1,
+        "potential_issues": [
+          "裸露异常处理可能隐藏关键错误"
+        ]
+      },
+      {
+        "name": "_calculate_relative_metrics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 754,
+        "complexity": 4,
+        "loop_count": 0,
+        "condition_count": 3,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 11,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_trade_statistics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 811,
+        "complexity": 4,
+        "loop_count": 0,
+        "condition_count": 3,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 1,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_max_drawdown_from_equity",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 855,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 1,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": [
+          "裸露异常处理可能隐藏关键错误"
+        ]
+      },
+      {
+        "name": "run_backtest",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 904,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "run_backtest",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 939,
+        "complexity": 1,
+        "loop_count": 0,
+        "condition_count": 0,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_portfolio_returns",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1098,
+        "complexity": 6,
+        "loop_count": 1,
+        "condition_count": 4,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_portfolio_metrics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 1180,
+        "complexity": 2,
+        "loop_count": 0,
+        "condition_count": 1,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 1,
+        "potential_issues": []
+      },
+      {
+        "name": "run_backtest",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+        "line": 167,
+        "complexity": 2,
+        "loop_count": 0,
+        "condition_count": 1,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 1,
+        "potential_issues": []
+      },
+      {
+        "name": "_calculate_performance",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+        "line": 209,
+        "complexity": 5,
+        "loop_count": 1,
+        "condition_count": 3,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 2,
+        "potential_issues": []
+      },
+      {
+        "name": "execute_trade",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+        "line": 396,
+        "complexity": 3,
+        "loop_count": 0,
+        "condition_count": 2,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "calculate_performance",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+        "line": 503,
+        "complexity": 6,
+        "loop_count": 1,
+        "condition_count": 4,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 2,
+        "potential_issues": []
+      },
+      {
+        "name": "execute_trade",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\backtrader_strategy_plugin.py",
+        "line": 403,
+        "complexity": 3,
+        "loop_count": 0,
+        "condition_count": 2,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      },
+      {
+        "name": "calculate_performance",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\backtrader_strategy_plugin.py",
+        "line": 510,
+        "complexity": 8,
+        "loop_count": 0,
+        "condition_count": 7,
+        "bare_except_count": 0,
+        "database_calls": 0,
+        "calculation_calls": 0,
+        "potential_issues": []
+      }
+    ],
+    "execution_order": [],
+    "bottleneck_points": [],
+    "error_handling_gaps": [
+      {
+        "method": "_calculate_max_drawdown_duration",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "issue": "裸露异常处理 1 个"
+      },
+      {
+        "method": "_calculate_omega_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "issue": "裸露异常处理 1 个"
+      },
+      {
+        "method": "_calculate_tail_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "issue": "裸露异常处理 1 个"
+      },
+      {
+        "method": "_calculate_common_sense_ratio",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "issue": "裸露异常处理 1 个"
+      },
+      {
+        "method": "_calculate_max_drawdown_from_equity",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "issue": "裸露异常处理 1 个"
+      }
+    ],
+    "flow_complexity": {}
+  },
+  "risk_control_analysis": {
+    "position_management": [
+      {
+        "name": "_execute_open_position",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 415,
+        "risk_checks": [
+          "数值范围检查"
+        ],
+        "validation_logic": [],
+        "error_handling": [],
+        "potential_issues": []
+      },
+      {
+        "name": "_execute_close_position",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 483,
+        "risk_checks": [
+          "数值范围检查"
+        ],
+        "validation_logic": [],
+        "error_handling": [],
+        "potential_issues": []
+      }
+    ],
+    "stop_loss_logic": [
+      {
+        "name": "_check_exit_conditions",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 367,
+        "risk_checks": [
+          "数值范围检查"
+        ],
+        "validation_logic": [],
+        "error_handling": [],
+        "potential_issues": []
+      }
+    ],
+    "take_profit_logic": [],
+    "risk_metrics_calculation": [
+      {
+        "name": "_calculate_unified_risk_metrics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 572,
+        "risk_checks": [],
+        "validation_logic": [],
+        "error_handling": [
+          "异常处理"
+        ],
+        "potential_issues": [
+          "风险方法缺少验证逻辑"
+        ]
+      },
+      {
+        "name": "_calculate_max_drawdown_duration",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 683,
+        "risk_checks": [
+          "数值范围检查"
+        ],
+        "validation_logic": [],
+        "error_handling": [
+          "异常处理"
+        ],
+        "potential_issues": [
+          "裸露异常处理"
+        ]
+      },
+      {
+        "name": "_calculate_max_drawdown_from_equity",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 855,
+        "risk_checks": [],
+        "validation_logic": [],
+        "error_handling": [
+          "异常处理"
+        ],
+        "potential_issues": [
+          "裸露异常处理"
+        ]
+      },
+      {
+        "name": "_empty_risk_metrics",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 864,
+        "risk_checks": [],
+        "validation_logic": [],
+        "error_handling": [],
+        "potential_issues": [
+          "风险方法缺少验证逻辑"
+        ]
+      }
+    ],
+    "portfolio_constraints": [
+      {
+        "name": "_calculate_max_drawdown_duration",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 683,
+        "risk_checks": [
+          "数值范围检查"
+        ],
+        "validation_logic": [],
+        "error_handling": [
+          "异常处理"
+        ],
+        "potential_issues": [
+          "裸露异常处理"
+        ]
+      },
+      {
+        "name": "_calculate_max_drawdown_from_equity",
+        "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "line": 855,
+        "risk_checks": [],
+        "validation_logic": [],
+        "error_handling": [
+          "异常处理"
+        ],
+        "potential_issues": [
+          "裸露异常处理"
+        ]
+      }
+    ],
+    "missing_controls": [
+      "position_size_validation",
+      "stop_loss_enforcement",
+      "portfolio_risk_check"
+    ]
+  },
+  "trading_logic_issues": [
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 130,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trades = []"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 209,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.logger.info(f\"回测完成，总交易次数: {len(self.trades)}\")"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 301,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state = self._initialize_trade_state(initial_capital)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 304,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trades = []"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 314,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] != 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 315,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['holding_periods'] += 1"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 319,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state, current_price, stop_loss_pct, take_profit_pct, max_holding_periods"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 323,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self._process_trading_signals("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 324,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results, i, trade_state, current_signal, current_price,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 329,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self._update_account_status(results, i, trade_state, current_price)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 338,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'trade_profit', 'commission', 'shares', 'trade_value'"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 338,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "'trade_profit', 'commission', 'shares', 'trade_value'"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 342,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if col in ['entry_price', 'exit_price', 'trade_profit', 'commission', 'returns']:"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 346,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "elif col in ['position', 'holding_periods', 'shares']:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 351,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "elif col == 'trade_value':"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 354,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _initialize_trade_state(self, initial_capital: float) -> Dict[str, Any]:"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 363,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "'shares': 0,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 367,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _check_exit_conditions(self, trade_state: Dict[str, Any], current_price: float,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 371,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] == 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 376,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if (trade_state['position'] > 0 and"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 377,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "current_price <= trade_state['entry_price'] * (1 - stop_loss_pct)):"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 377,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "current_price <= trade_state['entry_price'] * (1 - stop_loss_pct)):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 379,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "elif (trade_state['position'] < 0 and"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 380,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "current_price >= trade_state['entry_price'] * (1 + stop_loss_pct)):"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 380,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "current_price >= trade_state['entry_price'] * (1 + stop_loss_pct)):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 385,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if (trade_state['position'] > 0 and"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 386,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "current_price >= trade_state['entry_price'] * (1 + take_profit_pct)):"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 386,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "current_price >= trade_state['entry_price'] * (1 + take_profit_pct)):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 388,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "elif (trade_state['position'] < 0 and"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 389,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "current_price <= trade_state['entry_price'] * (1 - take_profit_pct)):"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 389,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "current_price <= trade_state['entry_price'] * (1 - take_profit_pct)):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 393,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if max_holding_periods is not None and trade_state['holding_periods'] >= max_holding_periods:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 398,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _process_trading_signals(self, results: pd.DataFrame, i: int,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 399,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state: Dict[str, Any], signal: float,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 406,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] != 0 and (signal == -trade_state['position'] or exit_triggered):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 407,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self._execute_close_position("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 408,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results, i, trade_state, price, exit_reason or 'Signal')"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 411,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] == 0 and signal != 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 412,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self._execute_open_position("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 413,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results, i, trade_state, signal, price, enable_compound)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 415,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _execute_open_position(self, results: pd.DataFrame, i: int,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 416,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state: Dict[str, Any], signal: float,"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 428,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "actual_price = price * (1 + slippage_pct)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 429,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['position'] = 1"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 431,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "actual_price = price * (1 - slippage_pct)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 432,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['position'] = -1"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 437,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "available_capital = trade_state['current_equity'] * 0.9  # 90%仓位"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 440,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "available_capital = trade_state['current_capital'] * 0.9"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 447,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "shares = int(net_available / actual_price)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 449,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "if shares > 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 451,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_value = shares * actual_price"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 451,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "trade_value = shares * actual_price"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 451,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_value = shares * actual_price"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 452,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_cost = trade_value + commission"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 455,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_price'] = actual_price"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 456,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_date'] = current_date"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 457,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['shares'] = shares"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 457,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_state['shares'] = shares"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 458,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_value'] = trade_value"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 459,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['holding_periods'] = 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 462,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['current_capital'] -= total_cost"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 465,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results.loc[results.index[i], 'position'] = trade_state['position']"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 468,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'shares'] = shares"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 470,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results.loc[results.index[i], 'trade_value'] = trade_value"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 473,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade = {"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 476,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'position': trade_state['position'],"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 477,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "'shares': shares,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 479,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'entry_value': trade_value"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 481,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trades.append(trade)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 483,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _execute_close_position(self, results: pd.DataFrame, i: int,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 484,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state: Dict[str, Any], price: float, exit_reason: str):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 486,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] == 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 496,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_value = trade_state['shares'] * price"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 496,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "trade_value = trade_state['shares'] * price"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 496,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_value = trade_state['shares'] * price"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 497,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "commission = max(trade_value * commission_pct, min_commission)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 500,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] > 0:  # 卖出平多"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 501,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "actual_price = price * (1 - slippage_pct)"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 503,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "actual_price = price * (1 + slippage_pct)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 506,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] > 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 507,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 507,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 508,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "(actual_price - trade_state['entry_price'])"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 510,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 510,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 511,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "(trade_state['entry_price'] - actual_price)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 514,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "net_profit = trade_profit - commission"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 517,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['current_capital'] += (trade_state['shares']"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 517,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_state['current_capital'] += (trade_state['shares']"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 518,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "* actual_price - commission)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 524,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results.loc[results.index[i], 'trade_profit'] = net_profit"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 527,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'holding_periods'] = trade_state['holding_periods']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 530,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if self.trades:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 531,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trades[-1].update({"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 535,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'holding_periods': trade_state['holding_periods'],"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 536,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'trade_profit': net_profit,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 541,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['position'] = 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 542,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_price'] = 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 543,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_date'] = None"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 544,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['shares'] = 0"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 544,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_state['shares'] = 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 545,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['entry_value'] = 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 546,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['holding_periods'] = 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 549,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state: Dict[str, Any], current_price: float):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 552,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_state['position'] != 0:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 553,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "position_value = trade_state['shares'] * current_price"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 553,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "position_value = trade_state['shares'] * current_price"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 553,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "position_value = trade_state['shares'] * current_price"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 554,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['current_equity'] = trade_state['current_capital'] + \\"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 557,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_state['current_equity'] = trade_state['current_capital']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 561,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "'capital'] = trade_state['current_capital']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 562,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "results.loc[results.index[i], 'equity'] = trade_state['current_equity']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 633,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_stats = self._calculate_trade_statistics()"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 829,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_profit = sum(t['trade_profit']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 830,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "for t in completed_trades if t['trade_profit'] > 0)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 831,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_loss = abs(sum(t['trade_profit']"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 832,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "for t in completed_trades if t['trade_profit'] < 0))"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1121,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "portfolio_returns = self._buy_and_hold(returns_df, weights)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1166,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _buy_and_hold(self, returns_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 38,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "StrategyType, SignalType, TradeAction, TradeStatus, RiskLevel,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 55,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "signal_type = SignalType.BUY"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 57,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "signal_type = SignalType.SELL"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 195,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _convert_trade_record(self, hku_trade) -> TradeResult:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 197,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "return TradeResult("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 198,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_id=str(hku_trade.datetime),"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 199,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "symbol=hku_trade.stock.market_code + hku_trade.stock.code,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 200,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "action=TradeAction.OPEN_LONG if hku_trade.business == BUSINESS.BUY else TradeAction.CLOSE_LONG,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 201,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "quantity=hku_trade.number,"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 201,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity=hku_trade.number,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 202,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "price=hku_trade.realPrice,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 203,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "timestamp=datetime.fromtimestamp(hku_trade.datetime.timestamp()),"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 204,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "commission=hku_trade.cost.commission,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 205,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "status=TradeStatus.FILLED,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 206,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "metadata={'hikyuu_trade': True}"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 209,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def _calculate_performance(self, trade_list: List, initial_capital: float) -> PerformanceMetrics:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 211,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if not trade_list:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 215,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_trades=0, winning_trades=0, losing_trades=0,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 221,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_trades = len(trade_list)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 224,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "for trade in trade_list:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 225,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if hasattr(trade, 'profit'):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 226,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "profits.append(trade.profit)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 231,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "winning_trades = len([p for p in profits if p > 0])"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 232,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "losing_trades = len([p for p in profits if p < 0])"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 237,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "win_rate = winning_trades / total_trades if total_trades > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 239,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "avg_win = np.mean([p for p in profits if p > 0]) if winning_trades > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 240,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "avg_loss = abs(np.mean([p for p in profits if p < 0])) if losing_trades > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 242,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "profit_factor = (avg_win * winning_trades) / (avg_loss * losing_trades) if avg_loss > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 251,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_trades=total_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 252,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "winning_trades=winning_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 253,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "losing_trades=losing_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 256,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "start_date=datetime.fromtimestamp(trade_list[0].datetime.timestamp()) if trade_list else datetime.now(),"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 257,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "end_date=datetime.fromtimestamp(trade_list[-1].datetime.timestamp()) if trade_list else datetime.now()"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 269,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trade_history = []"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 377,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "buy_signal = signal_generator.getBuySignal(len(kdata) - 1)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 378,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if buy_signal:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 384,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "sell_signal = signal_generator.getSellSignal(len(kdata) - 1)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 411,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = self.strategy_config.get('money_manager', {}).get('count', 100)"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 414,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "commission = signal.price * quantity * context.commission_rate"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 414,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "commission = signal.price * quantity * context.commission_rate"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 417,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_result = TradeResult("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 418,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_id=trade_id,"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 421,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity=quantity,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 425,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "status=TradeStatus.FILLED,  # 模拟交易，直接成交"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 430,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "self.trade_history.append(trade_result)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 432,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "logger.info(f\"HIkyuu交易执行: {action.value} {signal.symbol} {quantity}@{signal.price}\")"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 433,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "return trade_result"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 437,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "return TradeResult("
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 438,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_id=f\"error_{int(signal.timestamp.timestamp())}\","
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 440,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "action=TradeAction.OPEN_LONG,"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 441,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity=0,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 445,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "status=TradeStatus.ERROR,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 449,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "def update_position(self, trade_result: TradeResult, context: StrategyContext) -> Position:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 451,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "symbol = trade_result.symbol"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 458,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_result.action in [TradeAction.OPEN_LONG, TradeAction.OPEN_SHORT]:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 459,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "quantity = trade_result.quantity"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 459,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = trade_result.quantity"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 460,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "avg_price = trade_result.price"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 462,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 466,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if trade_result.action == TradeAction.OPEN_LONG:"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 468,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "total_cost = (current_position.quantity * current_position.avg_price +"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 468,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "total_cost = (current_position.quantity * current_position.avg_price +"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 469,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "trade_result.quantity * trade_result.price)"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 469,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "trade_result.quantity * trade_result.price)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 469,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "trade_result.quantity * trade_result.price)"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 470,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "quantity = current_position.quantity + trade_result.quantity"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 470,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = current_position.quantity + trade_result.quantity"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 471,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "avg_price = total_cost / quantity if quantity > 0 else 0"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 471,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "avg_price = total_cost / quantity if quantity > 0 else 0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 472,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "elif trade_result.action == TradeAction.CLOSE_LONG:"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 474,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "quantity = max(0, current_position.quantity - trade_result.quantity)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 474,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = max(0, current_position.quantity - trade_result.quantity)"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 477,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity = current_position.quantity"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 481,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "current_price = trade_result.price"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 482,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "market_value = quantity * current_price"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 482,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "market_value = quantity * current_price"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 483,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "unrealized_pnl = (current_price - avg_price) * quantity if quantity > 0 else 0"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 483,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "unrealized_pnl = (current_price - avg_price) * quantity if quantity > 0 else 0"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 488,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "quantity=quantity,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 520,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "for i in range(0, len(self.trade_history), 2):  # 假设买卖成对"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 521,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if i + 1 < len(self.trade_history):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 522,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "buy_trade = self.trade_history[i]"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 523,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "sell_trade = self.trade_history[i + 1]"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 524,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "if (buy_trade.action == TradeAction.OPEN_LONG and"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 525,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "sell_trade.action == TradeAction.CLOSE_LONG):"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 526,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "profit = (sell_trade.price - buy_trade.price) * buy_trade.quantity"
+    },
+    {
+      "type": "price_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 526,
+      "description": "价格计算可能存在精度问题",
+      "severity": "MEDIUM",
+      "code": "profit = (sell_trade.price - buy_trade.price) * buy_trade.quantity"
+    },
+    {
+      "type": "quantity_precision",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 526,
+      "description": "股票数量计算可能产生小数",
+      "severity": "MEDIUM",
+      "code": "profit = (sell_trade.price - buy_trade.price) * buy_trade.quantity"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 532,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "winning_trades = len([p for p in profits if p > 0])"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 533,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "losing_trades = len([p for p in profits if p < 0])"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 538,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "win_rate = winning_trades / len(profits) if profits else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 540,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "avg_win = np.mean([p for p in profits if p > 0]) if winning_trades > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 541,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "avg_loss = abs(np.mean([p for p in profits if p < 0])) if losing_trades > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 543,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "profit_factor = (avg_win * winning_trades) / (avg_loss * losing_trades) if avg_loss > 0 else 0.0"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 552,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_trades=total_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 553,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "winning_trades=winning_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 554,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "losing_trades=losing_trades,"
+    },
+    {
+      "type": "missing_error_handling",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\plugins\\strategies\\hikyuu_strategy_plugin.py",
+      "line": 567,
+      "description": "交易执行缺少错误处理",
+      "severity": "HIGH",
+      "code": "total_trades=0, winning_trades=0, losing_trades=0,"
+    }
+  ],
+  "data_integrity_issues": [
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "#!/usr/bin/env python3"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 130,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.trades = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 161,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "stop_loss_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 162,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "take_profit_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 163,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "max_holding_periods: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 165,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "benchmark_data: Optional[pd.DataFrame] = None) -> Dict[str, Any]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 244,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "data['datetime'] = pd.to_datetime(data['datetime'])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 252,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "required_columns = ['open', 'high', 'low', 'close', 'volume']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 290,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "stop_loss_pct: Optional[float], take_profit_pct: Optional[float],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 291,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "max_holding_periods: Optional[int], enable_compound: bool) -> pd.DataFrame:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 304,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.trades = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 314,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] != 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 315,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['holding_periods'] += 1"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 342,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if col in ['entry_price', 'exit_price', 'trade_profit', 'commission', 'returns']:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 343,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results[col] = 0.0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 344,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "elif col in ['entry_date', 'exit_date', 'exit_reason']:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 345,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results[col] = None"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 346,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "elif col in ['position', 'holding_periods', 'shares']:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 347,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results[col] = 0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 348,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "elif col in ['capital', 'equity']:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 349,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results[col] = float("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 350,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.iloc[0]['close'] if 'close' in results.columns else 100000)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 352,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results[col] = 0.0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 354,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _initialize_trade_state(self, initial_capital: float) -> Dict[str, Any]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 367,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _check_exit_conditions(self, trade_state: Dict[str, Any], current_price: float,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 368,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "stop_loss_pct: Optional[float], take_profit_pct: Optional[float],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 369,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "max_holding_periods: Optional[int]) -> Tuple[bool, str]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 371,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] == 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 376,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if (trade_state['position'] > 0 and"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 377,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "current_price <= trade_state['entry_price'] * (1 - stop_loss_pct)):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 379,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "elif (trade_state['position'] < 0 and"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 380,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "current_price >= trade_state['entry_price'] * (1 + stop_loss_pct)):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 385,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if (trade_state['position'] > 0 and"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 386,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "current_price >= trade_state['entry_price'] * (1 + take_profit_pct)):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 388,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "elif (trade_state['position'] < 0 and"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 389,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "current_price <= trade_state['entry_price'] * (1 - take_profit_pct)):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 393,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if max_holding_periods is not None and trade_state['holding_periods'] >= max_holding_periods:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 399,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state: Dict[str, Any], signal: float,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 406,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] != 0 and (signal == -trade_state['position'] or exit_triggered):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 411,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] == 0 and signal != 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 416,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state: Dict[str, Any], signal: float,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 429,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['position'] = 1"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 432,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['position'] = -1"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 437,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "available_capital = trade_state['current_equity'] * 0.9  # 90%仓位"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 440,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "available_capital = trade_state['current_capital'] * 0.9"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 447,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "shares = int(net_available / actual_price)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 455,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_price'] = actual_price"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 456,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_date'] = current_date"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 457,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['shares'] = shares"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 458,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_value'] = trade_value"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 459,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['holding_periods'] = 0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 462,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['current_capital'] -= total_cost"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 465,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'position'] = trade_state['position']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 466,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'entry_price'] = actual_price"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 467,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'entry_date'] = current_date"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 468,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'shares'] = shares"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 469,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'commission'] = commission"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 470,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'trade_value'] = trade_value"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 476,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "'position': trade_state['position'],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 484,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state: Dict[str, Any], price: float, exit_reason: str):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 486,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] == 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 496,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_value = trade_state['shares'] * price"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 500,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] > 0:  # 卖出平多"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 506,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] > 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 507,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 508,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(actual_price - trade_state['entry_price'])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 510,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_profit = trade_state['shares'] * \\"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 511,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(trade_state['entry_price'] - actual_price)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 517,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['current_capital'] += (trade_state['shares']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 521,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'exit_price'] = actual_price"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 522,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'exit_date'] = current_date"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 523,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'exit_reason'] = exit_reason"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 524,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'trade_profit'] = net_profit"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 525,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'commission'] += commission"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 526,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 527,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "'holding_periods'] = trade_state['holding_periods']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 531,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.trades[-1].update({"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 535,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "'holding_periods': trade_state['holding_periods'],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 541,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['position'] = 0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 542,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_price'] = 0.0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 543,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_date'] = None"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 544,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['shares'] = 0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 545,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['entry_value'] = 0.0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 546,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['holding_periods'] = 0"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 549,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state: Dict[str, Any], current_price: float):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 552,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if trade_state['position'] != 0:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 553,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "position_value = trade_state['shares'] * current_price"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 554,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['current_equity'] = trade_state['current_capital'] + \\"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 557,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "trade_state['current_equity'] = trade_state['current_capital']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 560,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 561,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "'capital'] = trade_state['current_capital']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 562,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'equity'] = trade_state['current_equity']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 566,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "prev_equity = results.iloc[i-1]['equity']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 568,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "returns = (trade_state['current_equity'] -"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 570,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results.loc[results.index[i], 'returns'] = returns"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 573,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "benchmark_data: Optional[pd.DataFrame] = None) -> UnifiedRiskMetrics:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 579,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "returns = results['returns'].dropna()"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 584,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "total_return = (results['equity'].iloc[-1] /"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 591,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "sharpe_ratio = (annualized_return - risk_free_rate) / \\"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 595,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "downside_returns = returns[returns < 0]"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 598,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "sortino_ratio = (annualized_return - risk_free_rate) / \\"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 604,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "drawdown = (cumulative - running_max) / running_max"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 615,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "cvar_95 = returns[returns <= var_95].mean() if len("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 687,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "drawdown_periods = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 709,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "positive_returns = excess_returns[excess_returns > 0].sum()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 710,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "negative_returns = abs(excess_returns[excess_returns < 0].sum())"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 734,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "target_index: pd.Index) -> Optional[pd.Series]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 738,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "benchmark_returns = benchmark_data['close'].pct_change("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 741,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "benchmark_returns = benchmark_data['returns'].dropna()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 755,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "risk_free_rate: float) -> Tuple[float, float, float, float, float, float, float]:"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 767,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "excess_returns = aligned_returns - risk_free_rate / 252"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 768,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "excess_benchmark = aligned_benchmark - risk_free_rate / 252"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 771,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "covariance = np.cov(excess_returns, excess_benchmark)[0, 1]"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 783,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "information_ratio = excess_return / tracking_error * \\"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 798,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "upside_capture = aligned_returns[up_market].mean("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 799,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": ") / aligned_benchmark[up_market].mean()"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 799,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": ") / aligned_benchmark[up_market].mean()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 802,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "downside_capture = aligned_returns[down_market].mean("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 803,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": ") / aligned_benchmark[down_market].mean()"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 803,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": ") / aligned_benchmark[down_market].mean()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 811,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _calculate_trade_statistics(self) -> Dict[str, float]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 818,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "completed_trades = [t for t in self.trades if 'trade_profit' in t]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 825,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "t for t in completed_trades if t['trade_profit'] > 0]"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 826,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "win_rate = len(winning_trades) / len(completed_trades)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 832,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "for t in completed_trades if t['trade_profit'] < 0))"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 838,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.results['equity'].iloc[-1] / self.results['equity'].iloc[0]) - 1"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 838,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "self.results['equity'].iloc[-1] / self.results['equity'].iloc[0]) - 1"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 840,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.results['equity'])"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 859,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "drawdown = (equity - running_max) / running_max"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 868,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def get_metrics_summary(self) -> Dict[str, Any]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 905,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "stop_loss_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 906,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "take_profit_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 907,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "max_holding_periods: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 924,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return result['backtest_result']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 955,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return result['backtest_result']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 975,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "slippage_pct: float = 0.001, stop_loss_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 976,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "take_profit_pct: Optional[float] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 977,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "max_holding_periods: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1007,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def run_portfolio_backtest(self, portfolio_data: Dict[str, pd.DataFrame],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1008,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "weights: Dict[str, float],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1010,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "initial_capital: float = 1000000) -> Dict[str, Any]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1043,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "result[f'{stock}_weight'] = weight"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1044,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "result[f'{stock}_returns'] = aligned_data[stock]['returns']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1063,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _align_portfolio_data(self, portfolio_data: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1082,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "aligned_data[stock] = data.loc[common_dates].copy()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1085,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if 'returns' not in aligned_data[stock].columns:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1086,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if 'close' in aligned_data[stock].columns:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1087,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "aligned_data[stock]['returns'] = aligned_data[stock]['close'].pct_change("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1098,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _calculate_portfolio_returns(self, aligned_data: Dict[str, pd.DataFrame],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1099,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "weights: Dict[str, float],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1107,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "returns_data[stock] = data['returns']"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1129,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _daily_rebalance(self, returns_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1134,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _monthly_rebalance(self, returns_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1136,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "portfolio_returns = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1140,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "month_data = month_group[1]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1150,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _quarterly_rebalance(self, returns_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1152,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "portfolio_returns = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1156,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "quarter_data = quarter_group[1]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1166,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _buy_and_hold(self, returns_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1180,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "def _calculate_portfolio_metrics(self, portfolio_returns: pd.Series) -> Dict[str, float]:"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1193,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "sharpe_ratio = (annualized_return - risk_free_rate) / \\"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+      "line": 1199,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "drawdown = (cumulative - running_max) / running_max"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 1,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "# core/metrics/repository.py"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 17,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "# D:/DevelopTool/FreeCode/FactorWeave-Quant ‌/FactorWeave-Quant ‌/core/metrics/repository.py"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 23,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "PROJECT_ROOT = Path(__file__).resolve().parents[3]"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 28,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "DB_FILE = PROJECT_ROOT / \"db\" / \"metrics.sqlite\""
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 39,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "def __init__(self, db_path: str = \"db/metrics.sqlite\", cache_size: int = 1000):"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 135,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "tags: Dict[str, str] = None) -> bool:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 161,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.cache[cache_key] = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 163,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.cache[cache_key].append({"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 170,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if len(self.cache[cache_key]) >= self.cache_size:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 187,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if cache_key not in self.cache or not self.cache[cache_key]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 196,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "data = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 197,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "for item in self.cache[cache_key]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 200,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "item[\"value\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 201,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "item[\"timestamp\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 203,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "item[\"tags\"]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 215,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "self.cache[cache_key] = []"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 220,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "def query_metrics(self,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 222,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "start_time: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 223,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "end_time: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 224,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "category: Optional[str] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 225,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "limit: int = 1000) -> List[Dict[str, Any]]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 242,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "params = [metric_name]"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 253,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "query += \" AND category = ?\""
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 256,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "query += \" ORDER BY timestamp DESC LIMIT ?\""
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 264,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "cursor.execute(query, params)"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 265,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "rows = cursor.fetchall()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 268,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "results = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 270,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "value = row[\"metric_value\"]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 281,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if row[\"tags\"]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 283,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "tags = json.loads(row[\"tags\"])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 288,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"name\": row[\"metric_name\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 290,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"timestamp\": row[\"timestamp\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 291,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"category\": row[\"category\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 300,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 304,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "category: Optional[str] = None) -> Optional[Dict[str, Any]]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 321,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return results[0] if results else None"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 326,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "start_time: Optional[int] = None,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 327,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "end_time: Optional[int] = None) -> Dict[str, Any]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 365,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "MIN(CASE WHEN metric_value GLOB '*[0-9]*' AND metric_value NOT GLOB '*[a-zA-Z]*' THEN CAST(metric_value AS REAL) ELSE NULL END) as min_value,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 366,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "MAX(CASE WHEN metric_value GLOB '*[0-9]*' AND metric_value NOT GLOB '*[a-zA-Z]*' THEN CAST(metric_value AS REAL) ELSE NULL END) as max_value,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 367,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "AVG(CASE WHEN metric_value GLOB '*[0-9]*' AND metric_value NOT GLOB '*[a-zA-Z]*' THEN CAST(metric_value AS REAL) ELSE NULL END) as avg_value,"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 375,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "row = cursor.fetchone()"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 384,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(metric_name, row[0], row[1], row[2],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 385,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "row[3], period, start_time, end_time)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 393,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"min\": row[0],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 394,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"max\": row[1],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 395,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"avg\": row[2],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 396,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"count\": row[3],"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 451,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "def query_historical_data(self,"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 455,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "operation_name: Optional[str] = None) -> List[Dict[str, Any]]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 469,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if table not in [\"resource_metrics_summary\", \"app_metrics_summary\"]:"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 479,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "cpu_data = self.query_metrics("
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 481,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "memory_data = self.query_metrics("
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 489,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 492,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "result = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 497,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "timestamps.add(item[\"timestamp\"])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 502,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(float(item[\"value\"]) for item in cpu_data if item[\"timestamp\"] == ts), 0)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 504,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(float(item[\"value\"]) for item in memory_data if item[\"timestamp\"] == ts), 0)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 506,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "(float(item[\"value\"]) for item in disk_data if item[\"timestamp\"] == ts), 0)"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 531,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "query = \"\"\""
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 536,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "params = [category, start_timestamp, end_timestamp]"
+    },
+    {
+      "type": "unchecked_query_result",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 539,
+      "description": "数据库查询结果未验证",
+      "severity": "MEDIUM",
+      "code": "query += \" AND metric_name = ?\""
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 549,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 552,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "result = []"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 556,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "metric_name = row[\"metric_name\"]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 558,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "timestamp = row[\"timestamp\"]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 562,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "duration = float(row[\"metric_value\"])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 568,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "if row[\"tags\"]:"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 570,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "tags = json.loads(row[\"tags\"])"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 581,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "operation_data[key] = {"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 584,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"durations\": [],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 588,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "operation_data[key][\"durations\"].append(duration)"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 590,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "operation_data[key][\"error_count\"] += 1"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 594,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "durations = data[\"durations\"]"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 600,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"t_stamp\": data[\"t_stamp\"],"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 601,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "\"operation\": data[\"operation\"],"
+    },
+    {
+      "type": "division_by_zero_risk",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 602,
+      "description": "除法运算可能存在除零风险",
+      "severity": "HIGH",
+      "code": "\"avg_duration\": sum(durations) / len(durations),"
+    },
+    {
+      "type": "missing_bounds_check",
+      "file": "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py",
+      "line": 613,
+      "description": "数组访问缺少边界检查",
+      "severity": "MEDIUM",
+      "code": "return []"
+    }
+  ],
+  "performance_issues": [
+    {
+      "type": "performance_bottleneck",
+      "method": "_run_core_backtest",
+      "description": "核心回测循环可能存在性能瓶颈",
+      "recommendation": "考虑向量化操作和并行处理",
+      "severity": "HIGH"
+    },
+    {
+      "type": "performance_bottleneck",
+      "method": "_process_trading_signals",
+      "description": "信号处理逻辑可能重复计算",
+      "recommendation": "实现信号缓存机制",
+      "severity": "HIGH"
+    },
+    {
+      "type": "performance_bottleneck",
+      "method": "query_historical_data",
+      "description": "历史数据查询可能频繁访问数据库",
+      "recommendation": "实现数据预加载和缓存",
+      "severity": "HIGH"
+    }
+  ],
+  "safety_recommendations": [
+    {
+      "category": "异常处理",
+      "priority": "CRITICAL",
+      "title": "修复裸露异常处理",
+      "description": "将所有 except: 改为具体异常类型",
+      "implementation": [
+        "识别所有裸露的 except: 语句",
+        "根据上下文确定具体异常类型",
+        "添加适当的错误日志记录",
+        "实现优雅的错误恢复机制"
+      ]
+    },
+    {
+      "category": "数据验证",
+      "priority": "HIGH",
+      "title": "加强数据完整性检查",
+      "description": "在关键数据操作前添加验证逻辑",
+      "implementation": [
+        "添加数组边界检查",
+        "实现除零保护",
+        "验证数据库查询结果",
+        "添加数据类型检查"
+      ]
+    },
+    {
+      "category": "风险控制",
+      "priority": "HIGH",
+      "title": "完善风险管理机制",
+      "description": "实现全面的风险控制体系",
+      "implementation": [
+        "添加仓位大小验证",
+        "实现止损止盈强制执行",
+        "添加组合风险监控",
+        "实现最大回撤保护"
+      ]
+    },
+    {
+      "category": "性能优化",
+      "priority": "MEDIUM",
+      "title": "优化关键性能瓶颈",
+      "description": "针对识别的瓶颈进行专项优化",
+      "implementation": [
+        "实现数据缓存机制",
+        "使用向量化操作",
+        "考虑并行处理",
+        "优化数据库查询"
+      ]
+    }
+  ],
+  "critical_fixes_needed": [
+    {
+      "priority": 1,
+      "category": "异常处理",
+      "title": "修复异常处理缺陷",
+      "affected_methods": [
+        "_calculate_max_drawdown_duration",
+        "_calculate_omega_ratio",
+        "_calculate_tail_ratio",
+        "_calculate_common_sense_ratio",
+        "_calculate_max_drawdown_from_equity"
+      ],
+      "risk_level": "CRITICAL",
+      "description": "多个关键方法存在裸露异常处理，可能隐藏严重错误"
+    },
+    {
+      "priority": 2,
+      "category": "数据完整性",
+      "title": "修复数据完整性问题",
+      "affected_methods": [
+        "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\backtest\\unified_backtest_engine.py",
+        "D:\\DevelopTool\\FreeCode\\HIkyuu-UI\\hikyuu-ui\\core\\metrics\\repository.py"
+      ],
+      "risk_level": "HIGH",
+      "description": "存在除零风险和数据访问安全问题"
+    },
+    {
+      "priority": 3,
+      "category": "风险控制",
+      "title": "实现缺失的风险控制",
+      "missing_controls": [
+        "position_size_validation",
+        "stop_loss_enforcement",
+        "portfolio_risk_check"
+      ],
+      "risk_level": "HIGH",
+      "description": "缺少关键的风险控制机制"
+    }
+  ]
+}

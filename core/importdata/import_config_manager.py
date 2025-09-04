@@ -164,7 +164,7 @@ class ImportConfigManager:
     管理数据源配置、导入任务配置和进度跟踪
     """
 
-    def __init__(self, db_path: str = "db/import_config.db"):
+    def __init__(self, db_path: str = "db/factorweave_system.sqlite"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 

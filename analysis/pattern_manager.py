@@ -28,7 +28,7 @@ class PatternManager:
         """
         if db_path is None:
             self.db_path = os.path.join(os.path.dirname(
-                __file__), '..', 'db', 'factorweave_system.db')
+                __file__), '..', 'db', 'factorweave_system.sqlite')
         else:
             self.db_path = db_path
 

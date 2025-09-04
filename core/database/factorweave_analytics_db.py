@@ -403,18 +403,18 @@ class FactorWeaveAnalyticsDB:
             "CREATE INDEX IF NOT EXISTS idx_indicator_timeframe ON indicator_calculation_results(timeframe, calculation_time)",
 
             # 形态识别结果索引 - 优化模式查询
-            "CREATE INDEX IF NOT EXISTS idx_pattern_symbol_time ON pattern_recognition_results(symbol, detection_time)",
-            "CREATE INDEX IF NOT EXISTS idx_pattern_name_time ON pattern_recognition_results(pattern_name, detection_time)",
-            "CREATE INDEX IF NOT EXISTS idx_pattern_confidence ON pattern_recognition_results(confidence DESC, detection_time)",
+            "CREATE INDEX IF NOT EXISTS idx_pattern_symbol_time ON pattern_recognition_results(symbol, recognition_time)",
+            "CREATE INDEX IF NOT EXISTS idx_pattern_type_time ON pattern_recognition_results(pattern_type, recognition_time)",
+            "CREATE INDEX IF NOT EXISTS idx_pattern_confidence ON pattern_recognition_results(confidence DESC, recognition_time)",
 
             # 回测指标索引 - 优化时序分析
-            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_time ON backtest_metrics_history(timestamp)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_return ON backtest_metrics_history(current_return, timestamp)",
+            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_time ON backtest_metrics_history(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_backtest_metrics_return ON backtest_metrics_history(total_return, created_at)",
 
             # 回测预警索引 - 优化告警查询
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_time ON backtest_alerts_history(timestamp)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_level ON backtest_alerts_history(level, timestamp)",
-            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_metric ON backtest_alerts_history(metric_name, timestamp)",
+            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_time ON backtest_alerts_history(alert_time)",
+            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_level ON backtest_alerts_history(severity, alert_time)",
+            "CREATE INDEX IF NOT EXISTS idx_backtest_alerts_type ON backtest_alerts_history(alert_type, alert_time)",
 
             # 性能指标索引 - 优化性能分析
             "CREATE INDEX IF NOT EXISTS idx_performance_pattern_time ON performance_metrics(pattern_name, test_time)",
