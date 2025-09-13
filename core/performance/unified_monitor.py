@@ -50,6 +50,8 @@ class PerformanceCategory(Enum):
     ALGORITHM = "algorithm"        # 算法性能
     TRADE = "trade"               # 交易性能
     CACHE = "cache"               # 缓存性能
+    DATA_IMPORT = "data_import"     # 数据导入性能
+    DATABASE = "database"           # 数据库性能
 
 
 class TuningDirection(Enum):

@@ -618,12 +618,12 @@ class MultiLevelCacheManager:
     def set(self, key: str, value: Any, ttl: Optional[timedelta] = None) -> bool:
         """
         设置缓存值（put方法的别名，保持向后兼容性）
-        
+
         Args:
             key: 缓存键
             value: 缓存值
             ttl: 生存时间
-            
+
         Returns:
             是否成功
         """
@@ -735,6 +735,10 @@ class MultiLevelCacheManager:
         except Exception as e:
             self.logger.error(f"获取缓存统计失败: {e}")
             return {'error': str(e)}
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """获取缓存统计信息（别名方法）"""
+        return self.get_stats()
 
 
 def cache_result(ttl_minutes: int = 30, cache_manager: Optional[MultiLevelCacheManager] = None):

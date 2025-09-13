@@ -356,16 +356,19 @@ class AnalysisService(CacheableService, ConfigurableService):
             return None
 
     def _get_stock_service(self):
-        raise NotImplementedError("此方法已废弃，请使用 self.data_manager")
+        # 方法已移除 - 请使用 self.data_manager
+        pass
 
     def _get_stock_data(self, stock_code: str, period: str, time_range: int) -> Optional[pd.DataFrame]:
         raise NotImplementedError("此方法已废弃，请使用 self.data_manager")
 
     def start_technical_analysis(self, stock_code: str = None) -> bool:
-        raise NotImplementedError("此方法已废弃，请直接调用 analyze_stock")
+        # 方法已移除 - 请直接调用 analyze_stock
+        return False
 
     def _run_auto_analysis(self, stock_code: str) -> None:
-        raise NotImplementedError("此方法已废弃")
+        # 方法已移除
+        pass
 
     def _run_auto_analysis_async(self, stock_code: str) -> None:
         raise NotImplementedError("此方法已废弃")

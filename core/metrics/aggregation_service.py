@@ -333,7 +333,8 @@ class MetricsAggregationService:
         """
         self.aggregation_interval = max(10, interval)  # 最小10秒
 
-    def set_alert_threshold(self, metric_name: str, value: float) -> bool:
+    # def set_alert_threshold(self, metric_name: str, value: float) -> bool:  # 已废弃
+    def _deprecated_set_alert_threshold(self, metric_name: str, value: float) -> bool:
         """
         设置告警阈值
 
@@ -350,7 +351,8 @@ class MetricsAggregationService:
         logger.warning(f"set_alert_threshold 方法已废弃，请使用 AlertRuleEngine 配置告警规则")
         return False
 
-    def get_alert_thresholds(self) -> Dict[str, float]:
+    # def get_alert_thresholds(self) -> Dict[str, float]:  # 已废弃
+    def _deprecated_get_alert_thresholds(self) -> Dict[str, float]:
         """
         获取告警阈值
 

@@ -1525,7 +1525,9 @@ FactorWeave-Quant  2.0 (重构版本)
     def _on_batch_analysis(self) -> None:
         """批量分析"""
         try:
-            from gui.dialogs.batch_analysis_dialog import BatchAnalysisDialog
+            # from gui.dialogs.batch_analysis_dialog import BatchAnalysisDialog  # 已移除
+            logger.warning("批量分析对话框已移除，请使用主界面右侧面板的批量分析功能")
+            return
 
             dialog = BatchAnalysisDialog(self._main_window)
             self.center_dialog(dialog)
@@ -2508,26 +2510,26 @@ FactorWeave-Quant  2.0 (重构版本)
         """打开数据管理中心"""
         try:
             from gui.dialogs.data_management_dialog import DataManagementDialog
-            
+
             # 检查是否已经打开了数据管理中心
             if hasattr(self, '_data_management_dialog') and self._data_management_dialog:
                 # 如果已经存在，就激活窗口
                 self._data_management_dialog.raise_()
                 self._data_management_dialog.activateWindow()
                 return
-            
+
             # 创建数据管理中心对话框
             self._data_management_dialog = DataManagementDialog(self._main_window)
-            
+
             # 连接信号
             self._data_management_dialog.data_downloaded.connect(self._on_data_downloaded_from_center)
             self._data_management_dialog.source_configured.connect(self._on_source_configured_from_center)
-            
+
             # 显示对话框
             self._data_management_dialog.show()
-            
+
             logger.info("数据管理中心已打开")
-            
+
         except Exception as e:
             logger.error(f"打开数据管理中心失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法打开数据管理中心: {e}")
@@ -2552,29 +2554,60 @@ FactorWeave-Quant  2.0 (重构版本)
     # ==================== DuckDB专业数据导入功能 ====================
 
     def _on_duckdb_import(self) -> None:
-        """打开DuckDB专业数据导入界面"""
+        """打开DuckDB专业数据导入界面（重定向到增强版）"""
         try:
-            from gui.widgets.data_import_widget import DataImportWidget
+            # 重定向到增强版数据导入系统
+            from gui.enhanced_data_import_launcher import EnhancedDataImportMainWindow
 
-            # 创建数据导入窗口
-            import_window = QMainWindow(self._main_window)
-            import_window.setWindowTitle("DuckDB专业数据导入系统")
-            import_window.setWindowIcon(QIcon("icons/import.png"))
-            import_window.resize(1200, 800)
+            # 创建增强版数据导入窗口
+            self.enhanced_import_window = EnhancedDataImportMainWindow()
+            self.enhanced_import_window.show()
 
-            # 创建导入组件
-            import_widget = DataImportWidget(import_window)
-            import_window.setCentralWidget(import_widget)
+            logger.info("打开增强版DuckDB专业数据导入系统")
 
-            # 居中显示
-            self.center_dialog(import_window)
-            import_window.show()
-
-            logger.info("打开DuckDB专业数据导入界面")
+        except ImportError as e:
+            QMessageBox.warning(
+                self._main_window,
+                "功能不可用",
+                f"增强版数据导入UI组件加载失败:\n{str(e)}\n\n请确保所有依赖项已正确安装。"
+            )
+            logger.error(f"增强版数据导入UI组件加载失败: {e}")
 
         except Exception as e:
-            logger.error(f"打开DuckDB导入界面失败: {e}")
-            QMessageBox.warning(self._main_window, "错误", f"无法打开DuckDB导入界面: {e}")
+            QMessageBox.critical(
+                self._main_window,
+                "错误",
+                f"启动增强版数据导入系统失败:\n{str(e)}"
+            )
+            logger.error(f"启动增强版数据导入系统失败: {e}")
+
+    def _on_enhanced_import(self) -> None:
+        """打开增强版数据导入系统"""
+        try:
+            # 启动增强版数据导入系统
+            from gui.enhanced_data_import_launcher import EnhancedDataImportMainWindow
+
+            # 创建增强版数据导入窗口
+            self.enhanced_import_window = EnhancedDataImportMainWindow()
+            self.enhanced_import_window.show()
+
+            logger.info("启动增强版数据导入系统")
+
+        except ImportError as e:
+            QMessageBox.warning(
+                self._main_window,
+                "功能不可用",
+                f"增强版数据导入UI组件加载失败:\n{str(e)}\n\n请确保所有依赖项已正确安装。"
+            )
+            logger.error(f"增强版数据导入UI组件加载失败: {e}")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self._main_window,
+                "错误",
+                f"启动增强版数据导入系统失败:\n{str(e)}"
+            )
+            logger.error(f"启动增强版数据导入系统失败: {e}")
 
     def _on_import_monitor(self) -> None:
         """打开数据导入监控仪表板"""
@@ -2602,26 +2635,27 @@ FactorWeave-Quant  2.0 (重构版本)
             QMessageBox.warning(self._main_window, "错误", f"无法打开导入监控仪表板: {e}")
 
     def _on_batch_import(self) -> None:
-        """批量数据导入"""
+        """批量数据导入（重定向到增强版任务管理）"""
         try:
-            from gui.dialogs.batch_import_dialog import BatchImportDialog
+            # 批量导入功能已集成到增强版数据导入系统的任务管理中
+            from gui.enhanced_data_import_launcher import EnhancedDataImportMainWindow
 
-            dialog = BatchImportDialog(self._main_window)
-            self.center_dialog(dialog)
+            # 创建增强版数据导入窗口
+            self.enhanced_import_window = EnhancedDataImportMainWindow()
+            self.enhanced_import_window.show()
 
-            if dialog.exec_() == dialog.Accepted:
-                # 处理批量导入结果
-                QMessageBox.information(self._main_window, "成功", "批量导入任务已启动")
+            # 提示用户使用任务管理功能
+            QMessageBox.information(
+                self._main_window,
+                "功能整合",
+                "批量导入功能已整合到增强版数据导入系统的任务管理中。\n\n请使用'任务管理'选项卡进行批量任务创建和管理。"
+            )
 
-            logger.info("启动批量数据导入")
+            logger.info("重定向到增强版数据导入系统的任务管理功能")
 
-        except ImportError:
-            # 如果对话框不存在，显示开发中提示
-            QMessageBox.information(self._main_window, "提示", "批量导入功能正在开发中")
-            logger.info("批量导入功能正在开发中")
         except Exception as e:
-            logger.error(f"批量导入失败: {e}")
-            QMessageBox.warning(self._main_window, "错误", f"无法启动批量导入: {e}")
+            logger.error(f"启动增强版数据导入系统失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动增强版数据导入系统: {e}")
 
     def _on_scheduled_import(self) -> None:
         """定时导入任务管理"""

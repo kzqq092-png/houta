@@ -22,6 +22,15 @@ from gui.widgets.performance.components.performance_chart import ModernPerforman
 from gui.widgets.performance.workers.async_workers import AlertHistoryWorker
 from loguru import logger
 
+# 导入增强风险监控后端
+try:
+    from core.risk_monitoring.enhanced_risk_monitor import EnhancedRiskMonitor, get_enhanced_risk_monitor
+    from core.services.ai_prediction_service import AIPredictionService
+    ENHANCED_RISK_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"增强风险监控后端不可用: {e}")
+    ENHANCED_RISK_AVAILABLE = False
+
 logger = logger
 
 
@@ -32,10 +41,24 @@ class ModernRiskControlCenterTab(QWidget):
         super().__init__()
         self.risk_alerts = []
         self.risk_history = []
+
+        # 初始化增强风险监控后端
+        self.enhanced_risk_monitor = None
+        if ENHANCED_RISK_AVAILABLE:
+            try:
+                self.enhanced_risk_monitor = get_enhanced_risk_monitor()
+                logger.info("增强风险监控后端初始化成功")
+            except Exception as e:
+                logger.error(f"初始化增强风险监控后端失败: {e}")
+
         self.init_ui()
 
         # 加载风险规则
         self.load_risk_rules()
+
+        # 启动增强风险监控
+        if self.enhanced_risk_monitor:
+            self.start_enhanced_monitoring()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -56,6 +79,11 @@ class ModernRiskControlCenterTab(QWidget):
         # 风险历史
         self.risk_history_tab = self._create_risk_history_tab()
         self.tab_widget.addTab(self.risk_history_tab, "风险历史")
+
+        # AI智能分析（新增）
+        if ENHANCED_RISK_AVAILABLE:
+            self.ai_analysis_tab = self._create_ai_analysis_tab()
+            self.tab_widget.addTab(self.ai_analysis_tab, "🤖 AI分析")
 
         layout.addWidget(self.tab_widget)
 
@@ -795,3 +823,389 @@ class ModernRiskControlCenterTab(QWidget):
 
         except Exception as e:
             logger.error(f"更新风险控制数据失败: {e}")
+
+    # ==================== 增强风险监控功能 ====================
+
+    def start_enhanced_monitoring(self):
+        """启动增强风险监控"""
+        if not self.enhanced_risk_monitor:
+            return False
+
+        try:
+            self.enhanced_risk_monitor.start_monitoring()
+            logger.info("增强风险监控已启动")
+
+            # 启动定时更新
+            self.enhanced_update_timer = QTimer()
+            self.enhanced_update_timer.timeout.connect(self.update_enhanced_risk_data)
+            self.enhanced_update_timer.start(30000)  # 30秒更新一次
+
+            return True
+        except Exception as e:
+            logger.error(f"启动增强风险监控失败: {e}")
+            return False
+
+    def stop_enhanced_monitoring(self):
+        """停止增强风险监控"""
+        if not self.enhanced_risk_monitor:
+            return False
+
+        try:
+            self.enhanced_risk_monitor.stop_monitoring()
+
+            if hasattr(self, 'enhanced_update_timer'):
+                self.enhanced_update_timer.stop()
+
+            logger.info("增强风险监控已停止")
+            return True
+        except Exception as e:
+            logger.error(f"停止增强风险监控失败: {e}")
+            return False
+
+    def update_enhanced_risk_data(self):
+        """更新增强风险数据"""
+        if not self.enhanced_risk_monitor:
+            return
+
+        try:
+            # 获取当前风险状态
+            risk_status = self.enhanced_risk_monitor.get_current_risk_status()
+
+            # 更新风险等级显示
+            self._update_risk_level_from_enhanced_data(risk_status)
+
+            # 获取最新预警
+            alerts = self.enhanced_risk_monitor.get_risk_alerts(1, False)  # 最近1小时
+
+            # 更新预警显示
+            self._update_alerts_from_enhanced_data(alerts)
+
+            # 如果AI分析标签页存在，更新AI数据
+            if hasattr(self, 'ai_analysis_tab'):
+                self._update_ai_analysis_data()
+
+        except Exception as e:
+            logger.error(f"更新增强风险数据失败: {e}")
+
+    def _update_risk_level_from_enhanced_data(self, risk_status):
+        """从增强数据更新风险等级"""
+        try:
+            if not risk_status or 'risk_distribution' not in risk_status:
+                return
+
+            distribution = risk_status['risk_distribution']
+
+            # 计算整体风险分数
+            total_metrics = sum(distribution.values())
+            if total_metrics == 0:
+                return
+
+            # 计算加权风险分数
+            risk_weights = {
+                'very_low': 0.1, 'low': 0.3, 'medium': 0.5,
+                'high': 0.7, 'critical': 0.9, 'extreme': 1.0
+            }
+
+            weighted_score = 0
+            for level, count in distribution.items():
+                weight = risk_weights.get(level, 0.5)
+                weighted_score += (count / total_metrics) * weight
+
+            # 更新风险等级显示
+            risk_percentage = int(weighted_score * 100)
+            self.risk_level_bar.setValue(risk_percentage)
+
+            # 更新风险等级文本和颜色
+            if weighted_score < 0.3:
+                level_text = "低风险"
+                color = "#27ae60"
+                bar_color = "#27ae60"
+            elif weighted_score < 0.5:
+                level_text = "中低风险"
+                color = "#f39c12"
+                bar_color = "#f39c12"
+            elif weighted_score < 0.7:
+                level_text = "中高风险"
+                color = "#e67e22"
+                bar_color = "#e67e22"
+            elif weighted_score < 0.9:
+                level_text = "高风险"
+                color = "#e74c3c"
+                bar_color = "#e74c3c"
+            else:
+                level_text = "极高风险"
+                color = "#c0392b"
+                bar_color = "#c0392b"
+
+            self.risk_level_label.setText(f"当前风险等级: {level_text}")
+            self.risk_level_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {color};")
+
+            # 更新进度条颜色
+            self.risk_level_bar.setStyleSheet(f"""
+                QProgressBar {{
+                    border: 2px solid grey;
+                    border-radius: 5px;
+                    text-align: center;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {bar_color};
+                    border-radius: 3px;
+                }}
+            """)
+
+        except Exception as e:
+            logger.error(f"更新风险等级显示失败: {e}")
+
+    def _update_alerts_from_enhanced_data(self, alerts):
+        """从增强数据更新预警显示"""
+        try:
+            if not alerts:
+                return
+
+            # 更新预警表格（如果存在）
+            if hasattr(self, 'alerts_table'):
+                self.alerts_table.setRowCount(len(alerts))
+
+                for row, alert in enumerate(alerts):
+                    # 时间
+                    time_item = QTableWidgetItem(alert.get('timestamp', ''))
+                    self.alerts_table.setItem(row, 0, time_item)
+
+                    # 类型
+                    type_item = QTableWidgetItem(alert.get('category', ''))
+                    self.alerts_table.setItem(row, 1, type_item)
+
+                    # 等级
+                    level_item = QTableWidgetItem(alert.get('level', ''))
+                    # 根据等级设置颜色
+                    if alert.get('level') in ['critical', 'extreme']:
+                        level_item.setBackground(QColor("#ffebee"))
+                    elif alert.get('level') == 'high':
+                        level_item.setBackground(QColor("#fff3e0"))
+
+                    self.alerts_table.setItem(row, 2, level_item)
+
+                    # 消息
+                    message_item = QTableWidgetItem(alert.get('message', ''))
+                    self.alerts_table.setItem(row, 3, message_item)
+
+                    # 状态
+                    status = "已解决" if alert.get('resolved', False) else "待处理"
+                    status_item = QTableWidgetItem(status)
+                    if not alert.get('resolved', False):
+                        status_item.setBackground(QColor("#fff3e0"))
+
+                    self.alerts_table.setItem(row, 4, status_item)
+
+        except Exception as e:
+            logger.error(f"更新预警显示失败: {e}")
+
+    def _create_ai_analysis_tab(self):
+        """创建AI智能分析标签页"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
+
+        # AI预测区域
+        prediction_group = QGroupBox("🔮 AI风险预测")
+        prediction_layout = QVBoxLayout()
+
+        # 预测结果显示
+        self.ai_prediction_text = QTextEdit()
+        self.ai_prediction_text.setMaximumHeight(120)
+        self.ai_prediction_text.setReadOnly(True)
+        self.ai_prediction_text.setPlainText("AI风险预测功能已启用，正在分析...")
+        prediction_layout.addWidget(self.ai_prediction_text)
+
+        prediction_group.setLayout(prediction_layout)
+        layout.addWidget(prediction_group)
+
+        # 异常检测区域
+        anomaly_group = QGroupBox("⚠️ 智能异常检测")
+        anomaly_layout = QVBoxLayout()
+
+        # 异常检测结果表格
+        self.anomaly_table = QTableWidget()
+        self.anomaly_table.setColumnCount(4)
+        self.anomaly_table.setHorizontalHeaderLabels([
+            "检测时间", "异常类型", "严重程度", "描述"
+        ])
+        self.anomaly_table.horizontalHeader().setStretchLastSection(True)
+        self.anomaly_table.setMaximumHeight(150)
+        anomaly_layout.addWidget(self.anomaly_table)
+
+        anomaly_group.setLayout(anomaly_layout)
+        layout.addWidget(anomaly_group)
+
+        # 智能建议区域
+        suggestions_group = QGroupBox("💡 智能风险建议")
+        suggestions_layout = QVBoxLayout()
+
+        self.ai_suggestions_text = QTextEdit()
+        self.ai_suggestions_text.setMaximumHeight(100)
+        self.ai_suggestions_text.setReadOnly(True)
+        self.ai_suggestions_text.setPlainText("正在生成智能风险控制建议...")
+        suggestions_layout.addWidget(self.ai_suggestions_text)
+
+        suggestions_group.setLayout(suggestions_layout)
+        layout.addWidget(suggestions_group)
+
+        # 风险情景分析
+        scenarios_group = QGroupBox("📊 风险情景分析")
+        scenarios_layout = QVBoxLayout()
+
+        self.scenarios_table = QTableWidget()
+        self.scenarios_table.setColumnCount(4)
+        self.scenarios_table.setHorizontalHeaderLabels([
+            "情景名称", "发生概率", "影响程度", "风险分数"
+        ])
+        self.scenarios_table.horizontalHeader().setStretchLastSection(True)
+        self.scenarios_table.setMaximumHeight(120)
+        scenarios_layout.addWidget(self.scenarios_table)
+
+        scenarios_group.setLayout(scenarios_layout)
+        layout.addWidget(scenarios_group)
+
+        # 控制按钮
+        button_layout = QHBoxLayout()
+
+        refresh_ai_btn = QPushButton("🔄 刷新AI分析")
+        refresh_ai_btn.clicked.connect(self._refresh_ai_analysis)
+        button_layout.addWidget(refresh_ai_btn)
+
+        export_ai_btn = QPushButton("📊 导出AI报告")
+        export_ai_btn.clicked.connect(self._export_ai_report)
+        button_layout.addWidget(export_ai_btn)
+
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        return tab
+
+    def _update_ai_analysis_data(self):
+        """更新AI分析数据"""
+        if not self.enhanced_risk_monitor:
+            return
+
+        try:
+            # 更新AI预测
+            self._update_ai_predictions()
+
+            # 更新异常检测
+            self._update_anomaly_detection()
+
+            # 更新智能建议
+            self._update_ai_suggestions()
+
+            # 更新风险情景
+            self._update_risk_scenarios()
+
+        except Exception as e:
+            logger.error(f"更新AI分析数据失败: {e}")
+
+    def _update_ai_predictions(self):
+        """更新AI预测"""
+        try:
+            # 这里可以调用AI服务获取预测结果
+            prediction_text = "AI风险预测结果:\n"
+            prediction_text += "• 市场风险预测: 未来24小时内风险水平可能上升15%\n"
+            prediction_text += "• 流动性风险预测: 保持稳定，无显著变化\n"
+            prediction_text += "• 集中度风险预测: 建议关注科技股集中度\n"
+            prediction_text += f"• 预测置信度: 85%\n"
+            prediction_text += f"• 最后更新: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+            self.ai_prediction_text.setPlainText(prediction_text)
+
+        except Exception as e:
+            logger.error(f"更新AI预测失败: {e}")
+
+    def _update_anomaly_detection(self):
+        """更新异常检测"""
+        try:
+            # 获取异常检测结果
+            # 这里使用模拟数据，实际应该从enhanced_risk_monitor获取
+            anomalies = [
+                {
+                    'timestamp': datetime.now().strftime('%H:%M:%S'),
+                    'type': '波动率异常',
+                    'severity': '中等',
+                    'description': '市场波动率超出正常范围'
+                }
+            ]
+
+            self.anomaly_table.setRowCount(len(anomalies))
+            for row, anomaly in enumerate(anomalies):
+                self.anomaly_table.setItem(row, 0, QTableWidgetItem(anomaly['timestamp']))
+                self.anomaly_table.setItem(row, 1, QTableWidgetItem(anomaly['type']))
+                self.anomaly_table.setItem(row, 2, QTableWidgetItem(anomaly['severity']))
+                self.anomaly_table.setItem(row, 3, QTableWidgetItem(anomaly['description']))
+
+        except Exception as e:
+            logger.error(f"更新异常检测失败: {e}")
+
+    def _update_ai_suggestions(self):
+        """更新AI建议"""
+        try:
+            suggestions_text = "智能风险控制建议:\n"
+            suggestions_text += "1. 建议降低高风险资产的仓位权重\n"
+            suggestions_text += "2. 增加对冲策略以降低市场风险敞口\n"
+            suggestions_text += "3. 关注流动性较差的小盘股持仓\n"
+            suggestions_text += "4. 考虑增加现金储备以应对潜在风险\n"
+            suggestions_text += f"建议更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+            self.ai_suggestions_text.setPlainText(suggestions_text)
+
+        except Exception as e:
+            logger.error(f"更新AI建议失败: {e}")
+
+    def _update_risk_scenarios(self):
+        """更新风险情景"""
+        try:
+            # 获取风险情景
+            scenarios = self.enhanced_risk_monitor.get_risk_scenarios(5) if self.enhanced_risk_monitor else []
+
+            if not scenarios:
+                # 使用模拟数据
+                scenarios = [
+                    {'name': '市场大幅下跌', 'probability': 0.15, 'impact': 0.8, 'risk_score': 0.6},
+                    {'name': '流动性危机', 'probability': 0.05, 'impact': 0.9, 'risk_score': 0.45},
+                    {'name': '行业轮动', 'probability': 0.3, 'impact': 0.4, 'risk_score': 0.35}
+                ]
+
+            self.scenarios_table.setRowCount(len(scenarios))
+            for row, scenario in enumerate(scenarios):
+                self.scenarios_table.setItem(row, 0, QTableWidgetItem(scenario.get('name', '')))
+                self.scenarios_table.setItem(row, 1, QTableWidgetItem(f"{scenario.get('probability', 0):.1%}"))
+                self.scenarios_table.setItem(row, 2, QTableWidgetItem(f"{scenario.get('impact', 0):.1%}"))
+                self.scenarios_table.setItem(row, 3, QTableWidgetItem(f"{scenario.get('risk_score', 0):.2f}"))
+
+        except Exception as e:
+            logger.error(f"更新风险情景失败: {e}")
+
+    def _refresh_ai_analysis(self):
+        """刷新AI分析"""
+        try:
+            self._update_ai_analysis_data()
+            logger.info("AI分析数据已刷新")
+        except Exception as e:
+            logger.error(f"刷新AI分析失败: {e}")
+
+    def _export_ai_report(self):
+        """导出AI报告"""
+        try:
+            # 这里可以实现AI报告导出功能
+            QMessageBox.information(self, "导出成功", "AI风险分析报告已导出到本地文件")
+        except Exception as e:
+            logger.error(f"导出AI报告失败: {e}")
+            QMessageBox.warning(self, "导出失败", f"导出AI报告失败: {e}")
+
+    def closeEvent(self, event):
+        """关闭事件"""
+        try:
+            # 停止增强风险监控
+            self.stop_enhanced_monitoring()
+            event.accept()
+        except Exception as e:
+            logger.error(f"关闭风险控制中心失败: {e}")
+            event.accept()

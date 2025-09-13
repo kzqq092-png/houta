@@ -77,6 +77,10 @@ class FactorWeavePerformanceIntegrator:
         )
         self.integration_thread.start()
 
+    def start_monitoring(self):
+        """启动性能监控（别名方法）"""
+        return self.start_integration()
+
         logger.info("FactorWeave性能监控集成已启动")
 
     def stop_integration(self):
@@ -113,35 +117,44 @@ class FactorWeavePerformanceIntegrator:
             if not recent_metrics:
                 return
 
-            # 批量插入到DuckDB (手动提供id)
-            for i, metric in enumerate(recent_metrics, 1):
-                self.analytics_db.conn.execute("""
-                    INSERT INTO performance_metrics 
-                    (id, version_id, pattern_name, test_time, precision, recall, f1_score, 
-                     accuracy, execution_time, memory_usage, cpu_usage, signal_quality, 
-                     confidence_avg, patterns_found, robustness_score, parameter_sensitivity, 
-                     overall_score, test_conditions)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, [
-                    i,  # 简单的序号作为id
-                    1,  # version_id
-                    metric.get('name', 'unknown'),
-                    datetime.now(),
-                    metric.get('precision', 0.0),
-                    metric.get('recall', 0.0),
-                    metric.get('f1_score', 0.0),
-                    metric.get('accuracy', 0.0),
-                    metric.get('execution_time', 0.0),
-                    metric.get('memory_usage', 0.0),
-                    metric.get('cpu_usage', 0.0),
-                    metric.get('signal_quality', 0.0),
-                    metric.get('confidence_avg', 0.0),
-                    metric.get('patterns_found', 0),
-                    metric.get('robustness_score', 0.0),
-                    metric.get('parameter_sensitivity', 0.0),
-                    metric.get('overall_score', 0.0),
-                    json.dumps(metric.get('conditions', {}))
-                ])
+            # 批量插入到DuckDB (使用时间戳+随机数生成唯一ID)
+            import random
+            base_timestamp = int(datetime.now().timestamp() * 1000)  # 毫秒时间戳
+
+            for i, metric in enumerate(recent_metrics):
+                # 生成唯一ID：时间戳 + 序号 + 随机数
+                unique_id = base_timestamp + i * 1000 + random.randint(1, 999)
+
+                try:
+                    self.analytics_db.conn.execute("""
+                        INSERT OR REPLACE INTO performance_metrics 
+                        (id, version_id, pattern_name, test_time, precision, recall, f1_score, 
+                         accuracy, execution_time, memory_usage, cpu_usage, signal_quality, 
+                         confidence_avg, patterns_found, robustness_score, parameter_sensitivity, 
+                         overall_score, test_conditions)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, [
+                        unique_id,  # 唯一ID
+                        1,  # version_id
+                        metric.get('name', 'unknown'),
+                        datetime.now(),
+                        metric.get('precision', 0.0),
+                        metric.get('recall', 0.0),
+                        metric.get('f1_score', 0.0),
+                        metric.get('accuracy', 0.0),
+                        metric.get('execution_time', 0.0),
+                        metric.get('memory_usage', 0.0),
+                        metric.get('cpu_usage', 0.0),
+                        metric.get('signal_quality', 0.0),
+                        metric.get('confidence_avg', 0.0),
+                        metric.get('patterns_found', 0),
+                        metric.get('robustness_score', 0.0),
+                        metric.get('parameter_sensitivity', 0.0),
+                        metric.get('overall_score', 0.0),
+                        json.dumps(metric.get('conditions', {}))
+                    ])
+                except Exception as insert_error:
+                    logger.debug(f"插入性能指标失败，跳过: {insert_error}")
 
             self.analytics_db.conn.commit()
             logger.debug(f"同步了 {len(recent_metrics)} 条性能数据到DuckDB")
@@ -325,19 +338,28 @@ class FactorWeavePerformanceIntegrator:
     def _store_benchmarks(self, benchmarks: List[PerformanceBenchmark]):
         """存储性能基准"""
         try:
-            for i, benchmark in enumerate(benchmarks, 1):
-                self.analytics_db.conn.execute("""
-                    INSERT INTO analysis_cache 
-                    (id, cache_key, cache_type, data, expires_at, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, [
-                    i + 2000,  # 手动提供id，避免与洞察冲突
-                    f"benchmark_{benchmark.metric_name}",
-                    'performance_benchmark',
-                    json.dumps(asdict(benchmark)),
-                    datetime.now() + timedelta(hours=1),
-                    datetime.now()
-                ])
+            import random
+            base_timestamp = int(datetime.now().timestamp() * 1000)  # 毫秒时间戳
+
+            for i, benchmark in enumerate(benchmarks):
+                # 生成唯一ID：时间戳 + 序号 + 随机数 + 偏移量
+                unique_id = base_timestamp + i * 1000 + random.randint(1, 999) + 50000
+
+                try:
+                    self.analytics_db.conn.execute("""
+                        INSERT OR REPLACE INTO analysis_cache 
+                        (id, cache_key, cache_type, data, expires_at, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, [
+                        unique_id,  # 唯一ID
+                        f"benchmark_{benchmark.metric_name}_{unique_id}",  # 唯一缓存键
+                        'performance_benchmark',
+                        json.dumps(asdict(benchmark)),
+                        datetime.now() + timedelta(hours=1),
+                        datetime.now()
+                    ])
+                except Exception as insert_error:
+                    logger.debug(f"插入性能基准失败，跳过: {insert_error}")
 
             self.analytics_db.conn.commit()
 

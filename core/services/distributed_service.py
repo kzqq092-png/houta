@@ -160,7 +160,26 @@ class NodeDiscovery:
         """监听发现响应"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.bind(('', self.discovery_port))
+            # 设置端口重用选项
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            # 尝试绑定端口，如果失败则尝试其他端口
+            port_to_bind = self.discovery_port
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                try:
+                    sock.bind(('', port_to_bind))
+                    break
+                except OSError as e:
+                    if e.errno == 10048:  # 端口已被使用
+                        port_to_bind += 1
+                        if attempt == max_attempts - 1:
+                            logger.warning(f"无法绑定端口 {self.discovery_port}-{port_to_bind}，跳过监听")
+                            sock.close()
+                            return
+                    else:
+                        raise
+
             sock.settimeout(3)  # 3秒超时
 
             while self.running:

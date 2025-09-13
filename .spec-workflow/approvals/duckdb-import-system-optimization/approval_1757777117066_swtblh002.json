@@ -1,0 +1,21 @@
+{
+  "id": "approval_1757777117066_swtblh002",
+  "title": "DuckDB专业数据导入系统优化 - 技术设计文档审批",
+  "filePath": ".spec-workflow/specs/duckdb-import-system-optimization/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-13T15:25:17.067Z",
+  "category": "spec",
+  "categoryName": "duckdb-import-system-optimization",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. 针对每一阶段的修改输出详细的功能改动点和实现的功能不要包含代码\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"针对每一阶段的修改输出详细的功能改动点和实现的功能不要包含代码\",\n      \"timestamp\": \"2025-09-13T15:28:55.271Z\",\n      \"id\": \"comment_1757777335271_sjn6xbutd\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. 针对每一阶段的修改输出详细的功能改动点和实现的功能不要包含代码\\n\\n\",\n  \"timestamp\": \"2025-09-13T15:28:59.286Z\"\n}",
+  "respondedAt": "2025-09-13T15:28:59.605Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "针对每一阶段的修改输出详细的功能改动点和实现的功能不要包含代码",
+      "timestamp": "2025-09-13T15:28:55.271Z",
+      "id": "comment_1757777335271_sjn6xbutd"
+    }
+  ]
+}

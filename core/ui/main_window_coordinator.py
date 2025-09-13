@@ -66,7 +66,9 @@ class MainWindowCoordinator(QObject):
     def show_batch_analysis_dialog(self):
         """显示批量分析对话框"""
         try:
-            from gui.dialogs.batch_analysis_dialog import BatchAnalysisDialog
+            # from gui.dialogs.batch_analysis_dialog import BatchAnalysisDialog  # 已移除
+            logger.warning("批量分析对话框已移除，请使用主界面右侧面板的批量分析功能")
+            return
             dialog = BatchAnalysisDialog(self.main_window)
             dialog.exec_()
         except Exception as e:

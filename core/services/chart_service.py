@@ -183,7 +183,7 @@ class ChartService(CacheableService, ConfigurableService):
         Raises:
             NotImplementedError: 此方法已被废弃，以推广事件驱动的异步模型。
         """
-        logger.warning("create_chart方法已被废弃，请改为发布StockSelectedEvent事件。")
+        # 方法已移除 - 请使用 StockSelectedEvent 事件
         raise NotImplementedError(
             "create_chart is deprecated. Publish StockSelectedEvent instead.")
 

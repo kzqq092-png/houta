@@ -161,7 +161,7 @@ class PerformanceDataBridge:
 
         except Exception as e:
             try:
-                logger.error("收集系统指标失败: {}", str(e))
+                logger.error(f"收集系统指标失败: {e}")
             except Exception:
                 # 如果logger.error也失败，使用最基本的记录方式
                 logger.info("收集系统指标时发生错误")

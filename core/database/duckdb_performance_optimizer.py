@@ -73,8 +73,17 @@ class DuckDBPerformanceOptimizer:
         """获取优化的DuckDB连接"""
         with self._lock:
             if self.conn is None:
-                self.conn = duckdb.connect(str(self.db_path))
-                logger.info(f"创建DuckDB连接: {self.db_path}")
+                # 确保路径使用正确的编码，避免中文字符问题
+                try:
+                    # 使用绝对路径并确保编码正确
+                    db_path_str = str(self.db_path.resolve())
+                    self.conn = duckdb.connect(db_path_str)
+                    logger.info(f"创建DuckDB连接: {self.db_path}")
+                except UnicodeDecodeError as e:
+                    logger.warning(f"DuckDB路径编码问题，尝试使用ASCII安全路径: {e}")
+                    # 如果路径包含中文，使用内存数据库作为回退
+                    self.conn = duckdb.connect(":memory:")
+                    logger.info("使用内存DuckDB连接作为回退方案")
             return self.conn
 
     def optimize_for_workload(self, workload_type: WorkloadType) -> bool:

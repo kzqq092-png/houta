@@ -316,11 +316,11 @@ class MainMenuBar(QMenuBar):
             # 数据导入子菜单 - 专业级DuckDB导入系统
             self.data_import_menu = self.data_menu.addMenu(" 数据导入")
 
-            # DuckDB专业导入
-            self.duckdb_import_action = QAction("DuckDB数据导入", self)
-            self.duckdb_import_action.setStatusTip("打开专业级DuckDB数据导入界面")
-            self.duckdb_import_action.setShortcut("Ctrl+Shift+I")
-            self.data_import_menu.addAction(self.duckdb_import_action)
+            # DuckDB专业数据导入（统一入口）
+            self.enhanced_import_action = QAction("🚀 DuckDB专业数据导入", self)
+            self.enhanced_import_action.setStatusTip("打开DuckDB专业数据导入系统（集成AI智能优化、任务管理、分布式执行、质量监控）")
+            self.enhanced_import_action.setShortcut("Ctrl+Shift+I")
+            self.data_import_menu.addAction(self.enhanced_import_action)
 
             # 数据导入监控
             self.import_monitor_action = QAction("导入监控仪表板", self)
@@ -329,11 +329,6 @@ class MainMenuBar(QMenuBar):
             self.data_import_menu.addAction(self.import_monitor_action)
 
             self.data_import_menu.addSeparator()
-
-            # 批量导入
-            self.batch_import_action = QAction("批量数据导入", self)
-            self.batch_import_action.setStatusTip("批量导入多个数据源")
-            self.data_import_menu.addAction(self.batch_import_action)
 
             # 定时导入任务
             self.scheduled_import_action = QAction("定时导入任务", self)
@@ -374,22 +369,8 @@ class MainMenuBar(QMenuBar):
             self.data_management_center_action.setShortcut("Ctrl+D")
             self.data_menu.addAction(self.data_management_center_action)
 
-            # 连接信号到coordinator
-            if self.coordinator:
-                # DuckDB专业导入功能
-                self.duckdb_import_action.triggered.connect(
-                    lambda: self.coordinator._on_duckdb_import() if hasattr(self.coordinator, '_on_duckdb_import') else None)
-                self.import_monitor_action.triggered.connect(
-                    lambda: self.coordinator._on_import_monitor() if hasattr(self.coordinator, '_on_import_monitor') else None)
-                self.batch_import_action.triggered.connect(
-                    lambda: self.coordinator._on_batch_import() if hasattr(self.coordinator, '_on_batch_import') else None)
-                self.scheduled_import_action.triggered.connect(
-                    lambda: self.coordinator._on_scheduled_import() if hasattr(self.coordinator, '_on_scheduled_import') else None)
-                self.import_history_action.triggered.connect(
-                    lambda: self.coordinator._on_import_history() if hasattr(self.coordinator, '_on_import_history') else None)
-
-                # 传统数据管理功能的信号连接已移至统一的信号连接处理中
-                # 避免重复连接导致方法被调用多次
+            # 信号连接已移至统一的 _connect_action_signals 方法中
+            # 避免重复连接导致方法被调用多次
 
         except Exception as e:
             if True:  # 使用Loguru日志
@@ -997,6 +978,10 @@ class MainMenuBar(QMenuBar):
                 ('database_admin_action', '_on_database_admin'),
                 ('data_quality_action', '_on_data_quality_check'),
                 ('data_management_center_action', '_on_data_management_center'),
+                ('enhanced_import_action', '_on_enhanced_import'),  # DuckDB专业数据导入（统一入口）
+                ('import_monitor_action', '_on_import_monitor'),
+                ('scheduled_import_action', '_on_scheduled_import'),
+                ('import_history_action', '_on_import_history'),
 
                 # 工具相关
                 ('calculator_action', '_on_calculator'),
@@ -1189,3 +1174,50 @@ class MainMenuBar(QMenuBar):
         except Exception as e:
             logger.info(f" 创建插件对话框失败: {e}")
             raise
+
+    def _on_enhanced_import(self):
+        """处理增强版数据导入菜单点击"""
+        try:
+            # 导入增强版数据导入UI
+            from gui.enhanced_data_import_launcher import EnhancedDataImportMainWindow
+
+            # 创建增强版数据导入窗口
+            self.enhanced_import_window = EnhancedDataImportMainWindow()
+            self.enhanced_import_window.show()
+
+            logger.info("增强版数据导入系统已启动")
+
+        except ImportError as e:
+            QMessageBox.warning(
+                self.parent(),
+                "功能不可用",
+                f"增强版数据导入UI组件加载失败:\n{str(e)}\n\n请确保所有依赖项已正确安装。"
+            )
+            logger.error(f"增强版数据导入UI组件加载失败: {e}")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"启动增强版数据导入系统失败:\n{str(e)}"
+            )
+            logger.error(f"启动增强版数据导入系统失败: {e}")
+
+    def _on_duckdb_import(self):
+        """处理DuckDB数据导入菜单点击"""
+        try:
+            # 这里可以添加原有的DuckDB导入功能
+            # 或者重定向到增强版导入
+            QMessageBox.information(
+                self.parent(),
+                "提示",
+                "建议使用增强版智能导入系统，它包含了所有DuckDB功能并增加了AI优化功能。"
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.parent(),
+                "错误",
+                f"启动DuckDB导入失败:\n{str(e)}"
+            )
+            logger.error(f"启动DuckDB导入失败: {e}")

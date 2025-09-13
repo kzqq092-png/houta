@@ -50,12 +50,12 @@ except ImportError as e:
 
 # 导入缓存和工具
 try:
-    from utils.cache import Cache
+    # from utils.cache import Cache  # 已统一使用MultiLevelCacheManager
     # log_structured已替换为直接的logger调用
     from core.performance import measure_performance
 except ImportError as e:
     logger.warning(f"工具模块导入失败: {e}")
-    Cache = None
+    # Cache = None  # 已统一使用MultiLevelCacheManager
 
 logger = logger
 
@@ -107,7 +107,8 @@ class DataRequest:
     # 向后兼容属性
     @property
     def stock_code(self) -> str:
-        """向后兼容：股票代码"""
+        """
+        清理缓存 - 使用统一的MultiLevelCacheManager向后兼容：股票代码"""
         return self.symbol
 
     @stock_code.setter
@@ -186,13 +187,14 @@ class UnifiedDataManager:
         self._request_lock = threading.Lock()
 
         # 数据缓存
-        self._data_cache: Dict[str, Any] = {}
-        self._cache_timestamps: Dict[str, float] = {}
-        self._cache_lock = threading.Lock()
+        # self._data_cache: Dict[str, Any] = {}  # 已统一使用MultiLevelCacheManager
+        # self._cache_timestamps: Dict[str, float] = {}  # 已统一使用MultiLevelCacheManager
+        # self._cache_lock = threading.Lock()  # 已统一使用MultiLevelCacheManager
         self._cache_ttl = 300  # 5分钟缓存TTL
 
         # 初始化缓存管理器
-        if Cache:
+        # if Cache:  # 已统一使用MultiLevelCacheManager
+        if False:
             self.cache_manager = Cache()
         else:
             self.cache_manager = None
@@ -438,7 +440,8 @@ class UnifiedDataManager:
             cache_key = f"stock_list_{market}"
 
             # 尝试从缓存获取数据
-            if self.cache_manager:
+            # if self.cache_manager:  # 已统一使用MultiLevelCacheManager
+            if False:
                 cached_data = self.cache_manager.get(cache_key)
                 if cached_data is not None:
                     logger.info(f"从缓存获取股票列表: {len(cached_data)} 只股票")
@@ -486,7 +489,8 @@ class UnifiedDataManager:
                             df = pd.DataFrame(result.data)
 
                             # 缓存结果
-                            if self.cache_manager and not df.empty:
+                            # if self.cache_manager and not df.empty:  # 已统一使用MultiLevelCacheManager
+                            if False:
                                 self.cache_manager.set(cache_key, df)
 
                             logger.info(f" 通过TET管道获取股票列表成功: {len(df)} 只股票")
@@ -517,7 +521,8 @@ class UnifiedDataManager:
                 df = self._get_mock_stock_list(market)
 
             # 缓存结果
-            if self.cache_manager and not df.empty:
+            # if self.cache_manager and not df.empty:  # 已统一使用MultiLevelCacheManager
+            if False:
                 self.cache_manager.set(cache_key, df)
 
             return df
@@ -605,7 +610,8 @@ class UnifiedDataManager:
                     df['industry'] = '其他'
 
                 # 缓存数据
-                if self.cache_manager and not df.empty:
+                # if self.cache_manager and not df.empty:  # 已统一使用MultiLevelCacheManager
+                if False:
                     self.cache_manager.set(f"stock_list_{market}", df)
 
                 return df
@@ -712,7 +718,7 @@ class UnifiedDataManager:
             return pd.DataFrame()
 
     def _get_cached_data(self, cache_key: str) -> Optional[pd.DataFrame]:
-        """增强缓存获取 - 支持多级缓存"""
+        """增强缓存获取 - 统一使用MultiLevelCacheManager"""
         try:
             # 优先从多级缓存获取
             if self.duckdb_available and self.multi_cache:
@@ -2280,7 +2286,7 @@ class UnifiedDataManager:
                 'pending_requests': len(self._pending_requests),
                 'active_requests': len(self._active_requests),
                 'completed_requests': len(self._completed_requests),
-                'cache_size': len(self._data_cache)
+                'cache_size': self.multi_cache.get_statistics()['total_items'] if self.multi_cache else 0
             }
 
     def clear_cache(self, stock_code: str = None, data_type: str = None) -> None:
@@ -2441,12 +2447,13 @@ class UnifiedDataManager:
         return self._get_cache_key(stock_code, data_type, period, time_range, parameters)
 
     def _get_from_cache(self, cache_key: str) -> Optional[Any]:
-        """从缓存获取数据"""
+        """从缓存获取数据 - 使用统一的MultiLevelCacheManager"""
         with self._cache_lock:
-            if cache_key in self._data_cache:
+            # if cache_key in self._data_cache:  # 已统一使用MultiLevelCacheManager
+            if self.multi_cache and self.multi_cache.get(cache_key) is not None:
                 timestamp = self._cache_timestamps.get(cache_key, 0)
                 if time.time() - timestamp < self._cache_ttl:
-                    return self._data_cache[cache_key]
+                    return self.multi_cache.get(cache_key)
                 else:
                     # 缓存过期，清理
                     del self._data_cache[cache_key]
@@ -2456,10 +2463,12 @@ class UnifiedDataManager:
         return None
 
     def _put_to_cache(self, cache_key: str, data: Any) -> None:
-        """将数据放入缓存"""
+        """将数据放入缓存 - 使用统一的MultiLevelCacheManager"""
         with self._cache_lock:
-            self._data_cache[cache_key] = data
-            self._cache_timestamps[cache_key] = time.time()
+            # self._data_cache[cache_key] = data  # 已统一使用MultiLevelCacheManager
+            if self.multi_cache:
+                self.multi_cache.set(cache_key, data, ttl=self._cache_ttl)
+            # self._cache_timestamps[cache_key] = time.time()  # 已统一使用MultiLevelCacheManager
 
     def dispose(self) -> None:
         """清理资源"""

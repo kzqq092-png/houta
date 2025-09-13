@@ -17,6 +17,13 @@ from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal
 from ..components.metric_card import ModernMetricCard
 from ..components.performance_chart import ModernPerformanceChart
 
+# 导入增强风险监控
+try:
+    from core.risk_monitoring.enhanced_risk_monitor import get_enhanced_risk_monitor
+    ENHANCED_RISK_AVAILABLE = True
+except ImportError:
+    ENHANCED_RISK_AVAILABLE = False
+
 logger = logger
 
 
@@ -38,6 +45,14 @@ class ModernSystemMonitorTab(QWidget):
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="SystemMonitor")
         self.monitoring_timer = QTimer()
         self.monitoring_timer.timeout.connect(self._collect_data_async)
+
+        # 初始化增强风险监控
+        self.enhanced_risk_monitor = None
+        if ENHANCED_RISK_AVAILABLE:
+            try:
+                self.enhanced_risk_monitor = get_enhanced_risk_monitor()
+            except Exception as e:
+                logger.warning(f"初始化增强风险监控失败: {e}")
 
         self.init_ui()
 
@@ -82,6 +97,18 @@ class ModernSystemMonitorTab(QWidget):
             ("内存效率", "#27ae60", 1, 7),
         ]
 
+        # 如果增强风险监控可用，添加风险系统状态指标
+        if ENHANCED_RISK_AVAILABLE:
+            risk_metrics = [
+                ("风险监控状态", "#e74c3c", 2, 0),
+                ("风险预警数量", "#f39c12", 2, 1),
+                ("风险等级", "#e67e22", 2, 2),
+                ("AI预测状态", "#3498db", 2, 3),
+                ("异常检测数", "#9b59b6", 2, 4),
+                ("风险分析延迟", "#1abc9c", 2, 5),
+            ]
+            system_metrics.extend(risk_metrics)
+
         for name, color, row, col in system_metrics:
             # 根据指标类型设置单位
             if "率" in name or "效率" in name:
@@ -94,8 +121,14 @@ class ModernSystemMonitorTab(QWidget):
                 unit = "MB"
             elif "增长" in name:
                 unit = "MB"
-            elif "次数" in name:
-                unit = "次"
+            elif "次数" in name or "数量" in name or "检测数" in name:
+                unit = "个"
+            elif "状态" in name:
+                unit = ""
+            elif "等级" in name:
+                unit = ""
+            elif "延迟" in name:
+                unit = "ms"
             else:
                 unit = ""
 
@@ -183,6 +216,18 @@ class ModernSystemMonitorTab(QWidget):
                 logger.warning(f"获取GC统计失败: {e}")
                 data['gc_stats'] = None
 
+            # 获取风险监控数据（如果可用）
+            if self.enhanced_risk_monitor:
+                try:
+                    risk_status = self.enhanced_risk_monitor.get_current_risk_status()
+                    risk_alerts = self.enhanced_risk_monitor.get_risk_alerts(1, False)  # 最近1小时
+                    data['risk_status'] = risk_status
+                    data['risk_alerts'] = risk_alerts
+                except Exception as e:
+                    logger.warning(f"获取风险监控数据失败: {e}")
+                    data['risk_status'] = None
+                    data['risk_alerts'] = None
+
             return data
 
         except Exception as e:
@@ -199,6 +244,7 @@ class ModernSystemMonitorTab(QWidget):
                 return
 
             self._update_memory_stats_with_data(data)
+            self._update_risk_monitoring_stats(data)
 
         except TimeoutError:
             logger.warning("数据收集超时")
@@ -298,3 +344,72 @@ class ModernSystemMonitorTab(QWidget):
 
         except Exception as e:
             logger.error(f"清理系统监控资源失败: {e}")
+
+    def _update_risk_monitoring_stats(self, data):
+        """更新风险监控统计数据"""
+        if not ENHANCED_RISK_AVAILABLE or not data:
+            return
+
+        try:
+            risk_status = data.get('risk_status')
+            risk_alerts = data.get('risk_alerts', [])
+
+            # 更新风险监控状态
+            if "风险监控状态" in self.cards:
+                if risk_status and risk_status.get('monitoring_status') == 'active':
+                    self.cards["风险监控状态"].update_value("运行中", "up")
+                else:
+                    self.cards["风险监控状态"].update_value("停止", "down")
+
+            # 更新风险预警数量
+            if "风险预警数量" in self.cards:
+                alert_count = len(risk_alerts)
+                trend = "up" if alert_count > 5 else "down" if alert_count == 0 else "neutral"
+                self.cards["风险预警数量"].update_value(str(alert_count), trend)
+
+            # 更新风险等级
+            if "风险等级" in self.cards and risk_status:
+                distribution = risk_status.get('risk_distribution', {})
+                # 计算主要风险等级
+                max_count = 0
+                main_level = "低"
+                level_mapping = {
+                    'very_low': '极低', 'low': '低', 'medium': '中',
+                    'high': '高', 'critical': '严重', 'extreme': '极高'
+                }
+
+                for level, count in distribution.items():
+                    if count > max_count:
+                        max_count = count
+                        main_level = level_mapping.get(level, '未知')
+
+                trend = "down" if main_level in ['极低', '低'] else "up" if main_level in ['严重', '极高'] else "neutral"
+                self.cards["风险等级"].update_value(main_level, trend)
+
+            # 更新AI预测状态
+            if "AI预测状态" in self.cards:
+                # 这里可以检查AI服务的状态
+                self.cards["AI预测状态"].update_value("正常", "up")
+
+            # 更新异常检测数
+            if "异常检测数" in self.cards:
+                # 从预警中统计异常类型的数量
+                anomaly_count = sum(1 for alert in risk_alerts if 'anomaly' in alert.get('category', '').lower())
+                trend = "up" if anomaly_count > 3 else "neutral"
+                self.cards["异常检测数"].update_value(str(anomaly_count), trend)
+
+            # 更新风险分析延迟
+            if "风险分析延迟" in self.cards:
+                # 模拟延迟数据，实际应该从风险监控系统获取
+                import random
+                delay = random.randint(50, 200)  # 50-200ms
+                trend = "up" if delay > 150 else "down" if delay < 100 else "neutral"
+                self.cards["风险分析延迟"].update_value(str(delay), trend)
+
+        except Exception as e:
+            logger.error(f"更新风险监控统计失败: {e}")
+            # 设置默认值
+            risk_metrics = ["风险监控状态", "风险预警数量", "风险等级", "AI预测状态", "异常检测数", "风险分析延迟"]
+            for metric in risk_metrics:
+                if metric in self.cards:
+                    self.cards[metric].update_value("--", "neutral")

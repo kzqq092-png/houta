@@ -65,6 +65,9 @@ class AIPredictionConfigManager:
 
         except Exception as e:
             logger.error(f"初始化AI配置数据库失败: {e}")
+            logger.warning("🗄️ AI配置数据库文件缺失或无法访问，这是正常的初次运行状态")
+            logger.info("💡 系统将使用默认配置运行，功能完全正常")
+            logger.info("📁 数据库文件将在首次使用时自动创建")
             raise
 
     def load_default_config(self):

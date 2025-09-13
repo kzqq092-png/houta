@@ -123,12 +123,12 @@ def pytest_runtest_teardown(item):
 # 处理测试异常
 
 
-def pytest_runtest_call(pyfuncitem):
+def pytest_runtest_call(item):
     """测试调用钩子 - 捕获测试中的异常"""
     try:
         yield
     except Exception as e:
-        test_name = pyfuncitem.nodeid
+        test_name = item.nodeid
         logger.bind(test_name=test_name, test_error=True).exception(
             f" 测试失败: {test_name} - {e}"
         )

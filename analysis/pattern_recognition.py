@@ -757,7 +757,8 @@ PatternAlgorithmFactory.register('default', DatabaseAlgorithmRecognizer)
 PatternRecognizer = EnhancedPatternRecognizer
 
 
-class PerformanceMonitor:
+# class PerformanceMonitor:  # 已移除 - 统一使用 core.performance.UnifiedPerformanceMonitor
+class _ObsoletePerformanceMonitor:  # 过时类，已不使用
     """性能监控器 - 监控形态识别系统性能"""
 
     def __init__(self):

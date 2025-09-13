@@ -393,6 +393,10 @@ class ImportConfigManager:
         """获取所有导入任务配置"""
         return self._tasks.copy()
 
+    def get_import_tasks(self) -> List[ImportTaskConfig]:
+        """获取导入任务配置列表（别名方法）"""
+        return list(self._tasks.values())
+
     def get_tasks_by_data_source(self, data_source: str) -> List[ImportTaskConfig]:
         """根据数据源获取任务"""
         return [task for task in self._tasks.values()

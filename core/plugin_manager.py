@@ -2739,39 +2739,4 @@ class PluginManager(QObject):
             return {}
 
 
-class BasePlugin:
-    """插件基类"""
-
-    name = "BasePlugin"
-    version = "1.0.0"
-    description = "基础插件类"
-    author = ""
-    dependencies = []
-
-    def __init__(self):
-        """初始化插件"""
-        self.logger = logger
-
-    def initialize(self) -> None:
-        """初始化插件"""
-        self.logger.info(f"插件初始化: {self.name}")
-
-    def cleanup(self) -> None:
-        """清理插件"""
-        self.logger.info(f"插件清理: {self.name}")
-
-    def get_name(self) -> str:
-        """获取插件名称"""
-        return self.name
-
-    def get_version(self) -> str:
-        """获取插件版本"""
-        return self.version
-
-    def get_description(self) -> str:
-        """获取插件描述"""
-        return self.description
-
-    def on_event(self, event_name: str, *args, **kwargs) -> None:
-        """处理事件"""
-        pass
+# BasePlugin 类已移除 - 未被使用，请使用 IPlugin 接口
