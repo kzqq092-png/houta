@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 HIkyuu策略管理系统
@@ -10,7 +11,7 @@ import atexit
 from typing import Dict, List, Optional, Any, Type
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config
+from core.adapters import get_config
 
 # 导入核心组件
 from .base_strategy import (
@@ -44,7 +45,7 @@ __author__ = "FactorWeave 团队"
 
 # 全局管理器实例
 _managers_initialized = False
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 
 def initialize_strategy_system(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -226,8 +227,9 @@ def _register_builtin_strategies(registry: StrategyRegistry):
     except Exception as e:
         logger.warning(f"注册内置策略失败: {e}")
 
-
 # 便捷函数
+
+
 def create_strategy(strategy_name: str, **kwargs) -> Optional[BaseStrategy]:
     """
     创建策略实例

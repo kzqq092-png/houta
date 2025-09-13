@@ -1,3 +1,4 @@
+from loguru import logger
 """
 多层降级渲染器模块
 
@@ -7,7 +8,6 @@ WebGPU → OpenGL → Canvas 2D → matplotlib
 确保在任何环境下都能正常工作
 """
 
-import logging
 import time
 from typing import Dict, Any, Optional, Protocol, List
 from abc import ABC, abstractmethod
@@ -18,7 +18,7 @@ import pandas as pd
 from .environment import GPUSupportLevel
 from .compatibility import CompatibilityReport
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RenderBackend(Enum):

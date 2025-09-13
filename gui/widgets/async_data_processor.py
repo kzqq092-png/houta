@@ -10,6 +10,7 @@ import time
 
 
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from loguru import logger
 
 
 class AsyncDataProcessor(QObject):
@@ -231,13 +232,13 @@ class AsyncDataProcessor(QObject):
 
                 except Exception as e:
                     # 记录错误但继续处理其他指标
-                    print(f"计算指标 {indicator} 在块 {chunk_idx} 中失败: {str(e)}")
+                    logger.info(f"计算指标 {indicator} 在块 {chunk_idx} 中失败: {str(e)}")
                     continue
 
             return results
 
         except Exception as e:
-            print(f"处理数据块 {chunk_idx} 失败: {str(e)}")
+            logger.info(f"处理数据块 {chunk_idx} 失败: {str(e)}")
             return {}
 
     def _calculate_indicator(self, data: pd.DataFrame, indicator: str, params: Dict[str, Any]) -> Any:
@@ -325,13 +326,13 @@ class AsyncDataProcessor(QObject):
                     merged_series.index = original_index[:len(merged_series)]
                     merged_results[indicator_name] = merged_series
                 except Exception as e:
-                    print(f"合并指标 {indicator_name} 失败: {str(e)}")
+                    logger.info(f"合并指标 {indicator_name} 失败: {str(e)}")
                     continue
 
             return merged_results
 
         except Exception as e:
-            print(f"合并结果失败: {str(e)}")
+            logger.info(f"合并结果失败: {str(e)}")
             return {}
 
     def clear_cache(self):
@@ -368,7 +369,7 @@ class AsyncDataProcessor(QObject):
             self.performance_metrics.emit(self._processing_stats.copy())
 
         except Exception as e:
-            print(f"更新性能统计失败: {str(e)}")
+            logger.info(f"更新性能统计失败: {str(e)}")
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """获取性能统计信息
@@ -388,7 +389,7 @@ class AsyncDataProcessor(QObject):
             self.thread_pool = ThreadPoolExecutor(max_workers=self.max_workers)
 
         except Exception as e:
-            print(f"取消任务失败: {str(e)}")
+            logger.info(f"取消任务失败: {str(e)}")
 
     def __del__(self):
         """析构函数，确保线程池正确关闭"""

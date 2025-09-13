@@ -11,7 +11,7 @@
 
 import time
 import threading
-import logging
+from loguru import logger
 import hashlib
 import pickle
 import gzip
@@ -27,7 +27,7 @@ import weakref
 # 导入项目模块
 from .plugin_types import AssetType, DataType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CacheLevel(Enum):

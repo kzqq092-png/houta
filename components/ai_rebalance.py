@@ -1,11 +1,10 @@
 import openai
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIRebalancer:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
 
     def rebalance(self, positions: list, strategy: str = "", risk_params: dict = None, user_input: str = "") -> dict:
@@ -31,7 +30,7 @@ class AIRebalancer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"AI调仓/风控失败: {e}")
+            logger.error(f"AI调仓/风控失败: {e}")
             return {"error": str(e)}
 
     def ask(self, user_input: str) -> dict:
@@ -44,5 +43,5 @@ class AIRebalancer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"AI调仓/风控问答失败: {e}")
+            logger.error(f"AI调仓/风控问答失败: {e}")
             return {"error": str(e)}

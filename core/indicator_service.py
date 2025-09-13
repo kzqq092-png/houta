@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -15,20 +16,14 @@ from core.unified_indicator_service import (
 import os
 import sys
 import json
-import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional, Union, Tuple
 from functools import lru_cache
 
-# 设置日志
-logger = logging.getLogger('indicator_service')
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(handler)
+# Loguru日志已在全局配置，无需额外设置
+# logger = logger  # 已在文件开头导入
+# Loguru自动处理所有日志配置
 
 # 统一数据库文件路径
 UNIFIED_DB_PATH = os.path.join(

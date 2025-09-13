@@ -4,7 +4,7 @@
 提供详细的区间统计功能，包含30多个统计指标。
 """
 
-import logging
+from loguru import logger
 from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
@@ -31,7 +31,7 @@ except ImportError:
     FigureCanvas = None
     Figure = None
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class IntervalStatDialog(QDialog):

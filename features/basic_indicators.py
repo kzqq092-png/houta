@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import warnings
 from indicators_algo import calc_ma
+from loguru import logger
 
 
 def add_basic_indicators(df):
@@ -295,7 +296,7 @@ def create_time_series_features(df):
     """
     # 确保索引是日期类型
     if not isinstance(df.index, pd.DatetimeIndex):
-        print("警告: 索引不是日期类型，无法创建时间特征")
+        logger.info("警告: 索引不是日期类型，无法创建时间特征")
         return df
 
     # 提取基本日期特征

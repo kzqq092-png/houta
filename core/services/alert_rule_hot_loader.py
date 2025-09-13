@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -7,7 +8,6 @@
 """
 
 import asyncio
-import logging
 import time
 import hashlib
 from datetime import datetime
@@ -17,7 +17,7 @@ from threading import Timer, Event
 from .base_service import BaseService
 from db.models.alert_config_models import get_alert_config_database, AlertRule
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AlertRuleHotLoader(BaseService):
@@ -57,9 +57,9 @@ class AlertRuleHotLoader(BaseService):
         try:
             # 加载初始规则
             self._load_initial_rules()
-            logger.info("✅ 告警规则热加载服务初始化成功")
+            logger.info(" 告警规则热加载服务初始化成功")
         except Exception as e:
-            logger.error(f"❌ 告警规则热加载服务初始化失败: {e}")
+            logger.error(f" 告警规则热加载服务初始化失败: {e}")
             raise
 
     def _load_initial_rules(self):
@@ -102,7 +102,7 @@ class AlertRuleHotLoader(BaseService):
         # 启动定时器线程
         self._schedule_next_check()
 
-        logger.info(f"✅ 告警规则热加载服务已启动，检查间隔: {self.check_interval}秒")
+        logger.info(f" 告警规则热加载服务已启动，检查间隔: {self.check_interval}秒")
 
     def stop(self):
         """停止热加载服务"""
@@ -116,7 +116,7 @@ class AlertRuleHotLoader(BaseService):
         if self._timer_thread:
             self._timer_thread.cancel()
 
-        logger.info("✅ 告警规则热加载服务已停止")
+        logger.info(" 告警规则热加载服务已停止")
 
     def _schedule_next_check(self):
         """调度下一次检查"""
@@ -271,10 +271,10 @@ class AlertRuleHotLoader(BaseService):
                 except Exception as e:
                     logger.error(f"执行强制重载回调失败: {e}")
 
-            logger.info(f"✅ 强制重新加载了 {len(rules)} 个告警规则")
+            logger.info(f" 强制重新加载了 {len(rules)} 个告警规则")
 
         except Exception as e:
-            logger.error(f"❌ 强制重新加载规则失败: {e}")
+            logger.error(f" 强制重新加载规则失败: {e}")
 
     def get_statistics(self) -> Dict[str, Any]:
         """获取热加载服务统计信息"""

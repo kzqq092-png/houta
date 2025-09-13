@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -8,7 +9,6 @@
 """
 
 import asyncio
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Callable, Set
@@ -21,7 +21,7 @@ from .base_service import BaseService
 from .alert_deduplication_service import AlertMessage, AlertLevel, get_alert_deduplication_service
 from db.models.alert_config_models import get_alert_config_database, AlertRule, AlertHistory
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RuleStatus(Enum):
@@ -139,12 +139,12 @@ class AlertRuleEngine(BaseService):
                 self._loop = asyncio.get_running_loop()
                 # 异步模式：启动后台任务
                 self._start_async_tasks()
-                logger.info("🚀 告警规则引擎已启动 - 异步模式")
+                logger.info(" 告警规则引擎已启动 - 异步模式")
 
             except RuntimeError:
                 # 同步模式：在新线程中运行事件循环
                 self._start_sync_mode()
-                logger.info("🚀 告警规则引擎已启动 - 同步模式")
+                logger.info(" 告警规则引擎已启动 - 同步模式")
 
             logger.info("告警引擎运行中")
 
@@ -183,7 +183,7 @@ class AlertRuleEngine(BaseService):
             self._monitor_task = self._loop.create_task(self._monitor_rules_loop())
             self._reload_task = self._loop.create_task(self._hot_reload_loop())
             self._cleanup_task = self._loop.create_task(self._cleanup_loop())
-            logger.info("✅ 异步监控任务已启动")
+            logger.info(" 异步监控任务已启动")
 
     def _start_sync_mode(self) -> None:
         """启动同步模式（新线程运行事件循环）"""
@@ -334,14 +334,37 @@ class AlertRuleEngine(BaseService):
             )
 
             # 磁盘使用率
-            disk = psutil.disk_usage('/')
-            metrics['disk_usage'] = MetricValue(
-                name='disk_usage',
-                value=disk.percent,
-                unit='%',
-                timestamp=current_time,
-                source='system'
-            )
+            import os
+            try:
+                if os.name == 'nt':  # Windows系统
+                    try:
+                        disk = psutil.disk_usage('C:\\')
+                    except (OSError, ValueError):
+                        # 如果C盘不可用，尝试获取当前工作目录所在磁盘
+                        from pathlib import Path
+                        current_drive = Path.cwd().anchor
+                        disk = psutil.disk_usage(current_drive)
+                else:  # Unix/Linux系统
+                    disk = psutil.disk_usage('/')
+
+                metrics['disk_usage'] = MetricValue(
+                    name='disk_usage',
+                    value=disk.percent,
+                    unit='%',
+                    timestamp=current_time,
+                    source='system'
+                )
+            except Exception as disk_error:
+                # 如果磁盘监控失败，记录调试信息但不中断整个指标收集
+                logger.debug(f"磁盘使用率监控失败: {str(disk_error)}")
+                # 提供默认值
+                metrics['disk_usage'] = MetricValue(
+                    name='disk_usage',
+                    value=0.0,
+                    unit='%',
+                    timestamp=current_time,
+                    source='system'
+                )
 
         except Exception as e:
             logger.error(f"收集系统指标失败: {e}")
@@ -784,18 +807,18 @@ class AlertRuleEngine(BaseService):
 
             try:
                 self.metrics_service = service_container.resolve_by_name('MetricsAggregationService')
-                logger.info("✅ 已连接到指标聚合服务")
+                logger.info(" 已连接到指标聚合服务")
             except:
                 self.metrics_service = None
-                logger.warning("⚠️ 无法连接到指标聚合服务")
+                logger.warning(" 无法连接到指标聚合服务")
 
             # 获取系统资源服务
             try:
                 self.resource_service = service_container.resolve_by_name('SystemResourceService')
-                logger.info("✅ 已连接到系统资源服务")
+                logger.info(" 已连接到系统资源服务")
             except:
                 self.resource_service = None
-                logger.warning("⚠️ 无法连接到系统资源服务")
+                logger.warning(" 无法连接到系统资源服务")
 
             logger.info("设置指标数据源连接")
 

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 async_manager.py
 异步任务调度与并发管理
@@ -7,7 +8,7 @@ async_manager.py
     def task(x):
         return x * x
     future = am.run_async(task, 5)
-    print(future.result())
+    logger.info(future.result())
     am.shutdown()
 """
 from asyncio import base_events

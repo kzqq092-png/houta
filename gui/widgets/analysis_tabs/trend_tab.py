@@ -1,3 +1,4 @@
+from loguru import logger
 """
 趋势分析标签页模块 - 专业版升级
 """
@@ -15,11 +16,8 @@ import sqlite3
 import json
 
 from .base_tab import BaseAnalysisTab
-from core.logger import LogManager, LogLevel
-import logging
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class TrendAnalysisTab(BaseAnalysisTab):
     # Tab索引常量
@@ -174,11 +172,11 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 """, ('trend_alerts', settings_json))
 
                 conn.commit()
-                logger.info("✅ 预警设置已保存到数据库")
+                logger.info(" 预警设置已保存到数据库")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 保存预警设置到数据库失败: {e}")
+            logger.error(f" 保存预警设置到数据库失败: {e}")
             return False
 
     def _load_advanced_options_from_db(self):
@@ -240,11 +238,11 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 """, ('advanced_options', options_json))
 
                 conn.commit()
-                logger.info("✅ 高级选项设置已保存到数据库")
+                logger.info(" 高级选项设置已保存到数据库")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 保存高级选项设置到数据库失败: {e}")
+            logger.error(f" 保存高级选项设置到数据库失败: {e}")
             return False
 
     def _connect_signals(self):
@@ -254,9 +252,9 @@ class TrendAnalysisTab(BaseAnalysisTab):
             self.analysis_completed.connect(self._on_analysis_completed)
             # 连接错误信号
             self.error_occurred.connect(self._on_analysis_error)
-            logger.info("✅ 趋势分析信号连接完成")
+            logger.info(" 趋势分析信号连接完成")
         except Exception as e:
-            logger.error(f"❌ 信号连接失败: {e}")
+            logger.error(f" 信号连接失败: {e}")
 
     def _on_advanced_option_changed(self):
         """高级选项变化时保存到数据库"""
@@ -269,15 +267,15 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
             if self._save_advanced_options_to_db(options):
                 self.advanced_options = options
-                logger.info("✅ 高级选项设置已更新")
+                logger.info(" 高级选项设置已更新")
 
         except Exception as e:
-            logger.error(f"❌ 保存高级选项设置失败: {e}")
+            logger.error(f" 保存高级选项设置失败: {e}")
 
     def _on_analysis_completed(self, results):
         """处理分析完成事件"""
         try:
-            logger.info(f"📊 收到分析结果: {type(results)}")
+            logger.info(f" 收到分析结果: {type(results)}")
             self.hide_loading()
 
             if isinstance(results, dict):
@@ -288,22 +286,22 @@ class TrendAnalysisTab(BaseAnalysisTab):
                     if hasattr(self, 'status_label') and self.status_label:
                         self.status_label.setText("分析完成")
             else:
-                logger.warning(f"⚠️ 未知的结果格式: {results}")
+                logger.warning(f" 未知的结果格式: {results}")
 
         except Exception as e:
-            logger.error(f"❌ 处理分析结果失败: {e}")
+            logger.error(f" 处理分析结果失败: {e}")
             self._show_error_message("处理错误", f"结果处理失败: {str(e)}")
 
     def _on_analysis_error(self, error_msg):
         """处理分析错误事件"""
         try:
-            logger.error(f"❌ 分析错误: {error_msg}")
+            logger.error(f" 分析错误: {error_msg}")
             self.hide_loading()
             self._show_error_message("分析错误", error_msg)
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText("分析失败")
         except Exception as e:
-            logger.error(f"❌ 处理错误事件失败: {e}")
+            logger.error(f" 处理错误事件失败: {e}")
 
     def _show_error_message(self, title, message):
         """显示错误消息"""
@@ -312,7 +310,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
             QMessageBox.critical(self, title, message)
         except Exception as e:
             logger.error(f"显示错误消息失败: {e}")
-            print(f"错误: {title} - {message}")
+            logger.info(f"错误: {title} - {message}")
 
     def create_ui(self):
         """创建专业级趋势分析UI"""
@@ -361,7 +359,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 一键趋势分析
-        trend_btn = QPushButton("📈 趋势分析")
+        trend_btn = QPushButton(" 趋势分析")
         trend_btn.setStyleSheet(self._get_button_style('#28a745'))
         trend_btn.clicked.connect(self.comprehensive_trend_analysis)
 
@@ -371,7 +369,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
         multi_tf_btn.clicked.connect(self.multi_timeframe_analysis)
 
         # 趋势预警
-        alert_btn = QPushButton("🚨 趋势预警")
+        alert_btn = QPushButton(" 趋势预警")
         alert_btn.setStyleSheet(self._get_button_style('#dc3545'))
         alert_btn.clicked.connect(self.setup_trend_alerts)
 
@@ -385,12 +383,12 @@ class TrendAnalysisTab(BaseAnalysisTab):
         advanced_layout = QHBoxLayout(advanced_group)
 
         # 趋势预测
-        predict_btn = QPushButton("🔮 趋势预测")
+        predict_btn = QPushButton(" 趋势预测")
         predict_btn.setStyleSheet(self._get_button_style('#6f42c1'))
         predict_btn.clicked.connect(self.trend_prediction)
 
         # 支撑阻力
-        sr_btn = QPushButton("📊 支撑阻力")
+        sr_btn = QPushButton(" 支撑阻力")
         sr_btn.setStyleSheet(self._get_button_style('#fd7e14'))
         sr_btn.clicked.connect(self.support_resistance_analysis)
 
@@ -515,7 +513,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         # 趋势分析结果
         trend_tab = self._create_trend_results_tab()
-        self.results_tabs.addTab(trend_tab, "📈 趋势分析")
+        self.results_tabs.addTab(trend_tab, " 趋势分析")
 
         # 多时间框架
         multi_tf_tab = self._create_multi_timeframe_tab()
@@ -523,15 +521,15 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         # 趋势预测
         prediction_tab = self._create_prediction_tab()
-        self.results_tabs.addTab(prediction_tab, "🔮 趋势预测")
+        self.results_tabs.addTab(prediction_tab, " 趋势预测")
 
         # 支撑阻力
         sr_tab = self._create_support_resistance_tab()
-        self.results_tabs.addTab(sr_tab, "📊 支撑阻力")
+        self.results_tabs.addTab(sr_tab, " 支撑阻力")
 
         # 预警中心
         alert_tab = self._create_alert_tab()
-        self.results_tabs.addTab(alert_tab, "🚨 预警中心")
+        self.results_tabs.addTab(alert_tab, " 预警中心")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -575,10 +573,10 @@ class TrendAnalysisTab(BaseAnalysisTab):
         # 操作按钮
         buttons_layout = QHBoxLayout()
 
-        export_btn = QPushButton("📤 导出结果")
+        export_btn = QPushButton(" 导出结果")
         export_btn.clicked.connect(self.export_trend_results)
 
-        refresh_btn = QPushButton("🔄 刷新分析")
+        refresh_btn = QPushButton(" 刷新分析")
         refresh_btn.clicked.connect(self.comprehensive_trend_analysis)
 
         buttons_layout.addWidget(export_btn)
@@ -693,7 +691,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _comprehensive_analysis_async(self):
         """综合分析"""
         try:
-            logger.info("🚀 开始综合趋势分析异步处理...")
+            logger.info(" 开始综合趋势分析异步处理...")
             results = {
                 'trend_analysis': [],
                 'statistics': {},
@@ -725,7 +723,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 results['alerts'] = alerts
 
             # 6. 返回结果（通过信号处理显示更新）
-            logger.info(f"✅ 综合分析完成，结果包含: {list(results.keys())}")
+            logger.info(f" 综合分析完成，结果包含: {list(results.keys())}")
             for key, value in results.items():
                 if isinstance(value, list):
                     logger.info(f"   {key}: {len(value)} 项")
@@ -734,7 +732,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
             return results
 
         except Exception as e:
-            logger.error(f"❌ 综合分析异步处理失败: {e}")
+            logger.error(f" 综合分析异步处理失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return {'error': str(e)}
@@ -744,30 +742,30 @@ class TrendAnalysisTab(BaseAnalysisTab):
         try:
             # 验证算法类型
             if algorithm not in self.trend_algorithms:
-                logger.warning(f"⚠️ 未知的趋势算法: {algorithm}, 使用默认算法")
+                logger.warning(f" 未知的趋势算法: {algorithm}, 使用默认算法")
                 algorithm = 'linear_regression'
 
             # 验证周期参数
             if period < 5:
-                logger.warning(f"⚠️ 周期参数过小: {period}, 调整为最小值5")
+                logger.warning(f" 周期参数过小: {period}, 调整为最小值5")
                 period = 5
             elif period > 100:
-                logger.warning(f"⚠️ 周期参数过大: {period}, 调整为最大值100")
+                logger.warning(f" 周期参数过大: {period}, 调整为最大值100")
                 period = 100
 
             # 验证阈值参数
             if threshold < 0.1:
-                logger.warning(f"⚠️ 阈值参数过小: {threshold}, 调整为最小值0.1")
+                logger.warning(f" 阈值参数过小: {threshold}, 调整为最小值0.1")
                 threshold = 0.1
             elif threshold > 10.0:
-                logger.warning(f"⚠️ 阈值参数过大: {threshold}, 调整为最大值10.0")
+                logger.warning(f" 阈值参数过大: {threshold}, 调整为最大值10.0")
                 threshold = 10.0
 
-            logger.info(f"✅ 算法参数验证通过: algorithm={algorithm}, period={period}, threshold={threshold}")
+            logger.info(f" 算法参数验证通过: algorithm={algorithm}, period={period}, threshold={threshold}")
             return algorithm, period, threshold
 
         except Exception as e:
-            logger.error(f"❌ 算法参数验证失败: {e}")
+            logger.error(f" 算法参数验证失败: {e}")
             return 'linear_regression', 20, 2.0  # 返回默认值
 
     def _track_algorithm_execution(self, algorithm, start_time=None, end_time=None, success=True, error=None):
@@ -775,12 +773,12 @@ class TrendAnalysisTab(BaseAnalysisTab):
         try:
             if start_time and end_time:
                 execution_time = (end_time - start_time).total_seconds()
-                logger.info(f"📊 算法 {algorithm} 执行时间: {execution_time:.3f}秒")
+                logger.info(f" 算法 {algorithm} 执行时间: {execution_time:.3f}秒")
 
             if success:
-                logger.info(f"✅ 算法 {algorithm} 执行成功")
+                logger.info(f" 算法 {algorithm} 执行成功")
             else:
-                logger.error(f"❌ 算法 {algorithm} 执行失败: {error}")
+                logger.error(f" 算法 {algorithm} 执行失败: {error}")
 
         except Exception as e:
             logger.error(f"算法执行状态跟踪失败: {e}")
@@ -788,7 +786,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _analyze_basic_trends(self):
         """基础趋势分析"""
         try:
-            logger.info("🔍 开始基础趋势分析...")
+            logger.info(" 开始基础趋势分析...")
             trends = []
             algorithm = self.algorithm_combo.currentData()
             period = self.period_spin.value()
@@ -797,15 +795,15 @@ class TrendAnalysisTab(BaseAnalysisTab):
             # 验证和调整参数
             algorithm, period, threshold = self._validate_algorithm_parameters(algorithm, period, threshold)
 
-            logger.info(f"📊 分析参数: algorithm={algorithm}, period={period}, threshold={threshold}")
-            logger.info(f"📈 当前数据状态: kdata={hasattr(self, 'kdata')}, current_kdata={hasattr(self, 'current_kdata')}")
+            logger.info(f" 分析参数: algorithm={algorithm}, period={period}, threshold={threshold}")
+            logger.info(f" 当前数据状态: kdata={hasattr(self, 'kdata')}, current_kdata={hasattr(self, 'current_kdata')}")
 
             if hasattr(self, 'kdata') and self.kdata is not None:
-                logger.info(f"📊 K线数据长度: {len(self.kdata)}")
+                logger.info(f" K线数据长度: {len(self.kdata)}")
             if hasattr(self, 'current_kdata') and self.current_kdata is not None:
-                logger.info(f"📊 当前K线数据长度: {len(self.current_kdata)}")
+                logger.info(f" 当前K线数据长度: {len(self.current_kdata)}")
         except Exception as e:
-            logger.error(f"❌ 基础趋势分析初始化失败: {e}")
+            logger.error(f" 基础趋势分析初始化失败: {e}")
             return []
 
         # 价格趋势分析
@@ -822,18 +820,18 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
         try:
             # 技术指标趋势分析
-            logger.info("📊 开始技术指标趋势分析...")
+            logger.info(" 开始技术指标趋势分析...")
             indicator_trends = self._analyze_indicator_trends(
                 algorithm, period, threshold)
             # 过滤有效数据
             valid_indicator_trends = [t for t in indicator_trends if self._is_valid_trend_data(t)]
             trends.extend(valid_indicator_trends)
 
-            logger.info(f"✅ 基础趋势分析完成，有效趋势: {len(trends)}")
+            logger.info(f" 基础趋势分析完成，有效趋势: {len(trends)}")
             return trends
 
         except Exception as e:
-            logger.error(f"❌ 技术指标趋势分析失败: {e}")
+            logger.error(f" 技术指标趋势分析失败: {e}")
             return trends
 
     def _is_valid_trend_data(self, trend_data):
@@ -1095,10 +1093,10 @@ class TrendAnalysisTab(BaseAnalysisTab):
             if kdj_result:
                 trends.append(kdj_result)
 
-            logger.info(f"✅ 技术指标分析完成，计算了 {len(trends)} 个真实指标")
+            logger.info(f" 技术指标分析完成，计算了 {len(trends)} 个真实指标")
 
         except Exception as e:
-            logger.error(f"❌ 技术指标分析失败: {e}")
+            logger.error(f" 技术指标分析失败: {e}")
 
         return trends
 
@@ -1487,7 +1485,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def trend_prediction(self):
         """趋势预测"""
         try:
-            logger.info("🚀 启动趋势预测...")
+            logger.info(" 启动趋势预测...")
             self.show_loading("正在生成趋势预测...")
 
             # 自动切换到趋势预测tab
@@ -1511,7 +1509,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def support_resistance_analysis(self):
         """支撑阻力分析"""
         try:
-            logger.info("🚀 启动支撑阻力分析...")
+            logger.info(" 启动支撑阻力分析...")
             self.show_loading("正在分析支撑阻力位...")
 
             # 自动切换到支撑阻力tab
@@ -1595,9 +1593,9 @@ class TrendAnalysisTab(BaseAnalysisTab):
                 # 发出状态更新信号
                 self.status_label.setText(f"已切换到 {tab_name}")
             else:
-                logger.error(f"❌ 无效的tab索引: {tab_index}")
+                logger.error(f" 无效的tab索引: {tab_index}")
         except Exception as e:
-            logger.error(f"❌ 自动切换tab失败: {e}")
+            logger.error(f" 自动切换tab失败: {e}")
 
     def _update_results_display(self, results):
         """更新结果显示"""
@@ -1721,7 +1719,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
 
             processed_results.append(processed_result)
 
-        logger.info(f"📊 更新趋势表格: {len(processed_results)} 条有效记录")
+        logger.info(f" 更新趋势表格: {len(processed_results)} 条有效记录")
         self.update_table_data(self.trend_table, processed_results, column_keys)
 
     def _update_trend_statistics_display(self, stats):
@@ -1807,7 +1805,7 @@ class TrendAnalysisTab(BaseAnalysisTab):
     def _update_prediction_display(self, predictions):
         """更新预测显示"""
         text = f"""
-🔮 趋势预测报告
+ 趋势预测报告
 ================
 
 当前价格: {predictions.get('current_price', 'N/A'):.2f}

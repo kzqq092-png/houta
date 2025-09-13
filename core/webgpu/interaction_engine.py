@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU交互引擎模块
 
@@ -8,7 +9,6 @@ WebGPU交互引擎模块
 - 手势识别和响应
 """
 
-import logging
 import time
 import threading
 from typing import Dict, Any, Optional, Tuple, List, Callable
@@ -21,7 +21,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QPropertyAnimation, QEasin
 from PyQt5.QtGui import QWheelEvent, QMouseEvent
 from PyQt5.QtWidgets import QWidget
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class InteractionType(Enum):

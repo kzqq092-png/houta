@@ -1,3 +1,4 @@
+from loguru import logger
 """
 统一性能监控系统 - 整合所有性能监控功能
 版本：2.0
@@ -15,7 +16,6 @@
 
 import time
 import threading
-import logging
 import os
 import json
 import hashlib
@@ -39,7 +39,7 @@ try:
 except ImportError:
     PSUTIL_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class PerformanceCategory(Enum):

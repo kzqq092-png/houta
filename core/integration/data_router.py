@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据路由器
 
@@ -5,13 +6,12 @@
 基于数据类型、查询模式、数据量等因素进行路由决策
 """
 
-import logging
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from enum import Enum
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StorageBackend(Enum):
@@ -39,7 +39,7 @@ class DataRouter:
     """
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.routing_rules: List[RoutingRule] = []
         self._setup_default_rules()
 

@@ -7,7 +7,6 @@ from PyQt5.QtChart import QChart, QChartView, QLineSeries, QValueAxis, QDateTime
 import time
 from typing import Dict, Any, Optional, List, Union
 from core.services.unified_data_manager import UnifiedDataManager
-from core.logger import LogManager, LogLevel
 from datetime import datetime
 import ptvsd
 from gui.ui_components import BaseAnalysisPanel
@@ -15,6 +14,7 @@ import traceback
 from utils.config_manager import ConfigManager
 from utils.template_manager import TemplateManager
 from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
+from loguru import logger
 
 
 class DataUpdateThread(QThread):
@@ -23,10 +23,10 @@ class DataUpdateThread(QThread):
     error_occurred = pyqtSignal(str)  # 错误信号
     status_changed = pyqtSignal(str)  # 状态信号
 
-    def __init__(self, data_manager: UnifiedDataManager, log_manager: Optional[LogManager] = None):
+    def __init__(self, data_manager: UnifiedDataManager):
         super().__init__()
         self.data_manager = data_manager
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.running = False
         self.update_interval = 60  # 更新间隔（秒）
         self.retry_interval = 5    # 重试间隔（秒）
@@ -40,14 +40,14 @@ class DataUpdateThread(QThread):
         while self.running:
             try:
                 # 获取最新数据
-                self.log_manager.log("[线程] 正在更新数据...", LogLevel.DEBUG)
+                logger.info("[线程] 正在更新数据...")
                 self.status_changed.emit("正在更新数据...")
                 sentiment_data = self.data_manager.get_market_sentiment()
 
                 if sentiment_data:
                     # 发送信号更新UI
                     self.data_updated.emit(sentiment_data)
-                    self.log_manager.log("[线程] 数据更新成功", LogLevel.DEBUG)
+                    logger.info("[线程] 数据更新成功")
                     self.status_changed.emit("数据更新成功")
                     retry_count = 0  # 重置重试计数
                 else:
@@ -56,14 +56,14 @@ class DataUpdateThread(QThread):
             except Exception as e:
                 retry_count += 1
                 error_msg = f"更新市场情绪数据失败 ({retry_count}/{self.max_retries}): {str(e)}"
-                self.log_manager.log(error_msg, LogLevel.ERROR)
+                logger.error(error_msg)
                 self.error_occurred.emit(error_msg)
-                self.log_manager.log("[线程] 更新失败，准备重试...", LogLevel.WARNING)
+                logger.warning("[线程] 更新失败，准备重试...")
                 self.status_changed.emit("更新失败，准备重试...")
 
                 if retry_count >= self.max_retries:
-                    self.log_manager.log(
-                        "[线程] 达到最大重试次数，等待下一轮更新", LogLevel.WARNING)
+                    logger.info(
+                        "[线程] 达到最大重试次数，等待下一轮更新")
                     self.status_changed.emit("达到最大重试次数，等待下一轮更新")
                     retry_count = 0
                     time.sleep(self.update_interval)
@@ -77,7 +77,7 @@ class DataUpdateThread(QThread):
                     break
                 time.sleep(1)
 
-        self.log_manager.log("[线程] 已停止更新", LogLevel.INFO)
+        logger.info("[线程] 已停止更新")
         self.status_changed.emit("已停止更新")
 
     def stop(self):
@@ -89,16 +89,16 @@ class DataUpdateThread(QThread):
 class MarketSentimentWidget(BaseAnalysisTab):
     """市场情绪分析组件，继承统一分析面板基类"""
 
-    def __init__(self, parent=None, data_manager=None, log_manager=None, chart_widget=None):
+    def __init__(self, parent=None, data_manager=None, chart_widget=None):
         """初始化市场情绪组件
 
         Args:
             parent: 父窗口
             data_manager: 数据管理器实例
-            log_manager: 日志管理器实例
+            # log_manager: 已迁移到Loguru日志系统
             chart_widget: 主图表控件实例
         """
-        super().__init__(parent, log_manager=log_manager)
+        super().__init__(parent)  # log_manager已迁移到Loguru
         self.data_manager = data_manager
         self.chart_widget = chart_widget
         self.template_manager = TemplateManager(
@@ -164,13 +164,13 @@ class MarketSentimentWidget(BaseAnalysisTab):
                         'raw_data': response.data  # 保留原始数据
                     }
 
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.info(f"✅ 市场情绪组件使用真实插件数据，情绪指数: {sentiment_index:.3f}")
+                    if True:  # 使用Loguru日志
+                        logger.info(f" 市场情绪组件使用真实插件数据，情绪指数: {sentiment_index:.3f}")
 
                     return result
 
-                elif hasattr(self, 'log_manager'):
-                    self.log_manager.warning(f"⚠️ 情绪数据服务返回错误: {response.error_message}")
+                elif True:  # 使用Loguru日志
+                    logger.warning(f" 情绪数据服务返回错误: {response.error_message}")
 
             # 检查原数据管理器
             if hasattr(self.data_manager, 'get_market_sentiment'):
@@ -186,8 +186,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
             }
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 获取市场情绪数据失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 获取市场情绪数据失败: {e}")
 
             # 错误时返回安全的回退数据
             return {
@@ -309,11 +309,11 @@ class MarketSentimentWidget(BaseAnalysisTab):
             if layout is not None:
                 layout.addWidget(chart_view)
 
-            self.log_manager.info("市场情绪图表创建成功")
+            logger.info("市场情绪图表创建成功")
             return chart_view
 
         except Exception as e:
-            self.log_manager.error(f"创建市场情绪图表失败: {str(e)}")
+            logger.error(f"创建市场情绪图表失败: {str(e)}")
             return None
 
     def create_market_heat_indicator(self, layout):
@@ -413,13 +413,13 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     if hasattr(self, 'sentiment_chart_view'):
                         pixmap = self.sentiment_chart_view.grab()
                         pixmap.save(file_path)
-                        self.log_manager.info(f"图表已导出到: {file_path}")
+                        logger.info(f"图表已导出到: {file_path}")
                         self.show_info_message("导出成功", f"图表已导出到: {file_path}")
                     else:
-                        self.log_manager.warning("未找到图表控件，无法导出图表")
+                        logger.warning("未找到图表控件，无法导出图表")
                         self.show_warning_message("导出失败", "未找到图表控件，无法导出图表")
         except Exception as e:
-            self.log_manager.error(f"导出失败: {str(e)}")
+            logger.error(f"导出失败: {str(e)}")
             self.show_error_message("导出错误", f"导出失败: {str(e)}")
 
     def show_alert_dialog(self):
@@ -473,19 +473,19 @@ class MarketSentimentWidget(BaseAnalysisTab):
     def update_sentiment_data(self, data: dict):
         """只更新情绪分数和多市场走势"""
         try:
-            self.log_manager.info(f"收到市场情绪数据: {data}")
+            logger.info(f"收到市场情绪数据: {data}")
             # 1. 情绪分数
             score = data.get('sentiment_index')
             if isinstance(score, (int, float)):
                 self.sentiment_score_label.setText(f"{score:.3f}")
                 self.sentiment_score_label.setStyleSheet(
                     "font-size: 20px; font-weight: bold; color: #1976d2; padding: 4px 12px; border-radius: 8px; background: #e3f2fd;")
-                self.log_manager.info(f"市场情绪分数显示: {score:.3f}")
+                logger.info(f"市场情绪分数显示: {score:.3f}")
             else:
                 self.sentiment_score_label.setText("暂无数据")
                 self.sentiment_score_label.setStyleSheet(
                     "font-size: 20px; color: #999999; font-weight: bold;")
-                self.log_manager.warning("市场情绪分数字段缺失或为None")
+                logger.warning("市场情绪分数字段缺失或为None")
 
             # 2. 多市场情绪指数走势
             if hasattr(self.data_manager, 'get_market_sentiment_history'):
@@ -502,16 +502,16 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     try:
                         heat = float(heat)
                         self.heat_progress.setValue(int(heat))
-                        self.log_manager.info(f"市场热度显示: {heat}")
+                        logger.info(f"市场热度显示: {heat}")
                     except Exception:
                         self.heat_progress.setValue(0)
-                        self.log_manager.warning("市场热度字段格式异常")
+                        logger.warning("市场热度字段格式异常")
                 else:
                     self.heat_progress.setValue(0)
-                    self.log_manager.warning("市场热度字段缺失")
+                    logger.warning("市场热度字段缺失")
         except Exception as e:
-            self.log_manager.error(f"更新市场情绪数据失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"更新市场情绪数据失败: {str(e)}")
+            logger.error(traceback.format_exc())
 
     def _update_sentiment_chart_multi(self, all_history):
         """多市场情绪走势曲线"""
@@ -549,8 +549,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"多市场情绪走势渲染失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"多市场情绪走势渲染失败: {str(e)}")
 
     def _update_ui_safely(self, data: dict):
         """在主线程中安全地更新UI，数据缺失时所有UI区域显示暂无数据，并写日志"""
@@ -569,7 +569,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     self.sentiment_series.clear()
                 if hasattr(self, 'heat_progress'):
                     self.heat_progress.setValue(0)
-                self.log_manager.warning("UI刷新时市场情绪数据缺失，所有UI区域已置为暂无数据")
+                logger.warning("UI刷新时市场情绪数据缺失，所有UI区域已置为暂无数据")
                 return
             self._data_cache.update(data)
             self._cache_time[datetime.now()] = data
@@ -578,7 +578,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
             self._update_charts(data)
             self._check_alerts(data)
         except Exception as e:
-            self.log_manager.error(f"更新UI失败: {e}")
+            logger.error(f"更新UI失败: {e}")
 
     def _update_sentiment_index(self, data: dict):
         """
@@ -601,8 +601,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     self.sentiment_score_label.setStyleSheet(
                         "font-size: 16px; font-weight: bold; color: #52c41a;")
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.log(f"更新情绪分数标签失败: {e}", LogLevel.ERROR)
+            logger.error(f"更新情绪分数标签失败: {e}")
 
     def _update_sentiment_chart(self, data):
         """更新情绪图表
@@ -612,8 +611,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
         """
         try:
             if not hasattr(self, 'sentiment_chart') or not hasattr(self, 'sentiment_series'):
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.warning("情绪图表未初始化")
+                if True:  # 使用Loguru日志
+                    logger.warning("情绪图表未初始化")
                 return
             # 清除现有数据
             self.sentiment_series.clear()
@@ -650,11 +649,11 @@ class MarketSentimentWidget(BaseAnalysisTab):
             # 更新图表
             if hasattr(self, 'sentiment_chart_view'):
                 self.sentiment_chart_view.update()
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("情绪图表更新成功")
+            if True:  # 使用Loguru日志
+                logger.info("情绪图表更新成功")
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"更新情绪图表失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"更新情绪图表失败: {str(e)}")
 
     def _update_heat_indicator(self, data):
         """更新热度指示器"""
@@ -664,9 +663,9 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 self.heat_progress.setValue(int(heat_value))
                 self._update_heat_color(float(heat_value))
             else:
-                self.log_manager.log(f"无效的热度值: {heat_value}", LogLevel.WARNING)
+                logger.warning(f"无效的热度值: {heat_value}")
         except Exception as e:
-            self.log_manager.log(f"更新热度指示器失败: {e}", LogLevel.ERROR)
+            logger.error(f"更新热度指示器失败: {e}")
 
     def _check_alerts(self, data):
         """检查预警条件"""
@@ -778,7 +777,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
         Args:
             error_msg: 错误信息
         """
-        self.log_manager.log(error_msg, LogLevel.ERROR)
+        logger.error(error_msg)
         if hasattr(self, 'status_label'):
             self.status_label.setText(error_msg)
             self.status_label.setStyleSheet("color: #FF5252;")  # 红色
@@ -789,8 +788,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
         Args:
             status: 状态信息
         """
-        if hasattr(self, 'log_manager') and self.log_manager:
-            self.log_manager.log(f"[状态变更] {status}", LogLevel.INFO)
+        logger.info(f"[状态变更] {status}")
         if hasattr(self, 'status_label'):
             self.status_label.setText(status)
             self.status_label.setStyleSheet("color: #666666;")  # 灰色
@@ -805,7 +803,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
         self.set_status_message("参数校验通过，正在分析...", error=False)
         self.sentiment_threshold.setToolTip("")
         try:
-            self.log_manager.info("分析按钮被点击，强制拉取最新市场情绪数据")
+            logger.info("分析按钮被点击，强制拉取最新市场情绪数据")
             if hasattr(self.data_manager, 'get_market_sentiment'):
                 data = self.data_manager.get_market_sentiment()
                 if data:
@@ -813,13 +811,13 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     self.set_status_message("分析完成", error=False)
                 else:
                     self.set_status_message("未获取到市场情绪数据", error=True)
-                    self.log_manager.warning("分析未获取到数据")
+                    logger.warning("分析未获取到数据")
             else:
                 self.set_status_message(
                     "数据管理器未实现get_market_sentiment", error=True)
         except Exception as e:
             self.set_status_message(f"分析失败: {str(e)}", error=True)
-            self.log_manager.error(f"分析失败: {str(e)}")
+            logger.error(f"分析失败: {str(e)}")
 
     def show_template_manager_dialog(self):
         """显示模板管理对话框 - 使用基类统一方法"""
@@ -900,7 +898,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
         interval = self.auto_refresh_spin.value()
         if hasattr(self, 'update_thread'):
             self.update_thread.update_interval = interval
-        self.log_manager.info(f"自动刷新间隔已设置为{interval}秒")
+        logger.info(f"自动刷新间隔已设置为{interval}秒")
 
     def show_custom_indicator_dialog(self):
         """显示自定义指标对话框 - 使用基类统一方法"""
@@ -966,8 +964,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     result = analysis_func(*args, **kwargs)
                     return result
             except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
+                if True:  # 使用Loguru日志
+                    logger.error(f"分析异常: {str(e)}")
                 return None
             finally:
                 QTimer.singleShot(0, lambda: on_done(None))
@@ -1063,11 +1061,11 @@ class MarketSentimentWidget(BaseAnalysisTab):
             if container:
                 try:
                     self._sentiment_service = container.resolve(SentimentDataService)
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.info("✅ 市场情绪组件：情绪数据服务初始化成功")
+                    if True:  # 使用Loguru日志
+                        logger.info(" 市场情绪组件：情绪数据服务初始化成功")
                 except Exception as resolve_error:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"⚠️ 无法从服务容器获取情绪数据服务: {resolve_error}")
+                    if True:  # 使用Loguru日志
+                        logger.warning(f" 无法从服务容器获取情绪数据服务: {resolve_error}")
 
                     # 尝试手动创建服务
                     self._try_manual_service_creation()
@@ -1075,8 +1073,8 @@ class MarketSentimentWidget(BaseAnalysisTab):
                 self._try_manual_service_creation()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 市场情绪组件：初始化情绪数据服务失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 市场情绪组件：初始化情绪数据服务失败: {e}")
             self._sentiment_service = None
 
     def _try_manual_service_creation(self):
@@ -1096,7 +1094,7 @@ class MarketSentimentWidget(BaseAnalysisTab):
             )
 
             # 创建服务
-            self._sentiment_service = SentimentDataService(config=config, log_manager=getattr(self, 'log_manager', None))
+            self._sentiment_service = SentimentDataService(config=config)  # log_manager已迁移到Loguru
 
             # 注册真实数据源插件（排除模拟数据插件）
             plugin_configs = [
@@ -1114,22 +1112,22 @@ class MarketSentimentWidget(BaseAnalysisTab):
                     plugin_instance = plugin_class()
                     if self._sentiment_service.register_plugin(plugin_name, plugin_instance, priority=priority, weight=weight):
                         registered_count += 1
-                        if hasattr(self, 'log_manager'):
-                            self.log_manager.info(f"✅ 市场情绪组件：注册插件: {plugin_name}")
+                        if True:  # 使用Loguru日志
+                            logger.info(f" 市场情绪组件：注册插件: {plugin_name}")
                 except Exception as e:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"⚠️ 市场情绪组件：注册插件 {plugin_name} 失败: {e}")
+                    if True:  # 使用Loguru日志
+                        logger.warning(f" 市场情绪组件：注册插件 {plugin_name} 失败: {e}")
 
             # 初始化服务
             if self._sentiment_service.initialize():
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.info(f"✅ 市场情绪组件：手动创建情绪数据服务成功，已注册 {registered_count} 个插件")
+                if True:  # 使用Loguru日志
+                    logger.info(f" 市场情绪组件：手动创建情绪数据服务成功，已注册 {registered_count} 个插件")
             else:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error("❌ 市场情绪组件：情绪数据服务初始化失败")
+                if True:  # 使用Loguru日志
+                    logger.error(" 市场情绪组件：情绪数据服务初始化失败")
                 self._sentiment_service = None
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 市场情绪组件：手动创建情绪数据服务失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 市场情绪组件：手动创建情绪数据服务失败: {e}")
             self._sentiment_service = None

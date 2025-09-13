@@ -1,11 +1,10 @@
 import openai
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIAssistant:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
         self.history = []
 
@@ -22,5 +21,5 @@ class AIAssistant:
             # TODO: 可扩展意图识别与子模块自动调用
             return {"reply": reply}
         except Exception as e:
-            self.log_manager.error(f"AI助手对话失败: {e}")
+            logger.error(f"AI助手对话失败: {e}")
             return {"error": str(e)}

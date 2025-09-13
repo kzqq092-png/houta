@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -160,13 +161,13 @@ class OptimizationDatabaseManager:
 
             # 标记表已初始化
             self._tables_initialized = True
-            print("✅ 优化系统数据库表初始化完成")
+            logger.info(" 优化系统数据库表初始化完成")
 
         except sqlite3.OperationalError as e:
-            print(f"⚠️ 数据库初始化失败: {e}")
+            logger.info(f" 数据库初始化失败: {e}")
             # 不抛出异常，允许系统继续运行
         except Exception as e:
-            print(f"⚠️ 优化系统数据库初始化异常: {e}")
+            logger.info(f" 优化系统数据库初始化异常: {e}")
             # 不抛出异常，允许系统继续运行
 
     def save_algorithm_version(self, pattern_id: int, pattern_name: str,
@@ -372,7 +373,7 @@ class OptimizationDatabaseManager:
                 WHERE id IN ({','.join(['?'] * len(old_version_ids))})
             ''', old_version_ids)
 
-            print(f"✅ 清理了 {len(old_version_ids)} 个旧版本")
+            logger.info(f" 清理了 {len(old_version_ids)} 个旧版本")
 
         conn.commit()
         conn.close()
@@ -430,7 +431,7 @@ class OptimizationDatabaseManager:
 def create_optimization_database():
     """创建优化系统数据库"""
     manager = OptimizationDatabaseManager()
-    print("🚀 优化系统数据库创建完成")
+    logger.info(" 优化系统数据库创建完成")
     return manager
 
 

@@ -8,6 +8,7 @@
 # ===============================================================================
 
 from hikyuu import *
+from loguru import logger
 
 
 def TurtleSG(self, k):
@@ -34,6 +35,6 @@ if __name__ == "__main__":
     dates = k.get_datetime_list()
     for d in dates:
         if (sg.should_buy(d)):
-            print("买入：%s" % d)
+            logger.info("买入：%s" % d)
         elif (sg.should_sell(d)):
-            print("卖出: %s" % d)
+            logger.info("卖出: %s" % d)

@@ -1,10 +1,10 @@
+from loguru import logger
 """
 图表服务模块
 
 负责图表的创建、渲染和管理。
 """
 
-import logging
 import pandas as pd
 import uuid
 import asyncio
@@ -14,7 +14,7 @@ from ..events import ChartUpdateEvent, StockSelectedEvent, EventBus
 from .unified_data_manager import UnifiedDataManager
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 # 错误类型枚举

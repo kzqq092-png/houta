@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 检查所有插件的配置UI - 验证修复是否适用于所有插件
@@ -13,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 def discover_all_plugins():
     """自动发现系统中的所有插件"""
     plugins = []
-    print("🔍 自动发现插件...")
+    logger.info(" 自动发现插件...")
 
     # 搜索插件目录
     plugin_directories = [
@@ -24,7 +25,7 @@ def discover_all_plugins():
 
     for plugin_dir in plugin_directories:
         if os.path.exists(plugin_dir):
-            print(f"📂 搜索目录: {plugin_dir}")
+            logger.info(f" 搜索目录: {plugin_dir}")
 
             # 查找Python文件
             pattern = os.path.join(plugin_dir, "*.py")
@@ -56,9 +57,9 @@ def discover_all_plugins():
                 }
 
                 plugins.append(plugin_info)
-                print(f"  ✅ 发现: {display_name}")
+                logger.info(f"   发现: {display_name}")
 
-    print(f"🎯 总共发现 {len(plugins)} 个插件")
+    logger.info(f" 总共发现 {len(plugins)} 个插件")
     return plugins
 
 
@@ -152,14 +153,14 @@ def get_plugin_instance_adaptive(plugin_info):
                 class_name_parts = clean_name.split('_')
                 class_name = ''.join(word.capitalize() for word in class_name_parts) + strategy['class_suffix']
 
-                print(f"🔧 尝试导入: {module_path}.{class_name}")
+                logger.info(f" 尝试导入: {module_path}.{class_name}")
 
                 module = __import__(module_path, fromlist=[class_name])
                 plugin_class = getattr(module, class_name)
                 return plugin_class()
 
             except Exception as e:
-                print(f"⚠️ 策略失败: {e}")
+                logger.info(f" 策略失败: {e}")
                 continue
 
     return None
@@ -167,14 +168,14 @@ def get_plugin_instance_adaptive(plugin_info):
 
 def check_all_plugins():
     """检查所有插件的配置 - 自动发现和自适应"""
-    print("🔍 检查所有插件的配置...")
+    logger.info(" 检查所有插件的配置...")
 
     # 尝试获取系统中的所有插件
     discovered_plugins = discover_all_plugins()
 
     # 如果自动发现失败，使用预定义列表
     if not discovered_plugins:
-        print("⚠️ 自动发现插件失败，使用预定义插件列表")
+        logger.info(" 自动发现插件失败，使用预定义插件列表")
         discovered_plugins = get_predefined_plugins()
 
     plugins_to_check = discovered_plugins
@@ -182,129 +183,129 @@ def check_all_plugins():
     results = []
 
     for plugin_info in plugins_to_check:
-        print(f"\n=== 检查插件: {plugin_info['display_name']} ===")
-        print(f"📋 插件名称: {plugin_info['name']}")
+        logger.info(f"\n=== 检查插件: {plugin_info['display_name']} ===")
+        logger.info(f" 插件名称: {plugin_info['name']}")
 
         try:
             # 尝试使用自适应的方式获取插件实例
             plugin_instance = get_plugin_instance_adaptive(plugin_info)
 
             if plugin_instance:
-                print(f"✅ 插件实例创建成功: {type(plugin_instance)}")
+                logger.info(f" 插件实例创建成功: {type(plugin_instance)}")
 
                 # 检查是否是ConfigurablePlugin
                 from plugins.sentiment_data_sources.config_base import ConfigurablePlugin
 
                 if isinstance(plugin_instance, ConfigurablePlugin):
-                    print(f"✅ 是ConfigurablePlugin类型")
+                    logger.info(f" 是ConfigurablePlugin类型")
 
                     # 获取配置模式
                     try:
                         schema = plugin_instance.get_config_schema()
                         config_count = len(schema)
-                        print(f"✅ 配置字段数量: {config_count}")
+                        logger.info(f" 配置字段数量: {config_count}")
 
                         if config_count > 0:
-                            print(f"📝 配置字段详情:")
+                            logger.info(f" 配置字段详情:")
                             for field in schema:
                                 required_mark = " *" if field.required else ""
-                                print(f"  - {field.name}{required_mark}: {field.field_type} ({field.display_name})")
+                                logger.info(f"  - {field.name}{required_mark}: {field.field_type} ({field.display_name})")
                         else:
-                            print(f"⚠️ 没有配置字段")
+                            logger.info(f" 没有配置字段")
 
                         # 检查配置状态
                         if hasattr(plugin_instance, 'is_properly_configured'):
                             is_configured = plugin_instance.is_properly_configured()
                             status_msg = plugin_instance.get_config_status_message() if hasattr(plugin_instance, 'get_config_status_message') else "未知"
-                            print(f"🔧 配置状态: {'✅ 正常' if is_configured else '⚠️ 需要配置'} - {status_msg}")
+                            logger.info(f" 配置状态: {' 正常' if is_configured else ' 需要配置'} - {status_msg}")
 
                         results.append({
                             "name": plugin_info['name'],
                             "display_name": plugin_info['display_name'],
-                            "status": "✅ ConfigurablePlugin",
+                            "status": " ConfigurablePlugin",
                             "config_count": config_count,
                             "configurable": True
                         })
 
                     except Exception as e:
-                        print(f"❌ 获取配置模式失败: {e}")
+                        logger.info(f" 获取配置模式失败: {e}")
                         results.append({
                             "name": plugin_info['name'],
                             "display_name": plugin_info['display_name'],
-                            "status": "❌ 配置模式错误",
+                            "status": " 配置模式错误",
                             "config_count": 0,
                             "configurable": False
                         })
                 else:
-                    print(f"⚠️ 不是ConfigurablePlugin类型，将使用传统配置")
+                    logger.info(f" 不是ConfigurablePlugin类型，将使用传统配置")
                     results.append({
                         "name": plugin_info['name'],
                         "display_name": plugin_info['display_name'],
-                        "status": "⚠️ 传统配置",
+                        "status": " 传统配置",
                         "config_count": 0,
                         "configurable": False
                     })
             else:
-                print(f"❌ 无法创建插件实例")
+                logger.info(f" 无法创建插件实例")
                 results.append({
                     "name": plugin_info['name'],
                     "display_name": plugin_info['display_name'],
-                    "status": "❌ 实例化失败",
+                    "status": " 实例化失败",
                     "config_count": 0,
                     "configurable": False
                 })
 
         except ImportError as e:
-            print(f"❌ 插件导入失败: {e}")
+            logger.info(f" 插件导入失败: {e}")
             results.append({
                 "name": plugin_info['name'],
                 "display_name": plugin_info['display_name'],
-                "status": "❌ 导入失败",
+                "status": " 导入失败",
                 "config_count": 0,
                 "configurable": False
             })
         except Exception as e:
-            print(f"❌ 插件检查失败: {e}")
+            logger.info(f" 插件检查失败: {e}")
             results.append({
                 "name": plugin_info['name'],
                 "display_name": plugin_info['display_name'],
-                "status": f"❌ 错误: {e}",
+                "status": f" 错误: {e}",
                 "config_count": 0,
                 "configurable": False
             })
 
     # 汇总报告
-    print(f"\n" + "="*80)
-    print(f"📊 插件配置检查汇总报告")
-    print(f"="*80)
+    logger.info(f"\n" + "="*80)
+    logger.info(f" 插件配置检查汇总报告")
+    logger.info(f"="*80)
 
     configurable_plugins = [r for r in results if r['configurable']]
     traditional_plugins = [r for r in results if not r['configurable'] and '导入失败' not in r['status'] and '错误' not in r['status']]
     failed_plugins = [r for r in results if '导入失败' in r['status'] or '错误' in r['status']]
 
-    print(f"\n✅ 支持ConfigurablePlugin的插件 ({len(configurable_plugins)}个):")
+    logger.info(f"\n 支持ConfigurablePlugin的插件 ({len(configurable_plugins)}个):")
     for plugin in configurable_plugins:
-        print(f"  - {plugin['display_name']}: {plugin['config_count']}个配置字段")
+        logger.info(f"  - {plugin['display_name']}: {plugin['config_count']}个配置字段")
 
     if traditional_plugins:
-        print(f"\n⚠️ 使用传统配置的插件 ({len(traditional_plugins)}个):")
+        logger.info(f"\n 使用传统配置的插件 ({len(traditional_plugins)}个):")
         for plugin in traditional_plugins:
-            print(f"  - {plugin['display_name']}")
+            logger.info(f"  - {plugin['display_name']}")
 
     if failed_plugins:
-        print(f"\n❌ 有问题的插件 ({len(failed_plugins)}个):")
+        logger.info(f"\n 有问题的插件 ({len(failed_plugins)}个):")
         for plugin in failed_plugins:
-            print(f"  - {plugin['display_name']}: {plugin['status']}")
+            logger.info(f"  - {plugin['display_name']}: {plugin['status']}")
 
-    print(f"\n🎉 总计: {len(results)}个插件检查完成")
-    print(f"💡 支持配置UI的插件应该能正常显示配置参数")
+    logger.info(f"\n 总计: {len(results)}个插件检查完成")
+    logger.info(f" 支持配置UI的插件应该能正常显示配置参数")
 
     return results
 
 
 if __name__ == "__main__":
-    print("🚀 开始检查所有插件...")
+    logger.info(" 开始检查所有插件...")
     results = check_all_plugins()
 
-    print(f"\n✅ 检查完成！用户可以在HIkyuu插件管理器中测试这些插件的配置功能。")
+    logger.info(f"\n 检查完成！用户可以在HIkyuu插件管理器中测试这些插件的配置功能。")
     input("\n按回车键退出...")

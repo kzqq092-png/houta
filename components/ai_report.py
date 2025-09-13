@@ -1,11 +1,10 @@
 import openai
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIReportGenerator:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
 
     def generate_report(self, obj: str, report_type: str) -> dict:
@@ -18,5 +17,5 @@ class AIReportGenerator:
             )
             return {"report": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"LLM生成报告失败: {e}")
+            logger.error(f"LLM生成报告失败: {e}")
             return {"error": str(e)}

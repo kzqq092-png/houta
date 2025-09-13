@@ -1,3 +1,4 @@
+from loguru import logger
 """
 插件配置管理器
 
@@ -12,10 +13,7 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-from core.logger import get_logger
-
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 class PluginPermission(Enum):
     """插件权限枚举"""
@@ -26,7 +24,6 @@ class PluginPermission(Enum):
     SYSTEM_COMMANDS = "system_commands"
     UI_MODIFICATION = "ui_modification"
     PLUGIN_MANAGEMENT = "plugin_management"
-
 
 @dataclass
 class PluginSecurityPolicy:
@@ -39,7 +36,6 @@ class PluginSecurityPolicy:
     max_memory_usage: int = 100 * 1024 * 1024  # 100MB
     max_cpu_usage: float = 0.5  # 50%
     timeout_seconds: int = 30
-
 
 @dataclass
 class PluginConfig:
@@ -58,7 +54,6 @@ class PluginConfig:
                 allowed_permissions=[],
                 denied_permissions=[]
             )
-
 
 class PluginConfigManager:
     """插件配置管理器"""
@@ -444,10 +439,8 @@ class PluginConfigManager:
             logger.error(f"恢复配置文件失败: {e}")
             return False
 
-
 # 全局配置管理器实例
 _plugin_config_manager = None
-
 
 def get_plugin_config_manager() -> PluginConfigManager:
     """获取全局插件配置管理器实例"""

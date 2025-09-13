@@ -1,10 +1,10 @@
+from loguru import logger
 """
 统一资产服务
 提供OpenBB风格的统一资产访问接口，支持多种资产类型
 借鉴OpenBB的Provider模式，适配HIkyuu现有服务架构
 """
 
-import logging
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
@@ -13,7 +13,7 @@ from .unified_data_manager import UnifiedDataManager
 from .stock_service import StockService
 from ..tet_data_pipeline import StandardQuery, StandardData
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AssetService:
@@ -43,7 +43,7 @@ class AssetService:
         self.unified_data_manager = unified_data_manager
         self.stock_service = stock_service
         self.service_container = service_container
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # 资产类型到服务的映射（用于优化特定资产类型的处理）
         self.asset_service_mapping = {
@@ -83,11 +83,11 @@ class AssetService:
             crypto_data = asset_service.get_historical_data("BTCUSDT", AssetType.CRYPTO)
         """
         try:
-            self.logger.info(f"📈 AssetService获取历史数据: {symbol} ({asset_type.value})")
+            self.logger.info(f" AssetService获取历史数据: {symbol} ({asset_type.value})")
 
             # 优先使用TET管道
             if self.unified_data_manager.tet_enabled:
-                self.logger.info(f"🚀 AssetService使用TET模式: {symbol}")
+                self.logger.info(f" AssetService使用TET模式: {symbol}")
                 result = self.unified_data_manager.get_asset_data(
                     symbol=symbol,
                     asset_type=asset_type,
@@ -99,12 +99,12 @@ class AssetService:
                     **kwargs
                 )
                 if result is not None:
-                    self.logger.info(f"✅ AssetService TET模式成功: {symbol} | 记录数: {len(result)}")
+                    self.logger.info(f" AssetService TET模式成功: {symbol} | 记录数: {len(result)}")
                 else:
-                    self.logger.warning(f"⚠️ AssetService TET模式返回空数据: {symbol}")
+                    self.logger.warning(f" AssetService TET模式返回空数据: {symbol}")
                 return result
             else:
-                self.logger.warning(f"⚠️ TET模式未启用，降级到传统模式: {symbol}")
+                self.logger.warning(f" TET模式未启用，降级到传统模式: {symbol}")
 
             # 降级到专用服务
             if asset_type in self.asset_service_mapping:

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 告警配置数据库模型
 
@@ -6,13 +7,12 @@
 
 import sqlite3
 import json
-import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -8,7 +9,6 @@ DuckDB性能优化器
 
 import duckdb
 import psutil
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Any, Optional
@@ -16,7 +16,7 @@ from pathlib import Path
 import time
 import threading
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class WorkloadType(Enum):
@@ -90,9 +90,9 @@ class DuckDBPerformanceOptimizer:
 
             if success:
                 self.current_config = config
-                logger.info(f"✅ {workload_type.value}工作负载优化完成")
+                logger.info(f" {workload_type.value}工作负载优化完成")
             else:
-                logger.error(f"❌ {workload_type.value}工作负载优化失败")
+                logger.error(f" {workload_type.value}工作负载优化失败")
 
             return success
 

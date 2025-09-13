@@ -2,6 +2,7 @@ from hikyuu import *
 from hikyuu.trade_sys import ProfitGoalBase
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 
 class AdaptiveTakeProfit(ProfitGoalBase):
@@ -76,7 +77,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             return profit_price
 
         except Exception as e:
-            print(f"止盈价格计算错误: {str(e)}")
+            logger.info(f"止盈价格计算错误: {str(e)}")
             return 0.0
 
     def _calculate_atr(self, df):
@@ -97,7 +98,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             return np.mean(tr[-self.get_param("atr_period"):])
 
         except Exception as e:
-            print(f"ATR计算错误: {str(e)}")
+            logger.info(f"ATR计算错误: {str(e)}")
             return 0.0
 
     def _calculate_ma(self, df):
@@ -105,7 +106,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
         try:
             return df['close'].rolling(window=self.get_param("ma_period")).mean().iloc[-1]
         except Exception as e:
-            print(f"MA计算错误: {str(e)}")
+            logger.info(f"MA计算错误: {str(e)}")
             return 0.0
 
     def _calculate_volatility(self, df):
@@ -114,7 +115,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             returns = df['close'].pct_change()
             return returns.rolling(window=self.get_param("volatility_period")).std().iloc[-1]
         except Exception as e:
-            print(f"波动率计算错误: {str(e)}")
+            logger.info(f"波动率计算错误: {str(e)}")
             return 0.0
 
     def _calculate_trend(self, df):
@@ -123,7 +124,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             ma = df['close'].rolling(window=self.get_param("ma_period")).mean()
             return 1 if df['close'].iloc[-1] > ma.iloc[-1] else -1
         except Exception as e:
-            print(f"趋势计算错误: {str(e)}")
+            logger.info(f"趋势计算错误: {str(e)}")
             return 0
 
     def _get_position_info(self, stock):
@@ -145,7 +146,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             return self.positions[stock.market_code]
 
         except Exception as e:
-            print(f"获取持仓信息错误: {str(e)}")
+            logger.info(f"获取持仓信息错误: {str(e)}")
             return None
 
     def _calculate_atr_profit(self, price, atr, trend):
@@ -157,7 +158,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             else:
                 return price - profit_distance
         except Exception as e:
-            print(f"ATR止盈计算错误: {str(e)}")
+            logger.info(f"ATR止盈计算错误: {str(e)}")
             return 0.0
 
     def _calculate_ma_profit(self, price, ma):
@@ -165,7 +166,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
         try:
             return ma
         except Exception as e:
-            print(f"均线止盈计算错误: {str(e)}")
+            logger.info(f"均线止盈计算错误: {str(e)}")
             return 0.0
 
     def _calculate_trailing_profit(self, price, position):
@@ -179,7 +180,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             return position['highest_price'] + profit_distance
 
         except Exception as e:
-            print(f"跟踪止盈计算错误: {str(e)}")
+            logger.info(f"跟踪止盈计算错误: {str(e)}")
             return 0.0
 
     def _calculate_volatility_profit(self, price, volatility):
@@ -189,7 +190,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
                 self.get_param("volatility_factor")
             return price + profit_distance
         except Exception as e:
-            print(f"波动率止盈计算错误: {str(e)}")
+            logger.info(f"波动率止盈计算错误: {str(e)}")
             return 0.0
 
     def _calculate_fixed_profit(self, price):
@@ -197,7 +198,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
         try:
             return price * (1 + self.get_param("min_take_profit"))
         except Exception as e:
-            print(f"固定止盈计算错误: {str(e)}")
+            logger.info(f"固定止盈计算错误: {str(e)}")
             return 0.0
 
     def _select_profit_price(self, price, profits, position, trend):
@@ -237,7 +238,7 @@ class AdaptiveTakeProfit(ProfitGoalBase):
             return profit_price
 
         except Exception as e:
-            print(f"选择止盈价格错误: {str(e)}")
+            logger.info(f"选择止盈价格错误: {str(e)}")
             return 0.0
 
     def _update_position_info(self, stock, price, profit_price, datetime):
@@ -254,4 +255,4 @@ class AdaptiveTakeProfit(ProfitGoalBase):
                     position['lowest_price'] = price
 
         except Exception as e:
-            print(f"更新持仓信息错误: {str(e)}")
+            logger.info(f"更新持仓信息错误: {str(e)}")

@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
+from loguru import logger
 
 
 class SinaDataSource(DataSource):

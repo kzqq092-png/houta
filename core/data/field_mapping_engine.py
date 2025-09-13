@@ -1,3 +1,4 @@
+from loguru import logger
 """
 智能字段映射引擎
 
@@ -14,7 +15,6 @@
 
 import pandas as pd
 import numpy as np
-import logging
 import re
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
@@ -25,7 +25,7 @@ from decimal import Decimal
 
 from ..plugin_types import DataType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class FieldType(Enum):
@@ -267,7 +267,7 @@ class FieldMappingEngine:
         Args:
             field_mappings: 预定义的字段映射配置
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # 基础映射规则
         self.base_mappings = field_mappings or {}

@@ -1,10 +1,10 @@
+from loguru import logger
 """
 债券数据插件
 提供国债、企业债、可转债等债券市场数据
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -27,7 +27,7 @@ class BondDataPlugin(IDataSourcePlugin):
         self.description = "债券市场数据源"
         self.plugin_type = PluginType.DATA_SOURCE_BOND
         self.supported_asset_types = [AssetType.BOND]
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 连接状态属性
         self.connection_time = None

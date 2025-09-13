@@ -1,10 +1,10 @@
+from loguru import logger
 """
 策略插件扩展模块
 
 定义统一的策略插件接口和相关数据结构，支持多种策略框架的插件化。
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import time
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StrategyType(Enum):
@@ -349,7 +349,7 @@ class StrategyPluginAdapter:
     def __init__(self, plugin: IStrategyPlugin, plugin_id: str):
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logging.getLogger(f"{self.__class__.__name__}.{plugin_id}")
+        self.logger = logger
 
         # 性能统计
         self._signal_count = 0

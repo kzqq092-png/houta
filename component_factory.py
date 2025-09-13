@@ -7,6 +7,7 @@ from utils.trading_utils import calculate_atr
 from core.take_profit import AdaptiveTakeProfit
 from core.market_environment import MarketEnvironment
 from core.system_condition import EnhancedSystemCondition
+from loguru import logger
 
 
 class ComponentFactory:
@@ -83,7 +84,7 @@ class ComponentFactory:
                         record.add_sell_signal(k[i].datetime)
 
             except Exception as e:
-                print(f"信号计算错误: {str(e)}")
+                logger.info(f"信号计算错误: {str(e)}")
                 return
 
         return crtSG(signal_calculate, params=params, name='EnhancedSignal')
@@ -145,7 +146,7 @@ class ComponentFactory:
 
                 return 0
             except Exception as e:
-                print(f"资金管理买入错误: {str(e)}")
+                logger.info(f"资金管理买入错误: {str(e)}")
                 return 0
 
         def get_sell_num(tm, datetime, stk, price, risk, part_from):
@@ -157,7 +158,7 @@ class ComponentFactory:
                 # 简化实现: 全部卖出
                 return total_num
             except Exception as e:
-                print(f"资金管理卖出错误: {str(e)}")
+                logger.info(f"资金管理卖出错误: {str(e)}")
                 return 0
 
         return crtMM(get_buy_num, get_sell_num, params=params, name='EnhancedMoneyManager')
@@ -203,7 +204,7 @@ class ComponentFactory:
 
                 return price * (1 - (params.get('fixed_stop_loss', 0.05) if params else 0.05))
             except Exception as e:
-                print(f"止损计算错误: {str(e)}")
+                logger.info(f"止损计算错误: {str(e)}")
                 return price * (1 - (params.get('fixed_stop_loss', 0.05) if params else 0.05))
 
         return crtST(stoploss_calculate, params=params, name='EnhancedStoploss')

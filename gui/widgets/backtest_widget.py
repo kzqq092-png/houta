@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级回测UI组件
 集成到HIkyuu GUI系统中，提供实时回测监控和数据联动功能
@@ -31,13 +32,12 @@ try:
     from utils.matplotlib_font_config import configure_matplotlib_chinese_font
     configure_matplotlib_chinese_font()
 except ImportError:
-    print("⚠️ 无法导入字体配置工具，使用默认配置")
+    logger.info(" 无法导入字体配置工具，使用默认配置")
 
 # 导入回测相关模块
 try:
     from backtest.unified_backtest_engine import (
-        UnifiedBacktestEngine, BacktestLevel, create_unified_backtest_engine,
-        FixedStrategyBacktester, StrategyBacktester
+        UnifiedBacktestEngine, BacktestLevel, create_unified_backtest_engine
     )
     from backtest.real_time_backtest_monitor import RealTimeBacktestMonitor, MonitoringLevel
     from backtest.ultra_performance_optimizer import UltraPerformanceOptimizer, PerformanceLevel
@@ -66,27 +66,27 @@ except ImportError:
 
 # 导入核心模块
 try:
-    from core.logger import LogManager
     from utils.config_manager import ConfigManager
     CORE_MODULES_AVAILABLE = True
 except ImportError:
     # 如果核心模块不可用，使用简化版本
     try:
         # 尝试导入基础日志管理器
-        from core.base_logger import BaseLogManager as LogManager
+        from core.base_logger import BaseLogger
     except ImportError:
+
         class LogManager:
             def log(self, message, level):
-                print(f"[{level}] {message}")
+                logger.info(f"[{level}] {message}")
 
             def info(self, message):
-                print(f"[INFO] {message}")
+                logger.info(f"[INFO] {message}")
 
             def warning(self, message):
-                print(f"[WARNING] {message}")
+                logger.info(f"[WARNING] {message}")
 
             def error(self, message):
-                print(f"[ERROR] {message}")
+                logger.info(f"[ERROR] {message}")
 
     # 简化版配置管理器
     class ConfigManager:
@@ -155,8 +155,11 @@ class RealTimeChart(QWidget):
             # 获取统一图表服务
             chart_service = get_unified_chart_service()
 
-            # 配置图表主题
-            chart_service.apply_theme(self.chart_widget, 'dark')
+            # 配置图表主题（如果支持）
+            if hasattr(chart_service, 'apply_theme'):
+                chart_service.apply_theme(self.chart_widget, 'dark')
+            else:
+                logger.debug("图表服务不支持apply_theme方法")
 
             # 设置图表类型为多子图模式
             self.chart_widget.set_chart_type('multi_panel')
@@ -165,7 +168,7 @@ class RealTimeChart(QWidget):
             self.chart_widget.enable_real_time_update(True)
 
         except Exception as e:
-            print(f"图表设置失败: {e}")
+            logger.info(f"图表设置失败: {e}")
 
     def update_charts(self):
         """更新图表"""
@@ -187,7 +190,7 @@ class RealTimeChart(QWidget):
                     self.chart_widget.update_data(df)
 
         except Exception as e:
-            print(f"图表更新失败: {e}")
+            logger.info(f"图表更新失败: {e}")
 
     def add_data(self, data: Dict):
         """添加数据到队列"""
@@ -210,7 +213,10 @@ class RealTimeChart(QWidget):
         """应用主题"""
         if UNIFIED_CHART_AVAILABLE and hasattr(self, 'chart_widget'):
             chart_service = get_unified_chart_service()
-            chart_service.apply_theme(self.chart_widget, theme)
+            if hasattr(chart_service, 'apply_theme'):
+                chart_service.apply_theme(self.chart_widget, theme)
+            else:
+                logger.debug("图表服务不支持apply_theme方法")
 
 
 class MetricsPanel(QWidget):
@@ -223,49 +229,148 @@ class MetricsPanel(QWidget):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
+        layout.setSpacing(2)  # 进一步减少间距
+        layout.setContentsMargins(4, 4, 4, 4)  # 进一步减少边距
 
         # 标题
         title = QLabel("📊 关键指标")
         title.setStyleSheet("""
             QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #00ff88;
-                padding: 10px;
-                border-bottom: 2px solid #00ff88;
+                font-size: 13px;
+                font-weight: 600;
+                color: #48bb78;
+                padding: 6px 8px;
+                border-bottom: 1px solid #48bb78;
+                margin-bottom: 4px;
+                background: rgba(72, 187, 120, 0.1);
+                border-radius: 4px;
             }
         """)
         layout.addWidget(title)
 
-        # 指标卡片容器
-        self.metrics_container = QVBoxLayout()
-        layout.addLayout(self.metrics_container)
+        # 指标表格 - 扩展为更多指标
+        self.metrics_table = QTableWidget(3, 6)  # 3行6列，显示更多指标
+        self.metrics_table.setMaximumHeight(180)  # 进一步增加高度
+        self.metrics_table.setMinimumHeight(160)   # 增加最小高度
 
-        # 初始化指标卡片
-        self.create_metric_cards()
+        # 设置专业表格样式
+        self.metrics_table.setStyleSheet("""
+            QTableWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1a1f2e, stop:1 #0f1419);
+                border: 2px solid #2d3748;
+                border-radius: 8px;
+                gridline-color: #4a5568;
+                font-size: 11px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                selection-background-color: #4299e1;
+            }
+            QTableWidget::item {
+                padding: 6px 8px;
+                border: 1px solid #2d3748;
+                text-align: center;
+                min-height: 20px;
+            }
+            QTableWidget::item:hover {
+                background-color: rgba(66, 153, 225, 0.2);
+                border: 1px solid #4299e1;
+            }
+            QTableWidget::item:selected {
+                background-color: rgba(66, 153, 225, 0.3);
+                color: #ffffff;
+                font-weight: bold;
+            }
+            QHeaderView::section {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4a5568, stop:1 #2d3748);
+                color: #e2e8f0;
+                padding: 8px;
+                border: 1px solid #4a5568;
+                font-weight: 700;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            QHeaderView::section:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5a6578, stop:1 #3d4758);
+            }
+        """)
 
-        layout.addStretch()
+        # 设置表头 - 扩展为更多专业指标
+        headers = ["总收益率", "年化收益", "Sharpe比率", "Sortino比率", "最大回撤", "胜率"]
+        self.metrics_table.setHorizontalHeaderLabels(headers)
+        self.metrics_table.setVerticalHeaderLabels(["主要指标", "风险指标", "交易指标"])
+
+        # 设置表格属性
+        self.metrics_table.setEditTriggers(QAbstractItemView.NoEditTriggers)  # 不可编辑
+        self.metrics_table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.metrics_table.horizontalHeader().setStretchLastSection(True)
+        self.metrics_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.metrics_table.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        # 初始化表格数据
+        self.init_metrics_table()
+
+        layout.addWidget(self.metrics_table)
+
+    def init_metrics_table(self):
+        """初始化指标表格数据"""
+        # 初始化数据 - 3行6列的专业指标
+        initial_data = [
+            # 主要指标行
+            ["0.00%", "0.00%", "0.000", "0.000", "0.00%", "0.00%"],
+            # 风险指标行
+            ["VaR: 0.00%", "β: 0.000", "偏度: 0.00", "峰度: 0.00", "波动率: 0.00%", "α: 0.000"],
+            # 交易指标行
+            ["交易: 0次", "盈亏比: 0.00", "期望: 0.00%", "连胜: 0次", "持仓: 0天", "换手: 0.00%"]
+        ]
+
+        for row in range(3):
+            for col in range(6):
+                item = QTableWidgetItem(initial_data[row][col])
+                item.setTextAlignment(Qt.AlignCenter)
+
+                # 设置不同行的样式
+                if row == 0:  # 主要指标行
+                    item.setForeground(QColor("#ffffff"))
+                    font = item.font()
+                    font.setBold(True)
+                    font.setPointSize(10)
+                    item.setFont(font)
+                elif row == 1:  # 风险指标行
+                    item.setForeground(QColor("#fbbf24"))  # 黄色
+                    font = item.font()
+                    font.setPointSize(9)
+                    item.setFont(font)
+                else:  # 交易指标行
+                    item.setForeground(QColor("#34d399"))  # 绿色
+                    font = item.font()
+                    font.setPointSize(9)
+                    item.setFont(font)
+
+                self.metrics_table.setItem(row, col, item)
 
     def create_metric_cards(self):
         """创建指标卡片"""
         # 总收益率卡片
         self.return_card = self.create_metric_card(
-            "💰 总收益率", "0.00%", "年化收益: 0.00%")
+            " 总收益率", "0.00%", "年化收益: 0.00%")
         self.metrics_container.addWidget(self.return_card)
 
         # Sharpe比率卡片
         self.sharpe_card = self.create_metric_card(
-            "📈 Sharpe比率", "0.000", "最大回撤: 0.00%")
+            " Sharpe比率", "0.000", "最大回撤: 0.00%")
         self.metrics_container.addWidget(self.sharpe_card)
 
         # 胜率卡片
         self.winrate_card = self.create_metric_card(
-            "🎯 胜率", "0.00%", "盈利因子: 0.00")
+            " 胜率", "0.00%", "盈利因子: 0.00")
         self.metrics_container.addWidget(self.winrate_card)
 
         # 风险指标卡片
         self.risk_card = self.create_metric_card(
-            "⚠️ 风险指标", "VaR: 0.00%", "波动率: 0.00%")
+            " 风险指标", "VaR: 0.00%", "波动率: 0.00%")
         self.metrics_container.addWidget(self.risk_card)
 
     def create_metric_card(self, title: str, value: str, subtitle: str) -> QFrame:
@@ -274,30 +379,53 @@ class MetricsPanel(QWidget):
         card.setStyleSheet("""
             QFrame {
                 background: linear-gradient(135deg, #1e2329, #2d3748);
-                border: 1px solid #2d3748;
-                border-radius: 10px;
-                margin: 5px;
-                padding: 15px;
+                border: 1px solid #3a4553;
+                border-radius: 6px;
+                margin: 1px;
+                padding: 6px;
+                min-width: 120px;
+                max-width: 160px;
+                min-height: 70px;
+                max-height: 85px;
+            }
+            QFrame:hover {
+                border: 1px solid #4a5568;
+                background: linear-gradient(135deg, #2d3748, #3a4553);
+                transform: translateY(-1px);
             }
         """)
 
         layout = QVBoxLayout(card)
+        layout.setSpacing(2)
+        layout.setContentsMargins(6, 4, 6, 4)
 
         # 标题
         title_label = QLabel(title)
-        title_label.setStyleSheet(
-            "color: #b0b3b8; font-size: 12px; font-weight: bold;")
+        title_label.setStyleSheet("""
+            color: #a0aec0; 
+            font-size: 10px; 
+            font-weight: 600;
+            margin-bottom: 2px;
+        """)
         layout.addWidget(title_label)
 
         # 数值
         value_label = QLabel(value)
-        value_label.setStyleSheet(
-            "color: white; font-size: 18px; font-weight: bold;")
+        value_label.setStyleSheet("""
+            color: #ffffff; 
+            font-size: 14px; 
+            font-weight: bold;
+            margin: 1px 0;
+        """)
         layout.addWidget(value_label)
 
         # 副标题
         subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: #b0b3b8; font-size: 10px;")
+        subtitle_label.setStyleSheet("""
+            color: #718096; 
+            font-size: 9px;
+            margin-top: 1px;
+        """)
         layout.addWidget(subtitle_label)
 
         # 存储标签引用
@@ -307,40 +435,86 @@ class MetricsPanel(QWidget):
         return card
 
     def update_metrics(self, metrics: Dict):
-        """更新指标"""
+        """更新指标表格"""
         try:
-            # 更新总收益率
+            # 准备所有指标数据
             total_return = metrics.get('total_return', 0)
             annualized_return = metrics.get('annualized_return', 0)
-            self.return_card.value_label.setText(f"{total_return:.2%}")
-            self.return_card.subtitle_label.setText(
-                f"年化收益: {annualized_return:.2%}")
-
-            # 更新Sharpe比率
             sharpe_ratio = metrics.get('sharpe_ratio', 0)
+            sortino_ratio = metrics.get('sortino_ratio', 0)
             max_drawdown = metrics.get('max_drawdown', 0)
-            self.sharpe_card.value_label.setText(f"{sharpe_ratio:.3f}")
-            self.sharpe_card.subtitle_label.setText(
-                f"最大回撤: {max_drawdown:.2%}")
-
-            # 更新胜率
             win_rate = metrics.get('win_rate', 0)
-            profit_factor = metrics.get('profit_factor', 0)
-            self.winrate_card.value_label.setText(f"{win_rate:.2%}")
-            self.winrate_card.subtitle_label.setText(
-                f"盈利因子: {profit_factor:.2f}")
 
-            # 更新风险指标
+            # 风险指标
             var_95 = metrics.get('var_95', 0)
+            beta = metrics.get('beta', 0)
+            skew = metrics.get('skew', 0)
+            kurtosis = metrics.get('kurtosis', 0)
             volatility = metrics.get('volatility', 0)
-            self.risk_card.value_label.setText(f"VaR: {var_95:.2%}")
-            self.risk_card.subtitle_label.setText(f"波动率: {volatility:.2%}")
+            alpha = metrics.get('alpha', 0)
 
-            # 根据指标值设置颜色
-            self._update_card_colors(metrics)
+            # 交易指标
+            trade_count = metrics.get('trade_count', 0)
+            profit_loss_ratio = metrics.get('profit_loss_ratio', 0)
+            expectancy = metrics.get('expectancy', 0)
+            max_consecutive_wins = metrics.get('max_consecutive_wins', 0)
+            avg_holding_period = metrics.get('avg_holding_period', 0)
+            turnover_rate = metrics.get('turnover_rate', 0)
+
+            # 更新表格数据 - 3行6列
+            table_data = [
+                # 主要指标行
+                [f"{total_return:.2%}", f"{annualized_return:.2%}", f"{sharpe_ratio:.3f}",
+                 f"{sortino_ratio:.3f}", f"{max_drawdown:.2%}", f"{win_rate:.2%}"],
+                # 风险指标行
+                [f"VaR: {var_95:.2%}", f"β: {beta:.3f}", f"偏度: {skew:.2f}",
+                 f"峰度: {kurtosis:.2f}", f"波动率: {volatility:.2%}", f"α: {alpha:.3f}"],
+                # 交易指标行
+                [f"交易: {trade_count}次", f"盈亏比: {profit_loss_ratio:.2f}", f"期望: {expectancy:.2%}",
+                 f"连胜: {max_consecutive_wins}次", f"持仓: {avg_holding_period:.0f}天", f"换手: {turnover_rate:.2%}"]
+            ]
+
+            for row in range(3):
+                for col in range(6):
+                    item = self.metrics_table.item(row, col)
+                    if item:
+                        item.setText(table_data[row][col])
+
+                        # 根据数值和行设置颜色
+                        if row == 0:  # 主要指标行
+                            if col == 0:  # 总收益率
+                                color = "#10b981" if total_return >= 0 else "#ef4444"
+                            elif col == 1:  # 年化收益
+                                color = "#10b981" if annualized_return >= 0 else "#ef4444"
+                            elif col == 2:  # Sharpe比率
+                                color = "#10b981" if sharpe_ratio >= 1.0 else "#f59e0b" if sharpe_ratio >= 0.5 else "#ef4444"
+                            elif col == 3:  # Sortino比率
+                                color = "#10b981" if sortino_ratio >= 1.0 else "#f59e0b" if sortino_ratio >= 0.5 else "#ef4444"
+                            elif col == 4:  # 最大回撤
+                                color = "#10b981" if max_drawdown <= 0.1 else "#f59e0b" if max_drawdown <= 0.2 else "#ef4444"
+                            else:  # 胜率
+                                color = "#10b981" if win_rate >= 0.6 else "#f59e0b" if win_rate >= 0.5 else "#ef4444"
+
+                            item.setForeground(QColor(color))
+                            font = item.font()
+                            font.setBold(True)
+                            font.setPointSize(10)
+                            item.setFont(font)
+
+                        elif row == 1:  # 风险指标行
+                            item.setForeground(QColor("#fbbf24"))  # 统一黄色
+                            font = item.font()
+                            font.setPointSize(9)
+                            item.setFont(font)
+
+                        else:  # 交易指标行
+                            item.setForeground(QColor("#34d399"))  # 统一绿色
+                            font = item.font()
+                            font.setPointSize(9)
+                            item.setFont(font)
 
         except Exception as e:
-            print(f"更新指标失败: {e}")
+            logger.info(f"更新指标表格失败: {e}")
 
     def _update_card_colors(self, metrics: Dict):
         """根据指标值更新卡片颜色"""
@@ -393,14 +567,17 @@ class ControlPanel(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title = QLabel("🎛️ 控制面板")
+        title = QLabel("⚙️ 控制面板")
         title.setStyleSheet("""
             QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #00ff88;
-                padding: 10px;
-                border-bottom: 2px solid #00ff88;
+                font-size: 13px;
+                font-weight: 600;
+                color: #4299e1;
+                padding: 6px 8px;
+                border-bottom: 1px solid #4299e1;
+                margin-bottom: 4px;
+                background: rgba(66, 153, 225, 0.1);
+                border-radius: 4px;
             }
         """)
         layout.addWidget(title)
@@ -409,17 +586,21 @@ class ControlPanel(QWidget):
         params_group = QGroupBox("回测参数")
         params_group.setStyleSheet("""
             QGroupBox {
-                font-weight: bold;
-                border: 2px solid #2d3748;
-                border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
-                color: white;
+                font-weight: 500;
+                font-size: 11px;
+                border: 1px solid #4a5568;
+                border-radius: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
+                color: #e2e8f0;
+                background: rgba(45, 55, 72, 0.2);
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #cbd5e0;
+                font-size: 10px;
             }
         """)
         params_layout = QFormLayout(params_group)
@@ -463,15 +644,79 @@ class ControlPanel(QWidget):
         self.performance_level.setCurrentText("ULTRA")
         params_layout.addRow("性能级别:", self.performance_level)
 
+        # 时间范围设置组
+        time_group = QGroupBox("时间范围设置")
+        time_group.setStyleSheet(params_group.styleSheet())
+        time_layout = QFormLayout(time_group)
+
+        # 开始日期
+        self.start_date = QDateEdit()
+        self.start_date.setDate(QDate.currentDate().addYears(-1))
+        self.start_date.setCalendarPopup(True)
+        time_layout.addRow("开始日期:", self.start_date)
+
+        # 结束日期
+        self.end_date = QDateEdit()
+        self.end_date.setDate(QDate.currentDate())
+        self.end_date.setCalendarPopup(True)
+        time_layout.addRow("结束日期:", self.end_date)
+
+        # 数据频率
+        self.data_frequency = QComboBox()
+        self.data_frequency.addItems(["日线", "小时线", "30分钟", "15分钟", "5分钟", "1分钟"])
+        self.data_frequency.setCurrentText("日线")
+        time_layout.addRow("数据频率:", self.data_frequency)
+
+        # 基准对比设置组
+        benchmark_group = QGroupBox("基准对比设置")
+        benchmark_group.setStyleSheet(params_group.styleSheet())
+        benchmark_layout = QFormLayout(benchmark_group)
+
+        # 基准指数选择
+        self.benchmark_index = QComboBox()
+        self.benchmark_index.addItems([
+            "无基准", "沪深300", "中证500", "创业板指", "上证50",
+            "科创50", "恒生指数", "纳斯达克", "标普500"
+        ])
+        self.benchmark_index.setCurrentText("沪深300")
+        benchmark_layout.addRow("基准指数:", self.benchmark_index)
+
+        # 引擎选择
+        engine_group = QGroupBox("回测引擎设置")
+        engine_group.setStyleSheet(params_group.styleSheet())
+        engine_layout = QFormLayout(engine_group)
+
+        # 引擎类型选择
+        self.engine_type = QComboBox()
+        self.engine_type.addItems([
+            "自动选择（推荐）", "向量化引擎", "标准引擎"
+        ])
+        self.engine_type.setCurrentText("自动选择（推荐）")
+        self.engine_type.setToolTip("自动选择：根据数据大小和功能需求智能选择最优引擎\n向量化引擎：高性能，适合大数据集\n标准引擎：功能完整，支持高级功能")
+        engine_layout.addRow("引擎类型:", self.engine_type)
+
+        # 向量化选项
+        self.use_vectorized = QCheckBox("启用向量化优化")
+        self.use_vectorized.setChecked(True)
+        self.use_vectorized.setToolTip("启用向量化计算，可提升3-5倍性能")
+        engine_layout.addRow("", self.use_vectorized)
+
+        # 自动选择选项
+        self.auto_select = QCheckBox("智能引擎选择")
+        self.auto_select.setChecked(True)
+        self.auto_select.setToolTip("根据数据大小和功能需求自动选择最优引擎")
+        engine_layout.addRow("", self.auto_select)
+
         layout.addWidget(params_group)
+        layout.addWidget(engine_group)
 
         # 控制按钮
         buttons_layout = QHBoxLayout()
 
-        self.start_button = QPushButton("🚀 开始回测")
+        self.start_button = QPushButton(" 开始回测")
         self.start_button.setStyleSheet("""
             QPushButton {
-                background: linear-gradient(45deg, #00d4ff, #8b5cf6);
+                background: linear-gradient(45deg, #10d4ff, #8b5cf6);
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -488,10 +733,10 @@ class ControlPanel(QWidget):
         """)
         self.start_button.clicked.connect(self.on_start_backtest)
 
-        self.stop_button = QPushButton("⏹️ 停止回测")
+        self.stop_button = QPushButton(" 停止回测")
         self.stop_button.setStyleSheet("""
             QPushButton {
-                background: linear-gradient(45deg, #ef4444, #dc2626);
+                background: linear-gradient(45deg, #1f4444, #dc2626);
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -531,12 +776,26 @@ class ControlPanel(QWidget):
 
     def on_start_backtest(self):
         """开始回测"""
+        # 解析引擎选择
+        engine_type_text = self.engine_type.currentText()
+        if engine_type_text == "自动选择（推荐）":
+            use_vectorized = self.use_vectorized.isChecked()
+            auto_select = True
+        elif engine_type_text == "向量化引擎":
+            use_vectorized = True
+            auto_select = False
+        else:  # 标准引擎
+            use_vectorized = False
+            auto_select = False
+
         params = {
             'initial_capital': self.initial_capital.value(),
             'position_size': self.position_size.value() / 100,
             'commission_pct': self.commission_pct.value() / 100,
             'professional_level': self.professional_level.currentText(),
-            'performance_level': self.performance_level.currentText()
+            'performance_level': self.performance_level.currentText(),
+            'use_vectorized_engine': use_vectorized,
+            'auto_select_engine': auto_select
         }
 
         self.start_backtest.emit(params)
@@ -584,17 +843,36 @@ class AlertsPanel(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title = QLabel("⚠️ 预警中心")
+        title = QLabel("🔍 监控中心")
         title.setStyleSheet("""
             QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #f59e0b;
-                padding: 10px;
-                border-bottom: 2px solid #f59e0b;
+                font-size: 13px;
+                font-weight: 600;
+                color: #f6ad55;
+                padding: 6px 8px;
+                border-bottom: 1px solid #f6ad55;
+                margin-bottom: 4px;
+                background: rgba(246, 173, 85, 0.1);
+                border-radius: 4px;
             }
         """)
         layout.addWidget(title)
+
+        # 性能指标显示
+        self.performance_group = QGroupBox("性能指标")
+        performance_layout = QFormLayout(self.performance_group)
+
+        self.engine_type_label = QLabel("未启动")
+        self.execution_time_label = QLabel("0.00秒")
+        self.data_size_label = QLabel("0条")
+        self.trade_count_label = QLabel("0次")
+
+        performance_layout.addRow("引擎类型:", self.engine_type_label)
+        performance_layout.addRow("执行时间:", self.execution_time_label)
+        performance_layout.addRow("数据量:", self.data_size_label)
+        performance_layout.addRow("交易次数:", self.trade_count_label)
+
+        layout.addWidget(self.performance_group)
 
         # 预警列表
         self.alerts_list = QListWidget()
@@ -616,7 +894,7 @@ class AlertsPanel(QWidget):
         layout.addWidget(self.alerts_list)
 
         # 清除按钮
-        clear_button = QPushButton("🗑️ 清除预警")
+        clear_button = QPushButton(" 清除预警")
         clear_button.setStyleSheet("""
             QPushButton {
                 background-color: #374151;
@@ -639,13 +917,13 @@ class AlertsPanel(QWidget):
 
         # 确定图标和颜色
         if level == 'critical':
-            icon = '🚨'
+            icon = ''
             color = '#ef4444'
         elif level == 'warning':
-            icon = '⚠️'
+            icon = ''
             color = '#f59e0b'
         else:
-            icon = 'ℹ️'
+            icon = 'ℹ'
             color = '#3b82f6'
 
         # 创建预警项
@@ -673,6 +951,32 @@ class AlertsPanel(QWidget):
         self.alerts_list.clear()
         self.alerts.clear()
 
+    def update_performance_metrics(self, engine_type: str = None, execution_time: float = None,
+                                   data_size: int = None, trade_count: int = None):
+        """更新性能指标显示"""
+        if engine_type:
+            self.engine_type_label.setText(engine_type)
+            self.engine_type_label.setStyleSheet("color: #10b981; font-weight: bold;")
+
+        if execution_time is not None:
+            self.execution_time_label.setText(f"{execution_time:.4f}秒")
+            # 根据执行时间设置颜色
+            if execution_time < 1.0:
+                color = "#10b981"  # 绿色 - 快
+            elif execution_time < 5.0:
+                color = "#f59e0b"  # 黄色 - 中等
+            else:
+                color = "#ef4444"  # 红色 - 慢
+            self.execution_time_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+        if data_size is not None:
+            self.data_size_label.setText(f"{data_size}条")
+            self.data_size_label.setStyleSheet("color: #3b82f6; font-weight: bold;")
+
+        if trade_count is not None:
+            self.trade_count_label.setText(f"{trade_count}次")
+            self.trade_count_label.setStyleSheet("color: #8b5cf6; font-weight: bold;")
+
 
 class ProfessionalBacktestWidget(QWidget):
     """专业级回测UI组件"""
@@ -681,10 +985,10 @@ class ProfessionalBacktestWidget(QWidget):
     backtest_completed = pyqtSignal(dict)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, config_manager: Optional[ConfigManager] = None):
-        super().__init__()
+    def __init__(self, parent=None, config_manager: Optional[ConfigManager] = None):
+        super().__init__(parent)
         self.config_manager = config_manager or ConfigManager()
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 回测相关组件
         self.backtest_engine = None
@@ -716,12 +1020,13 @@ class ProfessionalBacktestWidget(QWidget):
 
         # 主布局
         main_layout = QHBoxLayout(self)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(8, 8, 8, 8)
 
-        # 左侧面板
+        # 左侧控制面板（只保留控制和预警）
         left_panel = QVBoxLayout()
-        left_panel.setSpacing(10)
+        left_panel.setSpacing(6)
+        left_panel.setContentsMargins(4, 4, 4, 4)
 
         # 控制面板
         self.control_panel = ControlPanel()
@@ -729,64 +1034,270 @@ class ProfessionalBacktestWidget(QWidget):
         self.control_panel.stop_backtest.connect(self.stop_backtest)
         left_panel.addWidget(self.control_panel)
 
-        # 指标面板
-        self.metrics_panel = MetricsPanel()
-        left_panel.addWidget(self.metrics_panel)
+        # 时间范围设置面板
+        self.time_panel = self.create_time_panel()
+        left_panel.addWidget(self.time_panel)
+
+        # 基准对比设置面板
+        self.benchmark_panel = self.create_benchmark_panel()
+        left_panel.addWidget(self.benchmark_panel)
+
+        # 风险管理设置面板
+        self.risk_panel = self.create_risk_panel()
+        left_panel.addWidget(self.risk_panel)
+
+        # 高级设置面板
+        self.advanced_panel = self.create_advanced_panel()
+        left_panel.addWidget(self.advanced_panel)
 
         # 预警面板
         self.alerts_panel = AlertsPanel()
         left_panel.addWidget(self.alerts_panel)
 
-        # 左侧面板容器
+        # 左侧面板容器（添加滚动功能）
         left_widget = QWidget()
         left_widget.setLayout(left_panel)
-        left_widget.setFixedWidth(350)
 
-        # 右侧图表区域
+        # 创建滚动区域
+        left_scroll = QScrollArea()
+        left_scroll.setWidget(left_widget)
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        left_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        left_scroll.setMinimumWidth(280)  # 增加宽度
+        left_scroll.setMaximumWidth(340)  # 增加最大宽度
+        left_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                background: rgba(45, 55, 72, 0.3);
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(66, 153, 225, 0.6);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(66, 153, 225, 0.8);
+            }
+        """)
+
+        # 右侧区域（指标+图表）
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(4)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 指标面板
+        self.metrics_panel = MetricsPanel()
+        self.metrics_panel.setMaximumHeight(200)  # 进一步增加高度避免遮挡
+        self.metrics_panel.setMinimumHeight(180)  # 设置最小高度
+        right_layout.addWidget(self.metrics_panel)
+
+        # 图表区域
         self.chart_widget = RealTimeChart()
+        right_layout.addWidget(self.chart_widget, 1)  # 占用剩余空间
+
+        # 右侧容器
+        right_widget = QWidget()
+        right_widget.setLayout(right_layout)
 
         # 添加到主布局
-        main_layout.addWidget(left_widget)
-        main_layout.addWidget(self.chart_widget, 1)
+        main_layout.addWidget(left_scroll)
+        main_layout.addWidget(right_widget, 1)
+
+    def create_time_panel(self):
+        """创建时间范围设置面板"""
+        group = QGroupBox("时间范围设置")
+        group.setStyleSheet(self.get_group_style())
+        layout = QFormLayout(group)
+
+        # 开始日期
+        self.start_date = QDateEdit()
+        self.start_date.setDate(QDate.currentDate().addYears(-1))
+        self.start_date.setCalendarPopup(True)
+        layout.addRow("开始日期:", self.start_date)
+
+        # 结束日期
+        self.end_date = QDateEdit()
+        self.end_date.setDate(QDate.currentDate())
+        self.end_date.setCalendarPopup(True)
+        layout.addRow("结束日期:", self.end_date)
+
+        # 数据频率
+        self.data_frequency = QComboBox()
+        self.data_frequency.addItems(["日线", "小时线", "30分钟", "15分钟", "5分钟", "1分钟"])
+        self.data_frequency.setCurrentText("日线")
+        layout.addRow("数据频率:", self.data_frequency)
+
+        return group
+
+    def create_benchmark_panel(self):
+        """创建基准对比设置面板"""
+        group = QGroupBox("基准对比设置")
+        group.setStyleSheet(self.get_group_style())
+        layout = QFormLayout(group)
+
+        # 基准指数选择
+        self.benchmark_index = QComboBox()
+        self.benchmark_index.addItems([
+            "无基准", "沪深300", "中证500", "创业板指", "上证50",
+            "科创50", "恒生指数", "纳斯达克", "标普500"
+        ])
+        self.benchmark_index.setCurrentText("沪深300")
+        layout.addRow("基准指数:", self.benchmark_index)
+
+        return group
+
+    def create_risk_panel(self):
+        """创建风险管理设置面板"""
+        group = QGroupBox("风险管理设置")
+        group.setStyleSheet(self.get_group_style())
+        layout = QFormLayout(group)
+
+        # 最大回撤限制
+        self.max_drawdown_limit = QDoubleSpinBox()
+        self.max_drawdown_limit.setRange(0.0, 1.0)
+        self.max_drawdown_limit.setSingleStep(0.01)
+        self.max_drawdown_limit.setValue(0.20)
+        self.max_drawdown_limit.setSuffix("%")
+        layout.addRow("最大回撤限制:", self.max_drawdown_limit)
+
+        # 止损设置
+        self.stop_loss = QDoubleSpinBox()
+        self.stop_loss.setRange(0.0, 1.0)
+        self.stop_loss.setSingleStep(0.01)
+        self.stop_loss.setValue(0.10)
+        self.stop_loss.setSuffix("%")
+        layout.addRow("止损比例:", self.stop_loss)
+
+        # 止盈设置
+        self.take_profit = QDoubleSpinBox()
+        self.take_profit.setRange(0.0, 5.0)
+        self.take_profit.setSingleStep(0.1)
+        self.take_profit.setValue(0.20)
+        self.take_profit.setSuffix("%")
+        layout.addRow("止盈比例:", self.take_profit)
+
+        # 单笔最大投资比例
+        self.max_position_size = QDoubleSpinBox()
+        self.max_position_size.setRange(0.01, 1.0)
+        self.max_position_size.setSingleStep(0.01)
+        self.max_position_size.setValue(0.10)
+        self.max_position_size.setSuffix("%")
+        layout.addRow("单笔最大仓位:", self.max_position_size)
+
+        return group
+
+    def create_advanced_panel(self):
+        """创建高级设置面板"""
+        group = QGroupBox("高级设置")
+        group.setStyleSheet(self.get_group_style())
+        layout = QFormLayout(group)
+
+        # 滑点设置
+        self.slippage = QDoubleSpinBox()
+        self.slippage.setRange(0.0, 0.1)
+        self.slippage.setSingleStep(0.001)
+        self.slippage.setValue(0.001)
+        self.slippage.setSuffix("%")
+        layout.addRow("滑点:", self.slippage)
+
+        # 手续费设置
+        self.commission = QDoubleSpinBox()
+        self.commission.setRange(0.0, 0.01)
+        self.commission.setSingleStep(0.0001)
+        self.commission.setValue(0.0003)
+        self.commission.setSuffix("%")
+        layout.addRow("手续费:", self.commission)
+
+        # 最小交易单位
+        self.min_trade_unit = QSpinBox()
+        self.min_trade_unit.setRange(1, 10000)
+        self.min_trade_unit.setValue(100)
+        layout.addRow("最小交易单位:", self.min_trade_unit)
+
+        return group
+
+    def get_group_style(self):
+        """获取统一的组样式"""
+        return """
+            QGroupBox {
+                font-weight: 500;
+                font-size: 11px;
+                border: 1px solid #4a5568;
+                border-radius: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
+                color: #e2e8f0;
+                background: rgba(45, 55, 72, 0.2);
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #cbd5e0;
+                font-size: 10px;
+            }
+        """
 
     def init_backtest_components(self):
         """初始化回测组件"""
         try:
             # 初始化验证器（如果可用）
             try:
-                self.validator = ProfessionalBacktestValidator(
-                    self.log_manager)
+                from backtest.backtest_validator import ProfessionalBacktestValidator
+                self.validator = ProfessionalBacktestValidator()
+            except ImportError:
+                logger.info("ProfessionalBacktestValidator不可用，使用基础验证器")
+                self.validator = None
             except Exception as e:
-                logger.error(f'init_backtest_components执行失败: {e}')
+                logger.error(f'验证器初始化失败: {e}')
                 self.validator = None
 
             # 初始化优化器（如果可用）
             try:
-                self.optimizer = UltraPerformanceOptimizer(
-                    log_manager=self.log_manager)
+                from backtest.ultra_performance_optimizer import UltraPerformanceOptimizer
+                self.optimizer = UltraPerformanceOptimizer()
+            except ImportError:
+                logger.info("UltraPerformanceOptimizer不可用，使用基础优化器")
+                self.optimizer = None
             except Exception as e:
-                logger.error(f'init_backtest_components执行失败: {e}')
+                logger.error(f'优化器初始化失败: {e}')
                 self.optimizer = None
 
-            self.log_manager.log("回测组件初始化完成", LogLevel.INFO)
+            logger.info("回测组件初始化完成")
 
         except Exception as e:
-            self.log_manager.log(f"回测组件初始化失败: {e}", LogLevel.ERROR)
+            logger.error(f"回测组件初始化失败: {e}")
             self.error_occurred.emit(f"回测组件初始化失败: {str(e)}")
 
     def start_backtest(self, params: Dict):
         """开始回测"""
         try:
-            self.log_manager.log("开始启动回测", LogLevel.INFO)
+            logger.info("开始启动回测")
 
             # 创建回测引擎（如果可用）
             try:
                 backtest_level = getattr(
                     BacktestLevel, params['professional_level'])
+
+                # 使用新的引擎参数
+                use_vectorized = params.get('use_vectorized_engine', True)
+                auto_select = params.get('auto_select_engine', True)
+
                 self.backtest_engine = UnifiedBacktestEngine(
                     backtest_level=backtest_level,
-                    log_manager=self.log_manager
+                    use_vectorized_engine=use_vectorized,
+                    auto_select_engine=auto_select
                 )
+
+                engine_info = f"向量化: {use_vectorized}, 自动选择: {auto_select}"
+                logger.info(f"回测引擎创建成功 - {engine_info}")
+
             except Exception as e:
                 logger.error(f'start_backtest执行失败: {e}')
                 self.backtest_engine = None
@@ -794,8 +1305,7 @@ class ProfessionalBacktestWidget(QWidget):
             # 创建监控器（如果可用）
             try:
                 self.monitor = RealTimeBacktestMonitor(
-                    monitoring_level=MonitoringLevel.REAL_TIME,
-                    log_manager=self.log_manager
+                    monitoring_level=MonitoringLevel.REAL_TIME
                 )
             except Exception as e:
                 logger.error(f'start_backtest执行失败: {e}')
@@ -804,73 +1314,132 @@ class ProfessionalBacktestWidget(QWidget):
             # 生成模拟数据进行演示
             demo_data = self._generate_demo_data()
 
+            # 更新监控面板信息
+            engine_type = "向量化引擎" if params.get('use_vectorized_engine', True) else "标准引擎"
+            if params.get('auto_select_engine', True):
+                engine_type += " (自动选择)"
+
+            self.alerts_panel.update_performance_metrics(
+                engine_type=engine_type,
+                data_size=len(demo_data)
+            )
+
             # 启动监控线程
             self.start_monitoring(demo_data, params)
 
-            self.alerts_panel.add_alert('info', '回测已启动，正在实时监控中...')
+            self.alerts_panel.add_alert('info', f'回测已启动，使用{engine_type}，正在实时监控中...')
 
         except Exception as e:
-            self.log_manager.log(f"启动回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"启动回测失败: {e}")
             self.error_occurred.emit(f"启动回测失败: {str(e)}")
             self.control_panel.on_stop_backtest()
 
     def stop_backtest(self):
         """停止回测"""
         try:
+            logger.info("正在停止回测...")
             self.is_monitoring = False
 
             if self.monitoring_thread and self.monitoring_thread.is_alive():
-                self.monitoring_thread.join(timeout=2)
+                logger.info(f"等待监控线程结束 - 线程ID: {self.monitoring_thread.ident}")
+
+                # 给线程更多时间优雅退出
+                self.monitoring_thread.join(timeout=10.0)
+
+                if self.monitoring_thread.is_alive():
+                    logger.warning(f"监控线程未能在10秒内结束 - 线程ID: {self.monitoring_thread.ident}")
+                else:
+                    logger.info("监控线程已正常结束")
+
+            # 清理线程引用
+            self.monitoring_thread = None
+
+            # 性能监控已移至性能监控中心
 
             self.control_panel.on_stop_backtest()
             self.alerts_panel.add_alert('info', '回测已停止')
 
-            self.log_manager.log("回测已停止", LogLevel.INFO)
+            logger.info("回测已停止")
 
         except Exception as e:
-            self.log_manager.log(f"停止回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"停止回测失败: {e}")
 
     def start_monitoring(self, data: pd.DataFrame, params: Dict):
         """启动监控"""
-        self.is_monitoring = True
+        # 停止之前的监控（如果有的话）
+        if self.is_monitoring:
+            self.stop_backtest()
+
+        # 使用资源管理器管理监控线程
+        from backtest.resource_manager import managed_backtest_resources
 
         def monitoring_loop():
             """监控循环"""
-            iteration = 0
+            with managed_backtest_resources() as resource_manager:
+                # 注册监控线程到资源管理器
+                resource_manager.register_thread(threading.current_thread())
 
-            while self.is_monitoring:
+                iteration = 0
+                thread_name = threading.current_thread().name
+                logger.info(f"回测监控循环开始 - 线程: {thread_name}")
+
                 try:
-                    # 生成模拟监控数据
-                    monitoring_data = self._generate_monitoring_data(iteration)
+                    while self.is_monitoring:
+                        # 检查停止信号
+                        if not self.is_monitoring:
+                            logger.info(f"收到停止信号，退出监控循环 - 线程: {thread_name}")
+                            break
 
-                    # 更新图表
-                    self.chart_widget.add_data(monitoring_data)
+                        try:
+                            # 生成模拟监控数据
+                            monitoring_data = self._generate_monitoring_data(iteration)
 
-                    # 更新指标面板
-                    QTimer.singleShot(
-                        0, lambda: self.metrics_panel.update_metrics(monitoring_data))
+                            # 更新图表
+                            self.chart_widget.add_data(monitoring_data)
 
-                    # 检查预警
-                    self._check_alerts(monitoring_data)
+                            # 更新指标面板
+                            QTimer.singleShot(
+                                0, lambda: self.metrics_panel.update_metrics(monitoring_data))
 
-                    # 存储监控数据
-                    self.monitoring_data.append(monitoring_data)
+                            # 检查预警
+                            self._check_alerts(monitoring_data)
 
-                    # 限制数据长度
-                    if len(self.monitoring_data) > 1000:
-                        self.monitoring_data = self.monitoring_data[-1000:]
+                            # 存储监控数据
+                            self.monitoring_data.append(monitoring_data)
 
-                    iteration += 1
-                    time.sleep(2)  # 每2秒更新一次
+                            # 限制数据长度
+                            if len(self.monitoring_data) > 1000:
+                                self.monitoring_data = self.monitoring_data[-1000:]
+
+                            iteration += 1
+
+                            # 短暂休眠，允许更快响应停止信号
+                            for _ in range(20):  # 2秒分成20个0.1秒
+                                if not self.is_monitoring:
+                                    break
+                                time.sleep(0.1)
+
+                        except Exception as e:
+                            logger.error(f"监控循环异常: {e}")
+                            break
 
                 except Exception as e:
-                    self.log_manager.log(f"监控循环异常: {e}", LogLevel.ERROR)
-                    break
+                    logger.error(f"监控线程异常: {e}")
+                finally:
+                    logger.info(f"监控循环结束 - 线程: {thread_name}")
+                    self.is_monitoring = False
 
-        # 启动监控线程
+        # 启动监控线程（非守护线程，确保可以正确停止）
+        self.is_monitoring = True
         self.monitoring_thread = threading.Thread(
-            target=monitoring_loop, daemon=True)
+            target=monitoring_loop,
+            daemon=False,
+            name=f"BacktestWidget-Monitor-{threading.get_ident()}")
         self.monitoring_thread.start()
+
+        # 性能监控已移至性能监控中心
+
+        logger.info(f"监控线程已启动 - 线程ID: {self.monitoring_thread.ident}")
 
     def _generate_demo_data(self) -> pd.DataFrame:
         """生成演示数据"""
@@ -897,7 +1466,7 @@ class ProfessionalBacktestWidget(QWidget):
             return demo_data
 
         except Exception as e:
-            self.log_manager.log(f"生成演示数据失败: {e}", LogLevel.ERROR)
+            logger.error(f"生成演示数据失败: {e}")
             return pd.DataFrame()
 
     def _generate_monitoring_data(self, iteration: int) -> Dict:
@@ -926,7 +1495,7 @@ class ProfessionalBacktestWidget(QWidget):
             return monitoring_data
 
         except Exception as e:
-            self.log_manager.log(f"生成监控数据失败: {e}", LogLevel.ERROR)
+            logger.error(f"生成监控数据失败: {e}")
             return {}
 
     def _check_alerts(self, data: Dict):
@@ -958,26 +1527,26 @@ class ProfessionalBacktestWidget(QWidget):
                 ))
 
         except Exception as e:
-            self.log_manager.log(f"检查预警失败: {e}", LogLevel.ERROR)
+            logger.error(f"检查预警失败: {e}")
 
     def set_kdata(self, kdata):
         """设置K线数据"""
         try:
             if kdata is not None and not kdata.empty:
-                self.log_manager.log("接收到K线数据，准备回测", LogLevel.INFO)
+                logger.error("接收到K线数据，准备回测")
                 # 这里可以使用真实的K线数据进行回测
 
         except Exception as e:
-            self.log_manager.log(f"设置K线数据失败: {e}", LogLevel.ERROR)
+            logger.info(f"设置K线数据失败: {e}")
 
     def refresh_data(self):
         """刷新数据"""
         try:
             if self.is_monitoring:
-                self.log_manager.log("刷新监控数据", LogLevel.INFO)
+                logger.error("刷新监控数据")
 
         except Exception as e:
-            self.log_manager.log(f"刷新数据失败: {e}", LogLevel.ERROR)
+            logger.info(f"刷新数据失败: {e}")
 
     def clear_data(self):
         """清除数据"""
@@ -986,13 +1555,14 @@ class ProfessionalBacktestWidget(QWidget):
             self.alerts_panel.clear_alerts()
             self.chart_widget.clear_data()
 
-            self.log_manager.log("数据已清除", LogLevel.INFO)
+            logger.error("数据已清除")
 
         except Exception as e:
-            self.log_manager.log(f"清除数据失败: {e}", LogLevel.ERROR)
-
+            logger.info(f"清除数据失败: {e}")
 
 # 便捷函数
+
+
 def create_backtest_widget(config_manager: Optional[ConfigManager] = None) -> ProfessionalBacktestWidget:
     """创建回测组件实例"""
     return ProfessionalBacktestWidget(config_manager)

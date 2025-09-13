@@ -1,8 +1,9 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 系统优化器使用示例
 
-展示如何在FactorWeave-Quant ‌中使用系统优化器的各种功能
+展示如何在FactorWeave-Quant 中使用系统优化器的各种功能
 """
 
 from gui.panels.system_optimizer_panel import SystemOptimizerPanel
@@ -24,7 +25,7 @@ class SystemOptimizerExample(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FactorWeave-Quant ‌ 系统优化器示例")
+        self.setWindowTitle("FactorWeave-Quant  系统优化器示例")
         self.setGeometry(100, 100, 1000, 700)
 
         # 创建中央窗口
@@ -82,16 +83,16 @@ class SystemOptimizerExample(QMainWindow):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.optimizer_service.initialize_async())
-            print("✓ 系统优化器服务初始化成功")
+            logger.info(" 系统优化器服务初始化成功")
         except Exception as e:
-            print(f"❌ 系统优化器服务初始化失败: {e}")
+            logger.info(f" 系统优化器服务初始化失败: {e}")
 
     def show_optimizer_dialog(self):
         """显示系统优化器对话框"""
         try:
             show_system_optimizer_dialog(self)
         except Exception as e:
-            print(f"打开系统优化器对话框失败: {e}")
+            logger.info(f"打开系统优化器对话框失败: {e}")
 
     def toggle_optimizer_panel(self):
         """切换优化器面板显示状态"""
@@ -104,26 +105,26 @@ class SystemOptimizerExample(QMainWindow):
             self.optimizer_panel.level_combo.setCurrentIndex(0)
             self.optimizer_panel._start_optimization()
         except Exception as e:
-            print(f"快速优化失败: {e}")
+            logger.info(f"快速优化失败: {e}")
 
     def analyze_system(self):
         """分析系统"""
         try:
             self.optimizer_panel._analyze_system()
         except Exception as e:
-            print(f"系统分析失败: {e}")
+            logger.info(f"系统分析失败: {e}")
 
     def on_optimization_completed(self, result):
         """优化完成回调"""
-        print(f"✓ 优化完成！")
-        print(f"  - 清理文件: {result.files_cleaned}")
-        print(f"  - 释放空间: {result.bytes_freed / 1024 / 1024:.2f} MB")
-        print(f"  - 耗时: {result.duration.total_seconds():.2f} 秒")
-        print(f"  - 成功率: {result.success_rate:.2%}")
+        logger.info(f" 优化完成！")
+        logger.info(f"  - 清理文件: {result.files_cleaned}")
+        logger.info(f"  - 释放空间: {result.bytes_freed / 1024 / 1024:.2f} MB")
+        logger.info(f"  - 耗时: {result.duration.total_seconds():.2f} 秒")
+        logger.info(f"  - 成功率: {result.success_rate:.2%}")
 
     def on_optimization_failed(self, error):
         """优化失败回调"""
-        print(f"❌ 优化失败: {error}")
+        logger.info(f" 优化失败: {error}")
 
     def closeEvent(self, event):
         """关闭事件"""
@@ -132,20 +133,20 @@ class SystemOptimizerExample(QMainWindow):
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self.optimizer_service.dispose_async())
         except Exception as e:
-            print(f"清理优化器服务失败: {e}")
+            logger.info(f"清理优化器服务失败: {e}")
 
         event.accept()
 
 
 def main():
     """主函数"""
-    print("FactorWeave-Quant ‌ 系统优化器示例")
-    print("=" * 40)
+    logger.info("FactorWeave-Quant  系统优化器示例")
+    logger.info("=" * 40)
 
     app = QApplication(sys.argv)
 
     # 设置应用程序属性
-    app.setApplicationName("FactorWeave-Quant ‌ System Optimizer Example")
+    app.setApplicationName("FactorWeave-Quant  System Optimizer Example")
     app.setApplicationVersion("1.0")
 
     # 创建主窗口

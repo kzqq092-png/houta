@@ -1,3 +1,4 @@
+from loguru import logger
 """
 GPU增强缩放Mixin模块
 
@@ -8,13 +9,12 @@ GPU增强缩放Mixin模块
 - 性能监控和优化
 """
 
-import logging
 from typing import Optional, Dict, Any, Tuple
 from PyQt5.QtCore import pyqtSignal, QTimer
 from PyQt5.QtGui import QWheelEvent, QMouseEvent
 from PyQt5.QtWidgets import QWidget
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class GPUEnhancedZoomMixin:

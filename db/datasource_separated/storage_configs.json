@@ -1,0 +1,46 @@
+{
+  "examples.akshare_stock_plugin": {
+    "plugin_id": "examples.akshare_stock_plugin",
+    "plugin_name": "examples.akshare_stock_plugin",
+    "isolation_level": "database",
+    "database_path": "db\\datasource_separated\\examples_akshare_stock_plugin.duckdb",
+    "schema_prefix": "",
+    "table_prefix": "",
+    "auto_create_tables": true,
+    "enable_compression": true,
+    "max_database_size_mb": 1024
+  },
+  "examples.eastmoney_stock_plugin": {
+    "plugin_id": "examples.eastmoney_stock_plugin",
+    "plugin_name": "examples.eastmoney_stock_plugin",
+    "isolation_level": "database",
+    "database_path": "db\\datasource_separated\\examples_eastmoney_stock_plugin.duckdb",
+    "schema_prefix": "",
+    "table_prefix": "",
+    "auto_create_tables": true,
+    "enable_compression": true,
+    "max_database_size_mb": 1024
+  },
+  "examples.tongdaxin_stock_plugin": {
+    "plugin_id": "examples.tongdaxin_stock_plugin",
+    "plugin_name": "examples.tongdaxin_stock_plugin",
+    "isolation_level": "database",
+    "database_path": "db\\datasource_separated\\examples_tongdaxin_stock_plugin.duckdb",
+    "schema_prefix": "",
+    "table_prefix": "",
+    "auto_create_tables": true,
+    "enable_compression": true,
+    "max_database_size_mb": 1024
+  },
+  "examples.complete_test_plugin": {
+    "plugin_id": "examples.complete_test_plugin",
+    "plugin_name": "examples.complete_test_plugin",
+    "isolation_level": "database",
+    "database_path": "db\\datasource_separated\\examples_complete_test_plugin.duckdb",
+    "schema_prefix": "",
+    "table_prefix": "",
+    "auto_create_tables": true,
+    "enable_compression": true,
+    "max_database_size_mb": 1024
+  }
+}

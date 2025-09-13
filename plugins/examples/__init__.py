@@ -1,7 +1,8 @@
+from loguru import logger
 """
 插件示例包
 
-包含各种类型的插件示例，用于演示如何开发FactorWeave-Quant ‌插件。
+包含各种类型的插件示例，用于演示如何开发FactorWeave-Quant 插件。
 """
 
 # 导出所有示例插件
@@ -23,4 +24,4 @@ for file_path in current_dir.glob("*.py"):
         # 将模块添加到当前命名空间
         globals()[module_name] = module
     except ImportError as e:
-        print(f"无法导入示例插件 {module_name}: {e}")
+        logger.info(f"无法导入示例插件 {module_name}: {e}")

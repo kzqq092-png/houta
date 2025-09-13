@@ -1,3 +1,4 @@
+from loguru import logger
 """
 第一阶段DuckDB数据库存储基础架构单元测试
 
@@ -755,18 +756,18 @@ if __name__ == '__main__':
     result = runner.run(test_suite)
 
     # 输出测试结果
-    print(f"\n测试结果:")
-    print(f"运行测试: {result.testsRun}")
-    print(f"失败: {len(result.failures)}")
-    print(f"错误: {len(result.errors)}")
-    print(f"成功率: {(result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun * 100:.1f}%")
+    logger.info(f"\n测试结果:")
+    logger.info(f"运行测试: {result.testsRun}")
+    logger.info(f"失败: {len(result.failures)}")
+    logger.info(f"错误: {len(result.errors)}")
+    logger.info(f"成功率: {(result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun * 100:.1f}%")
 
     if result.failures:
-        print(f"\n失败的测试:")
+        logger.info(f"\n失败的测试:")
         for test, traceback in result.failures:
-            print(f"- {test}: {traceback}")
+            logger.info(f"- {test}: {traceback}")
 
     if result.errors:
-        print(f"\n错误的测试:")
+        logger.info(f"\n错误的测试:")
         for test, traceback in result.errors:
-            print(f"- {test}: {traceback}")
+            logger.info(f"- {test}: {traceback}")

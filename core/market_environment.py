@@ -5,6 +5,7 @@ import pandas as pd
 
 
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from loguru import logger
 
 
 class MarketEnvironment(EnvironmentBase):
@@ -71,7 +72,7 @@ class MarketEnvironment(EnvironmentBase):
             return self._judge_market_environment()
 
         except Exception as e:
-            print(f"市场环境分析错误: {str(e)}")
+            logger.info(f"市场环境分析错误: {str(e)}")
             return True
 
     def _calculate_indicators(self, k):
@@ -146,7 +147,7 @@ class MarketEnvironment(EnvironmentBase):
                 'volume': volume
             }
         except Exception as e:
-            print(f"技术指标计算错误: {str(e)}")
+            logger.info(f"技术指标计算错误: {str(e)}")
             return {}
 
     def _analyze_trend(self, indicators):
@@ -178,7 +179,7 @@ class MarketEnvironment(EnvironmentBase):
             self.market_state['strength'] = abs(trend_strength)
 
         except Exception as e:
-            print(f"趋势分析错误: {str(e)}")
+            logger.info(f"趋势分析错误: {str(e)}")
 
     def _analyze_volatility(self, indicators):
         """分析波动率"""
@@ -193,7 +194,7 @@ class MarketEnvironment(EnvironmentBase):
                 self.market_state['volatility'] = 'normal'
 
         except Exception as e:
-            print(f"波动率分析错误: {str(e)}")
+            logger.info(f"波动率分析错误: {str(e)}")
 
     def _analyze_volume(self, indicators):
         """分析成交量"""
@@ -210,7 +211,7 @@ class MarketEnvironment(EnvironmentBase):
                 self.market_state['volume'] = 'normal'
 
         except Exception as e:
-            print(f"成交量分析错误: {str(e)}")
+            logger.info(f"成交量分析错误: {str(e)}")
 
     def _analyze_market_regime(self, indicators):
         """分析市场状态"""
@@ -251,7 +252,7 @@ class MarketEnvironment(EnvironmentBase):
                 self.market_state['regime'] = 'neutral'
 
         except Exception as e:
-            print(f"市场状态分析错误: {str(e)}")
+            logger.info(f"市场状态分析错误: {str(e)}")
 
     def _judge_market_environment(self):
         """综合判断市场环境"""
@@ -273,7 +274,7 @@ class MarketEnvironment(EnvironmentBase):
                 return False  # 不适合交易
 
         except Exception as e:
-            print(f"市场环境判断错误: {str(e)}")
+            logger.info(f"市场环境判断错误: {str(e)}")
             return True
 
     def get_market_state(self):

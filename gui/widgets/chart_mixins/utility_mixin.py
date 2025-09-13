@@ -1,3 +1,6 @@
+from loguru import logger
+
+from gui.widgets.chart_mixins.ui_mixin import UIMixin
 """
 图表控件工具方法Mixin
 
@@ -105,14 +108,11 @@ class UtilityMixin:
             self.period_changed.emit(self.current_period)
 
             # 如果设置了调试日志
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.info(f"周期已变更为: {period} -> {self.current_period}")
+            logger.info(f"周期已变更为: {period} -> {self.current_period}")
 
         except Exception as e:
             error_msg = f"处理周期变更失败: {str(e)}"
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)
 
@@ -127,8 +127,7 @@ class UtilityMixin:
             self.current_chart_type = chart_type
 
             # 如果设置了调试日志
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.info(f"图表类型已变更为: {chart_type}")
+            logger.info(f"图表类型已变更为: {chart_type}")
 
             # 发出图表类型变更信号
             if hasattr(self, 'chart_type_changed'):
@@ -136,9 +135,7 @@ class UtilityMixin:
 
         except Exception as e:
             error_msg = f"处理图表类型变更失败: {str(e)}"
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)
 
@@ -153,8 +150,7 @@ class UtilityMixin:
             self.current_time_range = time_range
 
             # 如果设置了调试日志
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.info(f"时间范围已变更为: {time_range}")
+            logger.info(f"时间范围已变更为: {time_range}")
 
             # 发出时间范围变更信号
             if hasattr(self, 'time_range_changed'):
@@ -162,9 +158,7 @@ class UtilityMixin:
 
         except Exception as e:
             error_msg = f"处理时间范围变更失败: {str(e)}"
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)
 
@@ -187,9 +181,7 @@ class UtilityMixin:
                 self.show_no_data("无数据")
         except Exception as e:
             error_msg = f"刷新图表失败: {str(e)}"
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
             # 发射异常信号，主窗口可捕获弹窗
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(error_msg)

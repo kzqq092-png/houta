@@ -5,12 +5,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from typing import Optional, Dict, Any, List
-import logging
+from loguru import logger
 import pandas as pd
 import numpy as np
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataQualityDialog(QDialog):

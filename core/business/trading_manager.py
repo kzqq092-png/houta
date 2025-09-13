@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易管理业务逻辑
 
@@ -8,7 +9,6 @@
 - 交易记录
 """
 
-import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from dataclasses import dataclass
@@ -73,7 +73,7 @@ class TradingManager:
     """交易管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
         self.data_access = data_access
         self._orders: Dict[str, Order] = {}  # 订单字典
         self._trade_records: List[TradeRecord] = []  # 交易记录

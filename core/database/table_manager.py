@@ -1,3 +1,4 @@
+from loguru import logger
 """
 DuckDB动态表管理器
 
@@ -12,7 +13,6 @@ DuckDB动态表管理器
 版本: 1.0
 """
 
-import logging
 from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from dataclasses import dataclass
@@ -23,12 +23,15 @@ from datetime import datetime, date
 
 from .duckdb_manager import DuckDBConnectionManager, get_connection_manager
 from ..plugin_types import DataType
+from .unified_table_name_generator import UnifiedTableNameGenerator, generate_table_name
+from ..plugin_types import AssetType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TableType(Enum):
     """表类型枚举"""
+    # 基础数据类型
     STOCK_BASIC_INFO = "stock_basic_info"
     KLINE_DATA = "kline_data"
     FINANCIAL_STATEMENT = "financial_statement"
@@ -40,6 +43,16 @@ class TableType(Enum):
     ANNOUNCEMENT = "announcement"
     FUND_FLOW = "fund_flow"
     TECHNICAL_INDICATOR = "technical_indicator"
+
+    # 风险管理相关（对应现有功能）
+    RISK_METRICS = "risk_metrics"
+
+    # 扩展数据类型（有对应功能支持）
+    INDEX_DATA = "index_data"
+    EVENT_DATA = "event_data"
+    ASSET_LIST = "asset_list"
+    SECTOR_DATA = "sector_data"
+    PATTERN_RECOGNITION = "pattern_recognition"
 
 
 @dataclass
@@ -255,7 +268,437 @@ class TableSchemaRegistry:
             ]
         )
 
-        logger.info("默认表结构初始化完成")
+        # 实时行情表
+        self._schemas[TableType.REAL_TIME_QUOTE] = TableSchema(
+            table_type=TableType.REAL_TIME_QUOTE,
+            columns={
+                'symbol': 'VARCHAR NOT NULL',
+                'datetime': 'TIMESTAMP NOT NULL',
+                'price': 'DECIMAL(10,4) NOT NULL',
+                'volume': 'BIGINT NOT NULL',
+                'amount': 'DECIMAL(20,2)',
+                'change': 'DECIMAL(10,4)',
+                'change_percent': 'DECIMAL(10,4)',
+                'open': 'DECIMAL(10,4)',
+                'high': 'DECIMAL(10,4)',
+                'low': 'DECIMAL(10,4)',
+                'prev_close': 'DECIMAL(10,4)',
+                'bid_price': 'DECIMAL(10,4)',
+                'ask_price': 'DECIMAL(10,4)',
+                'bid_volume': 'BIGINT',
+                'ask_volume': 'BIGINT',
+                'total_bid_volume': 'BIGINT',
+                'total_ask_volume': 'BIGINT',
+                'turnover_rate': 'DECIMAL(10,4)',
+                'market_status': 'VARCHAR',
+                'average_price': 'DECIMAL(10,4)',
+                'price_limit_up': 'DECIMAL(10,4)',
+                'price_limit_down': 'DECIMAL(10,4)',
+                'suspension_status': 'VARCHAR',
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_price', 'columns': ['price']},
+                {'name': 'idx_volume', 'columns': ['volume']},
+                {'name': 'idx_market_status', 'columns': ['market_status']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ]
+        )
+
+        # 市场深度表
+        self._schemas[TableType.MARKET_DEPTH] = TableSchema(
+            table_type=TableType.MARKET_DEPTH,
+            columns={
+                'symbol': 'VARCHAR NOT NULL',
+                'datetime': 'TIMESTAMP NOT NULL',
+                'bid_price_1': 'DECIMAL(10,4)',
+                'bid_volume_1': 'BIGINT',
+                'bid_price_2': 'DECIMAL(10,4)',
+                'bid_volume_2': 'BIGINT',
+                'bid_price_3': 'DECIMAL(10,4)',
+                'bid_volume_3': 'BIGINT',
+                'bid_price_4': 'DECIMAL(10,4)',
+                'bid_volume_4': 'BIGINT',
+                'bid_price_5': 'DECIMAL(10,4)',
+                'bid_volume_5': 'BIGINT',
+                'ask_price_1': 'DECIMAL(10,4)',
+                'ask_volume_1': 'BIGINT',
+                'ask_price_2': 'DECIMAL(10,4)',
+                'ask_volume_2': 'BIGINT',
+                'ask_price_3': 'DECIMAL(10,4)',
+                'ask_volume_3': 'BIGINT',
+                'ask_price_4': 'DECIMAL(10,4)',
+                'ask_volume_4': 'BIGINT',
+                'ask_price_5': 'DECIMAL(10,4)',
+                'ask_volume_5': 'BIGINT',
+                'total_bid_volume': 'BIGINT',
+                'total_ask_volume': 'BIGINT',
+                'weighted_bid_price': 'DECIMAL(10,4)',
+                'weighted_ask_price': 'DECIMAL(10,4)',
+                'spread': 'DECIMAL(10,4)',
+                'mid_price': 'DECIMAL(10,4)',
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_bid_price_1', 'columns': ['bid_price_1']},
+                {'name': 'idx_ask_price_1', 'columns': ['ask_price_1']},
+                {'name': 'idx_spread', 'columns': ['spread']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ]
+        )
+
+        # 交易Tick表
+        self._schemas[TableType.TRADE_TICK] = TableSchema(
+            table_type=TableType.TRADE_TICK,
+            columns={
+                'symbol': 'VARCHAR NOT NULL',
+                'datetime': 'TIMESTAMP NOT NULL',
+                'price': 'DECIMAL(10,4) NOT NULL',
+                'volume': 'BIGINT NOT NULL',
+                'amount': 'DECIMAL(20,2) NOT NULL',
+                'tick_direction': 'VARCHAR',  # 'buy', 'sell', 'neutral'
+                'order_type': 'VARCHAR',      # 'market', 'limit'
+                'trade_type': 'VARCHAR',      # 'normal', 'block', 'special'
+                'buyer_order_id': 'VARCHAR',
+                'seller_order_id': 'VARCHAR',
+                'seq_number': 'BIGINT',
+                'channel': 'VARCHAR',
+                'function_code': 'VARCHAR',
+                'bid_price': 'DECIMAL(10,4)',
+                'ask_price': 'DECIMAL(10,4)',
+                'bid_volume': 'BIGINT',
+                'ask_volume': 'BIGINT',
+                'cumulative_volume': 'BIGINT',
+                'cumulative_amount': 'DECIMAL(20,2)',
+                'trade_flag': 'VARCHAR',
+                'cancel_flag': 'BOOLEAN DEFAULT FALSE',
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime', 'seq_number'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_symbol_datetime', 'columns': ['symbol', 'datetime']},
+                {'name': 'idx_price', 'columns': ['price']},
+                {'name': 'idx_volume', 'columns': ['volume']},
+                {'name': 'idx_tick_direction', 'columns': ['tick_direction']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'datetime',
+                'interval': 'DAY'
+            }
+        )
+
+        # 新闻表
+        self._schemas[TableType.NEWS] = TableSchema(
+            table_type=TableType.NEWS,
+            columns={
+                'news_id': 'VARCHAR NOT NULL',
+                'title': 'VARCHAR NOT NULL',
+                'content': 'TEXT',
+                'summary': 'TEXT',
+                'publish_time': 'TIMESTAMP NOT NULL',
+                'source': 'VARCHAR NOT NULL',
+                'author': 'VARCHAR',
+                'category': 'VARCHAR',
+                'subcategory': 'VARCHAR',
+                'tags': 'VARCHAR[]',
+                'related_symbols': 'VARCHAR[]',
+                'related_industries': 'VARCHAR[]',
+                'sentiment_score': 'DECIMAL(3,2)',    # -1.0 to 1.0
+                'impact_score': 'DECIMAL(3,2)',       # 0.0 to 1.0
+                'language': 'VARCHAR DEFAULT \'zh\'',
+                'url': 'VARCHAR',
+                'image_urls': 'VARCHAR[]',
+                'read_count': 'INTEGER DEFAULT 0',
+                'like_count': 'INTEGER DEFAULT 0',
+                'comment_count': 'INTEGER DEFAULT 0',
+                'keywords': 'VARCHAR[]',
+                'is_verified': 'BOOLEAN DEFAULT FALSE',
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['news_id'],
+            indexes=[
+                {'name': 'idx_publish_time', 'columns': ['publish_time']},
+                {'name': 'idx_source', 'columns': ['source']},
+                {'name': 'idx_category', 'columns': ['category', 'subcategory']},
+                {'name': 'idx_related_symbols', 'columns': ['related_symbols']},
+                {'name': 'idx_sentiment_score', 'columns': ['sentiment_score']},
+                {'name': 'idx_impact_score', 'columns': ['impact_score']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'publish_time',
+                'interval': 'MONTH'
+            }
+        )
+
+        # 公告表
+        self._schemas[TableType.ANNOUNCEMENT] = TableSchema(
+            table_type=TableType.ANNOUNCEMENT,
+            columns={
+                'announcement_id': 'VARCHAR NOT NULL',
+                'symbol': 'VARCHAR NOT NULL',
+                'title': 'VARCHAR NOT NULL',
+                'content': 'TEXT NOT NULL',
+                'summary': 'TEXT',
+                'announcement_type': 'VARCHAR NOT NULL',  # 业绩预告、重大事项、股权变动等
+                'importance_level': 'VARCHAR NOT NULL',   # 高、中、低
+                'publish_time': 'TIMESTAMP NOT NULL',
+                'effective_date': 'DATE',
+                'disclosure_date': 'DATE',
+                'update_time': 'TIMESTAMP',
+                'announcement_source': 'VARCHAR',         # 交易所、公司官网等
+                'filing_type': 'VARCHAR',                 # 定期报告、临时公告等
+                'related_announcements': 'VARCHAR[]',     # 相关公告ID
+                'impact_type': 'VARCHAR',                 # 利好、利空、中性
+                'impact_description': 'TEXT',
+                'keywords': 'VARCHAR[]',
+                'attachments': 'JSON',                    # 附件信息
+                'regulation_compliance': 'BOOLEAN DEFAULT TRUE',
+                'is_correction': 'BOOLEAN DEFAULT FALSE',
+                'correction_reason': 'TEXT',
+                'market_reaction_score': 'DECIMAL(3,2)',
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['announcement_id'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_publish_time', 'columns': ['publish_time']},
+                {'name': 'idx_announcement_type', 'columns': ['announcement_type']},
+                {'name': 'idx_importance_level', 'columns': ['importance_level']},
+                {'name': 'idx_symbol_publish_time', 'columns': ['symbol', 'publish_time']},
+                {'name': 'idx_impact_type', 'columns': ['impact_type']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'publish_time',
+                'interval': 'MONTH'
+            }
+        )
+
+        # 资金流表
+        self._schemas[TableType.FUND_FLOW] = TableSchema(
+            table_type=TableType.FUND_FLOW,
+            columns={
+                'symbol': 'VARCHAR NOT NULL',
+                'datetime': 'TIMESTAMP NOT NULL',
+                'period': 'VARCHAR NOT NULL',              # 'minute', 'daily'
+                'main_inflow': 'DECIMAL(20,2)',           # 主力流入
+                'main_outflow': 'DECIMAL(20,2)',          # 主力流出
+                'main_net_inflow': 'DECIMAL(20,2)',       # 主力净流入
+                'retail_inflow': 'DECIMAL(20,2)',         # 散户流入
+                'retail_outflow': 'DECIMAL(20,2)',        # 散户流出
+                'retail_net_inflow': 'DECIMAL(20,2)',     # 散户净流入
+                'large_order_inflow': 'DECIMAL(20,2)',    # 大单流入
+                'large_order_outflow': 'DECIMAL(20,2)',   # 大单流出
+                'large_order_net_inflow': 'DECIMAL(20,2)',  # 大单净流入
+                'medium_order_inflow': 'DECIMAL(20,2)',   # 中单流入
+                'medium_order_outflow': 'DECIMAL(20,2)',  # 中单流出
+                'medium_order_net_inflow': 'DECIMAL(20,2)',  # 中单净流入
+                'small_order_inflow': 'DECIMAL(20,2)',    # 小单流入
+                'small_order_outflow': 'DECIMAL(20,2)',   # 小单流出
+                'small_order_net_inflow': 'DECIMAL(20,2)',  # 小单净流入
+                'super_large_inflow': 'DECIMAL(20,2)',    # 超大单流入
+                'super_large_outflow': 'DECIMAL(20,2)',   # 超大单流出
+                'super_large_net_inflow': 'DECIMAL(20,2)',  # 超大单净流入
+                'total_inflow': 'DECIMAL(20,2)',          # 总流入
+                'total_outflow': 'DECIMAL(20,2)',         # 总流出
+                'net_inflow': 'DECIMAL(20,2)',            # 净流入
+                'inflow_ratio': 'DECIMAL(5,2)',           # 流入占比
+                'main_participation_ratio': 'DECIMAL(5,2)',  # 主力参与度
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime', 'period'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_period', 'columns': ['period']},
+                {'name': 'idx_symbol_datetime', 'columns': ['symbol', 'datetime']},
+                {'name': 'idx_main_net_inflow', 'columns': ['main_net_inflow']},
+                {'name': 'idx_net_inflow', 'columns': ['net_inflow']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'datetime',
+                'interval': 'MONTH'
+            }
+        )
+
+        # 技术指标表
+        self._schemas[TableType.TECHNICAL_INDICATOR] = TableSchema(
+            table_type=TableType.TECHNICAL_INDICATOR,
+            columns={
+                'symbol': 'VARCHAR NOT NULL',
+                'datetime': 'TIMESTAMP NOT NULL',
+                'period': 'VARCHAR NOT NULL',              # 'minute', 'daily', 'weekly'
+                'indicator_name': 'VARCHAR NOT NULL',       # MA, RSI, MACD, KDJ等
+                'indicator_params': 'JSON',                # 指标参数配置
+                'value_1': 'DECIMAL(15,6)',               # 主要值（如MA值、RSI值）
+                'value_2': 'DECIMAL(15,6)',               # 辅助值（如MACD的DIF）
+                'value_3': 'DECIMAL(15,6)',               # 辅助值（如MACD的DEA）
+                'value_4': 'DECIMAL(15,6)',               # 辅助值（如MACD的柱状图）
+                'value_5': 'DECIMAL(15,6)',               # 辅助值（预留）
+                'signal': 'VARCHAR',                       # 信号类型：买入、卖出、持有
+                'signal_strength': 'DECIMAL(3,2)',        # 信号强度 0-1
+                'calculation_method': 'VARCHAR',           # 计算方法
+                'data_window_size': 'INTEGER',             # 计算窗口大小
+                'is_divergence': 'BOOLEAN DEFAULT FALSE',  # 是否存在背离
+                'divergence_type': 'VARCHAR',              # 背离类型
+                'trend_direction': 'VARCHAR',              # 趋势方向：上升、下降、横盘
+                'support_level': 'DECIMAL(10,4)',         # 支撑位
+                'resistance_level': 'DECIMAL(10,4)',      # 阻力位
+                'confidence_level': 'DECIMAL(3,2)',       # 可信度
+                'calculation_timestamp': 'TIMESTAMP',      # 计算时间戳
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime', 'period', 'indicator_name'],
+            indexes=[
+                {'name': 'idx_symbol', 'columns': ['symbol']},
+                {'name': 'idx_datetime', 'columns': ['datetime']},
+                {'name': 'idx_indicator_name', 'columns': ['indicator_name']},
+                {'name': 'idx_period', 'columns': ['period']},
+                {'name': 'idx_symbol_indicator', 'columns': ['symbol', 'indicator_name']},
+                {'name': 'idx_signal', 'columns': ['signal']},
+                {'name': 'idx_signal_strength', 'columns': ['signal_strength']},
+                {'name': 'idx_data_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'datetime',
+                'interval': 'MONTH'
+            }
+        )
+
+        # 其余重要表类型的简化定义（优化版本）
+        # 风险指标表
+        self._schemas[TableType.RISK_METRICS] = TableSchema(
+            table_type=TableType.RISK_METRICS,
+            columns={
+                'symbol': 'VARCHAR NOT NULL', 'datetime': 'TIMESTAMP NOT NULL',
+                'var_1d': 'DECIMAL(10,6)', 'var_5d': 'DECIMAL(10,6)', 'cvar': 'DECIMAL(10,6)',
+                'beta': 'DECIMAL(10,6)', 'alpha': 'DECIMAL(10,6)', 'sharpe_ratio': 'DECIMAL(10,6)',
+                'volatility': 'DECIMAL(10,6)', 'max_drawdown': 'DECIMAL(10,6)',
+                'correlation_matrix': 'JSON', 'risk_factors': 'JSON',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime'],
+            indexes=[{'name': 'idx_var_1d', 'columns': ['var_1d']}, {'name': 'idx_beta', 'columns': ['beta']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        # 指数数据表
+        self._schemas[TableType.INDEX_DATA] = TableSchema(
+            table_type=TableType.INDEX_DATA,
+            columns={
+                'symbol': 'VARCHAR NOT NULL', 'datetime': 'TIMESTAMP NOT NULL',
+                'index_value': 'DECIMAL(15,4) NOT NULL', 'change': 'DECIMAL(10,4)', 'change_percent': 'DECIMAL(10,4)',
+                'constituents': 'JSON', 'weights': 'JSON', 'divisor': 'DECIMAL(20,6)',
+                'market_cap': 'DECIMAL(25,2)', 'free_float_cap': 'DECIMAL(25,2)',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol', 'datetime'],
+            indexes=[{'name': 'idx_index_value', 'columns': ['index_value']}, {'name': 'idx_change_percent', 'columns': ['change_percent']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        # 事件数据表
+        self._schemas[TableType.EVENT_DATA] = TableSchema(
+            table_type=TableType.EVENT_DATA,
+            columns={
+                'symbol': 'VARCHAR NOT NULL', 'event_id': 'VARCHAR NOT NULL', 'event_type': 'VARCHAR NOT NULL',
+                'ex_date': 'DATE', 'record_date': 'DATE', 'announcement_date': 'DATE',
+                'amount': 'DECIMAL(10,4)', 'ratio': 'DECIMAL(10,6)', 'description': 'TEXT',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['event_id'],
+            indexes=[{'name': 'idx_symbol', 'columns': ['symbol']}, {'name': 'idx_event_type', 'columns': ['event_type']}, {'name': 'idx_ex_date', 'columns': ['ex_date']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        # 资产列表表
+        self._schemas[TableType.ASSET_LIST] = TableSchema(
+            table_type=TableType.ASSET_LIST,
+            columns={
+                'symbol': 'VARCHAR NOT NULL', 'name': 'VARCHAR NOT NULL', 'asset_type': 'VARCHAR NOT NULL',
+                'exchange': 'VARCHAR', 'listing_status': 'VARCHAR', 'sector': 'VARCHAR', 'industry': 'VARCHAR',
+                'currency': 'VARCHAR', 'country': 'VARCHAR', 'listing_date': 'DATE', 'delisting_date': 'DATE',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['symbol'],
+            indexes=[{'name': 'idx_asset_type', 'columns': ['asset_type']}, {'name': 'idx_exchange', 'columns': ['exchange']}, {'name': 'idx_sector', 'columns': ['sector']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        # 板块数据表
+        self._schemas[TableType.SECTOR_DATA] = TableSchema(
+            table_type=TableType.SECTOR_DATA,
+            columns={
+                'sector_code': 'VARCHAR NOT NULL', 'datetime': 'TIMESTAMP NOT NULL',
+                'sector_name': 'VARCHAR NOT NULL', 'constituents': 'JSON', 'weights': 'JSON',
+                'sector_value': 'DECIMAL(15,4)', 'change_percent': 'DECIMAL(10,4)',
+                'market_cap': 'DECIMAL(25,2)', 'turnover_rate': 'DECIMAL(10,4)',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['sector_code', 'datetime'],
+            indexes=[{'name': 'idx_sector_name', 'columns': ['sector_name']}, {'name': 'idx_change_percent', 'columns': ['change_percent']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        # 形态识别表
+        self._schemas[TableType.PATTERN_RECOGNITION] = TableSchema(
+            table_type=TableType.PATTERN_RECOGNITION,
+            columns={
+                'symbol': 'VARCHAR NOT NULL', 'pattern_id': 'VARCHAR NOT NULL', 'datetime': 'TIMESTAMP NOT NULL',
+                'pattern_type': 'VARCHAR NOT NULL', 'pattern_score': 'DECIMAL(5,4)', 'confidence': 'DECIMAL(5,4)',
+                'start_date': 'DATE', 'end_date': 'DATE', 'target_price': 'DECIMAL(10,4)',
+                'success_rate': 'DECIMAL(5,4)', 'description': 'TEXT',
+                'plugin_specific_data': 'JSON', 'data_source': 'VARCHAR NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'data_quality_score': 'DECIMAL(3,2)'
+            },
+            primary_key=['pattern_id'],
+            indexes=[{'name': 'idx_symbol', 'columns': ['symbol']}, {'name': 'idx_pattern_type', 'columns': ['pattern_type']}, {'name': 'idx_pattern_score', 'columns': ['pattern_score']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
+        )
+
+        logger.info("默认表结构初始化完成 - 已加载17种完整表结构")
 
     def get_schema(self, table_type: TableType) -> Optional[TableSchema]:
         """获取表结构"""
@@ -290,30 +733,80 @@ class DynamicTableManager:
         logger.info("动态表管理器初始化完成")
 
     def generate_table_name(self, table_type: TableType, plugin_name: str,
-                            period: Optional[str] = None) -> str:
+                            period: Optional[str] = None, market: Optional[str] = None,
+                            asset_type: Optional[AssetType] = None) -> str:
         """
-        生成动态表名
+        生成动态表名（使用统一表名生成器）
 
         Args:
             table_type: 表类型
             plugin_name: 插件名称
             period: 数据周期（可选）
+            market: 市场代码（可选）
+            asset_type: 资产类型（可选）
 
         Returns:
-            表名
+            标准化表名
         """
-        # 清理插件名称（移除特殊字符）
-        clean_plugin_name = re.sub(r'[^a-zA-Z0-9_]', '_', plugin_name.lower())
+        try:
+            # 将TableType转换为DataType
+            data_type_mapping = {
+                # 基础数据类型
+                TableType.KLINE_DATA: DataType.HISTORICAL_KLINE,
+                TableType.STOCK_BASIC_INFO: DataType.STOCK_BASIC_INFO,
+                TableType.FINANCIAL_STATEMENT: DataType.FINANCIAL_STATEMENT,
+                TableType.MACRO_ECONOMIC: DataType.MACRO_ECONOMIC,
+                TableType.REAL_TIME_QUOTE: DataType.REAL_TIME_QUOTE,
+                TableType.MARKET_DEPTH: DataType.MARKET_DEPTH,
+                TableType.TRADE_TICK: DataType.TRADE_TICK,
+                TableType.NEWS: DataType.NEWS,
+                TableType.ANNOUNCEMENT: DataType.ANNOUNCEMENT,
+                TableType.FUND_FLOW: DataType.FUND_FLOW,
+                TableType.TECHNICAL_INDICATOR: DataType.TECHNICAL_INDICATORS,
 
-        # 基础表名
-        base_name = f"{table_type.value}_{clean_plugin_name}"
+                # 风险管理相关
+                TableType.RISK_METRICS: DataType.RISK_METRICS,
 
-        # 如果有周期，添加到表名中
-        if period:
-            clean_period = re.sub(r'[^a-zA-Z0-9_]', '_', period.lower())
-            base_name = f"{base_name}_{clean_period}"
+                # 扩展数据类型
+                TableType.INDEX_DATA: DataType.INDEX_DATA,
+                TableType.EVENT_DATA: DataType.EVENT_DATA,
+                TableType.ASSET_LIST: DataType.ASSET_LIST,
+                TableType.SECTOR_DATA: DataType.SECTOR_DATA,
+                TableType.PATTERN_RECOGNITION: DataType.PATTERN_RECOGNITION
+            }
 
-        return base_name
+            # 获取对应的DataType
+            data_type = data_type_mapping.get(table_type)
+            if not data_type:
+                # 如果没有映射，使用表类型值创建临时DataType
+                logger.warning(f"未找到TableType {table_type} 的DataType映射，使用默认值")
+                # 创建一个临时的DataType对象
+
+                class TempDataType:
+                    def __init__(self, value):
+                        self.value = value
+                data_type = TempDataType(table_type.value)
+
+            # 使用统一表名生成器（使用SIMPLE模式，避免market=all后缀）
+            from .unified_table_name_generator import TableNamePattern
+            return UnifiedTableNameGenerator.generate(
+                data_type=data_type,
+                plugin_name=plugin_name,
+                period=period,
+                market=market,
+                asset_type=asset_type,
+                pattern=TableNamePattern.SIMPLE  # 使用SIMPLE模式：{data_type}_{plugin_name}_{period}
+            )
+
+        except Exception as e:
+            logger.error(f"使用统一表名生成器失败: {e}，回退到旧方法")
+            # 回退到旧的表名生成方法
+            clean_plugin_name = re.sub(r'[^a-zA-Z0-9_]', '_', plugin_name.lower())
+            base_name = f"{table_type.value}_{clean_plugin_name}"
+            if period:
+                clean_period = re.sub(r'[^a-zA-Z0-9_]', '_', period.lower())
+                base_name = f"{base_name}_{clean_period}"
+            return base_name
 
     def table_exists(self, database_path: str, table_name: str) -> bool:
         """
@@ -346,6 +839,38 @@ class DynamicTableManager:
         except Exception as e:
             logger.error(f"检查表存在性失败 {table_name}: {e}")
             return False
+
+    def ensure_table_exists(self, database_path: str, table_type: TableType,
+                            plugin_name: str, period: Optional[str] = None,
+                            custom_schema: Optional[TableSchema] = None) -> str:
+        """
+        确保表存在，如果不存在则创建
+
+        Args:
+            database_path: 数据库路径
+            table_type: 表类型
+            plugin_name: 插件名称
+            period: 数据周期（可选）
+            custom_schema: 自定义表结构（可选）
+
+        Returns:
+            表名（如果成功）或None（如果失败）
+        """
+        try:
+            # 生成表名
+            table_name = self.generate_table_name(table_type, plugin_name, period)
+
+            # 检查表是否已存在
+            if self.table_exists(database_path, table_name):
+                return table_name
+
+            # 表不存在，创建表
+            success = self.create_table(database_path, table_type, plugin_name, period, custom_schema)
+            return table_name if success else None
+
+        except Exception as e:
+            logger.error(f"确保表存在失败 {table_type} {plugin_name}: {e}")
+            return None
 
     def create_table(self, database_path: str, table_type: TableType,
                      plugin_name: str, period: Optional[str] = None,

@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import logging
 from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RiskAnalysis:

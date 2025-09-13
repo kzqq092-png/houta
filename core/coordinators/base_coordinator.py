@@ -1,17 +1,17 @@
+from loguru import logger
 """
 基础协调器模块
 
 定义协调器的基础接口和通用功能。
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 from ..events import EventBus, get_event_bus, BaseEvent
 from ..containers import ServiceContainer, get_service_container
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class BaseCoordinator(ABC):

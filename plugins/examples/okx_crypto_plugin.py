@@ -1,10 +1,10 @@
+from loguru import logger
 """
 OKX（欧易）交易所数字货币数据插件
 提供BTC、ETH等主流数字货币的实时和历史数据
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -35,7 +35,7 @@ class OKXCryptoPlugin(IDataSourcePlugin):
         }
         self.config = self.DEFAULT_CONFIG.copy()
         self.base_url = self.config['base_url']
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self._last_request_time = 0
         self._rate_limit_delay = float(self.config.get('rate_limit_delay', self.DEFAULT_CONFIG['rate_limit_delay']))
 

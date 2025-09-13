@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -15,8 +16,8 @@ sys.path.insert(0, str(project_root))
 
 def demo_smart_signals():
     """演示智能信号聚合"""
-    print("🚀 智能信号聚合系统演示")
-    print("=" * 60)
+    logger.info(" 智能信号聚合系统演示")
+    logger.info("=" * 60)
 
     try:
         from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QHBoxLayout
@@ -65,7 +66,7 @@ def demo_smart_signals():
                 self.timer.timeout.connect(self.generate_demo_signals)
                 self.timer.start(5000)  # 每5秒生成一次信号
 
-                print("✅ 演示窗口已创建")
+                logger.info(" 演示窗口已创建")
 
                 # 初始化一些模拟数据
                 self.generate_initial_data()
@@ -81,7 +82,7 @@ def demo_smart_signals():
                 }
 
                 self.sentiment_widget.update_sentiment_data(sentiment_data)
-                print(f"📊 初始情绪数据: 恐贪指数 {sentiment_data['fear_greed_index']:.0f}")
+                logger.info(f" 初始情绪数据: 恐贪指数 {sentiment_data['fear_greed_index']:.0f}")
 
             def generate_demo_signals(self):
                 """生成演示信号"""
@@ -121,20 +122,20 @@ def demo_smart_signals():
                     )
 
                     if alerts:
-                        print(f"🔔 生成了 {len(alerts)} 个聚合警报")
+                        logger.info(f" 生成了 {len(alerts)} 个聚合警报")
                         for alert in alerts:
-                            print(f"   📢 {alert.title}: {alert.message}")
+                            logger.info(f"    {alert.title}: {alert.message}")
 
                     # 显示检测器统计
                     total_signals = sum(len(signals) for signals in detector_signals.values())
                     if total_signals > 0:
-                        print(f"🎯 检测到 {total_signals} 个原始信号")
+                        logger.info(f" 检测到 {total_signals} 个原始信号")
                         for detector_name, signals in detector_signals.items():
                             if signals:
-                                print(f"   {detector_name}: {len(signals)} 个信号")
+                                logger.info(f"   {detector_name}: {len(signals)} 个信号")
 
                 except Exception as e:
-                    print(f"❌ 信号生成错误: {e}")
+                    logger.info(f" 信号生成错误: {e}")
 
             def generate_mock_kdata(self):
                 """生成模拟K线数据"""
@@ -217,28 +218,28 @@ def demo_smart_signals():
         demo_window = DemoWindow()
         demo_window.show()
 
-        print("\n🎭 智能信号聚合系统演示功能:")
-        print("   • 情绪数据实时更新和可视化")
-        print("   • 技术指标信号检测")
-        print("   • 情绪信号检测")
-        print("   • 基本面信号检测")
-        print("   • 成交量信号检测")
-        print("   • 多源信号智能聚合")
-        print("   • 实时智能提醒和警报")
-        print("   • 信号组合分析 (如: 技术超买 + 情绪贪婪)")
-        print("\n💡 特色功能:")
-        print("   🎯 当RSI>80且恐贪指数>85时，生成强烈卖出信号")
-        print("   🎯 当价格突破且情绪恐惧时，生成谨慎买入信号")
-        print("   🎯 基本面PE/PB估值分析")
-        print("   🎯 成交量异常和价量背离检测")
-        print("\n⏰ 每5秒自动生成新的模拟信号，观察聚合效果")
-        print("📱 点击警报卡片可查看详细信号分析")
+        logger.info("\n 智能信号聚合系统演示功能:")
+        logger.info("    情绪数据实时更新和可视化")
+        logger.info("    技术指标信号检测")
+        logger.info("    情绪信号检测")
+        logger.info("    基本面信号检测")
+        logger.info("    成交量信号检测")
+        logger.info("    多源信号智能聚合")
+        logger.info("    实时智能提醒和警报")
+        logger.info("    信号组合分析 (如: 技术超买 + 情绪贪婪)")
+        logger.info("\n 特色功能:")
+        logger.info("    当RSI>80且恐贪指数>85时，生成强烈卖出信号")
+        logger.info("    当价格突破且情绪恐惧时，生成谨慎买入信号")
+        logger.info("    基本面PE/PB估值分析")
+        logger.info("    成交量异常和价量背离检测")
+        logger.info("\n⏰ 每5秒自动生成新的模拟信号，观察聚合效果")
+        logger.info(" 点击警报卡片可查看详细信号分析")
 
         # 运行应用
         return app.exec_()
 
     except Exception as e:
-        print(f"❌ 演示失败: {e}")
+        logger.info(f" 演示失败: {e}")
         import traceback
         traceback.print_exc()
         return 1
@@ -246,5 +247,5 @@ def demo_smart_signals():
 
 if __name__ == "__main__":
     success = demo_smart_signals()
-    print(f"\n🏁 演示{'成功' if success == 0 else '失败'}!")
+    logger.info(f"\n 演示{'成功' if success == 0 else '失败'}!")
     sys.exit(success)

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 任务调度器
@@ -10,7 +11,6 @@
 - 任务历史记录
 """
 
-import logging
 import time
 import json
 from typing import Dict, Any, Optional, List, Callable, Union
@@ -21,7 +21,7 @@ from pathlib import Path
 import re
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TaskType(Enum):

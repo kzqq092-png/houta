@@ -1,3 +1,4 @@
+from loguru import logger
 """
 UI components for the trading system
 
@@ -17,7 +18,6 @@ import pandas as pd
 import psutil
 from datetime import datetime
 import traceback
-from core.logger import LogManager
 from gui.widgets.trading_widget import TradingWidget
 from utils.config_types import LoggingConfig
 from typing import Optional, Dict, Any
@@ -54,12 +54,6 @@ class BaseAnalysisPanel(QWidget):
         self.analysis_results = {}
         self.performance_metrics = {}
         self.current_strategy = None
-
-        # 初始化日志管理器
-        if hasattr(parent, 'log_manager'):
-            self.log_manager = parent.log_manager
-        else:
-            self.log_manager = LogManager()
 
         # 创建主布局
         self.main_layout = QVBoxLayout()
@@ -110,13 +104,13 @@ class BaseAnalysisPanel(QWidget):
 
     def log_info(self, message: str):
         """记录信息日志"""
-        if hasattr(self, 'log_manager'):
-            self.log_manager.info(message)
+        if True:  # 使用Loguru日志
+            logger.info(message)
 
     def log_error(self, message: str):
         """记录错误日志"""
-        if hasattr(self, 'log_manager'):
-            self.log_manager.error(message)
+        if True:  # 使用Loguru日志
+            logger.error(message)
 
     def export_results_to_csv(self, data: Dict[str, Any], filename: str = None):
         """导出结果到CSV文件"""
@@ -213,13 +207,8 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
         self.enhanced_batch_worker = None
 
         try:
-            # 初始化日志管理器
-            if hasattr(parent, 'log_manager'):
-                self.log_manager = parent.log_manager
-            else:
-                self.log_manager = LogManager()
 
-            self.log_manager.info("初始化策略回测UI组件")
+            logger.info("初始化策略回测UI组件")
             super().__init__(parent)
             # 集成TradingWidget实例（仅作分析逻辑调用，不显示UI）
             self.trading_widget = TradingWidget()
@@ -227,36 +216,36 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             try:
                 self.init_ui()
             except Exception as e:
-                self.log_manager.error(f"init_ui异常: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+                logger.error(f"init_ui异常: {str(e)}")
+                logger.error(traceback.format_exc())
             # 初始化数据
             try:
                 self.init_data()
             except Exception as e:
-                self.log_manager.error(f"init_data异常: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+                logger.error(f"init_data异常: {str(e)}")
+                logger.error(traceback.format_exc())
             # 连接信号
             try:
                 self.connect_signals()
             except Exception as e:
-                self.log_manager.error(f"connect_signals异常: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
-            self.log_manager.info("分析工具面板初始化完成")
+                logger.error(f"connect_signals异常: {str(e)}")
+                logger.error(traceback.format_exc())
+            logger.info("分析工具面板初始化完成")
             # 监听TradingWidget的analysis_progress信号
             if hasattr(self, 'trading_widget') and hasattr(self.trading_widget, 'analysis_progress'):
                 self.trading_widget.analysis_progress.connect(
                     self.on_analysis_progress)
         except Exception as e:
-            print(f"初始化UI组件失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"初始化UI组件失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            logger.info(f"初始化UI组件失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化UI组件失败: {str(e)}")
+                logger.error(traceback.format_exc())
             self.error_occurred.emit(f"初始化失败: {str(e)}")
 
     def init_ui(self):
         """初始化UI，合并所有功能区，确保所有控件都被正确初始化"""
         try:
-            self.log_manager.info("初始化策略回测区域")
+            logger.info("初始化策略回测区域")
             layout = self.main_layout  # 用父类的主布局
 
             # 策略选择区域
@@ -273,18 +262,18 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
                 if strategies:
                     for strategy in strategies:
                         self.strategy_combo.addItem(f"{strategy.name} - {strategy.description}", strategy.strategy_id)
-                    self.log_manager.info(f"从策略管理系统加载了 {len(strategies)} 个策略")
+                    logger.info(f"从策略管理系统加载了 {len(strategies)} 个策略")
                 else:
                     # 如果没有策略，添加默认选项
                     default_strategies = ["MA策略", "MACD策略", "RSI策略", "KDJ策略", "布林带策略"]
                     self.strategy_combo.addItems(default_strategies)
-                    self.log_manager.info("使用默认策略列表")
+                    logger.info("使用默认策略列表")
 
             except Exception as e:
                 # 回退到默认策略列表
                 default_strategies = ["MA策略", "MACD策略", "RSI策略", "KDJ策略", "布林带策略"]
                 self.strategy_combo.addItems(default_strategies)
-                self.log_manager.warning(f"策略管理系统加载失败，使用默认策略: {e}")
+                logger.warning(f"策略管理系统加载失败，使用默认策略: {e}")
 
             strategy_layout.addWidget(self.strategy_combo)
             strategy_group.setLayout(strategy_layout)
@@ -310,17 +299,17 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             """)
             layout.addWidget(self.analyze_btn)
 
-            self.log_manager.info("分析工具面板UI初始化完成")
+            logger.info("分析工具面板UI初始化完成")
 
         except Exception as e:
-            self.log_manager.error(f"UI初始化失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"UI初始化失败: {str(e)}")
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(f"UI初始化失败: {str(e)}")
 
     def init_data(self):
         """初始化数据"""
         try:
-            self.log_manager.info("初始化策略回测数据")
+            logger.info("初始化策略回测数据")
             # 初始化默认参数
             self.default_params = {
                 'lookback_period': 20,
@@ -333,9 +322,9 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             self.data_cache = {}
             self.performance_metrics = {}
 
-            self.log_manager.info("数据初始化完成")
+            logger.info("数据初始化完成")
         except Exception as e:
-            self.log_manager.error(f"数据初始化失败: {str(e)}")
+            logger.error(f"数据初始化失败: {str(e)}")
             self.error_occurred.emit(f"数据初始化失败: {str(e)}")
 
     def connect_signals(self):
@@ -345,22 +334,22 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             if hasattr(self, 'analyze_btn'):
                 self.analyze_btn.clicked.connect(self.on_tools_panel_analyze)
 
-            self.log_manager.info("信号连接完成")
+            logger.info("信号连接完成")
         except Exception as e:
-            self.log_manager.error(f"信号连接失败: {str(e)}")
+            logger.error(f"信号连接失败: {str(e)}")
             self.error_occurred.emit(f"信号连接失败: {str(e)}")
 
     def on_tools_panel_analyze(self):
         """分析按钮点击处理"""
         try:
-            self.log_manager.info("开始执行策略分析")
+            logger.info("开始执行策略分析")
 
             if not hasattr(self, 'strategy_combo') or not self.strategy_combo:
                 self.error_occurred.emit("策略选择器未初始化")
                 return
 
             current_strategy = self.strategy_combo.currentText()
-            self.log_manager.info(f"选择的策略: {current_strategy}")
+            logger.info(f"选择的策略: {current_strategy}")
 
             # 更新状态
             self.update_status(f"正在分析策略: {current_strategy}")
@@ -373,7 +362,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             QTimer.singleShot(3000, self.complete_analysis)
 
         except Exception as e:
-            self.log_manager.error(f"分析执行失败: {str(e)}")
+            logger.error(f"分析执行失败: {str(e)}")
             self.error_occurred.emit(f"分析失败: {str(e)}")
 
     def complete_analysis(self):
@@ -398,10 +387,10 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             # 发射完成信号
             self.analysis_completed.emit(results)
 
-            self.log_manager.info(f"分析完成: {results}")
+            logger.info(f"分析完成: {results}")
 
         except Exception as e:
-            self.log_manager.error(f"分析完成处理失败: {str(e)}")
+            logger.error(f"分析完成处理失败: {str(e)}")
             self.error_occurred.emit(f"分析完成失败: {str(e)}")
 
     def on_analysis_progress(self, message: str):
@@ -410,7 +399,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             self.update_status(message)
             self.analysis_progress.emit(message)
         except Exception as e:
-            self.log_manager.error(f"进度更新失败: {str(e)}")
+            logger.error(f"进度更新失败: {str(e)}")
 
     def get_analysis_results(self):
         """获取分析结果"""
@@ -427,7 +416,7 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             return self.export_results_to_csv(self.performance_metrics, filename)
 
         except Exception as e:
-            self.log_manager.error(f"导出分析结果失败: {str(e)}")
+            logger.error(f"导出分析结果失败: {str(e)}")
             self.update_status(f"导出失败: {str(e)}", error=True)
             return False
 
@@ -439,9 +428,9 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             self.show_progress(False)
             self.set_progress(0)
             self.update_status("准备就绪")
-            self.log_manager.info("分析状态已重置")
+            logger.info("分析状态已重置")
         except Exception as e:
-            self.log_manager.error(f"重置分析状态失败: {str(e)}")
+            logger.error(f"重置分析状态失败: {str(e)}")
 
     def cleanup_enhanced_batch_analysis(self):
         """清理增强批量分析资源"""
@@ -457,9 +446,9 @@ class AnalysisToolsPanel(BaseAnalysisPanel, EnhancedBatchAnalysisMixin):
             if hasattr(self, 'enhanced_batch_analysis_config'):
                 self.enhanced_batch_analysis_config.clear()
 
-            self.log_manager.info("增强批量分析资源清理完成")
+            logger.info("增强批量分析资源清理完成")
         except Exception as e:
-            self.log_manager.error(f"增强批量分析资源清理失败: {str(e)}")
+            logger.error(f"增强批量分析资源清理失败: {str(e)}")
 
     def __del__(self):
         """析构函数"""

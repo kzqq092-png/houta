@@ -1,10 +1,10 @@
+from loguru import logger
 """
 Wind万得数据终端插件
 专业的金融数据提供商，提供股票、债券、期货、宏观经济等数据
 """
 
 import json
-import logging
 import time
 import pandas as pd
 from datetime import datetime, timedelta
@@ -19,6 +19,7 @@ class WindDataPlugin(IDataSourcePlugin):
     """Wind万得数据源插件"""
 
     def __init__(self):
+        self.plugin_id = "examples.wind_data_plugin"  # 添加plugin_id属性
         self.name = "Wind数据终端数据源"
         self.version = "1.0.0"
         self.description = "Wind万得金融数据终端"
@@ -28,7 +29,7 @@ class WindDataPlugin(IDataSourcePlugin):
             AssetType.FUND, AssetType.INDEX, AssetType.COMMODITY
         ]
         self.initialized = False  # 添加初始化状态
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # Wind API配置
         self.wind_config = {

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Menu bar for the trading system
 
@@ -12,7 +13,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
 import traceback
 from utils.theme import get_theme_manager
-from utils.log_util import log_structured
+# log_structured已替换为直接的logger调用
 
 
 class MainMenuBar(QMenuBar):
@@ -30,30 +31,19 @@ class MainMenuBar(QMenuBar):
 
             # 保存coordinator引用
             self.coordinator = coordinator
-
-            # 初始化日志管理器
-            if hasattr(parent, 'log_manager'):
-                self.log_manager = parent.log_manager
-            elif coordinator and hasattr(coordinator, 'log_manager'):
-                self.log_manager = coordinator.log_manager
-            else:
-                from core.logger import LogManager
-                self.log_manager = LogManager()
-
             # 初始化主题管理器
             self.theme_manager = get_theme_manager()
 
             # 初始化UI
             self.init_ui()
 
-            log_structured(self.log_manager, "menu_bar_init",
-                           level="info", status="success")
+            logger.info("menu_bar_init", status="success")
 
         except Exception as e:
-            print(f"初始化菜单栏失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"初始化菜单栏失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            logger.info(f"初始化菜单栏失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化菜单栏失败: {str(e)}")
+                logger.error(traceback.format_exc())
 
     def init_ui(self):
         """初始化菜单栏"""
@@ -124,8 +114,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化文件菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化文件菜单失败: {str(e)}")
 
     def init_edit_menu(self):
         """初始化编辑菜单"""
@@ -155,8 +145,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化编辑菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化编辑菜单失败: {str(e)}")
 
     def init_view_menu(self):
         """初始化视图菜单"""
@@ -172,6 +162,15 @@ class MainMenuBar(QMenuBar):
             self.statusbar_action.setCheckable(True)
             self.statusbar_action.setChecked(True)
             self.view_menu.addAction(self.statusbar_action)
+
+            self.view_menu.addSeparator()
+
+            # 专业回测面板 - 已合并到分析菜单的专业回测中
+            # self.backtest_panel_action = QAction("专业回测面板", self)
+            # self.backtest_panel_action.setCheckable(True)
+            # self.backtest_panel_action.setChecked(False)
+            # self.backtest_panel_action.setStatusTip("显示/隐藏专业回测面板")
+            # self.view_menu.addAction(self.backtest_panel_action)
 
             self.view_menu.addSeparator()
 
@@ -204,8 +203,8 @@ class MainMenuBar(QMenuBar):
                 pass
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化视图菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化视图菜单失败: {str(e)}")
 
     def init_analysis_menu(self):
         """初始化分析菜单"""
@@ -222,6 +221,13 @@ class MainMenuBar(QMenuBar):
             self.backtest_action.setStatusTip("回测当前策略")
             self.analysis_menu.addAction(self.backtest_action)
 
+            # 专业回测（合并了专业回测系统和专业回测面板）
+            self.professional_backtest_action = QAction(
+                QIcon("icons/backtest.png"), "专业回测", self)
+            self.professional_backtest_action.setStatusTip("打开专业回测功能（支持面板和窗口模式）")
+            self.professional_backtest_action.setShortcut("Ctrl+Shift+B")
+            self.analysis_menu.addAction(self.professional_backtest_action)
+
             # 优化
             self.optimize_action = QAction(
                 QIcon("icons/optimize.png"), "优化", self)
@@ -236,8 +242,8 @@ class MainMenuBar(QMenuBar):
             self.batch_analysis_action.setStatusTip("批量/分布式回测与分析")
             self.analysis_menu.addAction(self.batch_analysis_action)
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化分析菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化分析菜单失败: {str(e)}")
 
     def init_strategy_menu(self):
         """初始化策略菜单"""
@@ -267,10 +273,10 @@ class MainMenuBar(QMenuBar):
 
             self.strategy_menu.addSeparator()
 
-            # 策略回测
-            self.strategy_backtest_action = QAction("策略回测", self)
-            self.strategy_backtest_action.setStatusTip("对策略进行历史回测")
-            self.strategy_menu.addAction(self.strategy_backtest_action)
+            # 策略回测 - 已整合到分析菜单的智能回测中
+            # self.strategy_backtest_action = QAction("策略回测", self)
+            # self.strategy_backtest_action.setStatusTip("对策略进行历史回测")
+            # self.strategy_menu.addAction(self.strategy_backtest_action)
 
             # 策略优化
             self.strategy_optimize_action = QAction("策略优化", self)
@@ -288,8 +294,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化策略菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化策略菜单失败: {str(e)}")
 
     def init_data_menu(self):
         """初始化数据菜单（含数据源切换）"""
@@ -308,7 +314,7 @@ class MainMenuBar(QMenuBar):
             self.data_menu.addSeparator()
 
             # 数据导入子菜单 - 专业级DuckDB导入系统
-            self.data_import_menu = self.data_menu.addMenu("🚀 数据导入")
+            self.data_import_menu = self.data_menu.addMenu(" 数据导入")
 
             # DuckDB专业导入
             self.duckdb_import_action = QAction("DuckDB数据导入", self)
@@ -360,6 +366,14 @@ class MainMenuBar(QMenuBar):
             self.data_quality_action.setStatusTip("检查数据质量")
             self.data_menu.addAction(self.data_quality_action)
 
+            self.data_menu.addSeparator()
+
+            # 数据管理中心 (新增)
+            self.data_management_center_action = QAction("数据管理中心", self)
+            self.data_management_center_action.setStatusTip("打开数据管理中心 - 统一的数据源管理、下载任务和质量监控")
+            self.data_management_center_action.setShortcut("Ctrl+D")
+            self.data_menu.addAction(self.data_management_center_action)
+
             # 连接信号到coordinator
             if self.coordinator:
                 # DuckDB专业导入功能
@@ -378,8 +392,8 @@ class MainMenuBar(QMenuBar):
                 # 避免重复连接导致方法被调用多次
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化数据菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化数据菜单失败: {str(e)}")
 
     def init_tools_menu(self):
         """初始化工具菜单"""
@@ -410,24 +424,24 @@ class MainMenuBar(QMenuBar):
             self.tools_menu.addSeparator()
 
             # 插件管理子菜单
-            self.plugin_menu = self.tools_menu.addMenu("🔌 插件管理")
+            self.plugin_menu = self.tools_menu.addMenu(" 插件管理")
 
             # 数据源插件管理
-            self.data_source_plugin_action = QAction("📋 数据源插件", self)
+            self.data_source_plugin_action = QAction(" 数据源插件", self)
             self.data_source_plugin_action.setStatusTip("管理数据源插件：配置、路由和监控")
             self.data_source_plugin_action.setShortcut("Ctrl+Shift+D")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.data_source_plugin_action)
 
             # 通用插件管理
-            self.plugin_manager_action = QAction("⚙️ 通用插件", self)
+            self.plugin_manager_action = QAction(" 通用插件", self)
             self.plugin_manager_action.setStatusTip("管理所有插件：启用、配置和监控")
             self.plugin_manager_action.setShortcut("Ctrl+Shift+P")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.plugin_manager_action)
 
             # 情绪数据插件
-            self.sentiment_plugin_action = QAction("📊 情绪数据插件", self)
+            self.sentiment_plugin_action = QAction(" 情绪数据插件", self)
             self.sentiment_plugin_action.setStatusTip("管理情绪分析数据源插件")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.sentiment_plugin_action)
@@ -435,7 +449,7 @@ class MainMenuBar(QMenuBar):
             self.plugin_menu.addSeparator()
 
             # 插件市场
-            self.plugin_market_action = QAction("🛒 插件市场", self)
+            self.plugin_market_action = QAction(" 插件市场", self)
             self.plugin_market_action.setStatusTip("浏览和安装新插件")
             # 注意：信号连接将在connect_signals方法中统一处理
             self.plugin_menu.addAction(self.plugin_market_action)
@@ -474,8 +488,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化工具菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化工具菜单失败: {str(e)}")
 
     def init_performance_menu(self):
         """初始化性能监控菜单"""
@@ -527,8 +541,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接将在connect_signals方法中统一处理
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化性能监控菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化性能监控菜单失败: {str(e)}")
 
     def init_advanced_menu(self):
         """初始化高级功能菜单"""
@@ -546,7 +560,7 @@ class MainMenuBar(QMenuBar):
             self.advanced_menu.addAction(self.batch_analysis_action)
 
             # GPU加速配置
-            self.gpu_config_action = QAction("⚡ GPU加速配置", self)
+            self.gpu_config_action = QAction(" GPU加速配置", self)
             self.gpu_config_action.setStatusTip("配置GPU加速设置")
             self.advanced_menu.addAction(self.gpu_config_action)
 
@@ -594,8 +608,8 @@ class MainMenuBar(QMenuBar):
             # 注意：优化系统菜单的信号连接已在connect_signals方法中统一处理
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化高级功能菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化高级功能菜单失败: {str(e)}")
 
     def init_debug_menu(self):
         """初始化调试菜单，添加显示/隐藏日志菜单项"""
@@ -605,8 +619,8 @@ class MainMenuBar(QMenuBar):
             # 信号连接已移至统一的信号连接处理中，避免重复连接
             self.debug_menu.addAction(self.toggle_log_action)
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化调试菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化调试菜单失败: {str(e)}")
 
     def init_help_menu(self):
         """初始化帮助菜单"""
@@ -657,8 +671,8 @@ class MainMenuBar(QMenuBar):
             # 注意：信号连接已在connect_signals方法中统一处理，这里不再重复连接
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"初始化帮助菜单失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化帮助菜单失败: {str(e)}")
 
     def log_message(self, message: str, level: str = "info") -> None:
         """记录日志消息，统一调用主窗口或日志管理器"""
@@ -666,24 +680,24 @@ class MainMenuBar(QMenuBar):
             parent = self.parentWidget()
             if parent and hasattr(parent, 'log_message'):
                 parent.log_message(message, level)
-            elif hasattr(self, 'log_manager'):
+            elif True:  # 使用Loguru日志
                 # 直接用log_manager
                 level = level.upper()
                 if level == "ERROR":
-                    self.log_manager.error(message)
+                    logger.error(message)
                 elif level == "WARNING":
-                    self.log_manager.warning(message)
+                    logger.warning(message)
                 elif level == "DEBUG":
-                    self.log_manager.debug(message)
+                    logger.debug(message)
                 else:
-                    self.log_manager.info(message)
+                    logger.info(message)
             else:
-                print(f"[LOG][{level}] {message}")
+                logger.info(f"[LOG][{level}] {message}")
         except Exception as e:
-            print(f"记录日志失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"记录日志失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            logger.info(f"记录日志失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"记录日志失败: {str(e)}")
+                logger.error(traceback.format_exc())
 
     def new_file(self):
         """Create a new file"""
@@ -866,8 +880,8 @@ class MainMenuBar(QMenuBar):
             show_system_optimizer_dialog(self.parent())
         except Exception as e:
             QMessageBox.critical(self.parent(), "错误", f"打开系统优化器失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"打开系统优化器失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开系统优化器失败: {str(e)}")
 
     def show_webgpu_status(self):
         """Show WebGPU status dialog"""
@@ -877,8 +891,8 @@ class MainMenuBar(QMenuBar):
             dialog.exec_()
         except Exception as e:
             QMessageBox.critical(self.parent(), "错误", f"打开WebGPU状态对话框失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"打开WebGPU状态对话框失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开WebGPU状态对话框失败: {str(e)}")
 
     def show_documentation(self):
         """Show documentation"""
@@ -953,6 +967,7 @@ class MainMenuBar(QMenuBar):
                 # 视图菜单
                 ('toolbar_action', '_on_toggle_toolbar'),
                 ('statusbar_action', '_on_toggle_statusbar'),
+                # ('backtest_panel_action', '_on_toggle_backtest_panel'),  # 已合并到专业回测
                 ('refresh_action', '_on_refresh'),
 
                 # 主题相关
@@ -963,6 +978,7 @@ class MainMenuBar(QMenuBar):
                 # 分析相关
                 ('analyze_action', '_on_analyze'),
                 ('backtest_action', '_on_backtest'),
+                ('professional_backtest_action', '_on_professional_backtest'),
                 ('optimize_action', '_on_optimize'),
                 ('batch_analysis_action', '_on_batch_analysis'),
 
@@ -971,7 +987,7 @@ class MainMenuBar(QMenuBar):
                 ('create_strategy_action', '_on_create_strategy'),
                 ('import_strategy_action', '_on_import_strategy'),
                 ('export_strategy_action', '_on_export_strategy'),
-                ('strategy_backtest_action', '_on_strategy_backtest'),
+                # ('strategy_backtest_action', '_on_strategy_backtest'),  # 已整合到智能回测
                 ('strategy_optimize_action', '_on_strategy_optimize'),
                 ('trading_monitor_action', '_on_trading_monitor'),
 
@@ -980,6 +996,7 @@ class MainMenuBar(QMenuBar):
                 ('export_data_action', '_on_export_data'),
                 ('database_admin_action', '_on_database_admin'),
                 ('data_quality_action', '_on_data_quality_check'),
+                ('data_management_center_action', '_on_data_management_center'),
 
                 # 工具相关
                 ('calculator_action', '_on_calculator'),
@@ -1037,10 +1054,10 @@ class MainMenuBar(QMenuBar):
                         action.triggered.connect(lambda: None)
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"连接菜单信号失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"连接菜单信号失败: {str(e)}")
             else:
-                print(f"连接菜单信号失败: {str(e)}")
+                logger.info(f"连接菜单信号失败: {str(e)}")
 
     # ==================== 插件管理方法 ====================
 
@@ -1061,8 +1078,8 @@ class MainMenuBar(QMenuBar):
                 "错误",
                 f"打开数据源插件管理器失败:\n{str(e)}"
             )
-            if self.log_manager:
-                self.log_manager.error(f"打开数据源插件管理器失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开数据源插件管理器失败: {str(e)}")
 
     def show_plugin_manager(self):
         """显示通用插件管理器"""
@@ -1081,8 +1098,8 @@ class MainMenuBar(QMenuBar):
                 "错误",
                 f"打开插件管理器失败:\n{str(e)}"
             )
-            if self.log_manager:
-                self.log_manager.error(f"打开插件管理器失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开插件管理器失败: {str(e)}")
 
     def show_sentiment_plugin_manager(self):
         """显示情绪数据插件管理器"""
@@ -1101,8 +1118,8 @@ class MainMenuBar(QMenuBar):
                 "错误",
                 f"打开情绪数据插件管理器失败:\n{str(e)}"
             )
-            if self.log_manager:
-                self.log_manager.error(f"打开情绪数据插件管理器失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开情绪数据插件管理器失败: {str(e)}")
 
     def show_plugin_market(self):
         """显示插件市场"""
@@ -1121,8 +1138,8 @@ class MainMenuBar(QMenuBar):
                 "错误",
                 f"打开插件市场失败:\n{str(e)}"
             )
-            if self.log_manager:
-                self.log_manager.error(f"打开插件市场失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"打开插件市场失败: {str(e)}")
 
     def _create_plugin_dialog(self, target_tab=None):
         """创建插件对话框的通用方法"""
@@ -1143,14 +1160,14 @@ class MainMenuBar(QMenuBar):
                     try:
                         plugin_manager = container.resolve(PluginManager)
                     except Exception as e:
-                        print(f"⚠️ 获取插件管理器失败: {e}")
+                        logger.info(f" 获取插件管理器失败: {e}")
 
                 # 获取情绪数据服务
                 if container.is_registered(SentimentDataService):
                     try:
                         sentiment_service = container.resolve(SentimentDataService)
                     except Exception as e:
-                        print(f"⚠️ 获取情绪数据服务失败: {e}")
+                        logger.info(f" 获取情绪数据服务失败: {e}")
 
             # 创建增强版插件管理器对话框
             dialog = EnhancedPluginManagerDialog(
@@ -1170,5 +1187,5 @@ class MainMenuBar(QMenuBar):
             dialog.exec_()
 
         except Exception as e:
-            print(f"❌ 创建插件对话框失败: {e}")
+            logger.info(f" 创建插件对话框失败: {e}")
             raise

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 导出功能Mixin - 处理图表导出、数据导出和剪贴板操作
 """
@@ -7,7 +8,6 @@ import json
 import pandas as pd
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication
 from PyQt5.QtGui import QPixmap
-
 
 class ExportMixin:
     """导出功能Mixin类 - 负责图表导出、数据导出和剪贴板操作"""
@@ -19,11 +19,9 @@ class ExportMixin:
                 self, "保存图表", "", "PNG Files (*.png);;JPEG Files (*.jpg);;PDF Files (*.pdf)")
             if file_path:
                 self.figure.savefig(file_path)
-                if self.log_manager:
-                    self.log_manager.info(f"图表已保存到: {file_path}")
+                logger.info(f"图表已保存到: {file_path}")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"保存图表失败: {str(e)}")
+            logger.error(f"保存图表失败: {str(e)}")
 
     def export_kline_and_indicators(self):
         """导出K线和指标数据"""
@@ -38,11 +36,9 @@ class ExportMixin:
                 self, "导出K线/指标数据", "", "CSV Files (*.csv)")
             if file_path:
                 df.to_csv(file_path, index=False, encoding='utf-8-sig')
-                if self.log_manager:
-                    self.log_manager.info(f"K线/指标数据已导出到: {file_path}")
+                logger.info(f"K线/指标数据已导出到: {file_path}")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出K线/指标数据失败: {str(e)}")
+            logger.error(f"导出K线/指标数据失败: {str(e)}")
 
     def copy_chart_to_clipboard(self):
         """复制图表到剪贴板"""
@@ -53,11 +49,9 @@ class ExportMixin:
             pixmap = QPixmap()
             pixmap.loadFromData(buf.read(), 'PNG')
             QApplication.clipboard().setPixmap(pixmap)
-            if self.log_manager:
-                self.log_manager.info("图表已复制到剪贴板")
+            logger.info("图表已复制到剪贴板")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"复制图表到剪贴板失败: {str(e)}")
+            logger.error(f"复制图表到剪贴板失败: {str(e)}")
 
     def trigger_stat_dialog(self):
         """触发统计对话框 - 统计当前缩放区间或鼠标选区"""
@@ -71,8 +65,7 @@ class ExportMixin:
             end_idx = int(min(len(self.current_kdata)-1, round(xlim[1])))
             self.request_stat_dialog.emit((start_idx, end_idx))
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"区间统计失败: {str(e)}")
+            logger.error(f"区间统计失败: {str(e)}")
 
     def export_chart_data(self, format_type: str = "csv") -> bool:
         """导出图表数据
@@ -127,14 +120,12 @@ class ExportMixin:
                 return False
 
             if file_path:
-                if self.log_manager:
-                    self.log_manager.info(f"数据已导出到: {file_path}")
+                logger.info(f"数据已导出到: {file_path}")
                 return True
             return False
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出数据失败: {str(e)}")
+            logger.error(f"导出数据失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
             return False
 
@@ -163,13 +154,11 @@ class ExportMixin:
                 signals_df.to_json(
                     file_path, orient='records', date_format='iso')
 
-            if self.log_manager:
-                self.log_manager.info(f"信号数据已导出到: {file_path}")
+            logger.info(f"信号数据已导出到: {file_path}")
             return True
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出信号数据失败: {str(e)}")
+            logger.error(f"导出信号数据失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"导出信号数据失败: {str(e)}")
             return False
 
@@ -212,13 +201,11 @@ class ExportMixin:
                 patterns_df.to_json(
                     file_path, orient='records', date_format='iso')
 
-            if self.log_manager:
-                self.log_manager.info(f"形态数据已导出到: {file_path}")
+            logger.info(f"形态数据已导出到: {file_path}")
             return True
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出形态数据失败: {str(e)}")
+            logger.error(f"导出形态数据失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"导出形态数据失败: {str(e)}")
             return False
 
@@ -249,13 +236,11 @@ class ExportMixin:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(template_data, f, indent=2, ensure_ascii=False)
 
-            if self.log_manager:
-                self.log_manager.info(f"图表模板已保存到: {file_path}")
+            logger.info(f"图表模板已保存到: {file_path}")
             return True
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"保存图表模板失败: {str(e)}")
+            logger.error(f"保存图表模板失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"保存模板失败: {str(e)}")
             return False
 
@@ -295,13 +280,11 @@ class ExportMixin:
             if hasattr(self, 'current_kdata') and self.current_kdata is not None:
                 self.update_chart({'kdata': self.current_kdata})
 
-            if self.log_manager:
-                self.log_manager.info(f"图表模板已加载: {file_path}")
+            logger.info(f"图表模板已加载: {file_path}")
             return True
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"加载图表模板失败: {str(e)}")
+            logger.error(f"加载图表模板失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"加载模板失败: {str(e)}")
             return False
 
@@ -330,13 +313,11 @@ class ExportMixin:
             elif file_path.endswith('.pdf'):
                 self._export_pdf_report(file_path, report_data)
 
-            if self.log_manager:
-                self.log_manager.info(f"分析报告已导出到: {file_path}")
+            logger.info(f"分析报告已导出到: {file_path}")
             return True
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出分析报告失败: {str(e)}")
+            logger.error(f"导出分析报告失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"导出报告失败: {str(e)}")
             return False
 
@@ -375,8 +356,7 @@ class ExportMixin:
             return report_data
 
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"生成报告数据失败: {str(e)}")
+            logger.error(f"生成报告数据失败: {str(e)}")
             return {}
 
     def _export_html_report(self, file_path: str, report_data: dict):

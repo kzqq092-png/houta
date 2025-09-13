@@ -1,3 +1,4 @@
+from loguru import logger
 """
 技术分析标签页 - 增强版
 """
@@ -18,10 +19,8 @@ from core.indicator_adapter import (
     get_talib_indicator_list, get_talib_chinese_name, get_indicator_category_by_name
 )
 from core.unified_indicator_service import UnifiedIndicatorService
-from core.logger import LogLevel
 from datetime import datetime
 import json
-
 
 class TechnicalAnalysisTab(BaseAnalysisTab):
     """技术分析标签页 - 增强版"""
@@ -243,7 +242,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         filter_layout.setSpacing(4)
 
         # 高级筛选按钮
-        self.advanced_filter_btn = QPushButton("🔍 筛选")
+        self.advanced_filter_btn = QPushButton(" 筛选")
         self.advanced_filter_btn.setMaximumHeight(28)
         self.advanced_filter_btn.setStyleSheet("""
             QPushButton {
@@ -259,7 +258,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         self.advanced_filter_btn.clicked.connect(self.show_advanced_filter_dialog)
 
         # 清除筛选按钮
-        self.clear_filter_btn = QPushButton("✖️ 清除")
+        self.clear_filter_btn = QPushButton(" 清除")
         self.clear_filter_btn.setMaximumHeight(28)
         self.clear_filter_btn.setStyleSheet("""
             QPushButton {
@@ -369,9 +368,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             indicators.append(pattern_name)
 
                     indicators.sort()
-                    self.log_manager.info(f"加载所有指标和形态，共 {len(indicators)} 个")
+                    logger.info(f"加载所有指标和形态，共 {len(indicators)} 个")
                 except Exception as e:
-                    self.log_manager.error(f"获取所有指标失败: {e}")
+                    logger.error(f"获取所有指标失败: {e}")
                     indicators = ["MA", "MACD", "RSI", "KDJ", "BOLL"]
             elif category == "形态识别" or "形态" in category:
                 # 专门获取形态数据
@@ -384,14 +383,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             indicators.append(pattern_name)
 
                     indicators.sort()
-                    self.log_manager.info(f"加载形态数据，共 {len(indicators)} 个形态")
+                    logger.info(f"加载形态数据，共 {len(indicators)} 个形态")
 
                     if not indicators:
                         # 如果没有形态数据，添加一些默认形态提示
                         indicators = ["锤头线", "十字星", "吞没形态", "三白兵"]
-                        self.log_manager.warning("数据库中没有形态数据，使用默认形态列表")
+                        logger.warning("数据库中没有形态数据，使用默认形态列表")
                 except Exception as e:
-                    self.log_manager.error(f"获取形态数据失败: {e}")
+                    logger.error(f"获取形态数据失败: {e}")
                     indicators = ["锤头线", "十字星", "吞没形态"]
             else:
                 # 获取特定分类的技术指标
@@ -412,11 +411,11 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                                 if pattern_name:
                                     indicators.append(pattern_name)
                         except Exception as e:
-                            self.log_manager.error(f"获取分类 {category} 的形态数据失败: {e}")
+                            logger.error(f"获取分类 {category} 的形态数据失败: {e}")
 
-                    self.log_manager.info(f"加载分类 {category} 的指标，共 {len(indicators)} 个")
+                    logger.info(f"加载分类 {category} 的指标，共 {len(indicators)} 个")
                 except Exception as e:
-                    self.log_manager.error(f"获取分类指标失败: {e}")
+                    logger.error(f"获取分类指标失败: {e}")
                     indicators = []
 
             # 添加指标到组合框
@@ -424,10 +423,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.indicator_combo.addItems(indicators)
                 self.indicator_combo.setCurrentIndex(0)
             else:
-                self.log_manager.warning(f"分类 {category} 没有可用的指标")
+                logger.warning(f"分类 {category} 没有可用的指标")
 
         except Exception as e:
-            self.log_manager.error(f"填充指标列表失败: {str(e)}")
+            logger.error(f"填充指标列表失败: {str(e)}")
             # 添加一些基本指标作为备选
             self.indicator_combo.addItems(["MA", "MACD", "RSI", "KDJ", "BOLL"])
 
@@ -480,7 +479,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'parent_widget') and self.parent_widget:
                 self.parent_widget.indicator_changed.emit(indicator_name)
         except Exception as e:
-            self.log_manager.error(f"指标变更处理失败: {e}")
+            logger.error(f"指标变更处理失败: {e}")
 
     def update_parameter_interface(self, indicator_name: str = None):
         """更新参数设置界面 - 紧凑专业版，带参数信息显示"""
@@ -501,7 +500,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.param_info_label.setText("请选择一个指标查看参数设置")
             return
 
-        self.log_manager.info(f"更新参数界面: {indicator_name}")
+        logger.info(f"更新参数界面: {indicator_name}")
 
         try:
             # 检查是否是形态指标 - 通过数据库查询判断
@@ -518,7 +517,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             config = get_indicator_params_config(english_name)
 
             if not config or not config.get("params"):
-                self.log_manager.warning(f"指标 {indicator_name} 无参数配置")
+                logger.warning(f"指标 {indicator_name} 无参数配置")
                 if hasattr(self, 'param_info_label'):
                     self.param_info_label.setText(f"指标 {indicator_name} 无需设置参数")
                 return
@@ -531,7 +530,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if hasattr(self, 'param_info_label'):
                 self.param_info_label.setText(info_text)
 
-            self.log_manager.info(f"指标 {indicator_name} 参数配置: {list(config['params'].keys())}")
+            logger.info(f"指标 {indicator_name} 参数配置: {list(config['params'].keys())}")
 
             # 创建参数控件 - 紧凑布局
             for param_name, param_config in config["params"].items():
@@ -594,10 +593,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 # 添加到布局
                 self.dynamic_params_layout.addWidget(param_widget)
 
-            self.log_manager.info(f"已创建 {len(self.param_controls)} 个参数控件")
+            logger.info(f"已创建 {len(self.param_controls)} 个参数控件")
 
         except Exception as e:
-            self.log_manager.error(f"更新参数界面失败: {str(e)}")
+            logger.error(f"更新参数界面失败: {str(e)}")
             if hasattr(self, 'param_info_label'):
                 self.param_info_label.setText(f"参数界面更新失败: {str(e)}")
 
@@ -669,7 +668,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self._add_default_pattern_params()
 
         except Exception as e:
-            self.log_manager.error(f"设置形态参数失败: {str(e)}")
+            logger.error(f"设置形态参数失败: {str(e)}")
             if hasattr(self, 'param_info_label'):
                 self.param_info_label.setText(f"形态参数设置失败: {str(e)}")
 
@@ -769,14 +768,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                                     except ValueError:
                                         params[talib_param_name] = text_value
                     except Exception as e:
-                        self.log_manager.warning(f"处理参数 {param_name} 时出错: {e}")
+                        logger.warning(f"处理参数 {param_name} 时出错: {e}")
                         continue
 
-            self.log_manager.info(f"获取到参数: {params}")
+            logger.info(f"获取到参数: {params}")
             return params
 
         except Exception as e:
-            self.log_manager.error(f"获取参数时出错: {str(e)}")
+            logger.error(f"获取参数时出错: {str(e)}")
             return {}
 
     def _convert_to_talib_param_name(self, param_name: str) -> str:
@@ -1073,10 +1072,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 填充表格
             self.update_indicators_table()
 
-            self.log_manager.info(f"成功加载 {len(all_indicators_data)} 个技术指标和 {len(all_patterns_data)} 个形态")
+            logger.info(f"成功加载 {len(all_indicators_data)} 个技术指标和 {len(all_patterns_data)} 个形态")
 
         except Exception as e:
-            self.log_manager.error(f"填充指标表格失败: {str(e)}")
+            logger.error(f"填充指标表格失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"填充指标表格失败: {str(e)}")
 
             # 如果统一服务失败，回退到TA-Lib指标
@@ -1096,7 +1095,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     self.indicator_data.sort(key=lambda x: x['chinese_name'])
                     self.update_indicators_table()
             except Exception as fallback_e:
-                self.log_manager.error(f"回退到TA-Lib也失败: {str(fallback_e)}")
+                logger.error(f"回退到TA-Lib也失败: {str(fallback_e)}")
                 QMessageBox.critical(self, "错误", f"无法加载任何指标: {str(fallback_e)}")
 
     def update_indicators_table(self, filtered_data=None):
@@ -1140,7 +1139,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.update_selection_stats()
 
         except Exception as e:
-            self.log_manager.error(f"更新指标表格失败: {str(e)}")
+            logger.error(f"更新指标表格失败: {str(e)}")
 
     def filter_indicators_table(self):
         """根据分类和搜索条件筛选指标表格"""
@@ -1169,7 +1168,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.update_indicators_table(filtered_data)
 
         except Exception as e:
-            self.log_manager.error(f"筛选指标表格失败: {str(e)}")
+            logger.error(f"筛选指标表格失败: {str(e)}")
 
     def select_all_indicators_table(self, select: bool):
         """全选/清除表格中的所有指标"""
@@ -1186,7 +1185,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.update_selection_stats()
 
         except Exception as e:
-            self.log_manager.error(f"全选/清除指标失败: {str(e)}")
+            logger.error(f"全选/清除指标失败: {str(e)}")
 
     def select_common_indicators(self):
         """选择常用指标"""
@@ -1208,7 +1207,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.update_selection_stats()
 
         except Exception as e:
-            self.log_manager.error(f"选择常用指标失败: {str(e)}")
+            logger.error(f"选择常用指标失败: {str(e)}")
 
     def update_selection_stats(self):
         """更新选择统计信息"""
@@ -1225,7 +1224,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     f"已选择: {selected_count} 个指标")
 
         except Exception as e:
-            self.log_manager.error(f"更新选择统计失败: {str(e)}")
+            logger.error(f"更新选择统计失败: {str(e)}")
 
     def apply_batch_selection_table(self, dialog):
         """应用表格中的批量选择"""
@@ -1259,7 +1258,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             )
 
         except Exception as e:
-            self.log_manager.error(f"应用批量选择失败: {str(e)}")
+            logger.error(f"应用批量选择失败: {str(e)}")
             QMessageBox.critical(dialog, "错误", f"应用选择失败: {str(e)}")
 
     def select_all_indicators(self, select: bool):
@@ -1287,15 +1286,15 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         try:
             # 开始计算技术指标
 
-            self.log_manager.info("开始计算技术指标...")
+            logger.info("开始计算技术指标...")
 
             # 验证数据 - 使用继承自BaseAnalysisTab的统一验证
             if not self._validate_kdata(self.current_kdata):
-                self.log_manager.warning("无有效K线数据，无法进行技术分析")
+                logger.warning("无有效K线数据，无法进行技术分析")
                 QMessageBox.warning(self, "提示", "无有效K线数据，无法进行技术分析\n请先加载股票数据")
                 return
 
-            self.log_manager.info(f"K线数据验证通过，数据长度: {len(self.current_kdata)}")
+            logger.info(f"K线数据验证通过，数据长度: {len(self.current_kdata)}")
 
             self.show_loading("正在计算技术指标...")
             start_time = time.time()
@@ -1303,19 +1302,19 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 清空之前的结果
             self.technical_table.setRowCount(0)
             self.indicator_results.clear()
-            self.log_manager.info("已清空之前的计算结果")
+            logger.info("已清空之前的计算结果")
 
             # 确定要计算的指标
             indicators_to_calculate = []
             if self.batch_checkbox.isChecked() and self.batch_indicators:
                 indicators_to_calculate = self.batch_indicators
-                self.log_manager.info(
+                logger.info(
                     f"批量计算模式，选择了 {len(self.batch_indicators)} 个指标")
             else:
                 current_indicator = self.indicator_combo.currentText()
                 if current_indicator:
                     indicators_to_calculate = [current_indicator]
-                    self.log_manager.info(
+                    logger.info(
                         f"单个指标计算模式，选择指标: {current_indicator}")
 
             if not indicators_to_calculate:
@@ -1323,7 +1322,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 QMessageBox.warning(self, "提示", "请选择要计算的指标")
                 return
 
-            self.log_manager.info(
+            logger.info(
                 f"准备计算 {len(indicators_to_calculate)} 个指标: {indicators_to_calculate}")
 
             # 批量计算指标
@@ -1337,7 +1336,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     progress = int((i / total_indicators) * 100)
                     self.update_loading_progress(
                         f"正在计算 {indicator_name}...", progress)
-                    self.log_manager.info(
+                    logger.info(
                         f"开始计算指标 {i+1}/{total_indicators}: {indicator_name}")
 
                     # 计算单个指标
@@ -1349,21 +1348,21 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     ):
                         self.indicator_results[indicator_name] = result
                         calculated_count += 1
-                        self.log_manager.info(f"指标 {indicator_name} 计算成功")
+                        logger.info(f"指标 {indicator_name} 计算成功")
 
                         # 添加到结果表格
                         self._add_indicator_to_table(indicator_name, result)
-                        self.log_manager.info(f"指标 {indicator_name} 已添加到结果表格")
+                        logger.info(f"指标 {indicator_name} 已添加到结果表格")
                     else:
                         error_count += 1
-                        self.log_manager.warning(
+                        logger.warning(
                             f"指标 {indicator_name} 计算失败，结果为空")
 
                 except Exception as e:
                     error_count += 1
-                    self.log_manager.error(
+                    logger.error(
                         f"计算指标 {indicator_name} 时出错: {str(e)}")
-                    self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+                    logger.error(f"详细错误信息: {traceback.format_exc()}")
                     continue
 
             # 计算完成
@@ -1394,7 +1393,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 result_message += f"\n部分指标计算失败，请检查日志获取详细信息"
 
             # 记录计算完成信息
-            self.log_manager.info(result_message)
+            logger.info(result_message)
 
             if calculated_count > 0:
                 # 发送指标计算完成信号
@@ -1419,8 +1418,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         except Exception as e:
             self.hide_loading()
             error_msg = f"技术指标计算过程出错: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+            logger.error(error_msg)
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             # 使用信号发送错误，避免阻塞UI
             self.error_occurred.emit(error_msg)
 
@@ -1428,32 +1427,32 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         """计算单个指标，包含参数处理和错误处理"""
         try:
             if self.current_kdata is None or self.current_kdata.empty:
-                self.log_manager.error(f"无法计算指标 {indicator_name}: 当前K线数据为空")
+                logger.error(f"无法计算指标 {indicator_name}: 当前K线数据为空")
                 return None
 
             # 获取参数
             params = self.get_current_params()
-            self.log_manager.info(f"计算指标 {indicator_name}，参数: {params}")
+            logger.info(f"计算指标 {indicator_name}，参数: {params}")
 
             # 统一通过IndicatorService计算
             result_df = calculate_indicator(indicator_name, self.current_kdata, **params)
 
             # 处理结果 - calculate_indicator返回的是DataFrame
             if result_df is None or result_df.empty:
-                self.log_manager.warning(f"指标 {indicator_name} 计算结果为空")
+                logger.warning(f"指标 {indicator_name} 计算结果为空")
                 return None
 
             # 转换DataFrame结果为字典格式以适配显示逻辑
             processed_result = self._process_dataframe_result(indicator_name, result_df)
 
-            self.log_manager.info(f"指标 {indicator_name} 计算完成，结果列数: {len(processed_result.get('values', {}))}")
+            logger.info(f"指标 {indicator_name} 计算完成，结果列数: {len(processed_result.get('values', {}))}")
 
             return processed_result
 
         except Exception as e:
             error_msg = f"计算指标 {indicator_name} 失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+            logger.error(error_msg)
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             self.error_occurred.emit(error_msg)
             return None
 
@@ -1472,7 +1471,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             original_columns = {'open', 'high', 'low', 'close', 'volume', 'date', 'datetime'}
             new_columns = [col for col in result_df.columns if col.lower() not in original_columns]
 
-            self.log_manager.info(f"指标 {indicator_name} 新增列: {new_columns}")
+            logger.info(f"指标 {indicator_name} 新增列: {new_columns}")
 
             # 处理新增的列
             for col in new_columns:
@@ -1483,9 +1482,9 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                         valid_data = col_data.dropna()
                         if len(valid_data) > 0:
                             processed["values"][col] = col_data
-                            self.log_manager.info(f"添加列 {col}，有效数据点: {len(valid_data)}")
+                            logger.info(f"添加列 {col}，有效数据点: {len(valid_data)}")
                         else:
-                            self.log_manager.warning(f"列 {col} 无有效数据")
+                            logger.warning(f"列 {col} 无有效数据")
 
             # 如果没有找到新增列，尝试查找与指标名称相关的列
             if not processed["values"]:
@@ -1496,7 +1495,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             valid_data = col_data.dropna()
                             if len(valid_data) > 0:
                                 processed["values"][col] = col_data
-                                self.log_manager.info(f"通过名称匹配添加列 {col}")
+                                logger.info(f"通过名称匹配添加列 {col}")
 
             # 生成简单的统计摘要
             if processed["values"]:
@@ -1506,12 +1505,12 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     "calculation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
             else:
-                self.log_manager.warning(f"指标 {indicator_name} 未产生有效结果列")
+                logger.warning(f"指标 {indicator_name} 未产生有效结果列")
 
             return processed
 
         except Exception as e:
-            self.log_manager.error(f"处理DataFrame结果失败: {str(e)}")
+            logger.error(f"处理DataFrame结果失败: {str(e)}")
             return {
                 "name": indicator_name,
                 "timestamp": datetime.now(),
@@ -1556,7 +1555,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 processed["values"]["main"] = result
             else:
                 # 其他类型
-                self.log_manager.warning(f"未知的结果类型: {type(result)}")
+                logger.warning(f"未知的结果类型: {type(result)}")
                 processed["values"]["main"] = result
 
             # 生成信号分析
@@ -1569,8 +1568,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             return processed
 
         except Exception as e:
-            self.log_manager.error(f"处理指标结果时出错: {str(e)}")
-            self.log_manager.error(f"详细错误信息: {traceback.format_exc()}")
+            logger.error(f"处理指标结果时出错: {str(e)}")
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             return {"name": indicator_name, "error": str(e)}
 
     def _get_indicator_output_names(self, indicator_name: str) -> List[str]:
@@ -1765,7 +1764,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     {"type": "neutral", "strength": "weak", "reason": "无明确信号"})
 
         except Exception as e:
-            self.log_manager.error(f"生成信号时出错: {str(e)}")
+            logger.error(f"生成信号时出错: {str(e)}")
             signals.append(
                 {"type": "neutral", "strength": "weak", "reason": "信号计算错误"})
 
@@ -1788,15 +1787,15 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             "count": len(valid_data)
                         }
         except Exception as e:
-            self.log_manager.error(f"生成摘要时出错: {str(e)}")
+            logger.error(f"生成摘要时出错: {str(e)}")
 
         return summary
 
     def _add_indicator_to_table(self, indicator_name: str, result: Dict[str, Any]):
         """将指标结果添加到表格 - 修复版，确保数据正确显示"""
         try:
-            self.log_manager.info(f"开始添加指标 {indicator_name} 到表格")
-            self.log_manager.info(f"结果类型: {type(result)}, 结果键: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
+            logger.info(f"开始添加指标 {indicator_name} 到表格")
+            logger.info(f"结果类型: {type(result)}, 结果键: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
 
             # 临时禁用排序，避免添加数据时的显示问题
             sorting_enabled = self.technical_table.isSortingEnabled()
@@ -1817,7 +1816,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.technical_table.setItem(row, 6, QTableWidgetItem(""))
                 self.technical_table.setItem(
                     row, 7, QTableWidgetItem(result["error"]))
-                self.log_manager.warning(
+                logger.warning(
                     f"指标 {indicator_name} 计算错误: {result['error']}")
                 # 恢复排序设置
                 self.technical_table.setSortingEnabled(sorting_enabled)
@@ -1828,8 +1827,8 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             signals = result.get("signals", [])
             summary = result.get("summary", {})
 
-            self.log_manager.info(f"指标 {indicator_name} 的值数量: {len(values)}")
-            self.log_manager.info(f"值的键: {list(values.keys())}")
+            logger.info(f"指标 {indicator_name} 的值数量: {len(values)}")
+            logger.info(f"值的键: {list(values.keys())}")
 
             # 处理不同的结果格式
             if not values:
@@ -1843,7 +1842,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             elif isinstance(value, (int, float)) and not np.isnan(value):
                                 values[key] = value
 
-                    self.log_manager.info(f"从结果中提取的值: {list(values.keys())}")
+                    logger.info(f"从结果中提取的值: {list(values.keys())}")
 
             if not values:
                 # 仍然没有数据，添加一个提示行
@@ -1859,7 +1858,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.technical_table.setItem(row, 6, QTableWidgetItem("计算完成但无返回值"))
                 self.technical_table.setItem(row, 7, QTableWidgetItem("请检查参数设置"))
 
-                self.log_manager.warning(f"指标 {indicator_name} 计算完成但无有效数据")
+                logger.warning(f"指标 {indicator_name} 计算完成但无有效数据")
                 self.technical_table.setSortingEnabled(sorting_enabled)
                 return
 
@@ -1868,7 +1867,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
             for value_name, value_data in values.items():
-                self.log_manager.info(f"处理值 {value_name}, 数据类型: {type(value_data)}")
+                logger.info(f"处理值 {value_name}, 数据类型: {type(value_data)}")
 
                 # 提取当前值和趋势信息
                 current_value = None
@@ -1995,10 +1994,10 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                         signal_info, advice = self._generate_signal_advice(indicator_name, value_name, current_value, trend_info)
 
                 except Exception as e:
-                    self.log_manager.error(f"处理数据时出错: {str(e)}")
+                    logger.error(f"处理数据时出错: {str(e)}")
                     current_value = "错误"
 
-                self.log_manager.info(f"提取的当前值: {current_value}")
+                logger.info(f"提取的当前值: {current_value}")
 
                 if current_value is not None:
                     row = self.technical_table.rowCount()
@@ -2041,14 +2040,14 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             # 恢复排序设置
             self.technical_table.setSortingEnabled(sorting_enabled)
 
-            self.log_manager.info(f"成功添加 {rows_added} 行数据到表格")
+            logger.info(f"成功添加 {rows_added} 行数据到表格")
 
             # 自动调整列宽
             self.technical_table.resizeColumnsToContents()
 
         except Exception as e:
-            self.log_manager.error(f"添加指标到表格失败: {str(e)}")
-            self.log_manager.error(f"详细错误: {traceback.format_exc()}")
+            logger.error(f"添加指标到表格失败: {str(e)}")
+            logger.error(f"详细错误: {traceback.format_exc()}")
 
             # 恢复排序设置
             if 'sorting_enabled' in locals():
@@ -2098,7 +2097,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         try:
             # 确保current_value是数值类型
             if not isinstance(current_value, (int, float)):
-                self.log_manager.warning(f"当前值不是数值类型: {type(current_value)}, 值: {current_value}")
+                logger.warning(f"当前值不是数值类型: {type(current_value)}, 值: {current_value}")
                 return "数据类型错误", "无法分析"
 
             # 检查是否为NaN
@@ -2164,7 +2163,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                     advice = "观望"
 
         except Exception as e:
-            self.log_manager.error(f"生成信号建议时出错: {str(e)}")
+            logger.error(f"生成信号建议时出错: {str(e)}")
             signal = "未知"
             advice = "需要分析"
 
@@ -2221,18 +2220,18 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                             item.setForeground(QColor(0, 128, 0))  # 绿色文字
 
         except Exception as e:
-            self.log_manager.error(f"设置行颜色失败: {str(e)}")
+            logger.error(f"设置行颜色失败: {str(e)}")
 
     def clear_cache(self):
         """清除缓存"""
         self.indicator_cache.clear()
-        self.log_manager.info("指标缓存已清除")
+        logger.info("指标缓存已清除")
         QMessageBox.information(self, "提示", "指标缓存已清除")
 
     def clear_indicators(self):
         """清除指标"""
         self._do_clear_data()
-        self.log_manager.info("技术指标已清除")
+        logger.info("技术指标已清除")
 
     def _get_export_specific_data(self) -> Optional[Dict[str, Any]]:
         """获取技术分析特定的导出数据"""
@@ -2275,7 +2274,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             return table_data
 
         except Exception as e:
-            self.log_manager.error(f"获取表格数据失败: {e}")
+            logger.error(f"获取表格数据失败: {e}")
             return []
 
     def export_technical_data(self):
@@ -2369,7 +2368,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             csv_filename = filename.replace('.xlsx', '.csv')
             return self.export_to_file(csv_filename, 'csv')
         except Exception as e:
-            self.log_manager.error(f"Excel导出失败: {e}")
+            logger.error(f"Excel导出失败: {e}")
             return False
 
     def apply_batch_selection(self, dialog):
@@ -2406,7 +2405,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
         # 强制刷新界面
         QApplication.processEvents()
 
-        self.log_manager.debug(f"{self.__class__.__name__}: {message}")
+        logger.debug(f"{self.__class__.__name__}: {message}")
 
     def hide_loading(self):
         """隐藏加载状态 - 本地实现"""
@@ -2471,16 +2470,16 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             technical_indicators = analysis_data.get('technical_indicators', {})
 
             if technical_indicators:
-                self.log_manager.info("收到分析数据，技术指标数据已更新")
+                logger.info("收到分析数据，技术指标数据已更新")
                 # 这里可以根据需要处理预计算的技术指标数据
                 # 例如：显示在状态栏或进行其他处理
                 indicator_count = len(technical_indicators)
                 self.update_status(f"收到 {indicator_count} 个预计算指标")
             else:
-                self.log_manager.debug("分析数据中未包含技术指标")
+                logger.debug("分析数据中未包含技术指标")
 
         except Exception as e:
-            self.log_manager.error(f"更新分析数据失败: {e}")
+            logger.error(f"更新分析数据失败: {e}")
 
     def set_kdata(self, kdata):
         """重写set_kdata方法，自动更新股票信息"""
@@ -2489,7 +2488,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             super().set_kdata(kdata)
 
         except Exception as e:
-            self.log_manager.error(f"设置K线数据时出错: {str(e)}")
+            logger.error(f"设置K线数据时出错: {str(e)}")
 
     def on_data_update(self, stock_data: Dict[str, Any]) -> None:
         """处理数据更新事件"""
@@ -2498,7 +2497,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             if self.auto_calc_checkbox.isChecked():
                 self.calculate_indicators()
         except Exception as e:
-            self.log_manager.error(f"数据更新处理失败: {e}")
+            logger.error(f"数据更新处理失败: {e}")
 
     def show_advanced_filter_dialog(self):
         """显示高级筛选对话框"""
@@ -2532,7 +2531,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 else:
                     self.clear_table_filters()
         except Exception as e:
-            self.log_manager.error(f"显示紧凑型筛选对话框失败: {e}")
+            logger.error(f"显示紧凑型筛选对话框失败: {e}")
             QMessageBox.warning(self, "错误", f"无法打开高级筛选对话框:\n{str(e)}")
 
     def _get_table_columns_config(self):
@@ -2578,7 +2577,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             else:
                 self.clear_table_filters()
         except Exception as e:
-            self.log_manager.error(f"应用筛选条件失败: {e}")
+            logger.error(f"应用筛选条件失败: {e}")
 
     def apply_table_filters(self, filters: Dict[str, Any]):
         """应用指标选股筛选条件到表格"""
@@ -2671,7 +2670,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
                 self.clear_filter_btn.setEnabled(False)
 
         except Exception as e:
-            self.log_manager.error(f"应用指标选股筛选失败: {str(e)}")
+            logger.error(f"应用指标选股筛选失败: {str(e)}")
 
     def clear_table_filters(self):
         """清除所有筛选条件"""
@@ -2685,7 +2684,7 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             self.clear_filter_btn.setEnabled(False)
 
         except Exception as e:
-            self.log_manager.error(f"清除筛选失败: {str(e)}")
+            logger.error(f"清除筛选失败: {str(e)}")
 
     def _get_column_index_by_name(self, column_name: str) -> int:
         """根据列名获取列索引"""
@@ -2694,7 +2693,6 @@ class TechnicalAnalysisTab(BaseAnalysisTab):
             return headers.index(column_name)
         except ValueError:
             return -1
-
 
 class AdvancedFilterDialog(QDialog):
     """高级筛选对话框"""

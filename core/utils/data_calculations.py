@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据计算工具函数库
 
@@ -14,13 +15,12 @@
 
 import pandas as pd
 import numpy as np
-import logging
 from typing import Dict, List, Optional, Union, Tuple, Any
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, date
 import warnings
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 抑制pandas性能警告
 warnings.filterwarnings('ignore', category=pd.errors.PerformanceWarning)

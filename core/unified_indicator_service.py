@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 统一指标服务
@@ -9,7 +10,6 @@ import os
 import sys
 import json
 import sqlite3
-import logging
 import numpy as np
 import pandas as pd
 import importlib
@@ -20,15 +20,10 @@ from datetime import datetime
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# 设置日志
-logger = logging.getLogger('unified_indicator_service')
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    ))
-    logger.addHandler(handler)
+# Loguru日志已在全局配置，无需额外设置
+# logger 已在文件开头导入
+# Loguru不需要setLevel
+# Loguru自动处理所有日志配置
 
 # 统一数据库路径
 UNIFIED_DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'factorweave_system.sqlite')
@@ -80,9 +75,9 @@ class UnifiedIndicatorService:
         try:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row  # 使用字典式访问
-            logger.info(f"✅ 连接到统一数据库: {self.db_path}")
+            logger.info(f" 连接到统一数据库: {self.db_path}")
         except Exception as e:
-            logger.error(f"❌ 数据库连接失败: {str(e)}")
+            logger.error(f" 数据库连接失败: {str(e)}")
             raise
 
     def close(self):
@@ -133,11 +128,11 @@ class UnifiedIndicatorService:
             self._indicator_plugins[plugin_id] = plugin_adapter
             self._plugin_priorities[plugin_id] = priority
 
-            logger.info(f"✅ 指标插件注册成功: {plugin_id} (优先级: {priority})")
+            logger.info(f" 指标插件注册成功: {plugin_id} (优先级: {priority})")
             return True
 
         except Exception as e:
-            logger.error(f"❌ 注册指标插件失败 {plugin_id}: {e}")
+            logger.error(f" 注册指标插件失败 {plugin_id}: {e}")
             return False
 
     def unregister_indicator_plugin(self, plugin_id: str) -> bool:
@@ -164,14 +159,14 @@ class UnifiedIndicatorService:
                 # 清理相关计算缓存
                 self._clear_plugin_cache(plugin_id)
 
-                logger.info(f"✅ 指标插件注销成功: {plugin_id}")
+                logger.info(f" 指标插件注销成功: {plugin_id}")
                 return True
             else:
                 logger.warning(f"指标插件不存在: {plugin_id}")
                 return False
 
         except Exception as e:
-            logger.error(f"❌ 注销指标插件失败 {plugin_id}: {e}")
+            logger.error(f" 注销指标插件失败 {plugin_id}: {e}")
             return False
 
     def get_registered_plugins(self) -> List[str]:
@@ -712,7 +707,7 @@ class UnifiedIndicatorService:
                         if self._cache_enabled:
                             self._calculation_cache[cache_key] = result_df
 
-                        logger.info(f"✅ 插件指标计算成功: {plugin_id}.{name}")
+                        logger.info(f" 插件指标计算成功: {plugin_id}.{name}")
                         return result_df
 
                 except Exception as e:
@@ -814,7 +809,7 @@ class UnifiedIndicatorService:
                     # 合并结果
                     plugin_results.update(batch_results)
 
-                    logger.info(f"✅ 插件批量计算完成: {plugin_id} ({len(plugin_indicator_list)} 个指标)")
+                    logger.info(f" 插件批量计算完成: {plugin_id} ({len(plugin_indicator_list)} 个指标)")
 
                 except Exception as e:
                     logger.error(f"插件批量计算失败 {plugin_id}: {e}")
@@ -1747,13 +1742,13 @@ class UnifiedIndicatorServiceEnhanced(UnifiedIndicatorService):
                 preload_results[indicator_name] = not result.empty
 
                 if preload_results[indicator_name]:
-                    logger.debug(f"✅ 指标预加载成功: {indicator_name}")
+                    logger.debug(f" 指标预加载成功: {indicator_name}")
                 else:
-                    logger.warning(f"⚠️ 指标预加载返回空结果: {indicator_name}")
+                    logger.warning(f" 指标预加载返回空结果: {indicator_name}")
 
             except Exception as e:
                 preload_results[indicator_name] = False
-                logger.error(f"❌ 指标预加载失败 {indicator_name}: {e}")
+                logger.error(f" 指标预加载失败 {indicator_name}: {e}")
 
         successful_count = sum(preload_results.values())
         logger.info(f"预加载完成: {successful_count}/{len(indicators)} 个指标成功")
@@ -1763,27 +1758,27 @@ class UnifiedIndicatorServiceEnhanced(UnifiedIndicatorService):
 
 if __name__ == '__main__':
     # 测试统一服务
-    print("🧪 测试统一指标服务...")
+    logger.info(" 测试统一指标服务...")
 
     try:
         service = UnifiedIndicatorService()
 
         # 测试获取分类
         categories = service.get_all_categories()
-        print(f"📂 共有 {len(categories)} 个分类")
+        logger.info(f" 共有 {len(categories)} 个分类")
 
         # 测试获取指标
         indicators = service.get_all_indicators()
-        print(f"📈 共有 {len(indicators)} 个指标")
+        logger.info(f" 共有 {len(indicators)} 个指标")
 
         # 测试获取形态
         patterns = service.get_all_patterns()
-        print(f"📊 共有 {len(patterns)} 个形态")
+        logger.info(f" 共有 {len(patterns)} 个形态")
 
         service.close()
-        print("✅ 统一指标服务测试通过")
+        logger.info(" 统一指标服务测试通过")
 
     except Exception as e:
-        print(f"❌ 测试失败: {str(e)}")
+        logger.info(f" 测试失败: {str(e)}")
         import traceback
-        print(traceback.format_exc())
+        logger.info(traceback.format_exc())

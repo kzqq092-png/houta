@@ -1507,7 +1507,7 @@
     },
     "600287": {
       "code": "600287",
-      "name": "江苏舜天",
+      "name": "苏豪时尚",
       "csrc_industry": "",
       "exchange_industry": "",
       "market": "SH"
@@ -5147,7 +5147,7 @@
     },
     "600981": {
       "code": "600981",
-      "name": "汇鸿集团",
+      "name": "苏豪汇鸿",
       "csrc_industry": "",
       "exchange_industry": "",
       "market": "SH"
@@ -6692,13 +6692,6 @@
       "exchange_industry": "",
       "market": "SH"
     },
-    "601989": {
-      "code": "601989",
-      "name": "中国重工",
-      "csrc_industry": "",
-      "exchange_industry": "",
-      "market": "SH"
-    },
     "601990": {
       "code": "601990",
       "name": "南京证券",
@@ -8220,7 +8213,7 @@
     },
     "603337": {
       "code": "603337",
-      "name": "杰克股份",
+      "name": "杰克科技",
       "csrc_industry": "",
       "exchange_industry": "",
       "market": "SH"
@@ -11236,5 +11229,5 @@
       "market": "SH"
     }
   },
-  "last_update": "2025-09-03T22:33:11.114026"
+  "last_update": "2025-09-12T21:44:04.028521"
 }

@@ -6,6 +6,7 @@
 提供形态识别算法的版本管理功能，包括版本比较、回滚、备份等
 """
 
+from loguru import logger
 import sys
 import os
 import traceback
@@ -23,16 +24,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPalette, QIcon
 
-from core.logger import get_logger
-
 # 导入后端版本管理系统
 try:
     from optimization.version_manager import create_version_manager, VersionManager
     VERSION_MANAGER_AVAILABLE = True
 except ImportError:
     VERSION_MANAGER_AVAILABLE = False
-    print("警告：版本管理后端系统不可用，将使用模拟数据")
-
+    logger.warning("版本管理后端系统不可用，将使用模拟数据")
 
 class VersionManagerDialog(QDialog):
     """版本管理对话框"""
@@ -48,7 +46,7 @@ class VersionManagerDialog(QDialog):
             parent: 父窗口
         """
         super().__init__(parent)
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 添加初始化标志
         self._ui_initialized = False
@@ -786,7 +784,6 @@ class VersionManagerDialog(QDialog):
             if not self.selected_version:
                 QMessageBox.warning(self, "警告", "请先选择要导出的版本！")
                 return
-
 
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "导出版本", f"{self.selected_version['version_id']}.json",

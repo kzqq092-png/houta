@@ -1,3 +1,4 @@
+from loguru import logger
 """
 金融算法验证框架
 用于验证HIkyuu-UI中金融指标计算的正确性
@@ -11,13 +12,12 @@
 
 import numpy as np
 import pandas as pd
-import logging
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 import warnings
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

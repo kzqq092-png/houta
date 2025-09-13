@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FactorWeave-Quant ‌ 主程序入口
+FactorWeave-Quant  主程序入口
 
 使用重构后的架构：
 - 主窗口协调器 (MainWindowCoordinator)
@@ -10,7 +10,7 @@ FactorWeave-Quant ‌ 主程序入口
 - WebGPU硬件加速渲染
 
 版本: 2.0 (重构版本)
-作者: FactorWeave-Quant ‌ Team
+作者: FactorWeave-Quant  Team
 """
 
 from utils.exception_handler import setup_exception_handler
@@ -22,10 +22,11 @@ from core.containers.service_registry import ServiceScope
 from core.services.service_bootstrap import bootstrap_services
 import sys
 import asyncio
-import logging
 import traceback
 from pathlib import Path
 import os
+
+from loguru import logger
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent
@@ -38,8 +39,8 @@ try:
     from PyQt5.QtGui import QIcon
     from qasync import QEventLoop
 except ImportError as e:
-    print(f"PyQt5导入失败: {e}")
-    print("请安装PyQt5: pip install PyQt5")
+    logger.info(f"PyQt5导入失败: {e}")
+    logger.info("请安装PyQt5: pip install PyQt5")
     QEventLoop = None
 
 # WebGPU硬件加速渲染初始化
@@ -47,29 +48,16 @@ try:
     from optimization.webgpu_chart_renderer import initialize_webgpu_chart_renderer
     # 初始化WebGPU图表渲染器（包含自动降级功能）
     initialize_webgpu_chart_renderer(max_workers=os.cpu_count() * 2, enable_progressive=True)
-    logging.info("WebGPU硬件加速渲染系统初始化成功")
+    logger.info("WebGPU硬件加速渲染系统初始化成功")
 except ImportError:
-    logging.warning("WebGPU模块不可用，将使用标准渲染")
+    logger.warning("WebGPU模块不可用，将使用标准渲染")
 except Exception as e:
-    logging.error(f"WebGPU初始化失败: {e}")
-
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('logs/factorweave_quant.log', encoding='utf-8')
-    ]
-)
-
-logger = logging.getLogger(__name__)
+    logger.error(f"WebGPU初始化失败: {e}")
 
 
 class FactorWeaveQuantApplication:
     """
-    FactorWeave-Quant ‌ 应用程序主类
+    FactorWeave-Quant  应用程序主类
 
     负责：
     1. 应用程序初始化
@@ -84,6 +72,7 @@ class FactorWeaveQuantApplication:
         self.main_window_coordinator = None
         self.service_container = None
         self.event_bus = None
+        self.qt_handler = None
 
     def initialize(self) -> bool:
         """
@@ -94,7 +83,7 @@ class FactorWeaveQuantApplication:
         """
         try:
             logger.info("=" * 60)
-            logger.info("FactorWeave-Quant ‌ 2.0 (重构版本) 启动中...")
+            logger.info("FactorWeave-Quant 2.0 启动中...")
             logger.info("=" * 60)
 
             # 1. 创建Qt应用程序
@@ -108,10 +97,11 @@ class FactorWeaveQuantApplication:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
             try:
                 import tensorflow as tf
-                tf.get_logger().setLevel('ERROR')
+                # TensorFlow使用标准logging，保持原有调用
+                tf.get_logger()  # Loguru自动管理日志级别
                 import warnings
                 warnings.filterwarnings('ignore', message='Compiled the loaded model*')
-                logger.info("✅ TensorFlow警告已抑制")
+                logger.info("TensorFlow警告已抑制")
             except ImportError:
                 pass
 
@@ -128,11 +118,11 @@ class FactorWeaveQuantApplication:
             # 6. 创建主窗口协调器
             self._create_main_window()
 
-            logger.info("✓ FactorWeave-Quant ‌ 2.0 初始化完成")
+            logger.info(" FactorWeave-Quant  2.0 初始化完成")
             return True
 
         except Exception as e:
-            logger.error(f"❌ 应用程序初始化失败: {e}")
+            logger.error(f" 应用程序初始化失败: {e}")
             logger.error(traceback.format_exc())
             self._show_error_message("初始化失败", str(e))
             return False
@@ -149,7 +139,7 @@ class FactorWeaveQuantApplication:
 
         # 创建应用程序实例
         self.app = QApplication(sys.argv)
-        self.app.setApplicationName("FactorWeave-Quant ‌")
+        self.app.setApplicationName("FactorWeave-Quant ")
         self.app.setApplicationVersion("2.0")
         self.app.setOrganizationName("FactorWeave 团队")
 
@@ -164,7 +154,7 @@ class FactorWeaveQuantApplication:
         # 设置全局样式
         self._setup_global_styles()
 
-        logger.info("✓ Qt应用程序创建完成")
+        logger.info(" Qt应用程序创建完成")
 
     def _register_qt_meta_types(self) -> None:
         """注册Qt元类型"""
@@ -172,7 +162,7 @@ class FactorWeaveQuantApplication:
             # 注册Qt类型以解决信号槽问题
             # 由于core/qt_types.py已在导入时调用init_qt_types()，这里不需要再次调用
             # 避免重复注册导致的问题
-            logger.info("✓ Qt元类型注册完成")
+            logger.info("Qt元类型注册完成")
 
         except Exception as e:
             logger.warning(f"Qt元类型注册失败: {e}")
@@ -254,6 +244,20 @@ class FactorWeaveQuantApplication:
         '''
         self.app.setStyleSheet(global_style)
 
+    def _setup_qt_logging(self) -> None:
+        """设置Qt日志处理器"""
+        try:
+            # 导入Qt日志处理器
+            from gui.loguru_qt_handler import get_qt_handler, get_qt_bridge
+
+            # 获取Qt日志处理器实例
+            self.qt_handler = get_qt_handler()
+
+            logger.info("Qt日志处理器初始化完成")
+        except Exception as e:
+            logger.warning(f"Qt日志处理器初始化失败: {e}")
+            self.qt_handler = None
+
     def _initialize_core_components(self) -> None:
         """初始化核心组件"""
         logger.info("2. 初始化核心组件...")
@@ -262,8 +266,8 @@ class FactorWeaveQuantApplication:
         self.service_container = get_service_container()
         self.event_bus = get_event_bus()
 
-        logger.info(f"✓ 服务容器: {type(self.service_container).__name__}")
-        logger.info(f"✓ 事件总线: {type(self.event_bus).__name__}")
+        logger.info(f" 服务容器: {type(self.service_container).__name__}")
+        logger.info(f" 事件总线: {type(self.event_bus).__name__}")
 
     def _register_services(self) -> bool:
         """
@@ -276,10 +280,10 @@ class FactorWeaveQuantApplication:
 
         # 使用服务引导器注册所有服务
         if not bootstrap_services():
-            logger.error("❌ 服务注册失败")
+            logger.error(" 服务注册失败")
             return False
 
-        logger.info("✓ 所有服务注册完成")
+        logger.info(" 所有服务注册完成")
         return True
 
     def _create_main_window(self) -> None:
@@ -300,9 +304,9 @@ class FactorWeaveQuantApplication:
             self.main_window_coordinator.initialize()
             logger.info("主窗口协调器初始化完成")
 
-            logger.info("✓ 主窗口协调器创建完成")
+            logger.info(" 主窗口协调器创建完成")
         except Exception as e:
-            logger.error(f"❌ 主窗口协调器创建失败: {e}")
+            logger.error(f" 主窗口协调器创建失败: {e}")
             logger.error(traceback.format_exc())
             raise
 
@@ -342,14 +346,14 @@ class FactorWeaveQuantApplication:
             if self.service_container:
                 # 清理所有服务
                 self.service_container.dispose()
-                logger.info("✓ 服务容器已清理")
+                logger.info(" 服务容器已清理")
 
             # 停止事件循环
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 loop.stop()
 
-            logger.info("✓ 资源清理完成")
+            logger.info(" 资源清理完成")
 
         except Exception as e:
             logger.error(f"清理资源时出错: {e}")
@@ -359,7 +363,7 @@ class FactorWeaveQuantApplication:
         if self.app:
             QMessageBox.critical(None, title, message)
         else:
-            print(f"错误: {title} - {message}")
+            logger.info(f"错误: {title} - {message}")
 
 
 def main():
@@ -401,8 +405,8 @@ def main():
             sys.exit(exit_code)
 
     except Exception as e:
-        print(f"程序启动失败: {e}")
-        print(traceback.format_exc())
+        logger.info(f"程序启动失败: {e}")
+        logger.info(traceback.format_exc())
         sys.exit(1)
 
 

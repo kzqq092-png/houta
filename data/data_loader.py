@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Data Loader Module
 
@@ -6,7 +7,6 @@ This module provides functionality for loading and managing data.
 
 import numpy as np
 import pandas as pd
-import logging
 from typing import Optional, Dict, Any, List
 from functools import lru_cache
 import time
@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from utils.cache import Cache
 
 # 配置日志
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -562,7 +562,7 @@ def fetch_fundamental_data_akshare(stock_code: str, use_cache: bool = True) -> p
         else:
             raise ImportError("当前akshare版本不支持主流A股财报接口，请升级akshare >= 1.11.0")
     except Exception as e:
-        print(f"akshare获取财务数据失败: {str(e)}")
+        logger.info(f"akshare获取财务数据失败: {str(e)}")
         return pd.DataFrame()
 
 

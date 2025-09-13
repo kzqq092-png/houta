@@ -10,7 +10,7 @@
 6. 回测和优化功能
 """
 
-import logging
+from loguru import logger
 import asyncio
 import json
 from typing import Dict, Any, List, Optional, Union
@@ -38,7 +38,7 @@ from core.strategy_extensions import (
     StrategyType, RiskLevel, ParameterDef
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StrategyCreationWizard(QDialog):

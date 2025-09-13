@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据源状态监控小部件
 
@@ -5,7 +6,6 @@
 - 实时健康状态显示
 - 路由统计信息
 - 失效通知和告警
-
 
 作者: FactorWeave-Quant 开发团队
 版本: 1.0.0
@@ -26,10 +26,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QPainter, QBrush
 
-from core.logger import get_logger
-
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 class StatusUpdateWorker(QThread):
     """数据源状态异步更新工作线程"""
@@ -52,15 +49,15 @@ class StatusUpdateWorker(QThread):
             self._is_running = True
 
             if not self.router:
-                print("❌ 路由器不可用")
+                logger.info(" 路由器不可用")
                 self.update_failed.emit("路由器不可用")
                 return
 
             data_sources = self.router.data_sources
-            print(f"📊 开始异步更新，数据源数量: {len(data_sources)}")
+            logger.info(f" 开始异步更新，数据源数量: {len(data_sources)}")
 
             if not data_sources:
-                print("⚠️ 没有注册的数据源")
+                logger.info(" 没有注册的数据源")
                 self.update_failed.emit("没有注册的数据源")
                 return
 
@@ -101,7 +98,7 @@ class StatusUpdateWorker(QThread):
                     self.msleep(5)
 
                 except Exception as e:
-                    print(f"⚠️ 处理数据源状态失败 {source_id}: {e}")
+                    logger.info(f" 处理数据源状态失败 {source_id}: {e}")
                     # 创建错误状态数据
                     status_data[source_id] = {
                         'name': source_id,
@@ -128,11 +125,11 @@ class StatusUpdateWorker(QThread):
 
             if self._is_running:
                 self.update_completed.emit()
-                print("✅ 异步状态更新完成")
+                logger.info(" 异步状态更新完成")
 
         except Exception as e:
             self.update_failed.emit(str(e))
-            print(f"❌ 异步状态更新失败: {e}")
+            logger.info(f" 异步状态更新失败: {e}")
 
     def _get_source_metrics(self, data_sources: dict) -> dict:
         """获取数据源指标（精简版，移除性能监控统计）"""
@@ -160,16 +157,15 @@ class StatusUpdateWorker(QThread):
                         'last_request_time': getattr(metric, 'last_request_time', 'N/A')
                     }
                 except Exception as e:
-                    print(f"⚠️ 获取路由统计失败 {source_id}: {e}")
+                    logger.info(f" 获取路由统计失败 {source_id}: {e}")
         except Exception as e:
-            print(f"⚠️ 获取路由统计失败: {e}")
+            logger.info(f" 获取路由统计失败: {e}")
 
         return routing_data
 
     def stop(self):
         """停止更新"""
         self._is_running = False
-
 
 class StatusIndicator(QLabel):
     """状态指示器组件"""
@@ -210,7 +206,6 @@ class StatusIndicator(QLabel):
 
         self.setPixmap(pixmap)
         self.setToolTip(f"状态: {self.status}")
-
 
 class MetricCard(QFrame):
     """指标卡片组件"""
@@ -269,7 +264,6 @@ class MetricCard(QFrame):
         self.value_label.setText(value)
         self.value_label.setStyleSheet(f"color: {color};")
 
-
 class NotificationItem(QListWidgetItem):
     """通知项目"""
 
@@ -281,13 +275,13 @@ class NotificationItem(QListWidgetItem):
 
         # 设置图标和颜色
         icons = {
-            "info": "ℹ️",
-            "warning": "⚠️",
-            "error": "❌",
-            "success": "✅"
+            "info": "ℹ",
+            "warning": "",
+            "error": "",
+            "success": ""
         }
 
-        icon = icons.get(level, "ℹ️")
+        icon = icons.get(level, "ℹ")
         time_str = self.timestamp.strftime("%H:%M:%S")
 
         self.setText(f"{icon} [{time_str}] {message}")
@@ -302,7 +296,6 @@ class NotificationItem(QListWidgetItem):
 
         if level in colors:
             self.setForeground(colors[level])
-
 
 class DataSourceStatusWidget(QWidget):
     """数据源状态监控主组件"""
@@ -327,7 +320,7 @@ class DataSourceStatusWidget(QWidget):
 
         # 标题栏
         title_layout = QHBoxLayout()
-        title_label = QLabel("📊 数据源状态监控")
+        title_label = QLabel(" 数据源状态监控")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
@@ -338,11 +331,11 @@ class DataSourceStatusWidget(QWidget):
         self.auto_refresh_check.toggled.connect(self.toggle_auto_refresh)
         title_layout.addWidget(self.auto_refresh_check)
 
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton(" 刷新")
         refresh_btn.clicked.connect(self.refresh_status)
         title_layout.addWidget(refresh_btn)
 
-        clear_btn = QPushButton("🗑️ 清空通知")
+        clear_btn = QPushButton(" 清空通知")
         clear_btn.clicked.connect(self.clear_notifications)
         title_layout.addWidget(clear_btn)
 
@@ -582,7 +575,7 @@ class DataSourceStatusWidget(QWidget):
     def refresh_status(self):
         """刷新状态 - 异步处理防止UI卡死"""
         try:
-            print("🔄 开始刷新数据源状态...")
+            logger.info(" 开始刷新数据源状态...")
 
             # 尝试从统一数据管理器获取数据
             router = None
@@ -590,17 +583,17 @@ class DataSourceStatusWidget(QWidget):
                 unified_manager = get_unified_data_manager()
                 if unified_manager and hasattr(unified_manager, 'data_source_router'):
                     router = unified_manager.data_source_router
-                    print(f"✅ 获取到数据源路由器，注册数据源数量: {len(router.data_sources) if router.data_sources else 0}")
+                    logger.info(f" 获取到数据源路由器，注册数据源数量: {len(router.data_sources) if router.data_sources else 0}")
                 else:
-                    print("⚠️ 统一数据管理器不可用或缺少路由器")
+                    logger.info(" 统一数据管理器不可用或缺少路由器")
             except ImportError:
-                print("⚠️ 无法导入统一数据管理器")
+                logger.info(" 无法导入统一数据管理器")
             except Exception as e:
-                print(f"⚠️ 获取统一数据管理器失败: {e}")
+                logger.info(f" 获取统一数据管理器失败: {e}")
 
             # 如果没有路由器，尝试从插件管理器获取数据
             if not router:
-                print("🔍 尝试从插件管理器获取数据源信息...")
+                logger.info(" 尝试从插件管理器获取数据源信息...")
                 self._refresh_from_plugin_manager()
                 return
 
@@ -621,10 +614,10 @@ class DataSourceStatusWidget(QWidget):
 
             # 启动异步更新
             self.status_worker.start()
-            print("✅ 异步状态更新线程已启动")
+            logger.info(" 异步状态更新线程已启动")
 
         except Exception as e:
-            print(f"❌ 刷新状态失败: {e}")
+            logger.info(f" 刷新状态失败: {e}")
             import traceback
             traceback.print_exc()
             logger.error(f"刷新状态失败: {str(e)}")
@@ -633,7 +626,7 @@ class DataSourceStatusWidget(QWidget):
     def _refresh_from_plugin_manager(self):
         """从插件管理器刷新数据源信息（回退方案）"""
         try:
-            print("使用插件管理器作为数据源...")
+            logger.info("使用插件管理器作为数据源...")
 
             # 尝试从服务容器获取插件管理器和数据管理器
             plugin_manager = None
@@ -644,9 +637,9 @@ class DataSourceStatusWidget(QWidget):
                 if container:
                     plugin_manager = getattr(container, 'plugin_manager', None)
                     data_manager = getattr(container, 'data_manager', None)
-                    print(f"📊 从服务容器获取: plugin_manager={plugin_manager is not None}, data_manager={data_manager is not None}")
+                    logger.info(f"从服务容器获取: plugin_manager={plugin_manager is not None} data_manager={data_manager is not None}")
             except Exception as e:
-                print(f"⚠️ 从服务容器获取服务失败: {e}")
+                logger.info(f" 从服务容器获取服务失败: {e}")
 
             # 创建模拟数据
             mock_status_data = {}
@@ -657,7 +650,7 @@ class DataSourceStatusWidget(QWidget):
             if plugin_manager and hasattr(plugin_manager, 'get_data_source_plugins'):
                 try:
                     ds_plugins = plugin_manager.get_data_source_plugins()
-                    print(f"📊 从插件管理器获取到 {len(ds_plugins)} 个数据源插件")
+                    logger.info(f" 从插件管理器获取到 {len(ds_plugins)} 个数据源插件")
 
                     for source_id, plugin_info in ds_plugins.items():
                         try:
@@ -681,7 +674,7 @@ class DataSourceStatusWidget(QWidget):
                                         response_time = health_result.response_time_ms
                                     health_score = 1.0 if is_healthy else 0.0
                                 except Exception as e:
-                                    print(f"    ⚠️ 健康检查失败 {source_id}: {e}")
+                                    logger.info(f"     健康检查失败 {source_id}: {e}")
                                     is_healthy = False
                                     health_score = 0.0
 
@@ -703,17 +696,17 @@ class DataSourceStatusWidget(QWidget):
                                 'success_rate': 1.0 if is_healthy else 0.0
                             }
 
-                            print(f"  ✅ 添加数据源: {source_id} ({name}) - {mock_status_data[source_id]['status']}")
+                            logger.info(f"   添加数据源: {source_id} ({name}) - {mock_status_data[source_id]['status']}")
                         except Exception as e:
-                            print(f"  ❌ 处理数据源 {source_id} 失败: {e}")
+                            logger.info(f"   处理数据源 {source_id} 失败: {e}")
                 except Exception as e:
-                    print(f"❌ 获取数据源插件失败: {e}")
+                    logger.info(f" 获取数据源插件失败: {e}")
 
             # 方案2：从数据管理器获取插件数据源
             if data_manager and hasattr(data_manager, 'get_plugin_data_sources'):
                 try:
                     plugin_sources = data_manager.get_plugin_data_sources()
-                    print(f"📊 从数据管理器获取到 {len(plugin_sources)} 个插件数据源")
+                    logger.info(f" 从数据管理器获取到 {len(plugin_sources)} 个插件数据源")
 
                     for source_id, source_info in plugin_sources.items():
                         if source_id not in mock_status_data:  # 避免重复
@@ -742,15 +735,15 @@ class DataSourceStatusWidget(QWidget):
                                     'success_rate': stats.get('success_rate', 0.0)
                                 }
 
-                                print(f"  ✅ 添加数据管理器数据源: {source_id} ({name}) - {mock_status_data[source_id]['status']}")
+                                logger.info(f"   添加数据管理器数据源: {source_id} ({name}) - {mock_status_data[source_id]['status']}")
                             except Exception as e:
-                                print(f"  ❌ 处理数据管理器数据源 {source_id} 失败: {e}")
+                                logger.info(f"   处理数据管理器数据源 {source_id} 失败: {e}")
                 except Exception as e:
-                    print(f"❌ 获取数据管理器插件数据源失败: {e}")
+                    logger.info(f" 获取数据管理器插件数据源失败: {e}")
 
             # 如果没有找到任何数据源，创建示例数据
             if not mock_status_data:
-                print("📋 创建示例数据源信息...")
+                logger.info(" 创建示例数据源信息...")
                 example_sources = [
                     ("akshare_stock", "AkShare股票数据源", True),
                     ("yahoo_finance", "Yahoo Finance数据源", False),
@@ -788,10 +781,10 @@ class DataSourceStatusWidget(QWidget):
             self._on_routing_updated(mock_routing_data)
             self._on_update_completed()
 
-            print(f"✅ 已更新 {len(mock_status_data)} 个数据源的状态信息")
+            logger.info(f" 已更新 {len(mock_status_data)} 个数据源的状态信息")
 
         except Exception as e:
-            print(f"❌ 从插件管理器刷新状态失败: {e}")
+            logger.info(f" 从插件管理器刷新状态失败: {e}")
             traceback.print_exc()
             self.add_notification("error", f"从插件管理器刷新状态失败: {str(e)}")
 
@@ -821,7 +814,7 @@ class DataSourceStatusWidget(QWidget):
 
     def _on_update_completed(self):
         """异步更新完成回调"""
-        print("🎉 数据源状态异步更新完成")
+        logger.info(" 数据源状态异步更新完成")
 
     def _on_update_failed(self, error_message: str):
         """异步更新失败回调"""
@@ -842,13 +835,13 @@ class DataSourceStatusWidget(QWidget):
                     # 更新状态
                     health_score = data['health_score']
                     if health_score > 0.7:
-                        status_item = QTableWidgetItem("🟢 健康")
+                        status_item = QTableWidgetItem(" 健康")
                         status_item.setForeground(QColor("#28a745"))
                     elif health_score > 0.3:
-                        status_item = QTableWidgetItem("🟡 警告")
+                        status_item = QTableWidgetItem(" 警告")
                         status_item.setForeground(QColor("#ffc107"))
                     else:
-                        status_item = QTableWidgetItem("🔴 错误")
+                        status_item = QTableWidgetItem(" 错误")
                         status_item.setForeground(QColor("#dc3545"))
 
                     self.status_table.setItem(row, 1, status_item)
@@ -951,13 +944,13 @@ class DataSourceStatusWidget(QWidget):
 
                     # 状态
                     if metric and metric.health_score > 0.7:
-                        status_item = QTableWidgetItem("🟢 健康")
+                        status_item = QTableWidgetItem(" 健康")
                         status_item.setForeground(QColor("#28a745"))
                     elif metric and metric.health_score > 0.3:
-                        status_item = QTableWidgetItem("🟡 警告")
+                        status_item = QTableWidgetItem(" 警告")
                         status_item.setForeground(QColor("#ffc107"))
                     else:
-                        status_item = QTableWidgetItem("🔴 错误")
+                        status_item = QTableWidgetItem(" 错误")
                         status_item.setForeground(QColor("#dc3545"))
 
                     self.status_table.setItem(row, 1, status_item)
@@ -1029,9 +1022,9 @@ class DataSourceStatusWidget(QWidget):
 
                     # 状态
                     state_map = {
-                        "CLOSED": "🟢 关闭",
-                        "OPEN": "🔴 开启",
-                        "HALF_OPEN": "🟡 半开"
+                        "CLOSED": " 关闭",
+                        "OPEN": " 开启",
+                        "HALF_OPEN": " 半开"
                     }
                     state_text = state_map.get(cb.state.value, cb.state.value)
                     self.circuit_table.setItem(row, 1, QTableWidgetItem(state_text))
@@ -1213,7 +1206,6 @@ class DataSourceStatusWidget(QWidget):
         self.notifications_list.clear()
         self.notification_count_label.setText("通知总数: 0")
         self.add_notification("info", "通知已清空")
-
 
 if __name__ == "__main__":
     import sys

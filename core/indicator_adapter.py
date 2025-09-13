@@ -6,6 +6,7 @@
 用于将旧的指标计算接口适配到新的指标计算服务
 """
 
+from loguru import logger
 from core.unified_indicator_service import (
     get_unified_service,
     calculate_indicator,
@@ -18,7 +19,6 @@ from core.indicators.library.trends import calculate_ma
 from core.indicators.library.oscillators import calculate_macd, calculate_rsi
 import os
 import sys
-import logging
 import pandas as pd
 from typing import Dict, List, Any, Optional, Union, Tuple
 
@@ -26,15 +26,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..')))
 
-
-# 设置日志
-logger = logging.getLogger('indicator_adapter')
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(handler)
+# Loguru 日志配置已在全局配置中设置，无需额外配置
 
 
 def get_indicator_english_name(name: str) -> str:
@@ -62,7 +54,7 @@ def get_indicator_english_name(name: str) -> str:
                 if indicator_metadata.get('display_name') == name:
                     return indicator_name
         else:
-            print(f"警告：unexpected metadata type: {type(all_metadata)}")
+            logger.info(f"警告：unexpected metadata type: {type(all_metadata)}")
 
         # 如果没有找到匹配的指标，尝试直接映射
         name_mapping = {
@@ -88,7 +80,7 @@ def get_indicator_english_name(name: str) -> str:
         return name
 
     except Exception as e:
-        print(f"获取指标英文名称失败: {e}")
+        logger.info(f"获取指标英文名称失败: {e}")
         # 使用备用映射
         backup_mapping = {
             "移动平均线": "MA",

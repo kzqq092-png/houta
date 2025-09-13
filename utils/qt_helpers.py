@@ -1,14 +1,14 @@
+from loguru import logger
 """
 Qt帮助工具模块
 
 提供PyQt5相关的辅助功能，包括元类型注册、信号连接等。
 """
 
-import logging
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, TypeVar
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 try:
     # 导入PyQt5核心模块

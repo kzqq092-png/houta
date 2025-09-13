@@ -1,10 +1,11 @@
+from loguru import logger
 #!/usr/bin/env python3
 """快速UI状态测试"""
 
 
 def test_ui_status_logic():
     """测试UI状态逻辑"""
-    print("🚀 测试UI状态逻辑修复...")
+    logger.info(" 测试UI状态逻辑修复...")
 
     # 模拟一个简单的健康检查结果
     class MockHealthResult:
@@ -27,7 +28,7 @@ def test_ui_status_logic():
         ("异常插件", MockAdapter(None), False),  # 会抛出异常
     ]
 
-    print("\n🔍 测试不同状态场景:")
+    logger.info("\n 测试不同状态场景:")
 
     for name, adapter, expected in test_cases:
         try:
@@ -46,19 +47,19 @@ def test_ui_status_logic():
             except Exception as e:
                 status_message = f"健康检查异常: {str(e)}"
 
-            result_icon = "✅" if is_connected == expected else "❌"
-            status_icon = "🟢" if is_connected else "🔴"
+            result_icon = "" if is_connected == expected else ""
+            status_icon = "" if is_connected else ""
 
-            print(f"  {result_icon} {name}: {status_icon} {status_message}")
+            logger.info(f"  {result_icon} {name}: {status_icon} {status_message}")
 
         except Exception as e:
-            print(f"  ❌ {name}: 测试异常 - {e}")
+            logger.info(f"   {name}: 测试异常 - {e}")
 
-    print("\n✅ UI状态逻辑测试完成")
-    print("修复要点:")
-    print("  1. 移除了过于严格的适配器状态检查")
-    print("  2. 统一使用健康检查作为连接状态判断标准")
-    print("  3. 为不支持is_connected的插件提供健康检查备用方案")
+    logger.info("\n UI状态逻辑测试完成")
+    logger.info("修复要点:")
+    logger.info("  1. 移除了过于严格的适配器状态检查")
+    logger.info("  2. 统一使用健康检查作为连接状态判断标准")
+    logger.info("  3. 为不支持is_connected的插件提供健康检查备用方案")
 
 
 if __name__ == "__main__":

@@ -3,22 +3,22 @@
 提供多种情绪分析数据源的统一接口
 """
 
-from .base_sentiment_plugin import BaseSentimentPlugin
-from .config_base import ConfigurablePlugin, PluginConfigField
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField
 
 # 导入新的独立插件
-from .fmp_sentiment_plugin import FMPSentimentPlugin
-from .exorde_sentiment_plugin import ExordeSentimentPlugin
-from .news_sentiment_plugin import NewsSentimentPlugin
-from .vix_sentiment_plugin import VIXSentimentPlugin
-from .crypto_sentiment_plugin import CryptoSentimentPlugin
+from plugins.sentiment_data_sources.fmp_sentiment_plugin import FMPSentimentPlugin
+from plugins.sentiment_data_sources.exorde_sentiment_plugin import ExordeSentimentPlugin
+from plugins.sentiment_data_sources.news_sentiment_plugin import NewsSentimentPlugin
+from plugins.sentiment_data_sources.vix_sentiment_plugin import VIXSentimentPlugin
+from plugins.sentiment_data_sources.crypto_sentiment_plugin import CryptoSentimentPlugin
 
 # 保留多源插件作为备用
-from .multi_source_sentiment_plugin import MultiSourceSentimentPlugin
+from plugins.sentiment_data_sources.multi_source_sentiment_plugin import MultiSourceSentimentPlugin
 
 # 可选导入AkShare插件（如果依赖不可用则跳过）
 try:
-    from .akshare_sentiment_plugin import AkShareSentimentPlugin
+    from plugins.sentiment_data_sources.akshare_sentiment_plugin import AkShareSentimentPlugin
     AKSHARE_AVAILABLE = True
 except ImportError:
     AkShareSentimentPlugin = None

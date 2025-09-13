@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU错误处理和恢复机制
 
@@ -12,7 +13,6 @@ WebGPU错误处理和恢复机制
 版本: 1.0.0
 """
 
-import logging
 import time
 import traceback
 import threading
@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Any, Callable, Union, Type
 from enum import Enum
 from abc import ABC, abstractmethod
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ErrorCategory(Enum):
@@ -599,11 +599,11 @@ class ErrorRecoveryManager:
         base_message = messages.get(category, "发生了图形渲染错误。")
 
         if severity == ErrorSeverity.CRITICAL:
-            return f"⚠️ {base_message}"
+            return f" {base_message}"
         elif severity == ErrorSeverity.HIGH:
-            return f"⚡ {base_message}"
+            return f" {base_message}"
         else:
-            return f"ℹ️ {base_message}"
+            return f"ℹ {base_message}"
 
     def _record_error(self, error_info: ErrorInfo) -> None:
         """记录错误信息"""
@@ -777,7 +777,7 @@ if __name__ == "__main__":
     # 模拟WebGPU不支持错误
     context = setup_error_recovery_context(
         current_engine="webgpu",
-        switch_engine_function=lambda engine: print(f"切换到引擎: {engine}")
+        switch_engine_function=lambda engine: logger.info(f"切换到引擎: {engine}")
     )
 
     result = manager.handle_error(
@@ -786,9 +786,9 @@ if __name__ == "__main__":
     )
 
     if result:
-        print(f"恢复结果: {result.message}")
-        print(f"新引擎: {result.new_engine}")
+        logger.info(f"恢复结果: {result.message}")
+        logger.info(f"新引擎: {result.new_engine}")
 
     # 获取统计信息
     stats = manager.get_error_statistics()
-    print(f"错误统计: {stats.total_errors} 个错误，恢复成功率: {stats.recovery_success_rate:.1%}")
+    logger.info(f"错误统计: {stats.total_errors} 个错误，恢复成功率: {stats.recovery_success_rate:.1%}")

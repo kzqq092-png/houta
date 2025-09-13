@@ -1,3 +1,4 @@
+from loguru import logger
 """
 TA-Lib指标插件
 
@@ -5,7 +6,6 @@ TA-Lib指标插件
 TA-Lib是广泛使用的技术分析库，提供150+种技术指标的高性能C实现。
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import time
@@ -24,7 +24,7 @@ from core.indicator_extensions import (
     IndicatorCalculationContext
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TALibIndicatorsPlugin(IIndicatorPlugin):

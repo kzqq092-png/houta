@@ -1,3 +1,4 @@
+from loguru import logger
 """
 DuckDB连接管理器
 
@@ -15,7 +16,6 @@ DuckDB连接管理器
 import duckdb
 import threading
 import time
-import logging
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from dataclasses import dataclass
@@ -24,7 +24,7 @@ from queue import Queue, Empty
 import json
 import os
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

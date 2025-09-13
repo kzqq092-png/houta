@@ -1,3 +1,4 @@
+from loguru import logger
 """
 统一数据管理器
 
@@ -5,7 +6,6 @@
 集成了原DataManager和HikyuuDataManager的所有功能。
 """
 
-import logging
 import threading
 import time
 from typing import Dict, Any, Optional, List, Callable, Set
@@ -27,14 +27,14 @@ from ..plugin_types import AssetType, DataType
 from ..tet_data_pipeline import TETDataPipeline, StandardQuery, StandardData
 
 # 安全导入hikyuu模块
-logger = logging.getLogger(__name__)
+logger = logger
 try:
     import hikyuu as hku
     from hikyuu.interactive import sm
     HIKYUU_AVAILABLE = True
-    logger.info("✅ HIkyuu模块导入成功")
+    logger.info("HIkyuu模块导入成功")
 except ImportError as e:
-    logger.warning(f"⚠️ HIkyuu模块导入失败: {e}")
+    logger.warning(f"HIkyuu模块导入失败: {e}")
     logger.warning("将使用模拟数据模式运行")
     hku = None
     sm = None
@@ -51,13 +51,13 @@ except ImportError as e:
 # 导入缓存和工具
 try:
     from utils.cache import Cache
-    from utils.log_util import log_structured
+    # log_structured已替换为直接的logger调用
     from core.performance import measure_performance
 except ImportError as e:
     logger.warning(f"工具模块导入失败: {e}")
     Cache = None
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.sqlite')
@@ -284,12 +284,12 @@ class UnifiedDataManager:
 
         except ImportError as e:
             logger.error(f"TET数据管道模块导入失败: {e}")
-            logger.info("🔄 禁用TET数据管道，使用传统HIkyuu模式")
+            logger.info(" 禁用TET数据管道，使用传统HIkyuu模式")
             self.tet_enabled = False
             self.tet_pipeline = None
         except Exception as e:
             logger.warning(f"TET数据管道初始化失败: {e}")
-            logger.info("🔄 降级到传统HIkyuu模式")
+            logger.info(" 降级到传统HIkyuu模式")
             self.tet_enabled = False
             self._plugins_discovered = False
 
@@ -349,10 +349,10 @@ class UnifiedDataManager:
             # DuckDB可用标志
             self.duckdb_available = True
 
-            logger.info("✅ DuckDB功能集成成功")
+            logger.info(" DuckDB功能集成成功")
 
         except ImportError as e:
-            logger.warning(f"⚠️ DuckDB模块导入失败，将使用传统模式: {e}")
+            logger.warning(f" DuckDB模块导入失败，将使用传统模式: {e}")
             self.duckdb_operations = None
             self.duckdb_manager = None
             self.table_manager = None
@@ -360,7 +360,7 @@ class UnifiedDataManager:
             self.multi_cache = None
             self.duckdb_available = False
         except Exception as e:
-            logger.warning(f"⚠️ DuckDB功能集成失败，将使用传统模式: {e}")
+            logger.warning(f" DuckDB功能集成失败，将使用传统模式: {e}")
             self.duckdb_operations = None
             self.duckdb_manager = None
             self.table_manager = None
@@ -441,12 +441,12 @@ class UnifiedDataManager:
             if self.cache_manager:
                 cached_data = self.cache_manager.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"从缓存获取股票列表: {len(cached_data)} 只股票")
+                    logger.info(f"从缓存获取股票列表: {len(cached_data)} 只股票")
                     return cached_data
 
             # 优先使用TET数据管道（插件化架构）
             if self.tet_enabled and self.tet_pipeline:
-                logger.info("🚀 使用TET数据管道获取股票列表（插件化架构）")
+                logger.info(" 使用TET数据管道获取股票列表（插件化架构）")
                 try:
                     from ..tet_data_pipeline import StandardQuery
                     from ..plugin_types import AssetType, DataType
@@ -477,7 +477,7 @@ class UnifiedDataManager:
                         try:
                             result = future.result(timeout=5.0)  # 5秒超时
                         except TimeoutError:
-                            logger.warning("⚠️ TET管道处理超时，降级到传统模式")
+                            logger.warning(" TET管道处理超时，降级到传统模式")
                             result = None
 
                     if result and result.data is not None:
@@ -489,13 +489,13 @@ class UnifiedDataManager:
                             if self.cache_manager and not df.empty:
                                 self.cache_manager.set(cache_key, df)
 
-                            logger.info(f"✅ 通过TET管道获取股票列表成功: {len(df)} 只股票")
+                            logger.info(f" 通过TET管道获取股票列表成功: {len(df)} 只股票")
                             return df
                         elif isinstance(result.data, pd.DataFrame) and not result.data.empty:
                             # 如果已经是DataFrame格式
                             if self.cache_manager:
                                 self.cache_manager.set(cache_key, result.data)
-                            logger.info(f"✅ 通过TET管道获取股票列表成功: {len(result.data)} 只股票")
+                            logger.info(f" 通过TET管道获取股票列表成功: {len(result.data)} 只股票")
                             return result.data
                         else:
                             logger.warning("TET管道返回空数据")
@@ -506,7 +506,7 @@ class UnifiedDataManager:
                     logger.warning(f"TET管道获取股票列表失败: {e}，降级到传统模式")
 
             # 降级到传统数据源（保持向后兼容性）
-            logger.info("🔄 降级到传统数据源模式")
+            logger.info(" 降级到传统数据源模式")
 
             # 根据当前数据源获取数据
             if self._current_source == 'hikyuu' and self._hikyuu_available:
@@ -743,14 +743,73 @@ class UnifiedDataManager:
         except Exception as e:
             logger.warning(f"缓存存储失败: {e}")
 
-    def _get_kdata_from_duckdb(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
-        """从DuckDB获取K线数据"""
+    def _get_kdata_from_duckdb(self, stock_code: str, period: str, count: int, data_source: str = None) -> pd.DataFrame:
+        """从DuckDB获取K线数据（支持数据源隔离）"""
         try:
             if not self.duckdb_operations:
                 return pd.DataFrame()
 
+            # 使用数据源分离存储管理器获取正确的数据库路径和表名
+            from ..database.data_source_separated_storage import get_separated_storage_manager
+            from ..database.table_manager import TableType
+            from ..database.duckdb_manager import get_connection_manager
+
+            separated_storage = get_separated_storage_manager()
+            self.connection_manager = get_connection_manager()
+
+            # 如果指定了数据源，从该数据源的独立数据库读取
+            if data_source:
+                db_path = separated_storage.get_database_path(data_source)
+                if not db_path:
+                    logger.warning(f"数据源 {data_source} 未注册，无法读取数据")
+                    return pd.DataFrame()
+
+                # 获取该数据源的表名（不创建，只查询已有表名）
+                table_name = None
+                try:
+                    # 先尝试获取存储配置
+                    config = separated_storage.get_storage_config(data_source)
+                    if config:
+                        # 使用表管理器生成正确的表名
+                        from ..database.table_manager import get_table_manager
+                        table_manager = get_table_manager()
+                        table_name = table_manager.generate_table_name(
+                            table_type=TableType.KLINE_DATA,
+                            plugin_name=data_source.replace('.', '_'),  # 例如 examples_tongdaxin_stock_plugin
+                            period=period
+                        )
+                except Exception as e:
+                    logger.warning(f"获取表名失败: {e}")
+
+                # 如果获取表名失败，使用默认格式（与表管理器一致）
+                if not table_name:
+                    clean_plugin_name = data_source.replace('.', '_')
+                    # 标准化period，确保与表管理器的命名一致
+                    # 参考unified_table_name_generator.py的NAME_MAPPINGS
+                    period_mapping = {
+                        'd': 'daily',
+                        'daily': 'daily',
+                        '1m': 'minute',
+                        'minute': 'minute',
+                        '1h': 'hourly',
+                        'hourly': 'hourly',
+                        'w': 'weekly',
+                        'weekly': 'weekly',
+                        'm': 'monthly',
+                        'monthly': 'monthly'
+                    }
+                    standardized_period = period_mapping.get(period.lower(), period.lower())
+                    table_name = f"kline_data_{clean_plugin_name}_{standardized_period}"
+            else:
+                # 降级到默认数据库
+                db_path = "db/kline_stock.duckdb"
+                table_name = f"kline_data_{period.lower()}"
+
+            if not table_name:
+                logger.warning(f"无法确定表名，数据源: {data_source}, 周期: {period}")
+                return pd.DataFrame()
+
             # 构建查询
-            table_name = f"kline_data_{period.lower()}"
             query = f"""
                 SELECT * FROM {table_name} 
                 WHERE symbol = ? 
@@ -758,15 +817,21 @@ class UnifiedDataManager:
                 LIMIT ?
             """
 
-            result = self.duckdb_operations.execute_query(
-                database_path="db/kline_stock.duckdb",
-                query=query,
-                params=[stock_code, count]
-            )
+            # 使用DuckDB连接管理器直接执行查询
+            with self.connection_manager.get_connection(db_path) as conn:
+                result_data = conn.execute(query, [stock_code, count]).fetchall()
+
+                # 构造结果对象
+                class QueryResult:
+                    def __init__(self, success, data):
+                        self.success = success
+                        self.data = data
+
+                result = QueryResult(success=True, data=result_data)
 
             if result.success and result.data:
                 df = pd.DataFrame(result.data)
-                logger.info(f"✅ 从DuckDB获取K线数据成功: {stock_code}, {len(df)}条")
+                logger.info(f" 从DuckDB({data_source or '默认'})获取K线数据成功: {stock_code}, {len(df)}条")
                 return df
 
             return pd.DataFrame()
@@ -785,7 +850,12 @@ class UnifiedDataManager:
 
             # 确保表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", table_name)
+                from ..database.table_manager import TableType
+                actual_table_name = self.table_manager.ensure_table_exists(
+                    "db/kline_stock.duckdb", TableType.KLINE_DATA, "unified_data_manager", period
+                )
+                if actual_table_name:
+                    table_name = actual_table_name
 
             # 插入数据（使用upsert避免重复）
             result = self.duckdb_operations.insert_dataframe(
@@ -796,7 +866,7 @@ class UnifiedDataManager:
             )
 
             if result.success:
-                logger.info(f"✅ 数据存储到DuckDB成功: {stock_code}, {len(data)}条")
+                logger.info(f" 数据存储到DuckDB成功: {stock_code}, {len(data)}条")
 
         except Exception as e:
             logger.warning(f"DuckDB数据存储失败: {e}")
@@ -804,7 +874,7 @@ class UnifiedDataManager:
     def _get_hikyuu_kdata(self, stock_code: str, period: str, count: int) -> pd.DataFrame:
         """通过插件系统获取K线数据（重构版）"""
         try:
-            logger.info(f"🔄 通过插件系统获取K线数据: {stock_code}, period={period}, count={count}")
+            logger.info(f" 通过插件系统获取K线数据: {stock_code}, period={period}, count={count}")
 
             # 优先使用TET数据管道（插件化架构）
             if self.tet_enabled and self.tet_pipeline:
@@ -827,7 +897,7 @@ class UnifiedDataManager:
 
                     if result and result.data is not None:
                         if isinstance(result.data, pd.DataFrame) and not result.data.empty:
-                            logger.info(f"✅ 通过TET管道获取K线数据成功: {len(result.data)} 条记录")
+                            logger.info(f" 通过TET管道获取K线数据成功: {len(result.data)} 条记录")
                             return result.data
                         else:
                             logger.warning("TET管道返回空K线数据")
@@ -838,17 +908,86 @@ class UnifiedDataManager:
                     logger.warning(f"TET管道获取K线数据失败: {e}，降级到传统模式")
 
             # 降级到传统HIkyuu调用（保持向后兼容性）
-            logger.info("🔄 降级到传统HIkyuu模式获取K线数据")
+            logger.info(" 降级到传统HIkyuu模式获取K线数据")
             legacy_data = self._get_hikyuu_kdata_legacy(stock_code, period, count)
 
             # 如果传统模式也失败，按获取数据为空处理
             if legacy_data.empty:
-                logger.warning(f"⚠️ 传统模式也无法获取数据: {stock_code}，返回空数据")
+                logger.warning(f" 传统模式也无法获取数据: {stock_code}，返回空数据")
 
             return legacy_data
 
         except Exception as e:
             logger.error(f"获取K线数据失败: {e}")
+            return pd.DataFrame()
+
+    def get_kdata_from_source(self, stock_code: str, period: str = 'D', count: int = 365, data_source: str = None) -> pd.DataFrame:
+        """
+        从指定数据源获取K线数据
+
+        Args:
+            stock_code: 股票代码
+            period: 周期 (D/W/M/1/5/15/30/60)
+            count: 数据条数
+            data_source: 数据源名称（如'examples.akshare_stock_plugin'）
+
+        Returns:
+            K线数据DataFrame
+        """
+        try:
+            logger.info(f"从指定数据源获取K线数据: {stock_code}, 数据源: {data_source}")
+
+            # 如果没有指定数据源，使用默认方法
+            if not data_source:
+                return self.get_kdata(stock_code, period, count)
+
+            # 优先使用TET管道处理指定数据源
+            if self.tet_enabled and self.tet_pipeline:
+                try:
+                    from ..tet_data_pipeline import StandardQuery
+                    from ..plugin_types import AssetType, DataType
+
+                    # 创建标准化查询请求，使用指定的数据源
+                    query = StandardQuery(
+                        symbol=stock_code,
+                        asset_type=AssetType.STOCK,
+                        data_type=DataType.HISTORICAL_KLINE,
+                        period=period,
+                        provider=data_source,  # 使用指定的数据源
+                        extra_params={'count': count}
+                    )
+
+                    # 通过TET管道处理请求
+                    result = self.tet_pipeline.process(query)
+
+                    if result and result.data is not None:
+                        if isinstance(result.data, pd.DataFrame) and not result.data.empty:
+                            logger.info(f"通过TET管道从{data_source}获取K线数据成功: {len(result.data)} 条记录")
+                            return result.data
+                        else:
+                            logger.warning(f"TET管道从{data_source}返回空K线数据")
+                    else:
+                        logger.warning(f"TET管道从{data_source}处理失败")
+
+                except Exception as e:
+                    logger.warning(f"TET管道从{data_source}获取K线数据失败: {e}，尝试从数据库读取")
+
+            # TET管道失败时，先尝试从数据库读取历史数据（可能有之前的数据）
+            if data_source:
+                try:
+                    db_data = self._get_kdata_from_duckdb(stock_code, period, count, data_source)
+                    if not db_data.empty:
+                        logger.info(f"从{data_source}数据库获取K线数据成功: {len(db_data)} 条记录")
+                        return db_data
+                except Exception as e:
+                    logger.warning(f"从{data_source}数据库读取失败: {e}")
+
+            # 指定数据源失败时，直接记录错误并返回空数据
+            logger.error(f"数据源{data_source}连接失败，股票{stock_code}无法获取数据")
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"从指定数据源获取K线数据失败: {e}")
             return pd.DataFrame()
 
     def get_historical_data(self, symbol: str, asset_type=None, period: str = "D", count: int = 365, **kwargs) -> Optional[pd.DataFrame]:
@@ -963,8 +1102,8 @@ class UnifiedDataManager:
 
                 query = hku.Query(stock.start_datetime, stock.last_datetime, ktype_str)
 
-            # 获取K线数据
-            kdata = stock.getKData(query)
+            # 获取K线数据 - 修复API方法名
+            kdata = stock.get_kdata(query)
 
             # 转换为DataFrame
             if len(kdata) == 0:
@@ -1118,7 +1257,7 @@ class UnifiedDataManager:
             }
 
             if self.tet_enabled and self.tet_pipeline:
-                logger.info("🚀 使用TET数据管道获取资金流数据")
+                logger.info(" 使用TET数据管道获取资金流数据")
 
                 try:
                     # 获取板块资金流数据
@@ -1136,12 +1275,12 @@ class UnifiedDataManager:
                         else:
                             # 如果返回的是列表或字典，转换为DataFrame
                             fund_flow_data['sector_flow_rank'] = pd.DataFrame(sector_result.data)
-                        logger.info(f"✅ TET获取板块资金流数据成功: {len(fund_flow_data['sector_flow_rank'])} 条记录")
+                        logger.info(f" TET获取板块资金流数据成功: {len(fund_flow_data['sector_flow_rank'])} 条记录")
                     else:
-                        logger.warning("⚠️ TET板块资金流数据为空或失败")
+                        logger.warning(" TET板块资金流数据为空或失败")
 
                 except Exception as e:
-                    logger.warning(f"⚠️ TET获取板块资金流数据失败: {e}")
+                    logger.warning(f" TET获取板块资金流数据失败: {e}")
 
                 try:
                     # 获取个股资金流数据
@@ -1158,12 +1297,12 @@ class UnifiedDataManager:
                             fund_flow_data['individual_flow'] = individual_result.data
                         else:
                             fund_flow_data['individual_flow'] = pd.DataFrame(individual_result.data)
-                        logger.info(f"✅ TET获取个股资金流数据成功: {len(fund_flow_data['individual_flow'])} 条记录")
+                        logger.info(f" TET获取个股资金流数据成功: {len(fund_flow_data['individual_flow'])} 条记录")
                     else:
-                        logger.warning("⚠️ TET个股资金流数据为空或失败")
+                        logger.warning(" TET个股资金流数据为空或失败")
 
                 except Exception as e:
-                    logger.warning(f"⚠️ TET获取个股资金流数据失败: {e}")
+                    logger.warning(f" TET获取个股资金流数据失败: {e}")
 
                 try:
                     # 获取市场整体资金流数据
@@ -1183,15 +1322,15 @@ class UnifiedDataManager:
                             fund_flow_data['market_flow'] = market_result.data.to_dict('records')[0] if len(market_result.data) > 0 else {}
                         else:
                             fund_flow_data['market_flow'] = {}
-                        logger.info(f"✅ TET获取市场资金流数据成功")
+                        logger.info(f" TET获取市场资金流数据成功")
                     else:
-                        logger.warning("⚠️ TET市场资金流数据为空或失败")
+                        logger.warning(" TET市场资金流数据为空或失败")
 
                 except Exception as e:
-                    logger.warning(f"⚠️ TET获取市场资金流数据失败: {e}")
+                    logger.warning(f" TET获取市场资金流数据失败: {e}")
 
             else:
-                logger.info("🔄 降级到传统数据源模式获取资金流数据")
+                logger.info(" 降级到传统数据源模式获取资金流数据")
                 # 使用HIkyuu或其他传统数据源获取资金流数据
                 fund_flow_data = self._get_fund_flow_legacy()
 
@@ -1199,7 +1338,7 @@ class UnifiedDataManager:
             if (fund_flow_data['sector_flow_rank'].empty and
                 fund_flow_data['individual_flow'].empty and
                     not fund_flow_data['market_flow']):
-                logger.info("📊 生成模拟资金流数据用于测试")
+                logger.info(" 生成模拟资金流数据用于测试")
                 fund_flow_data = self._generate_mock_fund_flow_data()
 
             return fund_flow_data
@@ -1226,7 +1365,7 @@ class UnifiedDataManager:
 
             # HIkyuu目前可能不直接支持资金流数据，这里预留接口
             # 可以通过其他数据源API补充
-            logger.info("📊 HIkyuu传统模式暂不支持资金流数据，返回空数据")
+            logger.info(" HIkyuu传统模式暂不支持资金流数据，返回空数据")
 
             return fund_flow_data
 
@@ -1238,77 +1377,12 @@ class UnifiedDataManager:
                 'market_flow': {}
             }
 
-    def _generate_mock_fund_flow_data(self) -> Dict[str, Any]:
-        """生成模拟资金流数据用于测试"""
-        try:
-            import numpy as np
-            from datetime import datetime, timedelta
-
-            # 生成板块资金流排行数据
-            sectors = ['银行', '证券', '保险', '房地产', '钢铁', '煤炭', '有色金属', '石油石化',
-                       '电力', '公用事业', '交通运输', '电子', '计算机', '通信', '医药生物',
-                       '食品饮料', '纺织服装', '轻工制造', '化工', '建筑材料']
-
-            sector_data = []
-            for i, sector in enumerate(sectors):
-                net_inflow = np.random.uniform(-5000, 8000)  # 净流入金额（万元）
-                inflow_rate = np.random.uniform(-8, 12)      # 净流入率（%）
-
-                sector_data.append({
-                    'sector_name': sector,
-                    'net_inflow': round(net_inflow, 2),
-                    'inflow_rate': round(inflow_rate, 2),
-                    'main_inflow': round(net_inflow * 0.6, 2),
-                    'retail_inflow': round(net_inflow * 0.4, 2),
-                    'rank': i + 1,
-                    'update_time': datetime.now()
-                })
-
-            sector_df = pd.DataFrame(sector_data)
-
-            # 生成个股资金流数据
-            stocks = ['平安银行', '招商银行', '中国平安', '贵州茅台', '五粮液', '美的集团',
-                      '格力电器', '海康威视', '恒瑞医药', '迈瑞医疗', '宁德时代', '比亚迪',
-                      '立讯精密', '韦尔股份', 'TCL科技', '京东方A', '三一重工', '中联重科',
-                      '万科A', '保利发展']
-
-            individual_data = []
-            for i, stock in enumerate(stocks):
-                code = f"00000{i+1:02d}"  # 模拟股票代码
-                net_inflow = np.random.uniform(-2000, 5000)
-                inflow_rate = np.random.uniform(-10, 15)
-
-                individual_data.append({
-                    'stock_code': code,
-                    'stock_name': stock,
-                    'net_inflow': round(net_inflow, 2),
-                    'inflow_rate': round(inflow_rate, 2),
-                    'main_inflow': round(net_inflow * 0.65, 2),
-                    'retail_inflow': round(net_inflow * 0.35, 2),
-                    'price': round(np.random.uniform(10, 200), 2),
-                    'change_rate': round(np.random.uniform(-5, 8), 2),
-                    'update_time': datetime.now()
-                })
-
-            individual_df = pd.DataFrame(individual_data)
-
-            # 生成市场整体资金流数据
-            market_flow = {
-                'total_net_inflow': round(np.random.uniform(-50000, 80000), 2),
-                'main_net_inflow': round(np.random.uniform(-30000, 50000), 2),
-                'retail_net_inflow': round(np.random.uniform(-20000, 30000), 2),
-                'north_bound_inflow': round(np.random.uniform(-100, 200), 2),
-                'market_sentiment': np.random.choice(['强势', '中性', '弱势']),
-                'active_ratio': round(np.random.uniform(0.6, 0.9), 2),
-                'update_time': datetime.now()
-            }
-
-            logger.info("✅ 生成模拟资金流数据完成")
-
+            # 返回空的资金流数据结构
+            logger.info("资金流数据需要通过真实数据源获取")
             return {
-                'sector_flow_rank': sector_df,
-                'individual_flow': individual_df,
-                'market_flow': market_flow
+                'sector_flow_rank': pd.DataFrame(),
+                'individual_flow': pd.DataFrame(),
+                'market_flow': {}
             }
 
         except Exception as e:
@@ -1380,10 +1454,10 @@ class UnifiedDataManager:
             try:
                 # 懒加载检查：如果插件还没发现，重新尝试发现
                 if not self._plugins_discovered:
-                    logger.info("🔄 TET管道首次使用，重新尝试插件发现...")
+                    logger.info(" TET管道首次使用，重新尝试插件发现...")
                     self._auto_discover_data_source_plugins()
 
-                logger.info("🚀 使用TET数据管道获取股票列表（插件化架构）")
+                logger.info(" 使用TET数据管道获取股票列表（插件化架构）")
                 query = StandardQuery(
                     symbol="",  # 资产列表查询不需要具体symbol
                     asset_type=asset_type,
@@ -1402,7 +1476,7 @@ class UnifiedDataManager:
 
             except Exception as e:
                 logger.warning(f"TET模式获取资产列表失败: {e}")
-                logger.info("🔄 降级到传统数据源模式")
+                logger.info(" 降级到传统数据源模式")
 
         # 降级到传统方式
         return self._legacy_get_asset_list(asset_type, market)
@@ -1455,7 +1529,7 @@ class UnifiedDataManager:
         """
         if self.tet_enabled and self.tet_pipeline:
             try:
-                logger.info(f"🚀 使用TET模式获取数据: {symbol} ({asset_type.value})")
+                logger.info(f" 使用TET模式获取数据: {symbol} ({asset_type.value})")
 
                 query = StandardQuery(
                     symbol=symbol,
@@ -1470,27 +1544,27 @@ class UnifiedDataManager:
                 # 记录使用的数据源
                 if result and hasattr(result, 'source_info') and result.source_info:
                     data_source = result.source_info.get('provider', 'Unknown')
-                    logger.info(f"✅ TET数据获取成功: {symbol} | 数据源: {data_source} | 记录数: {len(result.data) if result.data is not None else 0}")
+                    logger.info(f" TET数据获取成功: {symbol} | 数据源: {data_source} | 记录数: {len(result.data) if result.data is not None else 0}")
                 else:
-                    logger.info(f"✅ TET数据获取成功: {symbol} | 记录数: {len(result.data) if result.data is not None else 0}")
+                    logger.info(f" TET数据获取成功: {symbol} | 记录数: {len(result.data) if result.data is not None else 0}")
 
                 return result.data
 
             except Exception as e:
-                logger.warning(f"❌ TET模式获取数据失败: {symbol} - {e}")
-                logger.info("🔄 降级到传统数据获取模式")
+                logger.warning(f" TET模式获取数据失败: {symbol} - {e}")
+                logger.info(" 降级到传统数据获取模式")
 
         # 降级到传统方式
         if asset_type == AssetType.STOCK:
-            logger.info(f"📊 使用传统模式获取股票数据: {symbol}")
+            logger.info(f" 使用传统模式获取股票数据: {symbol}")
             data = self._legacy_get_stock_data(symbol, period, **kwargs)
             if data is not None:
-                logger.info(f"✅ 传统模式数据获取成功: {symbol} | 数据源: HIkyuu/DataAccess | 记录数: {len(data)}")
+                logger.info(f" 传统模式数据获取成功: {symbol} | 数据源: HIkyuu/DataAccess | 记录数: {len(data)}")
             else:
-                logger.warning(f"❌ 传统模式数据获取失败: {symbol}")
+                logger.warning(f" 传统模式数据获取失败: {symbol}")
             return data
         else:
-            logger.warning(f"❌ 传统模式不支持资产类型: {asset_type.value} | 建议启用TET模式")
+            logger.warning(f" 传统模式不支持资产类型: {asset_type.value} | 建议启用TET模式")
             return None
 
     def _format_asset_list(self, asset_data: pd.DataFrame) -> List[Dict[str, Any]]:
@@ -1577,7 +1651,7 @@ class UnifiedDataManager:
         try:
             # 检查TET管道是否可用
             if not (hasattr(self, 'tet_pipeline') and self.tet_pipeline):
-                logger.warning("⚠️ TET数据管道不可用，无法注册插件")
+                logger.warning(" TET数据管道不可用，无法注册插件")
                 return False
 
             # 注册到TET管道的路由器
@@ -1585,25 +1659,25 @@ class UnifiedDataManager:
                 router = self.tet_pipeline.router
                 router_success = router.register_data_source(plugin_id, adapter, priority, weight)
                 if router_success:
-                    logger.info(f"✅ 插件 {plugin_id} 已注册到TET数据管道路由器")
+                    logger.info(f" 插件 {plugin_id} 已注册到TET数据管道路由器")
                 else:
-                    logger.error(f"❌ 插件 {plugin_id} 注册到TET数据管道路由器失败")
+                    logger.error(f" 插件 {plugin_id} 注册到TET数据管道路由器失败")
                     return False
             else:
-                logger.error("❌ TET数据管道缺少路由器")
+                logger.error(" TET数据管道缺少路由器")
                 return False
 
             # 关键修复：同时注册到TET管道的适配器字典
             if hasattr(self.tet_pipeline, '_adapters'):
                 self.tet_pipeline._adapters[plugin_id] = adapter
-                logger.info(f"✅ 插件 {plugin_id} 已注册到TET管道适配器字典")
+                logger.info(f" 插件 {plugin_id} 已注册到TET管道适配器字典")
             else:
-                logger.warning("⚠️ TET管道缺少_adapters属性")
+                logger.warning(" TET管道缺少_adapters属性")
 
             # 如果适配器有对应的插件实例，也注册到_plugins字典
             if hasattr(adapter, 'plugin') and hasattr(self.tet_pipeline, '_plugins'):
                 self.tet_pipeline._plugins[plugin_id] = adapter.plugin
-                logger.info(f"✅ 插件 {plugin_id} 已注册到TET管道插件字典")
+                logger.info(f" 插件 {plugin_id} 已注册到TET管道插件字典")
 
             # 记录已注册的数据源信息
             plugin_info = {
@@ -1616,12 +1690,12 @@ class UnifiedDataManager:
                 'status': 'active'
             }
             self._registered_data_sources[plugin_id] = plugin_info
-            logger.info(f"✅ 数据源 {plugin_id} 信息已记录")
+            logger.info(f" 数据源 {plugin_id} 信息已记录")
 
             return True
 
         except Exception as e:
-            logger.error(f"❌ 注册数据源插件失败 {plugin_id}: {e}")
+            logger.error(f" 注册数据源插件失败 {plugin_id}: {e}")
             import traceback
             logger.error(f"详细错误信息: {traceback.format_exc()}")
             return False
@@ -1908,7 +1982,12 @@ class UnifiedDataManager:
 
             # 确保财务数据表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", "financial_statements")
+                from ..database.table_manager import TableType
+                if not self.table_manager.ensure_table_exists(
+                    "db/kline_stock.duckdb", TableType.FINANCIAL_STATEMENT, "unified_data_manager"
+                ):
+                    logger.error("创建财务数据表失败")
+                    return
 
             # 转换为DataFrame并存储
             df = pd.DataFrame([data])
@@ -1920,7 +1999,7 @@ class UnifiedDataManager:
             )
 
             if result.success:
-                logger.info(f"✅ 财务数据存储到DuckDB成功: {stock_code}")
+                logger.info(f" 财务数据存储到DuckDB成功: {stock_code}")
 
         except Exception as e:
             logger.warning(f"DuckDB财务数据存储失败: {e}")
@@ -2003,7 +2082,7 @@ class UnifiedDataManager:
 
             if result.success and result.data:
                 df = pd.DataFrame(result.data)
-                logger.info(f"✅ 从DuckDB获取宏观数据成功: {indicator}, {len(df)}条")
+                logger.info(f" 从DuckDB获取宏观数据成功: {indicator}, {len(df)}条")
                 return df
 
             return pd.DataFrame()
@@ -2020,7 +2099,12 @@ class UnifiedDataManager:
 
             # 确保宏观数据表存在
             if self.table_manager:
-                self.table_manager.ensure_table_exists("db/kline_stock.duckdb", "macro_economic_data")
+                from ..database.table_manager import TableType
+                if not self.table_manager.ensure_table_exists(
+                    "db/kline_stock.duckdb", TableType.MACRO_ECONOMIC, "unified_data_manager"
+                ):
+                    logger.error("创建宏观数据表失败")
+                    return
 
             # 插入数据
             result = self.duckdb_operations.insert_dataframe(
@@ -2031,7 +2115,7 @@ class UnifiedDataManager:
             )
 
             if result.success:
-                logger.info(f"✅ 宏观数据存储到DuckDB成功: {indicator}, {len(data)}条")
+                logger.info(f" 宏观数据存储到DuckDB成功: {indicator}, {len(data)}条")
 
         except Exception as e:
             logger.warning(f"DuckDB宏观数据存储失败: {e}")
@@ -2432,21 +2516,21 @@ class UnifiedDataManager:
 
                         if success:
                             registered_count += 1
-                            logger.info(f"✅ 自动注册数据源插件: {plugin_name}")
+                            logger.info(f" 自动注册数据源插件: {plugin_name}")
                         else:
-                            logger.warning(f"⚠️ 数据源插件注册失败: {plugin_name}")
+                            logger.warning(f" 数据源插件注册失败: {plugin_name}")
 
                 except Exception as e:
-                    logger.warning(f"⚠️ 检查插件失败 {plugin_name}: {e}")
+                    logger.warning(f" 检查插件失败 {plugin_name}: {e}")
 
             if registered_count > 0:
-                logger.info(f"✅ 自动发现并注册了 {registered_count} 个数据源插件")
+                logger.info(f" 自动发现并注册了 {registered_count} 个数据源插件")
                 self._plugins_discovered = True
             else:
-                logger.info("📝 未发现新的数据源插件")
+                logger.info(" 未发现新的数据源插件")
 
         except Exception as e:
-            logger.error(f"❌ 自动发现数据源插件失败: {e}")
+            logger.error(f" 自动发现数据源插件失败: {e}")
 
     def _is_data_source_plugin(self, plugin_instance) -> bool:
         """检查插件是否是数据源插件"""
@@ -2500,12 +2584,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册HIkyuu数据源插件成功")
+                logger.info(" 手动注册HIkyuu数据源插件成功")
             else:
-                logger.warning("⚠️ HIkyuu数据源插件注册失败")
+                logger.warning(" HIkyuu数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ HIkyuu插件注册失败: {e}")
+            logger.warning(f" HIkyuu插件注册失败: {e}")
 
         # 2. 注册AkShare插件（支持sector_fund_flow）
         try:
@@ -2524,12 +2608,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册AkShare数据源插件成功")
+                logger.info(" 手动注册AkShare数据源插件成功")
             else:
-                logger.warning("⚠️ AkShare数据源插件注册失败")
+                logger.warning(" AkShare数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ AkShare插件注册失败: {e}")
+            logger.warning(f" AkShare插件注册失败: {e}")
 
         # 3. 注册Wind插件（如果可用）
         try:
@@ -2545,12 +2629,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册Wind数据源插件成功")
+                logger.info(" 手动注册Wind数据源插件成功")
             else:
-                logger.warning("⚠️ Wind数据源插件注册失败")
+                logger.warning(" Wind数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ Wind插件注册失败: {e}")
+            logger.warning(f" Wind插件注册失败: {e}")
 
         # 4. 注册东方财富插件
         try:
@@ -2566,12 +2650,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册东方财富数据源插件成功")
+                logger.info(" 手动注册东方财富数据源插件成功")
             else:
-                logger.warning("⚠️ 东方财富数据源插件注册失败")
+                logger.warning(" 东方财富数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 东方财富插件注册失败: {e}")
+            logger.warning(f" 东方财富插件注册失败: {e}")
 
         # 5. 注册通达信插件
         try:
@@ -2587,12 +2671,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册通达信数据源插件成功")
+                logger.info(" 手动注册通达信数据源插件成功")
             else:
-                logger.warning("⚠️ 通达信数据源插件注册失败")
+                logger.warning(" 通达信数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 通达信插件注册失败: {e}")
+            logger.warning(f" 通达信插件注册失败: {e}")
 
         # 6. 注册Yahoo Finance插件
         try:
@@ -2608,12 +2692,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册Yahoo Finance数据源插件成功")
+                logger.info(" 手动注册Yahoo Finance数据源插件成功")
             else:
-                logger.warning("⚠️ Yahoo Finance数据源插件注册失败")
+                logger.warning(" Yahoo Finance数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ Yahoo Finance插件注册失败: {e}")
+            logger.warning(f" Yahoo Finance插件注册失败: {e}")
 
         # 7. 注册期货数据插件
         try:
@@ -2629,12 +2713,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册期货数据源插件成功")
+                logger.info(" 手动注册期货数据源插件成功")
             else:
-                logger.warning("⚠️ 期货数据源插件注册失败")
+                logger.warning(" 期货数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 期货插件注册失败: {e}")
+            logger.warning(f" 期货插件注册失败: {e}")
 
         # 8. 注册CTP期货插件
         try:
@@ -2650,12 +2734,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册CTP期货数据源插件成功")
+                logger.info(" 手动注册CTP期货数据源插件成功")
             else:
-                logger.warning("⚠️ CTP期货数据源插件注册失败")
+                logger.warning(" CTP期货数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ CTP期货插件注册失败: {e}")
+            logger.warning(f" CTP期货插件注册失败: {e}")
 
         # 9. 注册文华财经插件
         try:
@@ -2671,12 +2755,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册文华财经数据源插件成功")
+                logger.info(" 手动注册文华财经数据源插件成功")
             else:
-                logger.warning("⚠️ 文华财经数据源插件注册失败")
+                logger.warning(" 文华财经数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 文华财经插件注册失败: {e}")
+            logger.warning(f" 文华财经插件注册失败: {e}")
 
         # 10. 注册外汇数据插件
         try:
@@ -2692,12 +2776,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册外汇数据源插件成功")
+                logger.info(" 手动注册外汇数据源插件成功")
             else:
-                logger.warning("⚠️ 外汇数据源插件注册失败")
+                logger.warning(" 外汇数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 外汇插件注册失败: {e}")
+            logger.warning(f" 外汇插件注册失败: {e}")
 
         # 11. 注册债券数据插件
         try:
@@ -2713,12 +2797,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册债券数据源插件成功")
+                logger.info(" 手动注册债券数据源插件成功")
             else:
-                logger.warning("⚠️ 债券数据源插件注册失败")
+                logger.warning(" 债券数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 债券插件注册失败: {e}")
+            logger.warning(f" 债券插件注册失败: {e}")
 
         # 12. 注册加密货币数据插件
         try:
@@ -2734,12 +2818,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册加密货币数据源插件成功")
+                logger.info(" 手动注册加密货币数据源插件成功")
             else:
-                logger.warning("⚠️ 加密货币数据源插件注册失败")
+                logger.warning(" 加密货币数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 加密货币插件注册失败: {e}")
+            logger.warning(f" 加密货币插件注册失败: {e}")
 
         # 13. 注册币安加密货币插件
         try:
@@ -2755,12 +2839,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册币安加密货币数据源插件成功")
+                logger.info(" 手动注册币安加密货币数据源插件成功")
             else:
-                logger.warning("⚠️ 币安加密货币数据源插件注册失败")
+                logger.warning(" 币安加密货币数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 币安加密货币插件注册失败: {e}")
+            logger.warning(f" 币安加密货币插件注册失败: {e}")
 
         # 14. 注册火币加密货币插件
         try:
@@ -2776,12 +2860,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册火币加密货币数据源插件成功")
+                logger.info(" 手动注册火币加密货币数据源插件成功")
             else:
-                logger.warning("⚠️ 火币加密货币数据源插件注册失败")
+                logger.warning(" 火币加密货币数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 火币加密货币插件注册失败: {e}")
+            logger.warning(f" 火币加密货币插件注册失败: {e}")
 
         # 15. 注册OKX加密货币插件
         try:
@@ -2797,12 +2881,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册OKX加密货币数据源插件成功")
+                logger.info(" 手动注册OKX加密货币数据源插件成功")
             else:
-                logger.warning("⚠️ OKX加密货币数据源插件注册失败")
+                logger.warning(" OKX加密货币数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ OKX加密货币插件注册失败: {e}")
+            logger.warning(f" OKX加密货币插件注册失败: {e}")
 
         # 16. 注册Coinbase加密货币插件
         try:
@@ -2818,12 +2902,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册Coinbase加密货币数据源插件成功")
+                logger.info(" 手动注册Coinbase加密货币数据源插件成功")
             else:
-                logger.warning("⚠️ Coinbase加密货币数据源插件注册失败")
+                logger.warning(" Coinbase加密货币数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ Coinbase加密货币插件注册失败: {e}")
+            logger.warning(f" Coinbase加密货币插件注册失败: {e}")
 
         # 17. 注册我的钢铁网数据插件
         try:
@@ -2839,12 +2923,12 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册我的钢铁网数据源插件成功")
+                logger.info(" 手动注册我的钢铁网数据源插件成功")
             else:
-                logger.warning("⚠️ 我的钢铁网数据源插件注册失败")
+                logger.warning(" 我的钢铁网数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 我的钢铁网插件注册失败: {e}")
+            logger.warning(f" 我的钢铁网插件注册失败: {e}")
 
         # 18. 注册自定义数据插件
         try:
@@ -2860,18 +2944,18 @@ class UnifiedDataManager:
 
             if success:
                 registered_count += 1
-                logger.info("✅ 手动注册自定义数据源插件成功")
+                logger.info(" 手动注册自定义数据源插件成功")
             else:
-                logger.warning("⚠️ 自定义数据源插件注册失败")
+                logger.warning(" 自定义数据源插件注册失败")
 
         except Exception as e:
-            logger.warning(f"⚠️ 自定义插件注册失败: {e}")
+            logger.warning(f" 自定义插件注册失败: {e}")
 
         if registered_count > 0:
-            logger.info(f"✅ 手动注册了 {registered_count} 个核心数据源插件")
+            logger.info(f" 手动注册了 {registered_count} 个核心数据源插件")
             self._plugins_discovered = True
         else:
-            logger.warning("⚠️ 未能注册任何数据源插件，创建基本回退数据源")
+            logger.warning(" 未能注册任何数据源插件，创建基本回退数据源")
             # 创建基本回退数据源，避免TET管道完全无法工作
             self._create_fallback_data_source()
             self._plugins_discovered = True
@@ -2926,12 +3010,12 @@ class UnifiedDataManager:
             )
 
             if success:
-                logger.info("✅ 创建回退数据源成功")
+                logger.info(" 创建回退数据源成功")
             else:
-                logger.warning("⚠️ 创建回退数据源失败")
+                logger.warning(" 创建回退数据源失败")
 
         except Exception as e:
-            logger.error(f"❌ 创建回退数据源异常: {e}")
+            logger.error(f" 创建回退数据源异常: {e}")
 
     def _extend_akshare_plugin_for_sector_flow(self, akshare_plugin) -> None:
         """扩展AkShare插件以支持SECTOR_FUND_FLOW数据类型"""
@@ -2943,7 +3027,7 @@ class UnifiedDataManager:
                     from ..plugin_types import DataType
                     if DataType.SECTOR_FUND_FLOW not in plugin_info.supported_data_types:
                         plugin_info.supported_data_types.append(DataType.SECTOR_FUND_FLOW)
-                        logger.info("✅ AkShare插件已扩展支持SECTOR_FUND_FLOW")
+                        logger.info(" AkShare插件已扩展支持SECTOR_FUND_FLOW")
 
             # 添加获取板块资金流的方法
             def get_sector_fund_flow_data(symbol: str, **kwargs):
@@ -2960,7 +3044,7 @@ class UnifiedDataManager:
 
             # 动态添加方法到插件实例
             akshare_plugin.get_sector_fund_flow_data = get_sector_fund_flow_data
-            logger.info("✅ AkShare插件已添加板块资金流数据获取方法")
+            logger.info(" AkShare插件已添加板块资金流数据获取方法")
 
         except Exception as e:
             logger.error(f"扩展AkShare插件失败: {e}")
@@ -2996,11 +3080,11 @@ class UnifiedDataManager:
 
             # 调用路由器的set_asset_priorities方法
             router.set_asset_priorities(asset_type, priorities)
-            logger.info(f"✅ 成功设置{asset_type.value}的路由优先级: {priorities}")
+            logger.info(f" 成功设置{asset_type.value}的路由优先级: {priorities}")
             return True
 
         except Exception as e:
-            logger.error(f"❌ 设置资产路由优先级失败: {e}")
+            logger.error(f" 设置资产路由优先级失败: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -3024,7 +3108,7 @@ class UnifiedDataManager:
             return router.asset_priorities.get(asset_type, [])
 
         except Exception as e:
-            logger.error(f"❌ 获取资产路由优先级失败: {e}")
+            logger.error(f" 获取资产路由优先级失败: {e}")
             return []
 
 # 数据策略类

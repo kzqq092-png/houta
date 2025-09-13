@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 策略注册器
@@ -14,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config
+from core.adapters import get_config
 from .base_strategy import BaseStrategy, StrategyType
 from .strategy_database import get_strategy_database_manager
 
@@ -40,7 +41,7 @@ class StrategyRegistry:
 
     def __init__(self):
         """初始化策略注册器"""
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
         self.db_manager = get_strategy_database_manager()
 

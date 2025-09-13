@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 AI预测配置数据库模型
@@ -7,12 +8,11 @@ AI预测配置数据库模型
 
 import sqlite3
 import json
-import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AIPredictionConfigManager:

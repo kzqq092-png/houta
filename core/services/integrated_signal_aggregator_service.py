@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -6,7 +7,6 @@
 """
 
 import asyncio
-import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import pandas as pd
@@ -19,7 +19,7 @@ from core.tet_data_pipeline import StandardQuery
 from gui.widgets.signal_aggregator import SignalAggregator, AggregatedAlert
 from gui.widgets.signal_detectors.base_detector import SignalDetectorRegistry
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TETDataProvider:
@@ -28,7 +28,7 @@ class TETDataProvider:
     def __init__(self, unified_data_manager: UnifiedDataManager, asset_service: AssetService):
         self.unified_data_manager = unified_data_manager
         self.asset_service = asset_service
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     async def get_multi_source_data(self, symbol: str, asset_type: AssetType = AssetType.STOCK) -> Dict[str, Any]:
         """
@@ -36,7 +36,7 @@ class TETDataProvider:
         包括K线数据、技术指标、基本面数据等
         """
         try:
-            self.logger.info(f"🔄 通过TET框架获取多源数据: {symbol}")
+            self.logger.info(f" 通过TET框架获取多源数据: {symbol}")
 
             # 并行获取多种数据类型
             tasks = []
@@ -65,11 +65,11 @@ class TETDataProvider:
                 'technical_indicators': results[3] if not isinstance(results[3], Exception) else {}
             }
 
-            self.logger.info(f"✅ TET多源数据获取完成: {symbol}")
+            self.logger.info(f" TET多源数据获取完成: {symbol}")
             return multi_source_data
 
         except Exception as e:
-            self.logger.error(f"❌ TET多源数据获取失败: {symbol} - {e}")
+            self.logger.error(f" TET多源数据获取失败: {symbol} - {e}")
             return {
                 'kline_data': pd.DataFrame(),
                 'realtime_data': {},
@@ -90,14 +90,14 @@ class TETDataProvider:
             )
 
             if kdata is not None and not kdata.empty:
-                self.logger.info(f"📈 TET K线数据获取成功: {symbol} | {len(kdata)} 条记录")
+                self.logger.info(f" TET K线数据获取成功: {symbol} | {len(kdata)} 条记录")
                 return kdata
             else:
-                self.logger.warning(f"⚠️ TET K线数据为空: {symbol}")
+                self.logger.warning(f" TET K线数据为空: {symbol}")
                 return pd.DataFrame()
 
         except Exception as e:
-            self.logger.error(f"❌ TET K线数据获取失败: {symbol} - {e}")
+            self.logger.error(f" TET K线数据获取失败: {symbol} - {e}")
             return pd.DataFrame()
 
     async def _get_realtime_quote(self, symbol: str, asset_type: AssetType) -> Dict[str, Any]:
@@ -115,14 +115,14 @@ class TETDataProvider:
             if realtime_data is not None and not realtime_data.empty:
                 # 转换为字典格式
                 latest_quote = realtime_data.iloc[-1].to_dict()
-                self.logger.info(f"💰 TET实时行情获取成功: {symbol}")
+                self.logger.info(f" TET实时行情获取成功: {symbol}")
                 return latest_quote
             else:
-                self.logger.warning(f"⚠️ TET实时行情为空: {symbol}")
+                self.logger.warning(f" TET实时行情为空: {symbol}")
                 return {}
 
         except Exception as e:
-            self.logger.warning(f"⚠️ TET实时行情获取失败: {symbol} - {e}")
+            self.logger.warning(f" TET实时行情获取失败: {symbol} - {e}")
             return {}
 
     async def _get_fundamental_data(self, symbol: str, asset_type: AssetType) -> Dict[str, Any]:
@@ -143,14 +143,14 @@ class TETDataProvider:
             if fundamental_df is not None and not fundamental_df.empty:
                 # 转换为字典格式
                 fundamental_data = fundamental_df.iloc[-1].to_dict()
-                self.logger.info(f"🏢 TET基本面数据获取成功: {symbol}")
+                self.logger.info(f" TET基本面数据获取成功: {symbol}")
                 return fundamental_data
             else:
-                self.logger.warning(f"⚠️ TET基本面数据为空: {symbol}")
+                self.logger.warning(f" TET基本面数据为空: {symbol}")
                 return {}
 
         except Exception as e:
-            self.logger.warning(f"⚠️ TET基本面数据获取失败: {symbol} - {e}")
+            self.logger.warning(f" TET基本面数据获取失败: {symbol} - {e}")
             return {}
 
     async def _get_technical_indicators(self, symbol: str, asset_type: AssetType) -> Dict[str, Any]:
@@ -187,11 +187,11 @@ class TETDataProvider:
                 kdj_data = self._calculate_kdj(kdata)
                 indicators['kdj'] = kdj_data
 
-            self.logger.info(f"📊 技术指标计算完成: {symbol} | {len(indicators)} 个指标")
+            self.logger.info(f" 技术指标计算完成: {symbol} | {len(indicators)} 个指标")
             return indicators
 
         except Exception as e:
-            self.logger.error(f"❌ 技术指标计算失败: {symbol} - {e}")
+            self.logger.error(f" 技术指标计算失败: {symbol} - {e}")
             return {}
 
     def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
@@ -279,7 +279,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
     async def initialize(self):
         """初始化服务"""
         try:
-            logger.info("🔧 初始化智能信号聚合服务（TET模式）...")
+            logger.info(" 初始化智能信号聚合服务（TET模式）...")
 
             # 获取统一数据管理器
             self.unified_data_manager = get_unified_data_manager()
@@ -288,7 +288,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
 
             # 验证TET模式是否启用
             if not self.unified_data_manager.tet_enabled:
-                logger.warning("⚠️ TET模式未启用，尝试初始化...")
+                logger.warning(" TET模式未启用，尝试初始化...")
                 self.unified_data_manager._initialize_tet_pipeline()
 
             if not self.unified_data_manager.tet_enabled:
@@ -300,9 +300,9 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             if container:
                 try:
                     self.asset_service = container.resolve(AssetService)
-                    logger.info("✅ AssetService注入成功")
+                    logger.info(" AssetService注入成功")
                 except Exception as e:
-                    logger.warning(f"⚠️ AssetService注入失败: {e}")
+                    logger.warning(f" AssetService注入失败: {e}")
                     # 创建默认实例
                     self.asset_service = AssetService()
             else:
@@ -314,22 +314,22 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
                 self.asset_service
             )
 
-            logger.info("🎉 智能信号聚合服务（TET模式）初始化完成")
+            logger.info(" 智能信号聚合服务（TET模式）初始化完成")
 
         except Exception as e:
-            logger.error(f"❌ 服务初始化失败: {e}")
+            logger.error(f" 服务初始化失败: {e}")
             raise
 
     async def analyze_stock_signals(self, symbol: str, asset_type: AssetType = AssetType.STOCK) -> List[AggregatedAlert]:
         """分析股票信号（TET模式）"""
         try:
-            logger.info(f"🔍 开始TET模式信号分析: {symbol}")
+            logger.info(f" 开始TET模式信号分析: {symbol}")
 
             # 检查缓存
             cache_key = f"tet_signals_{symbol}_{asset_type.value}"
             cached_result = self.get_cached_data(cache_key)
             if cached_result is not None:
-                logger.info(f"📦 使用缓存的TET信号分析结果: {symbol}")
+                logger.info(f" 使用缓存的TET信号分析结果: {symbol}")
                 return cached_result
 
             # 通过TET框架获取多源数据
@@ -358,11 +358,11 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             # 缓存结果
             self.cache_data(cache_key, alerts, ttl=self.cache_ttl)
 
-            logger.info(f"🎯 TET模式信号分析完成: {symbol} | 生成 {len(alerts)} 个警报")
+            logger.info(f" TET模式信号分析完成: {symbol} | 生成 {len(alerts)} 个警报")
             return alerts
 
         except Exception as e:
-            logger.error(f"❌ TET模式信号分析失败: {symbol} - {e}")
+            logger.error(f" TET模式信号分析失败: {symbol} - {e}")
             return []
 
     def _extract_sentiment_data(self, realtime_data: Dict[str, Any], fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -409,7 +409,7 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             sentiment_data.setdefault('vix_index', 20)
 
         except Exception as e:
-            logger.warning(f"⚠️ 情绪数据提取失败: {e}")
+            logger.warning(f" 情绪数据提取失败: {e}")
             # 返回默认情绪数据
             sentiment_data = {
                 'fear_greed_index': 50,
@@ -442,21 +442,21 @@ class IntegratedSignalAggregatorService(CacheableService, ConfigurableService):
             return stats
 
         except Exception as e:
-            logger.error(f"❌ 获取信号统计失败: {e}")
+            logger.error(f" 获取信号统计失败: {e}")
             return {}
 
     def set_signal_weights(self, weights: Dict[str, float]):
         """设置信号权重"""
         try:
             self.signal_aggregator.signal_weights.update(weights)
-            logger.info(f"✅ 信号权重已更新: {weights}")
+            logger.info(f" 信号权重已更新: {weights}")
         except Exception as e:
-            logger.error(f"❌ 设置信号权重失败: {e}")
+            logger.error(f" 设置信号权重失败: {e}")
 
     def add_custom_detector(self, name: str, detector):
         """添加自定义信号检测器"""
         try:
             self.detector_registry.register_detector(name, detector)
-            logger.info(f"✅ 自定义检测器 {name} 已注册")
+            logger.info(f" 自定义检测器 {name} 已注册")
         except Exception as e:
-            logger.error(f"❌ 注册自定义检测器失败: {e}")
+            logger.error(f" 注册自定义检测器失败: {e}")

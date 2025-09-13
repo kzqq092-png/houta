@@ -1,10 +1,10 @@
+from loguru import logger
 """
 trace_context.py - 调用链追踪上下文管理模块
 
 提供 trace_id 的上下文管理功能，支持同步和异步环境下的调用链追踪
 """
 
-import logging
 import contextvars
 import uuid
 from typing import Optional
@@ -52,19 +52,19 @@ def clear_trace_id():
     trace_id_var.set('')
 
 
-class TraceIdFilter(logging.Filter):
-    """日志过滤器，为日志记录添加 trace_id"""
+class TraceIdFilter:
+    """Loguru日志过滤器，为日志记录添加 trace_id"""
 
-    def filter(self, record):
-        """为日志记录添加 trace_id 属性
+    def __call__(self, record):
+        """为Loguru日志记录添加 trace_id 属性
 
         Args:
-            record: 日志记录对象
+            record: Loguru日志记录对象
 
         Returns:
             bool: 始终返回 True，不过滤任何日志
         """
-        record.trace_id = get_trace_id()
+        record["extra"]["trace_id"] = get_trace_id()
         return True
 
 

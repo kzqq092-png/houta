@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 UI优化模块
@@ -13,7 +14,7 @@ import threading
 import time
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config
+from core.adapters import get_config
 
 
 class UIOptimizer(QObject):
@@ -26,7 +27,7 @@ class UIOptimizer(QObject):
     def __init__(self):
         """初始化UI优化器"""
         super().__init__()
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
 
         # 配置参数
@@ -184,7 +185,7 @@ class AsyncWorker(QThread):
         """
         super().__init__()
         self.work_func = work_func
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 连接信号
         if success_callback:
@@ -230,7 +231,7 @@ class UIUpdateManager:
         if self._initialized:
             return
 
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.optimizer = UIOptimizer()
         self._initialized = True
 
@@ -274,8 +275,9 @@ def get_ui_manager() -> UIUpdateManager:
 
         return _ui_manager
 
-
 # 便捷函数
+
+
 def schedule_ui_update(callback: Callable = None, delay: int = None):
     """调度UI更新的便捷函数
 
@@ -327,8 +329,9 @@ def debounce_ui_function(delay: int = 300):
         return manager.debounce(func, delay)
     return decorator
 
-
 # 替换QApplication.processEvents()的便捷函数
+
+
 def safe_process_events(delay: int = 0):
     """安全的事件处理函数，替换QApplication.processEvents()
 

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 AkShare情绪数据源插件
 基于akshare库获取真实的市场情绪数据
@@ -8,32 +9,177 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-import logging
 
 from core.plugin_types import PluginType, PluginCategory
-from .base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+from core.network.akshare_network_config import get_akshare_network_config
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
+from core.network.universal_network_config import INetworkConfigurable, NetworkEndpoint, PluginNetworkConfig
 
 
-class AkShareSentimentPlugin(BaseSentimentPlugin):
+class AkShareSentimentPlugin(BaseSentimentPlugin, INetworkConfigurable):
     """AkShare情绪数据源插件"""
 
     def __init__(self):
         super().__init__()
         # 创建本地logger作为备用
-        self._local_logger = logging.getLogger(__name__)
+        self._local_logger = logger
+
+        # 联网查询地址配置（endpointhost字段）
+        self.endpointhost = [
+            "https://api.github.com/repos/akfamily/akshare/contents/akshare",
+            "https://raw.githubusercontent.com/akfamily/akshare/master/akshare/config.py"
+        ]
+
+        # 初始化网络配置
+        self.network_config = get_akshare_network_config()
+        self.network_config.set_rate_limit(delay_seconds=2.0, max_requests_per_minute=20)  # 设置保守的请求频率
 
     def _safe_log(self, level: str, message: str):
         """安全的日志记录方法"""
         try:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                getattr(self.log_manager, level)(message)
-            else:
-                # 使用本地logger作为备用
-                getattr(self._local_logger, level)(message)
+            logger.level(message)
+
         except Exception:
             # 最后的备用方案，直接打印
-            print(f"[{level.upper()}] {message}")
+            logger.info(f"[{level.upper()}] {message}")
+
+    def _make_akshare_request(self, func_name: str, **kwargs):
+        """
+        使用网络配置进行AkShare请求
+
+        Args:
+            func_name: AkShare函数名
+            **kwargs: 函数参数
+
+        Returns:
+            数据结果
+        """
+        try:
+            # 检查频率限制
+            if not self.network_config.check_rate_limit():
+                raise Exception("请求频率受限或IP被封")
+
+            # 获取AkShare函数
+            ak_func = getattr(ak, func_name)
+
+            # 执行请求
+            self._safe_log("info", f"正在请求AkShare数据: {func_name}")
+            result = ak_func(**kwargs)
+
+            # 记录成功请求
+            self.network_config.request_count += 1
+            self.network_config.last_request_time = datetime.now()
+
+            self._safe_log("info", f"AkShare请求成功: {func_name}")
+            return result
+
+        except Exception as e:
+            error_msg = str(e)
+
+            # 检查是否为网络限制错误
+            if any(keyword in error_msg.lower() for keyword in ['403', '429', '406', 'blocked', 'rate limit']):
+                self._safe_log("warning", f"AkShare请求被限制: {func_name} - {error_msg}")
+                self.network_config._handle_rate_limit()
+            else:
+                self._safe_log("error", f"AkShare请求失败: {func_name} - {error_msg}")
+
+            raise
+
+    def configure_network(self, proxies: List[str] = None, delay_seconds: float = 2.0,
+                          max_requests_per_minute: int = 20):
+        """
+        配置网络设置
+
+        Args:
+            proxies: 代理列表
+            delay_seconds: 请求间隔
+            max_requests_per_minute: 每分钟最大请求数
+        """
+        self.network_config.set_rate_limit(delay_seconds, max_requests_per_minute)
+
+        if proxies:
+            self.network_config.load_proxy_list(proxies)
+            self._safe_log("info", f"已加载 {len(proxies)} 个代理")
+
+        self._safe_log("info", f"网络配置已更新: {delay_seconds}s间隔, {max_requests_per_minute}次/分钟")
+
+    def get_network_status(self) -> Dict[str, Any]:
+        """获取网络配置状态"""
+        return self.network_config.get_status()
+
+    def get_default_endpoints(self) -> List[NetworkEndpoint]:
+        """获取默认网络端点配置"""
+        return [
+            NetworkEndpoint(
+                name="akshare_api",
+                url="https://akshare.akfamily.xyz/data/stock/stock.html",
+                description="AkShare官方API",
+                priority=10,
+                timeout=30
+            ),
+            NetworkEndpoint(
+                name="akfamily_mirror",
+                url="https://ak.akfamily.xyz/data/stock/stock.html",
+                description="AkShare镜像站点",
+                priority=8,
+                timeout=30
+            ),
+            NetworkEndpoint(
+                name="github_api",
+                url="https://raw.githubusercontent.com/akfamily/akshare/master/akshare/",
+                description="GitHub原始文件",
+                priority=5,
+                timeout=45
+            )
+        ]
+
+    def get_network_config_schema(self) -> Dict[str, Any]:
+        """获取网络配置架构"""
+        return {
+            "endpoints": {
+                "title": "数据端点",
+                "description": "AkShare数据获取端点",
+                "categories": {
+                    "primary": "主要API端点",
+                    "mirror": "镜像端点",
+                    "backup": "备用端点"
+                }
+            },
+            "rate_limit": {
+                "title": "频率限制",
+                "description": "请求频率控制设置",
+                "default_requests_per_minute": 20,
+                "default_request_delay": 2.0,
+                "recommended_max_requests": 30
+            },
+            "proxy": {
+                "title": "代理设置",
+                "description": "代理服务器配置",
+                "support_types": ["http", "https", "socks5"]
+            }
+        }
+
+    def apply_network_config(self, config: PluginNetworkConfig) -> bool:
+        """应用网络配置"""
+        try:
+            # 应用频率限制
+            if config.rate_limit_enabled:
+                self.network_config.set_rate_limit(
+                    config.request_delay,
+                    config.requests_per_minute
+                )
+
+            # 应用代理设置
+            if config.proxy_enabled and config.proxy_list:
+                self.network_config.load_proxy_list(config.proxy_list)
+
+            self._safe_log("info", f"网络配置已应用: {config.plugin_name}")
+            return True
+
+        except Exception as e:
+            self._safe_log("error", f"应用网络配置失败: {e}")
+            return False
 
     @property
     def metadata(self) -> Dict[str, Any]:

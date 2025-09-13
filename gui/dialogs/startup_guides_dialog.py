@@ -14,10 +14,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QPixmap, QIcon
-import logging
+from loguru import logger
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StartupGuidesDialog(QDialog):
@@ -65,7 +65,7 @@ class StartupGuidesDialog(QDialog):
         header_layout = QHBoxLayout(header_frame)
 
         # 标题文本
-        title_label = QLabel("🚀 欢迎使用 FactorWeave-Quant 2.0")
+        title_label = QLabel(" 欢迎使用 FactorWeave-Quant 2.0")
         title_font = QFont()
         title_font.setPointSize(18)
         title_font.setBold(True)
@@ -113,31 +113,31 @@ class StartupGuidesDialog(QDialog):
         welcome_text.setReadOnly(True)
         welcome_text.setHtml("""
         <div style="font-family: Arial, sans-serif; line-height: 1.6; padding: 20px;">
-            <h2 style="color: #2c3e50;">🎉 欢迎使用 FactorWeave-Quant</h2>
+            <h2 style="color: #2c3e50;"> 欢迎使用 FactorWeave-Quant</h2>
             
             <p><strong>FactorWeave-Quant</strong> 是一个专业的量化交易分析平台，为您提供：</p>
             
             <ul>
-                <li>📊 <strong>实时数据分析</strong> - 支持多种数据源的实时股票、期货、数字货币数据</li>
-                <li>📈 <strong>技术指标计算</strong> - 内置100+种技术指标，支持自定义指标开发</li>
-                <li>🤖 <strong>策略回测</strong> - 强大的回测引擎，支持多种策略类型</li>
-                <li>🔌 <strong>插件生态</strong> - 丰富的插件市场，支持功能扩展</li>
-                <li>🧠 <strong>AI辅助分析</strong> - 集成机器学习模型，提供智能分析建议</li>
-                <li>📱 <strong>情绪分析</strong> - 多源情绪数据分析，把握市场情绪脉搏</li>
+                <li> <strong>实时数据分析</strong> - 支持多种数据源的实时股票、期货、数字货币数据</li>
+                <li> <strong>技术指标计算</strong> - 内置100+种技术指标，支持自定义指标开发</li>
+                <li> <strong>策略回测</strong> - 强大的回测引擎，支持多种策略类型</li>
+                <li> <strong>插件生态</strong> - 丰富的插件市场，支持功能扩展</li>
+                <li> <strong>AI辅助分析</strong> - 集成机器学习模型，提供智能分析建议</li>
+                <li> <strong>情绪分析</strong> - 多源情绪数据分析，把握市场情绪脉搏</li>
             </ul>
             
-            <h3 style="color: #34495e;">🚀 开始您的量化之旅</h3>
+            <h3 style="color: #34495e;"> 开始您的量化之旅</h3>
             <p>请按照向导的步骤，我们将帮助您快速上手这个强大的平台。</p>
             
             <div style="background: #ecf0f1; padding: 15px; border-radius: 5px; margin-top: 20px;">
-                <p><strong>💡 提示：</strong> 如果您是第一次使用，建议完整浏览所有向导页面。</p>
+                <p><strong> 提示：</strong> 如果您是第一次使用，建议完整浏览所有向导页面。</p>
             </div>
         </div>
         """)
 
         layout.addWidget(welcome_text)
 
-        self.tab_widget.addTab(welcome_widget, "🏠 欢迎")
+        self.tab_widget.addTab(welcome_widget, " 欢迎")
 
     def _create_features_tab(self):
         """创建功能介绍页"""
@@ -150,28 +150,28 @@ class StartupGuidesDialog(QDialog):
         scroll_layout = QVBoxLayout(scroll_widget)
 
         # 功能分组
-        self._add_feature_group(scroll_layout, "📊 数据分析", [
+        self._add_feature_group(scroll_layout, " 数据分析", [
             ("实时行情", "获取实时股票、期货、数字货币行情数据"),
             ("历史数据", "访问丰富的历史数据，支持多种时间周期"),
             ("数据质量", "内置数据质量检查和清洗功能"),
             ("多源整合", "支持多个数据源的整合和对比")
         ])
 
-        self._add_feature_group(scroll_layout, "📈 技术分析", [
+        self._add_feature_group(scroll_layout, " 技术分析", [
             ("技术指标", "100+种内置技术指标，支持自定义开发"),
             ("图表分析", "专业的K线图表，支持多种图表类型"),
             ("形态识别", "自动识别经典技术形态"),
             ("趋势分析", "智能趋势识别和预测")
         ])
 
-        self._add_feature_group(scroll_layout, "🤖 策略系统", [
+        self._add_feature_group(scroll_layout, " 策略系统", [
             ("策略开发", "可视化策略开发环境"),
             ("回测引擎", "高性能的策略回测系统"),
             ("风险管理", "完善的风险控制机制"),
             ("实盘交易", "支持多种券商接口的实盘交易")
         ])
 
-        self._add_feature_group(scroll_layout, "🧠 AI功能", [
+        self._add_feature_group(scroll_layout, " AI功能", [
             ("情绪分析", "多源市场情绪数据分析"),
             ("智能预测", "基于机器学习的价格预测"),
             ("模式识别", "AI驱动的市场模式识别"),
@@ -182,7 +182,7 @@ class StartupGuidesDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         layout.addWidget(scroll_area)
 
-        self.tab_widget.addTab(features_widget, "⚡ 功能")
+        self.tab_widget.addTab(features_widget, " 功能")
 
     def _add_feature_group(self, layout, title, features):
         """添加功能分组"""
@@ -193,7 +193,7 @@ class StartupGuidesDialog(QDialog):
             feature_frame = QFrame()
             feature_layout = QHBoxLayout(feature_frame)
 
-            name_label = QLabel(f"• {name}")
+            name_label = QLabel(f" {name}")
             name_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
             name_label.setFixedWidth(100)
 
@@ -219,7 +219,7 @@ class StartupGuidesDialog(QDialog):
         steps_text.setReadOnly(True)
         steps_text.setHtml("""
         <div style="font-family: Arial, sans-serif; line-height: 1.8; padding: 20px;">
-            <h2 style="color: #2c3e50;">🚀 快速开始指南</h2>
+            <h2 style="color: #2c3e50;"> 快速开始指南</h2>
             
             <h3 style="color: #34495e;">第一步：数据源配置</h3>
             <ol>
@@ -250,7 +250,7 @@ class StartupGuidesDialog(QDialog):
             </ol>
             
             <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin-top: 20px;">
-                <h4 style="color: #27ae60; margin-top: 0;">💡 新手建议</h4>
+                <h4 style="color: #27ae60; margin-top: 0;"> 新手建议</h4>
                 <ul>
                     <li>先从简单的技术指标开始学习</li>
                     <li>充分利用回测功能验证策略</li>
@@ -263,7 +263,7 @@ class StartupGuidesDialog(QDialog):
 
         layout.addWidget(steps_text)
 
-        self.tab_widget.addTab(quickstart_widget, "🎯 快速开始")
+        self.tab_widget.addTab(quickstart_widget, " 快速开始")
 
     def _create_settings_tab(self):
         """创建设置页"""
@@ -305,7 +305,7 @@ class StartupGuidesDialog(QDialog):
         resources_text.setMaximumHeight(200)
         resources_text.setHtml("""
         <div style="font-family: Arial, sans-serif; padding: 10px;">
-            <p><strong>📚 学习资源：</strong></p>
+            <p><strong> 学习资源：</strong></p>
             <ul>
                 <li><a href="#">用户手册</a> - 详细的功能说明</li>
                 <li><a href="#">视频教程</a> - 入门和进阶教程</li>
@@ -327,7 +327,7 @@ class StartupGuidesDialog(QDialog):
 
         layout.addStretch()
 
-        self.tab_widget.addTab(settings_widget, "⚙️ 设置")
+        self.tab_widget.addTab(settings_widget, " 设置")
 
     def _create_footer(self, parent_layout):
         """创建底部按钮区域"""

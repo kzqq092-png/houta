@@ -1,10 +1,10 @@
+from loguru import logger
 """
 系统优化器面板
 
 提供系统优化器的面板组件，可以集成到主窗口中
 """
 
-import logging
 import asyncio
 from typing import Optional, Dict, Any
 from PyQt5.QtWidgets import (
@@ -22,7 +22,7 @@ from system_optimizer import (
     OptimizationResult
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SystemOptimizerPanel(QWidget):
@@ -498,11 +498,11 @@ class SystemOptimizerPanel(QWidget):
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
         if level == "error":
-            formatted_message = f"[{timestamp}] ❌ {message}"
+            formatted_message = f"[{timestamp}]  {message}"
         elif level == "warning":
-            formatted_message = f"[{timestamp}] ⚠️ {message}"
+            formatted_message = f"[{timestamp}]  {message}"
         else:
-            formatted_message = f"[{timestamp}] ℹ️ {message}"
+            formatted_message = f"[{timestamp}] ℹ {message}"
 
         self.log_text.append(formatted_message)
 

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 api_server.py
 RESTful API主服务
@@ -192,10 +193,10 @@ def _kdata_preprocess(df, context="分析"):
             df = df.copy()
             df['datetime'] = df.index
             has_datetime = True
-            print(f"[{context}] 从DatetimeIndex推断datetime字段")
+            logger.info(f"[{context}] 从DatetimeIndex推断datetime字段")
         else:
             # 完全没有datetime信息，需要补全
-            print(f"[{context}] 缺少datetime字段，自动补全")
+            logger.info(f"[{context}] 缺少datetime字段，自动补全")
             df = df.copy()
             df['datetime'] = pd.date_range(
                 start='2023-01-01', periods=len(df), freq='D')
@@ -205,7 +206,7 @@ def _kdata_preprocess(df, context="分析"):
     required_cols = ['code', 'open', 'high', 'low', 'close', 'volume']
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
-        print(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
+        logger.info(f"[{context}] 缺少字段: {missing_cols}，自动补全为默认值")
         df = df.copy()
         for col in missing_cols:
             if col == 'code':
@@ -228,14 +229,14 @@ def _kdata_preprocess(df, context="分析"):
             df = df[df[col].notna() & (df[col] >= 0)]
             after = len(df)
             if after < before:
-                print(f"[{context}] 已过滤{before-after}行{col}异常数据")
+                logger.info(f"[{context}] 已过滤{before-after}行{col}异常数据")
 
     # 检查code字段
     if 'code' in df.columns:
         df = df[df['code'].notna() & (df['code'] != '')]
 
     if df.empty:
-        print(f"[{context}] 数据全部无效，返回空")
+        logger.info(f"[{context}] 数据全部无效，返回空")
 
     return df.reset_index(drop=True)
 

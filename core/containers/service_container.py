@@ -1,16 +1,16 @@
+from loguru import logger
 """
 服务容器模块
 
 提供依赖注入容器的实现，负责服务的创建、管理和注入。
 """
 
-import logging
 import threading
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 from .service_registry import ServiceRegistry, ServiceInfo, ServiceScope
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 T = TypeVar('T')
 
 

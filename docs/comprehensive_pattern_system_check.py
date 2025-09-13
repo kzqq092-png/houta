@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -22,7 +23,7 @@ try:
     from analysis.pattern_manager import PatternManager
     from analysis.pattern_base import PatternAlgorithmFactory, SignalType, PatternCategory
 except ImportError as e:
-    print(f"导入失败: {e}")
+    logger.info(f"导入失败: {e}")
     sys.exit(1)
 
 
@@ -39,7 +40,7 @@ class ComprehensivePatternSystemChecker:
 
     def check_database_integrity(self) -> Dict[str, Any]:
         """检查数据库完整性"""
-        print("🔍 检查数据库完整性...")
+        logger.info(" 检查数据库完整性...")
 
         results = {
             'table_exists': False,
@@ -63,9 +64,9 @@ class ComprehensivePatternSystemChecker:
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='pattern_types'")
             if cursor.fetchone():
                 results['table_exists'] = True
-                print("✅ pattern_types表存在")
+                logger.info(" pattern_types表存在")
             else:
-                print("❌ pattern_types表不存在")
+                logger.info(" pattern_types表不存在")
                 return results
 
             # 检查表结构
@@ -80,9 +81,9 @@ class ComprehensivePatternSystemChecker:
                     results['missing_fields'].append(field)
 
             if results['missing_fields']:
-                print(f"❌ 缺少字段: {results['missing_fields']}")
+                logger.info(f" 缺少字段: {results['missing_fields']}")
             else:
-                print("✅ 表结构完整")
+                logger.info(" 表结构完整")
 
             # 统计数据
             cursor.execute("SELECT COUNT(*) FROM pattern_types")
@@ -126,28 +127,28 @@ class ComprehensivePatternSystemChecker:
 
             conn.close()
 
-            print(f"数据库统计:")
-            print(f"  总形态数: {results['total_patterns']}")
-            print(f"  有算法代码: {results['patterns_with_code']}")
-            print(f"  无算法代码: {results['patterns_without_code']}")
-            print(f"  激活状态: {results['active_patterns']}")
-            print(f"  非激活状态: {results['inactive_patterns']}")
-            print(f"  形态类别: {len(results['categories'])}个")
-            print(f"  信号类型: {len(results['signal_types'])}个")
+            logger.info(f"数据库统计:")
+            logger.info(f"  总形态数: {results['total_patterns']}")
+            logger.info(f"  有算法代码: {results['patterns_with_code']}")
+            logger.info(f"  无算法代码: {results['patterns_without_code']}")
+            logger.info(f"  激活状态: {results['active_patterns']}")
+            logger.info(f"  非激活状态: {results['inactive_patterns']}")
+            logger.info(f"  形态类别: {len(results['categories'])}个")
+            logger.info(f"  信号类型: {len(results['signal_types'])}个")
 
             if results['data_quality_issues']:
-                print(f"⚠️  数据质量问题: {len(results['data_quality_issues'])}个")
+                logger.info(f"  数据质量问题: {len(results['data_quality_issues'])}个")
                 for issue in results['data_quality_issues']:
-                    print(f"    - {issue}")
+                    logger.info(f"    - {issue}")
 
         except Exception as e:
-            print(f"❌ 数据库检查失败: {e}")
+            logger.info(f" 数据库检查失败: {e}")
 
         return results
 
     def check_all_algorithms(self) -> Dict[str, Any]:
         """检查所有算法的完整性和正确性"""
-        print("\n🔍 检查所有算法...")
+        logger.info("\n 检查所有算法...")
 
         # 获取所有形态配置
         all_configs = self.manager.get_pattern_configs(active_only=False)
@@ -164,10 +165,10 @@ class ComprehensivePatternSystemChecker:
         }
 
         for config in all_configs:
-            print(f"\n检查形态: {config.name} ({config.english_name})")
+            logger.info(f"\n检查形态: {config.name} ({config.english_name})")
 
             if not config.algorithm_code or not config.algorithm_code.strip():
-                print(f"  ❌ 无算法代码")
+                logger.info(f"   无算法代码")
                 results['algorithms_without_code'] += 1
                 self.missing_algorithms.append(config.english_name)
                 continue
@@ -178,9 +179,9 @@ class ComprehensivePatternSystemChecker:
             try:
                 compile(config.algorithm_code,
                         f'<{config.english_name}>', 'exec')
-                print(f"  ✅ 语法检查通过")
+                logger.info(f"   语法检查通过")
             except SyntaxError as e:
-                print(f"  ❌ 语法错误: {e}")
+                logger.info(f"   语法错误: {e}")
                 results['syntax_errors'].append({
                     'pattern': config.english_name,
                     'error': str(e),
@@ -201,8 +202,8 @@ class ComprehensivePatternSystemChecker:
 
                 execution_time = (end_time - start_time).total_seconds()
 
-                print(f"  ✅ 运行时测试通过，识别到 {len(patterns)} 个形态")
-                print(f"  ⏱️  执行时间: {execution_time:.3f}秒")
+                logger.info(f"   运行时测试通过，识别到 {len(patterns)} 个形态")
+                logger.info(f"  ⏱  执行时间: {execution_time:.3f}秒")
 
                 results['successful_algorithms'].append({
                     'pattern': config.english_name,
@@ -216,7 +217,7 @@ class ComprehensivePatternSystemChecker:
                 }
 
             except Exception as e:
-                print(f"  ❌ 运行时错误: {e}")
+                logger.info(f"   运行时错误: {e}")
                 results['runtime_errors'].append({
                     'pattern': config.english_name,
                     'error': str(e),
@@ -443,7 +444,7 @@ class ComprehensivePatternSystemChecker:
 
     def check_hardcoded_issues(self) -> List[str]:
         """检查系统中的硬编码问题"""
-        print("\n🔍 检查硬编码问题...")
+        logger.info("\n 检查硬编码问题...")
 
         issues = []
 
@@ -475,20 +476,20 @@ class ComprehensivePatternSystemChecker:
                                         f"{file_path}:{i} - 硬编码形态名称: {pattern}")
 
                 except Exception as e:
-                    print(f"检查文件 {file_path} 失败: {e}")
+                    logger.info(f"检查文件 {file_path} 失败: {e}")
 
         if issues:
-            print(f"⚠️  发现 {len(issues)} 个硬编码问题:")
+            logger.info(f"  发现 {len(issues)} 个硬编码问题:")
             for issue in issues:
-                print(f"    - {issue}")
+                logger.info(f"    - {issue}")
         else:
-            print("✅ 未发现硬编码问题")
+            logger.info(" 未发现硬编码问题")
 
         return issues
 
     def generate_missing_algorithms(self) -> Dict[str, str]:
         """为缺少算法的形态生成基础算法代码"""
-        print("\n🔧 生成缺少的算法...")
+        logger.info("\n 生成缺少的算法...")
 
         generated_algorithms = {}
 
@@ -498,7 +499,7 @@ class ComprehensivePatternSystemChecker:
             c for c in all_configs if not c.algorithm_code or not c.algorithm_code.strip()]
 
         for config in missing_configs:
-            print(f"生成算法: {config.name} ({config.english_name})")
+            logger.info(f"生成算法: {config.name} ({config.english_name})")
 
             algorithm_code = self._generate_algorithm_template(config)
             generated_algorithms[config.english_name] = algorithm_code
@@ -513,9 +514,9 @@ class ComprehensivePatternSystemChecker:
                 )
                 conn.commit()
                 conn.close()
-                print(f"  ✅ 已更新数据库")
+                logger.info(f"   已更新数据库")
             except Exception as e:
-                print(f"  ❌ 更新数据库失败: {e}")
+                logger.info(f"   更新数据库失败: {e}")
 
         return generated_algorithms
 
@@ -667,7 +668,7 @@ for i in range({config.min_periods}, len(kdata)):
 
     def generate_comprehensive_report(self) -> str:
         """生成全面的系统检查报告"""
-        print("\n📋 生成全面检查报告...")
+        logger.info("\n 生成全面检查报告...")
 
         # 执行所有检查
         db_results = self.check_database_integrity()
@@ -692,7 +693,7 @@ for i in range({config.min_periods}, len(kdata)):
 - 信号类型: {', '.join(db_results['signal_types'])}
 
 ### 数据质量
-{"✅ 数据质量良好" if not db_results['data_quality_issues'] else "⚠️ 发现数据质量问题:"}
+{" 数据质量良好" if not db_results['data_quality_issues'] else " 发现数据质量问题:"}
 {chr(10).join(f"  - {issue}" for issue in db_results['data_quality_issues'])}
 
 ## 2. 算法完整性检查
@@ -741,7 +742,7 @@ for i in range({config.min_periods}, len(kdata)):
         report += f"""
 ## 3. 硬编码检查
 
-{"✅ 未发现硬编码问题" if not hardcode_issues else f"⚠️ 发现 {len(hardcode_issues)} 个硬编码问题:"}
+{" 未发现硬编码问题" if not hardcode_issues else f" 发现 {len(hardcode_issues)} 个硬编码问题:"}
 """
         for issue in hardcode_issues:
             report += f"- {issue}\n"
@@ -750,10 +751,10 @@ for i in range({config.min_periods}, len(kdata)):
 ## 4. 系统评估
 
 ### 整体健康度
-- 数据库完整性: {"✅ 良好" if db_results['table_exists'] and not db_results['missing_fields'] else "❌ 需要修复"}
+- 数据库完整性: {" 良好" if db_results['table_exists'] and not db_results['missing_fields'] else " 需要修复"}
 - 算法覆盖率: {(algo_results['algorithms_with_code'] / algo_results['total_checked'] * 100):.1f}%
 - 算法成功率: {(len(algo_results['successful_algorithms']) / max(1, algo_results['algorithms_with_code']) * 100):.1f}%
-- 代码质量: {"✅ 良好" if not hardcode_issues else "⚠️ 需要改进"}
+- 代码质量: {" 良好" if not hardcode_issues else " 需要改进"}
 
 ### 建议改进项
 """
@@ -783,10 +784,10 @@ for i in range({config.min_periods}, len(kdata)):
 - 执行效率: 优秀 (毫秒级响应)
 
 ### 专业化程度
-- 数据库驱动: ✅ 已实现
-- 配置化管理: ✅ 已实现
-- 算法可扩展: ✅ 已实现
-- 参数可调节: ✅ 已实现
+- 数据库驱动:  已实现
+- 配置化管理:  已实现
+- 算法可扩展:  已实现
+- 参数可调节:  已实现
 
 ### 与专业软件对比
 - 通达信: 功能相当，扩展性更强
@@ -804,10 +805,10 @@ for i in range({config.min_periods}, len(kdata)):
 
     def run_comprehensive_check(self):
         """运行全面检查"""
-        print("🚀 开始全面形态识别系统检查")
-        print("=" * 80)
-        print("目标：确保系统完全基于数据库驱动，对标专业软件")
-        print("=" * 80)
+        logger.info(" 开始全面形态识别系统检查")
+        logger.info("=" * 80)
+        logger.info("目标：确保系统完全基于数据库驱动，对标专业软件")
+        logger.info("=" * 80)
 
         # 生成报告
         report = self.generate_comprehensive_report()
@@ -817,18 +818,18 @@ for i in range({config.min_periods}, len(kdata)):
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(report)
 
-        print(f"\n📄 详细报告已保存到: {report_file}")
+        logger.info(f"\n 详细报告已保存到: {report_file}")
 
         # 生成缺失算法
         if self.missing_algorithms:
-            print(f"\n🔧 开始生成 {len(self.missing_algorithms)} 个缺失算法...")
+            logger.info(f"\n 开始生成 {len(self.missing_algorithms)} 个缺失算法...")
             generated = self.generate_missing_algorithms()
-            print(f"✅ 已生成 {len(generated)} 个算法模板")
+            logger.info(f" 已生成 {len(generated)} 个算法模板")
 
         # 输出总结
-        print("\n" + "=" * 80)
-        print("检查总结")
-        print("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("检查总结")
+        logger.info("=" * 80)
 
         db_results = self.check_database_integrity()
         algo_results = self.check_all_algorithms()
@@ -839,18 +840,18 @@ for i in range({config.min_periods}, len(kdata)):
         # 数据库完整性 (25分)
         if db_results['table_exists'] and not db_results['missing_fields']:
             total_score += 25
-            print("✅ 数据库完整性: 25/25分")
+            logger.info(" 数据库完整性: 25/25分")
         else:
             score = 15 if db_results['table_exists'] else 0
             total_score += score
-            print(f"⚠️  数据库完整性: {score}/25分")
+            logger.info(f"  数据库完整性: {score}/25分")
 
         # 算法覆盖率 (30分)
         coverage_rate = algo_results['algorithms_with_code'] / \
             algo_results['total_checked']
         coverage_score = int(coverage_rate * 30)
         total_score += coverage_score
-        print(f"算法覆盖率: {coverage_score}/30分 ({coverage_rate*100:.1f}%)")
+        logger.info(f"算法覆盖率: {coverage_score}/30分 ({coverage_rate*100:.1f}%)")
 
         # 算法成功率 (30分)
         if algo_results['algorithms_with_code'] > 0:
@@ -860,25 +861,25 @@ for i in range({config.min_periods}, len(kdata)):
         else:
             success_score = 0
         total_score += success_score
-        print(f"算法成功率: {success_score}/30分 ({success_rate*100:.1f}%)")
+        logger.info(f"算法成功率: {success_score}/30分 ({success_rate*100:.1f}%)")
 
         # 代码质量 (15分)
         hardcode_issues = self.check_hardcoded_issues()
         quality_score = 15 if not hardcode_issues else max(
             0, 15 - len(hardcode_issues))
         total_score += quality_score
-        print(f"🔧 代码质量: {quality_score}/15分")
+        logger.info(f" 代码质量: {quality_score}/15分")
 
-        print(f"\n🏆 总体评分: {total_score}/{max_score}分")
+        logger.info(f"\n 总体评分: {total_score}/{max_score}分")
 
         if total_score >= 90:
-            print("🌟 优秀！系统已达到专业软件标准")
+            logger.info(" 优秀！系统已达到专业软件标准")
         elif total_score >= 75:
-            print("👍 良好！系统基本达到专业标准，还有改进空间")
+            logger.info(" 良好！系统基本达到专业标准，还有改进空间")
         elif total_score >= 60:
-            print("⚠️  一般！系统需要重点改进")
+            logger.info("  一般！系统需要重点改进")
         else:
-            print("🚨 需要大幅改进！系统距离专业标准还有差距")
+            logger.info(" 需要大幅改进！系统距离专业标准还有差距")
 
         return total_score >= 75
 

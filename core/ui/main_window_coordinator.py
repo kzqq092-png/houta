@@ -1,23 +1,21 @@
+from loguru import logger
 """
 主窗口协调器模块
 
 负责协调主窗口各个组件之间的交互
 """
-import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 from PyQt5.QtCore import QObject, pyqtSignal
 
 from core.containers.service_container import ServiceContainer
-from core.logger import get_logger
-
 
 class MainWindowCoordinator(QObject):
     def __init__(self, main_window, service_container):
         super().__init__()
         self.main_window = main_window
         self.service_container = service_container
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.panels = {}  # Assuming a panels attribute to store panel references
 
     def show_settings_dialog(self):

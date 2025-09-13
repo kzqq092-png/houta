@@ -21,13 +21,14 @@ from gui.widgets.performance.workers.async_workers import (
 from gui.widgets.performance.components.metric_card import ModernMetricCard
 from gui.widgets.performance.components.performance_chart import ModernPerformanceChart
 from gui.widgets.performance.tabs.system_monitor_tab import ModernSystemMonitorTab
-from gui.widgets.performance.tabs.ui_optimization_tab import ModernUIOptimizationTab
+# 2024量化交易优化版标签页 - 已重构和合并
 from gui.widgets.performance.tabs.strategy_performance_tab import ModernStrategyPerformanceTab
-from gui.widgets.performance.tabs.algorithm_performance_tab import ModernAlgorithmPerformanceTab
-from gui.widgets.performance.tabs.auto_tuning_tab import ModernAutoTuningTab
+from gui.widgets.performance.tabs.algorithm_optimization_tab import ModernAlgorithmOptimizationTab
+from gui.widgets.performance.tabs.risk_control_center_tab import ModernRiskControlCenterTab
+from gui.widgets.performance.tabs.trading_execution_monitor_tab import ModernTradingExecutionMonitorTab
+from gui.widgets.performance.tabs.data_quality_monitor_tab import ModernDataQualityMonitorTab
 from gui.widgets.performance.tabs.system_health_tab import ModernSystemHealthTab
-from gui.widgets.performance.tabs.alert_config_tab import ModernAlertConfigTab
-from gui.widgets.performance.tabs.deep_analysis_tab import ModernDeepAnalysisTab
+# 已删除的标签页：UI优化、深度分析、算法性能、自动调优、告警配置
 from gui.widgets.performance.unified_performance_widget import ModernUnifiedPerformanceWidget
 # from gui.widgets.performance.dialogs.enhanced_stock_pool_settings_dialog import EnhancedStockPoolSettingsDialog  # 类不存在
 # from gui.widgets.performance.data_import_monitoring_widget import DataImportMonitoringWidget  # 类不存在
@@ -43,13 +44,13 @@ __all__ = [
     'ModernMetricCard',
     'ModernPerformanceChart',
     'ModernSystemMonitorTab',
-    'ModernUIOptimizationTab',
     'ModernStrategyPerformanceTab',
-    'ModernAlgorithmPerformanceTab',
-    'ModernAutoTuningTab',
+    'ModernAlgorithmOptimizationTab',
+    'ModernRiskControlCenterTab',
+    'ModernTradingExecutionMonitorTab',
+    'ModernDataQualityMonitorTab',
     'ModernSystemHealthTab',
-    'ModernAlertConfigTab',
-    'ModernDeepAnalysisTab',
+    # 兼容性：已删除的标签页类名不再导出
     'ModernUnifiedPerformanceWidget',
     # 'EnhancedStockPoolSettingsDialog',  # 暂时注释，类不存在
     # 'DataImportMonitoringWidget',       # 暂时注释，类不存在

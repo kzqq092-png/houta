@@ -1,10 +1,10 @@
+from loguru import logger
 """
 计算器工具
 
 提供基本的数学计算功能。
 """
 
-import logging
 from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class Calculator(QDialog):

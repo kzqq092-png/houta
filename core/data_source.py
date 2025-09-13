@@ -4,8 +4,8 @@ import pandas as pd
 from datetime import datetime
 import threading
 import queue
-import logging
 from enum import Enum, auto
+from loguru import logger
 
 
 class DataFrequency(Enum):
@@ -43,7 +43,7 @@ class DataSource(ABC):
 
     def __init__(self, source_type: DataSourceType):
         self.source_type = source_type
-        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+        self.logger = logger
         self._subscribers = []
         self._running = False
         self._thread = None
@@ -172,7 +172,7 @@ class DataSourceManager:
     def __init__(self):
         self._sources: Dict[DataSourceType, DataSource] = {}
         self._active_source = None
-        self.logger = logging.getLogger("DataSourceManager")
+        self.logger = logger
 
     def add_source(self, source: DataSource) -> None:
         """添加数据源"""

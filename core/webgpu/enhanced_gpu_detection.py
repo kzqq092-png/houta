@@ -1,3 +1,4 @@
+from loguru import logger
 """
 增强的GPU检测模块 - 支持真实的多GPU环境检测
 
@@ -8,7 +9,6 @@
 4. 性能和功耗偏好支持
 """
 
-import logging
 import platform
 import subprocess
 import json
@@ -16,7 +16,7 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class GPUType(Enum):
@@ -96,7 +96,7 @@ class EnhancedGPUDetector:
 
             # 解析list格式的输出
             raw_output = result.stdout.strip()
-            logger.debug(f"🔍 wmic原始输出: {raw_output[:500]}...")  # 显示前500字符用于调试
+            logger.debug(f" wmic原始输出: {raw_output[:500]}...")  # 显示前500字符用于调试
 
             # 分割每个GPU设备的信息块
             gpu_blocks = []
@@ -118,7 +118,7 @@ class EnhancedGPUDetector:
             if current_block:
                 gpu_blocks.append(current_block)
 
-            logger.info(f"🔍 解析到 {len(gpu_blocks)} 个GPU信息块")
+            logger.info(f"解析到 {len(gpu_blocks)} 个GPU信息块")
 
             for i, gpu_info in enumerate(gpu_blocks, 1):
                 try:
@@ -165,7 +165,7 @@ class EnhancedGPUDetector:
                     )
                     adapters.append(adapter)
 
-                    logger.info(f"✅ 解析GPU {i}: {gpu_name} ({vendor}) - {memory_mb}MB - {gpu_type.value}")
+                    logger.info(f"解析GPU {i}: {gpu_name} ({vendor}) - {memory_mb}MB - {gpu_type.value}")
 
                 except Exception as e:
                     logger.warning(f"解析GPU信息失败: {e}, gpu_info: {gpu_info}")

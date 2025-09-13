@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -8,13 +9,12 @@ DuckDB配置数据库模型
 
 import sqlite3
 import json
-import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -221,10 +221,10 @@ class DuckDBConfigManager:
                 """)
 
                 conn.commit()
-                logger.info("✅ DuckDB配置表初始化完成")
+                logger.info(" DuckDB配置表初始化完成")
 
         except Exception as e:
-            logger.error(f"❌ 初始化DuckDB配置表失败: {e}")
+            logger.error(f" 初始化DuckDB配置表失败: {e}")
             raise
 
     def create_profile(self, profile: DuckDBConfigProfile) -> int:
@@ -281,11 +281,11 @@ class DuckDBConfigManager:
                 self._record_history(profile_id, 'create', None, profile.to_json(), profile.created_by)
 
                 conn.commit()
-                logger.info(f"✅ 创建DuckDB配置配置文件: {profile.profile_name} (ID: {profile_id})")
+                logger.info(f" 创建DuckDB配置配置文件: {profile.profile_name} (ID: {profile_id})")
                 return profile_id
 
         except Exception as e:
-            logger.error(f"❌ 创建配置配置文件失败: {e}")
+            logger.error(f" 创建配置配置文件失败: {e}")
             raise
 
     def get_profile(self, profile_id: int) -> Optional[DuckDBConfigProfile]:
@@ -304,7 +304,7 @@ class DuckDBConfigManager:
                 return None
 
         except Exception as e:
-            logger.error(f"❌ 获取配置配置文件失败: {e}")
+            logger.error(f" 获取配置配置文件失败: {e}")
             return None
 
     def get_profile_by_name(self, profile_name: str) -> Optional[DuckDBConfigProfile]:
@@ -323,7 +323,7 @@ class DuckDBConfigManager:
                 return None
 
         except Exception as e:
-            logger.error(f"❌ 根据名称获取配置配置文件失败: {e}")
+            logger.error(f" 根据名称获取配置配置文件失败: {e}")
             return None
 
     def get_active_profile(self) -> Optional[DuckDBConfigProfile]:
@@ -341,7 +341,7 @@ class DuckDBConfigManager:
                 return None
 
         except Exception as e:
-            logger.error(f"❌ 获取活动配置配置文件失败: {e}")
+            logger.error(f" 获取活动配置配置文件失败: {e}")
             return None
 
     def get_default_profile(self) -> Optional[DuckDBConfigProfile]:
@@ -359,7 +359,7 @@ class DuckDBConfigManager:
                 return None
 
         except Exception as e:
-            logger.error(f"❌ 获取默认配置配置文件失败: {e}")
+            logger.error(f" 获取默认配置配置文件失败: {e}")
             return None
 
     def list_profiles(self, workload_type: str = None) -> List[DuckDBConfigProfile]:
@@ -385,7 +385,7 @@ class DuckDBConfigManager:
                 return profiles
 
         except Exception as e:
-            logger.error(f"❌ 列出配置配置文件失败: {e}")
+            logger.error(f" 列出配置配置文件失败: {e}")
             return []
 
     def update_profile(self, profile: DuckDBConfigProfile, updated_by: str = 'system') -> bool:
@@ -445,11 +445,11 @@ class DuckDBConfigManager:
                 self._record_history(profile.id, 'update', old_profile.to_json(), profile.to_json(), updated_by)
 
                 conn.commit()
-                logger.info(f"✅ 更新DuckDB配置配置文件: {profile.profile_name}")
+                logger.info(f" 更新DuckDB配置配置文件: {profile.profile_name}")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 更新配置配置文件失败: {e}")
+            logger.error(f" 更新配置配置文件失败: {e}")
             return False
 
     def activate_profile(self, profile_id: int, activated_by: str = 'system') -> bool:
@@ -472,14 +472,14 @@ class DuckDBConfigManager:
                         self._record_history(profile_id, 'activate', None, profile.to_json(), activated_by)
 
                     conn.commit()
-                    logger.info(f"✅ 激活DuckDB配置配置文件: {profile_id}")
+                    logger.info(f" 激活DuckDB配置配置文件: {profile_id}")
                     return True
                 else:
                     logger.error(f"配置配置文件不存在: {profile_id}")
                     return False
 
         except Exception as e:
-            logger.error(f"❌ 激活配置配置文件失败: {e}")
+            logger.error(f" 激活配置配置文件失败: {e}")
             return False
 
     def delete_profile(self, profile_id: int, deleted_by: str = 'system') -> bool:
@@ -505,13 +505,13 @@ class DuckDBConfigManager:
 
                 if cursor.rowcount > 0:
                     conn.commit()
-                    logger.info(f"✅ 删除DuckDB配置配置文件: {profile.profile_name}")
+                    logger.info(f" 删除DuckDB配置配置文件: {profile.profile_name}")
                     return True
                 else:
                     return False
 
         except Exception as e:
-            logger.error(f"❌ 删除配置配置文件失败: {e}")
+            logger.error(f" 删除配置配置文件失败: {e}")
             return False
 
     def _record_history(self, profile_id: int, action: str, old_config: str, new_config: str, changed_by: str, notes: str = None):
@@ -549,7 +549,7 @@ class DuckDBConfigManager:
                 return history
 
         except Exception as e:
-            logger.error(f"❌ 获取配置历史失败: {e}")
+            logger.error(f" 获取配置历史失败: {e}")
             return []
 
     def save_performance_test(self, test_result: Dict[str, Any]) -> int:
@@ -589,11 +589,11 @@ class DuckDBConfigManager:
 
                 test_id = cursor.lastrowid
                 conn.commit()
-                logger.info(f"✅ 保存性能测试结果: {test_id}")
+                logger.info(f" 保存性能测试结果: {test_id}")
                 return test_id
 
         except Exception as e:
-            logger.error(f"❌ 保存性能测试结果失败: {e}")
+            logger.error(f" 保存性能测试结果失败: {e}")
             return 0
 
     def get_performance_tests(self, profile_id: int = None) -> List[Dict[str, Any]]:
@@ -630,7 +630,7 @@ class DuckDBConfigManager:
                 return tests
 
         except Exception as e:
-            logger.error(f"❌ 获取性能测试结果失败: {e}")
+            logger.error(f" 获取性能测试结果失败: {e}")
             return []
 
 
@@ -705,15 +705,15 @@ def create_default_profiles():
         olap_id = manager.get_profile_by_name("OLAP优化").id
         manager.activate_profile(olap_id, "system")
 
-        logger.info("✅ 创建默认DuckDB配置配置文件完成")
+        logger.info(" 创建默认DuckDB配置配置文件完成")
 
     except Exception as e:
-        logger.error(f"❌ 创建默认配置配置文件失败: {e}")
+        logger.error(f" 创建默认配置配置文件失败: {e}")
 
 
 if __name__ == '__main__':
     # 测试配置管理器
-    logging.basicConfig(level=logging.INFO)
+    # Loguru配置在core.loguru_config中统一管理
 
     # 创建默认配置
     create_default_profiles()
@@ -723,7 +723,7 @@ if __name__ == '__main__':
 
     # 列出所有配置
     profiles = manager.list_profiles()
-    print(f"总共 {len(profiles)} 个配置配置文件:")
+    logger.info(f"总共 {len(profiles)} 个配置配置文件:")
     for profile in profiles:
         status = []
         if profile.is_active:
@@ -731,12 +731,12 @@ if __name__ == '__main__':
         if profile.is_default:
             status.append("默认")
         status_str = f" ({', '.join(status)})" if status else ""
-        print(f"  - {profile.profile_name}: {profile.description}{status_str}")
+        logger.info(f"  - {profile.profile_name}: {profile.description}{status_str}")
 
     # 获取活动配置
     active_profile = manager.get_active_profile()
     if active_profile:
-        print(f"\n当前活动配置: {active_profile.profile_name}")
-        print(f"内存限制: {active_profile.memory_limit}")
-        print(f"线程数: {active_profile.threads}")
-        print(f"工作负载类型: {active_profile.workload_type}")
+        logger.info(f"\n当前活动配置: {active_profile.profile_name}")
+        logger.info(f"内存限制: {active_profile.memory_limit}")
+        logger.info(f"线程数: {active_profile.threads}")
+        logger.info(f"工作负载类型: {active_profile.workload_type}")

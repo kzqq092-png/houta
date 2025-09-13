@@ -1,3 +1,4 @@
+from loguru import logger
 """
 SQLite管理表扩展
 
@@ -12,7 +13,6 @@ SQLite管理表扩展
 """
 
 import sqlite3
-import logging
 import json
 from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
@@ -23,7 +23,7 @@ import threading
 
 from .table_manager import TableType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 分析管理业务逻辑
 
@@ -8,7 +9,6 @@
 - 分析报告
 """
 
-import logging
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -49,7 +49,7 @@ class AnalysisManager:
     """分析管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
         self.data_access = data_access
         self._analysis_cache = {}  # 分析结果缓存
 

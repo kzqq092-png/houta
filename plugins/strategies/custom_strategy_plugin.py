@@ -1,3 +1,4 @@
+from loguru import logger
 """
 自定义策略框架插件
 
@@ -8,7 +9,6 @@
 - 灵活的策略定制
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
@@ -26,7 +26,7 @@ from core.strategy_extensions import (
     AssetType, TimeFrame
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CustomStrategyBase:

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 数据导入UI增强功能模块
@@ -12,7 +13,6 @@
 
 import os
 import json
-import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataPreviewWidget(QWidget):
@@ -54,12 +54,12 @@ class DataPreviewWidget(QWidget):
 
         control_panel.addStretch()
 
-        self.refresh_btn = QPushButton("🔄 刷新预览")
+        self.refresh_btn = QPushButton(" 刷新预览")
         self.refresh_btn.clicked.connect(self.refresh_preview)
         self.refresh_btn.setEnabled(False)
         control_panel.addWidget(self.refresh_btn)
 
-        self.export_btn = QPushButton("📤 导出预览")
+        self.export_btn = QPushButton(" 导出预览")
         self.export_btn.clicked.connect(self.export_preview)
         self.export_btn.setEnabled(False)
         control_panel.addWidget(self.export_btn)
@@ -246,7 +246,7 @@ class SmartConfigWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title = QLabel("🧠 智能配置推荐")
+        title = QLabel(" 智能配置推荐")
         title.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         layout.addWidget(title)
 
@@ -261,11 +261,11 @@ class SmartConfigWidget(QWidget):
         # 控制按钮
         button_layout = QHBoxLayout()
 
-        self.analyze_btn = QPushButton("🔍 分析数据")
+        self.analyze_btn = QPushButton(" 分析数据")
         self.analyze_btn.clicked.connect(self.analyze_data)
         button_layout.addWidget(self.analyze_btn)
 
-        self.apply_btn = QPushButton("✅ 应用推荐")
+        self.apply_btn = QPushButton(" 应用推荐")
         self.apply_btn.clicked.connect(self.apply_recommendations)
         self.apply_btn.setEnabled(False)
         button_layout.addWidget(self.apply_btn)
@@ -391,7 +391,7 @@ class PerformanceMonitorWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title = QLabel("📊 性能监控")
+        title = QLabel(" 性能监控")
         title.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         layout.addWidget(title)
 
@@ -514,7 +514,7 @@ class DataQualityWidget(QWidget):
         layout = QVBoxLayout(self)
 
         # 标题
-        title = QLabel("🔍 数据质量检查")
+        title = QLabel(" 数据质量检查")
         title.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         layout.addWidget(title)
 
@@ -555,11 +555,11 @@ class DataQualityWidget(QWidget):
         # 操作按钮
         button_layout = QHBoxLayout()
 
-        self.run_check_btn = QPushButton("🔍 运行检查")
+        self.run_check_btn = QPushButton(" 运行检查")
         self.run_check_btn.clicked.connect(self.run_quality_check)
         button_layout.addWidget(self.run_check_btn)
 
-        self.export_report_btn = QPushButton("📄 导出报告")
+        self.export_report_btn = QPushButton(" 导出报告")
         self.export_report_btn.clicked.connect(self.export_quality_report)
         self.export_report_btn.setEnabled(False)
         button_layout.addWidget(self.export_report_btn)
@@ -571,10 +571,10 @@ class DataQualityWidget(QWidget):
         """运行数据质量检查"""
         # 模拟质量检查结果
         check_results = [
-            ("空值检查", "⚠️ 警告", "15", "建议处理空值或使用默认值填充"),
-            ("重复值检查", "✅ 通过", "0", "数据无重复"),
-            ("异常值检查", "❌ 失败", "8", "发现异常值，建议进一步检查"),
-            ("格式一致性", "✅ 通过", "0", "格式一致")
+            ("空值检查", " 警告", "15", "建议处理空值或使用默认值填充"),
+            ("重复值检查", " 通过", "0", "数据无重复"),
+            ("异常值检查", " 失败", "8", "发现异常值，建议进一步检查"),
+            ("格式一致性", " 通过", "0", "格式一致")
         ]
 
         self.results_table.setRowCount(len(check_results))
@@ -625,10 +625,10 @@ class DataQualityWidget(QWidget):
 
 检查结果:
 --------
-空值检查: ⚠️ 警告 - 发现15个空值
-重复值检查: ✅ 通过 - 无重复数据
-异常值检查: ❌ 失败 - 发现8个异常值
-格式一致性: ✅ 通过 - 格式一致
+空值检查:  警告 - 发现15个空值
+重复值检查:  通过 - 无重复数据
+异常值检查:  失败 - 发现8个异常值
+格式一致性:  通过 - 格式一致
 
 建议:
 ----

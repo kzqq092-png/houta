@@ -1,10 +1,10 @@
+from loguru import logger
 """
 数据访问门面
 
 提供统一的数据访问入口，隐藏底层仓库的复杂性。
 """
 
-import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import pandas as pd
@@ -12,7 +12,7 @@ import pandas as pd
 from .models import StockInfo, KlineData, MarketData, QueryParams
 from .repository import StockRepository, KlineRepository, MarketRepository
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataAccess:
@@ -29,7 +29,7 @@ class DataAccess:
         Args:
             data_manager: 数据管理器实例（可选）
         """
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 初始化各个仓库
         self.stock_repo = StockRepository(data_manager)

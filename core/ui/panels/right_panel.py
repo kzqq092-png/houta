@@ -1,3 +1,4 @@
+from loguru import logger
 """
 右侧面板 - 修复版
 
@@ -7,7 +8,6 @@
 3. 数据更新时的组件访问问题
 """
 
-import logging
 import traceback
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime, timedelta
@@ -34,7 +34,7 @@ try:
     from gui.widgets.analysis_tabs.technical_tab import TechnicalAnalysisTab
     TECHNICAL_TAB_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入TechnicalAnalysisTab: {e}")
+    logger.warning(f"无法导入TechnicalAnalysisTab: {e}")
     TECHNICAL_TAB_AVAILABLE = False
 
 # 导入其他专业分析标签页
@@ -47,7 +47,7 @@ try:
     PROFESSIONAL_TABS_AVAILABLE = True
     ENHANCED_SENTIMENT_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入专业分析标签页: {e}")
+    logger.warning(f"无法导入专业分析标签页: {e}")
     PROFESSIONAL_TABS_AVAILABLE = False
     ENHANCED_SENTIMENT_AVAILABLE = False
 
@@ -58,7 +58,7 @@ try:
     # 向后兼容，EnhancedSentimentAnalysisTab 现在指向 ProfessionalSentimentTab
     EnhancedSentimentAnalysisTab = ProfessionalSentimentTab
 except ImportError as e:
-    logging.warning(f"无法导入专业版情绪分析标签页: {e}")
+    logger.warning(f"无法导入专业版情绪分析标签页: {e}")
     PROFESSIONAL_SENTIMENT_AVAILABLE = False
 
 # 导入K线技术分析标签页
@@ -66,7 +66,7 @@ try:
     from gui.widgets.analysis_tabs.enhanced_kline_sentiment_tab import EnhancedKLineTechnicalTab
     KLINE_TECHNICAL_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入K线技术分析标签页: {e}")
+    logger.warning(f"无法导入K线技术分析标签页: {e}")
     KLINE_TECHNICAL_AVAILABLE = False
 
 # 导入AnalysisToolsPanel
@@ -74,7 +74,7 @@ try:
     from gui.ui_components import AnalysisToolsPanel
     ANALYSIS_TOOLS_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入AnalysisToolsPanel: {e}")
+    logger.warning(f"无法导入AnalysisToolsPanel: {e}")
     ANALYSIS_TOOLS_AVAILABLE = False
 
 # 导入TradingPanel
@@ -82,14 +82,13 @@ try:
     from gui.widgets.trading_panel import TradingPanel
     TRADING_PANEL_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"无法导入TradingPanel: {e}")
+    logger.warning(f"无法导入TradingPanel: {e}")
     TRADING_PANEL_AVAILABLE = False
 
 if TYPE_CHECKING:
     from core.services import AnalysisService
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class RightPanel(BasePanel):
     """
@@ -326,10 +325,10 @@ class RightPanel(BasePanel):
             try:
                 if PROFESSIONAL_SENTIMENT_AVAILABLE:
                     self._sentiment_tab = ProfessionalSentimentTab(config_manager)
-                    tab_widget.addTab(self._sentiment_tab, "📊 情绪分析")
+                    tab_widget.addTab(self._sentiment_tab, " 情绪分析")
                     self.add_widget('sentiment_tab', self._sentiment_tab)
                     self._professional_tabs.append(self._sentiment_tab)
-                    logger.info("✅ 使用合并后的专业版情绪分析标签页（包含实时分析和报告功能）")
+                    logger.info(" 使用合并后的专业版情绪分析标签页（包含实时分析和报告功能）")
                 else:
                     # 如果都失败了，创建一个简单的占位符
                     placeholder_tab = QWidget()
@@ -337,80 +336,80 @@ class RightPanel(BasePanel):
                     placeholder_label = QLabel("情绪分析功能暂时不可用")
                     placeholder_label.setAlignment(Qt.AlignCenter)
                     placeholder_layout.addWidget(placeholder_label)
-                    tab_widget.addTab(placeholder_tab, "📊 情绪分析")
-                    logger.warning("⚠️ 情绪分析功能不可用，使用占位符")
+                    tab_widget.addTab(placeholder_tab, " 情绪分析")
+                    logger.warning(" 情绪分析功能不可用，使用占位符")
 
             except Exception as sentiment_error:
-                logger.error(f"❌ 情绪分析标签页创建失败: {sentiment_error}")
+                logger.error(f" 情绪分析标签页创建失败: {sentiment_error}")
                 # 如果都失败了，创建一个简单的占位符
                 placeholder_tab = QWidget()
                 placeholder_layout = QVBoxLayout(placeholder_tab)
                 placeholder_label = QLabel("情绪分析功能暂时不可用")
                 placeholder_label.setAlignment(Qt.AlignCenter)
                 placeholder_layout.addWidget(placeholder_label)
-                tab_widget.addTab(placeholder_tab, "📊 情绪分析")
+                tab_widget.addTab(placeholder_tab, " 情绪分析")
 
                 # K线情绪分析 - 使用服务容器
             if KLINE_TECHNICAL_AVAILABLE:
                 try:
-                    logger.info("🔄 开始创建K线技术分析标签页...")
+                    logger.info(" 开始创建K线技术分析标签页...")
                     import time
                     start_time = time.time()
 
-                    logger.info("📦 导入K线技术分析标签页模块...")
-                    logger.info("✅ K线技术分析标签页模块导入成功")
+                    logger.info(" 导入K线技术分析标签页模块...")
+                    logger.info(" K线技术分析标签页模块导入成功")
 
-                    logger.info("🏗️ 创建K线技术分析标签页实例...")
+                    logger.info(" 创建K线技术分析标签页实例...")
                     self._kline_sentiment_tab = EnhancedKLineTechnicalTab(
                         config_manager=config_manager
                     )
 
                     create_time = time.time()
-                    logger.info(f"⏱️ K线技术分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
+                    logger.info(f"⏱ K线技术分析标签页实例创建耗时: {(create_time - start_time):.2f}秒")
 
-                    logger.info("🎨 添加K线技术分析标签页到UI...")
-                    tab_widget.addTab(self._kline_sentiment_tab, "📈 K线技术")
+                    logger.info(" 添加K线技术分析标签页到UI...")
+                    tab_widget.addTab(self._kline_sentiment_tab, " K线技术")
 
                     # 注册到组件管理
-                    logger.info("📝 注册K线技术分析标签页到组件管理...")
+                    logger.info(" 注册K线技术分析标签页到组件管理...")
                     self.add_widget('kline_sentiment_tab', self._kline_sentiment_tab)
                     self._professional_tabs.append(self._kline_sentiment_tab)
 
                     end_time = time.time()
-                    logger.info(f"✅ K线技术分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
+                    logger.info(f" K线技术分析标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
                 except Exception as kline_error:
-                    logger.error(f"❌ K线技术分析标签页创建失败: {kline_error}")
+                    logger.error(f" K线技术分析标签页创建失败: {kline_error}")
                     logger.error(traceback.format_exc())
 
                     # 板块资金流 - 使用服务容器
             try:
-                logger.info("🔄 开始创建板块资金流标签页...")
+                logger.info(" 开始创建板块资金流标签页...")
                 start_time = time.time()
 
-                logger.info("📦 导入板块资金流标签页模块...")
-                logger.info("✅ 板块资金流标签页模块导入成功")
+                logger.info(" 导入板块资金流标签页模块...")
+                logger.info(" 板块资金流标签页模块导入成功")
 
-                logger.info("🏗️ 创建板块资金流标签页实例...")
+                logger.info(" 创建板块资金流标签页实例...")
                 self._sector_flow_tab = SectorFlowTab(
                     config_manager=config_manager,
                     service_container=self.coordinator.service_container
                 )
 
                 create_time = time.time()
-                logger.info(f"⏱️ 板块资金流标签页实例创建耗时: {(create_time - start_time):.2f}秒")
+                logger.info(f"⏱ 板块资金流标签页实例创建耗时: {(create_time - start_time):.2f}秒")
 
-                logger.info("🎨 添加板块资金流标签页到UI...")
+                logger.info(" 添加板块资金流标签页到UI...")
                 tab_widget.addTab(self._sector_flow_tab, "板块资金流")
 
                 # 注册到组件管理
-                logger.info("📝 注册板块资金流标签页到组件管理...")
+                logger.info(" 注册板块资金流标签页到组件管理...")
                 self.add_widget('sector_flow_tab', self._sector_flow_tab)
                 self._professional_tabs.append(self._sector_flow_tab)
 
                 end_time = time.time()
-                logger.info(f"✅ 板块资金流标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
+                logger.info(f" 板块资金流标签页创建完成，总耗时: {(end_time - start_time):.2f}秒")
             except Exception as e:
-                logger.error(f"❌ 板块资金流标签页创建失败: {e}")
+                logger.error(f" 板块资金流标签页创建失败: {e}")
                 logger.error(traceback.format_exc())
 
             # 热点分析 - 使用服务容器
@@ -425,14 +424,14 @@ class RightPanel(BasePanel):
                 self.add_widget('hotspot_tab', self._hotspot_tab)
                 self._professional_tabs.append(self._hotspot_tab)
 
-                logger.info("✅ 热点分析标签页创建完成")
+                logger.info(" 热点分析标签页创建完成")
             except Exception as e:
-                logger.error(f"❌ 热点分析标签页创建失败: {e}")
+                logger.error(f" 热点分析标签页创建失败: {e}")
                 logger.error(traceback.format_exc())
 
             # 情绪报告功能现在已经整合到专业版情绪分析标签页中（双标签页设计）
             # 不再需要单独的情绪报告标签页
-            logger.info("✅ 情绪报告功能已整合到专业版情绪分析标签页的第二个标签页中")
+            logger.info(" 情绪报告功能已整合到专业版情绪分析标签页的第二个标签页中")
 
         # 基础功能标签页（如果专业标签页不可用时的后备方案，或者总是创建）
         # 修复：总是创建基础标签页，但只有在需要时才显示
@@ -457,7 +456,7 @@ class RightPanel(BasePanel):
             class AnalysisToolsWrapper(QWidget):
                 def __init__(self, parent, logger):
                     super().__init__(parent)
-                    self.log_manager = logger
+                    # log_manager已迁移到Loguru
 
             wrapper = AnalysisToolsWrapper(self._root_frame, logger)
             self._analysis_tools_panel = AnalysisToolsPanel(parent=wrapper)
@@ -481,12 +480,12 @@ class RightPanel(BasePanel):
                     )
                     tab_widget.addTab(self._trading_panel, "实盘交易")
                     self.add_widget('trading_panel', self._trading_panel)
-                    logger.info("✅ 实盘交易标签页创建成功")
+                    logger.info(" 实盘交易标签页创建成功")
                 else:
-                    logger.warning("❌ 无法获取TradingService，跳过实盘交易标签页")
+                    logger.warning(" 无法获取TradingService，跳过实盘交易标签页")
 
             except Exception as e:
-                logger.error(f"❌ 创建实盘交易标签页失败: {e}")
+                logger.error(f" 创建实盘交易标签页失败: {e}")
                 logger.error(traceback.format_exc())
 
         # 性能监控标签页已删除 - 根据用户要求移除
@@ -826,20 +825,20 @@ class RightPanel(BasePanel):
             self._performance_manager = get_performance_monitor()
 
             # 标签页性能监控已通过统一系统自动启用
-            logger.info("✅ 标签页性能监控已启用")
+            logger.info(" 标签页性能监控已启用")
 
-            logger.info("✅ 统一性能监控系统已集成")
+            logger.info(" 统一性能监控系统已集成")
 
             # 统一性能监控标签页已自动连接到性能监控系统
             if hasattr(self, '_performance_monitor_tab') and self._performance_monitor_tab:
-                logger.info("✅ 统一性能监控标签页已就绪")
+                logger.info(" 统一性能监控标签页已就绪")
 
         except Exception as e:
-            logger.error(f"❌ 性能管理器初始化失败: {e}")
+            logger.error(f" 性能管理器初始化失败: {e}")
 
     def _register_tabs_with_performance_monitor(self):
         """标签页性能监控已通过统一系统自动处理"""
-        logger.info(f"✅ 标签页性能监控已启用，共监控 {len(self._professional_tabs)} 个标签页")
+        logger.info(f" 标签页性能监控已启用，共监控 {len(self._professional_tabs)} 个标签页")
 
     def _update_tab_with_performance_manager(self, tab, data, progressive=False):
         """更新标签页数据（兼容性方法）"""
@@ -859,9 +858,9 @@ class RightPanel(BasePanel):
             from gui.widgets.modern_performance_widget import show_modern_performance_monitor
             self._performance_monitor = show_modern_performance_monitor(self)
             if self._performance_monitor:
-                logger.info("✅ 性能监控窗口已打开")
+                logger.info(" 性能监控窗口已打开")
             else:
-                logger.error("❌ 无法打开性能监控窗口")
+                logger.error(" 无法打开性能监控窗口")
 
         except Exception as e:
             logger.error(f"显示性能监控窗口失败: {e}")
@@ -937,10 +936,10 @@ class RightPanel(BasePanel):
                     use_cache=True
                 )
 
-            logger.info(f"✅ 性能管理器完成所有标签页更新")
+            logger.info(f" 性能管理器完成所有标签页更新")
 
         except Exception as e:
-            logger.error(f"❌ 性能管理器更新标签页失败: {e}")
+            logger.error(f" 性能管理器更新标签页失败: {e}")
             # 回退到原有机制
             self._async_update_professional_tabs(kline_data)
 

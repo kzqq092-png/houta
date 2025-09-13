@@ -1,3 +1,4 @@
+from loguru import logger
 """
 主窗口协调器
 
@@ -5,7 +6,6 @@
 这是整个应用的中央协调器，替代原来的TradingGUI类。
 """
 
-import logging
 from typing import Dict, Any, Optional, List, Union
 import asyncio
 import traceback
@@ -16,7 +16,8 @@ import pandas as pd
 
 from PyQt5.QtWidgets import (
     QFileDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QSplitter, QStatusBar, QMenuBar, QMessageBox, QDockWidget, QLabel, QPushButton, QFrame
+    QSplitter, QStatusBar, QMenuBar, QMessageBox, QDockWidget, QLabel, QPushButton, QFrame,
+    QApplication
 )
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
@@ -46,7 +47,7 @@ from gui.widgets.modern_performance_widget import ModernUnifiedPerformanceWidget
 from core.performance import measure_performance
 from gui.menu_bar import MainMenuBar
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class MainWindowCoordinator(BaseCoordinator):
@@ -76,7 +77,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 创建主窗口
         self._main_window = QMainWindow(parent)
-        self._main_window.setWindowTitle("FactorWeave-Quant ‌ 2.0 多资产分析系统")
+        self._main_window.setWindowTitle("FactorWeave-Quant  2.0 多资产分析系统")
         self._main_window.setGeometry(100, 100, 1400, 900)
         self._main_window.setMinimumSize(1200, 800)
 
@@ -86,7 +87,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 窗口状态
         self._window_state = {
-            'title': 'FactorWeave-Quant ‌ 2.0 多资产分析系统',
+            'title': 'FactorWeave-Quant  2.0 多资产分析系统',
             'geometry': (100, 100, 1400, 900),
             'min_size': (1200, 800),
             'is_maximized': False
@@ -143,9 +144,9 @@ class MainWindowCoordinator(BaseCoordinator):
             try:
                 from ..services import AssetService
                 self._asset_service = self.service_container.resolve(AssetService)
-                logger.info("✅ AssetService初始化成功")
+                logger.info(" AssetService初始化成功")
             except Exception as e:
-                logger.warning(f"⚠️ AssetService初始化失败: {e}")
+                logger.warning(f" AssetService初始化失败: {e}")
                 self._asset_service = None
 
             # 初始化窗口
@@ -323,7 +324,10 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 性能仪表板停靠窗口已删除 - 根据用户要求移除
 
-            logger.info("Performance dashboard panel created and docked")
+            # 创建专业回测组件（作为停靠窗口）
+            self._create_professional_backtest_widget()
+
+            logger.info("All UI panels and components created successfully")
 
             # 连接面板之间的信号
             self._connect_panel_signals()
@@ -351,6 +355,36 @@ class MainWindowCoordinator(BaseCoordinator):
         except Exception as e:
             logger.error(f"Failed to connect panel signals: {e}")
             raise
+
+    def _create_professional_backtest_widget(self) -> None:
+        """创建专业回测组件作为停靠窗口"""
+        try:
+            from gui.widgets.backtest_widget import ProfessionalBacktestWidget
+
+            # 创建专业回测组件
+            self._backtest_widget = ProfessionalBacktestWidget(parent=self._main_window)
+
+            # 创建停靠窗口
+            backtest_dock = QDockWidget("专业回测系统", self._main_window)
+            backtest_dock.setWidget(self._backtest_widget)
+            backtest_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea)
+
+            # 添加到主窗口（默认停靠在右侧）
+            self._main_window.addDockWidget(Qt.RightDockWidgetArea, backtest_dock)
+
+            # 默认隐藏，用户可以通过菜单显示
+            backtest_dock.hide()
+
+            # 保存引用
+            self._panels['backtest_dock'] = backtest_dock
+            self._panels['backtest'] = self._backtest_widget
+
+            logger.info("专业回测组件创建成功")
+
+        except Exception as e:
+            logger.error(f"创建专业回测组件失败: {e}")
+            # 创建一个占位符，避免后续引用错误
+            self._backtest_widget = None
 
     def _on_bottom_panel_hidden(self) -> None:
         """处理底部面板隐藏事件"""
@@ -716,7 +750,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
         # 更新窗口标题
         asset_type_name = self._get_asset_type_display_name(event.asset_type)
-        self._main_window.setWindowTitle(f"FactorWeave-Quant ‌ 2.0 - {event.name} ({event.symbol}) - {asset_type_name}")
+        self._main_window.setWindowTitle(f"FactorWeave-Quant  2.0 - {event.name} ({event.symbol}) - {asset_type_name}")
 
         self.show_message(
             f"正在加载 {event.name} ({event.symbol}) 的{asset_type_name}数据...", level='info')
@@ -865,7 +899,7 @@ class MainWindowCoordinator(BaseCoordinator):
 
             # 更新窗口标题
             asset_type_name = self._get_asset_type_display_name(event.asset_type)
-            title = f"FactorWeave-Quant ‌ 2.0 - {event.name} ({event.symbol}) - {asset_type_name}"
+            title = f"FactorWeave-Quant  2.0 - {event.name} ({event.symbol}) - {asset_type_name}"
             if event.market:
                 title += f" [{event.market}]"
 
@@ -1258,21 +1292,21 @@ Ctrl+F12 - 关于
     def _on_about(self) -> None:
         """关于对话框"""
         about_text = """
-FactorWeave-Quant ‌ 2.0 (重构版本)
+FactorWeave-Quant  2.0 (重构版本)
 
 基于HIkyuu量化框架的股票分析工具
 
 主要功能：
-• 股票数据查看和分析
-• 技术指标计算和显示
-• 策略回测和优化
-• 投资组合管理
-• 数据质量检查
+ 股票数据查看和分析
+ 技术指标计算和显示
+ 策略回测和优化
+ 投资组合管理
+ 数据质量检查
 
 版本：2.0
 作者：HIkyuu开发团队
         """
-        QMessageBox.about(self._main_window, "关于 FactorWeave-Quant ‌",
+        QMessageBox.about(self._main_window, "关于 FactorWeave-Quant ",
                           about_text.strip())
 
     # 高级功能菜单方法（保持原有实现）
@@ -1335,28 +1369,28 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             if service_container and service_container.is_registered(PluginManager):
                 try:
                     plugin_manager = service_container.resolve(PluginManager)
-                    logger.info("✅ 从服务容器获取插件管理器成功")
+                    logger.info(" 从服务容器获取插件管理器成功")
 
                     # 验证插件管理器是否已初始化
                     if plugin_manager and hasattr(plugin_manager, 'enhanced_plugins'):
                         all_plugins = plugin_manager.get_all_plugins()
-                        logger.info(f"✅ 插件管理器已初始化，包含 {len(all_plugins)} 个插件")
+                        logger.info(f" 插件管理器已初始化，包含 {len(all_plugins)} 个插件")
                     else:
-                        logger.warning("⚠️ 插件管理器未完全初始化，尝试重新初始化")
+                        logger.warning(" 插件管理器未完全初始化，尝试重新初始化")
                         if plugin_manager and hasattr(plugin_manager, 'initialize'):
                             plugin_manager.initialize()
 
                 except Exception as e:
-                    logger.error(f"❌ 从服务容器获取插件管理器失败: {e}")
+                    logger.error(f" 从服务容器获取插件管理器失败: {e}")
                     logger.error(traceback.format_exc())
                     plugin_manager = None
             else:
-                logger.warning("⚠️ PluginManager未在服务容器中注册")
+                logger.warning(" PluginManager未在服务容器中注册")
 
             # 方法2：如果方法1失败，尝试创建并初始化新实例
             if not plugin_manager:
                 try:
-                    logger.info("🔄 创建新的插件管理器实例...")
+                    logger.info(" 创建新的插件管理器实例...")
 
                     # 获取必要的依赖
                     from utils.config_manager import ConfigManager
@@ -1373,23 +1407,23 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
                         main_window=self._main_window,
                         data_manager=None,
                         config_manager=config_manager,
-                        log_manager=logger
+                        # log_manager已迁移到Loguru
                     )
 
                     # 初始化插件管理器
                     plugin_manager.initialize()
-                    logger.info("✅ 插件管理器实例创建并初始化成功")
+                    logger.info(" 插件管理器实例创建并初始化成功")
 
                     # 将新实例注册到服务容器（如果可能）
                     if service_container:
                         try:
                             service_container.register_instance(PluginManager, plugin_manager)
-                            logger.info("✅ 新插件管理器实例已注册到服务容器")
+                            logger.info(" 新插件管理器实例已注册到服务容器")
                         except Exception as reg_e:
-                            logger.warning(f"⚠️ 注册新插件管理器实例失败: {reg_e}")
+                            logger.warning(f" 注册新插件管理器实例失败: {reg_e}")
 
                 except Exception as e:
-                    logger.error(f"❌ 创建插件管理器实例失败: {e}")
+                    logger.error(f" 创建插件管理器实例失败: {e}")
                     logger.error(traceback.format_exc())
                     # 继续执行，允许dialog处理空的plugin_manager
 
@@ -1398,14 +1432,14 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             if service_container and service_container.is_registered(SentimentDataService):
                 try:
                     sentiment_service = service_container.resolve(SentimentDataService)
-                    logger.info("✅ 获取情绪数据服务成功")
+                    logger.info(" 获取情绪数据服务成功")
                 except Exception as e:
-                    logger.warning(f"⚠️ 获取情绪数据服务失败: {e}")
+                    logger.warning(f" 获取情绪数据服务失败: {e}")
 
             # 显示插件管理器状态
             plugin_status = "可用" if plugin_manager else "不可用"
             sentiment_status = "可用" if sentiment_service else "不可用"
-            logger.info(f"📋 插件管理器状态: {plugin_status}, 情绪数据服务: {sentiment_status}")
+            logger.info(f" 插件管理器状态: {plugin_status}, 情绪数据服务: {sentiment_status}")
 
             # 创建并显示增强版对话框
             self._plugin_manager_dialog = EnhancedPluginManagerDialog(
@@ -2023,7 +2057,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             layout.addWidget(title_label)
 
             # 通用单位转换器按钮
-            unit_btn = QPushButton("🔧 通用单位转换器")
+            unit_btn = QPushButton(" 通用单位转换器")
             unit_btn.setStyleSheet("""
                 QPushButton {
                     padding: 15px;
@@ -2042,7 +2076,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             layout.addWidget(unit_btn)
 
             # 汇率转换器按钮
-            currency_btn = QPushButton("💱 汇率转换器")
+            currency_btn = QPushButton(" 汇率转换器")
             currency_btn.setStyleSheet("""
                 QPushButton {
                     padding: 15px;
@@ -2148,7 +2182,7 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
                 QMessageBox.warning(
                     self._main_window,
                     "使用条款",
-                    "您必须同意数据使用条款才能使用FactorWeave-Quant ‌系统。\n程序将退出。"
+                    "您必须同意数据使用条款才能使用FactorWeave-Quant 系统。\n程序将退出。"
                 )
                 # 延迟退出，让用户看到消息
                 from PyQt5.QtCore import QTimer
@@ -2347,9 +2381,9 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
             }
 
             # 构建状态消息
-            message = "🔧 优化系统状态\n\n"
+            message = " 优化系统状态\n\n"
             for key, value in status_info.items():
-                message += f"• {key}: {value}\n"
+                message += f" {key}: {value}\n"
 
             QMessageBox.information(self._main_window, "优化系统状态", message)
             logger.info("查看优化系统状态")
@@ -2405,9 +2439,30 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
     def _on_strategy_backtest(self) -> None:
         """策略回测"""
         try:
-            # TODO: 实现策略回测功能
-            QMessageBox.information(self._main_window, "提示", "策略回测功能正在开发中")
-            logger.info("启动策略回测")
+            # 优先使用增强版策略管理对话框（包含完整回测功能）
+            try:
+                from gui.dialogs.enhanced_strategy_manager_dialog import EnhancedStrategyManagerDialog
+                dialog = EnhancedStrategyManagerDialog(self._main_window)
+                # 直接切换到回测标签页
+                if hasattr(dialog, 'tab_widget'):
+                    for i in range(dialog.tab_widget.count()):
+                        if '回测' in dialog.tab_widget.tabText(i):
+                            dialog.tab_widget.setCurrentIndex(i)
+                            break
+                dialog.exec_()
+                logger.info("启动增强版策略回测对话框")
+            except ImportError:
+                # 降级到基础策略管理对话框
+                from gui.dialogs.strategy_manager_dialog import StrategyManagerDialog
+                dialog = StrategyManagerDialog(self._main_window)
+                # 切换到策略回测标签页
+                if hasattr(dialog, 'tab_widget'):
+                    for i in range(dialog.tab_widget.count()):
+                        if '回测' in dialog.tab_widget.tabText(i):
+                            dialog.tab_widget.setCurrentIndex(i)
+                            break
+                dialog.exec_()
+                logger.info("启动基础策略回测对话框")
         except Exception as e:
             logger.error(f"策略回测失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法启动策略回测: {e}")
@@ -2448,6 +2503,51 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         except Exception as e:
             logger.error(f"数据质量检查失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法启动数据质量检查: {e}")
+
+    def _on_data_management_center(self) -> None:
+        """打开数据管理中心"""
+        try:
+            from gui.dialogs.data_management_dialog import DataManagementDialog
+            
+            # 检查是否已经打开了数据管理中心
+            if hasattr(self, '_data_management_dialog') and self._data_management_dialog:
+                # 如果已经存在，就激活窗口
+                self._data_management_dialog.raise_()
+                self._data_management_dialog.activateWindow()
+                return
+            
+            # 创建数据管理中心对话框
+            self._data_management_dialog = DataManagementDialog(self._main_window)
+            
+            # 连接信号
+            self._data_management_dialog.data_downloaded.connect(self._on_data_downloaded_from_center)
+            self._data_management_dialog.source_configured.connect(self._on_source_configured_from_center)
+            
+            # 显示对话框
+            self._data_management_dialog.show()
+            
+            logger.info("数据管理中心已打开")
+            
+        except Exception as e:
+            logger.error(f"打开数据管理中心失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法打开数据管理中心: {e}")
+
+    def _on_data_downloaded_from_center(self, symbol: str, source: str):
+        """处理从数据管理中心下载的数据"""
+        try:
+            logger.info(f"数据下载完成: {symbol} (来源: {source})")
+            # 可以在这里添加数据下载后的处理逻辑
+            # 比如刷新图表、更新状态等
+        except Exception as e:
+            logger.error(f"处理下载数据失败: {e}")
+
+    def _on_source_configured_from_center(self, source_name: str, config: dict):
+        """处理从数据管理中心配置的数据源"""
+        try:
+            logger.info(f"数据源配置更新: {source_name}")
+            # 可以在这里添加数据源配置更新后的处理逻辑
+        except Exception as e:
+            logger.error(f"处理数据源配置失败: {e}")
 
     # ==================== DuckDB专业数据导入功能 ====================
 
@@ -2665,7 +2765,15 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
 
             # 检查是否有专门的回测面板
             if hasattr(self, '_backtest_widget') and self._backtest_widget:
-                self._backtest_widget.start_backtest()
+                # 创建默认回测参数
+                default_params = {
+                    'professional_level': 'PROFESSIONAL',
+                    'engine_type': 'unified',
+                    'use_vectorized': True,
+                    'auto_select': True,
+                    'monitoring_level': 'STANDARD'
+                }
+                self._backtest_widget.start_backtest(default_params)
                 logger.info("从专用回测面板启动回测功能")
                 return
 
@@ -2692,17 +2800,147 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
                         logger.info(f"切换到{tab_name}标签页并启动回测")
                         return
 
-            # 如果没有找到任何回测功能，显示提示
-            QMessageBox.information(
+            # 如果没有找到任何回测功能，提供选择
+            reply = QMessageBox.question(
                 self._main_window,
-                "回测功能",
-                "请先打开分析界面并选择相应的分析标签页后再启动回测"
+                "智能回测选择",
+                "未找到当前活跃的回测界面。\n\n请选择回测方式：\n\n• 是：打开专业回测功能\n• 否：打开策略回测功能",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes
             )
-            logger.warning("未找到可用的回测功能")
+
+            if reply == QMessageBox.Yes:
+                # 启动专业回测功能
+                self._on_professional_backtest()
+            elif reply == QMessageBox.No:
+                # 启动策略回测功能（原策略菜单功能）
+                self._on_strategy_backtest()
+            # Cancel 则不执行任何操作
+
+            logger.info("智能回测：用户选择了回测方式")
 
         except Exception as e:
             logger.error(f"启动回测失败: {e}")
             QMessageBox.warning(self._main_window, "错误", f"无法启动回测: {e}")
+
+    def _on_professional_backtest(self) -> None:
+        """启动专业回测功能（直接打开独立浮动窗口）"""
+        try:
+            # 直接创建独立浮动窗口，支持放大缩小和关闭
+            self._create_standalone_backtest_window()
+            logger.info("专业回测独立窗口已启动")
+
+        except Exception as e:
+            logger.error(f"启动专业回测功能失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法启动专业回测功能: {e}")
+
+    def _create_standalone_backtest_window(self) -> None:
+        """创建独立的专业回测浮动窗口（支持放大缩小和关闭）"""
+        try:
+            from gui.widgets.backtest_widget import ProfessionalBacktestWidget
+            from PyQt5.QtWidgets import QMainWindow
+            from PyQt5.QtCore import Qt
+            from PyQt5.QtGui import QIcon
+
+            # 检查是否已有独立窗口存在
+            if hasattr(self, '_standalone_backtest_window') and self._standalone_backtest_window:
+                # 如果窗口已存在，直接显示并激活
+                self._standalone_backtest_window.show()
+                self._standalone_backtest_window.raise_()
+                self._standalone_backtest_window.activateWindow()
+                logger.info("专业回测独立窗口已激活")
+                return
+
+            # 创建新的独立浮动窗口
+            self._standalone_backtest_window = QMainWindow()
+
+            # 设置窗口标题和图标
+            self._standalone_backtest_window.setWindowTitle("FactorWeave-Quant 专业回测系统")
+
+            # 设置窗口大小和位置（居中显示）
+            screen = QApplication.desktop().screenGeometry()
+            window_width = 1400
+            window_height = 900
+            x = (screen.width() - window_width) // 2
+            y = (screen.height() - window_height) // 2
+            self._standalone_backtest_window.setGeometry(x, y, window_width, window_height)
+
+            # 设置最小窗口大小
+            self._standalone_backtest_window.setMinimumSize(1000, 700)
+
+            # 设置窗口标志，支持放大缩小和关闭
+            self._standalone_backtest_window.setWindowFlags(
+                Qt.Window |                    # 独立窗口
+                Qt.WindowTitleHint |          # 显示标题栏
+                Qt.WindowSystemMenuHint |     # 显示系统菜单
+                Qt.WindowMinimizeButtonHint |  # 显示最小化按钮
+                Qt.WindowMaximizeButtonHint |  # 显示最大化按钮
+                Qt.WindowCloseButtonHint      # 显示关闭按钮
+            )
+
+            # 创建专业回测组件
+            backtest_widget = ProfessionalBacktestWidget(parent=self._standalone_backtest_window)
+            self._standalone_backtest_window.setCentralWidget(backtest_widget)
+
+            # 设置窗口样式
+            self._standalone_backtest_window.setStyleSheet("""
+                QMainWindow {
+                    background-color: #0e1117;
+                    color: white;
+                }
+            """)
+
+            # 设置窗口属性
+            self._standalone_backtest_window.setAttribute(Qt.WA_DeleteOnClose, False)  # 关闭时不删除，只隐藏
+
+            # 连接关闭事件
+            def on_window_close():
+                self._standalone_backtest_window.hide()
+                logger.info("专业回测独立窗口已隐藏")
+
+            # 重写关闭事件
+            original_close_event = self._standalone_backtest_window.closeEvent
+
+            def close_event(event):
+                event.ignore()  # 忽略关闭事件
+                on_window_close()  # 执行隐藏操作
+            self._standalone_backtest_window.closeEvent = close_event
+
+            # 显示窗口
+            self._standalone_backtest_window.show()
+            self._standalone_backtest_window.raise_()
+            self._standalone_backtest_window.activateWindow()
+
+            logger.info("专业回测独立浮动窗口创建成功")
+
+        except Exception as e:
+            logger.error(f"创建独立回测窗口失败: {e}")
+            QMessageBox.critical(self._main_window, "错误", f"无法创建专业回测窗口: {e}")
+
+    def _on_toggle_backtest_panel(self) -> None:
+        """切换专业回测面板的显示/隐藏"""
+        try:
+            backtest_dock = self._panels.get('backtest_dock')
+            if backtest_dock:
+                if backtest_dock.isVisible():
+                    backtest_dock.hide()
+                    logger.info("专业回测面板已隐藏")
+                else:
+                    backtest_dock.show()
+                    backtest_dock.raise_()
+                    logger.info("专业回测面板已显示")
+            else:
+                # 如果停靠窗口不存在，创建它
+                self._create_professional_backtest_widget()
+                backtest_dock = self._panels.get('backtest_dock')
+                if backtest_dock:
+                    backtest_dock.show()
+                    backtest_dock.raise_()
+                    logger.info("专业回测面板已创建并显示")
+
+        except Exception as e:
+            logger.error(f"切换专业回测面板失败: {e}")
+            QMessageBox.warning(self._main_window, "错误", f"无法切换专业回测面板: {e}")
 
     def _on_optimize(self) -> None:
         """启动优化功能"""
@@ -2898,12 +3136,12 @@ FactorWeave-Quant ‌ 2.0 (重构版本)
         try:
             import psutil
             memory_info = psutil.virtual_memory()
-            message = f"""💾 内存使用情况
+            message = f""" 内存使用情况
 
-• 总内存: {memory_info.total / (1024**3):.1f} GB
-• 已使用: {memory_info.used / (1024**3):.1f} GB
-• 可用内存: {memory_info.available / (1024**3):.1f} GB
-• 使用率: {memory_info.percent:.1f}%
+ 总内存: {memory_info.total / (1024**3):.1f} GB
+ 已使用: {memory_info.used / (1024**3):.1f} GB
+ 可用内存: {memory_info.available / (1024**3):.1f} GB
+ 使用率: {memory_info.percent:.1f}%
 """
             QMessageBox.information(self._main_window, "内存使用情况", message)
             logger.info("查看内存使用情况")

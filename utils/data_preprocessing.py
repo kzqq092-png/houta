@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据预处理工具模块
 统一处理K线数据的预处理逻辑，避免重复代码
@@ -8,26 +9,8 @@ import numpy as np
 from datetime import datetime
 from typing import Optional, Union, Any
 
-# 全局日志管理器
-_log_manager = None
-
-
-def _get_log_manager():
-    """获取日志管理器"""
-    global _log_manager
-    if _log_manager is None:
-        try:
-            from core.logger import LogManager
-            _log_manager = LogManager()
-        except ImportError:
-            # 创建简单的日志记录器
-            class SimpleLogger:
-                def info(self, msg): print(f"[INFO] {msg}")
-                def warning(self, msg): print(f"[WARNING] {msg}")
-                def error(self, msg): print(f"[ERROR] {msg}")
-                def debug(self, msg): print(f"[DEBUG] {msg}")
-            _log_manager = SimpleLogger()
-    return _log_manager
+# 日志系统已迁移到Loguru
+# 直接使用 logger.info(), logger.error() 等方法
 
 
 def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> Optional[pd.DataFrame]:
@@ -41,12 +24,12 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
     Returns:
         pd.DataFrame: 预处理后的标准化DataFrame，如果处理失败返回None
     """
-    log_manager = _get_log_manager()
+    # 使用全局logger
 
     # 如果不是DataFrame，尝试转换或直接返回
     if not isinstance(df, pd.DataFrame):
         if df is None:
-            log_manager.warning(f"[{context}] 输入数据为None")
+            logger.warning(f"[{context}] 输入数据为None")
             return None
 
         # 尝试转换为DataFrame
@@ -54,14 +37,14 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
             if hasattr(df, '__iter__') and not isinstance(df, str):
                 df = pd.DataFrame(df)
             else:
-                log_manager.warning(f"[{context}] 无法将输入数据转换为DataFrame")
+                logger.warning(f"[{context}] 无法将输入数据转换为DataFrame")
                 return None
         except Exception as e:
-            log_manager.error(f"[{context}] 数据转换失败: {str(e)}")
+            logger.error(f"[{context}] 数据转换失败: {str(e)}")
             return None
 
     if df.empty:
-        log_manager.warning(f"[{context}] 输入DataFrame为空")
+        logger.warning(f"[{context}] 输入DataFrame为空")
         return df
 
     # 创建副本避免修改原数据
@@ -100,13 +83,13 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
                 df.index = pd.to_datetime(df.index)
                 has_datetime = True
                 datetime_in_index = True
-                log_manager.info(f"[{context}] 从索引推断datetime字段")
+                logger.info(f"[{context}] 从索引推断datetime字段")
             except Exception:
                 pass
 
         if not has_datetime:
             # 完全没有datetime信息，创建默认时间序列
-            log_manager.warning(f"[{context}] 缺少datetime字段，自动补全")
+            logger.warning(f"[{context}] 缺少datetime字段，自动补全")
             df['datetime'] = pd.date_range(
                 start='2023-01-01', periods=len(df), freq='D')
             datetime_col_name = 'datetime'
@@ -120,7 +103,7 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
             df = df.set_index(datetime_col_name)
             datetime_in_index = True
         except Exception as e:
-            log_manager.warning(f"[{context}] datetime列转换失败: {str(e)}")
+            logger.warning(f"[{context}] datetime列转换失败: {str(e)}")
     elif datetime_in_index and 'datetime' not in df.columns:
         # datetime在索引中，复制到列中以保持兼容性
         df['datetime'] = df.index
@@ -134,7 +117,7 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
     missing_cols = [col for col in required_cols if col not in df.columns]
 
     if missing_cols:
-        log_manager.warning(f"[{context}] 缺少字段: {missing_cols}，自动补全")
+        logger.warning(f"[{context}] 缺少字段: {missing_cols}，自动补全")
 
         for col in missing_cols:
             if col == 'volume':
@@ -172,7 +155,7 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
 
             after_count = len(df)
             if after_count < before_count:
-                log_manager.info(
+                logger.info(
                     f"[{context}] 已过滤{before_count-after_count}行{col}异常数据")
 
     # 检查价格逻辑关系
@@ -183,7 +166,7 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
 
     # 最终检查
     if df.empty:
-        log_manager.warning(f"[{context}] 数据预处理后为空")
+        logger.warning(f"[{context}] 数据预处理后为空")
         return df
 
     # 添加code字段（如果不存在）
@@ -208,9 +191,9 @@ def kdata_preprocess(df: Union[pd.DataFrame, Any], context: str = "分析") -> O
         df = df.drop_duplicates(subset=['datetime'], keep='last')
 
     if len(df) < initial_len:
-        log_manager.info(f"[{context}] 移除了{initial_len - len(df)}行重复数据")
+        logger.info(f"[{context}] 移除了{initial_len - len(df)}行重复数据")
 
-    log_manager.debug(f"[{context}] 数据预处理完成，共{len(df)}行数据")
+    logger.debug(f"[{context}] 数据预处理完成，共{len(df)}行数据")
     return df
 
 
@@ -225,10 +208,10 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
     Returns:
         bool: 数据是否有效
     """
-    log_manager = _get_log_manager()
+    # 使用全局logger
 
     if df is None or df.empty:
-        log_manager.warning(f"[{context}] 数据为空")
+        logger.warning(f"[{context}] 数据为空")
         return False
 
     # 检查必要列
@@ -236,25 +219,25 @@ def validate_kdata(df: pd.DataFrame, context: str = "验证") -> bool:
     missing_columns = [
         col for col in required_columns if col not in df.columns]
     if missing_columns:
-        log_manager.warning(f"[{context}] 缺少必要列: {missing_columns}")
+        logger.warning(f"[{context}] 缺少必要列: {missing_columns}")
         return False
 
     # 检查数据量
     if len(df) < 2:
-        log_manager.warning(f"[{context}] 数据量不足，至少需要2行数据")
+        logger.warning(f"[{context}] 数据量不足，至少需要2行数据")
         return False
 
     # 检查价格数据有效性
     for col in required_columns:
         if df[col].isna().all():
-            log_manager.warning(f"[{context}] {col}列全部为空")
+            logger.warning(f"[{context}] {col}列全部为空")
             return False
 
         if (df[col] <= 0).any():
-            log_manager.warning(f"[{context}] {col}列存在非正数值")
+            logger.warning(f"[{context}] {col}列存在非正数值")
             return False
 
-    log_manager.debug(f"[{context}] 数据验证通过")
+    logger.debug(f"[{context}] 数据验证通过")
     return True
 
 
@@ -339,8 +322,8 @@ def calculate_basic_indicators(df: pd.DataFrame) -> pd.DataFrame:
         df['boll_mid'] = ma20
 
     except Exception as e:
-        log_manager = _get_log_manager()
-        log_manager.error(f"计算基础指标失败: {str(e)}")
+        # 使用全局logger
+        logger.error(f"计算基础指标失败: {str(e)}")
 
     return df
 

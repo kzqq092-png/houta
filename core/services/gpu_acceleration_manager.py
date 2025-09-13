@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 GPU加速数据处理管理器
@@ -9,7 +10,6 @@ GPU加速数据处理管理器
 - 性能监控和优化
 """
 
-import logging
 import threading
 import time
 import numpy as np
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 尝试导入GPU计算库
 try:

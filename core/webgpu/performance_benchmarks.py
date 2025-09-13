@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU性能基准测试系统
 
@@ -14,7 +15,6 @@ WebGPU性能基准测试系统
 """
 
 import time
-import logging
 import json
 import threading
 import statistics
@@ -26,7 +26,7 @@ from enum import Enum
 from pathlib import Path
 import numpy as np
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class BenchmarkType(Enum):
@@ -770,7 +770,7 @@ if __name__ == "__main__":
 
     # 快速测试
     result = run_quick_performance_test(dummy_render, RenderingEngine.WEBGPU)
-    print(f"\n性能测试结果:")
-    print(f"平均帧率: {result.metrics.frame_rate:.1f} FPS")
-    print(f"内存使用: {result.metrics.memory_usage_mb:.1f} MB")
-    print(f"测试时长: {result.duration:.2f}秒")
+    logger.info(f"\n性能测试结果:")
+    logger.info(f"平均帧率: {result.metrics.frame_rate:.1f} FPS")
+    logger.info(f"内存使用: {result.metrics.memory_usage_mb:.1f} MB")
+    logger.info(f"测试时长: {result.duration:.2f}秒")

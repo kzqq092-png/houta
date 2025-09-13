@@ -1,169 +1,118 @@
 #!/usr/bin/env python3
 """
-系统组件适配器
+系统适配器模块
 
-提供统一的接口来访问系统的各种组件
+提供系统组件的统一访问接口，简化模块间的依赖关系
 """
 
-from core.performance import get_performance_monitor
-import logging
+from loguru import logger
 from typing import Dict, Any, Optional
-from .logger import LogManager
-from .config import ConfigManager
-from .data_validator import ProfessionalDataValidator, ValidationLevel
-# from .performance_monitor import get_performance_monitor  # 已迁移到统一模块
-from utils import ConfigManager as UtilsConfigManager
+import json
+import os
 
-# 全局实例
-_log_manager = None
-_config_manager = None
-_data_validator = None
-
-
-def get_logger(name: str = None) -> logging.Logger:
-    """
-    获取日志记录器
-
-    Args:
-        name: 日志记录器名称
-
-    Returns:
-        日志记录器实例
-    """
-    global _log_manager
-
-    if _log_manager is None:
-        try:
-            from utils.config_types import LoggingConfig
-            _log_manager = LogManager(LoggingConfig())
-        except Exception:
-            # 如果初始化失败，使用标准日志记录器
-            return logging.getLogger(name or __name__)
-
-    # 返回标准的日志记录器，但确保日志管理器已初始化
-    return logging.getLogger(name or __name__)
+logger = logger
 
 
 def get_config() -> Dict[str, Any]:
     """
-    获取配置管理器
+    获取系统配置
 
     Returns:
-        配置字典
+        系统配置字典
     """
-    global _config_manager
-
-    if _config_manager is None:
-        try:
-            _config_manager = UtilsConfigManager()
-        except Exception as e:
-            logging.warning(f"配置管理器初始化失败: {e}")
-            # 返回默认配置
-            return {
-                'strategy_database': {
-                    'path': 'db/factorweave_system.sqlite'
-                },
-                'strategy_engine': {
-                    'max_workers': 4,
-                    'cache_size': 1000,
-                    'cache_ttl': 3600
-                },
-                'strategy_system': {
-                    'database': {
-                        'path': 'db/factorweave_system.sqlite'
-                    },
-                    'engine': {
-                        'max_workers': 4,
-                        'cache_size': 1000,
-                        'cache_ttl': 3600
-                    },
-                    'discovery': {
-                        'auto_discover': True,
-                        'paths': ['strategies']
-                    }
-                },
-                'strategy_discovery': {
-                    'paths': ['strategies']
-                }
-            }
-
     try:
-        return _config_manager.get_all()
+        # 默认配置
+        default_config = {
+            'real_data': {
+                'cache_ttl': 300,  # 5分钟缓存
+                'max_retries': 3,
+                'timeout': 30
+            },
+            'database': {
+                'path': 'db/factorweave_system.sqlite',
+                'connection_pool_size': 5
+            },
+            'import': {
+                'batch_size': 100,
+                'max_workers': 4
+            }
+        }
+
+        # 尝试从配置文件加载
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'system_config.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                file_config = json.load(f)
+                default_config.update(file_config)
+                logger.info(f"已加载配置文件: {config_path}")
+        else:
+            logger.info("使用默认配置")
+
+        return default_config
+
     except Exception as e:
-        logging.warning(f"获取配置失败: {e}")
-        return {}
+        logger.warning(f"获取配置失败，使用默认配置: {e}")
+        return {
+            'real_data': {'cache_ttl': 300},
+            'database': {'path': 'db/factorweave_system.sqlite'},
+            'import': {'batch_size': 100}
+        }
 
 
-class DataValidator:
-    """数据验证器适配器"""
-
-    def __init__(self):
-        self._validator = ProfessionalDataValidator(
-            validation_level=ValidationLevel.STANDARD)
-
-    def validate_strategy_data(self, strategy_data: Dict[str, Any]) -> bool:
-        """
-        验证策略数据
-
-        Args:
-            strategy_data: 策略数据字典
-
-        Returns:
-            是否有效
-        """
-        try:
-            # 检查必需字段
-            required_fields = ['name']
-            for field in required_fields:
-                if field not in strategy_data:
-                    return False
-
-            # 检查数据类型
-            if not isinstance(strategy_data.get('name'), str):
-                return False
-
-            # 检查可选字段的类型
-            if 'version' in strategy_data and not isinstance(strategy_data['version'], str):
-                return False
-
-            if 'author' in strategy_data and not isinstance(strategy_data['author'], str):
-                return False
-
-            if 'description' in strategy_data and not isinstance(strategy_data['description'], str):
-                return False
-
-            if 'category' in strategy_data and not isinstance(strategy_data['category'], str):
-                return False
-
-            if 'metadata' in strategy_data and not isinstance(strategy_data['metadata'], dict):
-                return False
-
-            return True
-
-        except Exception:
-            return False
-
-
-def get_data_validator() -> DataValidator:
+def get_data_validator():
     """
     获取数据验证器
 
     Returns:
         数据验证器实例
     """
-    global _data_validator
+    try:
+        from core.data_validator import ProfessionalDataValidator
+        return ProfessionalDataValidator()
+    except ImportError as e:
+        logger.warning(f"专业数据验证器不可用，使用默认验证器: {e}")
+        return DefaultDataValidator()
+    except Exception as e:
+        logger.warning(f"数据验证器初始化失败，使用默认验证器: {e}")
+        return DefaultDataValidator()
 
-    if _data_validator is None:
-        _data_validator = DataValidator()
 
-    return _data_validator
+class DefaultDataValidator:
+    """默认数据验证器"""
+
+    def validate_data(self, data, data_type: str = None) -> bool:
+        """验证数据"""
+        if data is None:
+            return False
+
+        # 简单验证：非空检查
+        if hasattr(data, '__len__'):
+            return len(data) > 0
+
+        return True
+
+    def validate_stock_code(self, code: str) -> bool:
+        """验证股票代码"""
+        if not code or not isinstance(code, str):
+            return False
+
+        # 简单验证：6位数字
+        return len(code) == 6 and code.isdigit()
 
 
-# 重新导出性能监控器（使用统一模块）
+def get_performance_monitor():
+    """
+    获取性能监控器
 
-__all__ = [
-    'get_logger',
-    'get_config',
-    'get_data_validator',
-    'get_performance_monitor'
-]
+    Returns:
+        性能监控器实例
+    """
+    try:
+        from core.performance import get_performance_monitor as _get_performance_monitor
+        return _get_performance_monitor()
+    except ImportError as e:
+        logger.warning(f"无法导入性能监控器: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"获取性能监控器失败: {e}")
+        return None

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 简化AI模型生成脚本
@@ -52,17 +53,17 @@ def create_dummy_h5_file(file_path, model_info):
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(dummy_model, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ 简化模型已创建: {file_path}")
+    logger.info(f" 简化模型已创建: {file_path}")
 
 
 def generate_simplified_models():
     """生成简化版AI模型"""
 
-    print("FactorWeave-Quant  简化AI模型生成器")
-    print("=" * 60)
-    print("注意：这是简化版本，建议安装TensorFlow以获得完整功能")
-    print("pip install tensorflow")
-    print("=" * 60)
+    logger.info("FactorWeave-Quant  简化AI模型生成器")
+    logger.info("=" * 60)
+    logger.info("注意：这是简化版本，建议安装TensorFlow以获得完整功能")
+    logger.info("pip install tensorflow")
+    logger.info("=" * 60)
 
     # 确保目录存在
     models_dir = project_root / "models" / "trained"
@@ -96,7 +97,7 @@ def generate_simplified_models():
 
     for model_type, config in model_configs.items():
         try:
-            print(f"\n创建 {model_type} 模型...")
+            logger.info(f"\n创建 {model_type} 模型...")
 
             # 模型文件路径
             model_path = models_dir / f"{model_type}_model.h5"
@@ -124,35 +125,35 @@ def generate_simplified_models():
             with open(info_path, 'w', encoding='utf-8') as f:
                 json.dump(model_info, f, indent=2, ensure_ascii=False)
 
-            print(f"✅ {model_type} 模型信息已保存: {info_path}")
+            logger.info(f" {model_type} 模型信息已保存: {info_path}")
             success_count += 1
 
         except Exception as e:
-            print(f"❌ {model_type} 模型创建失败: {e}")
+            logger.info(f" {model_type} 模型创建失败: {e}")
 
-    print(f"\n{'='*60}")
-    print(f"简化模型生成完成")
-    print(f"成功: {success_count}/{len(model_configs)}")
-    print(f"模型保存目录: {models_dir}")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"简化模型生成完成")
+    logger.info(f"成功: {success_count}/{len(model_configs)}")
+    logger.info(f"模型保存目录: {models_dir}")
+    logger.info(f"{'='*60}")
 
     if success_count == len(model_configs):
-        print("🎉 所有简化模型生成成功！")
-        print("\n📋 生成的模型文件:")
+        logger.info(" 所有简化模型生成成功！")
+        logger.info("\n 生成的模型文件:")
         for model_type in model_configs.keys():
             model_path = models_dir / f"{model_type}_model.h5"
-            print(f"  - {model_path}")
+            logger.info(f"  - {model_path}")
 
-        print("\n⚠️  重要提示:")
-        print("1. 这些是简化模型，功能有限")
-        print("2. 建议安装TensorFlow以获得完整AI预测功能:")
-        print("   pip install tensorflow")
-        print("3. 安装TensorFlow后，运行 python scripts/generate_ai_models.py --quick")
-        print("4. 现在可以重新启动FactorWeave-Quant 应用程序")
+        logger.info("\n  重要提示:")
+        logger.info("1. 这些是简化模型，功能有限")
+        logger.info("2. 建议安装TensorFlow以获得完整AI预测功能:")
+        logger.info("   pip install tensorflow")
+        logger.info("3. 安装TensorFlow后，运行 python scripts/generate_ai_models.py --quick")
+        logger.info("4. 现在可以重新启动FactorWeave-Quant 应用程序")
 
         return True
     else:
-        print("⚠️ 部分模型创建失败")
+        logger.info(" 部分模型创建失败")
         return False
 
 

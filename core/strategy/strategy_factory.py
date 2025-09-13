@@ -1,3 +1,4 @@
+from loguru import logger
 """
 策略工厂 - 负责策略实例的创建和管理
 
@@ -10,7 +11,7 @@ import threading
 from datetime import datetime
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config
+from core.adapters import get_config
 
 from .base_strategy import BaseStrategy, StrategyParameter
 from .strategy_registry import StrategyRegistry
@@ -26,7 +27,7 @@ class StrategyFactory:
         Args:
             registry: 策略注册器
         """
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
         self.registry = registry
         self.db_manager = get_strategy_database_manager()
@@ -676,8 +677,9 @@ def initialize_strategy_factory(registry: StrategyRegistry = None) -> StrategyFa
         _strategy_factory = StrategyFactory(registry)
         return _strategy_factory
 
-
 # 模块级别的便捷函数，用于向后兼容
+
+
 def create_strategy(strategy_name: str, instance_name: str = None, **kwargs) -> Optional[BaseStrategy]:
     """创建策略实例的便捷函数
 

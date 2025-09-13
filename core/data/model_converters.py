@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据模型转换器
 
@@ -12,7 +13,6 @@
 """
 
 import pandas as pd
-import logging
 from typing import Dict, Any, List, Tuple, Optional, Union
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
@@ -23,7 +23,7 @@ from .enhanced_models import (
     calculate_financial_ratios
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataValidationError(Exception):

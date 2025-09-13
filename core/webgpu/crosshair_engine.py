@@ -1,3 +1,4 @@
+from loguru import logger
 """
 GPU加速十字光标引擎模块
 
@@ -9,7 +10,6 @@ GPU加速十字光标引擎模块
 - 性能优化
 """
 
-import logging
 import time
 import threading
 from typing import Dict, Any, Optional, Tuple, List, Callable
@@ -21,7 +21,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QPointF, QRectF
 from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CrosshairStyle(Enum):

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 增强版批量分析支持方法
 

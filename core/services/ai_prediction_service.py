@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -12,7 +13,6 @@ AI预测服务 - 统一的机器学习预测服务
 5. 风险预测
 """
 
-import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple, Union
@@ -37,7 +37,7 @@ except ImportError:
 
 from core.services.base_service import BaseService
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 添加模型类型映射字典
 MODEL_TYPE_DISPLAY_NAMES = {
@@ -136,7 +136,7 @@ class AIPredictionService(BaseService):
                 'detailed_errors': True
             }
 
-            logger.info("✅ AI预测配置已从数据库加载")
+            logger.info(" AI预测配置已从数据库加载")
 
         except Exception as e:
             logger.warning(f"从数据库加载配置失败，使用默认配置: {e}")
@@ -290,14 +290,14 @@ class AIPredictionService(BaseService):
             model_dir.mkdir(exist_ok=True)
 
             if DL_AVAILABLE:
-                logger.info("✅ 深度学习模块可用，初始化AI预测模型")
+                logger.info(" 深度学习模块可用，初始化AI预测模型")
                 self._load_or_create_models()
             else:
-                logger.warning("⚠️ 深度学习模块不可用，使用统计模型")
+                logger.warning(" 深度学习模块不可用，使用统计模型")
                 self._initialize_statistical_models()
 
         except Exception as e:
-            logger.error(f"❌ 模型初始化失败: {e}")
+            logger.error(f" 模型初始化失败: {e}")
             self._initialize_fallback_models()
 
     def _load_or_create_models(self):
@@ -327,7 +327,7 @@ class AIPredictionService(BaseService):
                             continue
 
                         self._models[pred_type] = model
-                        logger.info(f"✅ 加载{pred_type}深度学习模型成功")
+                        logger.info(f" 加载{pred_type}深度学习模型成功")
                     else:
                         # 如果没有TensorFlow，检查是否是简化模型
                         try:
@@ -335,12 +335,12 @@ class AIPredictionService(BaseService):
                                 model_data = json.load(f)
                                 if model_data.get('model_type') == 'simplified':
                                     self._models[pred_type] = model_data
-                                    logger.info(f"✅ 加载{pred_type}简化模型")
+                                    logger.info(f" 加载{pred_type}简化模型")
                                 else:
                                     raise ValueError("Not a simplified model")
                         except Exception:
                             self._models[pred_type] = None
-                            logger.warning(f"⚠️ 无法识别{pred_type}模型格式")
+                            logger.warning(f" 无法识别{pred_type}模型格式")
 
                 except Exception as e:
                     # 回退：尝试加载为简化模型
@@ -349,16 +349,16 @@ class AIPredictionService(BaseService):
                             model_data = json.load(f)
                             if model_data.get('model_type') == 'simplified':
                                 self._models[pred_type] = model_data
-                                logger.info(f"✅ 加载{pred_type}简化模型（回退模式）")
+                                logger.info(f" 加载{pred_type}简化模型（回退模式）")
                             else:
                                 raise ValueError("Not a simplified model")
                     except Exception:
-                        logger.warning(f"⚠️ 加载{pred_type}模型失败: {e}")
+                        logger.warning(f" 加载{pred_type}模型失败: {e}")
                         self._models[pred_type] = None
             else:
                 # 标记需要训练
                 self._models[pred_type] = None
-                logger.warning(f"⚠️ 加载{pred_type}模型不存在，路径: {model_path}")
+                logger.warning(f" 加载{pred_type}模型不存在，路径: {model_path}")
 
     def _initialize_statistical_models(self):
         """初始化统计模型"""
@@ -388,10 +388,10 @@ class AIPredictionService(BaseService):
         """
         # === 详细调试日志开始 ===
         logger.info("="*80)
-        logger.info("🚀 AI预测服务 - predict_patterns 开始")
-        logger.info(f"📊 输入数据: K线长度={len(kdata)}, 形态数量={len(patterns)}")
-        logger.info(f"🧠 当前模型配置: {self.model_config}")
-        logger.info(f"🎯 当前模型类型: {self.model_config.get('model_type', 'N/A')}")
+        logger.info(" AI预测服务 - predict_patterns 开始")
+        logger.info(f" 输入数据: K线长度={len(kdata)}, 形态数量={len(patterns)}")
+        logger.info(f" 当前模型配置: {self.model_config}")
+        logger.info(f" 当前模型类型: {self.model_config.get('model_type', 'N/A')}")
         logger.info("="*80)
         # === 详细调试日志结束 ===
 
@@ -592,14 +592,14 @@ class AIPredictionService(BaseService):
     def _generate_pattern_prediction(self, kdata: pd.DataFrame, patterns: List[Dict]) -> Dict[str, Any]:
         """生成形态预测"""
         # === 详细调试日志 ===
-        logger.info("🔧 _generate_pattern_prediction 开始")
-        logger.info(f"📊 形态数量: {len(patterns)}")
+        logger.info(" _generate_pattern_prediction 开始")
+        logger.info(f" 形态数量: {len(patterns)}")
 
         if not patterns:
-            logger.warning("⚠️ 形态列表为空，调用 _predict_without_patterns")
-            logger.info(f"🧠 即将使用模型类型: {self.model_config.get('model_type', 'N/A')}")
+            logger.warning(" 形态列表为空，调用 _predict_without_patterns")
+            logger.info(f" 即将使用模型类型: {self.model_config.get('model_type', 'N/A')}")
             result = self._predict_without_patterns(kdata)
-            logger.info(f"✅ _predict_without_patterns 返回结果: {result}")
+            logger.info(f" _predict_without_patterns 返回结果: {result}")
             return result
         # === 调试日志结束 ===
 
@@ -633,7 +633,7 @@ class AIPredictionService(BaseService):
 
         # === 关键修复：根据模型类型进行不同的形态预测 ===
         model_type = self.model_config.get('model_type', AIModelType.ENSEMBLE)
-        logger.info(f"🎯 有形态的预测，使用模型类型: {model_type}")
+        logger.info(f" 有形态的预测，使用模型类型: {model_type}")
 
         # 分析形态信号强度
         buy_signals = [p for p in valid_patterns if p.get('signal_type') == 'bullish']
@@ -650,16 +650,16 @@ class AIPredictionService(BaseService):
         # 根据模型类型进行不同的预测处理
         try:
             if model_type == AIModelType.DEEP_LEARNING:
-                logger.info("🤖 使用深度学习模型处理形态预测...")
+                logger.info(" 使用深度学习模型处理形态预测...")
                 result = self._predict_with_patterns_deep_learning(kdata, valid_patterns, pattern_analysis)
             elif model_type == AIModelType.STATISTICAL:
-                logger.info("📊 使用统计模型处理形态预测...")
+                logger.info(" 使用统计模型处理形态预测...")
                 result = self._predict_with_patterns_statistical(kdata, valid_patterns, pattern_analysis)
             elif model_type == AIModelType.RULE_BASED:
-                logger.info("📏 使用规则模型处理形态预测...")
+                logger.info(" 使用规则模型处理形态预测...")
                 result = self._predict_with_patterns_rule_based(kdata, valid_patterns, pattern_analysis)
             else:  # ENSEMBLE
-                logger.info("🔄 使用集成模型处理形态预测...")
+                logger.info(" 使用集成模型处理形态预测...")
                 result = self._predict_with_patterns_ensemble(kdata, valid_patterns, pattern_analysis)
 
             # 添加形态分析信息
@@ -671,15 +671,15 @@ class AIPredictionService(BaseService):
                 'timestamp': datetime.now().isoformat()
             })
 
-            logger.info(f"✅ 形态预测完成:")
-            logger.info(f"   📈 方向: {result.get('direction', 'N/A')}")
-            logger.info(f"   🎯 置信度: {result.get('confidence', 'N/A')}")
-            logger.info(f"   🧠 模型类型: {result.get('model_type', 'N/A')}")
+            logger.info(f" 形态预测完成:")
+            logger.info(f"    方向: {result.get('direction', 'N/A')}")
+            logger.info(f"    置信度: {result.get('confidence', 'N/A')}")
+            logger.info(f"    模型类型: {result.get('model_type', 'N/A')}")
 
             return result
 
         except Exception as e:
-            logger.error(f"❌ 模型特定形态预测失败 ({model_type}): {e}")
+            logger.error(f" 模型特定形态预测失败 ({model_type}): {e}")
             logger.error(traceback.format_exc())
             # 降级到通用形态分析
             return self._fallback_pattern_analysis(valid_patterns, buy_signals, sell_signals, pattern_analysis)
@@ -687,43 +687,43 @@ class AIPredictionService(BaseService):
     def _predict_without_patterns(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """当形态列表为空时，根据模型类型进行预测"""
         # === 详细调试日志 ===
-        logger.info("🎯 _predict_without_patterns 开始执行")
+        logger.info(" _predict_without_patterns 开始执行")
         model_type = self.model_config.get('model_type', AIModelType.ENSEMBLE)
-        logger.info(f"🧠 使用模型类型: {model_type}")
-        logger.info(f"📋 完整模型配置: {self.model_config}")
+        logger.info(f" 使用模型类型: {model_type}")
+        logger.info(f" 完整模型配置: {self.model_config}")
         # === 调试日志结束 ===
 
         try:
             # 根据模型类型选择预测方法
             if model_type == AIModelType.DEEP_LEARNING:
-                logger.info("🤖 调用深度学习模型预测...")
+                logger.info(" 调用深度学习模型预测...")
                 result = self._predict_with_deep_learning(kdata)
                 result['model_path'] = 'deep_learning_without_patterns'
             elif model_type == AIModelType.STATISTICAL:
-                logger.info("📊 调用统计模型预测...")
+                logger.info(" 调用统计模型预测...")
                 result = self._predict_with_statistical_method(kdata)
                 result['model_path'] = 'statistical_without_patterns'
             elif model_type == AIModelType.RULE_BASED:
-                logger.info("📏 调用规则模型预测...")
+                logger.info(" 调用规则模型预测...")
                 result = self._predict_with_rule_based_method(kdata)
                 result['model_path'] = 'rule_based_without_patterns'
             else:  # ENSEMBLE
-                logger.info("🔄 调用集成模型预测...")
+                logger.info(" 调用集成模型预测...")
                 result = self._predict_with_ensemble_method(kdata)
                 result['model_path'] = 'ensemble_without_patterns'
 
             # === 调试日志：预测结果 ===
-            logger.info(f"✅ {model_type} 预测完成:")
-            logger.info(f"   📈 方向: {result.get('direction', 'N/A')}")
-            logger.info(f"   🎯 置信度: {result.get('confidence', 'N/A')}")
-            logger.info(f"   🏷️ 模型类型: {result.get('model_type', 'N/A')}")
-            logger.info(f"   🛣️ 模型路径: {result.get('model_path', 'N/A')}")
+            logger.info(f" {model_type} 预测完成:")
+            logger.info(f"    方向: {result.get('direction', 'N/A')}")
+            logger.info(f"    置信度: {result.get('confidence', 'N/A')}")
+            logger.info(f"    模型类型: {result.get('model_type', 'N/A')}")
+            logger.info(f"    模型路径: {result.get('model_path', 'N/A')}")
             # === 调试日志结束 ===
 
             return result
 
         except Exception as e:
-            logger.error(f"❌ 模型预测失败 ({model_type}): {e}")
+            logger.error(f" 模型预测失败 ({model_type}): {e}")
             logger.error(traceback.format_exc())
             # 返回后备预测
             return self._get_fallback_pattern_prediction()
@@ -769,12 +769,12 @@ class AIPredictionService(BaseService):
 
     def _predict_with_deep_learning(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """深度学习模型预测"""
-        logger.info("🤖 === 深度学习模型预测开始 ===")
+        logger.info(" === 深度学习模型预测开始 ===")
 
         try:
             # 提取特征
             features = self._extract_pattern_features(kdata)
-            logger.info(f"🔍 特征提取完成，特征数量: {len(features)}")
+            logger.info(f" 特征提取完成，特征数量: {len(features)}")
 
             # 模拟深度学习预测（实际项目中这里会调用真实的DL模型）
             prediction_strength = np.mean([
@@ -807,21 +807,21 @@ class AIPredictionService(BaseService):
                 'random_factor': random_factor
             }
 
-            logger.info(f"🤖 深度学习预测结果: {direction}, 置信度: {confidence:.3f}")
+            logger.info(f" 深度学习预测结果: {direction}, 置信度: {confidence:.3f}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 深度学习预测失败: {e}")
+            logger.error(f" 深度学习预测失败: {e}")
             raise
 
     def _predict_with_statistical_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """统计模型预测"""
-        logger.info("📊 === 统计模型预测开始 ===")
+        logger.info(" === 统计模型预测开始 ===")
 
         try:
             # 计算统计指标
             features = self._extract_pattern_features(kdata)
-            logger.info(f"📈 统计特征提取完成")
+            logger.info(f" 统计特征提取完成")
 
             # 基于Z-score的统计分析
             price_zscore = features.get('price_zscore', 0)
@@ -848,20 +848,20 @@ class AIPredictionService(BaseService):
                 'features_used': len(features)
             }
 
-            logger.info(f"📊 统计模型预测结果: {direction}, 置信度: {confidence:.3f}")
+            logger.info(f" 统计模型预测结果: {direction}, 置信度: {confidence:.3f}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 统计模型预测失败: {e}")
+            logger.error(f" 统计模型预测失败: {e}")
             raise
 
     def _predict_with_rule_based_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """规则模型预测"""
-        logger.info("📏 === 规则模型预测开始 ===")
+        logger.info(" === 规则模型预测开始 ===")
 
         try:
             features = self._extract_pattern_features(kdata)
-            logger.info(f"⚙️ 规则特征提取完成")
+            logger.info(f" 规则特征提取完成")
 
             # 多重技术指标规则
             signals = []
@@ -905,26 +905,26 @@ class AIPredictionService(BaseService):
                 'features_used': len(features)
             }
 
-            logger.info(f"📏 规则模型预测结果: {direction}, 置信度: {confidence:.3f}")
+            logger.info(f" 规则模型预测结果: {direction}, 置信度: {confidence:.3f}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 规则模型预测失败: {e}")
+            logger.error(f" 规则模型预测失败: {e}")
             raise
 
     def _predict_with_ensemble_method(self, kdata: pd.DataFrame) -> Dict[str, Any]:
         """集成模型预测"""
-        logger.info("🔄 === 集成模型预测开始 ===")
+        logger.info(" === 集成模型预测开始 ===")
 
         try:
             # 调用所有子模型
-            logger.info("🤖 调用深度学习子模型...")
+            logger.info(" 调用深度学习子模型...")
             dl_result = self._predict_with_deep_learning(kdata)
 
-            logger.info("📊 调用统计模型子模型...")
+            logger.info(" 调用统计模型子模型...")
             stat_result = self._predict_with_statistical_method(kdata)
 
-            logger.info("📏 调用规则模型子模型...")
+            logger.info(" 调用规则模型子模型...")
             rule_result = self._predict_with_rule_based_method(kdata)
 
             # 加权投票
@@ -963,11 +963,11 @@ class AIPredictionService(BaseService):
                 'vote_weights': direction_votes
             }
 
-            logger.info(f"🔄 集成模型预测结果: {final_direction}, 置信度: {final_confidence:.3f}")
+            logger.info(f" 集成模型预测结果: {final_direction}, 置信度: {final_confidence:.3f}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 集成模型预测失败: {e}")
+            logger.error(f" 集成模型预测失败: {e}")
             raise
 
     def _extract_trend_features(self, kdata: pd.DataFrame) -> np.ndarray:
@@ -1479,7 +1479,7 @@ class AIPredictionService(BaseService):
 
     def _predict_with_patterns_deep_learning(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """深度学习模型的形态预测"""
-        logger.info("🤖 === 深度学习形态预测开始 ===")
+        logger.info(" === 深度学习形态预测开始 ===")
 
         # 提取形态特征
         pattern_features = self._extract_pattern_features_from_patterns(patterns)
@@ -1531,12 +1531,12 @@ class AIPredictionService(BaseService):
             'signal_bias': signal_bias
         }
 
-        logger.info(f"🤖 深度学习形态预测结果: {direction}, 置信度: {confidence:.3f}")
+        logger.info(f" 深度学习形态预测结果: {direction}, 置信度: {confidence:.3f}")
         return result
 
     def _predict_with_patterns_statistical(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """统计模型的形态预测"""
-        logger.info("📊 === 统计模型形态预测开始 ===")
+        logger.info(" === 统计模型形态预测开始 ===")
 
         # 统计分析方法
         pattern_confidence_std = np.std([p.get('confidence', 0.5) for p in patterns])
@@ -1580,12 +1580,12 @@ class AIPredictionService(BaseService):
             'confidence_std': pattern_confidence_std
         }
 
-        logger.info(f"📊 统计模型形态预测结果: {direction}, 置信度: {confidence:.3f}")
+        logger.info(f" 统计模型形态预测结果: {direction}, 置信度: {confidence:.3f}")
         return result
 
     def _predict_with_patterns_rule_based(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """规则模型的形态预测"""
-        logger.info("📏 === 规则模型形态预测开始 ===")
+        logger.info(" === 规则模型形态预测开始 ===")
 
         rules_score = 0
         rules_applied = []
@@ -1640,13 +1640,13 @@ class AIPredictionService(BaseService):
             'pattern_density': pattern_density
         }
 
-        logger.info(f"📏 规则模型形态预测结果: {direction}, 置信度: {confidence:.3f}")
-        logger.info(f"📏 应用规则: {rules_applied}")
+        logger.info(f" 规则模型形态预测结果: {direction}, 置信度: {confidence:.3f}")
+        logger.info(f" 应用规则: {rules_applied}")
         return result
 
     def _predict_with_patterns_ensemble(self, kdata: pd.DataFrame, patterns: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """集成模型的形态预测"""
-        logger.info("🔄 === 集成模型形态预测开始 ===")
+        logger.info(" === 集成模型形态预测开始 ===")
 
         # 调用所有子模型
         dl_result = self._predict_with_patterns_deep_learning(kdata, patterns, pattern_analysis)
@@ -1688,7 +1688,7 @@ class AIPredictionService(BaseService):
             'vote_weights': direction_votes
         }
 
-        logger.info(f"🔄 集成模型形态预测结果: {final_direction}, 置信度: {final_confidence:.3f}")
+        logger.info(f" 集成模型形态预测结果: {final_direction}, 置信度: {final_confidence:.3f}")
         return result
 
     def _extract_pattern_features_from_patterns(self, patterns: List[Dict]) -> Dict[str, float]:
@@ -1712,7 +1712,7 @@ class AIPredictionService(BaseService):
 
     def _fallback_pattern_analysis(self, valid_patterns: List[Dict], buy_signals: List[Dict], sell_signals: List[Dict], pattern_analysis: Dict) -> Dict[str, Any]:
         """降级后备形态分析"""
-        logger.warning("⚠️ 使用后备形态分析")
+        logger.warning(" 使用后备形态分析")
 
         # 基于形态信号强度的简单预测
         if len(buy_signals) > len(sell_signals):

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 板块资金流数据服务
 
@@ -13,7 +14,6 @@
 """
 
 import asyncio
-import logging
 import threading
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timedelta
@@ -23,7 +23,6 @@ from dataclasses import dataclass
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
-from ..logger import LogManager
 from .unified_data_manager import UnifiedDataManager
 
 
@@ -48,15 +47,14 @@ class SectorFundFlowService(QObject):
     source_changed = pyqtSignal(str)  # 数据源变更信号
 
     def __init__(self, data_manager: Optional[UnifiedDataManager] = None,
-                 config: Optional[SectorFlowConfig] = None,
-                 log_manager: Optional[LogManager] = None):
+                 config: Optional[SectorFlowConfig] = None):
         """
         初始化板块资金流服务
 
         Args:
             data_manager: 数据管理器实例
             config: 服务配置
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
         """
         super().__init__()
 
@@ -73,7 +71,7 @@ class SectorFundFlowService(QObject):
         else:
             self.data_manager = data_manager
         self.config = config or SectorFlowConfig()
-        self.log_manager = log_manager or logging.getLogger(__name__)
+        # 纯Loguru架构，移除log_manager依赖
 
         # 缓存管理
         self._cache: Dict[str, Any] = {}
@@ -93,43 +91,43 @@ class SectorFundFlowService(QObject):
     def initialize(self) -> bool:
         """初始化服务"""
         try:
-            self.log_manager.info("🚀 初始化板块资金流服务...")
+            logger.info(" 初始化板块资金流服务...")
             import time
             start_time = time.time()
 
             # 检查数据管理器
-            self.log_manager.info("🔍 检查数据管理器状态...")
+            logger.info(" 检查数据管理器状态...")
             if self.data_manager:
-                self.log_manager.info("✅ 数据管理器可用")
+                logger.info(" 数据管理器可用")
             else:
-                self.log_manager.warning("⚠️ 数据管理器不可用")
+                logger.warning(" 数据管理器不可用")
 
             # 启动自动刷新
-            self.log_manager.info("⚙️ 配置自动刷新设置...")
+            logger.info(" 配置自动刷新设置...")
             if self.config.enable_auto_refresh:
                 refresh_start = time.time()
                 self._start_auto_refresh()
                 refresh_time = time.time()
-                self.log_manager.info(f"✅ 自动刷新启动完成，耗时: {(refresh_time - refresh_start):.2f}秒")
+                logger.info(f" 自动刷新启动完成，耗时: {(refresh_time - refresh_start):.2f}秒")
             else:
-                self.log_manager.info("ℹ️ 自动刷新已禁用")
+                logger.info("ℹ 自动刷新已禁用")
 
             # 获取当前数据源
             self._current_source = self.data_manager.get_current_source()
 
             self._is_initialized = True
-            self.log_manager.info(f"✅ 板块资金流服务初始化完成，当前数据源: {self._current_source}")
+            logger.info(f" 板块资金流服务初始化完成，当前数据源: {self._current_source}")
 
             return True
 
         except Exception as e:
-            self.log_manager.error(f"❌ 板块资金流服务初始化失败: {e}")
+            logger.error(f" 板块资金流服务初始化失败: {e}")
             return False
 
     def cleanup(self) -> None:
         """清理服务资源"""
         try:
-            self.log_manager.info("🧹 清理板块资金流服务...")
+            logger.info(" 清理板块资金流服务...")
 
             # 停止自动刷新
             self._refresh_timer.stop()
@@ -142,10 +140,10 @@ class SectorFundFlowService(QObject):
                 self._cache.clear()
                 self._cache_timestamps.clear()
 
-            self.log_manager.info("✅ 板块资金流服务清理完成")
+            logger.info(" 板块资金流服务清理完成")
 
         except Exception as e:
-            self.log_manager.error(f"❌ 清理板块资金流服务失败: {e}")
+            logger.error(f" 清理板块资金流服务失败: {e}")
 
     def get_sector_flow_rank(self, indicator: str = "今日", force_refresh: bool = False) -> pd.DataFrame:
         """获取板块资金流排行
@@ -162,10 +160,10 @@ class SectorFundFlowService(QObject):
         try:
             # 检查缓存
             if not force_refresh and self._is_cache_valid(cache_key):
-                self.log_manager.info(f"📋 使用缓存的板块资金流排行数据: {indicator}")
+                logger.info(f" 使用缓存的板块资金流排行数据: {indicator}")
                 return self._get_from_cache(cache_key)
 
-            self.log_manager.info(f"🔄 获取板块资金流排行数据: {indicator}")
+            logger.info(f" 获取板块资金流排行数据: {indicator}")
 
             # 从数据管理器获取数据
             fund_flow_data = self.data_manager.get_fund_flow()
@@ -179,16 +177,16 @@ class SectorFundFlowService(QObject):
                 # 更新缓存
                 self._update_cache(cache_key, df)
 
-                self.log_manager.info(f"✅ 板块资金流排行数据获取成功: {len(df)} 条记录")
+                logger.info(f" 板块资金流排行数据获取成功: {len(df)} 条记录")
                 self.data_updated.emit({'type': 'sector_flow_rank', 'data': df})
 
                 return df
             else:
-                self.log_manager.warning("⚠️ 未获取到板块资金流排行数据")
+                logger.warning(" 未获取到板块资金流排行数据")
                 return pd.DataFrame()
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取板块资金流排行失败: {e}")
+            logger.error(f" 获取板块资金流排行失败: {e}")
             self.error_occurred.emit(f"获取板块资金流排行失败: {str(e)}")
             return pd.DataFrame()
 
@@ -204,11 +202,11 @@ class SectorFundFlowService(QObject):
         """
         try:
             df = self.data_manager.get_sector_fund_flow_summary(symbol, indicator)
-            self.log_manager.info(f"✅ 板块资金流汇总获取成功: {symbol}, {len(df)} 条记录")
+            logger.info(f" 板块资金流汇总获取成功: {symbol}, {len(df)} 条记录")
             return df
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取板块资金流汇总失败: {e}")
+            logger.error(f" 获取板块资金流汇总失败: {e}")
             return pd.DataFrame()
 
     def get_sector_flow_history(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
@@ -223,11 +221,11 @@ class SectorFundFlowService(QObject):
         """
         try:
             df = self.data_manager.get_sector_fund_flow_hist(symbol, period)
-            self.log_manager.info(f"✅ 板块历史资金流获取成功: {symbol}, {len(df)} 条记录")
+            logger.info(f" 板块历史资金流获取成功: {symbol}, {len(df)} 条记录")
             return df
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取板块历史资金流失败: {e}")
+            logger.error(f" 获取板块历史资金流失败: {e}")
             return pd.DataFrame()
 
     def get_concept_flow_history(self, symbol: str, period: str = "近6月") -> pd.DataFrame:
@@ -242,11 +240,11 @@ class SectorFundFlowService(QObject):
         """
         try:
             df = self.data_manager.get_concept_fund_flow_hist(symbol, period)
-            self.log_manager.info(f"✅ 概念历史资金流获取成功: {symbol}, {len(df)} 条记录")
+            logger.info(f" 概念历史资金流获取成功: {symbol}, {len(df)} 条记录")
             return df
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取概念历史资金流失败: {e}")
+            logger.error(f" 获取概念历史资金流失败: {e}")
             return pd.DataFrame()
 
     def switch_data_source(self, source: str) -> bool:
@@ -259,7 +257,7 @@ class SectorFundFlowService(QObject):
             bool: 是否切换成功
         """
         try:
-            self.log_manager.info(f"🔄 切换数据源到: {source}")
+            logger.info(f" 切换数据源到: {source}")
 
             # 切换数据管理器的数据源
             self.data_manager.set_data_source(source)
@@ -268,13 +266,13 @@ class SectorFundFlowService(QObject):
             # 清理缓存
             self._clear_cache()
 
-            self.log_manager.info(f"✅ 数据源切换成功: {source}")
+            logger.info(f" 数据源切换成功: {source}")
             self.source_changed.emit(source)
 
             return True
 
         except Exception as e:
-            self.log_manager.error(f"❌ 数据源切换失败: {e}")
+            logger.error(f" 数据源切换失败: {e}")
             self.error_occurred.emit(f"数据源切换失败: {str(e)}")
             return False
 
@@ -307,7 +305,7 @@ class SectorFundFlowService(QObject):
             return df
 
         except Exception as e:
-            self.log_manager.warning(f"⚠️ 数据标准化失败: {e}")
+            logger.warning(f" 数据标准化失败: {e}")
             return df
 
     def _is_cache_valid(self, cache_key: str) -> bool:
@@ -341,23 +339,23 @@ class SectorFundFlowService(QObject):
         with self._cache_lock:
             self._cache.clear()
             self._cache_timestamps.clear()
-        self.log_manager.info("🗑️ 缓存已清理")
+        logger.info(" 缓存已清理")
 
     def _start_auto_refresh(self) -> None:
         """启动自动刷新"""
         if self.config.auto_refresh_interval_minutes > 0:
             interval_ms = self.config.auto_refresh_interval_minutes * 60 * 1000
             self._refresh_timer.start(interval_ms)
-            self.log_manager.info(f"🔄 启动自动刷新，间隔 {self.config.auto_refresh_interval_minutes} 分钟")
+            logger.info(f" 启动自动刷新，间隔 {self.config.auto_refresh_interval_minutes} 分钟")
 
     def _auto_refresh(self) -> None:
         """自动刷新数据（后台线程执行，避免阻塞UI线程）"""
         try:
-            self.log_manager.info("⏰ 调度自动刷新任务...")
+            logger.info("⏰ 调度自动刷新任务...")
             # 将实际刷新任务放入线程池，避免在Qt定时器回调（主线程）中执行重IO/CPU工作
             self._executor.submit(self._run_auto_refresh_task)
         except Exception as e:
-            self.log_manager.error(f"❌ 自动刷新调度失败: {e}")
+            logger.error(f" 自动刷新调度失败: {e}")
 
     def _run_auto_refresh_task(self) -> None:
         """实际的自动刷新任务，在线程池中执行"""
@@ -365,7 +363,7 @@ class SectorFundFlowService(QObject):
             # 这里直接调用现有方法即可；该方法内部会通过Qt信号通知数据更新
             self.get_sector_flow_rank(force_refresh=True)
         except Exception as e:
-            self.log_manager.error(f"❌ 自动刷新任务执行失败: {e}")
+            logger.error(f" 自动刷新任务执行失败: {e}")
 
     def get_service_status(self) -> Dict[str, Any]:
         """获取服务状态"""

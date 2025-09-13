@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -113,7 +114,7 @@ class TechnicalSignalDetector:
                 signals.append(price_signal)
 
         except Exception as e:
-            print(f"技术信号检测错误: {e}")
+            logger.info(f"技术信号检测错误: {e}")
 
         return signals
 
@@ -177,7 +178,7 @@ class TechnicalSignalDetector:
                         source_data=macd_data
                     )
         except Exception as e:
-            print(f"MACD信号检测错误: {e}")
+            logger.info(f"MACD信号检测错误: {e}")
 
         return None
 
@@ -219,7 +220,7 @@ class TechnicalSignalDetector:
                         source_data=ma_data
                     )
         except Exception as e:
-            print(f"均线信号检测错误: {e}")
+            logger.info(f"均线信号检测错误: {e}")
 
         return None
 
@@ -261,7 +262,7 @@ class TechnicalSignalDetector:
                     source_data={"breakdown_type": "low"}
                 )
         except Exception as e:
-            print(f"价格突破信号检测错误: {e}")
+            logger.info(f"价格突破信号检测错误: {e}")
 
         return None
 
@@ -303,7 +304,7 @@ class SentimentSignalDetector:
                     signals.append(money_flow_signal)
 
         except Exception as e:
-            print(f"情绪信号检测错误: {e}")
+            logger.info(f"情绪信号检测错误: {e}")
 
         return signals
 
@@ -554,7 +555,7 @@ class SignalAggregator(QObject):
             alert = AggregatedAlert(
                 alert_id=f"overbought_greed_combo_{timestamp.timestamp()}",
                 level=AlertLevel.DANGER,
-                title="⚠️ 强烈卖出信号",
+                title=" 强烈卖出信号",
                 message="技术面超买 + 市场极度贪婪，建议谨慎或减仓",
                 signals=relevant_signals,
                 overall_confidence=0.9,
@@ -585,7 +586,7 @@ class SignalAggregator(QObject):
             alert = AggregatedAlert(
                 alert_id=f"breakthrough_fear_combo_{timestamp.timestamp()}",
                 level=AlertLevel.WARNING,
-                title="🤔 谨慎乐观信号",
+                title=" 谨慎乐观信号",
                 message="技术面突破 + 市场恐惧，可能存在逆向投资机会",
                 signals=relevant_signals,
                 overall_confidence=0.7,

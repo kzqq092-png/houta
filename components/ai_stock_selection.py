@@ -1,13 +1,12 @@
 import openai
 from features.feature_selection import auto_feature_select
 from core.stock_screener import screen_by_all
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIStockSelector:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
 
     def parse_factors(self, user_input: str) -> dict:
@@ -23,7 +22,7 @@ class AIStockSelector:
             import json
             return json.loads(content)
         except Exception as e:
-            self.log_manager.error(f"LLM解析因子失败: {e}")
+            logger.error(f"LLM解析因子失败: {e}")
             return {}
 
     def ai_select(self, user_input: str) -> dict:
@@ -36,4 +35,4 @@ class AIStockSelector:
             result = screen_by_all(features)
             return {"factors": factors, "features": features, "result": result}
         except Exception as e:
-            self.log_manager.error(f"AI选股失败: {e}")
+            logger.error(f"AI选股失败: {e}")

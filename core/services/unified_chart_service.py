@@ -1,3 +1,4 @@
+from loguru import logger
 """
 统一图表服务
 
@@ -5,7 +6,6 @@
 替换系统中分散的matplotlib实现，提供更好的性能和一致的用户体验。
 """
 
-import logging
 from typing import Dict, Any, Optional, List, Callable
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QThread, pyqtSlot
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
@@ -13,13 +13,11 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from gui.widgets.chart_widget import ChartWidget
 from utils.config_manager import ConfigManager
 from utils.theme import get_theme_manager
-from core.logger import LogManager
 from core.metrics.app_metrics_service import measure
 # Cache将在需要时动态导入
 from core.containers import get_service_container
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class ChartDataLoader(QThread):
     """异步图表数据加载器"""
@@ -291,7 +289,6 @@ class ChartDataLoader(QThread):
             logger.error(f"计算指标 {indicator_name} 失败: {e}")
             return {}
 
-
 class UnifiedChartService(QObject):
     """统一图表服务
 
@@ -324,7 +321,7 @@ class UnifiedChartService(QObject):
         self.service_container = service_container
         self.config_manager = config_manager or ConfigManager()
         self.theme_manager = theme_manager or get_theme_manager()
-        self.log_manager = self.service_container.resolve(LogManager)
+        # LogManager已移除，使用Loguru
         self.data_source = data_source
 
         # 初始化缓存
@@ -357,15 +354,14 @@ class UnifiedChartService(QObject):
             if old_widget:
                 # 将控件的删除推迟到事件循环空闲时执行，是更安全的做法
                 old_widget.deleteLater()
-                self.log_manager.info(f"已移除并计划删除旧的ChartWidget实例: {chart_id}")
+                logger.info(f"已移除并计划删除旧的ChartWidget实例: {chart_id}")
 
         # 始终创建并返回一个全新的实例
-        self.log_manager.info(f"创建新的ChartWidget实例: {chart_id}")
+        logger.info(f"创建新的ChartWidget实例: {chart_id}")
         widget = ChartWidget(
             parent=parent,
             config_manager=self.config_manager,
             theme_manager=self.theme_manager,
-            log_manager=self.log_manager,
             data_manager=self.data_source,
             chart_id=chart_id
         )
@@ -644,10 +640,8 @@ class UnifiedChartService(QObject):
         except Exception as e:
             logger.error(f"释放图表服务资源失败: {e}")
 
-
 # 全局统一图表服务实例
 _chart_service_instance = None
-
 
 def get_unified_chart_service(config_manager=None, theme_manager=None, data_source=None) -> UnifiedChartService:
     """获取或创建统一图表服务的单例"""
@@ -661,7 +655,6 @@ def get_unified_chart_service(config_manager=None, theme_manager=None, data_sour
             data_source=data_source
         )
     return _chart_service_instance
-
 
 def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) -> ChartWidget:
     """
@@ -677,7 +670,7 @@ def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) 
         # 解析依赖
         config_manager = container.resolve(ConfigManager)
         theme_manager = get_theme_manager(config_manager)
-        log_manager = container.resolve(LogManager)
+        # LogManager已移除，使用Loguru
         event_bus = container.resolve(EventBus)
         data_manager = container.resolve(UnifiedDataManager)
 
@@ -686,7 +679,7 @@ def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) 
             parent=parent,
             config_manager=config_manager,
             theme_manager=theme_manager,
-            log_manager=log_manager,
+            # log_manager已迁移到Loguru,
             data_manager=data_manager,
             chart_id=chart_id,
             coordinator=coordinator,  # 传递 coordinator
@@ -721,7 +714,6 @@ def create_chart_widget(parent=None, chart_id=None, coordinator=None, **kwargs) 
                 pass
 
         return FallbackChartWidget(parent)
-
 
 def create_simple_chart(parent=None, chart_id=None, **kwargs) -> QWidget:
     """便捷函数：创建简单图表容器

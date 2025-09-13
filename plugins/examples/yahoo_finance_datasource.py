@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Yahoo Finance数据源插件示例（V2 对齐）
 
@@ -22,6 +23,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
     """Yahoo Finance数据源插件"""
 
     def __init__(self):
+        self.plugin_id = "examples.yahoo_finance_datasource"  # 添加plugin_id属性
         self.initialized = False
 
         # 默认配置
@@ -94,7 +96,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             self.initialized = True
             return True
         except Exception as e:
-            print(f"Yahoo Finance数据源插件初始化失败: {e}")
+            logger.info(f"Yahoo Finance数据源插件初始化失败: {e}")
             self.last_error = str(e)
             return False
 
@@ -172,7 +174,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                 cache_time, cached_data = self._cache[cache_key]
                 if (datetime.now() - cache_time).seconds < self._config['cache_duration']:
                     if self._context:
-                        self._context.log_manager.debug(f"从缓存返回数据: {symbol}")
+                        self._context.logger.debug(f"从缓存返回数据: {symbol}")
                     return cached_data
 
             # 根据数据类型获取数据
@@ -192,14 +194,14 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                 self._cache[cache_key] = (datetime.now(), data)
 
             if self._context:
-                self._context.log_manager.info(
+                self._context.logger.info(
                     f"成功获取数据: {symbol} ({data_type})")
 
             return data
 
         except Exception as e:
             if self._context:
-                self._context.log_manager.error(
+                self._context.logger.error(
                     f"获取数据失败: {symbol} ({data_type}) - {e}")
             raise
 
@@ -426,12 +428,12 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         if event_name == "market_close" and self._context:
             # 市场收盘时清理缓存
             self._cache.clear()
-            self._context.log_manager.info("Yahoo Finance数据源：市场收盘，清理缓存")
+            self._context.logger.info("Yahoo Finance数据源：市场收盘，清理缓存")
 
     def _on_market_close(self) -> None:
         """市场收盘事件处理器"""
         if self._context:
-            self._context.log_manager.debug("Yahoo Finance数据源：处理市场收盘事件")
+            self._context.logger.debug("Yahoo Finance数据源：处理市场收盘事件")
 
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -513,10 +515,10 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
             """测试连接"""
             result = self.test_connection()
             if result['success']:
-                result_text.setPlainText(f"✓ {result['message']}")
+                result_text.setPlainText(f" {result['message']}")
                 result_text.setStyleSheet("color: green;")
             else:
-                result_text.setPlainText(f"✗ {result['message']}")
+                result_text.setPlainText(f" {result['message']}")
                 result_text.setStyleSheet("color: red;")
 
         def save_config():
@@ -530,7 +532,7 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
                         self.metadata.name, self._config)
 
             except ValueError:
-                result_text.setPlainText("✗ 配置格式错误")
+                result_text.setPlainText(" 配置格式错误")
                 result_text.setStyleSheet("color: red;")
 
         test_btn.clicked.connect(test_connection)

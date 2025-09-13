@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Backtrader策略插件
 
@@ -10,7 +11,6 @@ Backtrader策略插件
 - 性能分析
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Union, Tuple
@@ -25,7 +25,7 @@ try:
     BACKTRADER_AVAILABLE = True
 except ImportError:
     BACKTRADER_AVAILABLE = False
-    logging.warning("Backtrader未安装或无法导入，Backtrader策略插件将无法使用")
+    logger.warning("Backtrader未安装或无法导入，Backtrader策略插件将无法使用")
 
 # 项目内部导入
 from core.strategy_extensions import (
@@ -35,30 +35,40 @@ from core.strategy_extensions import (
     AssetType, TimeFrame
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
+if BACKTRADER_AVAILABLE:
+    class BacktraderDataFeed(btfeeds.PandasData):
+        """Backtrader数据源适配器"""
 
-class BacktraderDataFeed(btfeeds.PandasData):
-    """Backtrader数据源适配器"""
+        params = (
+            ('datetime', None),
+            ('open', 'open'),
+            ('high', 'high'),
+            ('low', 'low'),
+            ('close', 'close'),
+            ('volume', 'volume'),
+            ('openinterest', None),
+        )
+else:
+    # 如果Backtrader不可用，创建占位符类
+    class BacktraderDataFeed:
+        """Backtrader数据源适配器占位符"""
+        pass
 
-    params = (
-        ('datetime', None),
-        ('open', 'open'),
-        ('high', 'high'),
-        ('low', 'low'),
-        ('close', 'close'),
-        ('volume', 'volume'),
-        ('openinterest', None),
-    )
+if BACKTRADER_AVAILABLE:
+    class BaseBacktraderStrategy(bt.Strategy):
+        """基础Backtrader策略类"""
 
-
-class BaseBacktraderStrategy(bt.Strategy):
-    """基础Backtrader策略类"""
-
-    params = (
-        ('period', 20),
-        ('position_size', 100),
-    )
+        params = (
+            ('period', 20),
+            ('position_size', 100),
+        )
+else:
+    # 如果Backtrader不可用，创建占位符类
+    class BaseBacktraderStrategy:
+        """基础Backtrader策略类占位符"""
+        pass
 
     def __init__(self):
         self.signals = []

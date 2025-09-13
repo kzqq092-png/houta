@@ -1,3 +1,4 @@
+from loguru import logger
 """
 自定义数据源插件模板
 用户可以基于此模板创建自己的数据源插件
@@ -5,7 +6,6 @@
 """
 
 import json
-import logging
 import csv
 import sqlite3
 from datetime import datetime, timedelta
@@ -24,12 +24,13 @@ class CustomDataPlugin(IDataSourcePlugin):
     """自定义数据源插件模板"""
 
     def __init__(self):
+        self.plugin_id = "examples.custom_data_plugin"  # 添加plugin_id属性
         self.name = "自定义数据源"
         self.version = "1.0.0"
         self.description = "自定义数据源插件模板"
         self.plugin_type = PluginType.DATA_SOURCE_CUSTOM
         self.supported_asset_types = [AssetType.STOCK, AssetType.FUTURES, AssetType.FOREX]
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 配置信息
         self.config = {

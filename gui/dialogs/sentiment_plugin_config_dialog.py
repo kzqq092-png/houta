@@ -48,7 +48,7 @@ class PluginConfigWidget(QWidget):
 
         # 插件名称和状态
         display_name = self.config.get('display_name', self.plugin_name)
-        name_label = QLabel(f"📊 {display_name}")
+        name_label = QLabel(f" {display_name}")
         name_label.setFont(QFont("Arial", 12, QFont.Bold))
         header_layout.addWidget(name_label)
 
@@ -61,7 +61,7 @@ class PluginConfigWidget(QWidget):
         header_layout.addWidget(self.enabled_cb)
 
         # 测试按钮
-        test_btn = QPushButton("🔍 测试连接")
+        test_btn = QPushButton(" 测试连接")
         test_btn.setMaximumWidth(100)
         test_btn.clicked.connect(self._on_test_requested)
         header_layout.addWidget(test_btn)
@@ -311,21 +311,21 @@ class SentimentPluginConfigDialog(QDialog):
         # 工具栏
         toolbar_layout = QHBoxLayout()
 
-        refresh_btn = QPushButton("🔄 刷新状态")
+        refresh_btn = QPushButton(" 刷新状态")
         refresh_btn.clicked.connect(self.refresh_plugin_status)
         toolbar_layout.addWidget(refresh_btn)
 
-        test_all_btn = QPushButton("🧪 测试所有")
+        test_all_btn = QPushButton(" 测试所有")
         test_all_btn.clicked.connect(self.test_all_plugins)
         toolbar_layout.addWidget(test_all_btn)
 
         toolbar_layout.addStretch()
 
-        export_btn = QPushButton("📤 导出配置")
+        export_btn = QPushButton(" 导出配置")
         export_btn.clicked.connect(self.export_config)
         toolbar_layout.addWidget(export_btn)
 
-        import_btn = QPushButton("📥 导入配置")
+        import_btn = QPushButton(" 导入配置")
         import_btn.clicked.connect(self.import_config)
         toolbar_layout.addWidget(import_btn)
 

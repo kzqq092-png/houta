@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 数据导入引擎核心组件
@@ -7,7 +8,6 @@
 """
 
 import asyncio
-import logging
 import threading
 import time
 from typing import Dict, List, Any, Optional, Callable, Union
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from queue import Queue, Empty
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -151,7 +151,7 @@ def main():
     # 执行导入任务
     async def test_import():
         result = await engine.start_import_task("test_task")
-        print(f"导入结果: {result}")
+        logger.info(f"导入结果: {result}")
 
     asyncio.run(test_import())
 

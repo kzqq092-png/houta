@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU集成图表渲染器
 
@@ -5,7 +6,6 @@ WebGPU集成图表渲染器
 保持与现有系统的完全兼容性，同时提供显著的性能提升。
 """
 
-import logging
 import threading
 import time
 from typing import Dict, List, Any, Optional, Callable
@@ -17,7 +17,7 @@ from PyQt5.QtCore import pyqtSignal
 from .chart_renderer import ChartRenderer as BaseChartRenderer, RenderPriority
 from core.webgpu import get_webgpu_manager, WebGPUConfig, RenderBackend
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class WebGPUChartRenderer(BaseChartRenderer):
@@ -324,10 +324,10 @@ class WebGPUChartRenderer(BaseChartRenderer):
     def enable_webgpu_debug(self, enable: bool = True):
         """启用/禁用WebGPU调试模式"""
         if enable:
-            logging.getLogger('core.webgpu').setLevel(logging.DEBUG)
+            # # Loguru自动管理日志级别  # Loguru不需要设置级别
             logger.info("WebGPU调试模式已启用")
         else:
-            logging.getLogger('core.webgpu').setLevel(logging.INFO)
+            # # Loguru自动管理日志级别  # Loguru不需要设置级别
             logger.info("WebGPU调试模式已禁用")
 
     def benchmark_rendering(self, data: pd.DataFrame, iterations: int = 10) -> Dict[str, Any]:

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -6,7 +7,6 @@ DuckDB动态配置管理器
 实现DuckDB配置的动态应用和实时生效
 """
 
-import logging
 import threading
 import time
 from typing import Dict, List, Any, Optional, Callable
@@ -20,7 +20,7 @@ from core.database.duckdb_performance_optimizer import (
     DuckDBPerformanceOptimizer, WorkloadType
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DynamicConfigManager:
@@ -478,27 +478,27 @@ _auto_register_listeners()
 
 if __name__ == '__main__':
     # 测试动态配置管理器
-    logging.basicConfig(level=logging.INFO)
+    # Loguru配置在core.loguru_config中统一管理
 
     # 创建管理器
     manager = get_dynamic_config_manager()
 
     # 注册测试连接
     success = manager.register_connection('test_conn', 'db/test_dynamic.db')
-    print(f"注册连接: {success}")
+    logger.info(f"注册连接: {success}")
 
     # 列出连接
     connections = manager.list_connections()
-    print(f"连接列表: {connections}")
+    logger.info(f"连接列表: {connections}")
 
     # 获取当前配置
     current_config = manager.get_current_config()
     if current_config:
-        print(f"当前配置: {current_config.profile_name}")
+        logger.info(f"当前配置: {current_config.profile_name}")
 
         # 测试配置
         test_result = manager.test_config_on_connection('test_conn', current_config)
-        print(f"配置测试: {test_result}")
+        logger.info(f"配置测试: {test_result}")
 
     # 清理
     manager.close_all_connections()

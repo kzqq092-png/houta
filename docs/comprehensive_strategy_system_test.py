@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 HIkyuu策略管理系统全面集成测试
@@ -5,7 +6,7 @@ HIkyuu策略管理系统全面集成测试
 测试策略管理系统的所有组件协作和完整功能
 """
 
-from core.adapters import get_logger, get_config
+# Loguru导入已完成
 from core.strategy import (
     initialize_strategy_system,
     get_strategy_registry,
@@ -26,7 +27,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 
 def create_comprehensive_test_data() -> pd.DataFrame:
     """创建全面的测试数据"""
@@ -70,10 +70,9 @@ def create_comprehensive_test_data() -> pd.DataFrame:
 
     return data
 
-
 def test_system_initialization():
     """测试系统初始化"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("=" * 80)
     logger.info("开始全面策略管理系统集成测试")
     logger.info("=" * 80)
@@ -108,9 +107,9 @@ def test_system_initialization():
         all_components_ok = True
         for name, component in components.items():
             if component is not None:
-                logger.info(f"✓ {name}: {type(component).__name__}")
+                logger.info(f" {name}: {type(component).__name__}")
             else:
-                logger.error(f"✗ {name}: 初始化失败 (component is {component})")
+                logger.error(f" {name}: 初始化失败 (component is {component})")
                 all_components_ok = False
 
         return all_components_ok
@@ -119,10 +118,9 @@ def test_system_initialization():
         logger.error(f"系统初始化失败: {e}", exc_info=True)
         return False
 
-
 def test_strategy_lifecycle():
     """测试策略完整生命周期"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("\n2. 测试策略完整生命周期...")
 
     try:
@@ -198,24 +196,24 @@ def test_strategy_lifecycle():
             logger.error("策略实例创建失败")
             return False
 
-        logger.info(f"  ✓ 策略实例创建成功: {strategy.name}")
+        logger.info(f"   策略实例创建成功: {strategy.name}")
 
         # 2. 保存到数据库
         logger.info("  1.2 保存策略到数据库...")
         save_success = factory.save_strategy_to_database(strategy.name)
         if save_success:
-            logger.info("  ✓ 策略保存到数据库成功")
+            logger.info("   策略保存到数据库成功")
         else:
-            logger.warning("  ⚠ 策略保存到数据库失败")
+            logger.warning("   策略保存到数据库失败")
 
         # 3. 从数据库加载
         logger.info("  1.3 从数据库加载策略...")
         loaded_strategy = factory.create_strategy_from_database(
             test_strategy_name)
         if loaded_strategy:
-            logger.info(f"  ✓ 从数据库加载策略成功: {loaded_strategy.name}")
+            logger.info(f"   从数据库加载策略成功: {loaded_strategy.name}")
         else:
-            logger.warning("  ⚠ 从数据库加载策略失败")
+            logger.warning("   从数据库加载策略失败")
 
         # 4. 生命周期管理
         logger.info("  1.4 测试生命周期管理...")
@@ -230,9 +228,9 @@ def test_strategy_lifecycle():
             f"cloned_{strategy.name}"
         )
         if cloned_strategy:
-            logger.info(f"  ✓ 策略克隆成功: {cloned_strategy.name}")
+            logger.info(f"   策略克隆成功: {cloned_strategy.name}")
         else:
-            logger.warning("  ⚠ 策略克隆失败")
+            logger.warning("   策略克隆失败")
 
         return True
 
@@ -240,10 +238,9 @@ def test_strategy_lifecycle():
         logger.error(f"策略生命周期测试失败: {e}", exc_info=True)
         return False
 
-
 def test_parallel_execution():
     """测试并行执行"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("\n3. 测试并行策略执行...")
 
     try:
@@ -376,10 +373,9 @@ def test_parallel_execution():
         logger.error(f"并行执行测试失败: {e}", exc_info=True)
         return False
 
-
 def test_performance_evaluation():
     """测试性能评估"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("\n4. 测试性能评估...")
 
     try:
@@ -474,14 +470,14 @@ def test_performance_evaluation():
         )
 
         if performance_result:
-            logger.info("  ✓ 性能评估完成")
+            logger.info("   性能评估完成")
             logger.info(f"    总收益率: {performance_result.total_return:.2%}")
             logger.info(f"    年化收益率: {performance_result.annual_return:.2%}")
             logger.info(f"    最大回撤: {performance_result.max_drawdown:.2%}")
             logger.info(f"    夏普比率: {performance_result.sharpe_ratio:.3f}")
             logger.info(f"    胜率: {performance_result.win_rate:.2%}")
         else:
-            logger.warning("  ⚠ 性能评估失败")
+            logger.warning("   性能评估失败")
 
         return True
 
@@ -489,10 +485,9 @@ def test_performance_evaluation():
         logger.error(f"性能评估测试失败: {e}", exc_info=True)
         return False
 
-
 def test_database_operations():
     """测试数据库操作"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("\n5. 测试数据库操作...")
 
     try:
@@ -526,9 +521,9 @@ def test_database_operations():
             export_success = db_manager.export_strategy(
                 first_strategy_name, f"export_{first_strategy_name}.json")
             if export_success:
-                logger.info(f"    ✓ 策略导出成功: {first_strategy_name}")
+                logger.info(f"     策略导出成功: {first_strategy_name}")
             else:
-                logger.warning(f"    ⚠ 策略导出失败: {first_strategy_name}")
+                logger.warning(f"     策略导出失败: {first_strategy_name}")
 
         return True
 
@@ -536,10 +531,9 @@ def test_database_operations():
         logger.error(f"数据库操作测试失败: {e}", exc_info=True)
         return False
 
-
 def test_system_statistics():
     """测试系统统计"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
     logger.info("\n6. 获取系统统计信息...")
 
     try:
@@ -575,10 +569,9 @@ def test_system_statistics():
         logger.error(f"系统统计测试失败: {e}", exc_info=True)
         return False
 
-
 def run_comprehensive_test():
     """运行全面测试"""
-    logger = get_logger(__name__)
+    logger = logger.bind(module=__name__)
 
     test_results = []
 
@@ -599,7 +592,7 @@ def run_comprehensive_test():
         try:
             result = test_func()
             test_results.append((test_name, result))
-            status = "✓ 通过" if result else "✗ 失败"
+            status = " 通过" if result else " 失败"
             logger.info(f"{test_name}: {status}")
         except Exception as e:
             logger.error(f"{test_name} 执行异常: {e}", exc_info=True)
@@ -623,21 +616,20 @@ def run_comprehensive_test():
 
     logger.info("\n详细结果:")
     for test_name, result in test_results:
-        status = "✓ 通过" if result else "✗ 失败"
+        status = " 通过" if result else " 失败"
         logger.info(f"  {test_name}: {status}")
 
     return passed_count == total_count
 
-
 if __name__ == "__main__":
-    print("HIkyuu策略管理系统全面集成测试")
-    print("="*80)
+    logger.info("HIkyuu策略管理系统全面集成测试")
+    logger.info("="*80)
 
     success = run_comprehensive_test()
 
     if success:
-        print("\n🎉 所有测试通过！策略管理系统运行正常。")
+        logger.info("\n 所有测试通过！策略管理系统运行正常。")
         sys.exit(0)
     else:
-        print("\n⚠️  部分测试失败，请检查日志了解详情。")
+        logger.info("\n  部分测试失败，请检查日志了解详情。")
         sys.exit(1)

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 实时回测监控和报告系统
 提供实时性能监控、动态报告生成、风险预警等功能
@@ -14,7 +15,6 @@ from typing import Dict, List, Optional, Any, Callable, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
-import logging
 import json
 import sqlite3
 from pathlib import Path
@@ -24,7 +24,6 @@ from matplotlib.animation import FuncAnimation
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-from core.logger import LogManager, LogLevel
 from backtest.unified_backtest_engine import UnifiedRiskMetrics, BacktestLevel
 
 
@@ -87,19 +86,18 @@ class RealTimeBacktestMonitor:
 
     def __init__(self,
                  monitoring_level: MonitoringLevel = MonitoringLevel.REAL_TIME,
-                 update_interval: float = 1.0,
-                 log_manager: Optional[LogManager] = None):
+                 update_interval: float = 1.0):
         """
         初始化实时监控器
 
         Args:
             monitoring_level: 监控级别
             update_interval: 更新间隔（秒）
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
         """
         self.monitoring_level = monitoring_level
         self.update_interval = update_interval
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 数据存储
         self.metrics_history: List[RealTimeMetrics] = []
@@ -196,7 +194,7 @@ class RealTimeBacktestMonitor:
                 conn.commit()
 
         except Exception as e:
-            self.log_manager.log(f"初始化数据库失败: {e}", LogLevel.ERROR)
+            logger.error(f"初始化数据库失败: {e}")
 
     def _initialize_chart_config(self) -> Dict[str, Any]:
         """初始化图表配置"""
@@ -225,45 +223,86 @@ class RealTimeBacktestMonitor:
         """
         try:
             if self.is_monitoring:
-                self.log_manager.log("监控已在运行中", LogLevel.WARNING)
+                logger.warning("监控已在运行中")
                 return
 
+            # 如果有旧的线程还在运行，先停止它
+            if self.monitor_thread and self.monitor_thread.is_alive():
+                logger.info("停止旧的监控线程")
+                self.stop_monitoring()
+
             self.is_monitoring = True
-            self.log_manager.log(
-                f"开始实时监控 - 级别: {self.monitoring_level.value}", LogLevel.INFO)
+            self.metrics_history.clear()
+            self.alerts_history.clear()
+
+            logger.info(
+                f"开始实时监控 - 级别: {self.monitoring_level.value}")
 
             # 启动监控线程
             self.monitor_thread = threading.Thread(
                 target=self._monitor_loop,
                 args=(backtest_engine, data),
                 kwargs=kwargs,
-                daemon=True
+                daemon=False,  # 改为非守护线程，确保可以正确停止
+                name=f"BacktestMonitor-{threading.get_ident()}"
             )
             self.monitor_thread.start()
 
+            logger.info(f"实时监控已启动 - 线程ID: {self.monitor_thread.ident}")
+
         except Exception as e:
-            self.log_manager.log(f"启动监控失败: {e}", LogLevel.ERROR)
+            logger.error(f"启动监控失败: {e}")
             self.is_monitoring = False
 
     def stop_monitoring(self):
         """停止监控"""
         try:
+            logger.info("正在停止监控...")
             self.is_monitoring = False
-            if self.monitor_thread and self.monitor_thread.is_alive():
-                self.monitor_thread.join(timeout=5.0)
 
-            self.log_manager.log("监控已停止", LogLevel.INFO)
+            if self.monitor_thread and self.monitor_thread.is_alive():
+                logger.info(f"等待监控线程结束 - 线程ID: {self.monitor_thread.ident}")
+
+                # 给线程更多时间优雅退出
+                self.monitor_thread.join(timeout=10.0)
+
+                if self.monitor_thread.is_alive():
+                    logger.warning(f"监控线程未能在10秒内结束 - 线程ID: {self.monitor_thread.ident}")
+                    # 注意：Python无法强制杀死线程，只能标记为停止
+                    # 线程应该检查 self.is_monitoring 标志来退出
+                else:
+                    logger.info("监控线程已正常结束")
+
+            # 清理线程引用
+            self.monitor_thread = None
+            logger.info("监控已停止")
 
         except Exception as e:
-            self.log_manager.log(f"停止监控失败: {e}", LogLevel.ERROR)
+            logger.error(f"停止监控失败: {e}")
+
+    def __enter__(self):
+        """上下文管理器入口"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """上下文管理器出口"""
+        self.stop_monitoring()
 
     def _monitor_loop(self, backtest_engine: Any, data: pd.DataFrame, **kwargs):
         """监控循环"""
+        thread_name = threading.current_thread().name
+        logger.info(f"监控循环开始 - 线程: {thread_name}")
+
         try:
             chunk_size = max(100, len(data) // 100)  # 动态调整块大小
             processed_rows = 0
 
             while self.is_monitoring and processed_rows < len(data):
+                # 检查停止信号（更频繁的检查）
+                if not self.is_monitoring:
+                    logger.info(f"收到停止信号，退出监控循环 - 线程: {thread_name}")
+                    break
+
                 start_time = time.time()
 
                 # 处理数据块
@@ -273,6 +312,11 @@ class RealTimeBacktestMonitor:
                 # 运行回测
                 result = backtest_engine.run_professional_backtest(
                     chunk_data, **kwargs)
+
+                # 再次检查停止信号
+                if not self.is_monitoring:
+                    logger.info(f"收到停止信号，退出监控循环 - 线程: {thread_name}")
+                    break
 
                 # 计算实时指标
                 metrics = self._calculate_real_time_metrics(result, start_time)
@@ -293,19 +337,25 @@ class RealTimeBacktestMonitor:
                     self.metrics_history = self.metrics_history[-self.chart_config["max_points"]:]
 
                 # 发送数据到队列（用于实时图表更新）
-                self.data_queue.put({
-                    'type': 'metrics',
-                    'data': metrics,
-                    'progress': processed_rows / len(data)
-                })
-
-                if alerts:
+                try:
                     self.data_queue.put({
-                        'type': 'alerts',
-                        'data': alerts
-                    })
+                        'type': 'metrics',
+                        'data': metrics,
+                        'progress': processed_rows / len(data)
+                    }, timeout=1.0)  # 添加超时避免阻塞
+
+                    if alerts:
+                        self.data_queue.put({
+                            'type': 'alerts',
+                            'data': alerts
+                        }, timeout=1.0)
+                except queue.Full:
+                    logger.warning("数据队列已满，跳过本次数据推送")
 
                 processed_rows = end_row
+
+                # 短暂休眠，给其他线程机会，同时允许更快响应停止信号
+                time.sleep(0.01)
 
                 # 控制更新频率
                 elapsed = time.time() - start_time
@@ -313,7 +363,7 @@ class RealTimeBacktestMonitor:
                     time.sleep(self.update_interval - elapsed)
 
         except Exception as e:
-            self.log_manager.log(f"监控循环异常: {e}", LogLevel.ERROR)
+            logger.error(f"监控循环异常: {e}")
         finally:
             self.is_monitoring = False
 
@@ -360,7 +410,7 @@ class RealTimeBacktestMonitor:
             )
 
         except Exception as e:
-            self.log_manager.log(f"计算实时指标失败: {e}", LogLevel.ERROR)
+            logger.error(f"计算实时指标失败: {e}")
             return RealTimeMetrics(
                 timestamp=datetime.now(),
                 current_return=0, cumulative_return=0, current_drawdown=0,
@@ -420,7 +470,7 @@ class RealTimeBacktestMonitor:
             ))
 
         except Exception as e:
-            self.log_manager.log(f"检查预警失败: {e}", LogLevel.ERROR)
+            logger.error(f"检查预警失败: {e}")
 
         return alerts
 
@@ -513,7 +563,7 @@ class RealTimeBacktestMonitor:
                 conn.commit()
 
         except Exception as e:
-            self.log_manager.log(f"存储指标失败: {e}", LogLevel.ERROR)
+            logger.error(f"存储指标失败: {e}")
 
     def _store_alerts(self, alerts: List[AlertMessage]):
         """存储预警到数据库"""
@@ -541,13 +591,13 @@ class RealTimeBacktestMonitor:
                 conn.commit()
 
         except Exception as e:
-            self.log_manager.log(f"存储预警失败: {e}", LogLevel.ERROR)
+            logger.error(f"存储预警失败: {e}")
 
     def generate_real_time_dashboard(self, output_path: str = "reports/real_time_dashboard.html"):
         """生成实时仪表板"""
         try:
             if not self.metrics_history:
-                self.log_manager.log("没有监控数据，无法生成仪表板", LogLevel.WARNING)
+                logger.warning("没有监控数据，无法生成仪表板")
                 return
 
             # 创建子图
@@ -642,10 +692,10 @@ class RealTimeBacktestMonitor:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
             fig.write_html(output_path)
 
-            self.log_manager.log(f"实时仪表板已生成: {output_path}", LogLevel.INFO)
+            logger.info(f"实时仪表板已生成: {output_path}")
 
         except Exception as e:
-            self.log_manager.log(f"生成实时仪表板失败: {e}", LogLevel.ERROR)
+            logger.error(f"生成实时仪表板失败: {e}")
 
     def _get_alert_statistics(self) -> Dict[str, int]:
         """获取预警统计"""
@@ -746,11 +796,11 @@ class RealTimeBacktestMonitor:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
 
-            self.log_manager.log(f"性能报告已生成: {output_path}", LogLevel.INFO)
+            logger.info(f"性能报告已生成: {output_path}")
             return output_path
 
         except Exception as e:
-            self.log_manager.log(f"生成性能报告失败: {e}", LogLevel.ERROR)
+            logger.error(f"生成性能报告失败: {e}")
             return ""
 
     def _generate_alerts_html(self) -> str:
@@ -823,18 +873,17 @@ class RealTimeBacktestMonitor:
             }
 
         except Exception as e:
-            self.log_manager.log(f"获取监控摘要失败: {e}", LogLevel.ERROR)
+            logger.error(f"获取监控摘要失败: {e}")
             return {"status": "error", "message": str(e)}
 
-
 # 便捷函数
+
+
 def create_real_time_monitor(
-    monitoring_level: MonitoringLevel = MonitoringLevel.REAL_TIME,
-    update_interval: float = 1.0,
-    log_manager: Optional[LogManager] = None
-) -> RealTimeBacktestMonitor:
+        monitoring_level: MonitoringLevel = MonitoringLevel.REAL_TIME,
+        update_interval: float = 1.0) -> RealTimeBacktestMonitor:
     """创建实时监控器"""
-    return RealTimeBacktestMonitor(monitoring_level, update_interval, log_manager)
+    return RealTimeBacktestMonitor(monitoring_level, update_interval)
 
 
 def start_monitoring_session(

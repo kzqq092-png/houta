@@ -1,3 +1,4 @@
+from loguru import logger
 """
 策略基础框架 - 统一策略基类和接口规范
 
@@ -277,7 +278,7 @@ class BaseStrategy(ABC):
 
             return True
         except Exception as e:
-            print(f"Failed to save strategy config: {e}")
+            logger.info(f"Failed to save strategy config: {e}")
             return False
 
     def load_config(self, filepath: Union[str, Path]) -> bool:
@@ -299,7 +300,7 @@ class BaseStrategy(ABC):
 
             return True
         except Exception as e:
-            print(f"Failed to load strategy config: {e}")
+            logger.info(f"Failed to load strategy config: {e}")
             return False
 
     def get_cache_key(self, data: pd.DataFrame) -> str:

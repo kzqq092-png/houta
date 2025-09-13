@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Technical Analysis Module for Trading System
 Provides various technical analysis tools and indicators
@@ -9,7 +10,6 @@ from datetime import datetime
 import pandas as pd
 from hikyuu import *
 from core.data_manager import data_manager
-
 
 class TechnicalAnalyzer:
     """Technical analysis tools for trading system"""
@@ -86,7 +86,7 @@ class TechnicalAnalyzer:
             }
 
         except Exception as e:
-            # logging.error(f"趋势分析失败: {e}") # 假设没有logger
+            # logger.error(f"趋势分析失败: {e}") # 假设没有logger
             return {'trend_direction': 'NEUTRAL', 'trend_strength': 0.0}
 
     def analyze_support_resistance(self, data: pd.DataFrame, window: int = 20) -> Dict[str, List[float]]:
@@ -115,7 +115,7 @@ class TechnicalAnalyzer:
             }
 
         except Exception as e:
-            # logging.error(f"支撑阻力分析失败: {e}")
+            # logger.error(f"支撑阻力分析失败: {e}")
             return {'support_levels': [], 'resistance_levels': []}
 
     def analyze_momentum(self, kdata) -> Dict:

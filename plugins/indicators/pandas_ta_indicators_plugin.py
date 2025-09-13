@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Pandas-TA指标插件
 
@@ -5,7 +6,6 @@ Pandas-TA指标插件
 pandas-ta提供易于使用的技术指标实现，与pandas DataFrame完美集成。
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import time
@@ -24,7 +24,7 @@ from core.indicator_extensions import (
     IndicatorCalculationContext
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class PandasTAIndicatorsPlugin(IIndicatorPlugin):

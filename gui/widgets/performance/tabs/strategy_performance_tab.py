@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -5,7 +6,6 @@
 现代化策略性能监控界面
 """
 
-import logging
 from typing import Dict, Any
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame, QGridLayout, QGroupBox,
@@ -17,7 +17,7 @@ from PyQt5.QtGui import QColor
 from gui.widgets.performance.components.metric_card import ModernMetricCard
 from gui.widgets.performance.components.performance_chart import ModernPerformanceChart
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ModernStrategyPerformanceTab(QWidget):
@@ -225,7 +225,7 @@ class ModernStrategyPerformanceTab(QWidget):
         self.stocks_value.setToolTip("股票池详细信息将在鼠标悬停时显示")  # 默认提示
 
         # 添加股票池设置按钮
-        self.stock_pool_settings_btn = QPushButton("⚙️设置")
+        self.stock_pool_settings_btn = QPushButton("设置")
         self.stock_pool_settings_btn.setFixedSize(50, 25)
         self.stock_pool_settings_btn.setStyleSheet("""
             QPushButton {
@@ -422,10 +422,10 @@ class ModernStrategyPerformanceTab(QWidget):
 评估建议：{advice}
 
 质量等级说明：
-• 优秀 (80%+)：可进行全面分析
-• 良好 (60-80%)：适合常规分析  
-• 一般 (40-60%)：谨慎解读结果
-• 不足 (<40%)：建议延长周期"""
+ 优秀 (80%+)：可进行全面分析
+ 良好 (60-80%)：适合常规分析  
+ 一般 (40-60%)：谨慎解读结果
+ 不足 (<40%)：建议延长周期"""
 
             self.quality_value.setToolTip(quality_tooltip)
 
@@ -563,7 +563,7 @@ class ModernStrategyPerformanceTab(QWidget):
 
             if len(selected_codes) < total_stocks:
                 tooltip_lines.append("")
-                tooltip_lines.append("💡 提示：可在设置中调整分析股票数量")
+                tooltip_lines.append(" 提示：可在设置中调整分析股票数量")
 
             tooltip_text = "\n".join(tooltip_lines)
 
@@ -721,7 +721,7 @@ class ModernStrategyPerformanceTab(QWidget):
                     stock_returns_data[code] = pd.Series(daily_returns, index=stock_dates)
                     stock_daily_data[code] = len(daily_returns)
 
-                    logger.info(f"✅ 生成股票 {code} 的 {len(daily_returns)} 个收益率数据点")
+                    logger.info(f" 生成股票 {code} 的 {len(daily_returns)} 个收益率数据点")
 
                 except Exception as e:
                     logger.warning(f"处理股票 {code} 数据失败: {e}")
@@ -776,7 +776,7 @@ class ModernStrategyPerformanceTab(QWidget):
                 # 转换为pandas Series
                 returns_series = pd.Series(portfolio_returns, index=all_dates[:len(portfolio_returns)])
 
-                logger.info(f"✅ 成功计算投资组合收益率: {len(returns_series)} 个交易日")
+                logger.info(f" 成功计算投资组合收益率: {len(returns_series)} 个交易日")
                 logger.info(f"投资组合收益率统计: 均值={returns_series.mean():.6f}, 标准差={returns_series.std():.6f}")
                 logger.info(f"收益率范围: 最小={returns_series.min():.6f}, 最大={returns_series.max():.6f}")
 

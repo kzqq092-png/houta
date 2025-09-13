@@ -1,10 +1,10 @@
+from loguru import logger
 """
 基础面板类
 
 所有UI面板的基类，提供通用的功能和接口。
 """
 
-import logging
 from typing import Dict, Any, Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
@@ -15,7 +15,7 @@ from PyQt5.sip import wrappertype
 if TYPE_CHECKING:
     from core.coordinators.main_window_coordinator import MainWindowCoordinator
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class QObjectMeta(wrappertype, type(ABC)):

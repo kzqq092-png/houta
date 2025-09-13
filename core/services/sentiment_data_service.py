@@ -1,3 +1,4 @@
+from loguru import logger
 """
 情绪数据服务管理器
 
@@ -13,7 +14,6 @@
 """
 
 import asyncio
-import logging
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
-from ..logger import LogManager
 from plugins.sentiment_data_source_interface import (
     ISentimentDataSource,
     SentimentData,
@@ -29,7 +28,6 @@ from plugins.sentiment_data_source_interface import (
     SentimentStatus,
     TradingSignal
 )
-
 
 @dataclass
 class SentimentDataServiceConfig:
@@ -42,7 +40,6 @@ class SentimentDataServiceConfig:
     enable_fallback: bool = True  # 启用回退机制
     enable_auto_refresh: bool = True  # 启用自动刷新
 
-
 class SentimentDataService(QObject):
     """情绪数据服务管理器"""
 
@@ -53,8 +50,7 @@ class SentimentDataService(QObject):
 
     def __init__(self,
                  plugin_manager=None,
-                 config: Optional[SentimentDataServiceConfig] = None,
-                 log_manager: Optional[LogManager] = None):
+                 config: Optional[SentimentDataServiceConfig] = None):
         """
         初始化情绪数据服务
         """
@@ -62,7 +58,7 @@ class SentimentDataService(QObject):
 
         self.plugin_manager = plugin_manager
         self.config = config or SentimentDataServiceConfig()
-        self.log_manager = log_manager or logging.getLogger(__name__)
+        # 纯Loguru架构，移除log_manager依赖
 
         self._registered_plugins: Dict[str, ISentimentDataSource] = {}
         self._plugin_priorities: Dict[str, int] = {}
@@ -96,14 +92,14 @@ class SentimentDataService(QObject):
             # 使用与插件管理器一致的全限定键，确保数据库与UI一致
             self.register_plugin('sentiment_data_sources.akshare_sentiment_plugin', akshare_plugin, priority=10, weight=1.0)
         except ImportError:
-            self.log_manager.warning("未能导入AkShare情绪插件，相关功能将不可用。")
+            logger.warning("未能导入AkShare情绪插件，相关功能将不可用。")
         except Exception as e:
-            self.log_manager.error(f"注册AkShare情绪插件失败: {e}")
+            logger.error(f"注册AkShare情绪插件失败: {e}")
 
     def _auto_discover_sentiment_plugins(self):
         """从插件管理器自动发现并注册情绪插件"""
         if not self.plugin_manager:
-            self.log_manager.warning("⚠️ 插件管理器不可用，无法自动发现情绪插件")
+            logger.warning(" 插件管理器不可用，无法自动发现情绪插件")
             return
 
         try:
@@ -124,22 +120,22 @@ class SentimentDataService(QObject):
                             success = self.register_plugin(plugin_name, plugin_instance, priority, weight)
                             if success:
                                 registered_count += 1
-                                self.log_manager.info(f"✅ 自动注册情绪插件: {plugin_name}")
+                                logger.info(f" 自动注册情绪插件: {plugin_name}")
                             else:
-                                self.log_manager.warning(f"⚠️ 自动注册情绪插件失败: {plugin_name}")
+                                logger.warning(f" 自动注册情绪插件失败: {plugin_name}")
                         else:
-                            self.log_manager.debug(f"插件 {plugin_name} 已注册，跳过")
+                            logger.debug(f"插件 {plugin_name} 已注册，跳过")
 
                 except Exception as e:
-                    self.log_manager.warning(f"⚠️ 检查插件 {plugin_name} 失败: {e}")
+                    logger.warning(f" 检查插件 {plugin_name} 失败: {e}")
 
             if registered_count > 0:
-                self.log_manager.info(f"✅ 自动发现并注册了 {registered_count} 个情绪插件")
+                logger.info(f" 自动发现并注册了 {registered_count} 个情绪插件")
             else:
-                self.log_manager.info("📝 未发现新的情绪插件")
+                logger.info(" 未发现新的情绪插件")
 
         except Exception as e:
-            self.log_manager.error(f"❌ 自动发现情绪插件失败: {e}")
+            logger.error(f" 自动发现情绪插件失败: {e}")
 
     def _is_sentiment_plugin(self, plugin_instance) -> bool:
         """检查插件是否是情绪数据源插件"""
@@ -165,13 +161,13 @@ class SentimentDataService(QObject):
             return False
 
         except Exception as e:
-            self.log_manager.debug(f"检查插件类型失败: {e}")
+            logger.debug(f"检查插件类型失败: {e}")
             return False
 
     def initialize(self) -> bool:
         """初始化情绪数据服务"""
         try:
-            self.log_manager.info("🚀 初始化情绪数据服务...")
+            logger.info(" 初始化情绪数据服务...")
 
             # 在初始化时从插件管理器自动发现并注册情绪插件
             self._auto_discover_sentiment_plugins()
@@ -182,7 +178,7 @@ class SentimentDataService(QObject):
                 # 延迟执行孤儿清理，确保所有插件都有机会注册
                 self._fully_initialized = False
             except Exception as e:
-                self.log_manager.warning(f"⚠️ 同步情绪插件元信息到数据库失败: {e}")
+                logger.warning(f" 同步情绪插件元信息到数据库失败: {e}")
 
             if self.config.enable_auto_refresh:
                 self._start_auto_refresh()
@@ -197,15 +193,15 @@ class SentimentDataService(QObject):
             try:
                 self._remove_orphan_db_records()
             except Exception as e:
-                self.log_manager.warning(f"⚠️ 清理孤儿插件记录失败: {e}")
+                logger.warning(f" 清理孤儿插件记录失败: {e}")
 
-            self.log_manager.info(f"✅ 情绪数据服务初始化完成，已注册 {len(self._registered_plugins)} 个插件")
+            logger.info(f" 情绪数据服务初始化完成，已注册 {len(self._registered_plugins)} 个插件")
             self.service_status_changed.emit("running")
 
             return True
 
         except Exception as e:
-            self.log_manager.error(f"❌ 情绪数据服务初始化失败: {e}")
+            logger.error(f" 情绪数据服务初始化失败: {e}")
             return False
 
     def _sync_registered_plugins_to_db(self) -> None:
@@ -250,16 +246,16 @@ class SentimentDataService(QObject):
 
                     dbs.register_plugin_from_metadata(name, payload)
                 except Exception as e:
-                    self.log_manager.debug(f"同步插件 {name} 到数据库失败: {e}")
+                    logger.debug(f"同步插件 {name} 到数据库失败: {e}")
         except Exception as e:
-            self.log_manager.debug(f"初始化数据库服务失败: {e}")
+            logger.debug(f"初始化数据库服务失败: {e}")
 
     def _remove_orphan_db_records(self) -> None:
         """删除数据库中不存在于当前注册集合的情绪插件记录。"""
         try:
             # 只有在服务完全初始化后才进行清理，避免误删
             if not hasattr(self, '_fully_initialized') or not self._fully_initialized:
-                self.log_manager.debug("服务未完全初始化，跳过孤儿插件清理")
+                logger.debug("服务未完全初始化，跳过孤儿插件清理")
                 return
 
             from .plugin_database_service import get_plugin_database_service
@@ -276,7 +272,7 @@ class SentimentDataService(QObject):
                         if 'sentiment_data_sources' in plugin_name:
                             plugin_manager_plugins.add(plugin_name)
             except Exception as e:
-                self.log_manager.debug(f"获取插件管理器插件列表失败: {e}")
+                logger.debug(f"获取插件管理器插件列表失败: {e}")
 
             for rec in records:
                 name = rec.get('name') or ''
@@ -302,13 +298,13 @@ class SentimentDataService(QObject):
                         if should_delete:
                             try:
                                 dbs.remove_plugin(name)
-                                self.log_manager.info(f"🧹 已删除不存在的情绪插件记录: {name}")
+                                logger.info(f" 已删除不存在的情绪插件记录: {name}")
                             except Exception as e:
-                                self.log_manager.warning(f"⚠️ 删除情绪插件记录失败 {name}: {e}")
+                                logger.warning(f" 删除情绪插件记录失败 {name}: {e}")
                         else:
-                            self.log_manager.debug(f"保留插件记录: {name} (状态: {rec_status}, 模块存在: {plugin_exists})")
+                            logger.debug(f"保留插件记录: {name} (状态: {rec_status}, 模块存在: {plugin_exists})")
         except Exception as e:
-            self.log_manager.debug(f"情绪插件孤儿清理失败: {e}")
+            logger.debug(f"情绪插件孤儿清理失败: {e}")
 
     def get_plugin_metadata(self, name: str) -> Dict[str, Any]:
         """获取指定情绪插件的元信息（用于UI展示）。"""
@@ -337,7 +333,7 @@ class SentimentDataService(QObject):
     def cleanup(self) -> None:
         """清理服务资源"""
         try:
-            self.log_manager.info("🧹 清理情绪数据服务...")
+            logger.info(" 清理情绪数据服务...")
 
             # 停止自动刷新
             self._refresh_timer.stop()
@@ -348,17 +344,17 @@ class SentimentDataService(QObject):
                     if hasattr(plugin, 'cleanup'):
                         plugin.cleanup()
                 except Exception as e:
-                    self.log_manager.warning(f"⚠️ 清理插件失败: {e}")
+                    logger.warning(f" 清理插件失败: {e}")
 
             # 关闭执行器
             self._executor.shutdown(wait=True)
 
             self._is_running = False
             self.service_status_changed.emit("stopped")
-            self.log_manager.info("✅ 情绪数据服务清理完成")
+            logger.info(" 情绪数据服务清理完成")
 
         except Exception as e:
-            self.log_manager.error(f"❌ 清理情绪数据服务失败: {e}")
+            logger.error(f" 清理情绪数据服务失败: {e}")
 
     def register_plugin(self,
                         name: str,
@@ -379,7 +375,7 @@ class SentimentDataService(QObject):
         """
         try:
             if not isinstance(plugin, ISentimentDataSource):
-                self.log_manager.error(f"❌ 插件 {name} 不是有效的情绪数据源插件")
+                logger.error(f" 插件 {name} 不是有效的情绪数据源插件")
                 return False
 
             # 初始化插件
@@ -388,27 +384,27 @@ class SentimentDataService(QObject):
                 try:
                     # 尝试传递None，BaseSentimentPlugin已经修改为能处理None context
                     if not plugin.initialize(None):
-                        self.log_manager.error(f"❌ 插件 {name} 初始化失败")
+                        logger.error(f" 插件 {name} 初始化失败")
                         return False
                 except TypeError:
                     # 如果插件不需要context参数，尝试无参数调用
                     try:
                         if not plugin.initialize():
-                            self.log_manager.error(f"❌ 插件 {name} 初始化失败")
+                            logger.error(f" 插件 {name} 初始化失败")
                             return False
                     except Exception as e:
-                        self.log_manager.error(f"❌ 插件 {name} 初始化失败: {e}")
+                        logger.error(f" 插件 {name} 初始化失败: {e}")
                         return False
 
             self._registered_plugins[name] = plugin
             self._plugin_priorities[name] = priority
             self._plugin_weights[name] = weight
 
-            self.log_manager.info(f"✅ 成功注册情绪数据源插件: {name}")
+            logger.info(f" 成功注册情绪数据源插件: {name}")
             return True
 
         except Exception as e:
-            self.log_manager.error(f"❌ 注册插件 {name} 失败: {e}")
+            logger.error(f" 注册插件 {name} 失败: {e}")
             return False
 
     def unregister_plugin(self, name: str) -> bool:
@@ -423,7 +419,7 @@ class SentimentDataService(QObject):
         """
         try:
             if name not in self._registered_plugins:
-                self.log_manager.warning(f"⚠️ 插件 {name} 未注册")
+                logger.warning(f" 插件 {name} 未注册")
                 return False
 
             # 清理插件
@@ -436,24 +432,24 @@ class SentimentDataService(QObject):
             del self._plugin_priorities[name]
             del self._plugin_weights[name]
 
-            self.log_manager.info(f"✅ 成功注销情绪数据源插件: {name}")
+            logger.info(f" 成功注销情绪数据源插件: {name}")
             return True
 
         except Exception as e:
-            self.log_manager.error(f"❌ 注销插件 {name} 失败: {e}")
+            logger.error(f" 注销插件 {name} 失败: {e}")
             return False
 
     def get_sentiment_data(self, force_refresh: bool = False) -> SentimentResponse:
         """获取聚合的情绪数据"""
         try:
             if not force_refresh and self._is_cache_valid():
-                self.log_manager.info("📋 使用缓存的情绪数据")
+                logger.info(" 使用缓存的情绪数据")
                 return self._cached_response
 
-            self.log_manager.info("🔄 开始获取最新情绪数据...")
+            logger.info(" 开始获取最新情绪数据...")
 
             if not self._registered_plugins:
-                self.log_manager.warning("没有注册任何情绪数据插件，无法获取数据。")
+                logger.warning("没有注册任何情绪数据插件，无法获取数据。")
                 return SentimentResponse(success=False, error_message="没有可用的数据源插件。")
 
             plugin_responses = self._fetch_from_all_plugins()
@@ -464,11 +460,11 @@ class SentimentDataService(QObject):
 
             self.data_updated.emit(aggregated_response)
 
-            self.log_manager.info(f"✅ 情绪数据获取完成，共 {len(aggregated_response.data)} 个指标")
+            logger.info(f" 情绪数据获取完成，共 {len(aggregated_response.data)} 个指标")
             return aggregated_response
 
         except Exception as e:
-            self.log_manager.error(f"❌ 获取情绪数据失败: {e}", exc_info=True)
+            logger.error(f" 获取情绪数据失败: {e}", exc_info=True)
             return SentimentResponse(
                 success=False,
                 error_message=f"获取情绪数据失败: {str(e)}",
@@ -528,7 +524,7 @@ class SentimentDataService(QObject):
                             'tags': info_obj.tags
                         }
                     except Exception as e:
-                        self.log_manager.warning(f"获取插件信息失败 {plugin_name}: {e}")
+                        logger.warning(f"获取插件信息失败 {plugin_name}: {e}")
 
                 # 后备方案：使用metadata属性
                 if not plugin_info and hasattr(plugin_instance, 'metadata'):
@@ -545,7 +541,7 @@ class SentimentDataService(QObject):
                             'tags': metadata.get('tags', [])
                         }
                     except Exception as e:
-                        self.log_manager.warning(f"获取插件metadata失败 {plugin_name}: {e}")
+                        logger.warning(f"获取插件metadata失败 {plugin_name}: {e}")
 
                 # 最后的后备方案
                 if not plugin_info:
@@ -576,7 +572,7 @@ class SentimentDataService(QObject):
                 plugins_info[plugin_name] = plugin_info
 
             except Exception as e:
-                self.log_manager.error(f"获取插件 {plugin_name} 信息失败: {e}")
+                logger.error(f"获取插件 {plugin_name} 信息失败: {e}")
                 # 提供最基本的信息
                 plugins_info[plugin_name] = {
                     'name': plugin_name,
@@ -600,7 +596,7 @@ class SentimentDataService(QObject):
         """测试指定插件的连接状态"""
         try:
             if plugin_name not in self._registered_plugins:
-                self.log_manager.warning(f"插件 {plugin_name} 未注册")
+                logger.warning(f"插件 {plugin_name} 未注册")
                 return False
 
             plugin = self._registered_plugins[plugin_name]
@@ -610,7 +606,7 @@ class SentimentDataService(QObject):
                 try:
                     return plugin.test_connection()
                 except Exception as e:
-                    self.log_manager.error(f"插件 {plugin_name} 连接测试失败: {e}")
+                    logger.error(f"插件 {plugin_name} 连接测试失败: {e}")
                     return False
 
             # 方法2：检查插件是否有is_connected方法
@@ -618,7 +614,7 @@ class SentimentDataService(QObject):
                 try:
                     return plugin.is_connected()
                 except Exception as e:
-                    self.log_manager.error(f"插件 {plugin_name} 连接状态检查失败: {e}")
+                    logger.error(f"插件 {plugin_name} 连接状态检查失败: {e}")
                     return False
 
             # 方法3：尝试获取测试数据
@@ -628,22 +624,22 @@ class SentimentDataService(QObject):
                     test_result = plugin.get_sentiment_data('000001', datetime.now() - timedelta(days=1), datetime.now())
                     return test_result is not None and test_result.success
                 except Exception as e:
-                    self.log_manager.error(f"插件 {plugin_name} 数据获取测试失败: {e}")
+                    logger.error(f"插件 {plugin_name} 数据获取测试失败: {e}")
                     return False
 
             # 如果都没有，假设连接正常
-            self.log_manager.info(f"插件 {plugin_name} 无法测试连接，假设正常")
+            logger.info(f"插件 {plugin_name} 无法测试连接，假设正常")
             return True
 
         except Exception as e:
-            self.log_manager.error(f"测试插件 {plugin_name} 连接时发生错误: {e}")
+            logger.error(f"测试插件 {plugin_name} 连接时发生错误: {e}")
             return False
 
     def enable_plugin(self, plugin_name: str) -> bool:
         """启用指定的情绪数据源插件"""
         try:
             if plugin_name not in self._registered_plugins:
-                self.log_manager.warning(f"插件 {plugin_name} 未注册，无法启用")
+                logger.warning(f"插件 {plugin_name} 未注册，无法启用")
                 return False
 
             plugin = self._registered_plugins[plugin_name]
@@ -653,7 +649,7 @@ class SentimentDataService(QObject):
                 try:
                     result = plugin.enable()
                     if result:
-                        self.log_manager.info(f"插件 {plugin_name} 已启用")
+                        logger.info(f"插件 {plugin_name} 已启用")
 
                         # 更新数据库状态
                         self._update_plugin_status_in_db(plugin_name, "enabled")
@@ -665,14 +661,14 @@ class SentimentDataService(QObject):
 
                         return True
                     else:
-                        self.log_manager.warning(f"插件 {plugin_name} 启用失败")
+                        logger.warning(f"插件 {plugin_name} 启用失败")
                         return False
                 except Exception as e:
-                    self.log_manager.error(f"插件 {plugin_name} 启用时发生错误: {e}")
+                    logger.error(f"插件 {plugin_name} 启用时发生错误: {e}")
                     return False
             else:
                 # 插件没有explicit的enable方法，标记为启用状态
-                self.log_manager.info(f"插件 {plugin_name} 没有enable方法，标记为启用状态")
+                logger.info(f"插件 {plugin_name} 没有enable方法，标记为启用状态")
                 self._update_plugin_status_in_db(plugin_name, "enabled")
 
                 if plugin_name not in self._selected_plugins:
@@ -681,14 +677,14 @@ class SentimentDataService(QObject):
                 return True
 
         except Exception as e:
-            self.log_manager.error(f"启用插件 {plugin_name} 时发生错误: {e}")
+            logger.error(f"启用插件 {plugin_name} 时发生错误: {e}")
             return False
 
     def disable_plugin(self, plugin_name: str) -> bool:
         """禁用指定的情绪数据源插件"""
         try:
             if plugin_name not in self._registered_plugins:
-                self.log_manager.warning(f"插件 {plugin_name} 未注册，无法禁用")
+                logger.warning(f"插件 {plugin_name} 未注册，无法禁用")
                 return False
 
             plugin = self._registered_plugins[plugin_name]
@@ -698,7 +694,7 @@ class SentimentDataService(QObject):
                 try:
                     result = plugin.disable()
                     if result:
-                        self.log_manager.info(f"插件 {plugin_name} 已禁用")
+                        logger.info(f"插件 {plugin_name} 已禁用")
 
                         # 更新数据库状态
                         self._update_plugin_status_in_db(plugin_name, "disabled")
@@ -709,14 +705,14 @@ class SentimentDataService(QObject):
 
                         return True
                     else:
-                        self.log_manager.warning(f"插件 {plugin_name} 禁用失败")
+                        logger.warning(f"插件 {plugin_name} 禁用失败")
                         return False
                 except Exception as e:
-                    self.log_manager.error(f"插件 {plugin_name} 禁用时发生错误: {e}")
+                    logger.error(f"插件 {plugin_name} 禁用时发生错误: {e}")
                     return False
             else:
                 # 插件没有explicit的disable方法，标记为禁用状态
-                self.log_manager.info(f"插件 {plugin_name} 没有disable方法，标记为禁用状态")
+                logger.info(f"插件 {plugin_name} 没有disable方法，标记为禁用状态")
                 self._update_plugin_status_in_db(plugin_name, "disabled")
 
                 if plugin_name in self._selected_plugins:
@@ -725,7 +721,7 @@ class SentimentDataService(QObject):
                 return True
 
         except Exception as e:
-            self.log_manager.error(f"禁用插件 {plugin_name} 时发生错误: {e}")
+            logger.error(f"禁用插件 {plugin_name} 时发生错误: {e}")
             return False
 
     def set_plugin_enabled(self, plugin_name: str, enabled: bool) -> bool:
@@ -754,7 +750,7 @@ class SentimentDataService(QObject):
                 db_service.update_plugin_status(plugin_name, db_status, f"情绪数据服务{status}")
 
         except Exception as e:
-            self.log_manager.warning(f"更新插件 {plugin_name} 数据库状态失败: {e}")
+            logger.warning(f"更新插件 {plugin_name} 数据库状态失败: {e}")
 
     def get_plugin_status(self, name: str) -> Dict[str, Any]:
         """
@@ -794,7 +790,7 @@ class SentimentDataService(QObject):
                 # 如果没有连接检查方法，假设已连接
                 is_connected = True
         except Exception as e:
-            self.log_manager.debug(f"检查插件 {name} 连接状态失败: {e}")
+            logger.debug(f"检查插件 {name} 连接状态失败: {e}")
             is_connected = False
 
         # 获取响应时间（如果插件支持）
@@ -852,10 +848,10 @@ class SentimentDataService(QObject):
             if plugin_name in self._registered_plugins:
                 valid_plugins.append(plugin_name)
             else:
-                self.log_manager.warning(f"⚠️ 插件 {plugin_name} 未注册，跳过")
+                logger.warning(f" 插件 {plugin_name} 未注册，跳过")
 
         self._selected_plugins = valid_plugins
-        self.log_manager.info(f"📝 设置选中插件: {self._selected_plugins}")
+        logger.info(f" 设置选中插件: {self._selected_plugins}")
 
     def get_selected_plugins(self) -> List[str]:
         """
@@ -869,7 +865,7 @@ class SentimentDataService(QObject):
     def clear_selected_plugins(self) -> None:
         """清空选中的插件列表"""
         self._selected_plugins = []
-        self.log_manager.info("🗑️ 已清空选中插件列表")
+        logger.info(" 已清空选中插件列表")
 
     def _fetch_from_all_plugins(self) -> Dict[str, SentimentResponse]:
         """并发从被勾选插件获取数据"""
@@ -883,15 +879,15 @@ class SentimentDataService(QObject):
                 if plugin_name in self._registered_plugins:
                     plugins_to_use[plugin_name] = self._registered_plugins[plugin_name]
                 else:
-                    self.log_manager.warning(f"⚠️ 选中的插件 {plugin_name} 未注册")
-            self.log_manager.info(f"🎯 使用选中的插件: {list(plugins_to_use.keys())}")
+                    logger.warning(f" 选中的插件 {plugin_name} 未注册")
+            logger.info(f" 使用选中的插件: {list(plugins_to_use.keys())}")
         else:
             # 如果没有设置选中插件，使用所有已注册的插件
             plugins_to_use = self._registered_plugins
-            self.log_manager.info(f"📋 未设置选中插件，使用所有已注册插件: {list(plugins_to_use.keys())}")
+            logger.info(f" 未设置选中插件，使用所有已注册插件: {list(plugins_to_use.keys())}")
 
         if not plugins_to_use:
-            self.log_manager.warning("⚠️ 没有可用的插件进行数据获取")
+            logger.warning(" 没有可用的插件进行数据获取")
             return plugin_responses
 
         # 按优先级排序插件
@@ -917,23 +913,23 @@ class SentimentDataService(QObject):
                     plugin_responses[plugin_name] = response
 
                     if response.success:
-                        self.log_manager.info(f"✅ 从插件 {plugin_name} 获取数据成功")
+                        logger.info(f" 从插件 {plugin_name} 获取数据成功")
                     else:
-                        self.log_manager.warning(f"⚠️ 插件 {plugin_name} 返回错误: {response.error_message}")
+                        logger.warning(f" 插件 {plugin_name} 返回错误: {response.error_message}")
 
                 except Exception as e:
-                    self.log_manager.error(f"❌ 从插件 {plugin_name} 获取数据失败: {e}")
+                    logger.error(f" 从插件 {plugin_name} 获取数据失败: {e}")
                     self.plugin_error.emit(plugin_name, str(e))
 
         except TimeoutError as e:
             # 处理超时的future，避免完全阻塞
             unfinished_futures = set(future_to_plugin.keys()) - completed_futures
-            self.log_manager.warning(f"⚠️ {len(unfinished_futures)} 个插件超时，继续处理已完成的插件")
+            logger.warning(f" {len(unfinished_futures)} 个插件超时，继续处理已完成的插件")
 
             # 取消未完成的future
             for future in unfinished_futures:
                 plugin_name = future_to_plugin[future]
-                self.log_manager.warning(f"⚠️ 插件 {plugin_name} 执行超时，已取消")
+                logger.warning(f" 插件 {plugin_name} 执行超时，已取消")
                 future.cancel()  # 尝试取消未完成的任务
                 self.plugin_error.emit(plugin_name, "插件执行超时")
 
@@ -963,7 +959,7 @@ class SentimentDataService(QObject):
                 current_level_index = quality_levels.index(quality) if quality in quality_levels else 0
 
                 if current_level_index < min_level_index:
-                    self.log_manager.warning(f"⚠️ 插件 {plugin_name} 数据质量不满足要求: {quality}")
+                    logger.warning(f" 插件 {plugin_name} 数据质量不满足要求: {quality}")
 
             return response
 
@@ -1040,7 +1036,7 @@ class SentimentDataService(QObject):
             )
 
         except Exception as e:
-            self.log_manager.error(f"❌ 聚合情绪数据失败: {e}")
+            logger.error(f" 聚合情绪数据失败: {e}")
             return SentimentResponse(
                 success=False,
                 error_message=f"聚合数据失败: {str(e)}",
@@ -1060,15 +1056,15 @@ class SentimentDataService(QObject):
         if self.config.auto_refresh_interval_minutes > 0:
             interval_ms = self.config.auto_refresh_interval_minutes * 60 * 1000
             self._refresh_timer.start(interval_ms)
-            self.log_manager.info(f"🔄 启动自动刷新，间隔 {self.config.auto_refresh_interval_minutes} 分钟")
+            logger.info(f" 启动自动刷新，间隔 {self.config.auto_refresh_interval_minutes} 分钟")
 
     def _auto_refresh(self) -> None:
         """自动刷新数据"""
         try:
-            self.log_manager.info("⏰ 执行自动刷新...")
+            logger.info("⏰ 执行自动刷新...")
             self.get_sentiment_data(force_refresh=True)
         except Exception as e:
-            self.log_manager.error(f"❌ 自动刷新失败: {e}")
+            logger.error(f" 自动刷新失败: {e}")
 
     def update_config(self, config: SentimentDataServiceConfig) -> None:
         """更新服务配置"""
@@ -1114,12 +1110,12 @@ class SentimentDataService(QObject):
             for plugin_name in enabled_sentiment_plugins:
                 if plugin_name not in self._selected_plugins:
                     self._selected_plugins.append(plugin_name)
-                    self.log_manager.info(f"✅ 自动选中已启用的情绪插件: {plugin_name}")
+                    logger.info(f" 自动选中已启用的情绪插件: {plugin_name}")
 
             if enabled_sentiment_plugins:
-                self.log_manager.info(f"🎯 已选中 {len(enabled_sentiment_plugins)} 个情绪插件")
+                logger.info(f" 已选中 {len(enabled_sentiment_plugins)} 个情绪插件")
             else:
-                self.log_manager.warning("⚠️ 没有找到已启用的情绪插件")
+                logger.warning(" 没有找到已启用的情绪插件")
 
         except Exception as e:
-            self.log_manager.error(f"❌ 自动发现插件失败: {e}")
+            logger.error(f" 自动发现插件失败: {e}")

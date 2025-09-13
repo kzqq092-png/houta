@@ -1,3 +1,4 @@
+from loguru import logger
 """
 选股策略组件
 
@@ -11,17 +12,24 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, List, Union
 from core.services.unified_data_manager import UnifiedDataManager
-from core.logger import LogManager, LogLevel
 from core.stock_screener import StockScreener
+from loguru import logger
+import traceback
+import time
+import json
+import os
+
+import datetime
+
+
 from datetime import datetime
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import json
 import traceback
-from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
+from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci, calc_wr, calc_talib_indicator, get_talib_indicator_list
 from core.indicator_service import get_indicator_categories, get_all_indicators_metadata, get_indicator_metadata
 from gui.ui_components import BaseAnalysisPanel, AnalysisToolsPanel
-import time
 from concurrent.futures import ThreadPoolExecutor
 import os
 
@@ -108,17 +116,17 @@ class ScreeningWorker(QThread):
 class StockScreenerWidget(BaseAnalysisPanel):
     """选股策略组件，继承统一分析面板基类"""
 
-    def __init__(self, parent=None, data_manager=None, log_manager=None):
+    def __init__(self, parent=None, data_manager=None):
         """初始化选股策略组件
 
         Args:
             parent: 父窗口
             data_manager: 数据管理器实例
-            log_manager: 日志管理器实例
+            # log_manager: 已迁移到Loguru日志系统
         """
         super().__init__(parent)
         self.data_manager = data_manager
-        self.log_manager = log_manager
+        # log_manager已迁移到Loguru
         # 先初始化所有依赖属性
         self.template_manager = TemplateManager(
             template_dir="templates/stock_screener")
@@ -136,8 +144,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     data = df.head(100).values.tolist()
                     self.paged_table.set_data(data)
             except Exception as e:
-                if self.log_manager:
-                    self.log_manager.warning(f"初始化拉取股票列表失败: {str(e)}")
+                logger.warning(f"初始化拉取股票列表失败: {str(e)}")
 
     def init_ui(self):
         """Initialize UI components"""
@@ -312,8 +319,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.export_multi_factor_results)
 
         except Exception as e:
-            self.log_manager.error(f"初始化UI失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"初始化UI失败: {str(e)}")
+            logger.error(traceback.format_exc())
             raise
 
     def on_strategy_changed(self, strategy_type: str):
@@ -340,7 +347,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.add_comprehensive_conditions()
 
         except Exception as e:
-            self.log_manager.log(f"更新策略设置失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"更新策略设置失败: {str(e)}")
 
     def add_technical_conditions(self):
         """Add technical indicator conditions"""
@@ -385,7 +392,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.condition_layout.addLayout(rsi_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加技术指标条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加技术指标条件失败: {str(e)}")
 
     def add_fundamental_conditions(self):
         """Add fundamental conditions"""
@@ -444,7 +451,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.condition_layout.addLayout(roe_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加基本面条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加基本面条件失败: {str(e)}")
 
     def add_capital_conditions(self):
         """Add capital flow conditions"""
@@ -476,7 +483,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.condition_layout.addLayout(volume_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加资金面条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加资金面条件失败: {str(e)}")
 
     def add_comprehensive_conditions(self):
         """Add comprehensive conditions"""
@@ -521,7 +528,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.condition_layout.addLayout(cap_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加综合条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加综合条件失败: {str(e)}")
 
     def start_screening(self):
         """多线程启动筛选"""
@@ -544,7 +551,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             # 禁用按钮防止重复点击
             self.run_button.setEnabled(False)
         except Exception as e:
-            self.log_manager.error(f"启动筛选失败: {str(e)}")
+            logger.error(f"启动筛选失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"启动筛选失败: {str(e)}")
 
     def on_screening_finished(self, results):
@@ -556,7 +563,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
     def on_screening_error(self, error):
         """筛选错误回调"""
         self.run_button.setEnabled(True)
-        self.log_manager.error(f"筛选失败: {error}")
+        logger.error(f"筛选失败: {error}")
         QMessageBox.critical(self, "错误", f"筛选失败: {error}")
 
     def get_technical_params(self):
@@ -587,7 +594,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.parent().on_stock_selected(stock_code)
 
         except Exception as e:
-            self.log_manager.log(f"处理股票选择失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"处理股票选择失败: {str(e)}")
 
     def export_results(self):
         """导出选股结果"""
@@ -625,11 +632,11 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 else:
                     df.to_csv(file_path, index=False)
 
-                self.log_manager.log(f"选股结果已导出到: {file_path}", LogLevel.INFO)
+                logger.info(f"选股结果已导出到: {file_path}")
                 QMessageBox.information(self, "成功", "选股结果导出成功")
 
         except Exception as e:
-            self.log_manager.log(f"导出选股结果失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"导出选股结果失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"导出选股结果失败: {str(e)}")
 
     def save_strategy(self):
@@ -643,7 +650,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.template_manager.save_template(name, conditions)
                 QMessageBox.information(self, "成功", "模板保存成功")
         except Exception as e:
-            self.log_manager.log(f"保存模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"保存模板失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"保存模板失败: {str(e)}")
 
     def load_strategy(self):
@@ -671,7 +678,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 # 更新条件设置
                 self.update_conditions(strategy_data['conditions'])
 
-                self.log_manager.log(f"已加载选股策略: {file_path}", LogLevel.INFO)
+                logger.info(f"已加载选股策略: {file_path}")
 
                 # 显示成功对话框
                 dialog = QMessageBox(self)
@@ -686,7 +693,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 dialog.exec_()
 
         except Exception as e:
-            self.log_manager.log(f"加载选股策略失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载选股策略失败: {str(e)}")
 
             # 显示错误对话框
             dialog = QMessageBox(self)
@@ -741,7 +748,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             return conditions
 
         except Exception as e:
-            self.log_manager.log(f"获取选股条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取选股条件失败: {str(e)}")
             return {}
 
     def load_templates(self):
@@ -751,7 +758,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             for name in self.template_manager.list_templates():
                 self.template_combo.addItem(name)
         except Exception as e:
-            self.log_manager.log(f"加载模板列表失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载模板列表失败: {str(e)}")
 
     def on_template_changed(self, template_name: str):
         """处理模板选择变更
@@ -765,7 +772,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             params = self.template_manager.load_template(template_name)
             self.update_conditions(params)
         except Exception as e:
-            self.log_manager.log(f"加载模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载模板失败: {str(e)}")
 
     def update_conditions(self, conditions: dict):
         """更新选股条件设置
@@ -841,7 +848,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.cap_weight.setValue(conditions['cap_weight'])
 
         except Exception as e:
-            self.log_manager.log(f"更新选股条件失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"更新选股条件失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"更新选股条件失败: {str(e)}")
 
     def save_template(self):
@@ -867,7 +874,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.load_templates()
 
         except Exception as e:
-            self.log_manager.log(f"保存模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"保存模板失败: {str(e)}")
 
     def delete_template(self):
         """删除选中的模板"""
@@ -893,7 +900,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 self.load_templates()
 
         except Exception as e:
-            self.log_manager.log(f"删除模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"删除模板失败: {str(e)}")
 
     def add_sorting_functions(self):
         """添加排序功能"""
@@ -928,7 +935,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.result_group.layout().insertLayout(0, sort_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加排序功能失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加排序功能失败: {str(e)}")
 
     def on_sort_changed(self):
         """处理排序变更"""
@@ -961,7 +968,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.update_result_table(df)
 
         except Exception as e:
-            self.log_manager.log(f"处理排序变更失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"处理排序变更失败: {str(e)}")
 
     def add_filter_functions(self):
         """添加筛选功能"""
@@ -985,7 +992,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.result_group.layout().insertLayout(1, filter_layout)
 
         except Exception as e:
-            self.log_manager.log(f"添加筛选功能失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加筛选功能失败: {str(e)}")
 
     def on_filter_changed(self):
         """处理筛选变更"""
@@ -1017,7 +1024,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.update_result_table(df)
 
         except Exception as e:
-            self.log_manager.log(f"处理筛选变更失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"处理筛选变更失败: {str(e)}")
 
     def add_chart_functions(self):
         """添加图表显示功能"""
@@ -1054,7 +1061,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.update_distribution_chart()
 
         except Exception as e:
-            self.log_manager.log(f"添加图表功能失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"添加图表功能失败: {str(e)}")
 
     def update_distribution_chart(self):
         """更新分布图/直方图，仅用于选股器等非K线业务"""
@@ -1120,12 +1127,11 @@ class StockScreenerWidget(BaseAnalysisPanel):
             # 更新画布
             self.canvas.draw()
         except Exception as e:
-            self.log_manager.log(f"更新分布图失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"更新分布图失败: {str(e)}")
 
     def screen_stocks(self):
         start_time = time.time()
-        if self.log_manager:
-            self.log_manager.info("[StockScreenerWidget.screen_stocks] 开始")
+        logger.info("[StockScreenerWidget.screen_stocks] 开始")
         try:
             if not self.conditions:
                 QMessageBox.warning(self, "警告", "请添加筛选条件")
@@ -1191,9 +1197,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
             progress.setLabelText(f"筛选失败: {str(e)}")
         finally:
             elapsed = int((time.time() - start_time) * 1000)
-            if self.log_manager:
-                self.log_manager.performance(
-                    f"[StockScreenerWidget.screen_stocks] 结束，耗时: {elapsed} ms")
+            logger.info(
+                f"[StockScreenerWidget.screen_stocks] 结束，耗时: {elapsed} ms")
             progress.setValue(total_stocks)
             QTimer.singleShot(500, progress.close)
 
@@ -1488,12 +1493,12 @@ class StockScreenerWidget(BaseAnalysisPanel):
             self.paged_table.table.resizeColumnsToContents()
 
             # 更新状态
-            self.log_manager.info(f"更新选股结果表格完成，共{len(results)}条记录")
+            logger.info(f"更新选股结果表格完成，共{len(results)}条记录")
 
         except Exception as e:
             error_msg = f"更新结果表格失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             QMessageBox.critical(self, "错误", error_msg)
 
     def load_template(self):
@@ -1517,11 +1522,11 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 # 更新条件设置
                 self.update_conditions(conditions)
 
-                self.log_manager.log(f"已加载模板: {template_name}", LogLevel.INFO)
+                logger.info(f"已加载模板: {template_name}")
                 QMessageBox.information(self, "成功", "模板加载成功")
 
         except Exception as e:
-            self.log_manager.log(f"加载模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载模板失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"加载模板失败: {str(e)}")
 
     def center_dialog(self, dialog, parent=None, offset_y=50):
@@ -1562,7 +1567,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
 
             dialog.move(x, y)
         except Exception as e:
-            self.log_manager.log(f"设置弹窗位置失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"设置弹窗位置失败: {str(e)}")
 
     def get_available_indicators(self):
         """获取可用的技术指标列表"""
@@ -1578,7 +1583,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                 categories[category].append(indicator['name'])
             return categories
         except Exception as e:
-            self.log_manager.error(f"获取指标列表失败: {str(e)}")
+            logger.error(f"获取指标列表失败: {str(e)}")
             # 返回默认分类
             return {
                 "趋势指标": ["MA", "EMA", "MACD"],
@@ -1624,8 +1629,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                         'north_money': self.get_north_money(stock)
                     })
             except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                logger.info(
+                    f"处理股票 {stock} 失败: {str(e)}")
                 continue
         return pd.DataFrame(results)
 
@@ -1822,7 +1827,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                    "PE", "PB", "ROE", "主力净流入", "北向资金"]
         self.compare_table.setColumnCount(len(headers))
         self.compare_table.setHorizontalHeaderLabels(headers)
-        screener = StockScreener(self.data_manager, self.log_manager)
+        screener = StockScreener(self.data_manager)
         row = 0
         for code in codes:
             for strategy in strategies:
@@ -1860,7 +1865,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
                             row, col, QTableWidgetItem(val))
                     row += 1
                 except Exception as e:
-                    self.log_manager.error(
+                    logger.error(
                         f"策略对比分析失败: {code}-{strategy}: {str(e)}")
                     self.compare_table.insertRow(row)
                     for col, val in enumerate([code, strategy, "异常", "-", "-", "-", "-", "-", "-", "-"]):
@@ -2053,8 +2058,8 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     result = analysis_func(*args, **kwargs)
                     return result
             except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
+                if True:  # 使用Loguru日志
+                    logger.error(f"分析异常: {str(e)}")
                 return None
             finally:
                 QTimer.singleShot(0, lambda: on_done(None))
@@ -2082,7 +2087,7 @@ class StockScreenerWidget(BaseAnalysisPanel):
             return
         self.set_status_message("参数校验通过，正在分析...", error=False)
         try:
-            self.log_manager.info("on_screener_analyze 开始分析 - 选股")
+            logger.info("on_screener_analyze 开始分析 - 选股")
             if hasattr(self.data_manager, 'get_screener_results'):
                 data = self.data_manager.get_screener_results()
                 if data:
@@ -2090,10 +2095,10 @@ class StockScreenerWidget(BaseAnalysisPanel):
                     self.set_status_message("分析完成", error=False)
                 else:
                     self.set_status_message("未获取到选股结果", error=True)
-                    self.log_manager.warning("分析未获取到数据")
+                    logger.warning("分析未获取到数据")
             else:
                 self.set_status_message(
                     "数据管理器未实现get_screener_results", error=True)
         except Exception as e:
             self.set_status_message(f"分析失败: {str(e)}", error=True)
-            self.log_manager.error(f"分析失败: {str(e)}")
+            logger.error(f"分析失败: {str(e)}")

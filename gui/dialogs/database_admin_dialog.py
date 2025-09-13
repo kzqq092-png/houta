@@ -7,7 +7,7 @@ import csv
 import json
 import requests
 import time
-import logging
+from loguru import logger
 import glob
 from datetime import datetime
 
@@ -18,58 +18,98 @@ class DatabaseScanThread(QThread):
     scan_error = pyqtSignal(str)
 
     def run(self):
-        """执行数据库扫描"""
+        """执行数据库扫描 - 递归扫描db目录最大5层深度"""
         try:
             databases = {
                 'sqlite': [],
                 'duckdb': []
             }
 
-            # 只扫描db目录
+            # 扫描db目录
             db_dir = os.path.join(os.getcwd(), 'db')
             if not os.path.exists(db_dir):
+                logger.warning(f"数据库目录不存在: {db_dir}")
                 self.scan_completed.emit(databases)
                 return
 
-            # 扫描db目录中的数据库文件
-            scan_patterns = [
-                os.path.join(db_dir, "*.db"),
-                os.path.join(db_dir, "*.sqlite"),
-                os.path.join(db_dir, "*.sqlite3"),
-                os.path.join(db_dir, "*.duckdb"),
-            ]
+            logger.info(f"开始递归扫描数据库目录: {db_dir}")
 
-            for pattern in scan_patterns:
-                for file_path in glob.glob(pattern):
-                    if os.path.isfile(file_path):
-                        file_size = os.path.getsize(file_path)
-                        # 跳过空文件或过小的文件
-                        if file_size < 1024:  # 小于1KB
-                            continue
+            # 递归扫描数据库文件，最大深度5层
+            self._recursive_scan_databases(db_dir, databases, current_depth=0, max_depth=5)
 
-                        # 根据扩展名分类
-                        ext = os.path.splitext(file_path)[1].lower()
-                        if ext in ['.db', '.sqlite', '.sqlite3']:
-                            # 检查是否真的是SQLite文件
-                            if self._is_sqlite_file(file_path):
-                                databases['sqlite'].append({
-                                    'path': file_path,
-                                    'name': os.path.basename(file_path),
-                                    'size': self._format_file_size(file_size)
-                                })
-                        elif ext == '.duckdb':
-                            # 标准DuckDB文件
-                            if self._is_duckdb_file(file_path):
-                                databases['duckdb'].append({
-                                    'path': file_path,
-                                    'name': os.path.basename(file_path),
-                                    'size': self._format_file_size(file_size)
-                                })
-
+            logger.info(f"数据库扫描完成: SQLite({len(databases['sqlite'])}个), DuckDB({len(databases['duckdb'])}个)")
             self.scan_completed.emit(databases)
 
         except Exception as e:
+            logger.error(f"数据库扫描失败: {e}")
             self.scan_error.emit(str(e))
+
+    def _recursive_scan_databases(self, directory, databases, current_depth=0, max_depth=5):
+        """递归扫描目录中的数据库文件"""
+        if current_depth > max_depth:
+            logger.debug(f"达到最大扫描深度 {max_depth}，跳过目录: {directory}")
+            return
+
+        try:
+            logger.debug(f"扫描目录 (深度{current_depth}): {directory}")
+
+            # 扫描当前目录中的文件
+            for item in os.listdir(directory):
+                item_path = os.path.join(directory, item)
+
+                if os.path.isfile(item_path):
+                    # 检查是否为数据库文件
+                    self._check_database_file(item_path, databases)
+                elif os.path.isdir(item_path):
+                    # 递归扫描子目录
+                    self._recursive_scan_databases(item_path, databases, current_depth + 1, max_depth)
+
+        except PermissionError:
+            logger.warning(f"没有权限访问目录: {directory}")
+        except Exception as e:
+            logger.warning(f"扫描目录失败 {directory}: {e}")
+
+    def _check_database_file(self, file_path, databases):
+        """检查文件是否为数据库文件并添加到列表"""
+        try:
+            # 检查文件扩展名
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext not in ['.db', '.sqlite', '.sqlite3', '.duckdb']:
+                return
+
+            # 检查文件大小
+            file_size = os.path.getsize(file_path)
+            if file_size < 512:  # 小于512字节的文件可能不是有效数据库
+                logger.debug(f"跳过过小的文件: {file_path} ({file_size} bytes)")
+                return
+
+            # 获取相对路径（相对于项目根目录）
+            relative_path = os.path.relpath(file_path, os.getcwd())
+
+            # 根据扩展名分类检查
+            if ext in ['.db', '.sqlite', '.sqlite3']:
+                if self._is_sqlite_file(file_path):
+                    databases['sqlite'].append({
+                        'path': file_path,
+                        'relative_path': relative_path,
+                        'name': os.path.basename(file_path),
+                        'size': self._format_file_size(file_size),
+                        'directory': os.path.dirname(relative_path)
+                    })
+                    logger.debug(f"发现SQLite数据库: {relative_path}")
+            elif ext == '.duckdb':
+                if self._is_duckdb_file(file_path):
+                    databases['duckdb'].append({
+                        'path': file_path,
+                        'relative_path': relative_path,
+                        'name': os.path.basename(file_path),
+                        'size': self._format_file_size(file_size),
+                        'directory': os.path.dirname(relative_path)
+                    })
+                    logger.debug(f"发现DuckDB数据库: {relative_path}")
+
+        except Exception as e:
+            logger.warning(f"检查文件失败 {file_path}: {e}")
 
     def _is_sqlite_file(self, file_path):
         """检查文件是否为有效的SQLite数据库"""
@@ -208,7 +248,7 @@ class TableDescriptionManager:
                 return {'description': '', 'tags': ''}
 
         except Exception as e:
-            print(f"获取表描述失败: {e}")
+            logger.error(f"获取表描述失败: {e}")
             return {'description': '', 'tags': ''}
 
     def save_description(self, database_path, database_type, table_name, description, tags=''):
@@ -229,7 +269,7 @@ class TableDescriptionManager:
             return True
 
         except Exception as e:
-            print(f"保存表描述失败: {e}")
+            logger.error(f"保存表描述失败: {e}")
             return False
 
     def get_all_descriptions(self, database_path):
@@ -250,7 +290,7 @@ class TableDescriptionManager:
             return {row[0]: {'description': row[1], 'tags': row[2]} for row in results}
 
         except Exception as e:
-            print(f"获取所有表描述失败: {e}")
+            logger.error(f"获取所有表描述失败: {e}")
             return {}
 
 
@@ -361,8 +401,8 @@ class DatabaseAdminDialog(QDialog):
 
         # 分页
         page_layout = QHBoxLayout()
-        self.prev_btn = QPushButton("⬅️ 上一页")
-        self.next_btn = QPushButton("➡️ 下一页")
+        self.prev_btn = QPushButton(" 上一页")
+        self.next_btn = QPushButton(" 下一页")
         self.page_label = QLabel()
         self.prev_btn.clicked.connect(self.prev_page)
         self.next_btn.clicked.connect(self.next_page)
@@ -443,11 +483,11 @@ class DatabaseAdminDialog(QDialog):
         row1_layout = QHBoxLayout()
         row1_layout.setSpacing(4)
 
-        self.add_btn = QPushButton("➕ 新增")
-        self.del_btn = QPushButton("➖ 删除")
-        self.edit_btn = QPushButton("✏️ 编辑")
-        self.save_btn = QPushButton("💾 保存修改")
-        self.refresh_btn = QPushButton("🔄 刷新")
+        self.add_btn = QPushButton(" 新增")
+        self.del_btn = QPushButton(" 删除")
+        self.edit_btn = QPushButton(" 编辑")
+        self.save_btn = QPushButton(" 保存修改")
+        self.refresh_btn = QPushButton(" 刷新")
 
         for btn in [self.add_btn, self.del_btn, self.edit_btn, self.save_btn, self.refresh_btn]:
             btn.setStyleSheet(button_style)
@@ -460,11 +500,11 @@ class DatabaseAdminDialog(QDialog):
         # row2_layout = QHBoxLayout()
         # row2_layout.setSpacing(4)
 
-        self.import_btn = QPushButton("📥 导入CSV")
-        self.export_btn = QPushButton("📤 导出CSV")
-        self.batch_btn = QPushButton("🔧 批量修改")
-        self.perm_btn = QPushButton("🔐 字段权限管理")
-        self.log_btn = QPushButton("📋 查看权限变更日志")
+        self.import_btn = QPushButton(" 导入CSV")
+        self.export_btn = QPushButton(" 导出CSV")
+        self.batch_btn = QPushButton(" 批量修改")
+        self.perm_btn = QPushButton(" 字段权限管理")
+        self.log_btn = QPushButton(" 查看权限变更日志")
 
         for btn in [self.import_btn, self.export_btn, self.batch_btn, self.perm_btn, self.log_btn]:
             btn.setStyleSheet(button_style)
@@ -477,11 +517,11 @@ class DatabaseAdminDialog(QDialog):
         # row3_layout = QHBoxLayout()
         # row3_layout.setSpacing(4)
 
-        self.upload_btn = QPushButton("☁️ 上传权限到云端")
-        self.download_btn = QPushButton("⬇️ 从云端拉取权限")
-        self.schema_btn = QPushButton("🏗️ 表结构管理")
-        self.stats_btn = QPushButton("📊 数据统计")
-        self.slow_sql_btn = QPushButton("🐌 慢SQL记录")
+        self.upload_btn = QPushButton(" 上传权限到云端")
+        self.download_btn = QPushButton(" 从云端拉取权限")
+        self.schema_btn = QPushButton(" 表结构管理")
+        self.stats_btn = QPushButton(" 数据统计")
+        self.slow_sql_btn = QPushButton(" 慢SQL记录")
 
         for btn in [self.upload_btn, self.download_btn, self.schema_btn, self.stats_btn, self.slow_sql_btn]:
             btn.setStyleSheet(button_style)
@@ -568,7 +608,7 @@ class DatabaseAdminDialog(QDialog):
         # 按钮布局
         button_layout = QHBoxLayout()
 
-        self.save_desc_btn = QPushButton("💾 保存描述")
+        self.save_desc_btn = QPushButton(" 保存描述")
         self.save_desc_btn.clicked.connect(self._save_table_description)
         self.save_desc_btn.setStyleSheet("""
             QPushButton {
@@ -584,7 +624,7 @@ class DatabaseAdminDialog(QDialog):
             }
         """)
 
-        self.clear_desc_btn = QPushButton("🗑️ 清空")
+        self.clear_desc_btn = QPushButton(" 清空")
         self.clear_desc_btn.clicked.connect(self._clear_table_description)
         self.clear_desc_btn.setStyleSheet("""
             QPushButton {
@@ -660,22 +700,22 @@ class DatabaseAdminDialog(QDialog):
 
         if desc_info['description']:
             # 如果有描述，显示描述信息
-            info_text = f"📋 表: {table_name}\n"
+            info_text = f" 表: {table_name}\n"
 
             # 添加标签信息
             if desc_info['tags']:
                 tags = desc_info['tags'].split(',')
                 tag_text = ' '.join([f"#{tag.strip()}" for tag in tags if tag.strip()])
-                info_text += f"🏷️ 标签: {tag_text}\n"
+                info_text += f" 标签: {tag_text}\n"
 
             # 添加描述
-            info_text += f"📝 描述: {desc_info['description']}"
+            info_text += f" 描述: {desc_info['description']}"
 
             self.dynamic_table_info.setText(info_text)
             self.dynamic_table_info.setVisible(True)
         else:
             # 如果没有描述，显示默认提示
-            default_info = f"📋 表: {table_name}\n💡 暂无描述信息，您可以在左侧面板添加表描述来帮助其他用户理解此表的用途。"
+            default_info = f" 表: {table_name}\n 暂无描述信息，您可以在左侧面板添加表描述来帮助其他用户理解此表的用途。"
             self.dynamic_table_info.setText(default_info)
             self.dynamic_table_info.setVisible(True)
 
@@ -1646,10 +1686,21 @@ class DatabaseAdminDialog(QDialog):
         # 显示扫描结果
         sqlite_count = len(databases['sqlite'])
         duckdb_count = len(databases['duckdb'])
-        QMessageBox.information(self, "扫描完成",
-                                f"在db目录中找到:\n"
-                                f"SQLite文件: {sqlite_count} 个\n"
-                                f"DuckDB文件: {duckdb_count} 个")
+
+        # 统计不同目录下的数据库文件
+        all_dirs = set()
+        for db_list in databases.values():
+            for db_info in db_list:
+                all_dirs.add(db_info.get('directory', 'db'))
+
+        dirs_info = f"扫描目录: {', '.join(sorted(all_dirs))}" if len(all_dirs) > 1 else f"扫描目录: {list(all_dirs)[0]}"
+
+        QMessageBox.information(self, "递归扫描完成",
+                                f"在db目录中递归扫描完成 (最大深度5层):\n\n"
+                                f"SQLite数据库: {sqlite_count} 个\n"
+                                f"DuckDB数据库: {duckdb_count} 个\n"
+                                f"总计: {sqlite_count + duckdb_count} 个数据库文件\n\n"
+                                f"{dirs_info}")
 
     def _on_scan_error(self, error_msg):
         """扫描错误回调"""
@@ -1699,7 +1750,7 @@ class DatabaseAdminDialog(QDialog):
             return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
 
     def update_database_file_list(self):
-        """更新数据库文件列表"""
+        """更新数据库文件列表 - 支持显示完整目录结构"""
         if not hasattr(self, 'db_file_combo'):
             return
 
@@ -1708,9 +1759,42 @@ class DatabaseAdminDialog(QDialog):
         # 根据当前选择的数据库类型显示文件
         db_type = self.current_db_type
         if db_type in self.available_databases:
+            # 按目录分组显示数据库文件
+            databases_by_dir = {}
             for db_info in self.available_databases[db_type]:
-                display_text = f"{db_info['name']} ({db_info['size']}) - {os.path.dirname(db_info['path'])}"
-                self.db_file_combo.addItem(display_text, db_info['path'])
+                directory = db_info.get('directory', 'db')
+                if directory not in databases_by_dir:
+                    databases_by_dir[directory] = []
+                databases_by_dir[directory].append(db_info)
+
+            # 按目录名排序，优先显示根目录
+            sorted_dirs = sorted(databases_by_dir.keys(), key=lambda x: (x != 'db', x))
+
+            for directory in sorted_dirs:
+                # 添加目录分隔符（仅当有多个目录时）
+                if len(databases_by_dir) > 1:
+                    separator_text = f"--- {directory} ---"
+                    self.db_file_combo.addItem(separator_text, None)
+                    # 设置分隔符样式（如果支持）
+                    index = self.db_file_combo.count() - 1
+                    try:
+                        item = self.db_file_combo.model().item(index)
+                        if item:
+                            item.setEnabled(False)  # 禁用分隔符项
+                    except:
+                        pass
+
+                # 添加该目录下的数据库文件
+                for db_info in sorted(databases_by_dir[directory], key=lambda x: x['name']):
+                    relative_path = db_info.get('relative_path', db_info['path'])
+                    if len(databases_by_dir) > 1:
+                        # 多目录时显示相对路径
+                        display_text = f"  {db_info['name']} ({db_info['size']}) - {relative_path}"
+                    else:
+                        # 单目录时显示简化格式
+                        display_text = f"{db_info['name']} ({db_info['size']}) - {relative_path}"
+
+                    self.db_file_combo.addItem(display_text, db_info['path'])
 
         # 应用当前的筛选条件
         if hasattr(self, 'filter_edit') and self.filter_edit.text():
@@ -1821,12 +1905,12 @@ class DatabaseAdminDialog(QDialog):
                 if current_strategy == QSqlTableModel.OnManualSubmit:
                     # 当前是手动提交模式，切换到自动提交
                     self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
-                    self.edit_btn.setText("🔒 锁定编辑")
+                    self.edit_btn.setText(" 锁定编辑")
                     QMessageBox.information(self, "编辑模式", "已启用自动编辑模式")
                 else:
                     # 当前是自动提交模式，切换到手动提交
                     self.model.setEditStrategy(QSqlTableModel.OnManualSubmit)
-                    self.edit_btn.setText("✏️ 编辑")
+                    self.edit_btn.setText(" 编辑")
                     QMessageBox.information(self, "编辑模式", "已切换到手动提交模式")
             else:
                 QMessageBox.warning(self, "警告", "请先选择一个表")
@@ -2055,10 +2139,10 @@ class DatabaseAdminDialog(QDialog):
             if hasattr(self, 'connection_name') and QSqlDatabase.contains(self.connection_name):
                 QSqlDatabase.removeDatabase(self.connection_name)
 
-            print(f"数据库连接 {getattr(self, 'connection_name', 'unknown')} 已正确清理")
+            logger.info(f"数据库连接 {getattr(self, 'connection_name', 'unknown')} 已正确清理")
 
         except Exception as e:
-            print(f"关闭数据库连接时出错: {e}")
+            logger.error(f"关闭数据库连接时出错: {e}")
 
         # 调用父类的关闭事件
         super().closeEvent(event)

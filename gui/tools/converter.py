@@ -1,10 +1,10 @@
+from loguru import logger
 """
 单位转换器工具
 
 提供各种单位之间的转换功能。
 """
 
-import logging
 from typing import Optional, Dict, Callable, Union
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QComboBox,
@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class Converter(QDialog):

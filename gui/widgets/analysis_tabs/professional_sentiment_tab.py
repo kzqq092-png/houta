@@ -1,4 +1,3 @@
-from core.services.unified_data_accessor import get_stock_data, get_stock_info, calculate_historical_average
 # -*- coding: utf-8 -*-
 """
 专业情绪分析标签页 - 合并增强版本
@@ -17,8 +16,9 @@ import os
 import traceback
 
 from .base_tab import BaseAnalysisTab
-from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
+from loguru import logger
+from core.services.unified_data_accessor import get_stock_data, get_stock_info, calculate_historical_average
 
 # 导入情绪数据服务和插件
 try:
@@ -26,9 +26,9 @@ try:
     from plugins.sentiment_data_sources import AVAILABLE_PLUGINS
     from plugins.sentiment_data_source_interface import SentimentResponse, SentimentData
     SENTIMENT_SERVICE_AVAILABLE = True
-    print("✅ 情绪数据服务可用")
+    logger.info(" 情绪数据服务可用")
 except ImportError as e:
-    print(f"⚠️ 情绪数据服务导入失败: {e}")
+    logger.error(f" 情绪数据服务导入失败: {e}")
     SENTIMENT_SERVICE_AVAILABLE = False
 
 
@@ -59,7 +59,7 @@ class AsyncPluginLoader(QThread):
                     records = self.db_service.get_all_plugins(force_refresh=True) or []
                     self.loading_progress.emit(30, f"从数据库获取到 {len(records)} 个插件记录")
             except Exception as e:
-                print(f"⚠️ 读取数据库插件列表失败: {e}")
+                logger.error(f" 读取数据库插件列表失败: {e}")
                 records = []
 
             # 筛选启用的情绪插件
@@ -101,7 +101,7 @@ class AsyncPluginLoader(QThread):
                         self.loading_progress.emit(progress, f"已加载插件: {plugin_info['display_name']}")
 
                 except Exception as e:
-                    print(f"⚠️ 加载插件失败 {rec.get('name', '')}: {e}")
+                    logger.error(f" 加载插件失败 {rec.get('name', '')}: {e}")
                     continue
 
             self.loading_progress.emit(100, f"插件加载完成，共加载 {len(loaded_plugins)} 个插件")
@@ -109,7 +109,7 @@ class AsyncPluginLoader(QThread):
 
         except Exception as e:
             error_msg = f"插件加载失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            logger.error(f" {error_msg}")
             self.loading_error.emit(error_msg)
         finally:
             self.is_running = False
@@ -181,7 +181,7 @@ class AsyncPluginLoader(QThread):
                     version = plugin_info.version
                     author = plugin_info.author
                 except Exception as e:
-                    print(f"⚠️ 获取插件信息失败 {rec_name}: {e}")
+                    logger.error(f" 获取插件信息失败 {rec_name}: {e}")
                     meta = instance.metadata if hasattr(instance, 'metadata') else {}
                     display_name = (meta.get('name') if isinstance(meta, dict) else None) or rec.get('display_name') or rec_name
             else:
@@ -200,7 +200,7 @@ class AsyncPluginLoader(QThread):
                     }
                     self.db_service.register_plugin_from_metadata(rec_name, payload)
                 except Exception as e:
-                    print(f"⚠️ 同步显示名失败 {rec_name}: {e}")
+                    logger.error(f" 同步显示名失败 {rec_name}: {e}")
 
             return {
                 'instance': instance,
@@ -211,7 +211,7 @@ class AsyncPluginLoader(QThread):
             }
 
         except Exception as e:
-            print(f"⚠️ 加载插件失败 {rec_name}: {e}")
+            logger.error(f" 加载插件失败 {rec_name}: {e}")
             return None
 
     def stop(self):
@@ -239,8 +239,7 @@ class SentimentAnalysisThread(QThread):
         self.is_running = False
 
         # 初始化日志管理器
-        from core.logger import LogManager
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
     def run(self):
         """执行异步情绪分析"""
@@ -260,7 +259,7 @@ class SentimentAnalysisThread(QThread):
                 return
 
             self.progress_updated.emit(20, f"开始分析 {len(self.selected_plugins)} 个插件...")
-            print(f"🚀 [SentimentAnalysisThread] 开始情绪分析，使用插件: {self.selected_plugins}")
+            logger.info(f" [SentimentAnalysisThread] 开始情绪分析，使用插件: {self.selected_plugins}")
 
             # 步骤1: 数据获取 (30%)
             self.progress_updated.emit(30, "获取情绪数据...")
@@ -284,7 +283,7 @@ class SentimentAnalysisThread(QThread):
             sentiment_results = self._process_sentiment_response(response)
 
             if not sentiment_results:
-                self.log_manager.warning("未能获取任何情绪数据，请检查插件配置和网络连接")
+                logger.warning("未能获取任何情绪数据，请检查插件配置和网络连接")
                 return
 
             results['sentiment_results'] = sentiment_results
@@ -302,13 +301,13 @@ class SentimentAnalysisThread(QThread):
 
             # 完成
             self.progress_updated.emit(100, "情绪分析完成")
-            print(f"✅ [SentimentAnalysisThread] 情绪分析完成，生成 {len(sentiment_results)} 个指标")
+            logger.info(f" [SentimentAnalysisThread] 情绪分析完成，生成 {len(sentiment_results)} 个指标")
 
             self.analysis_completed.emit(results)
 
         except Exception as e:
             error_msg = f"情绪分析失败: {str(e)}"
-            print(f"❌ [SentimentAnalysisThread] {error_msg}")
+            logger.error(f" [SentimentAnalysisThread] {error_msg}")
             traceback.print_exc()
             self.error_occurred.emit(error_msg)
         finally:
@@ -336,7 +335,7 @@ class SentimentAnalysisThread(QThread):
                 })
         else:
             error_msg = response.error_message if response else "未知错误"
-            print(f"⚠️ [SentimentAnalysisThread] 情绪数据服务响应失败: {error_msg}")
+            logger.error(f" [SentimentAnalysisThread] 情绪数据服务响应失败: {error_msg}")
 
         return sentiment_results
 
@@ -406,7 +405,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def __init__(self, config_manager: Optional[ConfigManager] = None):
         super().__init__(config_manager)
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         if not SENTIMENT_SERVICE_AVAILABLE:
             raise RuntimeError("情绪数据服务未能加载，无法启动情绪分析标签页。请检查相关依赖。")
@@ -453,7 +452,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         except Exception:
             self.db_service = None
 
-        print("✅ 专业情绪分析标签页初始化完成")
+        logger.info(" 专业情绪分析标签页初始化完成")
 
     def _initialize_sentiment_service(self):
         """初始化情绪数据服务"""
@@ -463,15 +462,15 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 if hasattr(self, 'coordinator') and hasattr(self.coordinator, 'service_container'):
                     try:
                         self.sentiment_service = self.coordinator.service_container.resolve(SentimentDataService)
-                        print("✅ 从服务容器获取情绪数据服务")
+                        logger.info(" 从服务容器获取情绪数据服务")
                     except:
                         # 如果服务容器中没有，创建新实例
                         self.sentiment_service = SentimentDataService()
-                        print("✅ 创建新的情绪数据服务实例")
+                        logger.info(" 创建新的情绪数据服务实例")
                 else:
                     # 直接创建
                     self.sentiment_service = SentimentDataService()
-                    print("✅ 直接创建情绪数据服务")
+                    logger.info(" 直接创建情绪数据服务")
 
                 # 初始化服务
                 if self.sentiment_service:
@@ -484,7 +483,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 raise RuntimeError("情绪数据服务不可用，无法启动情绪分析功能。请检查相关依赖。")
 
         except Exception as e:
-            print(f"❌ 初始化情绪数据服务失败: {e}")
+            logger.error(f" 初始化情绪数据服务失败: {e}")
             self.sentiment_service = None
             raise
 
@@ -509,7 +508,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         # 延迟加载插件，避免阻塞UI创建
         QTimer.singleShot(100, self.load_available_plugins_async)
 
-        print("✅ UI创建完成，所有组件已设置为可见")
+        logger.info(" UI创建完成，所有组件已设置为可见")
 
     def create_analysis_ui(self, layout):
         """创建实时情绪分析UI"""
@@ -536,7 +535,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def create_report_ui(self, layout):
         """创建情绪报告的UI界面"""
         # 报告配置组
-        config_group = QGroupBox("📋 报告配置")
+        config_group = QGroupBox(" 报告配置")
         config_layout = QGridLayout(config_group)
 
         # 报告类型
@@ -565,10 +564,10 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(config_group)
 
         # 报告控制组
-        control_group = QGroupBox("🎮 报告控制")
+        control_group = QGroupBox(" 报告控制")
         control_layout = QHBoxLayout(control_group)
 
-        self.generate_report_btn = QPushButton("📊 生成报告")
+        self.generate_report_btn = QPushButton(" 生成报告")
         self.generate_report_btn.clicked.connect(self.generate_sentiment_report)
         control_layout.addWidget(self.generate_report_btn)
 
@@ -576,7 +575,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.schedule_report_btn.clicked.connect(self.schedule_sentiment_report)
         control_layout.addWidget(self.schedule_report_btn)
 
-        self.export_report_btn = QPushButton("💾 导出报告")
+        self.export_report_btn = QPushButton(" 导出报告")
         self.export_report_btn.clicked.connect(self.export_sentiment_report)
         control_layout.addWidget(self.export_report_btn)
 
@@ -584,7 +583,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(control_group)
 
         # 报告预览区域
-        preview_group = QGroupBox("📖 报告预览")
+        preview_group = QGroupBox(" 报告预览")
         preview_layout = QVBoxLayout(preview_group)
 
         self.report_preview = QTextEdit()
@@ -595,7 +594,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addWidget(preview_group)
 
         # 历史报告列表
-        history_group = QGroupBox("📚 历史报告")
+        history_group = QGroupBox(" 历史报告")
         history_layout = QVBoxLayout(history_group)
 
         self.report_history_table = QTableWidget()
@@ -611,7 +610,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_plugins_section(self):
         """创建插件选择区域"""
-        plugins_group = QGroupBox("📊 情绪数据源插件")
+        plugins_group = QGroupBox(" 情绪数据源插件")
         layout = QVBoxLayout(plugins_group)
 
         # 插件选择说明
@@ -640,7 +639,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.deselect_all_btn.clicked.connect(self.deselect_all_plugins)
         button_layout.addWidget(self.deselect_all_btn)
 
-        self.refresh_plugins_btn = QPushButton("🔄 刷新插件")
+        self.refresh_plugins_btn = QPushButton(" 刷新插件")
         self.refresh_plugins_btn.clicked.connect(self.load_available_plugins_async)
         button_layout.addWidget(self.refresh_plugins_btn)
 
@@ -651,7 +650,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_params_section(self):
         """创建参数配置区域"""
-        params_group = QGroupBox("⚙️ 分析参数")
+        params_group = QGroupBox(" 分析参数")
         layout = QGridLayout(params_group)
 
         # 数据源权重
@@ -684,14 +683,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_control_section(self):
         """创建分析控制区域"""
-        control_group = QGroupBox("🎮 分析控制")
+        control_group = QGroupBox(" 分析控制")
         main_layout = QVBoxLayout(control_group)
 
         # 按钮和控制区域
         buttons_layout = QHBoxLayout()
 
         # 开始分析按钮
-        self.analyze_btn = QPushButton("🚀 开始分析")
+        self.analyze_btn = QPushButton(" 开始分析")
         self.analyze_btn.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
@@ -712,13 +711,13 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         buttons_layout.addWidget(self.analyze_btn)
 
         # 停止分析按钮
-        self.stop_btn = QPushButton("⏹️ 停止分析")
+        self.stop_btn = QPushButton(" 停止分析")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop_analysis)
         buttons_layout.addWidget(self.stop_btn)
 
         # 自动刷新开关
-        self.auto_refresh_cb = QCheckBox("🔄 自动刷新")
+        self.auto_refresh_cb = QCheckBox(" 自动刷新")
         self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
         buttons_layout.addWidget(self.auto_refresh_cb)
 
@@ -732,12 +731,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         buttons_layout.addStretch()
 
         # 保存结果按钮
-        self.save_btn = QPushButton("💾 保存结果")
+        self.save_btn = QPushButton(" 保存结果")
         self.save_btn.clicked.connect(self.save_results)
         buttons_layout.addWidget(self.save_btn)
 
         # 清空结果按钮
-        self.clear_btn = QPushButton("🗑️ 清空结果")
+        self.clear_btn = QPushButton(" 清空结果")
         self.clear_btn.clicked.connect(self.clear_results)
         buttons_layout.addWidget(self.clear_btn)
 
@@ -777,7 +776,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_status_section(self):
         """创建状态显示区域"""
-        status_group = QGroupBox("📡 服务状态")
+        status_group = QGroupBox(" 服务状态")
         layout = QHBoxLayout(status_group)
 
         # 服务状态
@@ -795,7 +794,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         layout.addStretch()
 
         # 状态刷新按钮
-        refresh_status_btn = QPushButton("🔄 刷新状态")
+        refresh_status_btn = QPushButton(" 刷新状态")
         refresh_status_btn.clicked.connect(self.refresh_status)
         layout.addWidget(refresh_status_btn)
 
@@ -803,14 +802,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
     def create_results_section(self):
         """创建结果显示区域"""
-        results_group = QGroupBox("📊 分析结果")
+        results_group = QGroupBox(" 分析结果")
         layout = QVBoxLayout(results_group)
 
         # 创建分割器
         splitter = QSplitter(Qt.Vertical)
 
         # 情绪概览
-        overview_group = QGroupBox("📈 情绪概览")
+        overview_group = QGroupBox(" 情绪概览")
         overview_layout = QVBoxLayout(overview_group)
 
         # 主要指数区域
@@ -885,7 +884,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         splitter.addWidget(overview_group)
 
         # 详细结果表格
-        details_group = QGroupBox("📋 详细分析结果")
+        details_group = QGroupBox(" 详细分析结果")
         details_layout = QVBoxLayout(details_group)
 
         self.sentiment_table = QTableWidget()
@@ -950,7 +949,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def load_available_plugins_async(self):
         """异步加载可用的情绪数据源插件"""
         try:
-            print("🔄 开始异步加载情绪数据源插件...")
+            logger.info(" 开始异步加载情绪数据源插件...")
             self.plugin_loader = AsyncPluginLoader(self.db_service)
             self.plugin_loader.plugin_loaded.connect(self.on_plugin_loaded)
             self.plugin_loader.loading_progress.connect(self.update_loading_progress)
@@ -958,33 +957,33 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.plugin_loader.loading_error.connect(self.on_loading_error)
             self.plugin_loader.start()
         except Exception as e:
-            print(f"❌ 异步加载情绪数据源插件失败: {e}")
+            logger.error(f" 异步加载情绪数据源插件失败: {e}")
 
     def on_plugin_loaded(self, plugin_name, plugin_info):
         """处理单个插件加载完成信号"""
-        print(f"✅ 插件 {plugin_name} 加载完成")
+        logger.info(f" 插件 {plugin_name} 加载完成")
         self.available_plugins[plugin_name] = plugin_info
         self.update_plugins_ui()
 
     def update_loading_progress(self, progress, message):
         """更新加载进度"""
-        print(f"🔄 加载进度: {progress}% - {message}")
+        logger.info(f" 加载进度: {progress}% - {message}")
 
     def on_plugins_loaded(self, plugins):
         """处理所有插件加载完成信号"""
-        print(f"✅ 已从数据库加载情绪插件: {len(plugins)} 个")
+        logger.info(f" 已从数据库加载情绪插件: {len(plugins)} 个")
         self.available_plugins.update(plugins)
         self.update_plugins_ui()
 
     def on_loading_error(self, error_message):
         """处理加载错误信号"""
-        print(f"❌ 加载情绪数据源插件失败: {error_message}")
+        logger.error(f" 加载情绪数据源插件失败: {error_message}")
 
     def update_plugins_ui(self):
         """更新插件UI显示 - 优化版本，避免阻塞主线程"""
         try:
             if not hasattr(self, 'plugins_layout') or self.plugins_layout is None:
-                print("⚠️ plugins_layout未初始化，无法更新插件UI")
+                logger.error(" plugins_layout未初始化，无法更新插件UI")
                 return
 
             # 清空现有插件选择
@@ -995,7 +994,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             if not self.available_plugins:
                 error_msg = "没有检测到任何情绪数据源插件（请在插件管理器中启用后重试）"
-                print(f"❌ {error_msg}")
+                logger.error(f" {error_msg}")
                 if hasattr(self, 'status_label') and self.status_label:
                     self.status_label.setText(error_msg)
                 return
@@ -1010,7 +1009,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     author = plugin_info.get('author', '')
 
                     # 创建复选框
-                    checkbox = QCheckBox(f"📊 {display_name}")
+                    checkbox = QCheckBox(f" {display_name}")
                     checkbox.setToolTip(f"{description}\n版本: {version}\n作者: {author}")
                     checkbox.setChecked(True)
                     checkbox.stateChanged.connect(self._on_plugin_selected_changed)
@@ -1025,7 +1024,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                         row += 1
 
                 except Exception as e:
-                    print(f"⚠️ 创建插件UI失败 {plugin_name}: {e}")
+                    logger.error(f" 创建插件UI失败 {plugin_name}: {e}")
 
             # 自动选择插件
             if self.available_plugins and not self.get_selected_plugins():
@@ -1035,11 +1034,11 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
                 auto_selected = self.get_selected_plugins()
                 if auto_selected:
-                    print(f"🔄 自动选择了 {len(auto_selected)} 个插件: {', '.join(auto_selected)}")
+                    logger.info(f" 自动选择了 {len(auto_selected)} 个插件: {', '.join(auto_selected)}")
                     self.update_status_label(f"自动选择了 {len(auto_selected)} 个插件")
 
         except Exception as e:
-            print(f"❌ 更新插件UI失败: {e}")
+            logger.error(f" 更新插件UI失败: {e}")
 
     def select_all_plugins(self):
         """全选插件"""
@@ -1081,21 +1080,21 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             if hasattr(self, 'analyze_btn'):
                 self.analyze_btn.setEnabled(len(selected_plugins) > 0)
 
-            print(f"🔄 插件选择状态已更新: {len(selected_plugins)} 个插件选中")
+            logger.info(f" 插件选择状态已更新: {len(selected_plugins)} 个插件选中")
 
         except Exception as e:
-            print(f"⚠️ 处理插件选择状态改变失败: {e}")
+            logger.error(f" 处理插件选择状态改变失败: {e}")
             # 不要在这里显示阻塞性的消息框，只记录错误
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"插件选择状态改变处理失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f"插件选择状态改变处理失败: {e}")
 
     def analyze_sentiment(self):
         """执行情绪分析 - 异步版本"""
         try:
             # 检查是否已有线程在运行
             if self.analysis_thread and self.analysis_thread.isRunning():
-                self.update_status_label("⚠️ 分析正在进行中，请等待完成")
-                print("⚠️ 分析正在进行中，请等待完成")
+                self.update_status_label(" 分析正在进行中，请等待完成")
+                logger.info(" 分析正在进行中，请等待完成")
                 return
 
             # 获取选中的插件
@@ -1103,23 +1102,23 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             if not selected_plugins:
                 # 使用非阻塞的状态提示替换阻塞性弹框
-                self.update_status_label("⚠️ 请至少选择一个情绪数据源插件")
-                print("⚠️ 请至少选择一个情绪数据源插件")
+                self.update_status_label(" 请至少选择一个情绪数据源插件")
+                logger.info(" 请至少选择一个情绪数据源插件")
 
                 # 尝试自动加载可用插件
                 if not self.available_plugins:
-                    self.update_status_label("🔄 尝试自动加载情绪插件...")
+                    self.update_status_label(" 尝试自动加载情绪插件...")
                     self.load_available_plugins_async()
                     return
 
                 self.reset_ui_state()
                 return
 
-            print(f"🚀 开始情绪分析，使用插件: {selected_plugins}")
+            logger.info(f" 开始情绪分析，使用插件: {selected_plugins}")
 
             # 更新UI状态
             self.analyze_btn.setEnabled(False)
-            self.analyze_btn.setText("🔄 分析中...")
+            self.analyze_btn.setText(" 分析中...")
             self.stop_btn.setEnabled(True)
             if self.progress_bar:
                 self.progress_bar.setVisible(True)
@@ -1151,17 +1150,17 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.analysis_thread.start()
 
         except Exception as e:
-            print(f"❌ 情绪分析启动失败: {e}")
+            logger.error(f" 情绪分析启动失败: {e}")
             traceback.print_exc()
             # 使用非阻塞错误提示替换阻塞式弹框
-            self.update_status_label(f"❌ 启动分析失败: {str(e)}")
+            self.update_status_label(f" 启动分析失败: {str(e)}")
             self.error_occurred.emit(f"启动分析失败: {str(e)}")
             self.reset_ui_state()
 
     def reset_ui_state(self):
         """重置UI状态"""
         self.analyze_btn.setEnabled(True)
-        self.analyze_btn.setText("🚀 开始分析")
+        self.analyze_btn.setText(" 开始分析")
         self.stop_btn.setEnabled(False)
         if self.progress_bar:
             self.progress_bar.setVisible(False)
@@ -1175,18 +1174,18 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.progress_bar.setValue(value)
         if self.status_label:
             self.status_label.setText(message)
-        print(f"🔄 进度: {value}% - {message}")
+        logger.info(f" 进度: {value}% - {message}")
 
     def update_status_label(self, message: str):
         """更新状态标签"""
         if self.status_label:
             self.status_label.setText(message)
-        print(f"📡 状态: {message}")
+        logger.info(f" 状态: {message}")
 
     def on_analysis_completed(self, results: dict):
         """异步分析完成信号处理"""
         try:
-            print(f"✅ [ProfessionalSentimentTab] 情绪分析完成，生成 {len(results['sentiment_results'])} 个指标")
+            logger.info(f" [ProfessionalSentimentTab] 情绪分析完成，生成 {len(results['sentiment_results'])} 个指标")
 
             # 更新数据
             self.sentiment_results = results['sentiment_results']
@@ -1210,18 +1209,18 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 'selected_plugins': self.get_selected_plugins()
             })
 
-            print("✅ 情绪分析UI更新完成")
+            logger.info(" 情绪分析UI更新完成")
 
         except Exception as e:
-            print(f"❌ 处理分析结果失败: {e}")
+            logger.error(f" 处理分析结果失败: {e}")
             traceback.print_exc()
             self.reset_ui_state()
 
     def on_analysis_error(self, error_message: str):
         """异步分析错误信号处理"""
-        print(f"❌ [ProfessionalSentimentTab] 情绪分析失败: {error_message}")
+        logger.error(f" [ProfessionalSentimentTab] 情绪分析失败: {error_message}")
         # 使用非阻塞错误提示替换阻塞式弹框
-        self.update_status_label(f"❌ 分析失败: {error_message}")
+        self.update_status_label(f" 分析失败: {error_message}")
         # 发送错误信号给父组件处理
         if hasattr(self, 'error_occurred'):
             self.error_occurred.emit(f"情绪分析失败: {error_message}")
@@ -1248,19 +1247,19 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     'timestamp': response.update_time.strftime('%Y-%m-%d %H:%M:%S') if response.update_time else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 })
         else:
-            print(f"⚠️ 情绪数据服务响应失败: {response.error_message}")
+            logger.error(f" 情绪数据服务响应失败: {response.error_message}")
 
     def update_sentiment_display(self):
         """更新情绪分析显示 - 优化版本，使用批量更新"""
         try:
-            print(f"🔄 更新情绪显示，数据量: {len(self.sentiment_results)}")
+            logger.info(f" 更新情绪显示，数据量: {len(self.sentiment_results)}")
 
             if not hasattr(self, 'sentiment_table') or self.sentiment_table is None:
-                print("❌ sentiment_table未初始化")
+                logger.error(" sentiment_table未初始化")
                 return
 
             if not self.sentiment_results:
-                print("⚠️ 没有情绪数据可显示")
+                logger.error(" 没有情绪数据可显示")
                 self.sentiment_table.setRowCount(0)
                 return
 
@@ -1269,7 +1268,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             # 批量设置行数
             self.sentiment_table.setRowCount(len(self.sentiment_results))
-            print(f"📊 设置表格行数: {len(self.sentiment_results)}")
+            logger.info(f" 设置表格行数: {len(self.sentiment_results)}")
 
             # 批量创建表格项
             for row, result in enumerate(self.sentiment_results):
@@ -1317,20 +1316,20 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     self._set_row_color(row, signal_strength)
 
                     if row < 3:  # 只打印前3行的调试信息
-                        print(f"  行{row}: {data_source} | {indicator} | {value}")
+                        logger.info(f"  行{row}: {data_source} | {indicator} | {value}")
 
                 except Exception as e:
-                    print(f"❌ 更新表格行{row}失败: {e}")
+                    logger.error(f" 更新表格行{row}失败: {e}")
 
             # 重新启用排序
             self.sentiment_table.setSortingEnabled(True)
 
             # 强制更新表格显示
             self.sentiment_table.update()
-            print("✅ 情绪表格更新完成")
+            logger.info(" 情绪表格更新完成")
 
         except Exception as e:
-            print(f"❌ 更新情绪显示失败: {e}")
+            logger.error(f" 更新情绪显示失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1361,7 +1360,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                             else:
                                 return f"{sentiment_change:+.1f}%"
                 except Exception as e:
-                    print(f"⚠️ 获取真实历史数据失败: {e}")
+                    logger.error(f" 获取真实历史数据失败: {e}")
 
             # 回退到基础计算
             current_value = result.get('value', 50)
@@ -1381,14 +1380,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def calculate_composite_sentiment(self):
         """计算综合情绪指数"""
         try:
-            print(f"🧮 计算综合情绪指数，数据量: {len(self.sentiment_results)}")
+            logger.info(f" 计算综合情绪指数，数据量: {len(self.sentiment_results)}")
 
             if not hasattr(self, 'composite_score_label') or self.composite_score_label is None:
-                print("❌ composite_score_label未初始化")
+                logger.error(" composite_score_label未初始化")
                 return
 
             if not self.sentiment_results:
-                print("⚠️ 没有数据计算综合指数")
+                logger.error(" 没有数据计算综合指数")
                 self.composite_score_label.setText("综合情绪指数: --")
                 return
 
@@ -1406,7 +1405,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             else:
                 composite_score = 50  # 默认中性
 
-            print(f"📊 计算出综合情绪指数: {composite_score:.2f}")
+            logger.info(f" 计算出综合情绪指数: {composite_score:.2f}")
 
             # 更新显示
             self.composite_score_label.setText(f"综合情绪指数: {composite_score:.2f}")
@@ -1451,10 +1450,10 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 更新其他专业指数
             self._update_professional_indices()
 
-            print("✅ 综合情绪指数更新完成")
+            logger.info(" 综合情绪指数更新完成")
 
         except Exception as e:
-            print(f"❌ 计算综合情绪指数失败: {e}")
+            logger.error(f" 计算综合情绪指数失败: {e}")
 
     def _calculate_signal_strength(self, result):
         """计算信号强度"""
@@ -1466,13 +1465,13 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             strength = (abs(value - 50) / 50) * confidence
 
             if strength > 0.8:
-                return "🔴 强"
+                return " 强"
             elif strength > 0.5:
-                return "🟡 中"
+                return " 中"
             else:
-                return "🟢 弱"
+                return " 弱"
         except:
-            return "🔵 未知"
+            return " 未知"
 
     def _determine_trend_direction(self, result):
         """确定趋势方向"""
@@ -1482,19 +1481,19 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             if isinstance(signal, str):
                 if 'bullish' in signal.lower() or 'buy' in signal.lower():
-                    return "📈 看涨"
+                    return " 看涨"
                 elif 'bearish' in signal.lower() or 'sell' in signal.lower():
-                    return "📉 看跌"
+                    return " 看跌"
 
             # 基于数值判断
             if value > 60:
-                return "📈 看涨"
+                return " 看涨"
             elif value < 40:
-                return "📉 看跌"
+                return " 看跌"
             else:
-                return "➡️ 中性"
+                return " 中性"
         except:
-            return "❓ 未知"
+            return " 未知"
 
     def _calculate_impact_weight(self, data_source, indicator):
         """计算影响权重"""
@@ -1534,7 +1533,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 if item:
                     item.setBackground(color)
         except Exception as e:
-            print(f"设置行颜色失败: {e}")
+            logger.error(f"设置行颜色失败: {e}")
 
     def _update_professional_indices(self):
         """更新专业指数显示 - 使用真实数据"""
@@ -1569,7 +1568,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 self.last_update_label.setText(f"更新时间: {datetime.now().strftime('%H:%M:%S')}")
 
         except Exception as e:
-            print(f"更新专业指数失败: {e}")
+            logger.error(f"更新专业指数失败: {e}")
 
     def _calculate_real_fear_greed_index(self):
         """计算真实的恐惧&贪婪指数"""
@@ -1608,7 +1607,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                                 elif latest_rsi < 30:  # 超卖，增加恐惧
                                     fear_greed = max(0, fear_greed - (30 - latest_rsi) * 0.5)
                 except Exception as e:
-                    print(f"⚠️ 使用hikyuu修正恐惧贪婪指数失败: {e}")
+                    logger.error(f" 使用hikyuu修正恐惧贪婪指数失败: {e}")
 
             if fear_greed < 25:
                 return f"{fear_greed:.0f} (极度恐惧)"
@@ -1647,7 +1646,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                                 volatility_pct = (latest_atr / latest_close * 100) if latest_close > 0 else 0
                                 return f"{volatility_pct:.1f}"
                 except Exception as e:
-                    print(f"⚠️ 使用hikyuu计算波动率失败: {e}")
+                    logger.error(f" 使用hikyuu计算波动率失败: {e}")
 
             # 基于情绪数据的标准差估算
             values = [r.get('value', 50) for r in self.sentiment_results]
@@ -1695,7 +1694,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                                 mfi = 100 - (100 / (1 + money_ratio))
                                 return f"{mfi:.1f}"
                 except Exception as e:
-                    print(f"⚠️ 使用hikyuu计算资金流失败: {e}")
+                    logger.error(f" 使用hikyuu计算资金流失败: {e}")
 
             # 基于情绪数据的置信度计算
             confidence_sum = sum(r.get('confidence', 0.5) for r in self.sentiment_results)
@@ -1725,7 +1724,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             # 使用hikyuu技术指标计算技术面情绪
             if hasattr(self, 'stock_code') and self.stock_code:
                 try:
-                    # # import hikyuu as hk  # 已替换为统一数据访问器  # 已替换为统一数据访问器
+                    import hikyuu as hk  # 已替换为统一数据访问器
                     stock = hk.get_stock(self.stock_code)
                     if not stock.is_null():
                         kdata = stock.get_kdata(hk.Query(-50))
@@ -1771,7 +1770,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                             return f"{technical_score:.1f}"
 
                 except Exception as e:
-                    print(f"⚠️ 使用hikyuu计算技术面情绪失败: {e}")
+                    logger.error(f" 使用hikyuu计算技术面情绪失败: {e}")
 
             # 基于非新闻类数据源计算技术面情绪
             tech_data = [r for r in self.sentiment_results if 'news' not in r.get('data_source', '').lower()]
@@ -1816,7 +1815,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                                 return f"{min(100, strength):.1f}"
 
                 except Exception as e:
-                    print(f"⚠️ 使用hikyuu计算市场强度失败: {e}")
+                    logger.error(f" 使用hikyuu计算市场强度失败: {e}")
 
             # 基于情绪数据的综合强度
             strengths = []
@@ -1903,12 +1902,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                                 })
                             data['historical_trend'] = historical_trend
                 except Exception as e:
-                    print(f"⚠️ 获取真实历史趋势数据失败: {e}")
+                    logger.error(f" 获取真实历史趋势数据失败: {e}")
 
             return data
 
         except Exception as e:
-            self.log_manager.error(f"收集情绪数据失败: {str(e)}")
+            logger.error(f"收集情绪数据失败: {str(e)}")
             return {}
 
     def update_status_display(self):
@@ -1935,7 +1934,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.last_update_label.setText(f"最后更新: {current_time}")
 
         except Exception as e:
-            print(f"❌ 更新状态显示失败: {e}")
+            logger.error(f" 更新状态显示失败: {e}")
 
     def refresh_status(self):
         """刷新状态"""
@@ -1946,15 +1945,15 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         if enabled:
             interval_ms = self.refresh_interval_spin.value() * 60 * 1000
             self.auto_refresh_timer.start(interval_ms)
-            print(f"✅ 启动自动刷新，间隔 {self.refresh_interval_spin.value()} 分钟")
+            logger.info(f" 启动自动刷新，间隔 {self.refresh_interval_spin.value()} 分钟")
         else:
             self.auto_refresh_timer.stop()
-            print("⏹️ 停止自动刷新")
+            logger.info(" 停止自动刷新")
 
     def auto_refresh_data(self):
         """自动刷新数据"""
         if self.get_selected_plugins():
-            print("⏰ 自动刷新情绪数据...")
+            logger.info("⏰ 自动刷新情绪数据...")
             self.analyze_sentiment()
 
     def stop_analysis(self):
@@ -1962,7 +1961,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         try:
             # 停止异步分析线程
             if self.analysis_thread and self.analysis_thread.isRunning():
-                print("⏹️ 正在停止异步分析线程...")
+                logger.info(" 正在停止异步分析线程...")
                 self.analysis_thread.stop()
                 # 使用非阻塞方式等待线程结束
                 QTimer.singleShot(100, self._check_thread_stopped)
@@ -1971,7 +1970,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
 
             # 停止插件加载线程
             if self.plugin_loader and self.plugin_loader.isRunning():
-                print("⏹️ 正在停止插件加载线程...")
+                logger.info(" 正在停止插件加载线程...")
                 self.plugin_loader.stop()
 
             # 停止自动刷新
@@ -1980,7 +1979,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                 self.auto_refresh_cb.setChecked(False)
 
         except Exception as e:
-            print(f"❌ 停止分析时出错: {e}")
+            logger.error(f" 停止分析时出错: {e}")
             self._finalize_stop()
 
     def _check_thread_stopped(self):
@@ -1994,7 +1993,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
     def _force_stop_thread(self):
         """强制停止线程"""
         if self.analysis_thread and self.analysis_thread.isRunning():
-            print("⚠️ 强制终止分析线程...")
+            logger.info(" 强制终止分析线程...")
             self.analysis_thread.terminate()
             self.analysis_thread.wait(1000)
         self._finalize_stop()
@@ -2005,12 +2004,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         self.reset_ui_state()
         if self.status_label:
             self.status_label.setText("分析已停止")
-        print("⏹️ 情绪分析已停止")
+        logger.info(" 情绪分析已停止")
 
     def save_results(self):
         """保存分析结果"""
         if not self.sentiment_results:
-            self.update_status_label("⚠️ 没有可保存的结果")
+            self.update_status_label(" 没有可保存的结果")
             return
 
         file_path, _ = QFileDialog.getSaveFileName(
@@ -2033,12 +2032,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     df = pd.DataFrame(self.sentiment_results)
                     df.to_csv(file_path, index=False, encoding='utf-8')
 
-                self.update_status_label(f"✅ 结果已保存到: {file_path}")
-                print(f"✅ 结果已保存: {file_path}")
+                self.update_status_label(f" 结果已保存到: {file_path}")
+                logger.info(f" 结果已保存: {file_path}")
             except Exception as e:
                 error_msg = f"保存失败: {str(e)}"
-                self.update_status_label(f"❌ {error_msg}")
-                print(f"❌ {error_msg}")
+                self.update_status_label(f" {error_msg}")
+                logger.error(f" {error_msg}")
 
     def clear_results(self):
         """清空分析结果"""
@@ -2051,13 +2050,13 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.total_indicators_label.setText("指标数量: --")
         if hasattr(self, 'data_quality_label'):
             self.data_quality_label.setText("数据质量: --")
-        print("🗑️ 已清空分析结果")
+        logger.info(" 已清空分析结果")
 
     # 报告功能方法
     def generate_sentiment_report(self):
         """生成情绪报告"""
         try:
-            print("📊 开始生成情绪报告...")
+            logger.info(" 开始生成情绪报告...")
 
             # 获取报告参数
             report_type = self.report_type_combo.currentText()
@@ -2091,10 +2090,10 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             })
 
             QMessageBox.information(self, "成功", f"情绪报告生成完成\n类型: {report_type}\n周期: {period}天")
-            print("✅ 情绪报告生成完成")
+            logger.info(" 情绪报告生成完成")
 
         except Exception as e:
-            print(f"❌ 生成报告失败: {e}")
+            logger.error(f" 生成报告失败: {e}")
             QMessageBox.critical(self, "错误", f"生成报告失败: {str(e)}")
 
     def format_sentiment_report(self, data, report_type):
@@ -2115,14 +2114,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
         </head>
         <body>
             <div class="header">
-                <h1>🎯 {report_type}</h1>
+                <h1> {report_type}</h1>
                 <h2>市场情绪分析报告</h2>
                 <p>生成时间: {data.get('collection_time', 'N/A')}</p>
                 <p>数据周期: {data.get('period', 'N/A')} 天</p>
             </div>
             
             <div class="section">
-                <h3>📊 情绪指标概览</h3>
+                <h3> 情绪指标概览</h3>
                 <div class="metric">
                     <strong>综合情绪指数:</strong> 
                     <span class="{'positive' if data.get('composite_index', 50) > 60 else 'negative' if data.get('composite_index', 50) < 40 else 'neutral'}">
@@ -2144,7 +2143,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             </div>
             
             <div class="section">
-                <h3>📈 分类情绪分析</h3>
+                <h3> 分类情绪分析</h3>
                 <div class="metric">
                     <strong>投资者情绪:</strong> {data.get('investor_sentiment', 0):.2f}
                 </div>
@@ -2160,14 +2159,14 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             </div>
             
             <div class="section">
-                <h3>🔍 分析结论</h3>
+                <h3> 分析结论</h3>
                 <p>根据当前数据分析，市场整体情绪呈现<strong>{data.get('sentiment_status', '未知')}</strong>态势。</p>
                 <p>综合情绪指数为<strong>{data.get('composite_index', 0):.2f}</strong>，
                 {'建议保持谨慎乐观态度' if data.get('composite_index', 50) > 60 else '建议控制风险' if data.get('composite_index', 50) < 40 else '建议保持观望'}。</p>
             </div>
             
             <div class="section">
-                <h3>⚠️ 风险提示</h3>
+                <h3> 风险提示</h3>
                 <p>本报告仅供参考，投资有风险，入市需谨慎。请结合其他分析工具和市场信息做出投资决策。</p>
             </div>
         </body>
@@ -2204,7 +2203,7 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     return
 
                 QMessageBox.information(self, "成功", f"报告已导出到:\n{file_path}")
-                print(f"✅ 报告已导出: {file_path}")
+                logger.info(f" 报告已导出: {file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"导出失败: {str(e)}")
 
@@ -2274,22 +2273,22 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             self.setVisible(True)
             self.update()
         except Exception as e:
-            print(f"❌ 确保UI可见性失败: {e}")
+            logger.error(f" 确保UI可见性失败: {e}")
 
     def on_sentiment_data_updated(self, response):
         """情绪数据更新事件处理"""
-        print(f"📊 收到情绪数据更新: {len(response.data) if response.data else 0} 个指标")
+        logger.info(f" 收到情绪数据更新: {len(response.data) if response.data else 0} 个指标")
         self.plugin_data_updated.emit({'response': response})
 
     def on_plugin_error(self, plugin_name: str, error_message: str):
         """插件错误事件处理"""
-        print(f"❌ 插件错误 {plugin_name}: {error_message}")
+        logger.error(f" 插件错误 {plugin_name}: {error_message}")
         QMessageBox.warning(self, "插件错误", f"插件 {plugin_name} 发生错误:\n{error_message}")
 
     def set_stock_data(self, stock_code: str, kdata):
         """设置股票数据"""
         super().set_stock_data(stock_code, kdata)
-        print(f"📈 情绪分析: 接收到股票数据 {stock_code}")
+        logger.info(f" 情绪分析: 接收到股票数据 {stock_code}")
 
         # 当股票数据更新时，可以自动进行情绪分析
         if hasattr(self, 'auto_refresh_cb') and self.auto_refresh_cb.isChecked():
@@ -2321,12 +2320,12 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     if hasattr(self.sentiment_service, 'cleanup'):
                         self.sentiment_service.cleanup()
                 except Exception as e:
-                    print(f"⚠️ 清理情绪数据服务失败: {e}")
+                    logger.error(f" 清理情绪数据服务失败: {e}")
 
-            print("✅ 专业情绪分析标签页资源清理完成")
+            logger.info(" 专业情绪分析标签页资源清理完成")
 
         except Exception as e:
-            print(f"❌ 关闭事件处理失败: {e}")
+            logger.error(f" 关闭事件处理失败: {e}")
         finally:
             super().closeEvent(event)
 
@@ -2348,10 +2347,10 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
                     if self.available_plugins:
                         QTimer.singleShot(500, self._delayed_analyze_sentiment)
                     else:
-                        print("⚠️ 插件尚未加载完成，跳过自动情绪分析")
+                        logger.info(" 插件尚未加载完成，跳过自动情绪分析")
 
         except Exception as e:
-            print(f"❌ [ProfessionalSentimentTab] 设置K线数据失败: {e}")
+            logger.error(f" [ProfessionalSentimentTab] 设置K线数据失败: {e}")
 
     def _delayed_analyze_sentiment(self):
         """延迟执行情绪分析 - 带安全检查"""
@@ -2360,19 +2359,19 @@ class ProfessionalSentimentTab(BaseAnalysisTab):
             if (hasattr(self, 'analyze_sentiment') and
                 self.available_plugins and
                     not (self.analysis_thread and self.analysis_thread.isRunning())):
-                print("🔄 执行延迟的情绪分析...")
+                logger.info(" 执行延迟的情绪分析...")
                 self.analyze_sentiment()
         except Exception as e:
-            print(f"❌ [ProfessionalSentimentTab] 延迟情绪分析失败: {e}")
+            logger.error(f" [ProfessionalSentimentTab] 延迟情绪分析失败: {e}")
 
     def on_plugins_db_updated(self):
         """数据库插件状态更新回调 -> 异步刷新情绪插件列表"""
         try:
-            print("🔄 检测到数据库更新，异步刷新情绪插件列表...")
+            logger.info(" 检测到数据库更新，异步刷新情绪插件列表...")
             # 使用异步方式刷新，避免阻塞主线程
             QTimer.singleShot(200, self.load_available_plugins_async)
         except Exception as e:
-            print(f"⚠️ 刷新情绪插件列表失败: {e}")
+            logger.error(f" 刷新情绪插件列表失败: {e}")
 
 
 # 为了向后兼容，添加别名

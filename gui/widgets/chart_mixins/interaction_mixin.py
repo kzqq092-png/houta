@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交互功能Mixin - 处理用户交互、拖拽、右键菜单、高亮等功能
 """
@@ -9,7 +10,6 @@ from PyQt5.QtWidgets import QMenu, QFileDialog, QMessageBox, QApplication
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QPixmap
 import io
-
 
 class InteractionMixin:
     """交互功能Mixin"""
@@ -36,7 +36,7 @@ class InteractionMixin:
                         break
                     p = p.parent()
 
-            # 🚀 优先使用TET模式（AssetService）
+            #  优先使用TET模式（AssetService）
             kdata = None
             try:
                 from core.containers import get_service_container
@@ -56,10 +56,9 @@ class InteractionMixin:
                         self.update_chart({'kdata': kdata, 'stock_code': code})
                         return
             except Exception as e:
-                if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.warning(f"TET模式拖拽数据获取失败: {e}")
+                logger.warning(f"TET模式拖拽数据获取失败: {e}")
 
-            # 📊 降级到传统data_manager
+            #  降级到传统data_manager
             if data_manager:
                 kdata = data_manager.get_kdata(code)
                 if kdata is not None and not kdata.empty:
@@ -69,8 +68,7 @@ class InteractionMixin:
             else:
                 self.show_no_data("所有数据获取方式都失败")
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"处理拖拽事件失败: {str(e)}")
+            logger.error(f"处理拖拽事件失败: {str(e)}")
             self.show_no_data("拖拽处理失败")
 
     def handle_external_drop_event(self, event):
@@ -91,7 +89,7 @@ class InteractionMixin:
         elif event.mimeData().hasFormat("text/plain"):
             raw_text = str(event.mimeData().data(
                 "text/plain"), encoding="utf-8").strip()
-        if raw_text.startswith("★"):
+        if raw_text.startswith(""):
             raw_text = raw_text[1:].strip()
         code = raw_text.split()[0] if raw_text else ""
         return code, raw_text
@@ -141,8 +139,8 @@ class InteractionMixin:
                 else:
                     self.show_no_data("无数据")
             except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"刷新图表失败: {str(e)}")
+                if True:  # 使用Loguru日志
+                    logger.error(f"刷新图表失败: {str(e)}")
                 if hasattr(self, 'error_occurred'):
                     self.error_occurred.emit(f"刷新图表失败: {str(e)}")
         elif action == clear_highlight_action:
@@ -155,11 +153,9 @@ class InteractionMixin:
                 self, "保存图表", "", "PNG Files (*.png);;JPEG Files (*.jpg);;PDF Files (*.pdf)")
             if file_path:
                 self.figure.savefig(file_path)
-                if self.log_manager:
-                    self.log_manager.info(f"图表已保存到: {file_path}")
+                logger.info(f"图表已保存到: {file_path}")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"保存图表失败: {str(e)}")
+            logger.error(f"保存图表失败: {str(e)}")
 
     def export_kline_and_indicators(self):
         """导出K线和指标数据"""
@@ -174,11 +170,9 @@ class InteractionMixin:
                 self, "导出K线/指标数据", "", "CSV Files (*.csv)")
             if file_path:
                 df.to_csv(file_path, index=False, encoding='utf-8-sig')
-                if self.log_manager:
-                    self.log_manager.info(f"K线/指标数据已导出到: {file_path}")
+                logger.info(f"K线/指标数据已导出到: {file_path}")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"导出K线/指标数据失败: {str(e)}")
+            logger.error(f"导出K线/指标数据失败: {str(e)}")
 
     def trigger_stat_dialog(self):
         """触发统计对话框"""
@@ -193,8 +187,7 @@ class InteractionMixin:
             end_idx = int(min(len(self.current_kdata)-1, round(xlim[1])))
             self.request_stat_dialog.emit((start_idx, end_idx))
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"区间统计失败: {str(e)}")
+            logger.error(f"区间统计失败: {str(e)}")
 
     def mark_highlight_candle(self, event):
         """标记高亮K线"""
@@ -211,8 +204,7 @@ class InteractionMixin:
                 self.highlighted_indices.add(x_idx)
                 self.refresh()
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"标记高亮K线失败: {str(e)}")
+            logger.error(f"标记高亮K线失败: {str(e)}")
 
     def clear_highlighted_candles(self):
         """清空高亮K线"""
@@ -236,8 +228,7 @@ class InteractionMixin:
             self._replay_timer.timeout.connect(self._replay_step)
             self._replay_timer.start(100)
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"历史回看/回放启动失败: {str(e)}")
+            logger.error(f"历史回看/回放启动失败: {str(e)}")
 
     def _replay_step(self):
         """回放步骤"""
@@ -262,11 +253,9 @@ class InteractionMixin:
             pixmap = QPixmap()
             pixmap.loadFromData(buf.read(), 'PNG')
             QApplication.clipboard().setPixmap(pixmap)
-            if self.log_manager:
-                self.log_manager.info("图表已复制到剪贴板")
+            logger.info("图表已复制到剪贴板")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"复制图表到剪贴板失败: {str(e)}")
+            logger.error(f"复制图表到剪贴板失败: {str(e)}")
 
     def on_indicator_selected(self, indicators: list):
         """接收指标选择结果，更新active_indicators并刷新图表"""
@@ -323,8 +312,7 @@ class InteractionMixin:
 
             # 修复：严格的索引边界检查
             if not isinstance(idx, (int, float)) or idx < 0 or idx >= len(kdata):
-                if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.warning(
+                logger.warning(
                         f"形态信号索引超出范围: {idx}, 数据长度: {len(kdata)}")
                 invalid_patterns += 1
                 continue
@@ -372,8 +360,7 @@ class InteractionMixin:
             }
 
         # 记录绘制结果
-        if hasattr(self, 'log_manager') and self.log_manager:
-            self.log_manager.info(
+        logger.info(
                 f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
 
         # 高亮特定形态（如果指定）
@@ -436,8 +423,8 @@ class InteractionMixin:
             self.canvas.draw()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"高亮信号失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"高亮信号失败: {str(e)}")
 
     def clear_signal_highlight(self):
         """清除信号高亮"""
@@ -461,5 +448,5 @@ class InteractionMixin:
             self.canvas.draw()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"清除信号高亮失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"清除信号高亮失败: {str(e)}")

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据源智能路由模块
 
@@ -11,7 +12,6 @@
 
 import time
 import threading
-import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Callable, Union
 from enum import Enum, auto
@@ -25,7 +25,7 @@ from collections import defaultdict, deque
 from .plugin_types import AssetType, DataType
 from .data_source_extensions import DataSourcePluginAdapter, HealthCheckResult
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RoutingStrategy(Enum):
@@ -699,6 +699,18 @@ class DataSourceRouter:
                     logger.error(f"检查数据源 {source_id} 支持的资产类型失败: {str(e)}")
 
         return available
+
+    def has_data_source(self, source_id: str) -> bool:
+        """
+        检查是否存在指定的数据源
+        
+        Args:
+            source_id: 数据源ID
+            
+        Returns:
+            bool: 数据源是否存在
+        """
+        return source_id in self.data_sources
 
     def _update_health_score(self, source_id: str) -> None:
         """更新健康分数"""

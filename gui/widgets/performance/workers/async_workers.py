@@ -1,15 +1,15 @@
+from loguru import logger
 """
 异步工作线程
 
 包含性能监控相关的异步工作线程类
 """
 
-import logging
 import json
 import os
 from PyQt5.QtCore import QRunnable, QThread, QObject, pyqtSignal
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AsyncDataSignals(QObject):
@@ -56,7 +56,7 @@ class AsyncDataWorker(QRunnable):
                     "优化建议": "系统运行良好" if cpu_usage < 70 else "建议优化CPU使用"
                 }
             elif self.data_type == "tuning":
-                # 🚨 修复：添加对tuning数据类型的处理
+                #  修复：添加对tuning数据类型的处理
                 try:
                     # 获取自动调优统计数据
                     if hasattr(self.monitor, 'get_auto_tuning_stats'):
@@ -98,7 +98,7 @@ class AsyncStrategyWorker(QRunnable):
     def run(self):
         """在后台线程中执行策略性能计算"""
         try:
-            # 🚨 重要修复：不能在后台线程中直接更新UI！
+            #  重要修复：不能在后台线程中直接更新UI！
             # 改为在后台线程中计算数据，然后通过信号传递给主线程更新UI
 
             # 在后台线程中获取性能数据（不涉及UI更新）
@@ -140,9 +140,9 @@ class SystemHealthCheckThread(QThread):
     def run(self):
         """执行健康检查"""
         try:
-            logger.info("🔍 开始执行系统健康检查...")
+            logger.info(" 开始执行系统健康检查...")
 
-            # 🔧 修复：添加详细的错误处理和日志
+            #  修复：添加详细的错误处理和日志
             if not self._health_checker:
                 error_msg = "健康检查器为None，无法执行检查"
                 logger.error(error_msg)
@@ -153,7 +153,7 @@ class SystemHealthCheckThread(QThread):
             health_report = self._health_checker.run_comprehensive_check()
 
             if health_report:
-                logger.info(f"✅ 健康检查完成，报告包含 {len(health_report)} 个项目")
+                logger.info(f" 健康检查完成，报告包含 {len(health_report)} 个项目")
                 self.health_check_completed.emit(health_report)
             else:
                 error_msg = "健康检查返回了空报告"
@@ -276,7 +276,7 @@ class EmailTestWorker(QRunnable):
             from core.services.notification_service import NotificationConfig
             from datetime import datetime
 
-            logger.info("🔍 开始异步邮件测试...")
+            logger.info(" 开始异步邮件测试...")
 
             # 配置邮件服务
             provider_map = {
@@ -312,7 +312,7 @@ class EmailTestWorker(QRunnable):
                 content="这是一封测试邮件，如果您收到此邮件，说明邮件配置正确。",
                 html_content=f"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #2c3e50;">📧 邮件配置测试</h2>
+                    <h2 style="color: #2c3e50;"> 邮件配置测试</h2>
                     <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db;">
                         <p>恭喜！您的邮件配置已成功。</p>
                         <p>这是一封来自 <strong>FactorWeave-Quant</strong> 系统的测试邮件。</p>
@@ -324,14 +324,14 @@ class EmailTestWorker(QRunnable):
                 """
             )
 
-            logger.info(f"📤 发送测试邮件到: {test_message.recipient}")
+            logger.info(f" 发送测试邮件到: {test_message.recipient}")
             success = notification_service.send_email(test_message, provider)
 
             if success:
-                logger.info("✅ 邮件发送成功")
+                logger.info(" 邮件发送成功")
                 self.signals.success.emit(f"测试邮件已发送到 {test_message.recipient}\n请检查您的邮箱（包括垃圾邮件文件夹）")
             else:
-                logger.error("❌ 邮件发送失败")
+                logger.error(" 邮件发送失败")
                 self.signals.error.emit("邮件发送失败，请检查配置")
 
         except Exception as e:
@@ -355,7 +355,7 @@ class SMSTestWorker(QRunnable):
             from core.services.notification_service import notification_service, NotificationMessage, NotificationProvider
             from core.services.notification_service import NotificationConfig
 
-            logger.info("🔍 开始异步短信测试...")
+            logger.info(" 开始异步短信测试...")
 
             # 配置短信服务
             provider_map = {
@@ -402,14 +402,14 @@ class SMSTestWorker(QRunnable):
                 content="【FactorWeave-Quant】这是一条测试短信，如果您收到此短信，说明短信配置正确。"
             )
 
-            logger.info(f"📱 发送测试短信到: {test_message.recipient}")
+            logger.info(f" 发送测试短信到: {test_message.recipient}")
             success = notification_service.send_sms(test_message, provider)
 
             if success:
-                logger.info("✅ 短信发送成功")
+                logger.info(" 短信发送成功")
                 self.signals.success.emit(f"测试短信已发送到 {test_message.recipient}\n请检查您的手机短信")
             else:
-                logger.error("❌ 短信发送失败")
+                logger.error(" 短信发送失败")
                 self.signals.error.emit("短信发送失败，请检查配置")
 
         except Exception as e:

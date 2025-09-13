@@ -1,3 +1,4 @@
+from loguru import logger
 """
 内置策略实现 - 常用的技术指标策略
 
@@ -544,7 +545,7 @@ class PatternAnalysisStrategy(BaseStrategy):
         signals = []
         if 'code' not in data.columns:
             # 尝试从其他地方获取股票代码，但这应该是数据准备阶段的工作
-            # log_manager.warning("K线数据缺少'code'列，形态分析可能不准确")
+            # logger.warning("K线数据缺少'code'列，形态分析可能不准确")
             # 假设一个默认代码或跳过
             return signals
 
@@ -558,7 +559,6 @@ class PatternAnalysisStrategy(BaseStrategy):
                 price=data.loc[result['end_date']]['close'],
                 confidence=result.get('confidence', 0.5),
                 strategy_name=self.name,
-                reason=result.get('pattern_name', '未知形态'),
-            ))
+                reason=result.get('pattern_name', '未知形态')))
 
         return signals

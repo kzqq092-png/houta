@@ -7,7 +7,7 @@
 """
 
 import json
-import logging
+from loguru import logger
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, field
@@ -17,7 +17,7 @@ import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ImportMode(Enum):
@@ -700,7 +700,7 @@ def main():
 
     # 获取统计信息
     stats = manager.get_statistics()
-    print("统计信息:", json.dumps(stats, ensure_ascii=False, indent=2))
+    logger.info(f"统计信息: {json.dumps(stats, ensure_ascii=False, indent=2)}")
 
 
 if __name__ == "__main__":

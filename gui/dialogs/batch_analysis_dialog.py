@@ -1,7 +1,7 @@
 """
 批量分析对话框 - 已弃用
 
-⚠️ 重要提示：此文件已弃用！
+ 重要提示：此文件已弃用！
 功能已整合到 AnalysisToolsPanel 中的增强版批量分析系统。
 
 新系统特性：
@@ -295,13 +295,13 @@ class BatchAnalysisDialog(QDialog):
         self.commission_spin = QSpinBox()
         self.commission_spin.setRange(1, 100)
         self.commission_spin.setValue(5)
-        self.commission_spin.setSuffix(" ‰")
+        self.commission_spin.setSuffix(" ")
         params_layout.addRow("手续费率:", self.commission_spin)
 
         self.slippage_spin = QSpinBox()
         self.slippage_spin.setRange(0, 50)
         self.slippage_spin.setValue(1)
-        self.slippage_spin.setSuffix(" ‰")
+        self.slippage_spin.setSuffix(" ")
         params_layout.addRow("滑点:", self.slippage_spin)
 
         layout.addWidget(params_group)

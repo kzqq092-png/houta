@@ -1,3 +1,4 @@
+from loguru import logger
 """
 统一管理器工厂模块
 
@@ -5,13 +6,13 @@
 实现单例模式，避免重复实例化，提高性能和一致性。
 
 使用方式:
-    from utils.manager_factory import get_config_manager, get_log_manager
+    from utils.manager_factory import get_config_manager
     
     # 获取配置管理器
     config_manager = get_config_manager()
     
-    # 获取日志管理器
-    log_manager = get_log_manager()
+    # 日志系统已迁移到Loguru
+    # 直接使用: from loguru import logger
 """
 
 import threading
@@ -20,10 +21,8 @@ from typing import Optional, Dict, Any
 from functools import lru_cache
 from core.industry_manager import IndustryManager
 from core.services.unified_data_manager import UnifiedDataManager
-from core.logger import LogManager
 from utils.theme import ThemeManager
 from utils.config_manager import ConfigManager
-
 
 # 全局锁，确保线程安全
 _factory_lock = threading.Lock()
@@ -67,38 +66,8 @@ class ManagerFactory:
 
             return self._instances[cache_key]
 
-    def get_log_manager(self, config=None, force_new: bool = False) -> 'LogManager':
-        """
-        获取日志管理器实例（单例）
-
-        Args:
-            config: 可选的日志配置
-            force_new: 是否强制创建新实例
-
-        Returns:
-            LogManager实例
-        """
-        cache_key = f'log_manager_{id(config) if config else "default"}'
-
-        with self._lock:
-            if force_new or cache_key not in self._instances:
-                try:
-                    self._instances[cache_key] = LogManager(config)
-                except ImportError:
-                    try:
-                        # 尝试使用基础日志管理器
-                        from core.base_logger import BaseLogManager
-                        self._instances[cache_key] = BaseLogManager()
-                    except ImportError as e:
-                        warnings.warn(f"无法导入LogManager: {e}")
-                        # 创建简化版日志管理器
-                        self._instances[cache_key] = self._create_simple_log_manager(
-                        )
-                except Exception as e:
-                    warnings.warn(f"创建LogManager失败: {e}")
-                    self._instances[cache_key] = self._create_simple_log_manager()
-
-            return self._instances[cache_key]
+    # get_log_manager 已删除 - 使用纯Loguru架构
+    # 直接使用: from loguru import logger
 
     def get_theme_manager(self, config_manager=None, force_new: bool = False) -> 'ThemeManager':
         """
@@ -130,24 +99,21 @@ class ManagerFactory:
 
             return self._instances[cache_key]
 
-    def get_data_manager(self, log_manager=None, force_new: bool = False) -> 'UnifiedDataManager':
+    def get_data_manager(self, force_new: bool = False) -> 'UnifiedDataManager':
         """
         获取数据管理器实例（单例）
 
         Args:
-            log_manager: 可选的日志管理器
             force_new: 是否强制创建新实例
 
         Returns:
             UnifiedDataManager实例
         """
-        cache_key = f'data_manager_{id(log_manager) if log_manager else "default"}'
+        cache_key = 'data_manager_singleton'
 
         with self._lock:
             if force_new or cache_key not in self._instances:
                 try:
-                    if log_manager is None:
-                        log_manager = self.get_log_manager()
                     self._instances[cache_key] = UnifiedDataManager()
                 except ImportError as e:
                     warnings.warn(f"无法导入UnifiedDataManager: {e}")
@@ -158,55 +124,46 @@ class ManagerFactory:
 
             return self._instances[cache_key]
 
-    def get_industry_manager(self, log_manager=None, force_new: bool = False) -> 'IndustryManager':
+    def get_industry_manager(self, force_new: bool = False) -> 'IndustryManager':
         """
         获取行业管理器实例（单例）
 
         Args:
-            log_manager: 可选的日志管理器
             force_new: 是否强制创建新实例
 
         Returns:
             IndustryManager实例
         """
-        # 统一缓存键策略 - 使用单一实例，避免因log_manager不同而创建多个实例
+        # 统一缓存键策略 - 使用单一实例
         cache_key = 'industry_manager_singleton'
-
-        # 获取日志管理器用于记录操作日志
-        log_manager = log_manager or self.get_log_manager()
 
         with self._lock:
             # 记录获取请求
             try:
                 # 检查PyQt5环境
                 pyqt5_status = self._check_pyqt5_environment()
-                log_manager.info(
+                logger.info(
                     f"开始获取行业管理器 - 缓存键: {cache_key}, 强制新建: {force_new}, PyQt5状态: {pyqt5_status}")
             except Exception:
                 # 如果日志记录失败，不影响主要逻辑
-                log_manager.error("获取行业管理器失败")
+                logger.error("获取行业管理器失败")
 
             if force_new or cache_key not in self._instances:
                 try:
                     # 记录开始创建实例
-                    log_manager.info(f"开始创建行业管理器实例 - 缓存键: {cache_key}")
-
-                    # 确保使用统一的日志管理器
-                    if log_manager is None:
-                        log_manager = self.get_log_manager()
+                    logger.info(f"开始创建行业管理器实例 - 缓存键: {cache_key}")
 
                     # 创建实例 - 添加额外的错误处理
                     try:
-                        self._instances[cache_key] = IndustryManager(
-                            log_manager=log_manager)
+                        self._instances[cache_key] = IndustryManager()
 
                         # 记录创建成功
-                        log_manager.info(
+                        logger.info(
                             f"行业管理器创建成功 - 类型: {type(self._instances[cache_key]).__name__}")
 
                     except Exception as creation_error:
                         # 记录创建过程中的具体错误
-                        log_manager.error(
+                        logger.error(
                             f"创建行业管理器失败: {creation_error} (类型: {type(creation_error).__name__})")
 
                         # 重新抛出原始错误
@@ -214,18 +171,18 @@ class ManagerFactory:
 
                 except ImportError as e:
                     # 记录导入错误
-                    log_manager.error(f"导入行业管理器失败: {e}")
+                    logger.error(f"导入行业管理器失败: {e}")
 
                     # 创建简化版管理器
                     self._instances[cache_key] = self._create_simple_industry_manager(
                     )
 
                     # 记录回退操作
-                    log_manager.warning(f"使用简化版行业管理器")
+                    logger.warning(f"使用简化版行业管理器")
 
                 except Exception as e:
                     # 记录创建错误
-                    log_manager.error(
+                    logger.error(
                         f"创建行业管理器失败: {e} (类型: {type(e).__name__})")
 
                     # 创建简化版管理器
@@ -233,13 +190,13 @@ class ManagerFactory:
                     )
 
                     # 记录回退操作
-                    log_manager.warning(f"使用简化版行业管理器，原因: {e}")
+                    logger.warning(f"使用简化版行业管理器，原因: {e}")
             else:
                 # 记录缓存命中
-                log_manager.debug(f"缓存命中 - 缓存键: {cache_key}")
+                logger.debug(f"缓存命中 - 缓存键: {cache_key}")
 
             # 记录获取完成
-            log_manager.info(
+            logger.info(
                 f"行业管理器获取完成 - 类型: {type(self._instances[cache_key]).__name__}")
 
             return self._instances[cache_key]
@@ -281,18 +238,11 @@ class ManagerFactory:
             manager_type: 要清除的管理器类型，None表示清除所有
         """
         with self._lock:
-            # 获取日志管理器
+            # 记录清除操作开始
             try:
-                log_manager = self.get_log_manager()
-                from utils.log_util import log_structured
-
-                # 记录清除操作开始
-                log_structured(log_manager, "clear_manager_cache",
-                               level="info", status="start",
-                               manager_type=manager_type,
-                               current_cache_size=len(self._instances))
+                logger.info(f"开始清除管理器缓存 - 类型: {manager_type}, 当前缓存大小: {len(self._instances)}")
             except Exception:
-                log_manager.error("记录清除操作开始失败")
+                logger.error("记录清除操作开始失败")
 
             if manager_type:
                 # 清除特定类型的管理器
@@ -302,56 +252,19 @@ class ManagerFactory:
 
                 for key in keys_to_remove:
                     try:
-                        # 记录即将删除的实例
-                        if log_manager:
-                            log_structured(log_manager, "remove_manager_instance",
-                                           level="debug", status="start",
-                                           cache_key=key,
-                                           instance_type=type(self._instances[key]).__name__)
-
+                        logger.debug(f"删除管理器实例: {key} ({type(self._instances[key]).__name__})")
                         del self._instances[key]
                         removed_count += 1
-
-                        # 记录删除成功
-                        if log_manager:
-                            log_structured(log_manager, "remove_manager_instance",
-                                           level="debug", status="success",
-                                           cache_key=key)
                     except Exception as e:
-                        # 记录删除失败
-                        if log_manager:
-                            log_structured(log_manager, "remove_manager_instance",
-                                           level="error", status="fail",
-                                           cache_key=key, error=str(e))
+                        logger.error(f"删除管理器实例失败: {key} - {e}")
 
-                # 记录清除结果
-                if log_manager:
-                    log_structured(log_manager, "clear_manager_cache",
-                                   level="info", status="success",
-                                   manager_type=manager_type,
-                                   removed_count=removed_count,
-                                   remaining_cache_size=len(self._instances))
+                logger.info(f"清除特定类型管理器完成 - 类型: {manager_type}, 删除数量: {removed_count}, 剩余缓存: {len(self._instances)}")
             else:
                 # 清除所有管理器
                 original_size = len(self._instances)
-
-                # 记录所有即将清除的实例
-                if log_manager:
-                    for key, instance in self._instances.items():
-                        log_structured(log_manager, "remove_manager_instance",
-                                       level="debug", status="start",
-                                       cache_key=key,
-                                       instance_type=type(instance).__name__)
-
+                logger.debug(f"清除所有管理器实例，共 {original_size} 个")
                 self._instances.clear()
-
-                # 记录清除结果
-                if log_manager:
-                    log_structured(log_manager, "clear_manager_cache",
-                                   level="info", status="success",
-                                   manager_type="all",
-                                   removed_count=original_size,
-                                   remaining_cache_size=0)
+                logger.info(f"清除所有管理器完成 - 删除数量: {original_size}")
 
     def get_manager_info(self) -> Dict[str, Any]:
         """
@@ -431,28 +344,7 @@ class ManagerFactory:
 
         return SimpleConfigManager()
 
-    def _create_simple_log_manager(self):
-        """创建简化版日志管理器"""
-        class SimpleLogManager:
-            def __init__(self):
-                self.level = 'INFO'
-
-            def info(self, message: str):
-                print(f"[INFO] {message}")
-
-            def warning(self, message: str):
-                print(f"[WARNING] {message}")
-
-            def error(self, message: str):
-                print(f"[ERROR] {message}")
-
-            def debug(self, message: str):
-                print(f"[DEBUG] {message}")
-
-            def log(self, message: str, level: str = 'INFO'):
-                print(f"[{level}] {message}")
-
-        return SimpleLogManager()
+    # _create_simple_log_manager 已删除 - 使用纯Loguru架构
 
     def _create_simple_theme_manager(self):
         """创建简化版主题管理器"""
@@ -475,10 +367,7 @@ class ManagerFactory:
     def _create_simple_industry_manager(self):
         """创建简化版行业管理器"""
         try:
-            # 获取日志管理器用于记录
-            log_manager = self.get_log_manager()
-
-            log_manager.info("开始创建简化版行业管理器")
+            logger.info("开始创建简化版行业管理器")
 
             class SimpleIndustryManager:
                 def __init__(self):
@@ -495,27 +384,26 @@ class ManagerFactory:
                         "BK0009": "新能源",
                         "BK0010": "汽车制造"
                     }
-                    self.log_manager = log_manager
 
                     # 记录简化版管理器初始化
-                    self.log_manager.info(
+                    logger.info(
                         f"简化版行业管理器初始化成功 - 行业数量: {len(self.industries)}")
 
                 def get_industry(self, code: str):
                     """获取行业信息"""
                     try:
                         result = self.industries.get(code, '未知行业')
-                        self.log_manager.debug(
+                        logger.debug(
                             f"获取行业信息 - 代码: {code}, 结果: {result}")
                         return result
                     except Exception as e:
-                        self.log_manager.error(
+                        logger.error(
                             f"获取行业信息失败 - 代码: {code}, 错误: {e}")
                         return '未知行业'
 
                 def update_industry_data(self):
                     """更新行业数据（简化版不执行实际更新）"""
-                    self.log_manager.info("简化版管理器跳过更新行业数据")
+                    logger.info("简化版管理器跳过更新行业数据")
                     return True
 
                 def get_industry_list(self, source: str = "default") -> list:
@@ -523,10 +411,10 @@ class ManagerFactory:
                     try:
                         result = [{"code": k, "name": v, "source": source}
                                   for k, v in self.industries.items()]
-                        self.log_manager.debug(f"获取行业列表成功 - 数量: {len(result)}")
+                        logger.debug(f"获取行业列表成功 - 数量: {len(result)}")
                         return result
                     except Exception as e:
-                        self.log_manager.error(f"获取行业列表失败: {e}")
+                        logger.error(f"获取行业列表失败: {e}")
                         return []
 
                 def get_industry_stocks(self, industry_code: str, source: str = "default") -> list:
@@ -541,27 +429,26 @@ class ManagerFactory:
                             {"code": "000002", "name": "万科A",
                                 "industry": industry_code}
                         ]
-                        self.log_manager.debug(
+                        logger.debug(
                             f"获取行业股票成功 - 行业: {industry_code}, 数量: {len(example_stocks)}")
                         return example_stocks
                     except Exception as e:
-                        self.log_manager.error(
+                        logger.error(
                             f"获取行业股票失败 - 行业: {industry_code}, 错误: {e}")
                         return []
 
             simple_manager = SimpleIndustryManager()
 
-            log_manager.info(f"简化版行业管理器创建成功 - 类型: SimpleIndustryManager")
+            logger.info(f"简化版行业管理器创建成功 - 类型: SimpleIndustryManager")
 
             return simple_manager
 
         except Exception as e:
             # 最后的保险措施
             try:
-                log_manager = self.get_log_manager()
-                log_manager.error(f"创建简化版行业管理器失败: {e}")
+                logger.error(f"创建简化版行业管理器失败: {e}")
             except Exception:
-                print(f"创建简化版行业管理器失败: {e}")
+                logger.info(f"创建简化版行业管理器失败: {e}")
 
             # 返回最基本的管理器
             class MinimalIndustryManager:
@@ -617,18 +504,8 @@ def get_config_manager(force_new: bool = False) -> 'ConfigManager':
     return get_manager_factory().get_config_manager(force_new)
 
 
-def get_log_manager(config=None, force_new: bool = False) -> 'LogManager':
-    """
-    获取日志管理器实例
-
-    Args:
-        config: 可选的日志配置
-        force_new: 是否强制创建新实例
-
-    Returns:
-        LogManager实例
-    """
-    return get_manager_factory().get_log_manager(config, force_new)
+# get_log_manager 已删除 - 使用纯Loguru架构
+# 直接使用: from loguru import logger
 
 
 def get_theme_manager(config_manager=None, force_new: bool = False) -> 'ThemeManager':
@@ -645,32 +522,32 @@ def get_theme_manager(config_manager=None, force_new: bool = False) -> 'ThemeMan
     return get_manager_factory().get_theme_manager(config_manager, force_new)
 
 
-def get_data_manager(log_manager=None, force_new: bool = False) -> 'UnifiedDataManager':
+def get_data_manager(force_new: bool = False) -> 'UnifiedDataManager':
     """
     获取数据管理器实例
 
     Args:
-        log_manager: 可选的日志管理器
+        # log_manager: 已迁移到Loguru日志系统
         force_new: 是否强制创建新实例
 
     Returns:
         UnifiedDataManager实例
     """
-    return get_manager_factory().get_data_manager(log_manager, force_new)
+    return get_manager_factory().get_data_manager(force_new)
 
 
-def get_industry_manager(log_manager=None, force_new: bool = False) -> 'IndustryManager':
+def get_industry_manager(force_new: bool = False) -> 'IndustryManager':
     """
     获取行业管理器实例
 
     Args:
-        log_manager: 可选的日志管理器
+        # log_manager: 已迁移到Loguru日志系统
         force_new: 是否强制创建新实例
 
     Returns:
         IndustryManager实例
     """
-    return get_manager_factory().get_industry_manager(log_manager, force_new)
+    return get_manager_factory().get_industry_manager(force_new)
 
 
 def clear_manager_cache(manager_type: Optional[str] = None):
@@ -713,8 +590,8 @@ def ensure_managers_available() -> Dict[str, bool]:
         status['config_manager'] = False
 
     try:
-        log_manager = get_log_manager()
-        status['log_manager'] = log_manager is not None
+        # 日志系统已迁移到Loguru
+        status['log_manager'] = True  # Loguru always available
     except Exception:
         status['log_manager'] = False
 
@@ -743,7 +620,7 @@ def get_manager_summary() -> str:
     summary += "\n=== 管理器可用性 ===\n"
 
     for manager_type, available in manager_status.items():
-        status_text = "✓ 可用" if available else "✗ 不可用"
+        status_text = " 可用" if available else " 不可用"
         summary += f"{manager_type}: {status_text}\n"
 
     summary += f"\n=== 缓存的管理器 ===\n"
@@ -770,7 +647,8 @@ def safe_get_manager(manager_type: str, **kwargs):
         if manager_type == 'config':
             return factory.get_config_manager(**kwargs)
         elif manager_type == 'log':
-            return factory.get_log_manager(**kwargs)
+            # log_manager已删除，返回None - 使用纯Loguru架构
+            return None
         elif manager_type == 'theme':
             return factory.get_theme_manager(**kwargs)
         elif manager_type == 'data':

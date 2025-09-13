@@ -6,9 +6,9 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import logging
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CommonVisualization:

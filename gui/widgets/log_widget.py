@@ -1,3 +1,4 @@
+from loguru import logger
 """
 日志控件模块
 
@@ -8,8 +9,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from datetime import datetime
-from core.logger import LogManager, LogLevel
-import traceback
 from utils.theme import get_theme_manager
 import json
 import pandas as pd
@@ -62,11 +61,11 @@ class LogWidget(QWidget):
     # 定义信号，确保日志更新在主线程进行
     _log_received = pyqtSignal(str, str)  # level, message
 
-    def __init__(self, log_manager: LogManager = None, parent=None):
+    def __init__(self, parent=None):
         """初始化日志控件
 
         Args:
-            log_manager: 日志管理器实例
+            # log_manager: 已迁移到Loguru日志系统
             parent: 父窗口
         """
         try:
@@ -77,7 +76,7 @@ class LogWidget(QWidget):
             self.log_text = None  # 确保属性总是存在
 
             # 使用传入的日志管理器或创建新的
-            self.log_manager = log_manager or LogManager()
+            # 纯Loguru架构，移除log_manager依赖
 
             self.pause_scroll = False  # 显式初始化
             self.user_paused = False  # 新增：区分用户主动暂停
@@ -95,14 +94,13 @@ class LogWidget(QWidget):
             # 设置样式
             self.theme_manager = get_theme_manager()
 
-            self.log_manager.info("日志控件初始化完成")
+            logger.info("日志控件初始化完成")
 
         except Exception as e:
             error_msg = f"初始化失败: {str(e)}"
             self.log_text = None
-            if self.log_manager:
-                self.log_manager.error(error_msg)
-                self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def init_ui(self):
@@ -201,7 +199,7 @@ class LogWidget(QWidget):
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.update()
             self.adjustSize()
-            self.log_manager.info("日志控件UI初始化完成")
+            logger.info("日志控件UI初始化完成")
         except Exception as e:
             error_msg = f"初始化UI失败,加载默认日志控件: {str(e)}"
             if self.log_text is None:
@@ -215,8 +213,8 @@ class LogWidget(QWidget):
                 self.layout().addWidget(self.log_text, 1)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.apply_style()
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
             self.setVisible(True)
             self.update()
@@ -234,11 +232,11 @@ class LogWidget(QWidget):
             self.clear_button.clicked.connect(self.clear_logs)
             self.export_button.clicked.connect(self.export_logs)
             self.visual_button.clicked.connect(self.show_log_stats)
-            self.log_manager.info("信号连接完成")
+            logger.info("信号连接完成")
         except Exception as e:
             error_msg = f"连接信号失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def apply_style(self):
@@ -275,7 +273,7 @@ class LogWidget(QWidget):
                 self.log_text.append(formatted_message)
         except Exception as e:
             # 记录到原始日志系统，避免无限循环
-            print(f"Error in _update_log_text: {e}")
+            logger.info(f"Error in _update_log_text: {e}")
 
     def _get_level_color(self, level: str) -> str:
         """根据日志级别获取颜色"""
@@ -317,7 +315,7 @@ class LogWidget(QWidget):
             QTimer.singleShot(
                 500, lambda: self.log_text.setStyleSheet(orig_style))
         except Exception as e:
-            self.log_manager.error(f"闪烁错误提示失败: {str(e)}")
+            logger.error(f"闪烁错误提示失败: {str(e)}")
 
     def filter_logs(self, level: str):
         """根据级别过滤日志
@@ -342,7 +340,7 @@ class LogWidget(QWidget):
             if self.log_text is not None:
                 self.log_text.clear()
             self.log_cleared.emit()
-            self.log_manager.info("日志已清除")
+            logger.info("日志已清除")
             # 清除后强制刷新UI
             self.setVisible(True)
             self.apply_style()
@@ -361,8 +359,8 @@ class LogWidget(QWidget):
                 self.layout().addWidget(self.log_text, 1)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.apply_style()
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
             self.setVisible(True)
             self.update()
@@ -391,12 +389,12 @@ class LogWidget(QWidget):
                 else:
                     df.to_json(file_path, orient="records", force_ascii=False)
 
-                self.log_manager.info(f"日志已导出到: {file_path}")
+                logger.info(f"日志已导出到: {file_path}")
 
         except Exception as e:
             error_msg = f"导出日志失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def show_log_context_menu(self, pos):
@@ -614,8 +612,8 @@ class LogWidget(QWidget):
 
         except Exception as e:
             error_msg = f"显示日志弹窗失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def center_dialog(self, dialog, parent=None, offset_y=50):
@@ -656,8 +654,8 @@ class LogWidget(QWidget):
 
             dialog.move(x, y)
         except Exception as e:
-            self.log_manager.error(f"设置弹窗位置失败: {str(e)}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"设置弹窗位置失败: {str(e)}")
+            logger.error(traceback.format_exc())
 
     def toggle_scroll(self):
         """暂停/恢复自动滚动"""
@@ -685,7 +683,7 @@ class LogWidget(QWidget):
                     self.pause_scroll = True
                     self.pause_btn.setText("恢复滚动")
         except Exception as e:
-            self.log_manager.error(f"滚动条监听失败: {str(e)}")
+            logger.error(f"滚动条监听失败: {str(e)}")
 
     def restore_scroll_position(self, scroll_to_end: bool = False):
         """刷新后还原滚动条位置或自动滚动到底部，供所有日志区/弹窗复用 - 线程安全版本"""
@@ -783,7 +781,7 @@ class LogWidget(QWidget):
         try:
             self.refresh_display(scroll_to_end=True)
         except Exception as e:
-            self.log_manager.error(f"刷新日志控件失败: {str(e)}")
+            logger.error(f"刷新日志控件失败: {str(e)}")
 
     def update(self) -> None:
         """

@@ -1,16 +1,16 @@
+from loguru import logger
 """
 现代化性能图表组件
 
 参考专业交易软件设计的图表组件
 """
 
-import logging
 from collections import defaultdict
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 可选导入matplotlib
 try:
@@ -44,6 +44,7 @@ class ModernPerformanceChart(QWidget):
         header = QHBoxLayout()
 
         title_label = QLabel(self.title)
+        title_label.setMaximumHeight(25)
         title_font = QFont("Segoe UI", 10, QFont.Weight.Bold)
         title_label.setFont(title_font)
         title_label.setStyleSheet("color: #11f0f1; font-weight: bold; margin-bottom: 8px;")
@@ -160,7 +161,7 @@ class ModernPerformanceChart(QWidget):
         self.ax.grid(True, alpha=0.2, color='#404040', linewidth=0.5)
 
         if len(self.data_history) > 1:
-            # 🎨 修复：设置图例文本颜色与线条颜色一致
+            #  修复：设置图例文本颜色与线条颜色一致
             legend = self.ax.legend(frameon=False, loc='upper left',
                                     fontsize=8, fancybox=False, shadow=False)
 

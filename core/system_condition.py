@@ -7,6 +7,7 @@ from core.indicator_adapter import get_talib_indicator_list, calc_talib_indicato
 
 
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from loguru import logger
 
 
 class EnhancedSystemCondition(ConditionBase):
@@ -75,7 +76,7 @@ class EnhancedSystemCondition(ConditionBase):
             return self._make_decision(k, indicators)
 
         except Exception as e:
-            print(f"系统条件判断错误: {str(e)}")
+            logger.info(f"系统条件判断错误: {str(e)}")
             return False
 
     def _check_basic_conditions(self, k):
@@ -98,7 +99,7 @@ class EnhancedSystemCondition(ConditionBase):
             return True
 
         except Exception as e:
-            print(f"基础条件检查错误: {str(e)}")
+            logger.info(f"基础条件检查错误: {str(e)}")
             return False
 
     def _calculate_indicators(self, k):
@@ -110,9 +111,9 @@ class EnhancedSystemCondition(ConditionBase):
             visible_count = {cat: len(names)
                              for cat, names in category_map.items() if names}
             for cat, count in visible_count.items():
-                print(f"系统条件-分类: {cat}，可见指标数: {count}")
+                logger.info(f"系统条件-分类: {cat}，可见指标数: {count}")
             if not talib_list or not category_map:
-                print("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
+                logger.info("未检测到任何ta-lib指标，请检查ta-lib安装或数据源！")
                 return {}
             for name in talib_list:
                 try:
@@ -126,7 +127,7 @@ class EnhancedSystemCondition(ConditionBase):
                     continue
             return indicators
         except Exception as e:
-            print(f"指标计算错误: {str(e)}")
+            logger.info(f"指标计算错误: {str(e)}")
             return {}
 
     def _detect_market_regime(self, k, indicators):
@@ -149,7 +150,7 @@ class EnhancedSystemCondition(ConditionBase):
                 return "neutral"
 
         except Exception as e:
-            print(f"市场状态检测错误: {str(e)}")
+            logger.info(f"市场状态检测错误: {str(e)}")
             return "neutral"
 
     def _calculate_volatility(self, k):
@@ -160,7 +161,7 @@ class EnhancedSystemCondition(ConditionBase):
                 window=self.get_param("volatility_period")).std()
             return volatility[-1]
         except Exception as e:
-            print(f"波动率计算错误: {str(e)}")
+            logger.info(f"波动率计算错误: {str(e)}")
             return 0.0
 
     def _calculate_trend_strength(self, k):
@@ -173,7 +174,7 @@ class EnhancedSystemCondition(ConditionBase):
             return trend
 
         except Exception as e:
-            print(f"趋势强度计算错误: {str(e)}")
+            logger.info(f"趋势强度计算错误: {str(e)}")
             return 0.0
 
     def _calculate_volume_ratio(self, k):
@@ -183,7 +184,7 @@ class EnhancedSystemCondition(ConditionBase):
             volume_ma = MA(volume, n=self.get_param("volume_ma_period"))
             return volume[-1] / volume_ma[-1]
         except Exception as e:
-            print(f"成交量比率计算错误: {str(e)}")
+            logger.info(f"成交量比率计算错误: {str(e)}")
             return 0.0
 
     def _make_decision(self, k, indicators):
@@ -221,7 +222,7 @@ class EnhancedSystemCondition(ConditionBase):
             return True
 
         except Exception as e:
-            print(f"综合判断错误: {str(e)}")
+            logger.info(f"综合判断错误: {str(e)}")
             return False
 
     def _ml_predict(self, k, indicators):
@@ -238,7 +239,7 @@ class EnhancedSystemCondition(ConditionBase):
             return prediction[0] > 0.5
 
         except Exception as e:
-            print(f"机器学习预测错误: {str(e)}")
+            logger.info(f"机器学习预测错误: {str(e)}")
             return False
 
     def _prepare_ml_features(self, k, indicators):
@@ -276,7 +277,7 @@ class EnhancedSystemCondition(ConditionBase):
             return np.array(features).reshape(1, -1)
 
         except Exception as e:
-            print(f"特征准备错误: {str(e)}")
+            logger.info(f"特征准备错误: {str(e)}")
             return None
 
 

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from loguru import logger
 
 TENSORFLOW_AVAILABLE = False
 try:
@@ -11,7 +12,7 @@ try:
     from tensorflow.keras.optimizers import Adam
     TENSORFLOW_AVAILABLE = True
 except ImportError:
-    print("TensorFlow/Keras 未安装，无法使用深度学习模型")
+    logger.info("TensorFlow/Keras 未安装，无法使用深度学习模型")
 
 
 def build_deep_learning_model(X_train, y_train, X_test, y_test, model_type='lstm', sequence_length=20, batch_size=32, epochs=50):
@@ -33,7 +34,7 @@ def build_deep_learning_model(X_train, y_train, X_test, y_test, model_type='lstm
         history: 训练历史
     """
     if not TENSORFLOW_AVAILABLE:
-        print("无法构建深度学习模型：TensorFlow/Keras 未安装")
+        logger.info("无法构建深度学习模型：TensorFlow/Keras 未安装")
         return None, None
 
     # 设置随机种子以确保可重复性
@@ -105,17 +106,15 @@ def build_deep_learning_model(X_train, y_train, X_test, y_test, model_type='lstm
             # 更新特征维度
             n_features = X_train.shape[2]
 
-            print(
-                f"序列化后的数据形状: X_train={X_train.shape}, y_train={y_train_categorical.shape}")
+            logger.info(f"序列化后的数据形状: X_train={X_train.shape} y_train={y_train_categorical.shape}")
         except ValueError as e:
-            print(f"无法创建序列: {e}")
+            logger.info(f"无法创建序列: {e}")
             model_type = 'mlp'  # 回退到MLP模型
     elif model_type == 'cnn':
         # 为CNN模型重塑数据（添加通道维度）
         X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
         X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
-        print(
-            f"CNN数据形状: X_train={X_train.shape}, y_train={y_train_categorical.shape}")
+        logger.info(f"CNN数据形状: X_train={X_train.shape} y_train={y_train_categorical.shape}")
 
     # 构建模型
     model = Sequential()
@@ -192,8 +191,8 @@ def build_deep_learning_model(X_train, y_train, X_test, y_test, model_type='lstm
 
         # 评估模型
         loss, accuracy = model.evaluate(X_test, y_test_categorical, verbose=0)
-        print(f"测试损失: {loss:.4f}")
-        print(f"测试准确率: {accuracy:.4f}")
+        logger.info(f"测试损失: {loss:.4f}")
+        logger.info(f"测试准确率: {accuracy:.4f}")
 
         # 绘制训练历史
         plt.figure(figsize=(12, 5))
@@ -222,5 +221,5 @@ def build_deep_learning_model(X_train, y_train, X_test, y_test, model_type='lstm
         return model, history
 
     except Exception as e:
-        print(f"训练过程出错: {e}")
+        logger.info(f"训练过程出错: {e}")
         return None, None

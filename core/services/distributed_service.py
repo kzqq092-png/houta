@@ -1,3 +1,4 @@
+from loguru import logger
 """
 分布式服务模块
 
@@ -14,9 +15,8 @@ from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

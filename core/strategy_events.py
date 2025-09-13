@@ -1,10 +1,10 @@
+from loguru import logger
 """
 策略事件系统
 
 定义策略生命周期中的各种事件，支持事件驱动的策略管理。
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
@@ -16,7 +16,7 @@ from .strategy_extensions import (
     StrategyContext, StrategyLifecycle
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class EventType(Enum):
@@ -208,7 +208,7 @@ class EventBus:
         self._global_handlers: List[IEventHandler] = []
         self._event_history: List[BaseEvent] = []
         self._max_history_size = 1000
-        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+        self.logger = logger
 
     def subscribe(self, event_type: EventType, handler: IEventHandler) -> None:
         """
@@ -366,8 +366,8 @@ class EventBus:
 class LoggingEventHandler(IEventHandler):
     """日志事件处理器"""
 
-    def __init__(self, log_level: int = logging.INFO):
-        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+    def __init__(self, log_level: str = "INFO"):
+        self.logger = logger
         self.log_level = log_level
 
     def handle_event(self, event: BaseEvent) -> None:
@@ -388,7 +388,15 @@ class LoggingEventHandler(IEventHandler):
             self.logger.error(message)
             return
 
-        self.logger.log(self.log_level, message)
+        # 使用Loguru的动态日志级别
+        if self.log_level.upper() == "DEBUG":
+            self.logger.debug(message)
+        elif self.log_level.upper() == "WARNING":
+            self.logger.warning(message)
+        elif self.log_level.upper() == "ERROR":
+            self.logger.error(message)
+        else:  # INFO 或其他
+            self.logger.info(message)
 
     def can_handle(self, event_type: EventType) -> bool:
         """可以处理所有事件类型"""

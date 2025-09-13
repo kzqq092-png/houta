@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Stage 3 字段映射增强和标准化扩展测试
 
@@ -513,7 +514,7 @@ class TestPerformance:
         assert not mapped_data.empty
         assert len(mapped_data) == n_rows
 
-        print(f"大数据集映射耗时: {processing_time:.2f}秒")
+        logger.info(f"大数据集映射耗时: {processing_time:.2f}秒")
 
     def test_mapping_cache_performance(self):
         """测试映射缓存性能"""
@@ -540,7 +541,7 @@ class TestPerformance:
         assert second_time <= first_time
         assert result1.equals(result2)
 
-        print(f"首次映射: {first_time:.4f}秒, 缓存映射: {second_time:.4f}秒")
+        logger.info(f"首次映射: {first_time:.4f}秒 缓存映射: {second_time:.4f}秒")
 
 
 class TestIntegrationStage3:
@@ -607,7 +608,7 @@ class TestIntegrationStage3:
             quality_score = result['data_quality_score'].iloc[0]
             assert quality_score > 0.5
 
-            print(f"变体 {i+1} 处理成功，质量评分: {quality_score:.2f}")
+            logger.info(f"变体 {i+1} 处理成功，质量评分: {quality_score:.2f}")
 
     def test_mixed_data_type_processing(self):
         """测试混合数据类型处理"""
@@ -650,7 +651,7 @@ class TestIntegrationStage3:
                 avg_quality = quality_scores.mean()
                 assert 0.0 <= avg_quality <= 1.0
 
-                print(f"{data_type} 平均质量评分: {avg_quality:.2f}")
+                logger.info(f"{data_type} 平均质量评分: {avg_quality:.2f}")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 风险评估模块
@@ -348,7 +349,7 @@ class RiskEvaluator:
                     recommendation=self._get_model_risk_recommendation(level)
                 )
         except Exception as e:
-            print(f"评估模型风险失败: {e}")
+            logger.info(f"评估模型风险失败: {e}")
 
         return metrics
 
@@ -673,12 +674,12 @@ if __name__ == "__main__":
         trading_volumes=trading_volumes
     )
 
-    print("风险评估报告:")
-    print("=" * 50)
-    print(f"整体风险等级: {report['overall_risk_level']}")
-    print(f"生成时间: {report['timestamp']}")
+    logger.info("风险评估报告:")
+    logger.info("=" * 50)
+    logger.info(f"整体风险等级: {report['overall_risk_level']}")
+    logger.info(f"生成时间: {report['timestamp']}")
 
     if report['recommendations']:
-        print("\n风险建议:")
+        logger.info("\n风险建议:")
         for i, rec in enumerate(report['recommendations'], 1):
-            print(f"{i}. {rec}")
+            logger.info(f"{i}. {rec}")

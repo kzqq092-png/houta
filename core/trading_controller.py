@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
 from typing import Optional, Dict, Any
-from .logger import LogManager, LogLevel
 from .containers import ServiceContainer
+from loguru import logger
 
 # 重构后的交易控制器 - 使用服务架构
 
@@ -22,10 +22,10 @@ class TradingController(QObject):
     market_updated = pyqtSignal(dict)
     backtest_updated = pyqtSignal(dict)
 
-    def __init__(self, service_container: ServiceContainer, log_manager: Optional[LogManager] = None):
+    def __init__(self, service_container: ServiceContainer):
         super().__init__()
         self.service_container = service_container
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 获取交易服务
         self._trading_service = None
@@ -53,15 +53,15 @@ class TradingController(QObject):
             from .services.unified_data_manager import UnifiedDataManager
             self._unified_data_manager = self.service_container.resolve(UnifiedDataManager)
 
-            self.log_manager.info("交易控制器服务依赖初始化完成")
+            logger.info("交易控制器服务依赖初始化完成")
 
         except Exception as e:
-            self.log_manager.error(f"交易控制器服务依赖初始化失败: {e}")
+            logger.error(f"交易控制器服务依赖初始化失败: {e}")
 
     def initialize(self):
         """Initialize the trading controller"""
         try:
-            self.log_manager.info("Initializing trading controller...")
+            logger.info("Initializing trading controller...")
 
             if self._trading_service:
                 # 初始化交易服务
@@ -71,14 +71,14 @@ class TradingController(QObject):
             self.log_updated.emit("交易控制器初始化完成")
 
         except Exception as e:
-            self.log_manager.error(f"Failed to initialize trading controller: {str(e)}")
+            logger.error(f"Failed to initialize trading controller: {str(e)}")
             self.log_updated.emit(f"交易控制器初始化失败: {str(e)}")
             raise
 
     def cleanup(self):
         """Clean up resources"""
         try:
-            self.log_manager.info("Cleaning up trading controller...")
+            logger.info("Cleaning up trading controller...")
 
             if self._trading_service and hasattr(self._trading_service, 'cleanup'):
                 self._trading_service.cleanup()
@@ -89,7 +89,7 @@ class TradingController(QObject):
             self.log_updated.emit("交易控制器清理完成")
 
         except Exception as e:
-            self.log_manager.error(f"Failed to cleanup trading controller: {str(e)}")
+            logger.error(f"Failed to cleanup trading controller: {str(e)}")
 
     def handle_signal(self, signal):
         """处理交易信号"""

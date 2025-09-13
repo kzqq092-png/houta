@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
+from loguru import logger
 
 
 def detect_market_regime(df, price_col='close', window=200, threshold=0.1, regime_window=20):
@@ -203,7 +204,7 @@ def plot_market_regimes(df, price_col='close', figsize=(15, 10)):
         figsize: tuple，图形大小
     """
     if 'market_state' not in df.columns:
-        print("DataFrame中缺少'market_state'列，请先运行detect_market_regime函数")
+        logger.info("DataFrame中缺少'market_state'列，请先运行detect_market_regime函数")
         return
 
     plt.figure(figsize=figsize)

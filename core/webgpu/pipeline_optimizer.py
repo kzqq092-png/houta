@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU渲染管道调优器
 
@@ -8,7 +9,6 @@ WebGPU渲染管道调优器
 - 渲染状态自动合并
 """
 
-import logging
 import threading
 import time
 import hashlib
@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple, Any, Set, Callable
 import weakref
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RenderPriority(Enum):

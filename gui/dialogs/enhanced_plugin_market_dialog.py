@@ -126,7 +126,7 @@ class PluginCard(QFrame):
 
         # 评分
         rating_label = QLabel(
-            f"★ {self.plugin_info.rating:.1f} ({self.plugin_info.rating_count})")
+            f" {self.plugin_info.rating:.1f} ({self.plugin_info.rating_count})")
         rating_label.setStyleSheet("color: #ff9500; font-size: 10px;")
         info_layout.addWidget(rating_label)
 
@@ -193,7 +193,7 @@ class EnhancedPluginMarketDialog(QDialog):
 
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("FactorWeave-Quant ‌ 插件市场")
+        self.setWindowTitle("FactorWeave-Quant  插件市场")
         self.setMinimumSize(1000, 700)
 
         layout = QVBoxLayout(self)
@@ -527,7 +527,7 @@ class EnhancedPluginMarketDialog(QDialog):
 
                 # 使用中文显示的插件类型
                 type_display = formatted_info.get('type_display', '未知类型')
-                type_icon = formatted_info.get('type_icon', '❓')
+                type_icon = formatted_info.get('type_icon', '')
                 self.installed_table.setItem(
                     row, 2, QTableWidgetItem(f"{type_icon} {type_display}"))
 

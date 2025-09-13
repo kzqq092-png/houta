@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU环境检测和初始化模块
 
@@ -8,7 +9,6 @@ WebGPU环境检测和初始化模块
 4. 浏览器兼容性检查
 """
 
-import logging
 import platform
 import threading
 from typing import Dict, List, Optional, Tuple, Any
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class GPUSupportLevel(Enum):
@@ -251,7 +251,7 @@ class WebGPUEnvironment:
             for adapter in adapters:
                 # 检查是否有足够的显存
                 if adapter.memory_mb >= 256:  # 至少256MB显存
-                    logger.info(f"✅ 检测到支持WebGPU的GPU: {adapter.name}")
+                    logger.info(f"检测到支持WebGPU的GPU: {adapter.name}")
                     return True
 
             logger.warning("未找到满足WebGPU要求的GPU适配器")
@@ -294,12 +294,12 @@ class WebGPUEnvironment:
                     self._gpu_capabilities.adapter_name = best_adapter.name
                     self._gpu_capabilities.vendor = best_adapter.vendor
                     self._gpu_capabilities.memory_mb = best_adapter.memory_mb
-                    logger.info(f"✅ 检测到GPU: {best_adapter.name} ({best_adapter.vendor})")
-                    logger.info(f"✅ GPU类型: {best_adapter.gpu_type.value}")
-                    logger.info(f"✅ 显存大小: {best_adapter.memory_mb}MB")
+                    logger.info(f" 检测到GPU: {best_adapter.name} ({best_adapter.vendor})")
+                    logger.info(f" GPU类型: {best_adapter.gpu_type.value}")
+                    logger.info(f" 显存大小: {best_adapter.memory_mb}MB")
 
                     # 记录所有检测到的适配器
-                    logger.info(f"📊 检测到 {len(adapters)} 个GPU适配器:")
+                    logger.info(f" 检测到 {len(adapters)} 个GPU适配器:")
                     for i, adapter in enumerate(adapters):
                         logger.info(f"  {i+1}. {adapter.name} ({adapter.vendor}) - {adapter.memory_mb}MB")
 
@@ -309,7 +309,7 @@ class WebGPUEnvironment:
                 raise Exception("GPU检测失败")
 
         except Exception as e:
-            logger.error(f"❌ 增强GPU检测失败: {e}")
+            logger.error(f" 增强GPU检测失败: {e}")
             # 不使用模拟数据，而是报告真实的检测失败状态
             self._gpu_capabilities.adapter_name = "GPU检测失败"
             self._gpu_capabilities.vendor = "检测失败"
@@ -341,12 +341,12 @@ class WebGPUEnvironment:
                 self._gpu_capabilities.adapter_name = f"{adapter.name} (WebGL)"
                 self._gpu_capabilities.vendor = adapter.vendor
                 self._gpu_capabilities.memory_mb = adapter.memory_mb
-                logger.info(f"✅ WebGL检测到GPU: {adapter.name} ({adapter.vendor})")
+                logger.info(f"WebGL检测到GPU: {adapter.name} ({adapter.vendor})")
             else:
                 raise Exception("未检测到可用的GPU适配器")
 
         except Exception as e:
-            logger.error(f"❌ WebGL GPU检测失败: {e}")
+            logger.error(f" WebGL GPU检测失败: {e}")
             # 不使用模拟数据，报告检测失败
             self._gpu_capabilities.adapter_name = "WebGL GPU检测失败"
             self._gpu_capabilities.vendor = "检测失败"

@@ -1,10 +1,10 @@
+from loguru import logger
 """
 分析服务模块
 
 负责技术分析、策略分析和数据分析。
 """
 
-import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple, Union
@@ -17,7 +17,7 @@ from ..events import AnalysisCompleteEvent, StockSelectedEvent, EventBus
 from .unified_data_manager import UnifiedDataManager
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AnalysisService(CacheableService, ConfigurableService):

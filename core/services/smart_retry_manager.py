@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 智能重试管理器
@@ -9,7 +10,6 @@
 - 重试历史记录
 """
 
-import logging
 import time
 import json
 from typing import Dict, Any, Optional, List, Callable
@@ -19,7 +19,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RetryStrategy(Enum):

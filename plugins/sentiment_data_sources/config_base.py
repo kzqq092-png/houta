@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -187,16 +188,11 @@ class ConfigurablePlugin(ABC):
     def _safe_log(self, level: str, message: str):
         """安全的日志记录方法"""
         try:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                getattr(self.log_manager, level)(message)
-            else:
-                # 使用本地logger作为备用
-                import logging
-                logger = logging.getLogger(__name__)
-                getattr(logger, level)(message)
+            logger.level(message)
+
         except Exception:
             # 最后的备用方案，直接打印
-            print(f"[{level.upper()}] {message}")
+            logger.info(f"[{level.upper()}] {message}")
 
 
 def create_config_file_path(plugin_name: str) -> str:

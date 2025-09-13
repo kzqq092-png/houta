@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -10,8 +11,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 from core.plugin_types import PluginType, PluginCategory
-from .base_sentiment_plugin import BaseSentimentPlugin
-from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
 
@@ -22,6 +23,10 @@ class CryptoSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         BaseSentimentPlugin.__init__(self)
         ConfigurablePlugin.__init__(self)
         self._config_file = create_config_file_path("crypto_sentiment")
+
+        # 联网查询地址配置（endpointhost字段）
+        # 加密货币情绪插件不需要联网查询地址，直接使用API，设为空
+        self.endpointhost = []
 
         # 支持的加密货币
         self.supported_cryptos = [
@@ -770,10 +775,10 @@ if __name__ == "__main__":
     # 获取数据
     response = plugin._fetch_raw_sentiment_data()
 
-    print(f"成功: {response.success}")
-    print(f"数据项: {len(response.data)}")
-    print(f"综合指数: {response.composite_score}")
+    logger.info(f"成功: {response.success}")
+    logger.info(f"数据项: {len(response.data)}")
+    logger.info(f"综合指数: {response.composite_score}")
 
     if response.data:
         for item in response.data:
-            print(f"- {item.indicator_name}: {item.value} ({item.status})")
+            logger.info(f"- {item.indicator_name}: {item.value} ({item.status})")

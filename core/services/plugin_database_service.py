@@ -1,3 +1,4 @@
+from loguru import logger
 """
 插件数据库服务
 
@@ -9,7 +10,6 @@
 """
 
 import os
-import logging
 from typing import Dict, List, Optional, Any
 from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
@@ -19,7 +19,7 @@ from db.models.plugin_models import (
     PluginDatabaseManager, PluginRecord, PluginStatus, PluginType
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class PluginDatabaseService(QObject):

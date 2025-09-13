@@ -1,10 +1,10 @@
+from loguru import logger
 """
 费率计算工具
 
 提供股票交易费率、手续费、印花税等计算功能。
 """
 
-import logging
 from typing import Optional, Dict, Tuple
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from decimal import Decimal, ROUND_HALF_UP
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CommissionCalculator(QDialog):

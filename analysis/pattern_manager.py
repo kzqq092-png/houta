@@ -1,3 +1,4 @@
+from loguru import logger
 """
 形态管理器模块
 负责管理K线形态的配置和识别
@@ -102,7 +103,7 @@ class PatternManager:
                     )
                 ''')
         except sqlite3.Error as e:
-            print(f"数据库 schema 检查失败: {e}")
+            logger.info(f"数据库 schema 检查失败: {e}")
 
     def get_pattern_configs(self, category: Optional[str] = None,
                             signal_type: Optional[str] = None,
@@ -148,7 +149,7 @@ class PatternManager:
                 rows = cursor.fetchall()
 
                 patterns = []
-                print(f"[_load_all_patterns_from_db] 从数据库加载了 {len(rows)} 条形态配置。")
+                logger.info(f"[_load_all_patterns_from_db] 从数据库加载了 {len(rows)} 条形态配置。")
 
                 for row in rows:
                     try:
@@ -185,12 +186,12 @@ class PatternManager:
                                 row) > 16 and row[16] is not None else 'medium'
                         ))
                     except (ValueError, json.JSONDecodeError) as e:
-                        print(f"解析形态配置失败 (ID: {row[0]}, 名称: {row[1]}): {e}")
+                        logger.info(f"解析形态配置失败 (ID: {row[0]} 名称: {row[1]}): {e}")
                         continue
                 self._patterns_cache = patterns
-                print(f"[_load_all_patterns_from_db] 成功解析并缓存了 {len(patterns)} 条形态配置。")
+                logger.info(f"[_load_all_patterns_from_db] 成功解析并缓存了 {len(patterns)} 条形态配置。")
         except sqlite3.Error as e:
-            print(f"从数据库加载形态配置失败: {e}")
+            logger.info(f"从数据库加载形态配置失败: {e}")
             self._patterns_cache = []
 
     def get_pattern_by_name(self, name: str) -> Optional[PatternConfig]:
@@ -319,7 +320,7 @@ class PatternManager:
 
                 return pattern_id
         except sqlite3.Error as e:
-            print(f"添加形态配置失败: {e}")
+            logger.info(f"添加形态配置失败: {e}")
             return None
 
     def update_pattern_config(self, pattern_id: int, **kwargs) -> bool:
@@ -360,7 +361,7 @@ class PatternManager:
 
                 return cursor.rowcount > 0
         except sqlite3.Error as e:
-            print(f"更新形态配置失败: {e}")
+            logger.info(f"更新形态配置失败: {e}")
             return False
 
     def delete_pattern_config(self, pattern_id: int) -> bool:
@@ -385,7 +386,7 @@ class PatternManager:
 
                 return cursor.rowcount > 0
         except sqlite3.Error as e:
-            print(f"删除形态配置失败: {e}")
+            logger.info(f"删除形态配置失败: {e}")
             return False
 
     def import_tdx_formula(self, name: str, formula: str) -> bool:
@@ -425,7 +426,7 @@ class PatternManager:
             return self._save_pattern_config(config)
 
         except Exception as e:
-            print(f"导入通达信公式失败: {e}")
+            logger.info(f"导入通达信公式失败: {e}")
             return False
 
     def _save_pattern_config(self, config: PatternConfig) -> bool:
@@ -457,7 +458,7 @@ class PatternManager:
             return True
 
         except sqlite3.Error as e:
-            print(f"保存形态配置失败: {e}")
+            logger.info(f"保存形态配置失败: {e}")
             return False
 
     def _convert_tdx_formula(self, formula: str) -> str:
@@ -583,7 +584,7 @@ for i in range(len(kdata)):
             return stats
 
         except Exception as e:
-            print(f"获取形态统计失败: {e}")
+            logger.info(f"获取形态统计失败: {e}")
             return {
                 'total_patterns': 0,
                 'by_category': {},
@@ -633,7 +634,7 @@ for i in range(len(kdata)):
                     }
 
         except sqlite3.Error as e:
-            print(f"获取形态有效性失败: {e}")
+            logger.info(f"获取形态有效性失败: {e}")
             return {
                 'total_signals': 0,
                 'success_rate': 0,
@@ -692,7 +693,7 @@ for i in range(len(kdata)):
                       return_rate, is_successful))
                 return True
         except sqlite3.Error as e:
-            print(f"记录形态结果失败: {e}")
+            logger.info(f"记录形态结果失败: {e}")
             return False
 
     def get_recommended_patterns(self, top_n: int = 10) -> List[Dict]:
@@ -736,7 +737,7 @@ for i in range(len(kdata)):
 
                 return recommendations
         except sqlite3.Error as e:
-            print(f"获取推荐形态失败: {e}")
+            logger.info(f"获取推荐形态失败: {e}")
             return []
 
     def get_all_patterns(self, active_only: bool = True) -> List[PatternConfig]:

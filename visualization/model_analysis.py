@@ -3,9 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import roc_curve, auc, precision_recall_curve
-import logging
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ModelAnalysis:

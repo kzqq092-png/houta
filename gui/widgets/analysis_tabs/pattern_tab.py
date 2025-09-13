@@ -1,3 +1,4 @@
+from loguru import logger
 """
 形态分析标签页 - 专业版升级
 """
@@ -9,7 +10,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QColor, QKeySequence
 from .pattern_tab_pro import PatternAnalysisTabPro
-
 
 class PatternAnalysisTab(PatternAnalysisTabPro):
     """形态分析标签页 - 继承专业版功能，保持向后兼容"""
@@ -43,7 +43,7 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                     self.pattern_selected.emit(i)
 
         except Exception as e:
-            self.log_manager.error(f"分析完成处理失败: {e}")
+            logger.error(f"分析完成处理失败: {e}")
 
     # 保持向后兼容的方法
     def identify_patterns(self):
@@ -193,11 +193,11 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         menu = QMenu(self)
 
         # 查看详情
-        detail_action = menu.addAction("🔍 查看详情")
+        detail_action = menu.addAction(" 查看详情")
         detail_action.triggered.connect(self.show_pattern_detail)
 
         # 导出选中
-        export_action = menu.addAction("📤 导出选中")
+        export_action = menu.addAction(" 导出选中")
         export_action.triggered.connect(self.export_selected_pattern)
 
         menu.exec_(self.patterns_table.mapToGlobal(position))
@@ -324,47 +324,47 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """开始回测 - 增强版错误处理"""
         try:
             # 记录开始回测
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🚀 用户点击开始回测按钮")
+            if True:  # 使用Loguru日志
+                logger.info(" 用户点击开始回测按钮")
             else:
-                print("[Pattern] 🚀 用户点击开始回测按钮")
+                logger.info("[Pattern]  用户点击开始回测按钮")
 
             # 验证K线数据
             if not self._validate_kdata(self.current_kdata):
                 error_msg = "请先加载有效的K线数据"
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.warning(f"⚠️ 回测失败: {error_msg}")
+                if True:  # 使用Loguru日志
+                    logger.warning(f" 回测失败: {error_msg}")
                 QMessageBox.warning(self, "警告", error_msg)
                 return
 
             # 检查回测周期设置
             if not hasattr(self, 'backtest_period'):
                 error_msg = "回测周期设置组件未找到，请重新初始化界面"
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"❌ {error_msg}")
+                if True:  # 使用Loguru日志
+                    logger.error(f" {error_msg}")
                 QMessageBox.critical(self, "错误", error_msg)
                 return
 
             period = self.backtest_period.value()
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"📊 K线数据验证通过，开始{period}天回测")
+            if True:  # 使用Loguru日志
+                logger.info(f" K线数据验证通过，开始{period}天回测")
 
             # 显示加载状态
             self.show_loading("正在执行历史回测...")
 
             # 启动异步回测
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🔄 启动异步回测线程")
+            if True:  # 使用Loguru日志
+                logger.info(" 启动异步回测线程")
             self.run_analysis_async(self._backtest_async)
 
         except Exception as e:
             error_msg = f"启动回测失败: {str(e)}"
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ {error_msg}")
+            if True:  # 使用Loguru日志
+                logger.error(f" {error_msg}")
                 import traceback
-                self.log_manager.error(traceback.format_exc())
+                logger.error(traceback.format_exc())
             else:
-                print(f"[Pattern] ❌ {error_msg}")
+                logger.info(f"[Pattern]  {error_msg}")
 
             # 隐藏加载状态
             self.hide_loading()
@@ -374,38 +374,38 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """异步回测 - 基于真实形态识别的专业回测"""
         try:
             # 记录异步执行开始
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("📊 === 异步回测线程开始执行 ===")
+            if True:  # 使用Loguru日志
+                logger.info(" === 异步回测线程开始执行 ===")
             else:
-                print("[Pattern] 📊 === 异步回测线程开始执行 ===")
+                logger.info("[Pattern]  === 异步回测线程开始执行 ===")
 
             # 获取回测参数
             period = self.backtest_period.value()
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"🎯 回测周期: {period}天")
+            if True:  # 使用Loguru日志
+                logger.info(f" 回测周期: {period}天")
 
             # 第一步：获取真实形态识别结果
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🔍 开始真实形态识别...")
+            if True:  # 使用Loguru日志
+                logger.info(" 开始真实形态识别...")
 
             patterns = self._get_real_patterns()
             if not patterns:
                 return {'error': '未发现任何形态，无法进行回测'}
 
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"✅ 发现 {len(patterns)} 个形态")
+            if True:  # 使用Loguru日志
+                logger.info(f" 发现 {len(patterns)} 个形态")
 
             # 第二步：基于形态生成交易信号
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("📈 开始生成交易信号...")
+            if True:  # 使用Loguru日志
+                logger.info(" 开始生成交易信号...")
 
             signal_data = self._generate_trading_signals_from_patterns(patterns, period)
             if signal_data is None or signal_data.empty:
                 return {'error': '无法生成有效的交易信号'}
 
             # 第三步：使用专业回测引擎
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🚀 启动专业回测引擎...")
+            if True:  # 使用Loguru日志
+                logger.info(" 启动专业回测引擎...")
 
             try:
                 from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
@@ -447,14 +447,14 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                     'data_quality': 'real_pattern_recognition'
                 }
 
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.info(f"✅ 专业回测完成: {final_results['total_signals']}个信号，成功率{final_results['success_rate']:.2%}")
+                if True:  # 使用Loguru日志
+                    logger.info(f" 专业回测完成: {final_results['total_signals']}个信号，成功率{final_results['success_rate']:.2%}")
 
                 return {'backtest': final_results}
 
             except ImportError as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.warning(f"⚠️ 专业回测引擎不可用，使用简化回测: {e}")
+                if True:  # 使用Loguru日志
+                    logger.warning(f" 专业回测引擎不可用，使用简化回测: {e}")
 
                 # 降级到简化回测
                 simplified_results = self._run_simplified_backtest(patterns, signal_data, period)
@@ -462,11 +462,11 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
         except Exception as e:
             error_msg = f"异步回测执行失败: {str(e)}"
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ {error_msg}")
-                self.log_manager.error(traceback.format_exc())
+            if True:  # 使用Loguru日志
+                logger.error(f" {error_msg}")
+                logger.error(traceback.format_exc())
             else:
-                print(f"[Pattern] ❌ {error_msg}")
+                logger.info(f"[Pattern]  {error_msg}")
 
             return {'error': error_msg}
 
@@ -486,8 +486,8 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                     return patterns
 
             # 执行真实形态识别
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🔍 执行实时形态识别...")
+            if True:  # 使用Loguru日志
+                logger.info(" 执行实时形态识别...")
 
             from analysis.pattern_manager import PatternManager
             from analysis.pattern_recognition import PatternRecognizer
@@ -506,14 +506,14 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                 confidence_threshold=confidence_threshold
             )
 
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"🎯 实时识别到 {len(patterns)} 个形态")
+            if True:  # 使用Loguru日志
+                logger.info(f" 实时识别到 {len(patterns)} 个形态")
 
             return patterns
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 获取真实形态失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 获取真实形态失败: {e}")
             return []
 
     def _generate_trading_signals_from_patterns(self, patterns, period):
@@ -560,19 +560,19 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                         data.iloc[pattern_index, data.columns.get_loc('signal')] = signal_value
 
                 except Exception as e:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"⚠️ 处理形态信号失败: {e}")
+                    if True:  # 使用Loguru日志
+                        logger.warning(f" 处理形态信号失败: {e}")
                     continue
 
-            if hasattr(self, 'log_manager'):
+            if True:  # 使用Loguru日志
                 signal_count = len(data[data['signal'] != 0])
-                self.log_manager.info(f"📊 生成 {signal_count} 个交易信号")
+                logger.info(f" 生成 {signal_count} 个交易信号")
 
             return data
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 生成交易信号失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 生成交易信号失败: {e}")
             return None
 
     def _calculate_pattern_effectiveness(self, patterns, signal_data):
@@ -627,15 +627,15 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             }
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 计算形态有效性失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 计算形态有效性失败: {e}")
             return {'successful_count': 0, 'success_rate': 0.0, 'pattern_breakdown': {}}
 
     def _run_simplified_backtest(self, patterns, signal_data, period):
         """简化回测逻辑（当专业引擎不可用时）"""
         try:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("🔄 运行简化回测...")
+            if True:  # 使用Loguru日志
+                logger.info(" 运行简化回测...")
 
             # 计算基础统计
             pattern_stats = self._calculate_pattern_effectiveness(patterns, signal_data)
@@ -661,8 +661,8 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             }
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 简化回测失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 简化回测失败: {e}")
             raise
 
     def _extract_patterns_from_table(self):
@@ -680,27 +680,27 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                     }
                     patterns.append(pattern)
                 except (ValueError, AttributeError) as e:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"⚠️ 跳过无效行 {row}: {e}")
+                    if True:  # 使用Loguru日志
+                        logger.warning(f" 跳过无效行 {row}: {e}")
                     continue
 
             return patterns
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 提取表格形态失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f" 提取表格形态失败: {e}")
             return []
 
     def _update_backtest_display(self, backtest_results):
         """更新回测显示 - 真实数据增强版"""
         try:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("📊 开始更新回测显示")
+            if True:  # 使用Loguru日志
+                logger.info(" 开始更新回测显示")
 
             # 确保有backtest_text组件
             if not hasattr(self, 'backtest_text'):
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error("❌ backtest_text组件不存在")
+                if True:  # 使用Loguru日志
+                    logger.error(" backtest_text组件不存在")
                 return
 
             # 格式化显示文本
@@ -722,49 +722,49 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
 
             # 构建基础报告
             text = f"""
-📈 历史回测报告（基于真实形态识别）
+ 历史回测报告（基于真实形态识别）
 =====================================
 
-📊 基础指标:
-• 回测周期: {backtest_results.get('period', 'N/A')} 天
-• 识别形态: {total_patterns} 个
-• 有效信号: {backtest_results.get('total_signals', 0)} 个
-• 成功信号: {backtest_results.get('successful_signals', 0)} 个
-• 成功率: {backtest_results.get('success_rate', 0):.2%}
+ 基础指标:
+ 回测周期: {backtest_results.get('period', 'N/A')} 天
+ 识别形态: {total_patterns} 个
+ 有效信号: {backtest_results.get('total_signals', 0)} 个
+ 成功信号: {backtest_results.get('successful_signals', 0)} 个
+ 成功率: {backtest_results.get('success_rate', 0):.2%}
 
-💰 收益指标:
-• 平均收益: {backtest_results.get('avg_return', 0):+.2%}
-• 最大回撤: {backtest_results.get('max_drawdown', 0):.2%}
-• 夏普比率: {backtest_results.get('sharpe_ratio', 0):.2f}
+ 收益指标:
+ 平均收益: {backtest_results.get('avg_return', 0):+.2%}
+ 最大回撤: {backtest_results.get('max_drawdown', 0):.2%}
+ 夏普比率: {backtest_results.get('sharpe_ratio', 0):.2f}
 
-🔍 数据质量:
-• 回测引擎: {self._get_method_description(backtest_method)}
-• 数据来源: {self._get_quality_description(data_quality)}
+ 数据质量:
+ 回测引擎: {self._get_method_description(backtest_method)}
+ 数据来源: {self._get_quality_description(data_quality)}
 """
 
             # 添加形态分析详情
             if pattern_breakdown:
-                text += "\n📋 形态分析详情:\n"
+                text += "\n 形态分析详情:\n"
                 for pattern_type, stats in pattern_breakdown.items():
                     if stats['count'] > 0:
                         success_rate = stats['successful'] / stats['count']
                         avg_conf = stats['avg_confidence']
-                        text += f"• {pattern_type}: {stats['count']}个 (成功率{success_rate:.1%}, 平均置信度{avg_conf:.1%})\n"
+                        text += f" {pattern_type}: {stats['count']}个 (成功率{success_rate:.1%}, 平均置信度{avg_conf:.1%})\n"
 
             text += f"\n⏰ 生成时间: {time_str}"
 
             self.backtest_text.setText(text)
 
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info("✅ 回测显示更新完成")
+            if True:  # 使用Loguru日志
+                logger.info(" 回测显示更新完成")
 
         except Exception as e:
             error_msg = f"更新回测显示失败: {str(e)}"
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ {error_msg}")
-                self.log_manager.error(traceback.format_exc())
+            if True:  # 使用Loguru日志
+                logger.error(f" {error_msg}")
+                logger.error(traceback.format_exc())
             else:
-                print(f"[Pattern] ❌ {error_msg}")
+                logger.info(f"[Pattern]  {error_msg}")
 
     def _get_method_description(self, method):
         """获取回测方法描述"""
@@ -787,24 +787,24 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
     def _update_results_display(self, results):
         """更新结果显示 - 重写以支持回测"""
         try:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"📊 开始更新结果显示，结果类型: {list(results.keys()) if isinstance(results, dict) else type(results)}")
+            if True:  # 使用Loguru日志
+                logger.info(f" 开始更新结果显示，结果类型: {list(results.keys()) if isinstance(results, dict) else type(results)}")
 
             # 处理回测结果
             if isinstance(results, dict) and 'backtest' in results:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.info("🔍 检测到回测结果，开始更新回测显示")
+                if True:  # 使用Loguru日志
+                    logger.info(" 检测到回测结果，开始更新回测显示")
                 self._update_backtest_display(results['backtest'])
 
             # 调用父类方法处理其他结果
             super()._update_results_display(results)
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"❌ 更新结果显示失败: {e}")
-                self.log_manager.error(traceback.format_exc())
+            if True:  # 使用Loguru日志
+                logger.error(f" 更新结果显示失败: {e}")
+                logger.error(traceback.format_exc())
             else:
-                print(f"[Pattern] ❌ 更新结果显示失败: {e}")
+                logger.info(f"[Pattern]  更新结果显示失败: {e}")
 
     # 使用父类PatternAnalysisTabPro的优化版本_update_predictions_display方法
     # 不再重写此方法，确保使用最新的优化版本
@@ -813,11 +813,11 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
         """更新统计显示 - 修复版"""
         try:
             if not hasattr(self, 'stats_text'):
-                self.log_manager.warning("对象没有stats_text属性")
+                logger.warning("对象没有stats_text属性")
                 return
 
             text = f"""
-📊 统计分析报告
+ 统计分析报告
 ================
 
 总体统计:
@@ -837,8 +837,8 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
             self.stats_text.setText(text)
 
         except Exception as e:
-            self.log_manager.error(f"更新统计显示失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"更新统计显示失败: {e}")
+            logger.error(traceback.format_exc())
 
     def _process_alerts(self, alerts):
         """处理预警 - 最终修复版"""
@@ -852,8 +852,8 @@ class PatternAnalysisTab(PatternAnalysisTabPro):
                 for alert in alerts:
                     self.pattern_alert.emit(alert['type'], alert)
         except Exception as e:
-            self.log_manager.error(f"处理预警失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"处理预警失败: {e}")
+            logger.error(traceback.format_exc())
 
             # 此处不再引用results变量
 

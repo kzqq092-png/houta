@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -5,10 +6,9 @@
 重构后的入口文件，提供向后兼容性
 """
 
-import logging
 from gui.widgets.performance.unified_performance_widget import ModernUnifiedPerformanceWidget
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 def show_modern_performance_monitor_with_import_monitoring():
@@ -19,7 +19,7 @@ def show_modern_performance_monitor_with_import_monitoring():
 
         # 添加数据导入监控选项卡 (暂时注释，类不存在)
         # import_monitor = DataImportMonitoringWidget()
-        # main_window.tab_widget.addTab(import_monitor, "📊 数据导入监控")
+        # main_window.tab_widget.addTab(import_monitor, " 数据导入监控")
 
         # 设置窗口属性
         main_window.setWindowTitle("FactorWeave-Quant 智能性能监控中心 (含数据导入)")
@@ -59,12 +59,12 @@ def show_modern_performance_monitor(parent=None):
                     aggregation_service=aggregation_service,
                     repository=metrics_repository
                 )
-                logger.info("✅ 健康检查器创建成功")
+                logger.info(" 健康检查器创建成功")
             else:
-                logger.warning("⚠️ 无法获取依赖服务，健康检查器将为空")
+                logger.warning(" 无法获取依赖服务，健康检查器将为空")
 
         except Exception as e:
-            logger.warning(f"⚠️ 创建健康检查器失败: {e}")
+            logger.warning(f" 创建健康检查器失败: {e}")
             # 继续创建窗口，但健康检查器为空
 
         # 创建性能监控窗口

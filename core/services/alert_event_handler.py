@@ -1,10 +1,10 @@
+from loguru import logger
 """
 告警事件处理器
 
 监听系统告警事件，将其转换为告警历史记录
 """
 
-import logging
 import json
 import os
 from datetime import datetime
@@ -15,7 +15,7 @@ from core.services.alert_deduplication_service import (
     get_alert_deduplication_service, AlertMessage, AlertLevel
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AlertEventHandler:
@@ -38,7 +38,7 @@ class AlertEventHandler:
     def handle_resource_alert(self, event_data):
         """处理资源告警事件"""
         try:
-            # 🔧 修复：支持新的ResourceAlert事件对象
+            #  修复：支持新的ResourceAlert事件对象
             from core.events.events import ResourceAlert
 
             if isinstance(event_data, ResourceAlert):
@@ -60,9 +60,9 @@ class AlertEventHandler:
 
                 history_id = db.save_alert_history(alert_history)
                 if history_id:
-                    logger.info(f"✅ 资源告警已保存到数据库，ID: {history_id}")
+                    logger.info(f" 资源告警已保存到数据库，ID: {history_id}")
                 else:
-                    logger.error("❌ 保存资源告警到数据库失败")
+                    logger.error(" 保存资源告警到数据库失败")
 
             else:
                 # 兼容旧的字典格式
@@ -100,7 +100,7 @@ class AlertEventHandler:
     def handle_application_alert(self, event_data):
         """处理应用告警事件"""
         try:
-            # 🔧 修复：支持新的ApplicationAlert事件对象
+            #  修复：支持新的ApplicationAlert事件对象
             from core.events.events import ApplicationAlert
 
             if isinstance(event_data, ApplicationAlert):
@@ -122,9 +122,9 @@ class AlertEventHandler:
 
                 history_id = db.save_alert_history(alert_history)
                 if history_id:
-                    logger.info(f"✅ 应用告警已保存到数据库，ID: {history_id}")
+                    logger.info(f" 应用告警已保存到数据库，ID: {history_id}")
                 else:
-                    logger.error("❌ 保存应用告警到数据库失败")
+                    logger.error(" 保存应用告警到数据库失败")
 
             else:
                 # 兼容旧的字典格式

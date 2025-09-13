@@ -1,16 +1,16 @@
+from loguru import logger
 """
 基础服务模块
 
 定义所有服务的基础接口和通用功能。
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from ..events import EventBus, get_event_bus
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class BaseService(ABC):

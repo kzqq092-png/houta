@@ -4,7 +4,7 @@
 提供技术指标计算、图表显示、分析报告等功能。
 """
 
-import logging
+from loguru import logger
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TechnicalAnalysisDialog(QDialog):

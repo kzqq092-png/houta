@@ -326,37 +326,32 @@ class UIConfig:
 
 @dataclass
 class LoggingConfig(QObject):
-    """日志配置类"""
+    """纯Loguru简化日志配置类 - 替代复杂的传统日志配置"""
 
     # 定义信号
     config_changed = pyqtSignal(object)  # 配置变更信号
 
     def __init__(self, **kwargs):
-        """初始化日志配置
+        """初始化简化的Loguru日志配置
 
         Args:
             **kwargs: 配置参数
         """
         super().__init__()
 
-        # 设置默认值
+        # 简化为Loguru核心配置
         self.level = kwargs.get("level", "INFO")
-        self.save_to_file = kwargs.get("save_to_file", True)
-        self.log_file = kwargs.get("log_file", "factorweave_quant.log")
-        self.max_bytes = kwargs.get("max_bytes", 10 * 1024 * 1024)  # 10MB
-        self.backup_count = kwargs.get("backup_count", 5)
-        self.console_output = kwargs.get("console_output", True)
-        self.auto_compress = kwargs.get("auto_compress", True)
-        self.max_logs = kwargs.get("max_logs", 1000)
-        self.performance_log = kwargs.get("performance_log", True)
-        self.performance_log_file = kwargs.get(
-            "performance_log_file", "performance.log")
-        self.exception_log = kwargs.get("exception_log", True)
-        self.exception_log_file = kwargs.get(
-            "exception_log_file", "exceptions.log")
-        self.async_logging = kwargs.get("async_logging", True)
-        self.log_queue_size = kwargs.get("log_queue_size", 1000)
-        self.worker_threads = kwargs.get("worker_threads", 2)
+        self.enable_console = kwargs.get("enable_console", True)
+        self.enable_file = kwargs.get("enable_file", True)
+        self.enable_async = kwargs.get("enable_async", True)
+        self.log_directory = kwargs.get("log_directory", "logs")
+
+        # Loguru特有配置
+        self.rotation = kwargs.get("rotation", "100 MB")
+        self.retention = kwargs.get("retention", "30 days")
+        self.compression = kwargs.get("compression", "zip")
+        self.backtrace = kwargs.get("backtrace", True)
+        self.diagnose = kwargs.get("diagnose", True)
 
     def validate(self) -> tuple[bool, str]:
         """验证配置是否有效
@@ -365,38 +360,9 @@ class LoggingConfig(QObject):
             tuple[bool, str]: (是否有效, 错误信息)
         """
         # 验证日志级别
-        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        valid_levels = ["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"]
         if self.level not in valid_levels:
             return False, f"无效的日志级别: {self.level}，必须是 {', '.join(valid_levels)} 之一"
-
-        # 验证工作线程数
-        if self.worker_threads <= 0:
-            return False, "工作线程数必须大于0"
-
-        # 验证日志队列大小
-        if self.log_queue_size <= 0:
-            return False, "日志队列大小必须大于0"
-
-        # 验证文件路径
-        if self.save_to_file:
-            if not self.log_file:
-                return False, "日志文件名不能为空"
-            if not self.log_file.endswith('.log'):
-                return False, "日志文件必须以.log结尾"
-
-        # 验证性能日志配置
-        if self.performance_log:
-            if not self.performance_log_file:
-                return False, "性能日志文件名不能为空"
-            if not self.performance_log_file.endswith('.log'):
-                return False, "性能日志文件必须以.log结尾"
-
-        # 验证异常日志配置
-        if self.exception_log:
-            if not self.exception_log_file:
-                return False, "异常日志文件名不能为空"
-            if not self.exception_log_file.endswith('.log'):
-                return False, "异常日志文件必须以.log结尾"
 
         return True, "配置验证通过"
 
@@ -408,20 +374,15 @@ class LoggingConfig(QObject):
         """
         return {
             "level": self.level,
-            "save_to_file": self.save_to_file,
-            "log_file": self.log_file,
-            "max_bytes": self.max_bytes,
-            "backup_count": self.backup_count,
-            "console_output": self.console_output,
-            "auto_compress": self.auto_compress,
-            "max_logs": self.max_logs,
-            "performance_log": self.performance_log,
-            "performance_log_file": self.performance_log_file,
-            "exception_log": self.exception_log,
-            "exception_log_file": self.exception_log_file,
-            "async_logging": self.async_logging,
-            "log_queue_size": self.log_queue_size,
-            "worker_threads": self.worker_threads
+            "enable_console": self.enable_console,
+            "enable_file": self.enable_file,
+            "enable_async": self.enable_async,
+            "log_directory": self.log_directory,
+            "rotation": self.rotation,
+            "retention": self.retention,
+            "compression": self.compression,
+            "backtrace": self.backtrace,
+            "diagnose": self.diagnose
         }
 
     @classmethod
@@ -434,40 +395,10 @@ class LoggingConfig(QObject):
         Returns:
             LoggingConfig实例
         """
-        config = cls()
+        return cls(**data)
 
-        # 更新配置
-        config.level = data.get("level", "INFO")
-        config.save_to_file = data.get("save_to_file", True)
-        config.log_file = data.get("log_file", "factorweave_quant.log")
-        config.max_bytes = data.get("max_bytes", 10 * 1024 * 1024)
-        config.backup_count = data.get("backup_count", 5)
-        config.console_output = data.get("console_output", True)
-        config.auto_compress = data.get("auto_compress", True)
-        config.max_logs = data.get("max_logs", 1000)
-        config.performance_log = data.get("performance_log", True)
-        config.performance_log_file = data.get(
-            "performance_log_file", "performance.log")
-        config.exception_log = data.get("exception_log", True)
-        config.exception_log_file = data.get(
-            "exception_log_file", "exceptions.log")
-        config.async_logging = data.get("async_logging", True)
-        config.log_queue_size = data.get("log_queue_size", 1000)
-        config.worker_threads = data.get("worker_threads", 2)
-
-        return config
-
-    def update(self, **kwargs):
-        """更新配置
-
-        Args:
-            **kwargs: 要更新的配置项
-        """
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-
-        # 发送配置变更信号
+    def emit_config_changed(self):
+        """发射配置变更信号"""
         self.config_changed.emit(self)
 
 

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 运行时调用链分析器
@@ -58,12 +59,12 @@ class RuntimeCallChainAnalyzer:
         self.enabled = True
         if target_modules:
             self.target_modules = set(target_modules)
-        print("🔍 运行时调用链分析已启用")
+        logger.info(" 运行时调用链分析已启用")
 
     def disable(self):
         """禁用调用链分析"""
         self.enabled = False
-        print("🔍 运行时调用链分析已禁用")
+        logger.info(" 运行时调用链分析已禁用")
 
     def should_trace(self, module_name: str) -> bool:
         """判断是否应该追踪此模块"""
@@ -311,7 +312,7 @@ class RuntimeCallChainAnalyzer:
         report.append("=" * 60)
 
         # 总体统计
-        report.append(f"\n## 📊 运行时统计")
+        report.append(f"\n##  运行时统计")
         report.append(f"- 总调用次数: {summary['total_calls']:,}")
         report.append(f"- 总执行时间: {summary['total_duration']:.4f} 秒")
         report.append(f"- 唯一函数数: {summary['unique_functions']}")
@@ -331,7 +332,7 @@ class RuntimeCallChainAnalyzer:
         )[:10]
 
         if top_functions:
-            report.append(f"\n## ⏱️ 最耗时的函数 (Top 10)")
+            report.append(f"\n## ⏱ 最耗时的函数 (Top 10)")
             for i, (func_name, stats) in enumerate(top_functions, 1):
                 short_name = func_name.split('.')[-1]
                 report.append(f"{i}. **{short_name}**")
@@ -342,7 +343,7 @@ class RuntimeCallChainAnalyzer:
 
         # 最慢的单次调用
         if summary['slowest_calls']:
-            report.append(f"\n## 🐌 最慢的单次调用 (Top 5)")
+            report.append(f"\n##  最慢的单次调用 (Top 5)")
             for i, (call_id, call_info) in enumerate(summary['slowest_calls'][:5], 1):
                 short_name = call_info['function'].split('.')[-1]
                 report.append(f"{i}. **{short_name}**: {call_info['duration']:.4f}秒")
@@ -352,7 +353,7 @@ class RuntimeCallChainAnalyzer:
 
         # 最深的调用链
         if summary['deepest_calls']:
-            report.append(f"\n## 🔗 最深的调用链")
+            report.append(f"\n##  最深的调用链")
             for i, (call_id, call_info) in enumerate(summary['deepest_calls'], 1):
                 short_name = call_info['function'].split('.')[-1]
                 report.append(f"{i}. **{short_name}** (深度: {call_info['depth']})")
@@ -360,7 +361,7 @@ class RuntimeCallChainAnalyzer:
 
         # 调用链分析
         if chains['longest_chain']:
-            report.append(f"\n## 📈 调用链分析")
+            report.append(f"\n##  调用链分析")
             longest = chains['longest_chain']
             report.append(f"**最长调用链**:")
             report.append(f"- 根函数: {longest['root_function'].split('.')[-1]}")
@@ -410,7 +411,7 @@ class RuntimeCallChainAnalyzer:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        print(f"📄 原始调用数据已保存到 {filename}")
+        logger.info(f" 原始调用数据已保存到 {filename}")
 
 
 def create_backtest_tracer():
@@ -450,7 +451,7 @@ def patch_backtest_methods(analyzer: RuntimeCallChainAnalyzer):
                 original_method = getattr(UnifiedBacktestEngine, method_name)
                 decorated_method = analyzer.trace_calls(original_method)
                 setattr(UnifiedBacktestEngine, method_name, decorated_method)
-                print(f"✅ 已装饰 UnifiedBacktestEngine.{method_name}")
+                logger.info(f" 已装饰 UnifiedBacktestEngine.{method_name}")
 
         # 装饰策略插件
         try:
@@ -462,10 +463,10 @@ def patch_backtest_methods(analyzer: RuntimeCallChainAnalyzer):
                     original_method = getattr(HikyuuStrategyPlugin, method_name)
                     decorated_method = analyzer.trace_calls(original_method)
                     setattr(HikyuuStrategyPlugin, method_name, decorated_method)
-                    print(f"✅ 已装饰 HikyuuStrategyPlugin.{method_name}")
+                    logger.info(f" 已装饰 HikyuuStrategyPlugin.{method_name}")
 
         except ImportError as e:
-            print(f"⚠️ 无法导入 HikyuuStrategyPlugin: {e}")
+            logger.info(f" 无法导入 HikyuuStrategyPlugin: {e}")
 
         # 装饰指标仓库
         try:
@@ -477,31 +478,31 @@ def patch_backtest_methods(analyzer: RuntimeCallChainAnalyzer):
                     original_method = getattr(MetricsRepository, method_name)
                     decorated_method = analyzer.trace_calls(original_method)
                     setattr(MetricsRepository, method_name, decorated_method)
-                    print(f"✅ 已装饰 MetricsRepository.{method_name}")
+                    logger.info(f" 已装饰 MetricsRepository.{method_name}")
 
         except ImportError as e:
-            print(f"⚠️ 无法导入 MetricsRepository: {e}")
+            logger.info(f" 无法导入 MetricsRepository: {e}")
 
         return True
 
     except ImportError as e:
-        print(f"❌ 无法导入回测引擎: {e}")
+        logger.info(f" 无法导入回测引擎: {e}")
         return False
 
 
 def main():
     """主函数 - 演示如何使用运行时调用链分析器"""
-    print("🚀 运行时调用链分析器演示")
-    print("=" * 50)
+    logger.info(" 运行时调用链分析器演示")
+    logger.info("=" * 50)
 
     # 创建分析器
     analyzer = create_backtest_tracer()
 
     # 尝试装饰回测系统的方法
     if patch_backtest_methods(analyzer):
-        print("✅ 回测系统方法装饰完成")
+        logger.info(" 回测系统方法装饰完成")
     else:
-        print("❌ 回测系统方法装饰失败")
+        logger.info(" 回测系统方法装饰失败")
 
     # 模拟一些调用来演示功能
     @analyzer.trace_calls
@@ -536,7 +537,7 @@ def main():
         time.sleep(0.003)
 
     # 运行演示
-    print("\n🔍 运行演示回测...")
+    logger.info("\n 运行演示回测...")
     start_time = time.time()
 
     for i in range(3):
@@ -548,12 +549,12 @@ def main():
     analyzer.disable()
 
     # 生成报告
-    print(f"\n📊 演示完成，总耗时: {end_time - start_time:.4f}秒")
+    logger.info(f"\n 演示完成，总耗时: {end_time - start_time:.4f}秒")
 
     # 获取性能摘要
     summary = analyzer.get_performance_summary()
-    print(f"📈 捕获了 {summary['total_calls']} 次调用")
-    print(f"📈 涉及 {summary['unique_functions']} 个唯一函数")
+    logger.info(f" 捕获了 {summary['total_calls']} 次调用")
+    logger.info(f" 涉及 {summary['unique_functions']} 个唯一函数")
 
     # 生成详细报告
     report = analyzer.generate_analysis_report()
@@ -565,8 +566,8 @@ def main():
     # 保存原始数据
     analyzer.save_raw_data()
 
-    print("📄 运行时调用链分析报告已保存到 runtime_call_chain_analysis.md")
-    print("📄 原始调用数据已保存到 call_chain_raw_data.json")
+    logger.info(" 运行时调用链分析报告已保存到 runtime_call_chain_analysis.md")
+    logger.info(" 原始调用数据已保存到 call_chain_raw_data.json")
 
     return analyzer
 

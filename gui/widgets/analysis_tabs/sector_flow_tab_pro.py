@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级板块资金流分析标签页 - 对标行业专业软件
 """
@@ -11,7 +12,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from .base_tab import BaseAnalysisTab
 from utils.manager_factory import get_manager_factory, get_data_manager
-
 
 class SectorFlowAnalysisThread(QThread):
     """板块资金流分析线程"""
@@ -40,7 +40,6 @@ class SectorFlowAnalysisThread(QThread):
         except Exception as e:
             error_msg = f"分析失败: {str(e)}"
             self.error_occurred.emit(error_msg)
-
 
 class SectorFlowTabPro(BaseAnalysisTab):
     """专业级板块资金流分析标签页 - 对标同花顺、Wind等专业软件"""
@@ -147,60 +146,60 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
     def _init_sector_flow_service(self):
         """初始化板块资金流服务"""
-        print("🔄 开始初始化板块资金流服务...")
+        logger.info(" 开始初始化板块资金流服务...")
         import time
         start_time = time.time()
 
         try:
             if self.service_container:
-                print("🔍 服务容器可用，获取板块资金流服务...")
+                logger.info(" 服务容器可用，获取板块资金流服务...")
                 from core.services.sector_fund_flow_service import SectorFundFlowService
-                print("📦 板块资金流服务类导入成功")
+                logger.info(" 板块资金流服务类导入成功")
 
-                print("🏭 从服务容器解析板块资金流服务...")
+                logger.info(" 从服务容器解析板块资金流服务...")
                 resolve_start = time.time()
                 self.sector_flow_service = self.service_container.resolve(SectorFundFlowService)
                 resolve_time = time.time()
-                print(f"✅ 从服务容器获取板块资金流服务成功，耗时: {(resolve_time - resolve_start):.2f}秒")
+                logger.info(f" 从服务容器获取板块资金流服务成功，耗时: {(resolve_time - resolve_start):.2f}秒")
 
                 # 初始化服务
-                print("⚙️ 初始化板块资金流服务...")
+                logger.info(" 初始化板块资金流服务...")
                 init_start = time.time()
                 self.sector_flow_service.initialize()
                 init_time = time.time()
-                print(f"✅ 板块资金流服务初始化完成，耗时: {(init_time - init_start):.2f}秒")
+                logger.info(f" 板块资金流服务初始化完成，耗时: {(init_time - init_start):.2f}秒")
 
                 # 连接信号
-                print("🔗 连接板块资金流服务信号...")
+                logger.info(" 连接板块资金流服务信号...")
                 self.sector_flow_service.data_updated.connect(self._on_flow_data_updated)
                 self.sector_flow_service.error_occurred.connect(self._on_flow_error)
-                print("✅ 板块资金流服务信号连接完成")
+                logger.info(" 板块资金流服务信号连接完成")
 
             else:
-                print("⚠️ 服务容器不可用，板块资金流功能受限")
+                logger.info(" 服务容器不可用，板块资金流功能受限")
 
             end_time = time.time()
-            print(f"✅ 板块资金流服务初始化完成，总耗时: {(end_time - start_time):.2f}秒")
+            logger.info(f" 板块资金流服务初始化完成，总耗时: {(end_time - start_time):.2f}秒")
         except Exception as e:
-            print(f"❌ 初始化板块资金流服务失败: {e}")
+            logger.info(f" 初始化板块资金流服务失败: {e}")
             import traceback
-            print(f"🔍 详细错误信息: {traceback.format_exc()}")
+            logger.info(f" 详细错误信息: {traceback.format_exc()}")
             self.sector_flow_service = None
 
     def _on_flow_data_updated(self, data):
         """处理资金流数据更新"""
         try:
-            print(f"📊 收到板块资金流数据更新: {len(data) if data else 0} 条记录")
+            logger.info(f" 收到板块资金流数据更新: {len(data) if data else 0} 条记录")
             # 这里可以更新UI显示
             self.flow_data = data
             # 可以发射信号通知其他组件
             self.flow_detected.emit(data)
         except Exception as e:
-            print(f"处理资金流数据更新失败: {e}")
+            logger.info(f"处理资金流数据更新失败: {e}")
 
     def _on_flow_error(self, error_message):
         """处理资金流数据错误"""
-        print(f"❌ 板块资金流数据错误: {error_message}")
+        logger.info(f" 板块资金流数据错误: {error_message}")
         self.flow_alert.emit("数据错误", {"error": error_message})
 
     def create_ui(self):
@@ -248,17 +247,17 @@ class SectorFlowTabPro(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 实时监控
-        realtime_btn = QPushButton("📊 实时监控")
+        realtime_btn = QPushButton(" 实时监控")
         realtime_btn.setStyleSheet(self._get_button_style('#28a745'))
         realtime_btn.clicked.connect(self.realtime_monitoring)
 
         # 板块轮动
-        rotation_btn = QPushButton("🔄 板块轮动")
+        rotation_btn = QPushButton(" 板块轮动")
         rotation_btn.setStyleSheet(self._get_button_style('#007bff'))
         rotation_btn.clicked.connect(self.sector_rotation_analysis)
 
         # 聪明资金
-        smart_money_btn = QPushButton("🧠 聪明资金")
+        smart_money_btn = QPushButton(" 聪明资金")
         smart_money_btn.setStyleSheet(self._get_button_style('#6f42c1'))
         smart_money_btn.clicked.connect(self.smart_money_analysis)
 
@@ -272,12 +271,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
         advanced_layout = QHBoxLayout(advanced_group)
 
         # 综合分析
-        comprehensive_btn = QPushButton("🎯 综合分析")
+        comprehensive_btn = QPushButton(" 综合分析")
         comprehensive_btn.setStyleSheet(self._get_button_style('#17a2b8'))
         comprehensive_btn.clicked.connect(self.comprehensive_flow_analysis)
 
         # 流向预测
-        prediction_btn = QPushButton("🔮 流向预测")
+        prediction_btn = QPushButton(" 流向预测")
         prediction_btn.setStyleSheet(self._get_button_style('#ffc107'))
         prediction_btn.clicked.connect(self.flow_prediction)
 
@@ -410,23 +409,23 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
         # 资金流排行
         ranking_tab = self._create_ranking_tab()
-        self.results_tabs.addTab(ranking_tab, "📊 资金流排行")
+        self.results_tabs.addTab(ranking_tab, " 资金流排行")
 
         # 板块轮动
         rotation_tab = self._create_rotation_tab()
-        self.results_tabs.addTab(rotation_tab, "🔄 板块轮动")
+        self.results_tabs.addTab(rotation_tab, " 板块轮动")
 
         # 聪明资金
         smart_money_tab = self._create_smart_money_tab()
-        self.results_tabs.addTab(smart_money_tab, "🧠 聪明资金")
+        self.results_tabs.addTab(smart_money_tab, " 聪明资金")
 
         # 流向预测
         prediction_tab = self._create_prediction_tab()
-        self.results_tabs.addTab(prediction_tab, "🔮 流向预测")
+        self.results_tabs.addTab(prediction_tab, " 流向预测")
 
         # 实时监控
         monitor_tab = self._create_monitor_tab()
-        self.results_tabs.addTab(monitor_tab, "📈 实时监控")
+        self.results_tabs.addTab(monitor_tab, " 实时监控")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -551,8 +550,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def realtime_monitoring(self):
         """实时监控 - 使用专用线程避免界面卡死"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 实时监控按钮被点击")
-            print("🔍 [DEBUG] 实时监控按钮被点击")
+            logger.info(" [DEBUG] 实时监控按钮被点击")
+            logger.info(" [DEBUG] 实时监控按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "实时监控", "实时监控功能已启动，正在分析数据...")
@@ -561,31 +560,31 @@ class SectorFlowTabPro(BaseAnalysisTab):
             if hasattr(self, 'progress_bar'):
                 self.progress_bar.setVisible(True)
                 self.progress_bar.setValue(0)
-                self.log_manager.info("🔍 [DEBUG] 进度条已显示")
+                logger.info(" [DEBUG] 进度条已显示")
             else:
-                self.log_manager.warning("⚠️ [DEBUG] progress_bar 不存在")
+                logger.warning(" [DEBUG] progress_bar 不存在")
 
             if hasattr(self, 'status_label'):
                 self.status_label.setText("正在启动实时监控...")
-                self.log_manager.info("🔍 [DEBUG] 状态标签已更新")
+                logger.info(" [DEBUG] 状态标签已更新")
             else:
-                self.log_manager.warning("⚠️ [DEBUG] status_label 不存在")
+                logger.warning(" [DEBUG] status_label 不存在")
 
             # 启动异步分析线程
-            self.log_manager.info("🔍 [DEBUG] 创建分析线程")
+            logger.info(" [DEBUG] 创建分析线程")
             self.realtime_thread = SectorFlowAnalysisThread(self._realtime_monitoring_async)
             self.realtime_thread.analysis_completed.connect(self._on_realtime_analysis_completed)
             self.realtime_thread.error_occurred.connect(self._on_realtime_analysis_error)
             self.realtime_thread.progress_updated.connect(self._on_realtime_progress_updated)
 
-            self.log_manager.info("🔍 [DEBUG] 启动分析线程")
+            logger.info(" [DEBUG] 启动分析线程")
             self.realtime_thread.start()
-            self.log_manager.info("✅ [DEBUG] 分析线程已启动")
+            logger.info(" [DEBUG] 分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动实时监控失败: {e}"
-            self.log_manager.error(f"❌ [DEBUG] {error_msg}")
-            print(f"❌ [DEBUG] {error_msg}")
+            logger.error(f" [DEBUG] {error_msg}")
+            logger.info(f" [DEBUG] {error_msg}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("启动失败")
             QMessageBox.warning(self, "错误", error_msg)
@@ -593,26 +592,26 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def _realtime_monitoring_async(self):
         """异步实时监控"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 开始异步实时监控")
-            print("🔍 [DEBUG] 开始异步实时监控")
+            logger.info(" [DEBUG] 开始异步实时监控")
+            logger.info(" [DEBUG] 开始异步实时监控")
             results = self._get_realtime_fund_flow_data()
-            self.log_manager.info(f"🔍 [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
-            print(f"🔍 [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
+            logger.info(f" [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
+            logger.info(f" [DEBUG] 获取到数据: {len(results) if isinstance(results, list) else 'N/A'} 条记录")
             return {'realtime_data': results}
         except Exception as e:
             error_msg = f"异步实时监控失败: {e}"
-            self.log_manager.error(f"❌ [DEBUG] {error_msg}")
-            print(f"❌ [DEBUG] {error_msg}")
+            logger.error(f" [DEBUG] {error_msg}")
+            logger.info(f" [DEBUG] {error_msg}")
             import traceback
-            self.log_manager.error(f"❌ [DEBUG] 详细错误: {traceback.format_exc()}")
-            print(f"❌ [DEBUG] 详细错误: {traceback.format_exc()}")
+            logger.error(f" [DEBUG] 详细错误: {traceback.format_exc()}")
+            logger.info(f" [DEBUG] 详细错误: {traceback.format_exc()}")
             return {'error': str(e)}
 
     def _get_realtime_fund_flow_data(self):
         """获取实时资金流数据 - 完全使用真实数据源"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 开始获取实时资金流数据")
-            print("🔍 [DEBUG] 开始获取实时资金流数据")
+            logger.info(" [DEBUG] 开始获取实时资金流数据")
+            logger.info(" [DEBUG] 开始获取实时资金流数据")
 
             # 方案1：尝试使用正确初始化的TET框架
             try:
@@ -627,8 +626,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                 if service_container:
                     unified_data_manager = UnifiedDataManager(service_container, event_bus)
-                    self.log_manager.info("🔍 [DEBUG] TET统一数据管理器初始化成功")
-                    print("🔍 [DEBUG] TET统一数据管理器初始化成功")
+                    logger.info(" [DEBUG] TET统一数据管理器初始化成功")
+                    logger.info(" [DEBUG] TET统一数据管理器初始化成功")
 
                     # 优先尝试获取板块资金流数据
                     try:
@@ -642,12 +641,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
                         if sector_fund_flow_data is not None and not sector_fund_flow_data.empty:
                             monitor_data = self._process_sector_flow_data(sector_fund_flow_data)
                             if monitor_data:
-                                self.log_manager.info(f"✅ [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
-                                print(f"✅ [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
                                 return monitor_data
                     except Exception as e:
-                        self.log_manager.warning(f"⚠️ [DEBUG] TET获取板块资金流数据失败: {e}")
-                        print(f"⚠️ [DEBUG] TET获取板块资金流数据失败: {e}")
+                        logger.warning(f" [DEBUG] TET获取板块资金流数据失败: {e}")
+                        logger.info(f" [DEBUG] TET获取板块资金流数据失败: {e}")
 
                     # 备选：尝试获取实时资金流数据
                     try:
@@ -661,12 +660,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
                         if realtime_fund_flow_data is not None and not realtime_fund_flow_data.empty:
                             monitor_data = self._process_realtime_fund_flow_data(realtime_fund_flow_data)
                             if monitor_data:
-                                self.log_manager.info(f"✅ [DEBUG] TET框架获取实时资金流数据成功: {len(monitor_data)} 条")
-                                print(f"✅ [DEBUG] TET框架获取实时资金流数据成功: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] TET框架获取实时资金流数据成功: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] TET框架获取实时资金流数据成功: {len(monitor_data)} 条")
                                 return monitor_data
                     except Exception as e:
-                        self.log_manager.warning(f"⚠️ [DEBUG] TET获取实时资金流数据失败: {e}")
-                        print(f"⚠️ [DEBUG] TET获取实时资金流数据失败: {e}")
+                        logger.warning(f" [DEBUG] TET获取实时资金流数据失败: {e}")
+                        logger.info(f" [DEBUG] TET获取实时资金流数据失败: {e}")
 
                     # 最后备选：获取股票基本面数据进行处理
                     major_stocks = ["000001", "000002", "000858", "002415", "600036"]
@@ -683,103 +682,103 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                             if stock_data is not None and not stock_data.empty:
                                 sector_data_list.append(stock_data)
-                                self.log_manager.info(f"🔍 [DEBUG] TET获取股票 {stock_code} 数据成功")
-                                print(f"🔍 [DEBUG] TET获取股票 {stock_code} 数据成功")
+                                logger.info(f" [DEBUG] TET获取股票 {stock_code} 数据成功")
+                                logger.info(f" [DEBUG] TET获取股票 {stock_code} 数据成功")
                         except Exception as e:
-                            self.log_manager.warning(f"⚠️ [DEBUG] TET获取股票 {stock_code} 失败: {e}")
-                            print(f"⚠️ [DEBUG] TET获取股票 {stock_code} 失败: {e}")
+                            logger.warning(f" [DEBUG] TET获取股票 {stock_code} 失败: {e}")
+                            logger.info(f" [DEBUG] TET获取股票 {stock_code} 失败: {e}")
 
                     if sector_data_list:
                         monitor_data = self._process_stock_data_to_sector_monitor(sector_data_list)
                         if monitor_data:
-                            self.log_manager.info(f"✅ [DEBUG] TET框架生成监控数据: {len(monitor_data)} 条")
-                            print(f"✅ [DEBUG] TET框架生成监控数据: {len(monitor_data)} 条")
+                            logger.info(f" [DEBUG] TET框架生成监控数据: {len(monitor_data)} 条")
+                            logger.info(f" [DEBUG] TET框架生成监控数据: {len(monitor_data)} 条")
                             return monitor_data
                 else:
-                    self.log_manager.warning("⚠️ [DEBUG] 服务容器不可用，跳过TET框架")
-                    print("⚠️ [DEBUG] 服务容器不可用，跳过TET框架")
+                    logger.warning(" [DEBUG] 服务容器不可用，跳过TET框架")
+                    logger.info(" [DEBUG] 服务容器不可用，跳过TET框架")
 
             except Exception as e:
-                self.log_manager.error(f"❌ [DEBUG] TET框架方案失败: {e}")
-                print(f"❌ [DEBUG] TET框架方案失败: {e}")
+                logger.error(f" [DEBUG] TET框架方案失败: {e}")
+                logger.info(f" [DEBUG] TET框架方案失败: {e}")
 
             # 方案2：使用数据管理器获取资金流数据
-            self.log_manager.info("🔍 [DEBUG] 尝试数据管理器方案")
-            print("🔍 [DEBUG] 尝试数据管理器方案")
+            logger.info(" [DEBUG] 尝试数据管理器方案")
+            logger.info(" [DEBUG] 尝试数据管理器方案")
 
             try:
                 from utils.manager_factory import get_data_manager
                 data_manager = get_data_manager()
 
                 if data_manager and hasattr(data_manager, 'get_fund_flow'):
-                    self.log_manager.info("🔍 [DEBUG] 通过数据管理器获取资金流数据")
-                    print("🔍 [DEBUG] 通过数据管理器获取资金流数据")
+                    logger.info(" [DEBUG] 通过数据管理器获取资金流数据")
+                    logger.info(" [DEBUG] 通过数据管理器获取资金流数据")
 
                     fund_flow_data = data_manager.get_fund_flow()
 
                     if fund_flow_data and isinstance(fund_flow_data, dict) and 'sector_flow_rank' in fund_flow_data:
                         df = fund_flow_data['sector_flow_rank']
-                        self.log_manager.info(f"🔍 [DEBUG] 数据管理器获取板块数据: {len(df)} 行")
-                        print(f"🔍 [DEBUG] 数据管理器获取板块数据: {len(df)} 行")
+                        logger.info(f" [DEBUG] 数据管理器获取板块数据: {len(df)} 行")
+                        logger.info(f" [DEBUG] 数据管理器获取板块数据: {len(df)} 行")
 
                         if not df.empty:
                             monitor_data = self._process_sector_flow_data(df)
                             if monitor_data:
-                                self.log_manager.info(f"✅ [DEBUG] 数据管理器生成监控数据: {len(monitor_data)} 条")
-                                print(f"✅ [DEBUG] 数据管理器生成监控数据: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] 数据管理器生成监控数据: {len(monitor_data)} 条")
+                                logger.info(f" [DEBUG] 数据管理器生成监控数据: {len(monitor_data)} 条")
                                 return monitor_data
                     else:
-                        self.log_manager.warning("⚠️ [DEBUG] 数据管理器未返回有效数据")
-                        print("⚠️ [DEBUG] 数据管理器未返回有效数据")
+                        logger.warning(" [DEBUG] 数据管理器未返回有效数据")
+                        logger.info(" [DEBUG] 数据管理器未返回有效数据")
 
             except Exception as e:
-                self.log_manager.error(f"❌ [DEBUG] 数据管理器方案失败: {e}")
-                print(f"❌ [DEBUG] 数据管理器方案失败: {e}")
+                logger.error(f" [DEBUG] 数据管理器方案失败: {e}")
+                logger.info(f" [DEBUG] 数据管理器方案失败: {e}")
 
             # 方案3：自实现资金流数据获取（使用AkShare网络查询）
-            self.log_manager.info("🔍 [DEBUG] 自实现资金流数据获取")
-            print("🔍 [DEBUG] 自实现资金流数据获取")
+            logger.info(" [DEBUG] 自实现资金流数据获取")
+            logger.info(" [DEBUG] 自实现资金流数据获取")
 
             try:
                 monitor_data = self._implement_fund_flow_analysis()
                 if monitor_data:
-                    self.log_manager.info(f"✅ [DEBUG] 自实现方案生成监控数据: {len(monitor_data)} 条")
-                    print(f"✅ [DEBUG] 自实现方案生成监控数据: {len(monitor_data)} 条")
+                    logger.info(f" [DEBUG] 自实现方案生成监控数据: {len(monitor_data)} 条")
+                    logger.info(f" [DEBUG] 自实现方案生成监控数据: {len(monitor_data)} 条")
                     return monitor_data
 
             except Exception as e:
-                self.log_manager.error(f"❌ [DEBUG] 自实现方案失败: {e}")
-                print(f"❌ [DEBUG] 自实现方案失败: {e}")
+                logger.error(f" [DEBUG] 自实现方案失败: {e}")
+                logger.info(f" [DEBUG] 自实现方案失败: {e}")
 
             # 所有真实数据源都失败，返回空数据
-            self.log_manager.error("❌ [DEBUG] 所有真实数据源都失败，无法获取数据")
-            print("❌ [DEBUG] 所有真实数据源都失败，无法获取数据")
+            logger.error(" [DEBUG] 所有真实数据源都失败，无法获取数据")
+            logger.info(" [DEBUG] 所有真实数据源都失败，无法获取数据")
             return []
 
         except Exception as e:
             error_msg = f"获取实时资金流数据失败: {e}"
-            self.log_manager.error(f"❌ [DEBUG] {error_msg}")
-            print(f"❌ [DEBUG] {error_msg}")
+            logger.error(f" [DEBUG] {error_msg}")
+            logger.info(f" [DEBUG] {error_msg}")
             return []
 
     def _implement_fund_flow_analysis(self):
         """自实现资金流分析功能"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 开始自实现资金流分析")
-            print("🔍 [DEBUG] 开始自实现资金流分析")
+            logger.info(" [DEBUG] 开始自实现资金流分析")
+            logger.info(" [DEBUG] 开始自实现资金流分析")
 
             # 使用AkShare直接获取板块资金流数据
             try:
                 import akshare as ak
-                self.log_manager.info("🔍 [DEBUG] 使用AkShare获取板块资金流数据")
-                print("🔍 [DEBUG] 使用AkShare获取板块资金流数据")
+                logger.info(" [DEBUG] 使用AkShare获取板块资金流数据")
+                logger.info(" [DEBUG] 使用AkShare获取板块资金流数据")
 
                 # 获取板块资金流排行
                 sector_flow_df = ak.stock_sector_fund_flow_rank(indicator="今日")
 
                 if not sector_flow_df.empty:
-                    self.log_manager.info(f"🔍 [DEBUG] AkShare获取板块数据: {len(sector_flow_df)} 行")
-                    print(f"🔍 [DEBUG] AkShare获取板块数据: {len(sector_flow_df)} 行")
+                    logger.info(f" [DEBUG] AkShare获取板块数据: {len(sector_flow_df)} 行")
+                    logger.info(f" [DEBUG] AkShare获取板块数据: {len(sector_flow_df)} 行")
 
                     monitor_data = []
 
@@ -821,21 +820,21 @@ class SectorFlowTabPro(BaseAnalysisTab):
 
                     return monitor_data
                 else:
-                    self.log_manager.warning("⚠️ [DEBUG] AkShare返回空数据")
-                    print("⚠️ [DEBUG] AkShare返回空数据")
+                    logger.warning(" [DEBUG] AkShare返回空数据")
+                    logger.info(" [DEBUG] AkShare返回空数据")
 
             except Exception as e:
-                self.log_manager.error(f"❌ [DEBUG] AkShare获取数据失败: {e}")
-                print(f"❌ [DEBUG] AkShare获取数据失败: {e}")
+                logger.error(f" [DEBUG] AkShare获取数据失败: {e}")
+                logger.info(f" [DEBUG] AkShare获取数据失败: {e}")
 
             # AkShare失败，无法获取真实数据
-            self.log_manager.error("❌ [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
-            print("❌ [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
+            logger.error(" [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
+            logger.info(" [DEBUG] AkShare网络查询失败，无法获取真实板块资金流数据")
             return []
 
         except Exception as e:
-            self.log_manager.error(f"❌ [DEBUG] 自实现资金流分析失败: {e}")
-            print(f"❌ [DEBUG] 自实现资金流分析失败: {e}")
+            logger.error(f" [DEBUG] 自实现资金流分析失败: {e}")
+            logger.info(f" [DEBUG] 自实现资金流分析失败: {e}")
             return []
 
     def _parse_money_amount(self, amount_str):
@@ -876,7 +875,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.prediction_thread.start()
 
         except Exception as e:
-            self.log_manager.error(f"启动资金流向预测失败: {e}")
+            logger.error(f"启动资金流向预测失败: {e}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("启动失败")
             QMessageBox.warning(self, "错误", f"启动资金流向预测失败: {str(e)}")
@@ -958,21 +957,21 @@ class SectorFlowTabPro(BaseAnalysisTab):
                                 'risk_level': '高' if abs(predicted_inflow) > 50000000 else '中' if abs(predicted_inflow) > 20000000 else '低'
                             })
 
-                    self.log_manager.info(f"资金流向预测完成，生成 {len(prediction_data)} 个预测")
+                    logger.info(f"资金流向预测完成，生成 {len(prediction_data)} 个预测")
                     return prediction_data
 
             # 如果没有数据，返回空列表
-            self.log_manager.warning("未获取到资金流向预测数据")
+            logger.warning("未获取到资金流向预测数据")
             return []
 
         except Exception as e:
-            self.log_manager.error(f"资金流向预测失败: {e}")
+            logger.error(f"资金流向预测失败: {e}")
             return []
 
     def _on_realtime_analysis_completed(self, results):
         """实时监控分析完成回调"""
         try:
-            print(f"🔍 [DEBUG] 实时监控分析完成回调被触发，结果: {results}")
+            logger.info(f" [DEBUG] 实时监控分析完成回调被触发，结果: {results}")
 
             if hasattr(self, 'progress_bar'):
                 self.progress_bar.setVisible(False)
@@ -980,20 +979,20 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 self.status_label.setText("实时监控完成")
 
             if 'error' in results:
-                print(f"❌ [DEBUG] 分析出现错误: {results['error']}")
+                logger.info(f" [DEBUG] 分析出现错误: {results['error']}")
                 QMessageBox.warning(self, "错误", results['error'])
                 return
 
             # 更新实时监控表格
             if 'realtime_data' in results:
                 realtime_data = results['realtime_data']
-                print(f"🔍 [DEBUG] 实时数据: {len(realtime_data) if isinstance(realtime_data, list) else 'N/A'} 条")
+                logger.info(f" [DEBUG] 实时数据: {len(realtime_data) if isinstance(realtime_data, list) else 'N/A'} 条")
 
                 if hasattr(self, 'monitor_table') and self.monitor_table:
-                    print("🔍 [DEBUG] 更新监控表格")
+                    logger.info(" [DEBUG] 更新监控表格")
                     self._update_monitor_table(realtime_data)
                 else:
-                    print("⚠️ [DEBUG] monitor_table 不存在，使用消息框显示结果")
+                    logger.info(" [DEBUG] monitor_table 不存在，使用消息框显示结果")
                     # 创建简单的消息框显示结果
                     if realtime_data:
                         message = f"实时监控完成，检测到 {len(realtime_data)} 个事件:\n\n"
@@ -1005,13 +1004,13 @@ class SectorFlowTabPro(BaseAnalysisTab):
                     else:
                         QMessageBox.information(self, "实时监控结果", "未检测到显著的资金流动事件")
             else:
-                print("⚠️ [DEBUG] 结果中没有 realtime_data")
+                logger.info(" [DEBUG] 结果中没有 realtime_data")
 
-            self.log_manager.info("实时监控分析完成")
+            logger.info("实时监控分析完成")
 
         except Exception as e:
-            print(f"❌ [DEBUG] 处理实时监控结果失败: {e}")
-            self.log_manager.error(f"处理实时监控结果失败: {e}")
+            logger.info(f" [DEBUG] 处理实时监控结果失败: {e}")
+            logger.error(f"处理实时监控结果失败: {e}")
 
     def _on_realtime_analysis_error(self, error_msg):
         """实时监控分析错误回调"""
@@ -1020,7 +1019,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         if hasattr(self, 'status_label'):
             self.status_label.setText("分析失败")
         QMessageBox.warning(self, "错误", error_msg)
-        self.log_manager.error(f"实时监控分析失败: {error_msg}")
+        logger.error(f"实时监控分析失败: {error_msg}")
 
     def _on_realtime_progress_updated(self, value, message):
         """实时监控进度更新回调"""
@@ -1046,13 +1045,13 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 self.monitor_table.setItem(i, 5, QTableWidgetItem(data.get('status', '')))
 
         except Exception as e:
-            self.log_manager.error(f"更新监控表格失败: {e}")
+            logger.error(f"更新监控表格失败: {e}")
 
     def sector_rotation_analysis(self):
         """板块轮动分析 - 使用专用线程避免界面卡死"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 板块轮动按钮被点击")
-            print("🔍 [DEBUG] 板块轮动按钮被点击")
+            logger.info(" [DEBUG] 板块轮动按钮被点击")
+            logger.info(" [DEBUG] 板块轮动按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "板块轮动分析", "板块轮动分析功能已启动，正在分析数据...")
@@ -1071,12 +1070,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.rotation_thread.progress_updated.connect(self._on_sector_rotation_progress_updated)
             self.rotation_thread.start()
 
-            self.log_manager.info("✅ [DEBUG] 板块轮动分析线程已启动")
+            logger.info(" [DEBUG] 板块轮动分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动板块轮动分析失败: {e}"
-            self.log_manager.error(f"❌ [DEBUG] {error_msg}")
-            print(f"❌ [DEBUG] {error_msg}")
+            logger.error(f" [DEBUG] {error_msg}")
+            logger.info(f" [DEBUG] {error_msg}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("启动失败")
             QMessageBox.warning(self, "错误", error_msg)
@@ -1179,22 +1178,22 @@ class SectorFlowTabPro(BaseAnalysisTab):
                                     'time': datetime.now().strftime('%H:%M')
                                 })
 
-                    self.log_manager.info(f"板块轮动分析完成，发现 {len(rotation_data)} 个轮动关系")
+                    logger.info(f"板块轮动分析完成，发现 {len(rotation_data)} 个轮动关系")
                     return rotation_data
 
             # 如果没有数据，返回空列表
-            self.log_manager.warning("未获取到板块轮动分析数据")
+            logger.warning("未获取到板块轮动分析数据")
             return []
 
         except Exception as e:
-            self.log_manager.error(f"板块轮动分析失败: {e}")
+            logger.error(f"板块轮动分析失败: {e}")
             return []
 
     def smart_money_analysis(self):
         """聪明资金分析 - 使用专用线程避免界面卡死"""
         try:
-            self.log_manager.info("🔍 [DEBUG] 聪明资金按钮被点击")
-            print("🔍 [DEBUG] 聪明资金按钮被点击")
+            logger.info(" [DEBUG] 聪明资金按钮被点击")
+            logger.info(" [DEBUG] 聪明资金按钮被点击")
 
             # 立即显示用户反馈
             QMessageBox.information(self, "聪明资金检测", "聪明资金检测功能已启动，正在分析数据...")
@@ -1213,12 +1212,12 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.smart_money_thread.progress_updated.connect(self._on_smart_money_progress_updated)
             self.smart_money_thread.start()
 
-            self.log_manager.info("✅ [DEBUG] 聪明资金分析线程已启动")
+            logger.info(" [DEBUG] 聪明资金分析线程已启动")
 
         except Exception as e:
             error_msg = f"启动聪明资金分析失败: {e}"
-            self.log_manager.error(f"❌ [DEBUG] {error_msg}")
-            print(f"❌ [DEBUG] {error_msg}")
+            logger.error(f" [DEBUG] {error_msg}")
+            logger.info(f" [DEBUG] {error_msg}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("启动失败")
             QMessageBox.warning(self, "错误", error_msg)
@@ -1311,15 +1310,15 @@ class SectorFlowTabPro(BaseAnalysisTab):
                             'impact': impact
                         })
 
-                    self.log_manager.info(f"聪明资金检测完成，发现 {len(smart_money_data)} 个活跃资金")
+                    logger.info(f"聪明资金检测完成，发现 {len(smart_money_data)} 个活跃资金")
                     return smart_money_data
 
             # 如果没有数据，返回空列表
-            self.log_manager.warning("未获取到聪明资金分析数据")
+            logger.warning("未获取到聪明资金分析数据")
             return []
 
         except Exception as e:
-            self.log_manager.error(f"聪明资金检测失败: {e}")
+            logger.error(f"聪明资金检测失败: {e}")
             return []
 
     def comprehensive_flow_analysis(self):
@@ -1340,7 +1339,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             self.comprehensive_thread.start()
 
         except Exception as e:
-            self.log_manager.error(f"启动综合资金流分析失败: {e}")
+            logger.error(f"启动综合资金流分析失败: {e}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText("启动失败")
             QMessageBox.warning(self, "错误", f"启动综合资金流分析失败: {str(e)}")
@@ -1449,15 +1448,15 @@ class SectorFlowTabPro(BaseAnalysisTab):
                     for i, data in enumerate(ranking_data):
                         data['rank'] = i + 1
 
-                    self.log_manager.info(f"资金流排行计算完成，共 {len(ranking_data)} 个板块")
+                    logger.info(f"资金流排行计算完成，共 {len(ranking_data)} 个板块")
                     return ranking_data
 
             # 如果没有真实数据，返回空列表
-            self.log_manager.warning("未获取到板块资金流排行数据")
+            logger.warning("未获取到板块资金流排行数据")
             return []
 
         except Exception as e:
-            self.log_manager.error(f"计算资金流排行失败: {e}")
+            logger.error(f"计算资金流排行失败: {e}")
             return []
 
     def flow_prediction(self):
@@ -1538,10 +1537,10 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 self.rotation_analysis = results['rotation_data']
                 # 可以在这里更新UI显示轮动结果
 
-            self.log_manager.info("板块轮动分析完成")
+            logger.info("板块轮动分析完成")
 
         except Exception as e:
-            self.log_manager.error(f"处理板块轮动分析结果失败: {e}")
+            logger.error(f"处理板块轮动分析结果失败: {e}")
 
     def _on_rotation_analysis_error(self, error_msg):
         """板块轮动分析错误回调"""
@@ -1550,7 +1549,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         if hasattr(self, 'status_label'):
             self.status_label.setText("分析失败")
         QMessageBox.warning(self, "错误", error_msg)
-        self.log_manager.error(f"板块轮动分析失败: {error_msg}")
+        logger.error(f"板块轮动分析失败: {error_msg}")
 
     def _on_rotation_progress_updated(self, value, message):
         """板块轮动进度更新回调"""
@@ -1564,7 +1563,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
     def _on_smart_money_analysis_completed(self, results):
         """聪明资金分析完成回调"""
         try:
-            print(f"🔍 [DEBUG] 聪明资金分析完成回调被触发，结果: {results}")
+            logger.info(f" [DEBUG] 聪明资金分析完成回调被触发，结果: {results}")
 
             if hasattr(self, 'progress_bar'):
                 self.progress_bar.setVisible(False)
@@ -1572,7 +1571,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 self.status_label.setText("聪明资金分析完成")
 
             if 'error' in results:
-                print(f"❌ [DEBUG] 聪明资金分析出现错误: {results['error']}")
+                logger.info(f" [DEBUG] 聪明资金分析出现错误: {results['error']}")
                 QMessageBox.warning(self, "错误", results['error'])
                 return
 
@@ -1580,7 +1579,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
             if 'smart_money_data' in results:
                 self.smart_money_flows = results['smart_money_data']
                 smart_money_data = results['smart_money_data']
-                print(f"🔍 [DEBUG] 聪明资金数据: {len(smart_money_data) if isinstance(smart_money_data, list) else 'N/A'} 条")
+                logger.info(f" [DEBUG] 聪明资金数据: {len(smart_money_data) if isinstance(smart_money_data, list) else 'N/A'} 条")
 
                 # 显示聪明资金结果
                 if smart_money_data:
@@ -1593,13 +1592,13 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 else:
                     QMessageBox.information(self, "聪明资金检测结果", "未检测到显著的聪明资金活动")
             else:
-                print("⚠️ [DEBUG] 结果中没有 smart_money_data")
+                logger.info(" [DEBUG] 结果中没有 smart_money_data")
 
-            self.log_manager.info("聪明资金分析完成")
+            logger.info("聪明资金分析完成")
 
         except Exception as e:
-            print(f"❌ [DEBUG] 处理聪明资金分析结果失败: {e}")
-            self.log_manager.error(f"处理聪明资金分析结果失败: {e}")
+            logger.info(f" [DEBUG] 处理聪明资金分析结果失败: {e}")
+            logger.error(f"处理聪明资金分析结果失败: {e}")
 
     def _on_smart_money_analysis_error(self, error_msg):
         """聪明资金分析错误回调"""
@@ -1608,7 +1607,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         if hasattr(self, 'status_label'):
             self.status_label.setText("分析失败")
         QMessageBox.warning(self, "错误", error_msg)
-        self.log_manager.error(f"聪明资金分析失败: {error_msg}")
+        logger.error(f"聪明资金分析失败: {error_msg}")
 
     def _on_smart_money_progress_updated(self, value, message):
         """聪明资金进度更新回调"""
@@ -1644,10 +1643,10 @@ class SectorFlowTabPro(BaseAnalysisTab):
             # 发射分析完成信号
             self.analysis_completed.emit(results)
 
-            self.log_manager.info("综合资金流分析完成")
+            logger.info("综合资金流分析完成")
 
         except Exception as e:
-            self.log_manager.error(f"处理综合分析结果失败: {e}")
+            logger.error(f"处理综合分析结果失败: {e}")
 
     def _on_comprehensive_analysis_error(self, error_msg):
         """综合分析错误回调"""
@@ -1656,7 +1655,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         if hasattr(self, 'status_label'):
             self.status_label.setText("分析失败")
         QMessageBox.warning(self, "错误", error_msg)
-        self.log_manager.error(f"综合分析失败: {error_msg}")
+        logger.error(f"综合分析失败: {error_msg}")
 
     def _on_comprehensive_progress_updated(self, value, message):
         """综合分析进度更新回调"""
@@ -1684,10 +1683,10 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 self.flow_predictions = results['prediction_data']
                 # 可以在这里更新UI显示预测结果
 
-            self.log_manager.info("资金流向预测完成")
+            logger.info("资金流向预测完成")
 
         except Exception as e:
-            self.log_manager.error(f"处理流向预测结果失败: {e}")
+            logger.error(f"处理流向预测结果失败: {e}")
 
     def _on_prediction_analysis_error(self, error_msg):
         """流向预测分析错误回调"""
@@ -1696,7 +1695,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
         if hasattr(self, 'status_label'):
             self.status_label.setText("分析失败")
         QMessageBox.warning(self, "错误", error_msg)
-        self.log_manager.error(f"流向预测分析失败: {error_msg}")
+        logger.error(f"流向预测分析失败: {error_msg}")
 
     def _on_prediction_progress_updated(self, value, message):
         """流向预测进度更新回调"""
@@ -1728,10 +1727,7 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 'data_type': type(kdata).__name__
             })
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.warning(f"SectorFlowTabPro.set_kdata 处理失败: {e}")
-            else:
-                print(f"SectorFlowTabPro.set_kdata 处理失败: {e}")
+            logger.warning(f"SectorFlowTabPro.set_kdata 处理失败: {e}")
 
     def _process_realtime_fund_flow_data(self, fund_flow_data: pd.DataFrame) -> List[Dict]:
         """处理实时资金流数据"""
@@ -1785,5 +1781,5 @@ class SectorFlowTabPro(BaseAnalysisTab):
             return monitor_data
 
         except Exception as e:
-            self.log_manager.error(f"处理实时资金流数据失败: {e}")
+            logger.error(f"处理实时资金流数据失败: {e}")
             return []

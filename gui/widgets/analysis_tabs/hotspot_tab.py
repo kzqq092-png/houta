@@ -1,3 +1,4 @@
+from loguru import logger
 """
 热点分析标签页模块
 """
@@ -14,9 +15,7 @@ import random
 import os
 
 from .base_tab import BaseAnalysisTab
-from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
-
 
 class HotspotAnalysisTab(BaseAnalysisTab):
     """热点分析标签页"""
@@ -389,7 +388,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             })
 
         except Exception as e:
-            self.log_manager.error(f"热点分析失败: {str(e)}")
+            logger.error(f"热点分析失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"热点分析失败: {str(e)}")
         finally:
             self.hide_loading()
@@ -439,7 +438,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 key=lambda x: float(x['热度指数']), reverse=True)
 
         except Exception as e:
-            self.log_manager.error(f"板块热点分析失败: {str(e)}")
+            logger.error(f"板块热点分析失败: {str(e)}")
 
     def analyze_leading_stocks(self, period: int, heat_threshold: float, gain_threshold: float):
         """分析龙头股"""
@@ -480,7 +479,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 key=lambda x: int(x['龙头指数']), reverse=True)
 
         except Exception as e:
-            self.log_manager.error(f"龙头股分析失败: {str(e)}")
+            logger.error(f"龙头股分析失败: {str(e)}")
 
     def analyze_theme_opportunities(self, period: int, heat_threshold: float):
         """分析主题机会"""
@@ -523,7 +522,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                 key=lambda x: float(x['热度评分']), reverse=True)
 
         except Exception as e:
-            self.log_manager.error(f"主题机会分析失败: {str(e)}")
+            logger.error(f"主题机会分析失败: {str(e)}")
 
     def analyze_capital_flow(self, period: int):
         """分析资金流向 - 使用真实数据"""
@@ -587,18 +586,18 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                             '资金偏好': preference
                         })
 
-                    self.log_manager.info(f"资金流向分析完成，共分析 {len(self.capital_flow)} 个板块")
+                    logger.info(f"资金流向分析完成，共分析 {len(self.capital_flow)} 个板块")
                 else:
-                    self.log_manager.warning("板块资金流数据为空")
+                    logger.warning("板块资金流数据为空")
             else:
-                self.log_manager.warning("未获取到板块资金流数据")
+                logger.warning("未获取到板块资金流数据")
 
             # 如果没有获取到真实数据，使用板块排行数据作为替代
             if not self.capital_flow and hasattr(self, 'sector_rankings') and self.sector_rankings:
                 self._analyze_capital_flow_from_rankings()
 
         except Exception as e:
-            self.log_manager.error(f"资金流向分析失败: {str(e)}")
+            logger.error(f"资金流向分析失败: {str(e)}")
 
     def _parse_flow_value(self, value):
         """解析资金流数值"""
@@ -654,28 +653,28 @@ class HotspotAnalysisTab(BaseAnalysisTab):
                     '资金偏好': preference
                 })
 
-            self.log_manager.info(f"使用排行数据估算资金流向完成，共 {len(self.capital_flow)} 个板块")
+            logger.info(f"使用排行数据估算资金流向完成，共 {len(self.capital_flow)} 个板块")
 
         except Exception as e:
-            self.log_manager.error(f"从排行数据分析资金流向失败: {str(e)}")
+            logger.error(f"从排行数据分析资金流向失败: {str(e)}")
 
     def analyze_sector_rotation(self, period: int):
         """分析板块轮动"""
         try:
             # 模拟板块轮动分析
-            self.log_manager.info("板块轮动分析完成")
+            logger.info("板块轮动分析完成")
 
         except Exception as e:
-            self.log_manager.error(f"板块轮动分析失败: {str(e)}")
+            logger.error(f"板块轮动分析失败: {str(e)}")
 
     def analyze_hotspot_persistence(self, period: int):
         """分析热点持续性"""
         try:
             # 模拟热点持续性分析
-            self.log_manager.info("热点持续性分析完成")
+            logger.info("热点持续性分析完成")
 
         except Exception as e:
-            self.log_manager.error(f"热点持续性分析失败: {str(e)}")
+            logger.error(f"热点持续性分析失败: {str(e)}")
 
     def start_monitor(self):
         """开始实时监控"""
@@ -684,7 +683,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             # 这里可以实现定时器来定期更新数据
 
         except Exception as e:
-            self.log_manager.error(f"启动监控失败: {str(e)}")
+            logger.error(f"启动监控失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"启动监控失败: {str(e)}")
 
     def update_hotspot_display(self):
@@ -829,7 +828,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             self.flow_table.resizeColumnsToContents()
 
         except Exception as e:
-            self.log_manager.error(f"更新热点分析显示失败: {str(e)}")
+            logger.error(f"更新热点分析显示失败: {str(e)}")
 
     def update_hotspot_statistics(self):
         """更新热点分析统计"""
@@ -873,7 +872,7 @@ class HotspotAnalysisTab(BaseAnalysisTab):
             }
 
         except Exception as e:
-            self.log_manager.error(f"更新热点分析统计失败: {str(e)}")
+            logger.error(f"更新热点分析统计失败: {str(e)}")
 
     def clear_hotspot(self):
         """清除热点分析结果"""

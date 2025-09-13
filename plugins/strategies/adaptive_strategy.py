@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 自适应策略模块
@@ -119,7 +120,7 @@ class AdaptiveHikuuStrategy(BaseStrategy):
                         ))
 
         except Exception as e:
-            print(f"HIkyuu自适应策略信号生成失败: {e}")
+            logger.info(f"HIkyuu自适应策略信号生成失败: {e}")
 
         return signals
 
@@ -178,7 +179,7 @@ class AdaptiveHikuuStrategy(BaseStrategy):
             return system
 
         except Exception as e:
-            print(f"创建HIkyuu系统失败: {e}")
+            logger.info(f"创建HIkyuu系统失败: {e}")
             return None
 
     def get_hikyuu_system(self):

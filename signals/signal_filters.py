@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 
 def filter_signals_by_strength(df, signal_col='signal', threshold=0.6, strength_cols=None):
@@ -35,7 +36,7 @@ def filter_signals_by_strength(df, signal_col='signal', threshold=0.6, strength_
                               1) & (result['sell_prob'] < threshold)
             result.loc[sell_condition, 'filtered_signal'] = 0  # 低于阈值，取消卖出信号
         else:
-            print("警告: 未找到概率列 (buy_prob, sell_prob), 无法按强度过滤信号")
+            logger.warning("未找到概率列 (buy_prob, sell_prob), 无法按强度过滤信号")
     else:
         # 使用指定的强度列
         if not all(col in result.columns for col in strength_cols):

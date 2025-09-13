@@ -1,3 +1,4 @@
+from loguru import logger
 """
 TET数据管道实现
 Transform-Extract-Transform数据处理管道
@@ -6,7 +7,6 @@ Transform-Extract-Transform数据处理管道
 增强版本：支持多数据源路由、故障转移、插件化数据源
 """
 
-import logging
 import time
 import asyncio
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -21,7 +21,7 @@ from .data_source_router import DataSourceRouter, RoutingRequest, RoutingStrateg
 from .data_source_extensions import IDataSourcePlugin, DataSourcePluginAdapter, HealthCheckResult
 from .data.field_mapping_engine import FieldMappingEngine
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -85,7 +85,7 @@ class TETDataPipeline:
 
     def __init__(self, data_source_router: DataSourceRouter):
         self.router = data_source_router
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # 插件管理
         self._plugins: Dict[str, IDataSourcePlugin] = {}
@@ -388,7 +388,7 @@ class TETDataPipeline:
             raw_data, provider_info, failover_result = self.extract_data_with_failover(routing_request, query)
 
             if failover_result and not failover_result.success:
-                self.logger.error(f"所有数据源都失败: {query.symbol}")
+                self.logger.error(f"下载股票数据失败: {query.symbol}")
                 raise Exception(f"数据提取失败: {', '.join(failover_result.error_messages)}")
 
             self.logger.debug(f"数据提取完成: {len(raw_data) if raw_data is not None else 0} 条记录")
@@ -466,23 +466,36 @@ class TETDataPipeline:
         error_messages = []
         attempts = 0
 
-        # 获取可用数据源列表
-        available_sources = self.router.get_available_sources(routing_request)
+        # 如果指定了特定提供商，直接使用，避免检查其他数据源
+        if original_query.provider:
+            # 检查指定的数据源是否存在
+            if self.router.has_data_source(original_query.provider):
+                available_sources = [original_query.provider]
+                self.logger.info(f"使用指定的数据源: {original_query.provider}")
+            else:
+                failover_result = FailoverResult(
+                    success=False,
+                    attempts=0,
+                    failed_sources=[],
+                    successful_source=None,
+                    error_messages=[f"指定的数据源不存在: {original_query.provider}"],
+                    total_time_ms=(time.time() - start_time) * 1000
+                )
+                return pd.DataFrame(), {}, failover_result
+        else:
+            # 只有在没有指定数据源时才获取所有可用数据源
+            available_sources = self.router.get_available_sources(routing_request)
 
-        if not available_sources:
-            failover_result = FailoverResult(
-                success=False,
-                attempts=0,
-                failed_sources=[],
-                successful_source=None,
-                error_messages=["没有可用的数据源"],
-                total_time_ms=(time.time() - start_time) * 1000
-            )
-            return pd.DataFrame(), {}, failover_result
-
-        # 如果指定了特定提供商，优先使用
-        if original_query.provider and original_query.provider in available_sources:
-            available_sources = [original_query.provider] + [s for s in available_sources if s != original_query.provider]
+            if not available_sources:
+                failover_result = FailoverResult(
+                    success=False,
+                    attempts=0,
+                    failed_sources=[],
+                    successful_source=None,
+                    error_messages=["没有可用的数据源"],
+                    total_time_ms=(time.time() - start_time) * 1000
+                )
+                return pd.DataFrame(), {}, failover_result
 
         # 尝试每个数据源
         for source_id in available_sources:

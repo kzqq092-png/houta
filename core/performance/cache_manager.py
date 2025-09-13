@@ -12,7 +12,7 @@
 版本: 1.0
 """
 
-import logging
+from loguru import logger
 import pickle
 import hashlib
 import asyncio
@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import weakref
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CacheLevel(Enum):
@@ -339,7 +339,7 @@ class DiskCache:
                         str(file_path),
                         datetime.now().isoformat(),
                         datetime.now().isoformat(),
-                        ttl.total_seconds() if ttl else None,
+                        ttl.total_seconds() if ttl and hasattr(ttl, 'total_seconds') else (ttl if isinstance(ttl, (int, float)) else None),
                         file_size
                     ))
 
@@ -498,7 +498,7 @@ class MultiLevelCacheManager:
             config: 缓存配置
         """
         self.config = config
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # 初始化各级缓存
         self.memory_cache = None
@@ -614,6 +614,20 @@ class MultiLevelCacheManager:
         except Exception as e:
             self.logger.error(f"缓存设置失败: {e}")
             return False
+
+    def set(self, key: str, value: Any, ttl: Optional[timedelta] = None) -> bool:
+        """
+        设置缓存值（put方法的别名，保持向后兼容性）
+        
+        Args:
+            key: 缓存键
+            value: 缓存值
+            ttl: 生存时间
+            
+        Returns:
+            是否成功
+        """
+        return self.put(key, value, ttl)
 
     def delete(self, key: str) -> bool:
         """

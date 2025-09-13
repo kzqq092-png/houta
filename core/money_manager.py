@@ -3,6 +3,7 @@ from hikyuu.trade_sys import MoneyManagerBase
 from hikyuu.indicator import ATR, CLOSE
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 
 class EnhancedMoneyManager(MoneyManagerBase):
@@ -79,7 +80,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return (adjusted_size // 100) * 100
 
         except Exception as e:
-            print(f"头寸大小计算错误: {str(e)}")
+            logger.info(f"头寸大小计算错误: {str(e)}")
             return 0
 
     def _calculate_position_scale(self):
@@ -109,7 +110,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return max(self.get_param("min_position"), min(scale, 1.0))
 
         except Exception as e:
-            print(f"仓位缩放因子计算错误: {str(e)}")
+            logger.info(f"仓位缩放因子计算错误: {str(e)}")
             return 1.0
 
     def _update_risk_metrics(self, datetime):
@@ -143,7 +144,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             self.position_count = len(self.positions)
 
         except Exception as e:
-            print(f"风险指标更新错误: {str(e)}")
+            logger.info(f"风险指标更新错误: {str(e)}")
 
     def _check_correlation(self, stk, price):
         """检查相关性"""
@@ -171,7 +172,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return True
 
         except Exception as e:
-            print(f"相关性检查错误: {str(e)}")
+            logger.info(f"相关性检查错误: {str(e)}")
             return True
 
     def _calculate_correlation(self, k1, k2):
@@ -185,7 +186,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return np.corrcoef(returns1, returns2)[0, 1]
 
         except Exception as e:
-            print(f"相关性计算错误: {str(e)}")
+            logger.info(f"相关性计算错误: {str(e)}")
             return 0.0
 
     def _get_buy_num(self, datetime, stk, price, risk, part_from):
@@ -238,7 +239,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return 0
 
         except Exception as e:
-            print(f"买入数量计算错误: {str(e)}")
+            logger.info(f"买入数量计算错误: {str(e)}")
             return 0
 
     def _get_sell_num(self, datetime, stk, price, risk, part_from):
@@ -281,7 +282,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return 0
 
         except Exception as e:
-            print(f"卖出数量计算错误: {str(e)}")
+            logger.info(f"卖出数量计算错误: {str(e)}")
             return 0
 
     def _calculate_sell_ratio(self, datetime, stk, price, position):
@@ -313,7 +314,7 @@ class EnhancedMoneyManager(MoneyManagerBase):
             return base_ratio
 
         except Exception as e:
-            print(f"卖出比例计算错误: {str(e)}")
+            logger.info(f"卖出比例计算错误: {str(e)}")
             return 1.0
 
     def _calculate_atr(self, df):
@@ -326,5 +327,5 @@ class EnhancedMoneyManager(MoneyManagerBase):
             true_range = np.max(ranges, axis=1)
             return true_range.rolling(self.get_param("atr_period")).mean().iloc[-1]
         except Exception as e:
-            print(f"ATR计算错误: {str(e)}")
+            logger.info(f"ATR计算错误: {str(e)}")
             return 0.0

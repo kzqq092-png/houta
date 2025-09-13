@@ -1,3 +1,4 @@
+from loguru import logger
 """
 HIkyuu-UI 指标算法模块
 提供技术指标计算功能，支持ta-lib和自定义实现
@@ -7,19 +8,18 @@ import numpy as np
 import pandas as pd
 from functools import lru_cache
 import importlib
-import logging
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 尝试导入ta-lib
 try:
     talib = importlib.import_module('talib')
     TALIB_AVAILABLE = True
-    logger.info("✅ Ta-lib 库可用")
+    logger.info(" Ta-lib 库可用")
 except ImportError:
     talib = None
     TALIB_AVAILABLE = False
-    logger.warning("⚠️ Ta-lib 库不可用，使用自定义实现")
+    logger.warning(" Ta-lib 库不可用，使用自定义实现")
 
 
 def get_talib_indicator_list():

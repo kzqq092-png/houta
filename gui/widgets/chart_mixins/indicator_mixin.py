@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Chart组件的指标渲染混入类
 """
@@ -67,13 +68,6 @@ class IndicatorMixin:
     def _render_indicators(self, kdata: pd.DataFrame, x=None):
         """渲染技术指标，所有指标与K线对齐，节假日无数据自动跳过，X轴为等距序号。"""
         try:
-            if not hasattr(self, 'log_manager'):
-                # 如果没有日志管理器，创建一个简单的错误处理函数
-                def log_error(msg):
-                    print(f"Error: {msg}")
-                self.log_error = log_error
-            else:
-                self.log_error = self.log_manager.error
 
             indicators = getattr(self, 'active_indicators', [])
             if not indicators:
@@ -246,7 +240,7 @@ class IndicatorMixin:
             if hasattr(self, 'error_occurred'):
                 self.error_occurred.emit(f"渲染指标失败: {str(e)}")
             else:
-                print(f"渲染指标失败: {str(e)}")
+                logger.info(f"渲染指标失败: {str(e)}")
 
     def _get_indicator_style(self, name: str, index: int = 0) -> Dict[str, Any]:
         """获取指标样式，颜色从theme_manager.get_theme_colors获取"""
@@ -268,7 +262,7 @@ class IndicatorMixin:
         """
         try:
             if indicator_data is None:
-                self.log_manager.warning("指标数据为空")
+                logger.warning("指标数据为空")
                 return
 
             # 将添加指标任务加入队列
@@ -276,8 +270,8 @@ class IndicatorMixin:
 
         except Exception as e:
             error_msg = f"添加指标失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def _add_indicator_impl(self, indicator_data, indicator_colors: list = None):
@@ -299,11 +293,11 @@ class IndicatorMixin:
                     self.price_ax.legend(
                         loc='upper left', fontsize=9, frameon=False)
                 QTimer.singleShot(0, self.canvas.draw)
-            self.log_manager.info(f"添加指标 {indicator_data.name} 完成")
+            logger.info(f"添加指标 {indicator_data.name} 完成")
         except Exception as e:
             error_msg = f"添加指标实现失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def clear_indicators(self):
@@ -324,13 +318,13 @@ class IndicatorMixin:
                 # 更新画布
                 QTimer.singleShot(0, self.canvas.draw)
 
-            self.log_manager.info("清除指标完成")
+            logger.info("清除指标完成")
             self._optimize_display()  # 保证清除后也显示网格和刻度
 
         except Exception as e:
             error_msg = f"清除指标失败: {str(e)}"
-            self.log_manager.error(error_msg)
-            self.log_manager.error(traceback.format_exc())
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def on_indicator_changed(self, indicator: str):
@@ -348,11 +342,11 @@ class IndicatorMixin:
             if hasattr(self, 'current_kdata') and self.current_kdata is not None:
                 self.update_chart({'kdata': self.current_kdata})
 
-            self.log_manager.info(f"指标变更为: {indicator}")
+            logger.info(f"指标变更为: {indicator}")
 
         except Exception as e:
             error_msg = f"指标变更失败: {str(e)}"
-            self.log_manager.error(error_msg)
+            logger.error(error_msg)
             self.error_occurred.emit(error_msg)
 
     def on_indicator_selected(self, indicators: list):
@@ -361,7 +355,7 @@ class IndicatorMixin:
             self.active_indicators = indicators
             self._on_indicator_changed(indicators)
         except Exception as e:
-            self.log_manager.error(f"指标选择处理失败: {str(e)}")
+            logger.error(f"指标选择处理失败: {str(e)}")
 
     def _on_indicator_changed(self, indicators):
         """内部指标变更处理"""
@@ -458,8 +452,7 @@ class IndicatorMixin:
                             self.price_ax.axvline(
                                 idx, color='#ffd600', linestyle='--', linewidth=1.5, alpha=0.7, zorder=1000)
             except Exception as e:
-                if self.log_manager:
-                    self.log_manager.error(f"高亮K线绘制失败: {str(e)}")
+                logger.error(f"高亮K线绘制失败: {str(e)}")
 
             # 左上角显示技术指标名称（下移到0.95）
             if hasattr(self, '_indicator_info_text') and self._indicator_info_text:
@@ -467,8 +460,8 @@ class IndicatorMixin:
                     if self._indicator_info_text in self.price_ax.texts:
                         self._indicator_info_text.remove()
                 except Exception as e:
-                    if hasattr(self, 'log_manager'):
-                        self.log_manager.warning(f"移除指标信息文本失败: {str(e)}")
+                    if True:  # 使用Loguru日志
+                        logger.warning(f"移除指标信息文本失败: {str(e)}")
                 self._indicator_info_text = None
             indicator_names = []
             if hasattr(self, 'active_indicators') and self.active_indicators:
@@ -498,7 +491,7 @@ class IndicatorMixin:
             self.enable_crosshair(force_rebind=True)
 
         except Exception as e:
-            self.log_manager.error(f"更新图表失败: {str(e)}")
+            logger.error(f"更新图表失败: {str(e)}")
             self.close_loading_dialog()
 
     def draw_overview(self, ax, kdata):
@@ -530,4 +523,4 @@ class IndicatorMixin:
             ax.tick_params(axis='both', which='major', labelsize=6)
 
         except Exception as e:
-            self.log_manager.error(f"绘制缩略图失败: {str(e)}")
+            logger.error(f"绘制缩略图失败: {str(e)}")

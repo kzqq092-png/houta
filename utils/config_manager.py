@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Configuration Manager Module
 
@@ -8,7 +9,6 @@ This module provides classes for managing application configuration settings.
 import os
 import json
 import yaml
-import logging
 import time
 import threading
 from utils.theme_utils import load_theme_json_with_comments
@@ -27,7 +27,7 @@ from .config_types import (
 import traceback
 import sqlite3
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 DB_PATH = os.path.join(os.path.dirname(
     os.path.dirname(__file__)), 'db', 'factorweave_system.sqlite')

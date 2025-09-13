@@ -1,3 +1,4 @@
+from loguru import logger
 """
 HIkyuu策略插件
 
@@ -8,7 +9,6 @@ HIkyuu策略插件
 - 多种策略模板
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Union, Tuple
@@ -25,11 +25,11 @@ try:
         from hikyuu.trade_sys import SL_FixedPercent, TP_FixedPercent
     except ImportError:
         # 如果特定组件不可用，尝试使用其他方式
-        logging.warning("部分HIkyuu组件不可用，将使用基础功能")
+        logger.warning("部分HIkyuu组件不可用，将使用基础功能")
     HIKYUU_AVAILABLE = True
 except ImportError as e:
     HIKYUU_AVAILABLE = False
-    logging.warning(f"HIkyuu未安装或无法导入，HIkyuu策略插件将无法使用: {e}")
+    logger.warning(f"HIkyuu未安装或无法导入，HIkyuu策略插件将无法使用: {e}")
 
 # 项目内部导入
 from core.strategy_extensions import (
@@ -39,8 +39,7 @@ from core.strategy_extensions import (
     AssetType, TimeFrame
 )
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class FactorWeaveSignalAdapter:
     """HIkyuu信号适配器"""
@@ -97,7 +96,6 @@ class FactorWeaveSignalAdapter:
         except Exception as e:
             logger.error(f"DataFrame转KData失败: {e}")
             raise
-
 
 class FactorWeaveTradingSystemAdapter:
     """HIkyuu交易系统适配器"""
@@ -256,7 +254,6 @@ class FactorWeaveTradingSystemAdapter:
             start_date=datetime.fromtimestamp(trade_list[0].datetime.timestamp()) if trade_list else datetime.now(),
             end_date=datetime.fromtimestamp(trade_list[-1].datetime.timestamp()) if trade_list else datetime.now()
         )
-
 
 class HikyuuStrategyPlugin(IStrategyPlugin):
     """HIkyuu策略插件"""
@@ -584,7 +581,6 @@ class HikyuuStrategyPlugin(IStrategyPlugin):
         except Exception as e:
             logger.error(f"HIkyuu策略清理失败: {e}")
 
-
 # 策略模板类
 class TrendFollowingStrategy(HikyuuStrategyPlugin):
     """趋势跟踪策略模板"""
@@ -601,7 +597,6 @@ class TrendFollowingStrategy(HikyuuStrategyPlugin):
             ParameterDef("position_size", int, 100, "仓位大小", 1, 10000),
         ]
         return info
-
 
 class MeanReversionStrategy(HikyuuStrategyPlugin):
     """均值回归策略模板"""
@@ -620,7 +615,6 @@ class MeanReversionStrategy(HikyuuStrategyPlugin):
         ]
         return info
 
-
 class MomentumStrategy(HikyuuStrategyPlugin):
     """动量策略模板"""
 
@@ -638,7 +632,6 @@ class MomentumStrategy(HikyuuStrategyPlugin):
         ]
         return info
 
-
 # 导出的策略类
 AVAILABLE_STRATEGIES = {
     'hikyuu_strategy': HikyuuStrategyPlugin,
@@ -647,13 +640,11 @@ AVAILABLE_STRATEGIES = {
     'hikyuu_momentum': MomentumStrategy,
 }
 
-
 def get_available_strategies() -> Dict[str, type]:
     """获取可用的HIkyuu策略"""
     if not HIKYUU_AVAILABLE:
         return {}
     return AVAILABLE_STRATEGIES
-
 
 def create_strategy(strategy_name: str) -> Optional[HikyuuStrategyPlugin]:
     """创建策略实例"""

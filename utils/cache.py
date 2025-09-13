@@ -3,6 +3,7 @@
 """
 from typing import Any, Dict, Optional, Union
 import threading
+from loguru import logger
 
 # 本地缓存（多进程多线程安全）
 try:
@@ -41,7 +42,7 @@ class Cache:
         if backend == "diskcache":
             if not DISKCACHE_AVAILABLE:
                 # 使用内存缓存作为回退
-                print("WARNING: diskcache 不可用，使用内存缓存")
+                logger.warning("WARNING: diskcache 不可用，使用内存缓存")
                 self.cache = {}
                 self._memory_cache = True
             else:

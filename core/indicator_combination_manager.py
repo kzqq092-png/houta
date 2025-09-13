@@ -1,3 +1,4 @@
+from loguru import logger
 """
 指标组合管理器
 
@@ -11,10 +12,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-from core.logger import get_logger
-
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 @dataclass
 class IndicatorCombination:
@@ -38,7 +36,6 @@ class IndicatorCombination:
     def from_dict(cls, data: Dict[str, Any]) -> 'IndicatorCombination':
         """从字典创建实例"""
         return cls(**data)
-
 
 class IndicatorCombinationManager:
     """指标组合管理器"""
@@ -411,10 +408,8 @@ class IndicatorCombinationManager:
             logger.error(f"Failed to backup combinations: {e}")
             return False
 
-
 # 全局实例
 _combination_manager = None
-
 
 def get_combination_manager() -> IndicatorCombinationManager:
     """获取指标组合管理器实例"""
@@ -422,7 +417,6 @@ def get_combination_manager() -> IndicatorCombinationManager:
     if _combination_manager is None:
         _combination_manager = IndicatorCombinationManager()
     return _combination_manager
-
 
 def main():
     """测试函数"""
@@ -443,23 +437,22 @@ def main():
         tags=["经典", "趋势", "震荡"]
     )
 
-    print(f"保存组合: {'成功' if success else '失败'}")
+    logger.info(f"保存组合: {'成功' if success else '失败'}")
 
     # 测试加载组合
     combination = manager.load_combination("经典组合")
     if combination:
-        print(f"加载组合: {combination.name}")
-        print(f"指标数量: {len(combination.indicators)}")
-        print(f"标签: {combination.tags}")
+        logger.info(f"加载组合: {combination.name}")
+        logger.info(f"指标数量: {len(combination.indicators)}")
+        logger.info(f"标签: {combination.tags}")
 
     # 测试搜索
     results = manager.search_combinations("经典")
-    print(f"搜索结果: {len(results)} 个组合")
+    logger.info(f"搜索结果: {len(results)} 个组合")
 
     # 测试统计
     stats = manager.get_combination_stats()
-    print(f"统计信息: {stats}")
-
+    logger.info(f"统计信息: {stats}")
 
 if __name__ == '__main__':
     main()

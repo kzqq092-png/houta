@@ -1,3 +1,4 @@
+from loguru import logger
 """
 更新节流器模块
 提供UI更新频率控制、防抖机制和批量更新功能
@@ -5,14 +6,13 @@
 
 import threading
 import time
-import logging
 from typing import Dict, List, Any, Optional, Callable, Union
 from dataclasses import dataclass, field
 from queue import Queue, Empty, PriorityQueue
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

@@ -4,7 +4,7 @@
 提供完整的多维度股票筛选功能，完全按照原版main_legacy.py实现。
 """
 
-import logging
+from loguru import logger
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SearchWorker(QThread):

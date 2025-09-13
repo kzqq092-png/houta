@@ -1,5 +1,6 @@
+from loguru import logger
 """
-FactorWeave-Quant ‌ 插件接口定义
+FactorWeave-Quant  插件接口定义
 
 定义了插件开发的标准接口和规范，为插件生态建设提供统一的标准。
 """
@@ -10,7 +11,6 @@ from enum import Enum
 from dataclasses import dataclass
 from PyQt5.QtWidgets import QWidget, QMenu, QAction
 from PyQt5.QtCore import QObject, pyqtSignal
-
 
 class PluginType(Enum):
     """插件类型枚举"""
@@ -23,14 +23,12 @@ class PluginType(Enum):
     NOTIFICATION = "notification"    # 通知插件
     CHART_TOOL = "chart_tool"        # 图表工具插件
 
-
 class PluginCategory(Enum):
     """插件分类"""
     CORE = "core"                    # 核心插件
     COMMUNITY = "community"          # 社区插件
     COMMERCIAL = "commercial"        # 商业插件
     EXPERIMENTAL = "experimental"    # 实验性插件
-
 
 @dataclass
 class PluginMetadata:
@@ -52,7 +50,6 @@ class PluginMetadata:
     documentation_url: Optional[str] = None  # 文档地址
     support_url: Optional[str] = None        # 支持地址
     changelog_url: Optional[str] = None      # 更新日志地址
-
 
 class IPlugin(ABC):
     """插件接口基类"""
@@ -122,7 +119,6 @@ class IPlugin(ABC):
         """
         pass
 
-
 class IIndicatorPlugin(IPlugin):
     """技术指标插件接口"""
 
@@ -158,7 +154,6 @@ class IIndicatorPlugin(IPlugin):
             绘图配置
         """
         return {}
-
 
 class IStrategyPlugin(IPlugin):
     """策略插件接口"""
@@ -200,7 +195,6 @@ class IStrategyPlugin(IPlugin):
         """
         return {}
 
-
 class IDataSourcePlugin(IPlugin):
     """数据源插件接口"""
 
@@ -238,7 +232,6 @@ class IDataSourcePlugin(IPlugin):
         """
         return True
 
-
 class IAnalysisPlugin(IPlugin):
     """分析工具插件接口"""
 
@@ -264,7 +257,6 @@ class IAnalysisPlugin(IPlugin):
     def get_analysis_parameters(self) -> Dict[str, Any]:
         """获取分析参数定义"""
         return {}
-
 
 class IUIComponentPlugin(IPlugin):
     """UI组件插件接口"""
@@ -305,7 +297,6 @@ class IUIComponentPlugin(IPlugin):
         """
         return []
 
-
 class IExportPlugin(IPlugin):
     """导出插件接口"""
 
@@ -335,7 +326,6 @@ class IExportPlugin(IPlugin):
         """
         pass
 
-
 class INotificationPlugin(IPlugin):
     """通知插件接口"""
 
@@ -362,7 +352,6 @@ class INotificationPlugin(IPlugin):
     def get_notification_types(self) -> List[str]:
         """获取支持的通知类型"""
         return ["info", "warning", "error"]
-
 
 class IChartToolPlugin(IPlugin):
     """图表工具插件接口"""
@@ -392,11 +381,10 @@ class IChartToolPlugin(IPlugin):
         """停用工具"""
         pass
 
-
 class PluginContext:
     """插件上下文"""
 
-    def __init__(self, main_window, data_manager, config_manager, log_manager):
+    def __init__(self, main_window, data_manager, config_manager):
         """
         初始化插件上下文
 
@@ -404,12 +392,12 @@ class PluginContext:
             main_window: 主窗口
             data_manager: 数据管理器
             config_manager: 配置管理器
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
         """
         self.main_window = main_window
         self.data_manager = data_manager
         self.config_manager = config_manager
-        self.log_manager = log_manager
+        # log_manager已迁移到Loguru
         self._event_handlers: Dict[str, List[Callable]] = {}
 
     def register_event_handler(self, event_name: str, handler: Callable) -> None:
@@ -438,7 +426,7 @@ class PluginContext:
                 try:
                     handler(*args, **kwargs)
                 except Exception as e:
-                    self.log_manager.error(f"事件处理器执行失败: {e}")
+                    logger.error(f"事件处理器执行失败: {e}")
 
     def get_plugin_config(self, plugin_name: str) -> Dict[str, Any]:
         """
@@ -462,7 +450,6 @@ class PluginContext:
         """
         self.config_manager.save_plugin_config(plugin_name, config)
 
-
 # 插件装饰器
 def plugin_metadata(**kwargs):
     """
@@ -475,7 +462,6 @@ def plugin_metadata(**kwargs):
         cls._plugin_metadata = PluginMetadata(**kwargs)
         return cls
     return decorator
-
 
 def register_plugin(plugin_type: PluginType):
     """

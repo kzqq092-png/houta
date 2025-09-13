@@ -1,3 +1,4 @@
+from loguru import logger
 """
 CTP期货数据插件
 期货交易的专业接口，提供期货合约的实时行情和历史数据
@@ -5,7 +6,6 @@ CTP期货数据插件
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -28,7 +28,7 @@ class CTPFuturesPlugin(IDataSourcePlugin):
         self.description = "CTP期货交易接口数据源"
         self.plugin_type = PluginType.DATA_SOURCE_FUTURES
         self.supported_asset_types = [AssetType.FUTURES]
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # CTP配置信息
         self.ctp_config = {

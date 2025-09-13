@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU兼容性测试框架
 
@@ -13,7 +14,6 @@ WebGPU兼容性测试框架
 """
 
 import platform
-import logging
 import json
 import time
 from dataclasses import dataclass, field
@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CompatibilityLevel(Enum):
@@ -915,13 +915,13 @@ if __name__ == "__main__":
     logger.info("运行WebGPU兼容性测试...")
     report = run_compatibility_test()
 
-    print("\n" + "="*60)
-    print("WebGPU兼容性测试报告")
-    print("="*60)
-    print(f"总体兼容性: {report.overall_compatibility.value}")
-    print(f"性能得分: {report.performance_score:.1f}/100")
-    print(f"测试时长: {report.test_duration:.2f}秒")
-    print(f"测试统计: {report.test_summary}")
-    print("\n建议:")
+    logger.info("\n" + "="*60)
+    logger.info("WebGPU兼容性测试报告")
+    logger.info("="*60)
+    logger.info(f"总体兼容性: {report.overall_compatibility.value}")
+    logger.info(f"性能得分: {report.performance_score:.1f}/100")
+    logger.info(f"测试时长: {report.test_duration:.2f}秒")
+    logger.info(f"测试统计: {report.test_summary}")
+    logger.info("\n建议:")
     for recommendation in report.recommendations:
-        print(f"- {recommendation}")
+        logger.info(f"- {recommendation}")

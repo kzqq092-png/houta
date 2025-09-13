@@ -9,6 +9,7 @@ from core.data_manager import data_manager
 
 from core.indicator_adapter import calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll, calc_atr, calc_obv, calc_cci
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from loguru import logger
 
 
 class BaseSignal(SignalBase):
@@ -32,7 +33,7 @@ class BaseSignal(SignalBase):
             if isinstance(k, pd.DataFrame):
                 k = data_manager.df_to_kdata(k)
             if k is None or len(k) == 0:
-                print("信号计算收到空KData，直接返回")
+                logger.info("信号计算收到空KData，直接返回")
                 return
             # 计算基础指标
             indicators = self._calculate_indicators(k)
@@ -41,7 +42,7 @@ class BaseSignal(SignalBase):
             # 记录信号
             self._record_signals(k, signals)
         except Exception as e:
-            print(f"信号计算错误: {str(e)}")
+            logger.info(f"信号计算错误: {str(e)}")
             return
 
     def _calculate_indicators(self, k) -> Dict[str, Any]:

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 中间面板
 
@@ -5,7 +6,6 @@
 使用统一图表服务提供高性能图表渲染。
 """
 
-import logging
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 import numpy as np
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ from core.services.unified_chart_service import get_unified_chart_service, creat
 from optimization.progressive_loading_manager import get_progressive_loader, LoadingStage
 from optimization.update_throttler import get_update_throttler
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 导入性能监控
 try:
@@ -722,7 +722,7 @@ class MiddlePanel(BasePanel):
         self.chart_service = None
         if coordinator and hasattr(coordinator, 'service_container') and coordinator.service_container:
             try:
-                # ✅ 正确导入并获取图表服务
+                #  正确导入并获取图表服务
                 from core.services.chart_service import ChartService
                 self.chart_service = coordinator.service_container.resolve(ChartService)
             except Exception as e:

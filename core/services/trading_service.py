@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易服务模块
 
@@ -5,7 +6,6 @@
 支持多策略插件并行运行、信号聚合和风险控制。
 """
 
-import logging
 from typing import Dict, Any, List, Optional, Union, Set, Callable
 from datetime import datetime, timedelta
 import asyncio
@@ -18,7 +18,6 @@ from collections import defaultdict
 from .base_service import BaseService
 from ..events import EventBus, StockSelectedEvent, TradeExecutedEvent, PositionUpdatedEvent
 from ..containers import ServiceContainer
-from ..logger import LogManager
 from ..strategy_extensions import (
     IStrategyPlugin, Signal, TradeResult, Position, PerformanceMetrics,
     StrategyContext, SignalType, TradeAction, TradeStatus
@@ -29,7 +28,7 @@ from ..strategy_events import (
     StrategyErrorEvent
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StrategyState(Enum):
@@ -231,8 +230,8 @@ class TradingService(BaseService):
             self._order_processor_task = asyncio.create_task(self._process_orders_loop())
             self._async_mode = True
 
-            logger.info("🚀 交易服务已启动 - 异步模式")
-            logger.info("📈 异步模式优势：并发处理、高性能、实时响应")
+            logger.info(" 交易服务已启动 - 异步模式")
+            logger.info(" 异步模式优势：并发处理、高性能、实时响应")
 
         except RuntimeError:
             # 同步模式：直接处理，无后台任务
@@ -240,9 +239,9 @@ class TradingService(BaseService):
             self._order_processor_task = None
             self._async_mode = False
 
-            logger.info("🚀 交易服务已启动 - 同步模式")
-            logger.info("🔒 同步模式优势：简单可靠、兼容性好、易于调试")
-            logger.info("💡 提示：在异步环境中运行可获得更好性能")
+            logger.info(" 交易服务已启动 - 同步模式")
+            logger.info(" 同步模式优势：简单可靠、兼容性好、易于调试")
+            logger.info(" 提示：在异步环境中运行可获得更好性能")
 
     async def _process_signals_loop(self) -> None:
         """信号处理循环"""

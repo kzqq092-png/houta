@@ -1,3 +1,4 @@
+from loguru import logger
 """
 形态算法初始化脚本
 将所有形态的算法代码存储到数据库中
@@ -804,7 +805,7 @@ for i in range(2, len(kdata)):
 
     conn.commit()
     conn.close()
-    print(f"成功初始化 {len(algorithms)} 个形态算法到数据库")
+    logger.info(f"成功初始化 {len(algorithms)} 个形态算法到数据库")
 
 
 if __name__ == '__main__':

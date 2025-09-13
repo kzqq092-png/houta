@@ -1,3 +1,4 @@
+from loguru import logger
 """
 DuckDB表结构定义
 
@@ -389,7 +390,7 @@ CREATE TABLE {table_name} (
             return True
 
         except Exception as e:
-            print(f"创建表失败: {e}")
+            logger.info(f"创建表失败: {e}")
             return False
 
     @staticmethod
@@ -517,16 +518,16 @@ CREATE TABLE {table_name} (
             # 检查列是否匹配
             for col_name, col_type in expected_columns.items():
                 if col_name not in actual_columns:
-                    print(f"缺少列: {col_name}")
+                    logger.info(f"缺少列: {col_name}")
                     return False
 
                 # 简单的类型检查（DuckDB类型可能有变化）
                 if not actual_columns[col_name].upper().startswith(col_type.split('(')[0].upper()):
-                    print(f"列类型不匹配: {col_name}, 期望: {col_type}, 实际: {actual_columns[col_name]}")
+                    logger.info(f"列类型不匹配: {col_name} 期望: {col_type} 实际: {actual_columns[col_name]}")
                     return False
 
             return True
 
         except Exception as e:
-            print(f"验证表结构失败: {e}")
+            logger.info(f"验证表结构失败: {e}")
             return False

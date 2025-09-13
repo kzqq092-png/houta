@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 HIkyuu-UI插件系统综合自动化测试
@@ -17,7 +18,6 @@ import sys
 import unittest
 import asyncio
 import time
-import logging
 import tempfile
 import shutil
 from pathlib import Path
@@ -38,12 +38,12 @@ try:
     from plugins.plugin_market import PluginMarket
     IMPORTS_AVAILABLE = True
 except ImportError as e:
-    print(f"警告: 部分模块导入失败: {e}")
+    logger.info(f"警告: 部分模块导入失败: {e}")
     IMPORTS_AVAILABLE = False
 
-# 设置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# 设置日志 - 使用纯Loguru
+# # Loguru配置在core.loguru_config中统一管理  # 已移除，使用Loguru
+# logger = logger  # Loguru已在文件开头导入
 
 
 class MockPlugin(IPlugin):
@@ -178,7 +178,7 @@ class TestPlugin(IPlugin):
             self.assertEqual(test_plugin.name, "test_plugin")
             self.assertEqual(test_plugin.version, "1.0.0")
 
-            logger.info("✓ 插件发现调用链测试通过")
+            logger.info(" 插件发现调用链测试通过")
 
         except Exception as e:
             logger.error(f"插件发现调用链测试失败: {e}")
@@ -230,7 +230,7 @@ class TestPlugin(IPlugin):
             self.assertEqual(plugin_info.status, PluginStatus.DISABLED)
             self.assertTrue(mock_plugin.cleaned_up, "插件应该被清理")
 
-            logger.info("✓ 插件加载调用链测试通过")
+            logger.info(" 插件加载调用链测试通过")
 
         except Exception as e:
             logger.error(f"插件加载调用链测试失败: {e}")
@@ -291,7 +291,7 @@ class TestPluginUIInteractions(unittest.TestCase):
             )
             self.assertFalse(has_system_permission, "不应该有系统命令权限")
 
-            logger.info("✓ 插件配置调用链测试通过")
+            logger.info(" 插件配置调用链测试通过")
 
         except Exception as e:
             logger.error(f"插件配置调用链测试失败: {e}")
@@ -360,7 +360,7 @@ class TestPluginDatabaseService(unittest.TestCase):
             self.assertIn("enabled", stats, "统计中应该包含enabled状态")
             self.assertGreater(stats["enabled"], 0, "enabled状态的插件数量应该大于0")
 
-            logger.info("✓ 数据库服务调用链测试通过")
+            logger.info(" 数据库服务调用链测试通过")
 
         except Exception as e:
             logger.error(f"数据库服务调用链测试失败: {e}")
@@ -447,7 +447,7 @@ class TestPluginMarketChain(unittest.TestCase):
             call_args = mock_get.call_args
             self.assertIn("search", call_args[0][0])  # URL应该包含search
 
-            logger.info("✓ 插件市场搜索调用链测试通过")
+            logger.info(" 插件市场搜索调用链测试通过")
 
         except Exception as e:
             logger.error(f"插件市场搜索调用链测试失败: {e}")
@@ -541,7 +541,7 @@ class TestErrorHandlingChain(unittest.TestCase):
             result = plugin_manager.disable_plugin("error_plugin")
             self.assertTrue(result, "错误插件禁用应该成功")
 
-            logger.info("✓ 插件错误处理调用链测试通过")
+            logger.info(" 插件错误处理调用链测试通过")
 
         except Exception as e:
             logger.error(f"插件错误处理调用链测试失败: {e}")
@@ -608,7 +608,7 @@ class TestPerformanceMonitoring(unittest.TestCase):
             self.assertEqual(metric["metric_value"], 0.5)
             self.assertEqual(metric["metric_unit"], "seconds")
 
-            logger.info("✓ 性能监控调用链测试通过")
+            logger.info(" 性能监控调用链测试通过")
 
         except Exception as e:
             logger.error(f"性能监控调用链测试失败: {e}")
@@ -625,7 +625,7 @@ class PluginSystemTestSuite:
 
     def run_all_tests(self) -> Dict[str, Any]:
         """运行所有测试"""
-        logger.info("🚀 开始HIkyuu-UI插件系统全面自动化测试")
+        logger.info(" 开始HIkyuu-UI插件系统全面自动化测试")
         logger.info("=" * 80)
 
         self.start_time = time.time()
@@ -700,7 +700,7 @@ class PluginSystemTestSuite:
 def main():
     """主函数"""
     if not IMPORTS_AVAILABLE:
-        print("❌ 无法导入必要的模块，跳过测试")
+        logger.info(" 无法导入必要的模块，跳过测试")
         return False
 
     # 运行测试套件

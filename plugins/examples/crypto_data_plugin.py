@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数字货币数据源插件示例
 
@@ -25,9 +26,8 @@ import pandas as pd
 from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import AssetType, DataType
-from core.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 # 检查必要的库
 try:
@@ -42,7 +42,6 @@ DEFAULT_CONFIG = {
     'coingecko_base_url': 'https://api.coingecko.com/api/v3',
     'timeout': 10
 }
-
 
 class CryptoDataPlugin(IDataSourcePlugin):
     """数字货币数据源插件"""
@@ -810,7 +809,6 @@ class CryptoDataPlugin(IDataSourcePlugin):
             "config": {k: "***" if "password" in k or "key" in k or "secret" in k else v for k, v in self.config.items()}
         }
 
-
 # 插件工厂函数
     def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
         """
@@ -940,11 +938,9 @@ class CryptoDataPlugin(IDataSourcePlugin):
             self.logger.error(traceback.format_exc())
             return pd.DataFrame()
 
-
 def create_plugin() -> IDataSourcePlugin:
     """创建插件实例"""
     return CryptoDataPlugin()
-
 
 # 插件元数据
 PLUGIN_METADATA = {

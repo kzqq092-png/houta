@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -32,7 +33,7 @@ try:
     from PyQt5.QtGui import QFont, QIcon, QPixmap, QTextCursor
     GUI_AVAILABLE = True
 except ImportError:
-    print("⚠️  PyQt5 未安装，UI功能将受限")
+    logger.info("  PyQt5 未安装，UI功能将受限")
     GUI_AVAILABLE = False
 
 # 导入优化系统组件
@@ -300,7 +301,7 @@ class VersionManagerDialog(QDialog if GUI_AVAILABLE else object):
                 i, 3, QTableWidgetItem(version.description))
 
             # 激活状态
-            status = "✓ 激活" if version.is_active else "未激活"
+            status = " 激活" if version.is_active else "未激活"
             self.version_table.setItem(i, 4, QTableWidgetItem(status))
 
             # 性能评分
@@ -394,7 +395,7 @@ class UIIntegration:
         """创建形态右键菜单"""
         if not GUI_AVAILABLE:
             if self.debug_mode:
-                print(f"  ⚠️  GUI不可用，跳过菜单创建: {pattern_name}")
+                logger.info(f"    GUI不可用，跳过菜单创建: {pattern_name}")
             return None
 
         try:
@@ -402,7 +403,7 @@ class UIIntegration:
             app = QApplication.instance()
             if app is None:
                 if self.debug_mode:
-                    print(f"  ⚠️  无QApplication实例，跳过菜单创建: {pattern_name}")
+                    logger.info(f"    无QApplication实例，跳过菜单创建: {pattern_name}")
                 return None
 
             menu = QMenu(f"优化 {pattern_name}")
@@ -437,13 +438,13 @@ class UIIntegration:
 
         except Exception as e:
             if self.debug_mode:
-                print(f"  ❌ 创建菜单失败: {e}")
+                logger.info(f"   创建菜单失败: {e}")
             return None
 
     def show_optimization_dialog(self, pattern_name: str):
         """显示优化配置对话框"""
         if not GUI_AVAILABLE:
-            print(f"GUI不可用，无法显示优化对话框: {pattern_name}")
+            logger.info(f"GUI不可用，无法显示优化对话框: {pattern_name}")
             return
 
         dialog = OptimizationDialog(pattern_name)
@@ -467,7 +468,7 @@ class UIIntegration:
                 QMessageBox.warning(None, "警告", f"{pattern_name} 正在优化中，请等待完成")
             return
 
-        print(f"🚀 开始优化: {pattern_name}")
+        logger.info(f" 开始优化: {pattern_name}")
 
         # 记录优化状态
         self.current_optimizations[pattern_name] = {
@@ -491,7 +492,7 @@ class UIIntegration:
     def show_version_manager(self, pattern_name: str):
         """显示版本管理对话框"""
         if not GUI_AVAILABLE:
-            print(f"GUI不可用，无法显示版本管理: {pattern_name}")
+            logger.info(f"GUI不可用，无法显示版本管理: {pattern_name}")
             return
 
         if pattern_name in self.active_dialogs:
@@ -510,7 +511,7 @@ class UIIntegration:
     def evaluate_pattern(self, pattern_name: str):
         """评估形态性能"""
         try:
-            print(f"评估形态性能: {pattern_name}")
+            logger.info(f"评估形态性能: {pattern_name}")
 
             # 创建测试数据集
             test_datasets = self.evaluator.create_test_datasets(
@@ -535,14 +536,14 @@ class UIIntegration:
                 QMessageBox.information(
                     None, f"性能评估 - {pattern_name}", result_text)
             else:
-                print(result_text)
+                logger.info(result_text)
 
         except Exception as e:
             error_msg = f"性能评估失败: {e}"
             if GUI_AVAILABLE:
                 QMessageBox.critical(None, "错误", error_msg)
             else:
-                print(f"❌ {error_msg}")
+                logger.info(f" {error_msg}")
 
     def export_pattern_algorithm(self, pattern_name: str):
         """导出形态算法"""
@@ -565,7 +566,7 @@ class UIIntegration:
                     QMessageBox.information(
                         None, "成功", f"算法已导出到: {export_path}")
                 else:
-                    print(f"✅ 算法已导出到: {export_path}")
+                    logger.info(f" 算法已导出到: {export_path}")
             else:
                 raise Exception("导出失败")
 
@@ -574,7 +575,7 @@ class UIIntegration:
             if GUI_AVAILABLE:
                 QMessageBox.critical(None, "错误", error_msg)
             else:
-                print(f"❌ {error_msg}")
+                logger.info(f" {error_msg}")
 
     def on_progress_updated(self, pattern_name: str, progress: float):
         """优化进度更新"""
@@ -582,7 +583,7 @@ class UIIntegration:
             self.current_optimizations[pattern_name]["progress"] = progress
 
         if self.debug_mode:
-            print(f"↑ {pattern_name} 优化进度: {progress:.1%}")
+            logger.info(f"↑ {pattern_name} 优化进度: {progress:.1%}")
 
     def on_task_completed(self, pattern_name: str, result: Dict[str, Any]):
         """优化任务完成"""
@@ -603,7 +604,7 @@ class UIIntegration:
         if GUI_AVAILABLE:
             QMessageBox.information(None, "优化完成", message)
         else:
-            print(f"✅ {message}")
+            logger.info(f" {message}")
 
     def on_error_occurred(self, pattern_name: str, error_message: str):
         """优化错误处理"""
@@ -615,7 +616,7 @@ class UIIntegration:
         if GUI_AVAILABLE:
             QMessageBox.critical(None, "优化失败", error_msg)
         else:
-            print(f"❌ {error_msg}")
+            logger.info(f" {error_msg}")
 
     def get_optimization_status(self) -> Dict[str, Any]:
         """获取当前优化状态"""
@@ -643,7 +644,7 @@ class UIIntegration:
             if reply != QMessageBox.Yes:
                 return
 
-        print("🚀 启动批量优化...")
+        logger.info(" 启动批量优化...")
         result = self.auto_tuner.one_click_optimize()
 
         summary = result.get("summary", {})
@@ -660,7 +661,7 @@ class UIIntegration:
         if GUI_AVAILABLE:
             QMessageBox.information(None, "批量优化完成", message)
         else:
-            print(f"✅ {message}")
+            logger.info(f" {message}")
 
 
 def create_ui_integration(debug_mode: bool = False) -> UIIntegration:
@@ -699,7 +700,7 @@ if __name__ == "__main__":
 
         sys.exit(app.exec_())
     else:
-        print("🧪 测试UI集成（无GUI模式）")
+        logger.info(" 测试UI集成（无GUI模式）")
         ui_integration = create_ui_integration(debug_mode=True)
 
         # 测试快速优化

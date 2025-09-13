@@ -5,9 +5,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from typing import Optional, Dict, Any
-import logging
+from loguru import logger
 
-logger = logging.getLogger(__name__)
 
 
 class ConverterDialog(QDialog):

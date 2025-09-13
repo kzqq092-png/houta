@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -11,8 +12,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 from core.plugin_types import PluginType, PluginCategory
-from .base_sentiment_plugin import BaseSentimentPlugin
-from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_api_key, validate_number_range
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_api_key, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
 
@@ -23,6 +24,10 @@ class FMPSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         BaseSentimentPlugin.__init__(self)
         ConfigurablePlugin.__init__(self)
         self._config_file = create_config_file_path("fmp_sentiment")
+
+        # 联网查询地址配置（endpointhost字段）
+        # FMP情绪插件不需要联网查询地址，直接使用API，设为空
+        self.endpointhost = []
 
     @property
     def metadata(self) -> Dict[str, Any]:
@@ -216,8 +221,8 @@ class FMPSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
     def get_config_status_message(self) -> str:
         """获取配置状态消息"""
         if not self.is_properly_configured():
-            return "❌ 需要配置API Key才能获取真实数据"
-        return "✅ 配置正常"
+            return " 需要配置API Key才能获取真实数据"
+        return " 配置正常"
 
     def _fetch_raw_sentiment_data(self, **kwargs) -> SentimentResponse:
         """获取FMP原始情绪数据"""
@@ -336,7 +341,7 @@ class FMPSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
                             )
 
                             sentiment_data.append(sentiment_item)
-                            self._safe_log("info", f"✅ 成功获取 {symbol} 的真实FMP数据")
+                            self._safe_log("info", f" 成功获取 {symbol} 的真实FMP数据")
                             break  # 成功获取，跳出重试循环
                         else:
                             self._safe_log("warning", f"FMP API返回空数据: {symbol}")
@@ -444,15 +449,15 @@ if __name__ == "__main__":
 
     # 获取配置UI模式
     ui_schema = plugin.get_config_ui_schema()
-    print(f"配置UI模式: {ui_schema}")
+    logger.info(f"配置UI模式: {ui_schema}")
 
     # 获取数据
     response = plugin._fetch_raw_sentiment_data()
 
-    print(f"成功: {response.success}")
-    print(f"数据项: {len(response.data)}")
-    print(f"综合指数: {response.composite_score}")
+    logger.info(f"成功: {response.success}")
+    logger.info(f"数据项: {len(response.data)}")
+    logger.info(f"综合指数: {response.composite_score}")
 
     if response.data:
         for item in response.data:
-            print(f"- {item.indicator_name}: {item.value} ({item.status})")
+            logger.info(f"- {item.indicator_name}: {item.value} ({item.status})")

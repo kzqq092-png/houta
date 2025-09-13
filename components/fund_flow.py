@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 import seaborn as sns
 import time
 import os
-import logging
+from loguru import logger
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -22,7 +22,6 @@ from pylab import mpl
 from gui.ui_components import BaseAnalysisPanel
 from utils.template_manager import TemplateManager
 from utils.config_manager import ConfigManager
-from core.logger import LogManager
 from gui.widgets.analysis_tabs.base_tab import BaseAnalysisTab
 
 # 使用统一的matplotlib中文字体配置
@@ -416,7 +415,7 @@ class DataUpdateThread(QThread):
                         data[k] = v
                 self.data_updated.emit(data)
             except Exception as e:
-                logging.error(f"数据更新错误: {e}")
+                logger.error(f"数据更新错误: {e}")
             self.msleep(300000)  # 休眠5分钟
 
     def _fetch_market_data(self):
@@ -431,8 +430,8 @@ class DataUpdateThread(QThread):
 class FundFlowWidget(BaseAnalysisTab):
     """资金流向分析组件，继承统一分析面板基类"""
 
-    def __init__(self, parent=None, data_manager=None, log_manager=None, chart_widget=None):
-        super().__init__(parent, log_manager=log_manager)
+    def __init__(self, parent=None, data_manager=None, chart_widget=None):
+        super().__init__(parent)  # log_manager已迁移到Loguru
         self.data_manager = data_manager
         self.chart_widget = chart_widget
         self._data_cache = {}
@@ -467,7 +466,7 @@ class FundFlowWidget(BaseAnalysisTab):
             QTimer.singleShot(1000, self.init_data_updates)
 
         except Exception as e:
-            print(f"❌ 初始化资金流UI失败: {e}")
+            logger.error(f"初始化资金流UI失败: {e}")
 
     def create_simple_overview(self, layout):
         """创建简化的概览区域"""
@@ -485,7 +484,7 @@ class FundFlowWidget(BaseAnalysisTab):
             overview_layout = QVBoxLayout(overview_group)
 
             # 标题
-            title = QLabel("📊 板块资金流概览")
+            title = QLabel(" 板块资金流概览")
             title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
             overview_layout.addWidget(title)
 
@@ -509,7 +508,7 @@ class FundFlowWidget(BaseAnalysisTab):
             layout.addWidget(overview_group)
 
         except Exception as e:
-            print(f"❌ 创建简化概览失败: {e}")
+            logger.error(f" 创建简化概览失败: {e}")
 
     def create_simple_data_display(self, layout):
         """创建简化的数据显示区域"""
@@ -527,7 +526,7 @@ class FundFlowWidget(BaseAnalysisTab):
             data_layout = QVBoxLayout(data_group)
 
             # 标题
-            title = QLabel("📈 资金流数据")
+            title = QLabel(" 资金流数据")
             title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
             data_layout.addWidget(title)
 
@@ -568,7 +567,7 @@ class FundFlowWidget(BaseAnalysisTab):
             layout.addWidget(data_group)
 
         except Exception as e:
-            print(f"❌ 创建简化数据显示失败: {e}")
+            logger.error(f" 创建简化数据显示失败: {e}")
 
     def create_simple_controls(self, layout):
         """创建简化的控制按钮"""
@@ -586,7 +585,7 @@ class FundFlowWidget(BaseAnalysisTab):
             controls_layout = QHBoxLayout(controls_group)
 
             # 刷新按钮
-            self.refresh_btn = QPushButton("🔄 刷新数据")
+            self.refresh_btn = QPushButton(" 刷新数据")
             self.refresh_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
@@ -604,7 +603,7 @@ class FundFlowWidget(BaseAnalysisTab):
             controls_layout.addWidget(self.refresh_btn)
 
             # 导出按钮
-            self.export_btn = QPushButton("📊 导出数据")
+            self.export_btn = QPushButton(" 导出数据")
             self.export_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -630,12 +629,12 @@ class FundFlowWidget(BaseAnalysisTab):
             layout.addWidget(controls_group)
 
         except Exception as e:
-            print(f"❌ 创建简化控制按钮失败: {e}")
+            logger.error(f" 创建简化控制按钮失败: {e}")
 
     def init_data_updates(self):
         """延迟初始化数据更新，避免阻塞UI"""
         try:
-            print("📊 开始初始化资金流数据更新...")
+            logger.info(" 开始初始化资金流数据更新...")
 
             # 使用TET框架获取数据
             self.init_tet_data_source()
@@ -649,7 +648,7 @@ class FundFlowWidget(BaseAnalysisTab):
             QTimer.singleShot(500, self.update_data_async)
 
         except Exception as e:
-            print(f"❌ 初始化数据更新失败: {e}")
+            logger.error(f" 初始化数据更新失败: {e}")
 
     def init_tet_data_source(self):
         """初始化TET数据源"""
@@ -671,21 +670,21 @@ class FundFlowWidget(BaseAnalysisTab):
                 try:
                     self.unified_data_manager = container.resolve(UnifiedDataManager)
                     self.sector_fund_flow_service = container.resolve(SectorFundFlowService)
-                    print("✅ 从服务容器获取TET数据源成功")
+                    logger.info(" 从服务容器获取TET数据源成功")
                 except Exception as e:
-                    print(f"⚠️ 从服务容器获取服务失败: {e}")
+                    logger.error(f" 从服务容器获取服务失败: {e}")
                     # 降级到直接实例化
                     self.unified_data_manager = UnifiedDataManager()
                     self.sector_fund_flow_service = SectorFundFlowService()
-                    print("✅ 直接实例化TET数据源")
+                    logger.info(" 直接实例化TET数据源")
             else:
                 # 直接实例化
                 self.unified_data_manager = UnifiedDataManager()
                 self.sector_fund_flow_service = SectorFundFlowService()
-                print("✅ 直接实例化TET数据源")
+                logger.info(" 直接实例化TET数据源")
 
         except Exception as e:
-            print(f"❌ 初始化TET数据源失败: {e}")
+            logger.error(f" 初始化TET数据源失败: {e}")
             self.unified_data_manager = None
             self.sector_fund_flow_service = None
             self.manager_factory = None
@@ -701,7 +700,7 @@ class FundFlowWidget(BaseAnalysisTab):
                     if data:
                         return self._process_data_manager_result(data)
                 except Exception as e:
-                    print(f"⚠️ 数据管理器获取资金流数据失败: {e}")
+                    logger.error(f" 数据管理器获取资金流数据失败: {e}")
 
             # 使用TET框架获取数据
             if self.unified_data_manager:
@@ -731,13 +730,13 @@ class FundFlowWidget(BaseAnalysisTab):
                         'source': 'TET_Framework'
                     }
                 except Exception as e:
-                    print(f"⚠️ TET框架获取数据失败: {e}")
+                    logger.error(f" TET框架获取数据失败: {e}")
 
             # 降级到模拟数据
             return self._get_fallback_fund_flow_data()
 
         except Exception as e:
-            print(f"❌ 获取资金流数据失败: {e}")
+            logger.error(f" 获取资金流数据失败: {e}")
             return self._get_fallback_fund_flow_data()
 
     def _process_data_manager_result(self, data) -> dict:
@@ -749,19 +748,19 @@ class FundFlowWidget(BaseAnalysisTab):
             if 'sector_flow_rank' in data and not data['sector_flow_rank'].empty:
                 sector_df = data['sector_flow_rank']
                 processed_data['industry_flow'] = sector_df
-                print(f"✅ 获取板块资金流数据: {len(sector_df)} 条记录")
+                logger.info(f" 获取板块资金流数据: {len(sector_df)} 条记录")
 
             # 处理北向资金数据
             if 'market_fund_flow' in data and not data['market_fund_flow'].empty:
                 market_df = data['market_fund_flow']
                 processed_data['north_flow'] = market_df
-                print(f"✅ 获取北向资金数据: {len(market_df)} 条记录")
+                logger.info(f" 获取北向资金数据: {len(market_df)} 条记录")
 
             # 处理主力资金数据
             if 'main_fund_flow' in data and not data['main_fund_flow'].empty:
                 main_df = data['main_fund_flow']
                 processed_data['concept_flow'] = main_df
-                print(f"✅ 获取主力资金数据: {len(main_df)} 条记录")
+                logger.info(f" 获取主力资金数据: {len(main_df)} 条记录")
 
             processed_data['timestamp'] = datetime.now()
             processed_data['source'] = 'DataManager'
@@ -769,13 +768,13 @@ class FundFlowWidget(BaseAnalysisTab):
             return processed_data
 
         except Exception as e:
-            print(f"❌ 处理数据管理器结果失败: {e}")
+            logger.error(f" 处理数据管理器结果失败: {e}")
             return self._get_fallback_fund_flow_data()
 
     def _perform_data_refresh(self):
         """执行数据刷新"""
         try:
-            print("📊 开始执行数据刷新...")
+            logger.info(" 开始执行数据刷新...")
 
             # 获取资金流数据
             fund_flow_data = self._get_fund_flow_data_via_tet()
@@ -785,14 +784,14 @@ class FundFlowWidget(BaseAnalysisTab):
                 self._update_ui_with_data(fund_flow_data)
                 if hasattr(self, 'status_label'):
                     self.status_label.setText("状态: 数据更新完成")
-                print("✅ 数据刷新完成")
+                logger.info(" 数据刷新完成")
             else:
                 if hasattr(self, 'status_label'):
                     self.status_label.setText("状态: 未获取到有效数据")
-                print("⚠️ 未获取到有效数据")
+                logger.info(" 未获取到有效数据")
 
         except Exception as e:
-            print(f"❌ 执行数据刷新失败: {e}")
+            logger.error(f" 执行数据刷新失败: {e}")
             if hasattr(self, 'status_label'):
                 self.status_label.setText(f"状态: 刷新失败 - {str(e)}")
         finally:
@@ -802,7 +801,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def _get_fallback_fund_flow_data(self) -> dict:
         """获取降级资金流数据"""
         try:
-            print("⚠️ 使用降级数据，请检查数据源配置")
+            logger.info(" 使用降级数据，请检查数据源配置")
 
             # 生成简单的模拟数据用于演示
             industries = ["医药生物", "计算机", "电子", "通信", "传媒", "电气设备", "机械设备", "汽车", "食品饮料", "银行"]
@@ -843,7 +842,7 @@ class FundFlowWidget(BaseAnalysisTab):
             }
 
         except Exception as e:
-            print(f"❌ 生成降级资金流数据失败: {e}")
+            logger.error(f" 生成降级资金流数据失败: {e}")
             return {
                 'industry_flow': pd.DataFrame(),
                 'concept_flow': pd.DataFrame(),
@@ -855,7 +854,7 @@ class FundFlowWidget(BaseAnalysisTab):
     def _update_ui_with_data(self, data: dict):
         """使用数据更新UI"""
         try:
-            print(f"📊 开始更新UI，数据源: {data.get('source', 'Unknown')}")
+            logger.info(f" 开始更新UI，数据源: {data.get('source', 'Unknown')}")
 
             # 更新概览指标
             self._update_overview_indicators(data)
@@ -863,10 +862,10 @@ class FundFlowWidget(BaseAnalysisTab):
             # 更新数据显示
             self._update_data_displays(data)
 
-            print("✅ UI更新完成")
+            logger.info(" UI更新完成")
 
         except Exception as e:
-            print(f"❌ 更新UI失败: {e}")
+            logger.error(f" 更新UI失败: {e}")
 
     def _update_overview_indicators(self, data: dict):
         """更新概览指标"""
@@ -926,7 +925,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 """)
 
         except Exception as e:
-            print(f"❌ 更新概览指标失败: {e}")
+            logger.error(f" 更新概览指标失败: {e}")
 
     def _update_data_displays(self, data: dict):
         """更新数据显示"""
@@ -1024,7 +1023,7 @@ class FundFlowWidget(BaseAnalysisTab):
                     self.main_force_text.setPlainText(north_text)
 
         except Exception as e:
-            print(f"❌ 更新数据显示失败: {e}")
+            logger.error(f" 更新数据显示失败: {e}")
 
     def create_control_buttons(self, layout):
         """创建控制按钮 - 使用基类统一方法"""
@@ -1255,8 +1254,8 @@ class FundFlowWidget(BaseAnalysisTab):
                     result = analysis_func(*args, **kwargs)
                     return result
             except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.error(f"分析异常: {str(e)}")
+                if True:  # 使用Loguru日志
+                    logger.error(f"分析异常: {str(e)}")
                 return None
             finally:
                 QTimer.singleShot(0, lambda: on_done(None))
@@ -1320,7 +1319,7 @@ class FundFlowWidget(BaseAnalysisTab):
                                     f"color: {value_data['color']};")
 
         except Exception as e:
-            logging.error(f"更新概览卡片失败: {str(e)}")
+            logger.error(f"更新概览卡片失败: {str(e)}")
 
     def update_fund_flow_data(self, data: dict):
         """更新资金流向数据
@@ -1333,7 +1332,7 @@ class FundFlowWidget(BaseAnalysisTab):
             QTimer.singleShot(0, lambda: self._update_ui_safely(data))
 
         except Exception as e:
-            self.log_manager.log(f"更新资金流向数据失败: {e}", LogLevel.ERROR)
+            logger.error(f"更新资金流向数据失败: {e}")
 
     def _update_ui_safely(self, data: dict):
         """在主线程中安全地更新UI
@@ -1355,7 +1354,7 @@ class FundFlowWidget(BaseAnalysisTab):
             self._check_flow_alerts(data)
 
         except Exception as e:
-            self.log_manager.log(f"更新UI失败: {e}", LogLevel.ERROR)
+            logger.error(f"更新UI失败: {e}")
 
     def _update_north_flow(self, data):
         """异步更新北向资金流向图表"""
@@ -1363,7 +1362,7 @@ class FundFlowWidget(BaseAnalysisTab):
             # 使用QTimer.singleShot确保在主线程中执行UI更新
             QTimer.singleShot(0, lambda: self._update_north_flow_ui(data))
         except Exception as e:
-            self.log_manager.error(f"更新北向资金流向图表失败: {str(e)}")
+            logger.error(f"更新北向资金流向图表失败: {str(e)}")
 
     def _update_north_flow_ui(self, data):
         """在主线程中更新北向资金流向图表UI"""
@@ -1390,7 +1389,7 @@ class FundFlowWidget(BaseAnalysisTab):
             self.north_chart.createDefaultAxes()
 
         except Exception as e:
-            self.log_manager.error(f"北向资金流向图表UI更新失败: {str(e)}")
+            logger.error(f"北向资金流向图表UI更新失败: {str(e)}")
 
     def _check_alerts(self, data):
         """检查预警条件"""
@@ -1421,7 +1420,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 self._show_loading_status("正在更新行业资金流向...")
 
         except Exception as e:
-            self.log_manager.error(f"启动行业资金流向更新失败: {str(e)}")
+            logger.error(f"启动行业资金流向更新失败: {str(e)}")
 
     def _on_industry_flow_calculated(self, result: dict):
         """处理行业资金流计算结果"""
@@ -1442,7 +1441,7 @@ class FundFlowWidget(BaseAnalysisTab):
             self._rendering_worker.start()
 
         except Exception as e:
-            self.log_manager.error(f"处理行业资金流计算结果失败: {str(e)}")
+            logger.error(f"处理行业资金流计算结果失败: {str(e)}")
 
     def _update_industry_table(self, table_data: dict):
         """更新行业资金流表格（在主线程中执行）"""
@@ -1508,16 +1507,16 @@ class FundFlowWidget(BaseAnalysisTab):
             self.industry_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
         except Exception as e:
-            self.log_manager.error(f"更新行业资金流表格失败: {str(e)}")
+            logger.error(f"更新行业资金流表格失败: {str(e)}")
 
     def _on_industry_chart_rendered(self, chart_type: str, result):
         """处理行业图表渲染完成"""
         try:
             self.industry_canvas.draw()
             self._hide_loading_status()
-            self.log_manager.info("行业资金流向更新完成")
+            logger.info("行业资金流向更新完成")
         except Exception as e:
-            self.log_manager.error(f"行业图表渲染完成处理失败: {str(e)}")
+            logger.error(f"行业图表渲染完成处理失败: {str(e)}")
 
     def update_concept_flow(self):
         """异步更新概念资金流向"""
@@ -1541,7 +1540,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 self._show_loading_status("正在更新概念资金流向...")
 
         except Exception as e:
-            self.log_manager.error(f"启动概念资金流向更新失败: {str(e)}")
+            logger.error(f"启动概念资金流向更新失败: {str(e)}")
 
     def _on_concept_flow_calculated(self, result: dict):
         """处理概念资金流计算结果"""
@@ -1562,7 +1561,7 @@ class FundFlowWidget(BaseAnalysisTab):
             self._rendering_worker.start()
 
         except Exception as e:
-            self.log_manager.error(f"处理概念资金流计算结果失败: {str(e)}")
+            logger.error(f"处理概念资金流计算结果失败: {str(e)}")
 
     def _update_concept_table(self, table_data: dict):
         """更新概念资金流表格（在主线程中执行）"""
@@ -1628,16 +1627,16 @@ class FundFlowWidget(BaseAnalysisTab):
             self.concept_table.item(min_str_idx, 4).setBackground(QColor("#ffcdd2"))
 
         except Exception as e:
-            self.log_manager.error(f"更新概念资金流表格失败: {str(e)}")
+            logger.error(f"更新概念资金流表格失败: {str(e)}")
 
     def _on_concept_chart_rendered(self, chart_type: str, result):
         """处理概念图表渲染完成"""
         try:
             self.concept_canvas.draw()
             self._hide_loading_status()
-            self.log_manager.info("概念资金流向更新完成")
+            logger.info("概念资金流向更新完成")
         except Exception as e:
-            self.log_manager.error(f"概念图表渲染完成处理失败: {str(e)}")
+            logger.error(f"概念图表渲染完成处理失败: {str(e)}")
 
     def update_main_force_analysis(self):
         """异步更新主力资金分析"""
@@ -1661,7 +1660,7 @@ class FundFlowWidget(BaseAnalysisTab):
                 self._show_loading_status("正在更新主力资金分析...")
 
         except Exception as e:
-            self.log_manager.error(f"启动主力资金分析更新失败: {str(e)}")
+            logger.error(f"启动主力资金分析更新失败: {str(e)}")
 
     def _on_main_force_calculated(self, result: dict):
         """处理主力资金分析计算结果"""
@@ -1677,26 +1676,26 @@ class FundFlowWidget(BaseAnalysisTab):
             self._rendering_worker.start()
 
         except Exception as e:
-            self.log_manager.error(f"处理主力资金分析计算结果失败: {str(e)}")
+            logger.error(f"处理主力资金分析计算结果失败: {str(e)}")
 
     def _on_main_force_chart_rendered(self, chart_type: str, result):
         """处理主力资金分析图表渲染完成"""
         try:
             self.main_force_canvas.draw()
             self._hide_loading_status()
-            self.log_manager.info("主力资金分析更新完成")
+            logger.info("主力资金分析更新完成")
         except Exception as e:
-            self.log_manager.error(f"主力资金分析图表渲染完成处理失败: {str(e)}")
+            logger.error(f"主力资金分析图表渲染完成处理失败: {str(e)}")
 
     # 添加辅助方法
     def _show_loading_status(self, message: str):
         """显示加载状态"""
         try:
             # 可以在这里添加加载状态的UI显示
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(message)
+            if True:  # 使用Loguru日志
+                logger.info(message)
         except Exception as e:
-            print(f"显示加载状态失败: {str(e)}")
+            logger.error(f"显示加载状态失败: {str(e)}")
 
     def _hide_loading_status(self):
         """隐藏加载状态"""
@@ -1704,38 +1703,35 @@ class FundFlowWidget(BaseAnalysisTab):
             # 可以在这里隐藏加载状态的UI显示
             pass
         except Exception as e:
-            print(f"隐藏加载状态失败: {str(e)}")
+            logger.error(f"隐藏加载状态失败: {str(e)}")
 
     def _on_calculation_error(self, error_message: str):
         """处理计算错误"""
         try:
             self._hide_loading_status()
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"资金流数据计算错误: {error_message}")
+            if True:  # 使用Loguru日志
+                logger.error(f"资金流数据计算错误: {error_message}")
             else:
-                print(f"资金流数据计算错误: {error_message}")
+                logger.error(f"资金流数据计算错误: {error_message}")
         except Exception as e:
-            print(f"处理计算错误失败: {str(e)}")
+            logger.error(f"处理计算错误失败: {str(e)}")
 
     def _on_rendering_error(self, error_message: str):
         """处理渲染错误"""
         try:
             self._hide_loading_status()
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"图表渲染错误: {error_message}")
-            else:
-                print(f"图表渲染错误: {error_message}")
+            logger.error(f"图表渲染错误: {error_message}")
+
         except Exception as e:
-            print(f"处理渲染错误失败: {str(e)}")
+            logger.error(f"处理渲染错误失败: {str(e)}")
 
     def _on_calculation_progress(self, progress: int, message: str):
         """处理计算进度"""
         try:
             # 可以在这里更新进度显示
-            if hasattr(self, 'log_manager'):
-                self.log_manager.debug(f"计算进度 {progress}%: {message}")
+            logger.debug(f"计算进度 {progress}%: {message}")
         except Exception as e:
-            print(f"处理计算进度失败: {str(e)}")
+            logger.error(f"处理计算进度失败: {str(e)}")
 
     def closeEvent(self, event):
         """关闭事件处理 - 简化版本"""
@@ -1744,10 +1740,10 @@ class FundFlowWidget(BaseAnalysisTab):
             if hasattr(self, 'update_timer'):
                 self.update_timer.stop()
 
-            print("📊 资金流组件已关闭")
+            logger.info(" 资金流组件已关闭")
 
         except Exception as e:
-            print(f"❌ 关闭资金流组件时出错: {e}")
+            logger.error(f" 关闭资金流组件时出错: {e}")
         finally:
             super().closeEvent(event)
 
@@ -1756,11 +1752,11 @@ class FundFlowWidget(BaseAnalysisTab):
         """设置K线数据 - 简化版本"""
         try:
             if kdata is not None:
-                print("📊 资金流组件接收到K线数据")
+                logger.info(" 资金流组件接收到K线数据")
                 # 触发数据更新
                 QTimer.singleShot(500, self.update_data_async)
         except Exception as e:
-            print(f"❌ 设置K线数据失败: {e}")
+            logger.error(f" 设置K线数据失败: {e}")
 
     def refresh_data(self):
         """刷新数据 - 兼容基类接口"""
@@ -1780,7 +1776,7 @@ class FundFlowWidget(BaseAnalysisTab):
             self.status_label.setText("状态: 数据已清除")
 
         except Exception as e:
-            print(f"❌ 清除数据失败: {e}")
+            logger.error(f" 清除数据失败: {e}")
 
     # 保留必要的基类兼容方法，但简化实现
     def _fetch_fund_flow_data(self) -> dict:

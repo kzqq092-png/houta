@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -19,8 +20,6 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont
 
 from gui.widgets.chart_widget import ChartWidget as ChartCanvas
-from core.logger import get_logger
-
 
 class MultiChartPanel(QWidget):
     """多屏幕图表面板"""
@@ -38,7 +37,7 @@ class MultiChartPanel(QWidget):
             parent: 父窗口
         """
         super().__init__(parent)
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 状态变量
         self.is_multi = False  # 是否为多屏模式
@@ -656,7 +655,6 @@ class MultiChartPanel(QWidget):
 
         except Exception as e:
             self.logger.error(f"加载股票数据失败: {e}")
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication, QMainWindow

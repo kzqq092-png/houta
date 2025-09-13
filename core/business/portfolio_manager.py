@@ -1,3 +1,4 @@
+from loguru import logger
 """
 投资组合管理业务逻辑
 
@@ -8,7 +9,6 @@
 - 收益计算
 """
 
-import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -60,7 +60,7 @@ class PortfolioManager:
     """投资组合管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
         self.data_access = data_access
         self._positions: Dict[str, Position] = {}  # 持仓字典
         self._cash_available = Decimal('100000.00')  # 初始可用资金10万

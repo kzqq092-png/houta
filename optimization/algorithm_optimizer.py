@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -65,9 +66,9 @@ class AlgorithmOptimizer:
         if config is None:
             config = OptimizationConfig()
 
-        print(f"🚀 开始优化算法: {pattern_name}")
-        print(f"📋 优化方法: {config.method}")
-        print(f"目标指标: {config.target_metric}")
+        logger.info(f" 开始优化算法: {pattern_name}")
+        logger.info(f" 优化方法: {config.method}")
+        logger.info(f"目标指标: {config.target_metric}")
 
         # 获取当前算法配置
         pattern_config = self.pattern_manager.get_pattern_by_name(pattern_name)
@@ -84,7 +85,7 @@ class AlgorithmOptimizer:
             pattern_name, test_datasets
         )
 
-        print(f"基准性能: {baseline_metrics.overall_score:.3f}")
+        logger.info(f"基准性能: {baseline_metrics.overall_score:.3f}")
 
         # 开始优化日志
         session_id = self.version_manager.db_manager.start_optimization_log(
@@ -126,8 +127,8 @@ class AlgorithmOptimizer:
                 optimization_log=json.dumps(result.get('optimization_log', []))
             )
 
-            print(f"✅ 优化完成！")
-            print(f"↑ 性能提升: {result.get('improvement_percentage', 0):.3f}%")
+            logger.info("优化完成！")
+            logger.info(f"性能提升: {result.get('improvement_percentage', 0):.3f}%")
 
             return result
 
@@ -144,7 +145,7 @@ class AlgorithmOptimizer:
                               config: OptimizationConfig, test_datasets: List[pd.DataFrame],
                               baseline_metrics: PerformanceMetrics) -> Dict[str, Any]:
         """遗传算法优化"""
-        print("🧬 使用遗传算法优化...")
+        logger.info(" 使用遗传算法优化...")
 
         # 初始化种群
         population = self._initialize_population(
@@ -155,7 +156,7 @@ class AlgorithmOptimizer:
         optimization_log = []
 
         for generation in range(config.max_iterations):
-            print(f"  第 {generation + 1}/{config.max_iterations} 代")
+            logger.info(f"  第 {generation + 1}/{config.max_iterations} 代")
 
             # 评估种群
             fitness_scores = []
@@ -176,11 +177,11 @@ class AlgorithmOptimizer:
                         best_score = score
                         best_individual = individual.copy()
 
-                        print(f"   发现更好的解: {score:.3f}")
+                        logger.info(f"   发现更好的解: {score:.3f}")
 
                 except Exception as e:
                     if self.debug_mode:
-                        print(f"    ❌ 个体评估失败: {e}")
+                        logger.info(f"     个体评估失败: {e}")
                     fitness_scores.append(0.0)
 
             # 记录当代最佳
@@ -195,7 +196,7 @@ class AlgorithmOptimizer:
             # 检查收敛条件
             if generation_best - baseline_metrics.overall_score < config.min_improvement:
                 if generation > 10:  # 至少运行10代
-                    print(f"    🛑 收敛，提前停止")
+                    logger.info(f"     收敛，提前停止")
                     break
 
             # 选择、交叉、变异
@@ -228,7 +229,7 @@ class AlgorithmOptimizer:
                                config: OptimizationConfig, test_datasets: List[pd.DataFrame],
                                baseline_metrics: PerformanceMetrics) -> Dict[str, Any]:
         """贝叶斯优化"""
-        print("使用贝叶斯优化...")
+        logger.info("使用贝叶斯优化...")
 
         # 简化的贝叶斯优化实现
         # 在实际应用中，可以使用scikit-optimize等库
@@ -241,7 +242,7 @@ class AlgorithmOptimizer:
         param_space = self._define_parameter_space(pattern_config)
 
         for iteration in range(config.max_iterations):
-            print(f"  第 {iteration + 1}/{config.max_iterations} 次迭代")
+            logger.info(f"  第 {iteration + 1}/{config.max_iterations} 次迭代")
 
             # 选择下一个参数组合（简化版本）
             if iteration < 5:
@@ -270,11 +271,11 @@ class AlgorithmOptimizer:
                 if score > best_score:
                     best_score = score
                     best_individual = individual.copy()
-                    print(f"   发现更好的解: {score:.3f}")
+                    logger.info(f"   发现更好的解: {score:.3f}")
 
             except Exception as e:
                 if self.debug_mode:
-                    print(f"    ❌ 参数评估失败: {e}")
+                    logger.info(f"     参数评估失败: {e}")
                 optimization_log.append({
                     "iteration": iteration + 1,
                     "parameters": individual,
@@ -307,7 +308,7 @@ class AlgorithmOptimizer:
                              config: OptimizationConfig, test_datasets: List[pd.DataFrame],
                              baseline_metrics: PerformanceMetrics) -> Dict[str, Any]:
         """随机搜索优化"""
-        print("🎲 使用随机搜索优化...")
+        logger.info(" 使用随机搜索优化...")
 
         best_individual = None
         best_score = baseline_metrics.overall_score
@@ -316,7 +317,7 @@ class AlgorithmOptimizer:
         param_space = self._define_parameter_space(pattern_config)
 
         for iteration in range(config.max_iterations):
-            print(f"  第 {iteration + 1}/{config.max_iterations} 次尝试")
+            logger.info(f"  第 {iteration + 1}/{config.max_iterations} 次尝试")
 
             # 随机采样参数
             individual = self._random_sample_parameters(param_space)
@@ -336,11 +337,11 @@ class AlgorithmOptimizer:
                 if score > best_score:
                     best_score = score
                     best_individual = individual.copy()
-                    print(f"   发现更好的解: {score:.3f}")
+                    logger.info(f"   发现更好的解: {score:.3f}")
 
             except Exception as e:
                 if self.debug_mode:
-                    print(f"    ❌ 参数评估失败: {e}")
+                    logger.info(f"     参数评估失败: {e}")
 
         # 保存最佳版本
         best_version_id = None
@@ -367,7 +368,7 @@ class AlgorithmOptimizer:
                                config: OptimizationConfig, test_datasets: List[pd.DataFrame],
                                baseline_metrics: PerformanceMetrics) -> Dict[str, Any]:
         """梯度优化（数值梯度）"""
-        print("↑ 使用梯度优化...")
+        logger.info("↑ 使用梯度优化...")
 
         # 这是一个简化的数值梯度实现
         # 实际应用中可能需要更复杂的梯度计算
@@ -379,7 +380,7 @@ class AlgorithmOptimizer:
         learning_rate = 0.01
 
         for iteration in range(config.max_iterations):
-            print(f"  第 {iteration + 1}/{config.max_iterations} 次迭代")
+            logger.info(f"  第 {iteration + 1}/{config.max_iterations} 次迭代")
 
             # 计算数值梯度
             gradients = {}
@@ -425,7 +426,7 @@ class AlgorithmOptimizer:
 
             if current_score > best_score:
                 best_score = current_score
-                print(f"   发现更好的解: {current_score:.3f}")
+                logger.info(f"   发现更好的解: {current_score:.3f}")
 
         # 保存最佳版本
         best_version_id = self._save_optimized_version(
@@ -755,10 +756,10 @@ if __name__ == "__main__":
     # 优化锤头线算法
     result = optimizer.optimize_algorithm("hammer", config)
 
-    print(f"\n优化结果:")
-    print(f"  方法: {result['method']}")
-    print(f"  最佳评分: {result['best_score']:.3f}")
-    print(f"  基准评分: {result['baseline_score']:.3f}")
-    print(f"  性能提升: {result['improvement_percentage']:.3f}%")
-    print(f"  迭代次数: {result['iterations']}")
-    print(f"  最佳版本ID: {result['best_version_id']}")
+    logger.info(f"\n优化结果:")
+    logger.info(f"  方法: {result['method']}")
+    logger.info(f"  最佳评分: {result['best_score']:.3f}")
+    logger.info(f"  基准评分: {result['baseline_score']:.3f}")
+    logger.info(f"  性能提升: {result['improvement_percentage']:.3f}%")
+    logger.info(f"  迭代次数: {result['iterations']}")
+    logger.info(f"  最佳版本ID: {result['best_version_id']}")

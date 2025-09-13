@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -14,14 +15,13 @@ FactorWeave-Quant 分析数据库管理器
 """
 
 import pandas as pd
-import logging
 
 # 安全导入DuckDB
 try:
     import duckdb
     DUCKDB_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"DuckDB模块不可用: {e}")
+    logger.warning(f"DuckDB模块不可用: {e}")
     duckdb = None
     DUCKDB_AVAILABLE = False
 from datetime import datetime
@@ -39,7 +39,7 @@ try:
     OPTIMIZER_AVAILABLE = True
 except ImportError:
     OPTIMIZER_AVAILABLE = False
-    logging.warning("DuckDB性能优化器不可用，使用默认配置")
+    logger.warning("DuckDB性能优化器不可用，使用默认配置")
 
     # 提供备用定义，避免NameError
     from enum import Enum
@@ -73,9 +73,7 @@ except ImportError:
         """备用函数定义"""
         return None
 
-
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class FactorWeaveAnalyticsDB:
     """FactorWeave分析数据库管理器 - 基于DuckDB"""
@@ -108,7 +106,7 @@ class FactorWeaveAnalyticsDB:
         # 初始化性能优化器
         if OPTIMIZER_AVAILABLE and DUCKDB_AVAILABLE:
             self.optimizer = DuckDBPerformanceOptimizer(str(self.db_path))
-            logger.info("✅ DuckDB性能优化器已启用")
+            logger.info(" DuckDB性能优化器已启用")
         else:
             self.optimizer = None
 
@@ -116,7 +114,7 @@ class FactorWeaveAnalyticsDB:
         self._init_tables()
 
         self._initialized = True
-        logger.info(f"✅ FactorWeave分析数据库初始化完成: {self.db_path}")
+        logger.info(f" FactorWeave分析数据库初始化完成: {self.db_path}")
 
     def _check_connection(self) -> bool:
         """检查数据库连接是否可用"""
@@ -131,7 +129,7 @@ class FactorWeaveAnalyticsDB:
     def _connect(self):
         """连接到DuckDB数据库"""
         if not DUCKDB_AVAILABLE:
-            logger.warning("⚠️ DuckDB不可用，分析数据库功能将被禁用")
+            logger.warning(" DuckDB不可用，分析数据库功能将被禁用")
             self.conn = None
             return
 
@@ -143,41 +141,41 @@ class FactorWeaveAnalyticsDB:
 
                 if optimized_conn is not None:
                     self.conn = optimized_conn
-                    logger.info(f"📊 DuckDB连接成功 (性能优化): {self.db_path}")
+                    logger.info(f" DuckDB连接成功 (性能优化): {self.db_path}")
 
                     # 显示优化配置
                     if hasattr(self.optimizer, 'current_config') and self.optimizer.current_config:
                         config = self.optimizer.current_config
-                        logger.info(f"🔧 优化配置: 内存={config.memory_limit}, 线程={config.threads}")
+                        logger.info(f" 优化配置: 内存={config.memory_limit}, 线程={config.threads}")
 
                     # 显示性能建议
                     recommendations = self.optimizer.get_performance_recommendations()
                     if recommendations:
-                        logger.info("💡 性能优化建议:")
+                        logger.info(" 性能优化建议:")
                         for rec in recommendations[:3]:  # 只显示前3条
                             logger.info(f"  {rec}")
                 else:
                     # 优化器返回None，回退到默认连接
                     self.conn = duckdb.connect(str(self.db_path))
-                    logger.info(f"📊 DuckDB连接成功 (默认配置-优化器回退): {self.db_path}")
+                    logger.info(f" DuckDB连接成功 (默认配置-优化器回退): {self.db_path}")
                     self._apply_basic_optimization()
             else:
                 # 使用默认连接
                 self.conn = duckdb.connect(str(self.db_path))
-                logger.info(f"📊 DuckDB连接成功 (默认配置): {self.db_path}")
+                logger.info(f" DuckDB连接成功 (默认配置): {self.db_path}")
 
                 # 应用基本优化配置
                 self._apply_basic_optimization()
 
         except Exception as e:
-            logger.error(f"❌ DuckDB连接失败: {e}")
+            logger.error(f" DuckDB连接失败: {e}")
             # 即使优化失败，也要尝试基本连接
             try:
                 self.conn = duckdb.connect(str(self.db_path))
-                logger.info(f"📊 DuckDB基本连接成功: {self.db_path}")
+                logger.info(f" DuckDB基本连接成功: {self.db_path}")
                 self._apply_basic_optimization()
             except Exception as e2:
-                logger.error(f"❌ DuckDB基本连接也失败: {e2}")
+                logger.error(f" DuckDB基本连接也失败: {e2}")
                 raise e2
 
     def _apply_basic_optimization(self):
@@ -202,7 +200,7 @@ class FactorWeaveAnalyticsDB:
             self.conn.execute("SET enable_object_cache = true")
             self.conn.execute("SET enable_progress_bar = true")
 
-            logger.info(f"🔧 基本优化配置: 内存={memory_limit:.1f}GB, 线程={threads}")
+            logger.info(f" 基本优化配置: 内存={memory_limit:.1f}GB, 线程={threads}")
 
         except Exception as e:
             logger.warning(f"应用基本优化配置失败: {e}")
@@ -381,10 +379,10 @@ class FactorWeaveAnalyticsDB:
             # 创建性能优化的索引
             self._create_optimized_indexes()
 
-            logger.info("✅ FactorWeave分析数据库表结构初始化完成")
+            logger.info(" FactorWeave分析数据库表结构初始化完成")
 
         except Exception as e:
-            logger.error(f"❌ 分析数据库表初始化失败: {e}")
+            logger.error(f" 分析数据库表初始化失败: {e}")
             raise
 
     def _create_optimized_indexes(self):
@@ -438,7 +436,7 @@ class FactorWeaveAnalyticsDB:
             except Exception as e:
                 logger.warning(f"创建索引失败: {e}")
 
-        logger.info("✅ 性能优化索引创建完成")
+        logger.info(" 性能优化索引创建完成")
 
     def execute_query(self, sql: str, params: List = None) -> pd.DataFrame:
         """执行查询并返回DataFrame"""
@@ -633,12 +631,12 @@ class FactorWeaveAnalyticsDB:
             success = self.optimizer.optimize_for_workload(workload_type)
 
             if success:
-                logger.info(f"✅ 性能配置已优化为{workload_type.value}工作负载")
+                logger.info(f" 性能配置已优化为{workload_type.value}工作负载")
 
                 # 显示新的配置
                 if self.optimizer.current_config:
                     config = self.optimizer.current_config
-                    logger.info(f"🔧 新配置: 内存={config.memory_limit}, 线程={config.threads}")
+                    logger.info(f" 新配置: 内存={config.memory_limit}, 线程={config.threads}")
 
             return success
 
@@ -672,11 +670,9 @@ class FactorWeaveAnalyticsDB:
             self.optimizer.close()
             self.optimizer = None
 
-
 # 全局实例和工厂函数
 _analytics_db = None
 _db_lock = threading.Lock()
-
 
 def get_analytics_db(db_path: str = 'db/factorweave_analytics.duckdb') -> FactorWeaveAnalyticsDB:
     """获取分析数据库实例"""
@@ -687,7 +683,6 @@ def get_analytics_db(db_path: str = 'db/factorweave_analytics.duckdb') -> Factor
             _analytics_db = FactorWeaveAnalyticsDB(db_path)
 
     return _analytics_db
-
 
 def create_optimized_analytics_connection(workload_type: WorkloadType = WorkloadType.OLAP) -> FactorWeaveAnalyticsDB:
     """创建优化的分析数据库连接"""

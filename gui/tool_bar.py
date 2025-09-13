@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Tool bar for the trading system
 
@@ -16,7 +17,7 @@ import os
 import traceback
 from gui.widgets.log_widget import LogWidget
 from utils.theme import get_theme_manager
-from utils.log_util import log_structured
+# log_structured已替换为直接的logger调用
 
 
 class MainToolBar(QToolBar):
@@ -32,26 +33,26 @@ class MainToolBar(QToolBar):
             super().__init__(parent)
 
             # 初始化日志管理器
-            if hasattr(parent, 'log_manager'):
-                self.log_manager = parent.log_manager
+            if True:  # 使用Loguru日志
+                # log_manager已迁移到Loguru
+                pass
             else:
-                from core.logger import LogManager
-                self.log_manager = LogManager()
+                # 纯Loguru架构，移除log_manager依赖
+                pass
 
-            # 初始化主题管理器
+                # 初始化主题管理器
             self.theme_manager = get_theme_manager()
 
             # 初始化UI
             self.init_ui()
 
-            log_structured(self.log_manager, "toolbar_init",
-                           level="info", status="success")
+            logger.info("toolbar_init", status="success")
 
         except Exception as e:
-            print(f"初始化工具栏失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"初始化工具栏失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            logger.info(f"初始化工具栏失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"初始化工具栏失败: {str(e)}")
+                logger.error(traceback.format_exc())
 
     def init_ui(self):
         """Initialize the UI"""
@@ -65,7 +66,7 @@ class MainToolBar(QToolBar):
             self.create_actions()
 
         except Exception as e:
-            self.log_manager.error(f"初始化工具栏失败: {str(e)}")
+            logger.error(f"初始化工具栏失败: {str(e)}")
 
     def create_actions(self):
         """创建工具栏按钮"""
@@ -167,23 +168,23 @@ class MainToolBar(QToolBar):
             parent = self.parentWidget()
             if parent and hasattr(parent, 'log_message'):
                 parent.log_message(message, level)
-            elif hasattr(self, 'log_manager'):
+            elif True:  # 使用Loguru日志
                 level = level.upper()
                 if level == "ERROR":
-                    self.log_manager.error(message)
+                    logger.error(message)
                 elif level == "WARNING":
-                    self.log_manager.warning(message)
+                    logger.warning(message)
                 elif level == "DEBUG":
-                    self.log_manager.debug(message)
+                    logger.debug(message)
                 else:
-                    self.log_manager.info(message)
+                    logger.info(message)
             else:
-                print(f"[LOG][{level}] {message}")
+                logger.info(f"[LOG][{level}] {message}")
         except Exception as e:
-            print(f"记录日志失败: {str(e)}")
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"记录日志失败: {str(e)}")
-                self.log_manager.error(traceback.format_exc())
+            logger.info(f"记录日志失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"记录日志失败: {str(e)}")
+                logger.error(traceback.format_exc())
 
     def new_file(self):
         """Create a new file"""
@@ -248,7 +249,7 @@ class MainToolBar(QToolBar):
             if hasattr(self.parent(), 'show_settings'):
                 self.parent().show_settings()
         except Exception as e:
-            self.log_manager.error(f"显示设置对话框失败: {str(e)}")
+            logger.error(f"显示设置对话框失败: {str(e)}")
 
     def show_calculator(self):
         """Show calculator"""
@@ -289,7 +290,7 @@ class MainToolBar(QToolBar):
             dialog.exec_()
 
         except Exception as e:
-            self.log_manager.error(f"显示计算器失败: {str(e)}")
+            logger.error(f"显示计算器失败: {str(e)}")
 
     def show_converter(self):
         """Show unit converter"""
@@ -339,4 +340,4 @@ class MainToolBar(QToolBar):
             dialog.exec_()
 
         except Exception as e:
-            self.log_manager.error(f"显示单位转换器失败: {str(e)}")
+            logger.error(f"显示单位转换器失败: {str(e)}")

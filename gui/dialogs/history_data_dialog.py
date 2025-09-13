@@ -4,7 +4,7 @@
 提供历史数据的查看、导入、导出、更新等功能。
 """
 
-import logging
+from loguru import logger
 import os
 import json
 import pandas as pd
@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QDate, QThread, pyqtSlot
 from PyQt5.QtGui import QFont, QPixmap
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataUpdateThread(QThread):

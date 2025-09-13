@@ -1,7 +1,7 @@
+from loguru import logger
 """
 底部面板模块 - 日志显示和系统状态
 """
-import logging
 from typing import Optional
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
@@ -12,22 +12,58 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QFont, QTextCursor
 
 from .base_panel import BasePanel
+import re
+import sys
+from datetime import datetime
 
 
-class LogHandler(logging.Handler):
-    """自定义日志处理器，将日志输出到UI"""
+class LogHandler:
+    """自定义日志处理器，将Loguru日志输出到UI（已迁移到Loguru）"""
 
     def __init__(self, log_widget):
-        super().__init__()
         self.log_widget = log_widget
+        # 注册到Loguru作为自定义sink
+        self.current_level = "INFO"
+        self.handler_id = logger.add(self._loguru_sink, level="INFO")
 
-    def emit(self, record):
-        """发送日志记录到UI"""
+    def _loguru_sink(self, message):
+        """Loguru自定义sink"""
         try:
-            msg = self.format(record)
-            self.log_widget.append_log(msg, record.levelname)
-        except Exception:
-            self.handleError(record)
+            # 解析Loguru消息
+            record = message.record
+            log_level = record["level"].name
+            msg = record["message"]
+            timestamp = record["time"].strftime("%H:%M:%S.%f")[:-3]
+
+            # 发送到UI
+            if hasattr(self.log_widget, 'add_log'):
+                self.log_widget.add_log(timestamp, log_level, msg)
+            elif hasattr(self.log_widget, 'append_log'):
+                self.log_widget.append_log(msg, log_level)
+        except Exception as e:
+            logger.error(f"UI日志处理错误: {e}")
+
+    def remove_handler(self):
+        """移除处理器"""
+        try:
+            logger.remove(self.handler_id)
+        except:
+            pass
+
+
+    def update_level(self, level: str):
+        """更新日志级别"""
+        if level != self.current_level:
+            # 移除旧的handler
+            try:
+                logger.remove(self.handler_id)
+            except:
+                pass
+            
+            # 添加新的handler with new level
+            self.current_level = level
+            self.handler_id = logger.add(self._loguru_sink, level=level)
+            logger.debug(f"UI日志处理器级别已更新为: {level}")
 
 
 class LogWidget(QTextEdit):
@@ -80,6 +116,12 @@ class LogWidget(QTextEdit):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.setTextCursor(cursor)
+
+
+    def add_log(self, timestamp: str, level: str, message: str):
+        """为LogHandler兼容性提供的方法"""
+        formatted_message = f"[{timestamp}] {message}"
+        self.append_log(formatted_message, level)
 
 
 class BottomPanel(BasePanel):
@@ -207,38 +249,32 @@ class BottomPanel(BasePanel):
         # 创建日志处理器
         self.log_handler = LogHandler(self.log_widget)
 
-        # 设置日志格式
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%H:%M:%S'
-        )
-        self.log_handler.setFormatter(formatter)
-
-        # 添加到根日志记录器
-        root_logger = logging.getLogger()
-        root_logger.addHandler(self.log_handler)
-        root_logger.setLevel(logging.INFO)
+        # Loguru配置在core.loguru_config中统一管理
+        # 不需要单独的格式化器和处理器设置
+        # root_logger = logger
+        # root_logger.addHandler(self.log_handler)
+        # root_# Loguru自动管理日志级别
 
         # 添加一些测试日志
         self._add_welcome_logs()
 
     def _add_welcome_logs(self):
         """添加欢迎日志"""
-        logger = logging.getLogger(__name__)
-        logger.info("FactorWeave-Quant ‌ 2.0 系统启动成功")
+        logger.info("FactorWeave-Quant  2.0 系统启动成功")
         logger.info("日志系统已初始化")
         logger.debug("调试模式已启用")
 
     def _on_level_changed(self, level: str):
         """日志级别改变"""
         if self.log_handler:
-            level_value = getattr(logging, level)
-            self.log_handler.setLevel(level_value)
-            logging.getLogger().setLevel(level_value)
+            # level_value = getattr(logging, level)
+            # self.log_handler  # Loguru自动管理日志级别
+            # # Loguru自动管理日志级别  # Loguru不支持setLevel
+            pass
 
         self.log_level_changed.emit(level)
 
-        logger = logging.getLogger(__name__)
+
         logger.info(f"日志级别已设置为: {level}")
 
     def _on_search_text_changed(self, text: str):
@@ -263,7 +299,7 @@ class BottomPanel(BasePanel):
         # 查找文本
         found = self.log_widget.find(search_text)
         if not found:
-            logger = logging.getLogger(__name__)
+    
             logger.warning(f"未找到包含 '{search_text}' 的日志")
 
     def _restore_all_logs(self):
@@ -276,7 +312,7 @@ class BottomPanel(BasePanel):
     def _on_auto_scroll_toggled(self, checked: bool):
         """自动滚动切换"""
         self.auto_scroll = checked
-        logger = logging.getLogger(__name__)
+
         logger.info(f"自动滚动已{'启用' if checked else '禁用'}")
 
     def _on_max_lines_changed(self, value: int):
@@ -288,7 +324,7 @@ class BottomPanel(BasePanel):
             # 如果方法不存在，忽略
             pass
 
-        logger = logging.getLogger(__name__)
+
         logger.info(f"最大日志行数已设置为: {value}")
 
     def _clear_logs(self):
@@ -296,7 +332,7 @@ class BottomPanel(BasePanel):
         self.log_widget.clear()
         self.log_cleared.emit()
 
-        logger = logging.getLogger(__name__)
+
         logger.info("日志已清空")
 
     def _export_logs(self):
@@ -322,11 +358,11 @@ class BottomPanel(BasePanel):
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(log_content)
 
-                logger = logging.getLogger(__name__)
+        
                 logger.info(f"日志已导出到: {filename}")
 
         except Exception as e:
-            logger = logging.getLogger(__name__)
+    
             logger.error(f"导出日志失败: {e}")
 
     def add_log(self, message: str, level: str = 'INFO'):
@@ -349,7 +385,7 @@ class BottomPanel(BasePanel):
         """关闭事件处理"""
         # 清理日志处理器
         if self.log_handler:
-            logging.getLogger().removeHandler(self.log_handler)
+            logger.removeHandler(self.log_handler)
         event.accept()
 
     def _toggle_panel(self) -> None:
@@ -373,7 +409,7 @@ class BottomPanel(BasePanel):
 
             # 发送隐藏信号
             self.panel_hidden.emit()
-            logger = logging.getLogger(__name__)
+    
             logger.debug("日志面板已隐藏")
 
     def _show_panel(self) -> None:

@@ -3,7 +3,7 @@ Enhanced Pattern Recognition Module for Trading System
 完全重构的形态识别模块，与新统一框架完全兼容
 """
 
-from core.performance import get_performance_monitor as _get_unified_monitor
+from core.performance import get_performance_monitor as _get_unified_monitor, PerformanceCategory, MetricType
 from utils.data_preprocessing import validate_kdata
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ from analysis.pattern_base import (
     calculate_body_ratio, calculate_shadow_ratios,
     is_bullish_candle, is_bearish_candle
 )
-
+from loguru import logger
 # 导入指标收集
 from core.metrics.app_metrics_service import measure
 
@@ -55,7 +55,7 @@ class EnhancedPatternRecognizer:
             return mapping
         except Exception as e:
             if self.debug_mode:
-                print(f"构建形态名称映射失败: {e}")
+                logger.error(f"构建形态名称映射失败: {e}")
             return {}
 
     @measure("pattern.identify_patterns")
@@ -77,13 +77,15 @@ class EnhancedPatternRecognizer:
         monitor = get_performance_monitor()
         cache = get_pattern_cache()
 
-        # 开始性能监控
-        monitor.start_recognition()
+        # 开始性能监控 - 使用上下文管理器
+        start_time = time.time()
 
         try:
             # 数据验证
             if not validate_kdata(kdata):
-                monitor.end_recognition(success=False, pattern_count=0)
+                # 记录失败的性能指标
+                duration = time.time() - start_time
+                monitor.record_timing("pattern_recognition_failed", duration, PerformanceCategory.ALGORITHM)
                 return []
 
             # 构建缓存配置
@@ -96,15 +98,17 @@ class EnhancedPatternRecognizer:
             # 尝试从缓存获取结果
             cached_result = cache.get(kdata, cache_config)
             if cached_result is not None:
-                monitor.record_cache_hit()
-                monitor.end_recognition(
-                    success=True, pattern_count=len(cached_result))
+                # 记录缓存命中
+                duration = time.time() - start_time
+                monitor.record_timing("pattern_recognition_cache_hit", duration, PerformanceCategory.ALGORITHM)
+                monitor.record_metric("cache_hit", 1, PerformanceCategory.CACHE, MetricType.COUNTER)
                 if self.debug_mode:
-                    print(
+                    logger.info(
                         f"[EnhancedPatternRecognizer] 缓存命中，返回 {len(cached_result)} 个形态")
                 return cached_result
 
-            monitor.record_cache_miss()
+            # 记录缓存未命中
+            monitor.record_metric("cache_miss", 1, PerformanceCategory.CACHE, MetricType.COUNTER)
 
             all_results = []
             from analysis.pattern_manager import PatternManager
@@ -115,26 +119,28 @@ class EnhancedPatternRecognizer:
             if pattern_types:
                 # 情况A：用户指定了要识别的形态类型
                 if self.debug_mode:
-                    print(f"[EnhancedPatternRecognizer] 模式A：识别指定的 {len(pattern_types)} 个形态: {pattern_types}")
+                    logger.info(f"[EnhancedPatternRecognizer] 模式A：识别指定的 {len(pattern_types)} 个形态: {pattern_types}")
                 for p_type in pattern_types:
                     config = pattern_manager.get_pattern_config(p_type)
                     if config and config.is_active:
                         target_configs.append(config)
                     elif self.debug_mode:
-                        print(f"[EnhancedPatternRecognizer] 警告：无法找到或形态 '{p_type}' 未激活，已跳过。")
+                        logger.info(f"[EnhancedPatternRecognizer] 警告：无法找到或形态 '{p_type}' 未激活，已跳过。")
             else:
                 # 情况B：用户未指定，识别所有激活的形态
                 if self.debug_mode:
-                    print("[EnhancedPatternRecognizer] 模式B：识别所有已激活的形态。")
+                    logger.info("[EnhancedPatternRecognizer] 模式B：识别所有已激活的形态。")
                 all_configs = pattern_manager.get_all_patterns()
                 target_configs = [config for config in all_configs if config.is_active]
 
             if self.debug_mode:
-                print(f"[EnhancedPatternRecognizer] 最终确定要执行识别的形态数量: {len(target_configs)}")
+                logger.info(f"[EnhancedPatternRecognizer] 最终确定要执行识别的形态数量: {len(target_configs)}")
 
             if not target_configs:
-                print("[EnhancedPatternRecognizer] 警告：没有找到任何可以执行的形态配置。")
-                monitor.end_recognition(success=False, pattern_count=0)
+                logger.info("[EnhancedPatternRecognizer] 警告：没有找到任何可以执行的形态配置。")
+                # 记录失败的性能指标
+                duration = time.time() - start_time
+                monitor.record_timing("pattern_recognition_no_config", duration, PerformanceCategory.ALGORITHM)
                 return []
 
             # 统一的执行循环
@@ -147,7 +153,7 @@ class EnhancedPatternRecognizer:
                     pattern_results = recognizer.recognize(kdata)
 
                     if self.debug_mode:
-                        print(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 识别到 {len(pattern_results)} 个原始结果")
+                        logger.info(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 识别到 {len(pattern_results)} 个原始结果")
 
                     # 过滤低置信度结果
                     filtered_results = [
@@ -156,7 +162,7 @@ class EnhancedPatternRecognizer:
                     ]
 
                     if self.debug_mode:
-                        print(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 筛选后剩余 {len(filtered_results)} 个结果 (置信度 > {confidence_threshold})")
+                        logger.info(f"[EnhancedPatternRecognizer] 形态 '{config.name}' 筛选后剩余 {len(filtered_results)} 个结果 (置信度 > {confidence_threshold})")
 
                     # 转换为字典格式
                     for result in filtered_results:
@@ -192,26 +198,29 @@ class EnhancedPatternRecognizer:
 
                 except Exception as e:
                     if self.debug_mode:
-                        print(f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 时发生内部错误: {e}\n{traceback.format_exc()}")
+                        logger.error(f"[EnhancedPatternRecognizer] 识别形态 {config.english_name} 时发生内部错误: {e}\n{traceback.format_exc()}")
                     continue
 
             # 缓存结果
             cache.put(kdata, cache_config, all_results)
 
-            # 结束性能监控
-            monitor.end_recognition(
-                success=True, pattern_count=len(all_results))
+            # 记录成功的性能指标
+            duration = time.time() - start_time
+            monitor.record_timing("pattern_recognition_success", duration, PerformanceCategory.ALGORITHM)
+            monitor.record_metric("patterns_found", len(all_results), PerformanceCategory.ALGORITHM, MetricType.GAUGE)
 
             if self.debug_mode:
-                print(
+                logger.info(
                     f"[EnhancedPatternRecognizer] 识别完成，共找到 {len(all_results)} 个形态")
 
             return all_results
 
         except Exception as e:
-            monitor.end_recognition(success=False, pattern_count=0)
+            # 记录失败的性能指标
+            duration = time.time() - start_time
+            monitor.record_timing("pattern_recognition_error", duration, PerformanceCategory.ALGORITHM)
             if self.debug_mode:
-                print(f"[EnhancedPatternRecognizer] 识别过程发生错误: {e}")
+                logger.error(f"[EnhancedPatternRecognizer] 识别过程发生错误: {e}")
             return []
 
     def get_pattern_signals(self, kdata: pd.DataFrame,
@@ -253,7 +262,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 数据大小检查，防止处理过大数据集
             if len(kdata) > 50000:  # 限制最大数据量
-                print(
+                logger.info(
                     f"[DatabaseAlgorithmRecognizer] 数据量过大({len(kdata)})，跳过算法: {self.config.english_name}")
                 return []
 
@@ -265,7 +274,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             return self._execute_algorithm_safely(algorithm_code, safe_globals, safe_locals)
 
         except Exception as e:
-            print(
+            logger.error(
                 f"[DatabaseAlgorithmRecognizer] 执行算法失败 {self.config.english_name}: {e}")
             return []
 
@@ -318,14 +327,14 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 检查是否超时
             if execution_thread.is_alive():
-                print(
+                logger.info(
                     f"[DatabaseAlgorithmRecognizer] 算法执行超时 {self.config.english_name} (>{timeout_seconds}秒)")
                 return []
 
             # 检查执行过程中是否有错误
             if '_execution_error' in safe_locals:
                 error = safe_locals['_execution_error']
-                print(
+                logger.error(
                     f"[DatabaseAlgorithmRecognizer] 算法执行错误 {self.config.english_name}: {error}")
                 return []
 
@@ -336,7 +345,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                     memory_increase = end_memory - start_memory
 
                     if memory_increase > 500:  # 如果内存增长超过500MB
-                        print(
+                        logger.info(
                             f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 内存使用异常增长 {memory_increase:.1f}MB")
                 except:
                     pass
@@ -346,27 +355,27 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
 
             # 限制结果数量，防止内存问题
             if len(raw_results) > 10000:
-                print(
+                logger.info(
                     f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 返回结果过多({len(raw_results)})，截取前10000个")
                 raw_results = raw_results[:10000]
 
             execution_time = time.time() - start_time
             if execution_time > 10:  # 如果执行时间超过10秒，给出警告
-                print(
+                logger.warning(
                     f"[DatabaseAlgorithmRecognizer] 警告: 算法 {self.config.english_name} 执行时间较长 {execution_time:.1f}秒")
 
             return self._convert_enhanced_results(raw_results)
 
         except MemoryError as e:
-            print(
+            logger.error(
                 f"[DatabaseAlgorithmRecognizer] 内存不足 {self.config.english_name}: {e}")
             return []
         except RecursionError as e:
-            print(
+            logger.error(
                 f"[DatabaseAlgorithmRecognizer] 递归深度超限 {self.config.english_name}: {e}")
             return []
         except Exception as e:
-            print(
+            logger.error(
                 f"[DatabaseAlgorithmRecognizer] 算法执行异常 {self.config.english_name}: {e}")
             return []
 
@@ -602,7 +611,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
             return precomputed
 
         except Exception as e:
-            print(f"[DatabaseAlgorithmRecognizer] 预计算指标失败: {e}")
+            logger.error(f"[DatabaseAlgorithmRecognizer] 预计算指标失败: {e}")
             return {}
 
     def _calculate_sma(self, prices: np.ndarray, period: int) -> np.ndarray:
@@ -721,7 +730,7 @@ class DatabaseAlgorithmRecognizer(BasePatternRecognizer):
                 converted_results.append(result)
 
             except Exception as e:
-                print(f"[DatabaseAlgorithmRecognizer] 结果转换失败: {e}")
+                logger.error(f"[DatabaseAlgorithmRecognizer] 结果转换失败: {e}")
                 continue
 
         return converted_results
@@ -934,11 +943,13 @@ class PatternCache:
 
 # 全局实例
 _pattern_cache = PatternCache()
+_performance_monitor = None  # 添加全局性能监控器变量
 
 
 def get_performance_monitor():
-    """获取性能监控器实例"""
-    return _get_unified_monitor()
+    """获取性能监控器实例 - 统一使用core.performance的实现"""
+    from core.performance import get_performance_monitor as _get_core_monitor
+    return _get_core_monitor()
 
 
 def get_pattern_cache() -> PatternCache:
@@ -969,6 +980,14 @@ def get_pattern_recognizer_info() -> Dict[str, Any]:
     Returns:
         系统信息字典
     """
+    # 安全获取性能统计
+    try:
+        monitor = get_performance_monitor()
+        performance_stats = monitor.get_statistics() if hasattr(monitor, 'get_statistics') else {}
+    except Exception as e:
+        logger.warning(f"获取性能统计失败: {e}")
+        performance_stats = {}
+
     return {
         'version': '2.5.6',
         'supported_patterns': 67,
@@ -977,25 +996,25 @@ def get_pattern_recognizer_info() -> Dict[str, Any]:
         'monitoring_enabled': True,
         'database_algorithms': True,
         'ml_predictions': True,
-        'performance_stats': _performance_monitor.get_performance_summary(),
+        'performance_stats': performance_stats,
         'cache_stats': _pattern_cache.get_stats()
     }
 
 
 if __name__ == "__main__":
     # 测试代码
-    print("Enhanced Pattern Recognition Module")
-    print("=" * 50)
+    logger.info("Enhanced Pattern Recognition Module")
+    logger.info("=" * 50)
 
     info = get_pattern_recognizer_info()
-    print(f"版本: {info['version']}")
-    print(f"框架: {info['framework']}")
-    print(f"特性: {', '.join(info['features'])}")
+    logger.info(f"版本: {info['version']}")
+    logger.info(f"框架: {info['framework']}")
+    logger.info(f"特性: {', '.join(info['features'])}")
 
     # 创建测试实例
     recognizer = create_pattern_recognizer(debug_mode=True)
-    print(f"\n创建识别器成功，调试模式: {recognizer.debug_mode}")
+    logger.info(f"\n创建识别器成功，调试模式: {recognizer.debug_mode}")
 
     # 显示统计信息
     stats = recognizer.get_execution_stats()
-    print(f"执行统计: {stats}")
+    logger.info(f"执行统计: {stats}")

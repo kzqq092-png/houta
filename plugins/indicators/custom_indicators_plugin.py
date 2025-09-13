@@ -1,3 +1,4 @@
+from loguru import logger
 """
 自定义指标插件框架
 
@@ -5,7 +6,6 @@
 提供指标开发模板、动态加载机制和指标管理功能。
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import time
@@ -20,7 +20,7 @@ from core.indicator_extensions import (
     IndicatorCalculationContext
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CustomIndicatorFunction:

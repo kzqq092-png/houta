@@ -1,12 +1,11 @@
 import openai
 import pandas as pd
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIMultimodalAnalyzer:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
 
     def analyze_image(self, image_path: str, user_input: str = "") -> dict:
@@ -23,7 +22,7 @@ class AIMultimodalAnalyzer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"多模态图片分析失败: {e}")
+            logger.error(f"多模态图片分析失败: {e}")
             return {"error": str(e)}
 
     def analyze_table(self, table_path: str, user_input: str = "") -> dict:
@@ -39,7 +38,7 @@ class AIMultimodalAnalyzer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"多模态表格分析失败: {e}")
+            logger.error(f"多模态表格分析失败: {e}")
             return {"error": str(e)}
 
     def analyze_text(self, user_input: str) -> dict:
@@ -51,5 +50,5 @@ class AIMultimodalAnalyzer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"多模态文本分析失败: {e}")
+            logger.error(f"多模态文本分析失败: {e}")
             return {"error": str(e)}

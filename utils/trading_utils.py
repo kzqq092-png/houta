@@ -1,25 +1,9 @@
 from utils.imports import np, pd
 from hikyuu import *
+from loguru import logger
 
-# 全局日志管理器
-_log_manager = None
-
-
-def _get_log_manager():
-    """获取日志管理器"""
-    global _log_manager
-    if _log_manager is None:
-        try:
-            from core.logger import LogManager
-            _log_manager = LogManager()
-        except ImportError:
-            # 创建简单的日志记录器
-            class SimpleLogger:
-                def info(self, msg): print(f"[INFO] {msg}")
-                def warning(self, msg): print(f"[WARNING] {msg}")
-                def error(self, msg): print(f"[ERROR] {msg}")
-            _log_manager = SimpleLogger()
-    return _log_manager
+# 日志系统已迁移到Loguru
+# 直接使用 logger.info(), logger.error() 等方法
 
 
 def calculate_atr(df, period=14):
@@ -33,17 +17,17 @@ def calculate_atr(df, period=14):
     返回:
         Series: ATR值
     """
-    log_manager = _get_log_manager()
+    # 使用全局logger
 
     # 使用统一的数据预处理
     try:
         from utils.data_preprocessing import kdata_preprocess
         df = kdata_preprocess(df, context="ATR计算")
     except ImportError:
-        log_manager.warning("无法导入统一的数据预处理模块")
+        logger.warning("无法导入统一的数据预处理模块")
 
     if df is None or df.empty:
-        log_manager.warning("ATR计算: 输入数据无效")
+        logger.warning("ATR计算: 输入数据无效")
         return pd.Series(dtype=float)
 
     high_low = df['high'] - df['low']
@@ -65,8 +49,8 @@ def calculate_drawdown(equity_curve):
         array: 回撤序列
         float: 最大回撤值
     """
-    log_manager = _get_log_manager()
-    log_manager.info(f"开始计算回撤，数据点数={len(equity_curve)}")
+    # 使用全局logger
+    logger.info(f"开始计算回撤，数据点数={len(equity_curve)}")
 
     # 转换为numpy数组
     equity = np.array(equity_curve)
@@ -80,7 +64,7 @@ def calculate_drawdown(equity_curve):
     # 最大回撤
     max_drawdown = np.min(drawdown)
 
-    log_manager.info(f"回撤计算完成，最大回撤={max_drawdown:.4f}")
+    logger.info(f"回撤计算完成，最大回撤={max_drawdown:.4f}")
     return drawdown, max_drawdown
 
 
@@ -96,20 +80,20 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
     返回:
         float: 年化夏普比率
     """
-    log_manager = _get_log_manager()
-    log_manager.info(f"开始计算夏普比率，收益率序列长度={len(returns)}")
+    # 使用全局logger
+    logger.info(f"开始计算夏普比率，收益率序列长度={len(returns)}")
 
     returns = np.array(returns)
     excess_returns = returns - risk_free_rate
 
     if len(excess_returns) == 0 or np.std(excess_returns) == 0:
-        log_manager.warning("夏普比率计算失败，收益率序列为空或标准差为0")
+        logger.warning("夏普比率计算失败，收益率序列为空或标准差为0")
         return 0
 
     sharpe = np.mean(excess_returns) / np.std(excess_returns)
     annual_sharpe = sharpe * np.sqrt(periods_per_year)
 
-    log_manager.info(f"夏普比率计算完成，年化夏普比率={annual_sharpe:.4f}")
+    logger.info(f"夏普比率计算完成，年化夏普比率={annual_sharpe:.4f}")
     return annual_sharpe
 
 
@@ -125,20 +109,20 @@ def calculate_performance_metrics(trades=None, equity_curve=None, returns_df=Non
     返回:
         dict: 包含各种性能指标的字典
     """
-    log_manager = _get_log_manager()
-    log_manager.info("开始计算性能指标")
+    # 使用全局logger
+    logger.info("开始计算性能指标")
 
     try:
         # 使用统一的性能指标计算模块
         # 性能指标计算已整合到 core.performance 模块中
 
         if returns_df is not None:
-            log_manager.info("使用统一模块计算性能指标（DataFrame输入）")
+            logger.info("使用统一模块计算性能指标（DataFrame输入）")
             result = calc_full_metrics(returns_df)
-            log_manager.info("统一模块性能指标计算完成")
+            logger.info("统一模块性能指标计算完成")
             return result
         elif equity_curve is not None:
-            log_manager.info("使用统一模块计算性能指标（资金曲线输入）")
+            logger.info("使用统一模块计算性能指标（资金曲线输入）")
             # 转换为DataFrame格式
             equity_curve = np.array(equity_curve)
             returns = np.diff(equity_curve) / equity_curve[:-1]
@@ -146,33 +130,33 @@ def calculate_performance_metrics(trades=None, equity_curve=None, returns_df=Non
                 'daily_return': returns
             })
             result = calc_full_metrics(returns_df)
-            log_manager.info("统一模块性能指标计算完成")
+            logger.info("统一模块性能指标计算完成")
             return result
         elif trades is not None:
-            log_manager.info("从交易记录计算性能指标")
+            logger.info("从交易记录计算性能指标")
             # 从交易记录构建收益序列
             returns_df = _build_returns_from_trades(trades)
             result = calc_full_metrics(returns_df)
-            log_manager.info("统一模块性能指标计算完成")
+            logger.info("统一模块性能指标计算完成")
             return result
         else:
             raise ValueError("需要提供returns_df、equity_curve或trades参数")
 
     except ImportError:
-        log_manager.warning("统一性能指标模块不可用，使用简化版本")
+        logger.warning("统一性能指标模块不可用，使用简化版本")
         # 如果统一模块不可用，使用简化版本
         return _calculate_simple_performance_metrics_fallback(trades, equity_curve)
     except Exception as e:
-        log_manager.error(f"性能指标计算失败: {e}")
+        logger.error(f"性能指标计算失败: {e}")
         return _calculate_simple_performance_metrics_fallback(trades, equity_curve)
 
 
 def _build_returns_from_trades(trades):
     """从交易记录构建收益序列"""
-    log_manager = _get_log_manager()
+    # 使用全局logger
 
     if not trades:
-        log_manager.warning("交易记录为空")
+        logger.warning("交易记录为空")
         return pd.DataFrame({'daily_return': []})
 
     # 构建简单的日收益序列
@@ -189,11 +173,11 @@ def _build_returns_from_trades(trades):
 
 def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
     """简化版性能指标计算 - 作为后备方案"""
-    log_manager = _get_log_manager()
-    log_manager.info("使用后备方案计算性能指标")
+    # 使用全局logger
+    logger.info("使用后备方案计算性能指标")
 
     if equity_curve is None and not trades:
-        log_manager.warning("后备方案计算失败，无有效数据")
+        logger.warning("后备方案计算失败，无有效数据")
         return {}
 
     # 如果有资金曲线，优先使用
@@ -219,7 +203,7 @@ def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
 
     # 如果有交易记录，添加交易统计
     if trades:
-        log_manager.info(f"计算交易统计，交易记录数={len(trades)}")
+        logger.info(f"计算交易统计，交易记录数={len(trades)}")
 
         winning_trades = sum(1 for trade in trades if trade.profit > 0)
         losing_trades = sum(1 for trade in trades if trade.profit < 0)
@@ -241,7 +225,7 @@ def _calculate_simple_performance_metrics_fallback(trades, equity_curve):
             'losing_trades': losing_trades,
         })
 
-    log_manager.info("后备方案性能指标计算完成")
+    logger.info("后备方案性能指标计算完成")
     return metrics
 
 
@@ -258,13 +242,13 @@ def get_optimal_position_size(capital, risk_per_trade, entry_price, stop_loss):
     返回:
         int: 计算得到的仓位大小（股数）
     """
-    log_manager = _get_log_manager()
-    log_manager.info(f"计算最优仓位大小，资金={capital}, 风险比例={risk_per_trade}")
+    # 使用全局logger
+    logger.info(f"计算最优仓位大小，资金={capital}, 风险比例={risk_per_trade}")
 
     # 计算每股风险
     risk_per_share = abs(entry_price - stop_loss)
     if risk_per_share <= 0:
-        log_manager.warning("仓位计算失败，止损价格无效")
+        logger.warning("仓位计算失败，止损价格无效")
         return 0
 
     # 计算风险金额
@@ -277,17 +261,17 @@ def get_optimal_position_size(capital, risk_per_trade, entry_price, stop_loss):
     position_size = (int(position_size) // 100) * 100
 
     result = position_size if position_size >= 100 else 0
-    log_manager.info(f"最优仓位计算完成，建议仓位={result}股")
+    logger.info(f"最优仓位计算完成，建议仓位={result}股")
     return result
 
 
 def _kdata_preprocess(df, context="分析"):
     """K线数据预处理：检查并修正所有关键字段，统一处理datetime字段"""
-    log_manager = _get_log_manager()
-    log_manager.info(f"开始{context}数据预处理")
+    # 使用全局logger
+    logger.info(f"开始{context}数据预处理")
 
     if not isinstance(df, pd.DataFrame):
-        log_manager.info(f"{context}数据不是DataFrame格式，直接返回")
+        logger.info(f"{context}数据不是DataFrame格式，直接返回")
         return df
 
     # 检查datetime是否在索引中或列中
@@ -308,14 +292,14 @@ def _kdata_preprocess(df, context="分析"):
         df = df.copy()
         df.index = pd.date_range(start='2020-01-01', periods=len(df), freq='D')
         datetime_in_index = True
-        log_manager.info(f"{context}数据缺少时间信息，已自动创建日期索引")
+        logger.info(f"{context}数据缺少时间信息，已自动创建日期索引")
 
     # 如果datetime在列中，将其设为索引
     if has_datetime and not datetime_in_index:
         df = df.copy()
         df['datetime'] = pd.to_datetime(df['datetime'])
         df.set_index('datetime', inplace=True)
-        log_manager.info(f"{context}数据已将datetime列设为索引")
+        logger.info(f"{context}数据已将datetime列设为索引")
 
     # 检查必需的列
     required_columns = ['open', 'high', 'low', 'close', 'volume']
@@ -323,16 +307,16 @@ def _kdata_preprocess(df, context="分析"):
         col for col in required_columns if col not in df.columns]
 
     if missing_columns:
-        log_manager.warning(f"{context}缺少必需的列: {missing_columns}")
+        logger.warning(f"{context}缺少必需的列: {missing_columns}")
         # 尝试修复缺失的列
         for col in missing_columns:
             if col == 'volume' and 'vol' in df.columns:
                 df['volume'] = df['vol']
-                log_manager.info(f"{context}已将vol列重命名为volume")
+                logger.info(f"{context}已将vol列重命名为volume")
             elif col in ['open', 'high', 'low'] and 'close' in df.columns:
                 # 如果只有close价格，用close填充其他价格
                 df[col] = df['close']
-                log_manager.info(f"{context}已用close价格填充{col}列")
+                logger.info(f"{context}已用close价格填充{col}列")
 
     # 检查数据类型
     numeric_columns = ['open', 'high', 'low', 'close', 'volume']
@@ -344,11 +328,11 @@ def _kdata_preprocess(df, context="分析"):
     original_len = len(df)
     df = df.dropna()
     if len(df) < original_len:
-        log_manager.info(f"{context}已删除{original_len - len(df)}行包含NaN的数据")
+        logger.info(f"{context}已删除{original_len - len(df)}行包含NaN的数据")
 
     if df.empty:
-        log_manager.warning(f"{context}数据预处理后为空")
+        logger.warning(f"{context}数据预处理后为空")
         return None
 
-    log_manager.info(f"{context}数据预处理完成，最终数据{len(df)}行")
+    logger.info(f"{context}数据预处理完成，最终数据{len(df)}行")
     return df

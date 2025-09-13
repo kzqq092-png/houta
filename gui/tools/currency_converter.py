@@ -1,10 +1,10 @@
+from loguru import logger
 """
 汇率转换工具
 
 提供主要货币之间的汇率转换功能。
 """
 
-import logging
 from typing import Optional, Dict
 from datetime import datetime
 from PyQt5.QtWidgets import (
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 from decimal import Decimal, ROUND_HALF_UP
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CurrencyConverter(QDialog):

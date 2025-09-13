@@ -1,13 +1,12 @@
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_openai import ChatOpenAI
 from langchain.chains import GraphQAChain
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIKnowledgeGraph:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.llm = ChatOpenAI(
             temperature=0, model_name="gpt-4-turbo", openai_api_key=api_key)
         self.transformer = LLMGraphTransformer(llm=self.llm)
@@ -24,7 +23,7 @@ class AIKnowledgeGraph:
                 self.llm, graph=self.graph, verbose=False)
             return {"triples": triples}
         except Exception as e:
-            self.log_manager.error(f"知识图谱构建失败: {e}")
+            logger.error(f"知识图谱构建失败: {e}")
             return {"error": str(e)}
 
     def ask(self, question: str) -> dict:
@@ -35,7 +34,7 @@ class AIKnowledgeGraph:
             answer = self.qa_chain.run(question)
             return {"answer": answer}
         except Exception as e:
-            self.log_manager.error(f"知识图谱问答失败: {e}")
+            logger.error(f"知识图谱问答失败: {e}")
             return {"error": str(e)}
 
     def get_triples(self) -> dict:
@@ -44,5 +43,5 @@ class AIKnowledgeGraph:
                 return {"error": "请先构建知识图谱"}
             return {"triples": self.graph.get_triples()}
         except Exception as e:
-            self.log_manager.error(f"获取知识三元组失败: {e}")
+            logger.error(f"获取知识三元组失败: {e}")
             return {"error": str(e)}

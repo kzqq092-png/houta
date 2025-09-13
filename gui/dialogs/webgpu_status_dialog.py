@@ -5,7 +5,7 @@ WebGPU状态监控对话框
 提供手动后端切换和性能测试功能。
 """
 
-import logging
+from loguru import logger
 from typing import Dict, Any, Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class WebGPUStatusDialog(QDialog):
@@ -545,7 +545,7 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
                         stock = hku.getStock(f"sz{code}")
                         if not stock.isNull():
                             # 获取最近1000个交易日的数据
-                            kdata = stock.getKData(-1000)
+                            kdata = stock.get_kdata(-1000)
                             if len(kdata) > 100:  # 确保有足够的数据
                                 # 转换为DataFrame格式
                                 data = []
@@ -560,7 +560,7 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
                                     })
 
                                 test_data = pd.DataFrame(data)
-                                logger.info(f"✅ 使用真实股票数据进行性能测试: {code}, {len(test_data)}条记录")
+                                logger.info(f" 使用真实股票数据进行性能测试: {code}, {len(test_data)}条记录")
                                 return test_data
                     except Exception as e:
                         logger.debug(f"获取股票{code}数据失败: {e}")
@@ -577,14 +577,14 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
                 # 尝试获取缓存的股票数据
                 stock_data = data_manager.get_cached_stock_data("000001", limit=1000)
                 if stock_data is not None and len(stock_data) > 100:
-                    logger.info(f"✅ 使用缓存股票数据进行性能测试: {len(stock_data)}条记录")
+                    logger.info(f" 使用缓存股票数据进行性能测试: {len(stock_data)}条记录")
                     return stock_data
 
             except Exception as e:
                 logger.debug(f"获取缓存数据失败: {e}")
 
             # 如果都失败了，生成基于真实股票特征的模拟数据
-            logger.warning("⚠️ 无法获取真实股票数据，生成基于真实特征的测试数据")
+            logger.warning(" 无法获取真实股票数据，生成基于真实特征的测试数据")
             return self._generate_realistic_stock_data()
 
         except Exception as e:
@@ -648,7 +648,7 @@ matplotlib耗时范围: {min(results.get('matplotlib_times', [0])) * 1000:.1f}ms
             })
 
         test_data = pd.DataFrame(data)
-        logger.info(f"✅ 生成基于真实特征的测试数据: {len(test_data)}条记录")
+        logger.info(f" 生成基于真实特征的测试数据: {len(test_data)}条记录")
         return test_data
 
     def _update_compatibility_tab(self):

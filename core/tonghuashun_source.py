@@ -1,3 +1,4 @@
+from loguru import logger
 """
 同花顺数据源模块
 """
@@ -5,7 +6,7 @@ import pandas as pd
 import requests
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from core.logger import LogManager
+from loguru import logger
 
 
 class TongHuaShunDataSource:
@@ -13,7 +14,7 @@ class TongHuaShunDataSource:
 
     def __init__(self):
         """初始化同花顺数据源"""
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.base_url = "http://d.10jqka.com.cn/v6/time/hs_{}/last"
         self.k_url = "http://d.10jqka.com.cn/v6/time/hs_{}/last"
         self.stock_list_url = "http://q.10jqka.com.cn/api/stock/search"
@@ -82,7 +83,7 @@ class TongHuaShunDataSource:
             try:
                 data = response.json()
                 if not data or 'data' not in data:
-                    self.log_manager.warning(f"获取股票 {code} K线数据为空")
+                    logger.warning(f"获取股票 {code} K线数据为空")
                     return pd.DataFrame()
 
                 # 转换为DataFrame
@@ -113,11 +114,11 @@ class TongHuaShunDataSource:
                 return df
 
             except ValueError as e:
-                self.log_manager.error(f"解析K线数据失败: {str(e)}")
+                logger.error(f"解析K线数据失败: {str(e)}")
                 return pd.DataFrame()
 
         except Exception as e:
-            self.log_manager.error(f"获取股票 {code} K线数据失败: {str(e)}")
+            logger.error(f"获取股票 {code} K线数据失败: {str(e)}")
             return pd.DataFrame()
 
     def get_stock_list(self, market: str = 'all') -> pd.DataFrame:
@@ -153,7 +154,7 @@ class TongHuaShunDataSource:
             try:
                 data = response.json()
                 if not data or 'data' not in data:
-                    self.log_manager.warning("获取股票列表数据为空")
+                    logger.warning("获取股票列表数据为空")
                     return pd.DataFrame()
 
                 # 转换为DataFrame
@@ -190,11 +191,11 @@ class TongHuaShunDataSource:
                 return df
 
             except ValueError as e:
-                self.log_manager.error(f"解析股票列表数据失败: {str(e)}")
+                logger.error(f"解析股票列表数据失败: {str(e)}")
                 return pd.DataFrame()
 
         except Exception as e:
-            self.log_manager.error(f"获取股票列表失败: {str(e)}")
+            logger.error(f"获取股票列表失败: {str(e)}")
             return pd.DataFrame()
 
     def get_realtime_quotes(self, codes: List[str]) -> pd.DataFrame:
@@ -224,7 +225,7 @@ class TongHuaShunDataSource:
             # 解析数据
             data = response.json()
             if not data or 'data' not in data:
-                self.log_manager.error("获取实时行情失败: 数据格式错误")
+                logger.error("获取实时行情失败: 数据格式错误")
                 return pd.DataFrame()
 
             # 转换为DataFrame
@@ -235,7 +236,7 @@ class TongHuaShunDataSource:
             return df
 
         except Exception as e:
-            self.log_manager.error(f"获取实时行情失败: {str(e)}")
+            logger.error(f"获取实时行情失败: {str(e)}")
             return pd.DataFrame()
 
     def get_index_list(self) -> pd.DataFrame:
@@ -256,7 +257,7 @@ class TongHuaShunDataSource:
             # 解析数据
             data = response.json()
             if not data or 'data' not in data:
-                self.log_manager.error("获取指数列表失败: 数据格式错误")
+                logger.error("获取指数列表失败: 数据格式错误")
                 return pd.DataFrame()
 
             # 转换为DataFrame
@@ -266,7 +267,7 @@ class TongHuaShunDataSource:
             return df
 
         except Exception as e:
-            self.log_manager.error(f"获取指数列表失败: {str(e)}")
+            logger.error(f"获取指数列表失败: {str(e)}")
             return pd.DataFrame()
 
     def get_industry_list(self) -> pd.DataFrame:
@@ -287,7 +288,7 @@ class TongHuaShunDataSource:
             # 解析数据
             data = response.json()
             if not data or 'data' not in data:
-                self.log_manager.error("获取行业列表失败: 数据格式错误")
+                logger.error("获取行业列表失败: 数据格式错误")
                 return pd.DataFrame()
 
             # 转换为DataFrame
@@ -297,7 +298,7 @@ class TongHuaShunDataSource:
             return df
 
         except Exception as e:
-            self.log_manager.error(f"获取行业列表失败: {str(e)}")
+            logger.error(f"获取行业列表失败: {str(e)}")
             return pd.DataFrame()
 
     def get_concept_list(self) -> pd.DataFrame:
@@ -318,7 +319,7 @@ class TongHuaShunDataSource:
             # 解析数据
             data = response.json()
             if not data or 'data' not in data:
-                self.log_manager.error("获取概念列表失败: 数据格式错误")
+                logger.error("获取概念列表失败: 数据格式错误")
                 return pd.DataFrame()
 
             # 转换为DataFrame
@@ -328,7 +329,7 @@ class TongHuaShunDataSource:
             return df
 
         except Exception as e:
-            self.log_manager.error(f"获取概念列表失败: {str(e)}")
+            logger.error(f"获取概念列表失败: {str(e)}")
             return pd.DataFrame()
 
     def get_stock_info(self, code: str) -> Dict[str, Any]:
@@ -358,11 +359,11 @@ class TongHuaShunDataSource:
             # 解析数据
             data = response.json()
             if not data or 'data' not in data:
-                self.log_manager.error(f"获取股票 {code} 基本信息失败: 数据格式错误")
+                logger.error(f"获取股票 {code} 基本信息失败: 数据格式错误")
                 return {}
 
             return data['data']
 
         except Exception as e:
-            self.log_manager.error(f"获取股票 {code} 基本信息失败: {str(e)}")
+            logger.error(f"获取股票 {code} 基本信息失败: {str(e)}")
             return {}

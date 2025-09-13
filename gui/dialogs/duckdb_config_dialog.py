@@ -14,7 +14,7 @@ from db.models.duckdb_config_models import (
 )
 import sys
 import json
-import logging
+from loguru import logger
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -33,7 +33,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DuckDBConfigTestThread(QThread):
@@ -1184,7 +1184,7 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
 
     # 配置日志
-    logging.basicConfig(level=logging.INFO)
+    # Loguru配置在core.loguru_config中统一管理
 
     app = QApplication(sys.argv)
 

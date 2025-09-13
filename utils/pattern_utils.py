@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
+from loguru import logger
 
 
 def find_peaks_and_troughs(data: pd.Series, prominence: float = 0.02, width: int = 3):
@@ -46,7 +47,7 @@ def find_peaks_and_troughs(data: pd.Series, prominence: float = 0.02, width: int
 
 if __name__ == '__main__':
     # 为了验证函数的有效性，我们创建一个示例并运行
-    print("正在执行 `find_peaks_and_troughs` 函数的单元测试...")
+    logger.info("正在执行 `find_peaks_and_troughs` 函数的单元测试...")
 
     # 1. 创建一段合成的、包含明显趋势和峰谷的K线数据
     dates = pd.to_datetime(pd.date_range(start='2023-01-01', periods=100))
@@ -71,25 +72,25 @@ if __name__ == '__main__':
     peaks, troughs = find_peaks_and_troughs(close_prices, prominence=0.01, width=1)
 
     # 3. 打印结果进行验证
-    print("\n合成K线数据预览:")
-    print(close_prices.head(10))
+    logger.info("\n合成K线数据预览:")
+    logger.info(close_prices.head(10))
 
-    print("\n找到的波峰 (Peaks):")
+    logger.info("\n找到的波峰 (Peaks):")
     if not peaks.empty:
-        print(peaks)
+        logger.info(peaks)
     else:
-        print("未找到显著波峰。")
+        logger.info("未找到显著波峰。")
 
-    print("\n找到的波谷 (Troughs):")
+    logger.info("\n找到的波谷 (Troughs):")
     if not troughs.empty:
-        print(troughs)
+        logger.info(troughs)
     else:
-        print("未找到显著波谷。")
+        logger.info("未找到显著波谷。")
 
     # 4. 可视化（如果可以）
     try:
         import matplotlib.pyplot as plt
-        print("\n正在生成可视化图表以供验证...")
+        logger.info("\n正在生成可视化图表以供验证...")
         plt.figure(figsize=(15, 7))
         plt.plot(close_prices, label='Close Price', color='blue', alpha=0.6)
         plt.scatter(peaks.index, peaks['price'], color='red', s=100, marker='^', label='Peaks')
@@ -100,9 +101,9 @@ if __name__ == '__main__':
         # 保存到文件而不是显示
         output_path = 'docs/peaks_troughs_test.png'
         plt.savefig(output_path)
-        print(f"测试图表已保存到: {output_path}")
+        logger.info(f"测试图表已保存到: {output_path}")
 
     except ImportError:
-        print("\nMatplotlib未安装，无法进行可视化验证。请运行 `pip install matplotlib`。")
+        logger.info("\nMatplotlib未安装，无法进行可视化验证。请运行 `pip install matplotlib`。")
 
-    print("\n单元测试执行完毕。")
+    logger.info("\n单元测试执行完毕。")

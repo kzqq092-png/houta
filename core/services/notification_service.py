@@ -1,3 +1,4 @@
+from loguru import logger
 """
 通知服务 - 邮件和短信发送
 
@@ -8,7 +9,6 @@
 
 import smtplib
 import requests
-import logging
 from typing import Dict, List, Optional, Union
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -20,7 +20,7 @@ from enum import Enum
 import json
 import base64
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class NotificationType(Enum):
@@ -612,7 +612,7 @@ def send_alert_notification(alert_type: str, message: str,
                 content=message,
                 html_content=f"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #e74c3c;">⚠️ 系统告警通知</h2>
+                    <h2 style="color: #e74c3c;"> 系统告警通知</h2>
                     <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c;">
                         <h3>告警类型：{alert_type}</h3>
                         <p>{message}</p>

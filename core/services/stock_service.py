@@ -1,3 +1,4 @@
+from loguru import logger
 """
 股票服务模块
 
@@ -5,7 +6,6 @@
 使用数据访问层进行数据操作。
 """
 
-import logging
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from .base_service import CacheableService, ConfigurableService
@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import time
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 # 移除MockDataManager，使用真正的HIkyuu数据管理器

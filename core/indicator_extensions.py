@@ -1,9 +1,9 @@
+from loguru import logger
 """
 指标插件扩展接口
 为指标系统插件化提供标准化的指标插件接口和适配器
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class IndicatorCategory(Enum):
@@ -346,7 +346,7 @@ class IndicatorPluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logging.getLogger(f"{self.__class__.__name__}.{plugin_id}")
+        self.logger = logger
 
         # 缓存
         self._metadata_cache = {}

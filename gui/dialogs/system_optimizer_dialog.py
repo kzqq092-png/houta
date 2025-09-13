@@ -4,7 +4,7 @@
 提供系统优化器的图形界面，包括优化设置、进度监控、结果展示等功能。
 """
 
-import logging
+from loguru import logger
 import asyncio
 from typing import Optional, Dict, Any
 from PyQt5.QtWidgets import (
@@ -24,7 +24,7 @@ from system_optimizer import (
     OptimizationResult
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class OptimizationWorker(QThread):

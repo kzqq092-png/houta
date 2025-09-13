@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple
 from datetime import datetime
+from loguru import logger
 
 
 class RiskMetricsCalculator:
@@ -39,7 +40,7 @@ class RiskMetricsCalculator:
                 'sortino_ratio': sortino_ratio
             }
         except Exception as e:
-            print(f"计算市场风险指标时出错: {str(e)}")
+            logger.info(f"计算市场风险指标时出错: {str(e)}")
             return {}
 
     def calculate_sector_exposure(self, portfolio: Dict[str, float], sector_data: Dict[str, str]) -> Dict:
@@ -59,7 +60,7 @@ class RiskMetricsCalculator:
                 'herfindahl_index': herfindahl_index
             }
         except Exception as e:
-            print(f"计算行业暴露度时出错: {str(e)}")
+            logger.info(f"计算行业暴露度时出错: {str(e)}")
             return {}
 
     def calculate_liquidity_risk(self, volume_data: pd.Series, price_data: pd.Series) -> Dict:
@@ -87,7 +88,7 @@ class RiskMetricsCalculator:
                 'liquidity_ratio': liquidity_ratio
             }
         except Exception as e:
-            print(f"计算流动性风险指标时出错: {str(e)}")
+            logger.info(f"计算流动性风险指标时出错: {str(e)}")
             return {}
 
     def calculate_value_at_risk(self, returns: pd.Series, confidence_level: float = 0.95) -> float:
@@ -95,7 +96,7 @@ class RiskMetricsCalculator:
         try:
             return np.percentile(returns, (1 - confidence_level) * 100)
         except Exception as e:
-            print(f"计算VaR时出错: {str(e)}")
+            logger.info(f"计算VaR时出错: {str(e)}")
             return 0
 
     def calculate_expected_shortfall(self, returns: pd.Series, confidence_level: float = 0.95) -> float:
@@ -104,7 +105,7 @@ class RiskMetricsCalculator:
             var = self.calculate_value_at_risk(returns, confidence_level)
             return returns[returns <= var].mean()
         except Exception as e:
-            print(f"计算ES时出错: {str(e)}")
+            logger.info(f"计算ES时出错: {str(e)}")
             return 0
 
     def calculate_correlation_risk(self, returns_matrix: pd.DataFrame) -> Dict:
@@ -119,7 +120,7 @@ class RiskMetricsCalculator:
                 'avg_correlation': avg_correlation
             }
         except Exception as e:
-            print(f"计算相关性风险时出错: {str(e)}")
+            logger.info(f"计算相关性风险时出错: {str(e)}")
             return {}
 
     def calculate_tail_risk(self, returns: pd.Series) -> Dict:
@@ -141,7 +142,7 @@ class RiskMetricsCalculator:
                 'extreme_loss_prob': extreme_loss_prob
             }
         except Exception as e:
-            print(f"计算尾部风险时出错: {str(e)}")
+            logger.info(f"计算尾部风险时出错: {str(e)}")
             return {}
 
     def calculate_risk_metrics(self, data: Dict) -> Dict:
@@ -181,5 +182,5 @@ class RiskMetricsCalculator:
 
             return risk_metrics
         except Exception as e:
-            print(f"计算风险指标时出错: {str(e)}")
+            logger.info(f"计算风险指标时出错: {str(e)}")
             return {}

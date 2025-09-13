@@ -1,3 +1,4 @@
+from loguru import logger
 """
 增强交易监控组件
 
@@ -10,7 +11,6 @@
 6. 性能分析界面
 """
 
-import logging
 import sys
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -45,7 +45,7 @@ from core.services.trading_service import TradingService, TradeRecord, Portfolio
 from core.services.strategy_service import StrategyService
 from core.strategy_extensions import Signal, SignalType, Position
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RealTimeChart(QWidget):

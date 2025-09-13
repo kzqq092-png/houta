@@ -1,3 +1,4 @@
+from loguru import logger
 """
 警告抑制器
 
@@ -5,10 +6,9 @@
 """
 
 import warnings
-import logging
 import os
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 def suppress_warnings():

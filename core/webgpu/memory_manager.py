@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU内存管理优化器
 
@@ -8,7 +9,6 @@ WebGPU内存管理优化器
 - 内存泄漏检测和防护
 """
 
-import logging
 import threading
 import time
 import weakref
@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple, Any, Set
 import gc
 import psutil
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class MemoryType(Enum):

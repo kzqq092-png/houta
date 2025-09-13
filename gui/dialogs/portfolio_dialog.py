@@ -6,6 +6,7 @@
 提供完整的投资组合管理功能，包括持仓管理、收益分析、风险评估等
 """
 
+from loguru import logger
 import sys
 import os
 import traceback
@@ -21,9 +22,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPalette
-
-from core.logger import get_logger
-
 
 class PortfolioDialog(QDialog):
     """投资组合管理对话框"""
@@ -42,7 +40,7 @@ class PortfolioDialog(QDialog):
         """
         super().__init__(parent)
         self.data_manager = data_manager
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 投资组合数据
         self.portfolios = {}  # 组合列表
@@ -804,7 +802,6 @@ class PortfolioDialog(QDialog):
 
         except Exception as e:
             self.logger.error(f"处理持仓双击失败: {e}")
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

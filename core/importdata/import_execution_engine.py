@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 数据导入任务执行引擎
@@ -6,9 +7,9 @@
 """
 
 import asyncio
-import logging
 import threading
 import time
+import pandas as pd
 from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -17,10 +18,11 @@ from enum import Enum
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
 from .import_config_manager import ImportConfigManager, ImportTaskConfig, ImportProgress, ImportStatus
+from core.database.table_manager import TableType
 from ..services.unified_data_manager import UnifiedDataManager
 from ..real_data_provider import RealDataProvider
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TaskExecutionStatus(Enum):
@@ -108,12 +110,12 @@ class DataImportExecutionEngine(QObject):
         """确保数据管理器已初始化"""
         if not self._data_manager_initialized:
             try:
-                logger.info("🔄 延迟初始化数据管理器...")
+                logger.info(" 延迟初始化数据管理器...")
                 self.data_manager = UnifiedDataManager()
                 self._data_manager_initialized = True
-                logger.info("✅ 数据管理器延迟初始化完成")
+                logger.info(" 数据管理器延迟初始化完成")
             except Exception as e:
-                logger.error(f"❌ 数据管理器初始化失败: {e}")
+                logger.error(f" 数据管理器初始化失败: {e}")
                 # 创建一个最小的数据管理器替代
                 self.data_manager = None
                 self._data_manager_initialized = False
@@ -122,15 +124,56 @@ class DataImportExecutionEngine(QObject):
         """确保真实数据提供器已初始化"""
         if not self._real_data_provider_initialized:
             try:
-                logger.info("🔄 延迟初始化真实数据提供器...")
+                logger.info(" 延迟初始化真实数据提供器...")
                 self.real_data_provider = RealDataProvider()
                 self._real_data_provider_initialized = True
-                logger.info("✅ 真实数据提供器延迟初始化完成")
+                logger.info(" 真实数据提供器延迟初始化完成")
             except Exception as e:
-                logger.error(f"❌ 真实数据提供器初始化失败: {e}")
+                logger.error(f" 真实数据提供器初始化失败: {e}")
                 # 创建一个最小的替代
                 self.real_data_provider = None
                 self._real_data_provider_initialized = False
+    
+    def _get_data_source_plugin(self, plugin_id: str):
+        """获取指定的数据源插件实例"""
+        try:
+            # 从插件管理器获取插件实例
+            from ..plugin_manager import get_plugin_manager
+            plugin_manager = get_plugin_manager()
+            
+            if plugin_manager:
+                # 获取数据源插件
+                plugin_instance = plugin_manager.get_data_source_plugin(plugin_id)
+                if plugin_instance:
+                    logger.info(f"获取数据源插件成功: {plugin_id}")
+                    return plugin_instance
+                else:
+                    logger.warning(f"未找到数据源插件: {plugin_id}")
+            
+            # 如果插件管理器不可用，尝试直接导入
+            if plugin_id.startswith('examples.'):
+                module_name = plugin_id.replace('examples.', 'plugins.examples.')
+                try:
+                    import importlib
+                    module = importlib.import_module(module_name)
+                    
+                    # 查找插件类
+                    for attr_name in dir(module):
+                        attr = getattr(module, attr_name)
+                        if (hasattr(attr, '__bases__') and 
+                            any('IDataSourcePlugin' in str(base) for base in attr.__bases__)):
+                            plugin_instance = attr()
+                            logger.info(f"直接导入数据源插件成功: {plugin_id}")
+                            return plugin_instance
+                            
+                except ImportError as e:
+                    logger.error(f"直接导入数据源插件失败 {plugin_id}: {e}")
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"获取数据源插件失败 {plugin_id}: {e}")
+            return None
 
     def start_task(self, task_id: str) -> bool:
         """
@@ -143,15 +186,15 @@ class DataImportExecutionEngine(QObject):
             bool: 是否成功启动
         """
         try:
-            logger.info(f"🔍 开始启动任务: {task_id}")
+            logger.info(f" 开始启动任务: {task_id}")
 
             # 获取任务配置
             task_config = self.config_manager.get_import_task(task_id)
             if not task_config:
-                logger.error(f"❌ 任务配置不存在: {task_id}")
+                logger.error(f" 任务配置不存在: {task_id}")
                 return False
 
-            logger.info(f"✅ 找到任务配置: {task_config.name}, 股票代码: {task_config.symbols}")
+            logger.info(f" 找到任务配置: {task_config.name}, 股票数量: {len(task_config.symbols)}")
 
             # 检查任务是否已在运行
             with self._task_lock:
@@ -281,27 +324,27 @@ class DataImportExecutionEngine(QObject):
             result: 任务执行结果
         """
         try:
-            logger.info(f"🚀 开始执行任务: {task_config.task_id}")
-            logger.info(f"📊 任务详情: 数据类型={getattr(task_config, 'data_type', 'K线数据')}, 股票={task_config.symbols}")
+            logger.info(f" 开始执行任务: {task_config.task_id}")
+            logger.info(f" 任务详情: 数据类型={getattr(task_config, 'data_type', 'K线数据')}, 股票数量={len(task_config.symbols)}")
 
             # 更新任务状态
             result.status = TaskExecutionStatus.RUNNING
 
             # 根据任务类型执行不同的导入逻辑
             data_type = getattr(task_config, 'data_type', 'K线数据')  # 默认为K线数据
-            logger.info(f"🔄 执行数据类型: {data_type}")
+            logger.info(f" 执行数据类型: {data_type}")
 
             if data_type == "K线数据":
-                logger.info("📈 开始导入K线数据")
+                logger.info(" 开始导入K线数据")
                 self._import_kline_data(task_config, result)
             elif data_type == "实时行情":
-                logger.info("⚡ 开始导入实时行情")
+                logger.info(" 开始导入实时行情")
                 self._import_realtime_data(task_config, result)
             elif data_type == "基本面数据":
-                logger.info("📋 开始导入基本面数据")
+                logger.info(" 开始导入基本面数据")
                 self._import_fundamental_data(task_config, result)
             else:
-                logger.warning(f"⚠️ 不支持的数据类型，默认使用K线数据: {data_type}")
+                logger.warning(f" 不支持的数据类型，默认使用K线数据: {data_type}")
                 self._import_kline_data(task_config, result)
 
             # 任务完成
@@ -314,8 +357,8 @@ class DataImportExecutionEngine(QObject):
                 task_id=task_config.task_id,
                 status=ImportStatus.COMPLETED,
                 total_records=result.total_records,
-                processed_records=result.processed_records,
-                failed_records=result.failed_records,
+                imported_records=result.processed_records,
+                error_count=result.failed_records,
                 start_time=result.start_time.isoformat(),
                 end_time=result.end_time.isoformat(),
                 error_message=result.error_message
@@ -345,45 +388,48 @@ class DataImportExecutionEngine(QObject):
                     del self._running_tasks[task_config.task_id]
 
     def _save_kdata_to_database(self, symbol: str, kdata: 'pd.DataFrame', task_config: ImportTaskConfig):
-        """保存K线数据到数据库"""
+        """保存K线数据到数据库（按数据源分离存储）"""
         try:
-            # 获取DuckDB操作实例
-            from ..database.duckdb_operations import get_duckdb_operations
-            from ..database.table_manager import get_table_manager
+            # 获取数据源分离存储管理器
+            from ..database.data_source_separated_storage import get_separated_storage_manager
+            from ..database.table_manager import TableType
+            
+            storage_manager = get_separated_storage_manager()
+            
+            # 获取数据源插件ID
+            data_source = getattr(task_config, 'data_source', 'unknown_source')
+            
+            # 确保数据源已注册
+            if not storage_manager.get_storage_config(data_source):
+                # 自动注册数据源
+                from ..database.data_source_separated_storage import DataSourceIsolationLevel
+                success = storage_manager.register_data_source(
+                    plugin_id=data_source,
+                    plugin_name=data_source,
+                    isolation_level=DataSourceIsolationLevel.DATABASE
+                )
+                if not success:
+                    logger.error(f"注册数据源失败: {data_source}")
+                    return
+                logger.info(f"自动注册数据源: {data_source}")
 
-            duckdb_ops = get_duckdb_operations()
-            table_manager = get_table_manager()
-
-            if not duckdb_ops or not table_manager:
-                logger.warning("DuckDB操作或表管理器不可用，跳过数据保存")
-                return
-
-            # 确定表名
+            # 确定数据周期
             frequency = task_config.frequency.value if hasattr(task_config, 'frequency') else 'D'
-            table_name = f"kline_data_{frequency.lower()}"
-
-            # 确保表存在 - 使用统一的DuckDB数据库
-            db_path = "db/kline_stock.duckdb"
-            table_manager.ensure_table_exists(db_path, table_name)
-
-            # 添加symbol列
-            kdata_with_symbol = kdata.copy()
-            kdata_with_symbol['symbol'] = symbol
-            kdata_with_symbol['import_time'] = pd.Timestamp.now()
-
-            # 插入数据（使用upsert避免重复）
-            result = duckdb_ops.insert_dataframe(
-                database_path=db_path,
-                table_name=table_name,
-                data=kdata_with_symbol,
-                upsert=True,
-                conflict_columns=['symbol', 'datetime'] if 'datetime' in kdata_with_symbol.columns else ['symbol']
+            
+            # 保存数据到指定数据源的专用存储
+            success = storage_manager.save_data_to_source(
+                plugin_id=data_source,
+                table_type=TableType.KLINE_DATA,
+                data=kdata,
+                symbol=symbol,
+                period=frequency,
+                upsert=True
             )
 
-            if result.success:
-                logger.info(f"✅ K线数据保存到DuckDB成功: {symbol}, {len(kdata)}条记录")
+            if success:
+                logger.info(f"K线数据保存到数据源专用存储成功: {symbol} -> {data_source}, {len(kdata)}条记录")
             else:
-                logger.error(f"❌ K线数据保存失败: {symbol}")
+                logger.error(f"K线数据保存到数据源专用存储失败: {symbol} -> {data_source}")
 
         except Exception as e:
             logger.error(f"保存K线数据到数据库失败 {symbol}: {e}")
@@ -406,7 +452,10 @@ class DataImportExecutionEngine(QObject):
 
             # 确保表存在 - 使用统一的DuckDB数据库
             db_path = "db/kline_stock.duckdb"
-            table_manager.ensure_table_exists(db_path, table_name)
+            # 确保表存在
+            if not table_manager.ensure_table_exists(db_path, TableType.FINANCIAL_STATEMENT, "import_engine"):
+                logger.error("创建财务数据表失败")
+                return
 
             # 添加symbol列
             data_with_symbol = data.copy()
@@ -423,9 +472,9 @@ class DataImportExecutionEngine(QObject):
             )
 
             if result.success:
-                logger.info(f"✅ 基本面数据保存到DuckDB成功: {symbol}, {len(data)}条记录")
+                logger.info(f" 基本面数据保存到DuckDB成功: {symbol}, {len(data)}条记录")
             else:
-                logger.error(f"❌ 基本面数据保存失败: {symbol}")
+                logger.error(f" 基本面数据保存失败: {symbol}")
 
         except Exception as e:
             logger.error(f"保存基本面数据到数据库失败 {symbol}: {e}")
@@ -448,7 +497,10 @@ class DataImportExecutionEngine(QObject):
 
             # 确保表存在 - 使用统一的DuckDB数据库
             db_path = "db/kline_stock.duckdb"
-            table_manager.ensure_table_exists(db_path, table_name)
+            # 确保表存在
+            if not table_manager.ensure_table_exists(db_path, TableType.REAL_TIME_QUOTE, "import_engine"):
+                logger.error("创建实时行情表失败")
+                return
 
             # 添加symbol列
             data_with_symbol = data.copy()
@@ -464,9 +516,9 @@ class DataImportExecutionEngine(QObject):
             )
 
             if result.success:
-                logger.info(f"✅ 实时数据保存到DuckDB成功: {symbol}, {len(data)}条记录")
+                logger.info(f" 实时数据保存到DuckDB成功: {symbol}, {len(data)}条记录")
             else:
-                logger.error(f"❌ 实时数据保存失败: {symbol}")
+                logger.error(f" 实时数据保存失败: {symbol}")
 
         except Exception as e:
             logger.error(f"保存实时数据到数据库失败 {symbol}: {e}")
@@ -483,10 +535,12 @@ class DataImportExecutionEngine(QObject):
             symbols = task_config.symbols
             result.total_records = len(symbols)
 
-            logger.info(f"📈 开始导入K线数据，股票列表: {symbols}")
-            logger.info(f"📅 时间范围: {task_config.start_date} 到 {task_config.end_date}")
-            logger.info(f"📊 频率: {task_config.frequency}")
-            logger.info(f"🚀 使用并发下载模式，最大工作线程: {task_config.max_workers}")
+            # 显示股票列表概要（避免日志过长）
+            symbols_preview = symbols[:5] if len(symbols) > 5 else symbols
+            logger.info(f" 开始导入K线数据，股票数量: {len(symbols)}, 示例: {symbols_preview}")
+            logger.info(f" 时间范围: {task_config.start_date} 到 {task_config.end_date}")
+            logger.info(f" 频率: {task_config.frequency}")
+            logger.info(f" 使用并发下载模式，最大工作线程: {task_config.max_workers}")
 
             # 使用并发下载优化性能
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -504,26 +558,37 @@ class DataImportExecutionEngine(QObject):
                 """下载单只股票的数据"""
                 nonlocal completed_count  # 声明必须在函数开头
                 try:
-                    # 发送进度更新信号
+                    # 发送进度更新信号（下载开始时）
+                    with progress_lock:
+                        current_progress = (completed_count / len(symbols)) * 100
                     self.task_progress.emit(
                         task_config.task_id,
-                        (completed_count / len(symbols)) * 100,
+                        current_progress,
                         f"正在下载 {symbol} 的K线数据..."
                     )
 
-                    logger.info(f"🔄 [{completed_count + 1}/{len(symbols)}] 正在获取 {symbol} 的K线数据...")
+                    logger.info(f" [{completed_count + 1}/{len(symbols)}] 正在获取 {symbol} 的K线数据...")
 
-                    # 使用真实数据提供器获取K线数据
+                    # 使用真实数据提供器获取K线数据，传递数据源信息
                     kdata = self.real_data_provider.get_real_kdata(
                         code=symbol,
                         freq=task_config.frequency.value,
                         start_date=task_config.start_date,
-                        end_date=task_config.end_date
+                        end_date=task_config.end_date,
+                        data_source=task_config.data_source  # 传递任务配置中的数据源
                     )
 
                     # 更新进度
                     with progress_lock:
                         completed_count += 1
+                        current_progress = (completed_count / len(symbols)) * 100
+
+                    # 发送进度更新信号（下载完成时）
+                    self.task_progress.emit(
+                        task_config.task_id,
+                        current_progress,
+                        f"已完成 {completed_count}/{len(symbols)} 只股票的数据下载"
+                    )
 
                     if not kdata.empty:
                         # 添加symbol列和时间戳
@@ -535,21 +600,30 @@ class DataImportExecutionEngine(QObject):
                         with download_lock:
                             all_kdata_list.append(kdata_with_meta)
 
-                        logger.info(f"✅ [{completed_count}/{len(symbols)}] {symbol} 数据获取成功: {len(kdata)} 条记录")
+                        logger.info(f" [{completed_count}/{len(symbols)}] {symbol} 数据获取成功: {len(kdata)} 条记录")
                         return {'symbol': symbol, 'status': 'success', 'records': len(kdata)}
                     else:
-                        logger.warning(f"⚠️ [{completed_count}/{len(symbols)}] 未获取到 {symbol} 的K线数据")
+                        logger.warning(f" [{completed_count}/{len(symbols)}] 未获取到 {symbol} 的K线数据")
                         return {'symbol': symbol, 'status': 'no_data', 'records': 0}
 
                 except Exception as e:
                     with progress_lock:
                         completed_count += 1
-                    logger.error(f"❌ [{completed_count}/{len(symbols)}] 导入 {symbol} K线数据失败: {e}")
+                        current_progress = (completed_count / len(symbols)) * 100
+
+                    # 发送进度更新信号（异常时）
+                    self.task_progress.emit(
+                        task_config.task_id,
+                        current_progress,
+                        f"下载失败 {completed_count}/{len(symbols)} - {symbol}: {str(e)}"
+                    )
+
+                    logger.error(f" [{completed_count}/{len(symbols)}] 导入 {symbol} K线数据失败: {e}")
                     return {'symbol': symbol, 'status': 'error', 'error': str(e), 'records': 0}
 
             # 并发下载所有股票数据
             max_workers = min(task_config.max_workers, len(symbols), 8)  # 限制最大并发数
-            logger.info(f"🔄 启动 {max_workers} 个并发下载线程...")
+            logger.info(f" 启动 {max_workers} 个并发下载线程...")
 
             download_results = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -579,21 +653,37 @@ class DataImportExecutionEngine(QObject):
 
             # 批量保存所有数据到数据库
             if all_kdata_list and result.status != TaskExecutionStatus.CANCELLED:
-                logger.info(f"📊 开始批量保存数据到DuckDB，共 {len(all_kdata_list)} 只股票的数据...")
+                logger.info(f" 开始批量保存数据到DuckDB，共 {len(all_kdata_list)} 只股票的数据...")
                 self._batch_save_kdata_to_database(all_kdata_list, task_config)
-                logger.info(f"✅ 批量保存完成")
+                logger.info(f" 批量保存完成")
 
             # 输出统计信息
             success_count = sum(1 for r in download_results if r['status'] == 'success')
             failed_count = sum(1 for r in download_results if r['status'] in ['error', 'no_data'])
             total_records = sum(r.get('records', 0) for r in download_results)
 
-            logger.info(f"📈 K线数据导入完成统计:")
-            logger.info(f"  ✅ 成功: {success_count} 只股票")
-            logger.info(f"  ❌ 失败: {failed_count} 只股票")
-            logger.info(f"  📊 总记录数: {total_records} 条")
+            logger.info(f" K线数据导入完成统计:")
+            logger.info(f"   成功: {success_count} 只股票")
+            logger.info(f"   失败: {failed_count} 只股票")
+            logger.info(f"   总记录数: {total_records} 条")
+
+            # 清理数据源连接池
+            if self.real_data_provider:
+                try:
+                    pool_status = self.real_data_provider.get_pool_status()
+                    logger.info(f" 任务完成前连接池状态: {pool_status}")
+                    self.real_data_provider.cleanup_data_source_pool()
+                except Exception as pool_e:
+                    logger.warning(f"清理数据源连接池失败: {pool_e}")
 
         except Exception as e:
+            # 即使出错也要清理连接池
+            if self.real_data_provider:
+                try:
+                    self.real_data_provider.cleanup_data_source_pool()
+                except Exception as pool_e:
+                    logger.warning(f"清理数据源连接池失败: {pool_e}")
+
             raise Exception(f"K线数据导入失败: {e}")
 
     def _batch_save_kdata_to_database(self, all_kdata_list: list, task_config: ImportTaskConfig):
@@ -614,39 +704,170 @@ class DataImportExecutionEngine(QObject):
                 logger.warning("DuckDB操作或表管理器不可用，跳过数据保存")
                 return
 
-            # 确定表名
+            # 确定表名和频率
             frequency = task_config.frequency.value if hasattr(task_config, 'frequency') else 'D'
-            table_name = f"kline_data_{frequency.lower()}"
 
-            # 确保表存在
-            db_path = "db/kline_stock.duckdb"
-            table_manager.ensure_table_exists(db_path, table_name)
+            # 频率映射：将长格式转换为短格式
+            frequency_map = {
+                'daily': 'd',
+                'weekly': 'w',
+                'monthly': 'm',
+                '1min': '1m',
+                '5min': '5m',
+                '15min': '15m',
+                '30min': '30m',
+                '1h': '1h',
+                'tick': 'tick'
+            }
+            frequency = frequency_map.get(frequency, frequency)
+
+            # 使用数据源分离存储管理器
+            from ..database.data_source_separated_storage import get_separated_storage_manager
+            from ..database.table_manager import TableType
+            
+            separated_storage = get_separated_storage_manager()
+            data_source = getattr(task_config, 'data_source', 'import_engine')
+            
+            # 获取插件的独立数据库路径
+            db_path = separated_storage.get_database_path(data_source)
+            if not db_path:
+                # 如果没有配置，自动注册并创建独立数据库
+                logger.info(f"数据源未注册，自动注册: {data_source}")
+                success = separated_storage.register_data_source(
+                    plugin_id=data_source,
+                    plugin_name=data_source
+                )
+                if success:
+                    db_path = separated_storage.get_database_path(data_source)
+                else:
+                    logger.error(f"注册数据源失败: {data_source}")
+                    return
+            
+            # 为数据源创建表
+            table_name = separated_storage.create_table_for_data_source(
+                plugin_id=data_source,
+                table_type=TableType.KLINE_DATA,
+                period=frequency
+            )
+
+            if not table_name:
+                logger.error("创建或获取数据表失败，跳过数据保存")
+                return
 
             # 合并所有数据
             import pandas as pd
             combined_data = pd.concat(all_kdata_list, ignore_index=True)
 
-            logger.info(f"📊 准备批量插入 {len(combined_data)} 条K线数据记录")
+            # 标准化数据字段，确保与表结构匹配
+            combined_data = self._standardize_kline_data_fields(combined_data)
 
-            # 批量插入数据（使用upsert避免重复）
-            result = duckdb_ops.insert_dataframe(
-                database_path=db_path,
-                table_name=table_name,
+            logger.info(f" 准备批量插入 {len(combined_data)} 条K线数据记录")
+
+            # 使用分离存储管理器保存数据（自动处理数据库、表创建和数据插入）
+            success = separated_storage.save_data_to_source(
+                plugin_id=data_source,
+                table_type=TableType.KLINE_DATA,
                 data=combined_data,
-                batch_size=5000,  # 增大批处理大小以提高性能
-                upsert=True,
-                conflict_columns=['symbol', 'datetime'] if 'datetime' in combined_data.columns else ['symbol']
+                period=frequency,
+                upsert=True
             )
 
-            if result.success:
-                logger.info(f"✅ 批量保存K线数据成功: {result.rows_inserted} 条记录，耗时: {result.execution_time:.2f}秒")
-                if result.failed_batches:
-                    logger.warning(f"⚠️ 有 {len(result.failed_batches)} 个批次保存失败")
+            if success:
+                logger.info(f" 批量保存K线数据成功到独立数据库: {db_path}")
+                logger.info(f" 数据已保存到表: {table_name}")
             else:
-                logger.error(f"❌ 批量保存K线数据失败: {result.error_message}")
+                logger.error(f" 批量保存K线数据失败到数据源: {data_source}")
 
         except Exception as e:
             logger.error(f"批量保存K线数据到数据库失败: {e}")
+
+    def _standardize_kline_data_fields(self, df) -> 'pd.DataFrame':
+        """标准化K线数据字段，确保与表结构匹配"""
+        try:
+            if df.empty:
+                return df
+
+            # 处理字段名称映射（code -> symbol）
+            if 'code' in df.columns and 'symbol' not in df.columns:
+                df['symbol'] = df['code']
+                df = df.drop('code', axis=1)
+            
+            # 基础字段映射和默认值
+            field_defaults = {
+                # 基础OHLCV字段（必需）
+                'symbol': '',
+                'datetime': None,
+                'open': 0.0,
+                'high': 0.0,
+                'low': 0.0,
+                'close': 0.0,
+                'volume': 0,
+                'amount': 0.0,
+
+                # 复权数据
+                'adj_close': None,
+                'adj_factor': None,
+                'vwap': None,
+                'bid_price': None,
+                'ask_price': None,
+                'bid_volume': None,
+                'ask_volume': None,
+
+                # 技术指标
+                'rsi_14': None,
+                'macd_dif': None,
+                'macd_dea': None,
+                'macd_histogram': None,
+                'kdj_k': None,
+                'kdj_d': None,
+                'kdj_j': None,
+                'bollinger_upper': None,
+                'bollinger_middle': None,
+                'bollinger_lower': None,
+                'turnover_rate': None,
+                'net_inflow_large': None,
+                'net_inflow_medium': None,
+                'net_inflow_small': None,
+
+                # 元数据
+                'plugin_specific_data': None,
+                'data_source': 'import_engine',
+                'created_at': None,
+                'data_quality_score': None
+            }
+
+            # 添加缺失的字段
+            for field, default_value in field_defaults.items():
+                if field not in df.columns:
+                    df[field] = default_value
+
+            # 导入pandas
+            import pandas as pd
+
+            # 确保数据类型正确
+            numeric_fields = ['open', 'high', 'low', 'close', 'volume', 'amount']
+            for field in numeric_fields:
+                if field in df.columns:
+                    df[field] = pd.to_numeric(df[field], errors='coerce').fillna(0)
+
+            # 确保datetime字段格式正确
+            if 'datetime' in df.columns:
+                df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+
+            # 确保symbol字段不为空
+            if 'symbol' in df.columns:
+                df['symbol'] = df['symbol'].fillna('').astype(str)
+
+            # 设置默认时间戳
+            if 'created_at' in df.columns and df['created_at'].isna().all():
+                df['created_at'] = pd.Timestamp.now()
+
+            logger.debug(f"数据字段标准化完成，字段数: {len(df.columns)}")
+            return df
+
+        except Exception as e:
+            logger.error(f"标准化K线数据字段失败: {e}")
+            return df
 
     def _import_realtime_data(self, task_config: ImportTaskConfig, result: TaskExecutionResult):
         """导入实时行情数据"""
@@ -782,7 +1003,7 @@ def main():
 
     # 启动任务
     success = engine.start_task("test_task_001")
-    print(f"任务启动: {'成功' if success else '失败'}")
+    logger.info(f"任务启动: {'成功' if success else '失败'}")
 
     # 运行应用
     try:

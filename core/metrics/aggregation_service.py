@@ -1,5 +1,4 @@
 # core/metrics/aggregation_service.py
-import logging
 import time
 import threading
 from typing import Dict, Any, List, Optional, Callable
@@ -10,8 +9,9 @@ import json
 from ..events import EventBus
 from .events import SystemResourceUpdated, ApplicationMetricRecorded
 from .repository import MetricsRepository
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class MetricsAggregationService:
@@ -32,13 +32,16 @@ class MetricsAggregationService:
         self.event_bus = event_bus
         self.repository = repository
         self.aggregation_interval = 60  # 聚合间隔（秒）
-        self.alert_thresholds = {
-            "cpu": 80.0,  # CPU使用率阈值
-            "memory": 80.0,  # 内存使用率阈值
-            "disk": 90.0,  # 磁盘使用率阈值
-            "operation_time": 5.0,  # 操作响应时间阈值（秒）
-            "error_rate": 0.1  # 错误率阈值
-        }
+
+        # 移除硬编码的告警阈值，改为使用专业的告警规则引擎
+        # 告警判断现在由 AlertRuleEngine 统一处理
+        # self.alert_thresholds = {
+        #     "cpu": 80.0,  # CPU使用率阈值
+        #     "memory": 80.0,  # 内存使用率阈值
+        #     "disk": 90.0,  # 磁盘使用率阈值
+        #     "operation_time": 5.0,  # 操作响应时间阈值（秒）
+        #     "error_rate": 0.1  # 错误率阈值
+        # }
 
         # 资源指标缓存
         self.resource_metrics = {
@@ -280,150 +283,46 @@ class MetricsAggregationService:
         """
         检查资源指标是否超过阈值
 
+        注意：此方法已被重构，不再进行硬编码的阈值检查。
+        告警判断现在由专业的 AlertRuleEngine 统一处理，支持：
+        - 数据库配置的告警规则
+        - 动态阈值调整
+        - 规则优先级管理
+        - 告警去重和静默期
+
         Args:
             event: 系统资源更新事件
         """
-        alerts = []
+        # 移除硬编码的告警阈值检查逻辑
+        # 告警判断现在由 AlertRuleEngine 统一处理
+        # 这样可以避免重复告警，并支持更灵活的规则配置
 
-        if event.cpu_percent > self.alert_thresholds["cpu"]:
-            alerts.append(
-                f"CPU使用率 ({event.cpu_percent:.1f}%) 超过阈值 ({self.alert_thresholds['cpu']}%)")
+        logger.debug(f"资源指标更新: CPU={event.cpu_percent:.1f}%, "
+                     f"内存={event.memory_percent:.1f}%, "
+                     f"磁盘={event.disk_percent:.1f}%")
 
-        if event.memory_percent > self.alert_thresholds["memory"]:
-            alerts.append(
-                f"内存使用率 ({event.memory_percent:.1f}%) 超过阈值 ({self.alert_thresholds['memory']}%)")
-
-        if event.disk_percent > self.alert_thresholds["disk"]:
-            alerts.append(
-                f"磁盘使用率 ({event.disk_percent:.1f}%) 超过阈值 ({self.alert_thresholds['disk']}%)")
-
-        if alerts and self.event_bus:
-            try:
-                # 🔧 修复：使用正确的ResourceAlert事件对象
-                from core.events import ResourceAlert, AlertLevel
-
-                for alert_message in alerts:
-                    # 解析告警信息
-                    if "CPU使用率" in alert_message:
-                        metric_name = "cpu_usage"
-                        current_value = event.cpu_percent
-                        threshold = self.alert_thresholds['cpu']
-                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.ERROR
-                    elif "内存使用率" in alert_message:
-                        metric_name = "memory_usage"
-                        current_value = event.memory_percent
-                        threshold = self.alert_thresholds['memory']
-                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.ERROR
-                    elif "磁盘使用率" in alert_message:
-                        metric_name = "disk_usage"
-                        current_value = event.disk_percent
-                        threshold = self.alert_thresholds['disk']
-                        level = AlertLevel.WARNING if current_value < threshold * 1.2 else AlertLevel.CRITICAL
-                    else:
-                        metric_name = "unknown"
-                        current_value = 0.0
-                        threshold = 0.0
-                        level = AlertLevel.WARNING
-
-                    # 创建ResourceAlert事件
-                    resource_alert = ResourceAlert(
-                        level=level,
-                        category="系统资源",
-                        message=alert_message,
-                        metric_name=metric_name,
-                        current_value=current_value,
-                        threshold=threshold,
-                        unit="%"
-                    )
-
-                    # 发布事件
-                    self.event_bus.publish(resource_alert)
-                    logger.info(f"✅ 发布资源告警事件: {alert_message}")
-
-            except Exception as e:
-                logger.error(f"发布资源告警事件失败: {e}")
-                import traceback
-                logger.error(f"详细错误信息: {traceback.format_exc()}")
+        # 如果需要告警，请通过 AlertRuleEngine 配置相应的告警规则
+        # 告警规则可以通过 GUI 界面或数据库直接配置
 
     def _check_app_thresholds(self, event: ApplicationMetricRecorded) -> None:
         """
         检查应用指标是否超过阈值
 
+        注意：此方法已被重构，不再进行硬编码的阈值检查。
+        应用指标告警判断现在由专业的 AlertRuleEngine 统一处理。
+
         Args:
             event: 应用指标记录事件
         """
-        alerts = []
+        # 移除硬编码的应用指标告警阈值检查逻辑
+        # 应用指标告警判断现在由 AlertRuleEngine 统一处理
 
-        if event.duration > self.alert_thresholds["operation_time"]:
-            alerts.append(
-                f"操作 '{event.operation_name}' 响应时间 ({event.duration:.2f}秒) 超过阈值 ({self.alert_thresholds['operation_time']}秒)")
+        logger.debug(f"应用指标记录: 操作={event.operation_name}, "
+                     f"持续时间={event.duration:.2f}秒, "
+                     f"成功={event.was_successful}")
 
-        if not event.was_successful:
-            # 计算错误率
-            with self._lock:
-                if event.operation_name in self.app_metrics and self.app_metrics[event.operation_name]:
-                    metrics = self.app_metrics[event.operation_name]
-                    error_count = sum(
-                        1 for m in metrics if not m.get("success", True))
-                    error_rate = error_count / len(metrics)
-
-                    if error_rate > self.alert_thresholds["error_rate"]:
-                        alerts.append(
-                            f"操作 '{event.operation_name}' 错误率 ({error_rate:.1%}) 超过阈值 ({self.alert_thresholds['error_rate']:.1%})")
-
-        if alerts and self.event_bus:
-            try:
-                # 🔧 修复：使用正确的ApplicationAlert事件对象
-                from core.events import ApplicationAlert, AlertLevel
-
-                for alert_message in alerts:
-                    # 解析告警信息
-                    if "响应时间" in alert_message:
-                        metric_name = "response_time"
-                        current_value = event.duration
-                        threshold = self.alert_thresholds['operation_time']
-                        unit = "秒"
-                        level = AlertLevel.WARNING if current_value < threshold * 2 else AlertLevel.ERROR
-                    elif "错误率" in alert_message:
-                        metric_name = "error_rate"
-                        # 计算当前错误率
-                        with self._lock:
-                            if event.operation_name in self.app_metrics and self.app_metrics[event.operation_name]:
-                                metrics = self.app_metrics[event.operation_name]
-                                error_count = sum(1 for m in metrics if not m.get("success", True))
-                                current_value = error_count / len(metrics) * 100  # 转换为百分比
-                            else:
-                                current_value = 100.0  # 如果没有历史数据，假设100%错误率
-                        threshold = self.alert_thresholds['error_rate'] * 100  # 转换为百分比
-                        unit = "%"
-                        level = AlertLevel.ERROR if current_value > threshold * 2 else AlertLevel.WARNING
-                    else:
-                        metric_name = "unknown"
-                        current_value = 0.0
-                        threshold = 0.0
-                        unit = ""
-                        level = AlertLevel.WARNING
-
-                    # 创建ApplicationAlert事件
-                    app_alert = ApplicationAlert(
-                        level=level,
-                        category="应用性能",
-                        message=alert_message,
-                        operation_name=event.operation_name,
-                        metric_name=metric_name,
-                        current_value=current_value,
-                        threshold=threshold,
-                        unit=unit
-                    )
-
-                    # 发布事件
-                    self.event_bus.publish(app_alert)
-                    logger.info(f"✅ 发布应用告警事件: {alert_message}")
-
-            except Exception as e:
-                logger.error(f"发布应用告警事件失败: {e}")
-                import traceback
-                logger.error(f"详细错误信息: {traceback.format_exc()}")
+        # 如果需要告警，请通过 AlertRuleEngine 配置相应的告警规则
+        # 告警规则可以通过 GUI 界面或数据库直接配置
 
     def set_aggregation_interval(self, interval: int) -> None:
         """
@@ -438,6 +337,9 @@ class MetricsAggregationService:
         """
         设置告警阈值
 
+        注意：此方法已被废弃，告警阈值现在通过 AlertRuleEngine 管理。
+        请使用 AlertRuleEngine 的配置接口来设置告警规则。
+
         Args:
             metric_name: 指标名称
             value: 阈值
@@ -445,20 +347,21 @@ class MetricsAggregationService:
         Returns:
             是否设置成功
         """
-        if metric_name not in self.alert_thresholds:
-            return False
-
-        self.alert_thresholds[metric_name] = value
-        return True
+        logger.warning(f"set_alert_threshold 方法已废弃，请使用 AlertRuleEngine 配置告警规则")
+        return False
 
     def get_alert_thresholds(self) -> Dict[str, float]:
         """
         获取告警阈值
 
+        注意：此方法已被废弃，告警阈值现在通过 AlertRuleEngine 管理。
+        请使用 AlertRuleEngine 的配置接口来获取告警规则。
+
         Returns:
             告警阈值字典
         """
-        return self.alert_thresholds.copy()
+        logger.warning(f"get_alert_thresholds 方法已废弃，请使用 AlertRuleEngine 获取告警规则")
+        return {}
 
     def get_recent_metrics(self) -> Dict[str, Any]:
         """

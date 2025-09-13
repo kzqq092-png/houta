@@ -1,12 +1,11 @@
 import openai
 import requests
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIMarketNewsAnalyzer:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
 
     def fetch_url_content(self, url: str) -> str:
@@ -15,7 +14,7 @@ class AIMarketNewsAnalyzer:
             resp.encoding = resp.apparent_encoding
             return resp.text
         except Exception as e:
-            self.log_manager.error(f"抓取新闻内容失败: {e}")
+            logger.error(f"抓取新闻内容失败: {e}")
             return ""
 
     def analyze(self, user_input: str = "", url: str = "") -> dict:
@@ -33,5 +32,5 @@ class AIMarketNewsAnalyzer:
             )
             return {"result": resp['choices'][0]['message']['content']}
         except Exception as e:
-            self.log_manager.error(f"AI行情/新闻解读失败: {e}")
+            logger.error(f"AI行情/新闻解读失败: {e}")
             return {"error": str(e)}

@@ -9,6 +9,7 @@
 - 插件更新
 """
 
+from loguru import logger
 import os
 import json
 from typing import Dict, List, Optional, Any
@@ -27,10 +28,8 @@ from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
 
 from core.plugin_manager import PluginManager, PluginInfo, PluginStatus, PluginType, PluginCategory
 from core.plugin_types import PluginType, PluginCategory
-from core.logger import get_logger
 
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 class PluginStatusWidget(QWidget):
     """插件状态小部件"""
@@ -266,7 +265,6 @@ class PluginStatusWidget(QWidget):
         except Exception as e:
             logger.warning(f"更新按钮状态失败: {e}")
 
-
 class PluginConfigDialog(QDialog):
     """插件配置对话框"""
 
@@ -331,8 +329,8 @@ class PluginConfigDialog(QDialog):
     def load_config(self):
         """加载配置"""
         try:
-            print(f"🔧 [调试] 开始加载插件配置: {self.plugin_info.name}")
-            print(f"📝 [调试] 当前插件信息: path={getattr(self.plugin_info, 'path', 'N/A')}, config={self.plugin_info.config}")
+            print(f" [调试] 开始加载插件配置: {self.plugin_info.name}")
+            print(f" [调试] 当前插件信息: path={getattr(self.plugin_info, 'path', 'N/A')}, config={self.plugin_info.config}")
 
             # 先尝试检查是否为ConfigurablePlugin类型的情绪插件
             plugin_instance = self._get_plugin_instance()
@@ -341,14 +339,14 @@ class PluginConfigDialog(QDialog):
             self.plugin_instance = plugin_instance
 
             if plugin_instance and self._is_configurable_plugin(plugin_instance):
-                print(f"✅ [调试] 检测到ConfigurablePlugin类型插件")
+                print(f" [调试] 检测到ConfigurablePlugin类型插件")
                 self._load_configurable_plugin_config(plugin_instance)
             else:
-                print(f"📋 [调试] 使用传统配置加载方式")
+                print(f" [调试] 使用传统配置加载方式")
                 self._load_traditional_config()
 
         except Exception as e:
-            print(f"❌ [调试] 加载插件配置失败: {e}")
+            print(f" [调试] 加载插件配置失败: {e}")
             import traceback
             traceback.print_exc()
             logger.error(f"加载插件配置失败: {e}")
@@ -357,7 +355,7 @@ class PluginConfigDialog(QDialog):
     def _get_plugin_instance(self):
         """尝试获取插件实例 - 自适应各种插件类型"""
         try:
-            print(f"🔍 [调试] 尝试获取插件实例: {self.plugin_info.name}")
+            print(f" [调试] 尝试获取插件实例: {self.plugin_info.name}")
 
             # 已知插件映射（可以逐步扩展）
             known_plugins = {
@@ -385,25 +383,25 @@ class PluginConfigDialog(QDialog):
             }
 
             plugin_path = known_plugins.get(self.plugin_info.name)
-            print(f"📋 [调试] 插件路径映射: {plugin_path}")
+            print(f" [调试] 插件路径映射: {plugin_path}")
 
             # 尝试第一种方式：直接映射
             if plugin_path:
                 try:
                     module_path, class_name = plugin_path.rsplit('.', 1)
-                    print(f"📦 [调试] 模块路径: {module_path}, 类名: {class_name}")
+                    print(f" [调试] 模块路径: {module_path}, 类名: {class_name}")
 
                     module = __import__(module_path, fromlist=[class_name])
                     plugin_class = getattr(module, class_name)
                     instance = plugin_class()
-                    print(f"✅ [调试] 插件实例创建成功: {type(instance)}")
+                    print(f" [调试] 插件实例创建成功: {type(instance)}")
                     return instance
                 except Exception as e:
-                    print(f"⚠️ [调试] 直接映射创建失败: {e}")
+                    print(f" [调试] 直接映射创建失败: {e}")
 
             # 尝试第二种方式：智能推断（自适应各种插件类型）
             plugin_name = self.plugin_info.name
-            print(f"🧠 [调试] 尝试智能推断插件: {plugin_name}")
+            print(f" [调试] 尝试智能推断插件: {plugin_name}")
 
             # 智能推断不同类型的插件
             inference_strategies = [
@@ -436,7 +434,7 @@ class PluginConfigDialog(QDialog):
             for strategy in inference_strategies:
                 if strategy['condition'](plugin_name):
                     try:
-                        print(f"🎯 [调试] 使用推断策略: {strategy['module_prefix']}")
+                        print(f" [调试] 使用推断策略: {strategy['module_prefix']}")
 
                         # 提取实际插件名
                         if '.' in plugin_name:
@@ -449,7 +447,7 @@ class PluginConfigDialog(QDialog):
                         else:
                             actual_name = plugin_name
 
-                        print(f"🔍 [调试] 提取的插件名: {actual_name}")
+                        print(f" [调试] 提取的插件名: {actual_name}")
 
                         # 构造模块路径
                         if '.' in plugin_name and strategy['module_prefix'] == 'plugins':
@@ -500,8 +498,8 @@ class PluginConfigDialog(QDialog):
                         # 去重
                         possible_class_names = list(dict.fromkeys(possible_class_names))
 
-                        print(f"🔧 [调试] 推断的模块路径: {module_path}")
-                        print(f"🔧 [调试] 可能的类名: {possible_class_names}")
+                        print(f" [调试] 推断的模块路径: {module_path}")
+                        print(f" [调试] 可能的类名: {possible_class_names}")
 
                         # 尝试每个可能的类名
                         module = __import__(module_path, fromlist=possible_class_names)
@@ -509,22 +507,22 @@ class PluginConfigDialog(QDialog):
                             try:
                                 plugin_class = getattr(module, class_name)
                                 instance = plugin_class()
-                                print(f"✅ [调试] 智能推断创建成功: {type(instance)} (使用类名: {class_name})")
+                                print(f" [调试] 智能推断创建成功: {type(instance)} (使用类名: {class_name})")
                                 return instance
                             except AttributeError:
-                                print(f"⚠️ [调试] 类名 {class_name} 不存在，尝试下一个")
+                                print(f" [调试] 类名 {class_name} 不存在，尝试下一个")
                                 continue
 
-                        print(f"❌ [调试] 推断策略失败")
+                        print(f" [调试] 推断策略失败")
 
                     except Exception as e:
-                        print(f"⚠️ [调试] 推断策略失败: {e}")
+                        print(f" [调试] 推断策略失败: {e}")
                         continue  # 尝试下一个策略
 
             # 尝试第三种方式：使用plugin_info.path
             if hasattr(self.plugin_info, 'path') and self.plugin_info.path:
                 try:
-                    print(f"🛠️ [调试] 尝试使用plugin_info.path: {self.plugin_info.path}")
+                    print(f" [调试] 尝试使用plugin_info.path: {self.plugin_info.path}")
 
                     # 如果path是模块路径，尝试导入
                     if '.' in self.plugin_info.path:
@@ -547,26 +545,26 @@ class PluginConfigDialog(QDialog):
                             possible_class_names.append(clean_name.replace('_', '') + 'Plugin')
                             possible_class_names.append(clean_name.title().replace('_', '') + 'Plugin')
 
-                        print(f"🔧 [调试] 可能的类名: {possible_class_names}")
+                        print(f" [调试] 可能的类名: {possible_class_names}")
 
                         for class_name in possible_class_names:
                             try:
                                 module = __import__(module_path, fromlist=[class_name])
                                 plugin_class = getattr(module, class_name)
                                 instance = plugin_class()
-                                print(f"✅ [调试] 使用plugin_info.path创建成功: {type(instance)}")
+                                print(f" [调试] 使用plugin_info.path创建成功: {type(instance)}")
                                 return instance
                             except (ImportError, AttributeError) as e:
-                                print(f"⚠️ [调试] 尝试类名 {class_name} 失败: {e}")
+                                print(f" [调试] 尝试类名 {class_name} 失败: {e}")
                                 continue
 
                 except Exception as e:
-                    print(f"⚠️ [调试] 使用plugin_info.path失败: {e}")
+                    print(f" [调试] 使用plugin_info.path失败: {e}")
 
-            print(f"❌ [调试] 所有方式都失败，返回None")
+            print(f" [调试] 所有方式都失败，返回None")
             return None
         except Exception as e:
-            print(f"🚫 [调试] 获取插件实例失败: {e}")
+            print(f" [调试] 获取插件实例失败: {e}")
             traceback.print_exc()
             return None
 
@@ -581,19 +579,19 @@ class PluginConfigDialog(QDialog):
     def _load_configurable_plugin_config(self, plugin_instance):
         """加载ConfigurablePlugin类型的配置"""
         try:
-            print(f"📋 [调试] 获取配置模式...")
+            print(f" [调试] 获取配置模式...")
             config_schema = plugin_instance.get_config_schema()
-            print(f"✅ [调试] 配置模式获取成功，字段数量: {len(config_schema)}")
+            print(f" [调试] 配置模式获取成功，字段数量: {len(config_schema)}")
 
             # 加载当前配置值
             current_config = plugin_instance.load_config()
-            print(f"📝 [调试] 当前配置: {current_config}")
+            print(f" [调试] 当前配置: {current_config}")
 
             # 为了保持与原有布局的兼容性，使用行号布局
             row = 0
 
             for field in config_schema:
-                print(f"🔧 [调试] 创建控件: {field.name} ({field.field_type})")
+                print(f" [调试] 创建控件: {field.name} ({field.field_type})")
 
                 # 创建标签
                 label_text = field.display_name
@@ -613,23 +611,23 @@ class PluginConfigDialog(QDialog):
                         widget.setToolTip(field.description)
                         label.setToolTip(field.description)
 
-                    print(f"  ✅ [调试] 控件创建成功: {field.name}")
+                    print(f"   [调试] 控件创建成功: {field.name}")
                     row += 1
                 else:
-                    print(f"  ❌ [调试] 控件创建失败: {field.name}")
+                    print(f"   [调试] 控件创建失败: {field.name}")
 
             # 插件实例已在load_config中保存，这里不需要重复保存
-            print(f"✅ [调试] ConfigurablePlugin配置加载完成，总共创建了 {len(self.config_widgets)} 个控件")
+            print(f" [调试] ConfigurablePlugin配置加载完成，总共创建了 {len(self.config_widgets)} 个控件")
 
             # 强制刷新布局
             self.config_layout.update()
             if hasattr(self, 'config_group'):
                 self.config_group.update()
             self.update()
-            print(f"🔄 [调试] 强制刷新布局和界面")
+            print(f" [调试] 强制刷新布局和界面")
 
         except Exception as e:
-            print(f"❌ [调试] 加载ConfigurablePlugin配置失败: {e}")
+            print(f" [调试] 加载ConfigurablePlugin配置失败: {e}")
             traceback.print_exc()
             raise
 
@@ -683,17 +681,17 @@ class PluginConfigDialog(QDialog):
                 return widget
 
         except Exception as e:
-            print(f"❌ [调试] 创建控件失败: {e}")
+            print(f" [调试] 创建控件失败: {e}")
             return None
 
     def _load_traditional_config(self):
         """加载传统的字典配置"""
-        print(f"📋 [调试] 使用传统配置加载方式")
+        print(f" [调试] 使用传统配置加载方式")
         config = self.plugin_info.config
-        print(f"📝 [调试] 传统配置内容: {config}")
+        print(f" [调试] 传统配置内容: {config}")
 
         if not config:
-            print(f"⚠️ [调试] 传统配置为空，将显示空白配置区域")
+            print(f" [调试] 传统配置为空，将显示空白配置区域")
             # 添加一个提示标签
             hint_label = QLabel("此插件没有可配置的参数")
             hint_label.setStyleSheet("color: #666; font-style: italic; padding: 20px;")
@@ -707,7 +705,7 @@ class PluginConfigDialog(QDialog):
             if key.startswith('_'):  # 跳过私有配置
                 continue
 
-            print(f"🔧 [调试] 创建传统配置控件: {key} = {value}")
+            print(f" [调试] 创建传统配置控件: {key} = {value}")
 
             label = QLabel(f"{key}:")
             self.config_layout.addWidget(label, row, 0)
@@ -733,14 +731,14 @@ class PluginConfigDialog(QDialog):
             self.config_layout.addWidget(widget, row, 1)
             self.config_widgets[key] = widget
             row += 1
-            print(f"  ✅ [调试] 传统配置控件创建成功: {key}")
+            print(f"   [调试] 传统配置控件创建成功: {key}")
 
-        print(f"✅ [调试] 传统配置加载完成，总共创建了 {len(self.config_widgets)} 个控件")
+        print(f" [调试] 传统配置加载完成，总共创建了 {len(self.config_widgets)} 个控件")
 
     def save_config(self):
         """保存配置"""
         try:
-            print(f"💾 [调试] 开始保存插件配置: {self.plugin_info.name}")
+            print(f" [调试] 开始保存插件配置: {self.plugin_info.name}")
 
             new_config = {}
 
@@ -769,11 +767,11 @@ class PluginConfigDialog(QDialog):
                         else:
                             new_config[key] = text
 
-            print(f"📝 [调试] 收集到的配置: {new_config}")
+            print(f" [调试] 收集到的配置: {new_config}")
 
             # 如果是ConfigurablePlugin，使用其保存方法
             if hasattr(self, 'plugin_instance') and self.plugin_instance:
-                print(f"✅ [调试] 使用ConfigurablePlugin保存方法")
+                print(f" [调试] 使用ConfigurablePlugin保存方法")
                 try:
                     # 验证配置
                     is_valid, error_msg = self.plugin_instance.validate_config(new_config)
@@ -784,16 +782,16 @@ class PluginConfigDialog(QDialog):
                     # 保存配置
                     success = self.plugin_instance.save_config(new_config)
                     if success:
-                        print(f"✅ [调试] ConfigurablePlugin配置保存成功")
+                        print(f" [调试] ConfigurablePlugin配置保存成功")
                         QMessageBox.information(self, "成功", "插件配置已保存")
                         self.accept()
                     else:
                         QMessageBox.warning(self, "保存失败", "无法保存插件配置")
                 except Exception as e:
-                    print(f"❌ [调试] ConfigurablePlugin保存失败: {e}")
+                    print(f" [调试] ConfigurablePlugin保存失败: {e}")
                     raise
             else:
-                print(f"📋 [调试] 使用传统保存方法")
+                print(f" [调试] 使用传统保存方法")
                 # 传统保存方法
                 self.plugin_info.config.update(new_config)
 
@@ -806,7 +804,7 @@ class PluginConfigDialog(QDialog):
                 self.accept()
 
         except Exception as e:
-            print(f"❌ [调试] 保存插件配置失败: {e}")
+            print(f" [调试] 保存插件配置失败: {e}")
             traceback.print_exc()
             logger.error(f"保存插件配置失败: {e}")
             QMessageBox.critical(self, "错误", f"保存配置失败: {e}")
@@ -817,7 +815,6 @@ class PluginConfigDialog(QDialog):
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.load_config()
-
 
 class PluginManagerDialog(QDialog):
     """插件管理主界面对话框"""
@@ -892,7 +889,7 @@ class PluginManagerDialog(QDialog):
         except Exception as e:
             logger.error(f"安全加载插件失败: {e}")
             self.last_error = str(e)
-            self.add_log(f"❌ 加载插件列表失败: {e}")
+            self.add_log(f" 加载插件列表失败: {e}")
         finally:
             self.is_loading = False
 
@@ -1336,7 +1333,7 @@ class PluginManagerDialog(QDialog):
                 success = self.plugin_manager.enable_plugin(plugin_name)
                 if success:
                     self.plugin_enabled.emit(plugin_name)
-                    self.add_log(f"✅ 插件 '{plugin_name}' 已成功启用")
+                    self.add_log(f" 插件 '{plugin_name}' 已成功启用")
 
                     # 更新数据库状态
                     if self.db_service:
@@ -1349,7 +1346,7 @@ class PluginManagerDialog(QDialog):
                     # 延迟刷新整个列表
                     QTimer.singleShot(100, self.refresh_plugins)
                 else:
-                    self.add_log(f"❌ 插件 '{plugin_name}' 启用失败")
+                    self.add_log(f" 插件 '{plugin_name}' 启用失败")
                     QMessageBox.warning(self, "警告", f"插件 '{plugin_name}' 启用失败，请检查插件依赖和配置")
             else:
                 # 降级处理：如果没有enable_plugin方法，尝试load_plugin
@@ -1357,17 +1354,17 @@ class PluginManagerDialog(QDialog):
                     success = self.plugin_manager.load_plugin(plugin_name)
                     if success:
                         self.plugin_enabled.emit(plugin_name)
-                        self.add_log(f"✅ 插件 '{plugin_name}' 已加载")
+                        self.add_log(f" 插件 '{plugin_name}' 已加载")
                         self.refresh_plugins()
                     else:
-                        self.add_log(f"❌ 插件 '{plugin_name}' 加载失败")
+                        self.add_log(f" 插件 '{plugin_name}' 加载失败")
                 else:
-                    self.add_log(f"⚠️ 插件管理器不支持启用功能")
+                    self.add_log(f" 插件管理器不支持启用功能")
                     QMessageBox.information(self, "提示", "插件管理器不支持启用功能")
 
         except Exception as e:
             logger.error(f"启用插件失败: {e}")
-            self.add_log(f"❌ 启用插件 '{plugin_name}' 时发生错误: {str(e)}")
+            self.add_log(f" 启用插件 '{plugin_name}' 时发生错误: {str(e)}")
             QMessageBox.critical(self, "错误", f"启用插件失败: {e}")
 
     def disable_plugin(self, plugin_name: str):
@@ -1378,7 +1375,7 @@ class PluginManagerDialog(QDialog):
                 success = self.plugin_manager.disable_plugin(plugin_name)
                 if success:
                     self.plugin_disabled.emit(plugin_name)
-                    self.add_log(f"✅ 插件 '{plugin_name}' 已成功禁用")
+                    self.add_log(f" 插件 '{plugin_name}' 已成功禁用")
 
                     # 更新数据库状态
                     if self.db_service:
@@ -1391,7 +1388,7 @@ class PluginManagerDialog(QDialog):
                     # 延迟刷新整个列表
                     QTimer.singleShot(100, self.refresh_plugins)
                 else:
-                    self.add_log(f"❌ 插件 '{plugin_name}' 禁用失败")
+                    self.add_log(f" 插件 '{plugin_name}' 禁用失败")
                     QMessageBox.warning(self, "警告", f"插件 '{plugin_name}' 禁用失败")
             else:
                 # 降级处理：如果没有disable_plugin方法，尝试unload_plugin
@@ -1399,17 +1396,17 @@ class PluginManagerDialog(QDialog):
                     success = self.plugin_manager.unload_plugin(plugin_name)
                     if success:
                         self.plugin_disabled.emit(plugin_name)
-                        self.add_log(f"✅ 插件 '{plugin_name}' 已卸载")
+                        self.add_log(f" 插件 '{plugin_name}' 已卸载")
                         self.refresh_plugins()
                     else:
-                        self.add_log(f"❌ 插件 '{plugin_name}' 卸载失败")
+                        self.add_log(f" 插件 '{plugin_name}' 卸载失败")
                 else:
-                    self.add_log(f"⚠️ 插件管理器不支持禁用功能")
+                    self.add_log(f" 插件管理器不支持禁用功能")
                     QMessageBox.information(self, "提示", "插件管理器不支持禁用功能")
 
         except Exception as e:
             logger.error(f"禁用插件失败: {e}")
-            self.add_log(f"❌ 禁用插件 '{plugin_name}' 时发生错误: {str(e)}")
+            self.add_log(f" 禁用插件 '{plugin_name}' 时发生错误: {str(e)}")
             QMessageBox.critical(self, "错误", f"禁用插件失败: {e}")
 
     def configure_plugin(self, plugin_name: str):
@@ -1477,11 +1474,11 @@ class PluginManagerDialog(QDialog):
                     self._immediate_update_plugin_status(plugin_name, PluginStatus.ENABLED)
 
                     success_count += 1
-                    self.add_log(f"✅ 插件 '{plugin_name}' 已启用")
+                    self.add_log(f" 插件 '{plugin_name}' 已启用")
 
                 except Exception as e:
                     error_count += 1
-                    self.add_log(f"❌ 启用插件 '{plugin_name}' 失败: {e}")
+                    self.add_log(f" 启用插件 '{plugin_name}' 失败: {e}")
 
             progress.setValue(len(plugin_names))
             progress.close()
@@ -1491,13 +1488,13 @@ class PluginManagerDialog(QDialog):
 
             # 显示结果摘要
             if error_count == 0:
-                self.add_log(f"✅ 批量启用完成，成功启用 {success_count} 个插件")
+                self.add_log(f" 批量启用完成，成功启用 {success_count} 个插件")
             else:
-                self.add_log(f"⚠️ 批量启用完成，成功 {success_count} 个，失败 {error_count} 个")
+                self.add_log(f" 批量启用完成，成功 {success_count} 个，失败 {error_count} 个")
 
         except Exception as e:
             logger.error(f"批量启用插件失败: {e}")
-            self.add_log(f"❌ 批量启用操作失败: {e}")
+            self.add_log(f" 批量启用操作失败: {e}")
 
     def _batch_disable_plugins(self, plugin_names: list):
         """批量禁用插件 - 直接更新状态，无弹窗"""
@@ -1531,11 +1528,11 @@ class PluginManagerDialog(QDialog):
                     self._immediate_update_plugin_status(plugin_name, PluginStatus.DISABLED)
 
                     success_count += 1
-                    self.add_log(f"✅ 插件 '{plugin_name}' 已禁用")
+                    self.add_log(f" 插件 '{plugin_name}' 已禁用")
 
                 except Exception as e:
                     error_count += 1
-                    self.add_log(f"❌ 禁用插件 '{plugin_name}' 失败: {e}")
+                    self.add_log(f" 禁用插件 '{plugin_name}' 失败: {e}")
 
             progress.setValue(len(plugin_names))
             progress.close()
@@ -1545,13 +1542,13 @@ class PluginManagerDialog(QDialog):
 
             # 显示结果摘要
             if error_count == 0:
-                self.add_log(f"✅ 批量禁用完成，成功禁用 {success_count} 个插件")
+                self.add_log(f" 批量禁用完成，成功禁用 {success_count} 个插件")
             else:
-                self.add_log(f"⚠️ 批量禁用完成，成功 {success_count} 个，失败 {error_count} 个")
+                self.add_log(f" 批量禁用完成，成功 {success_count} 个，失败 {error_count} 个")
 
         except Exception as e:
             logger.error(f"批量禁用插件失败: {e}")
-            self.add_log(f"❌ 批量禁用操作失败: {e}")
+            self.add_log(f" 批量禁用操作失败: {e}")
 
     def open_plugin_market(self):
         """打开插件市场"""
@@ -1637,29 +1634,29 @@ class PluginManagerDialog(QDialog):
             response_times = self._get_plugin_response_times()
 
             # 更新详细性能信息
-            perf_info = f"""📊 插件性能监控报告
+            perf_info = f""" 插件性能监控报告
 {'='*40}
 
-📈 状态统计:
+ 状态统计:
 ├─ 总插件数: {total} 个
-├─ ✅ 已启用: {status_counts[PluginStatus.ENABLED]} 个
-├─ ⏸️  已禁用: {status_counts[PluginStatus.DISABLED]} 个
-├─ 📦 已加载: {status_counts[PluginStatus.LOADED]} 个
+├─  已启用: {status_counts[PluginStatus.ENABLED]} 个
+├─   已禁用: {status_counts[PluginStatus.DISABLED]} 个
+├─  已加载: {status_counts[PluginStatus.LOADED]} 个
 ├─ ⭕ 未加载: {status_counts[PluginStatus.UNLOADED]} 个
-└─ ❌ 错误: {status_counts[PluginStatus.ERROR]} 个
+└─  错误: {status_counts[PluginStatus.ERROR]} 个
 
-💾 内存使用:
+ 内存使用:
 ├─ 插件总内存: {memory_info['plugin_memory']:.2f} MB
 ├─ 平均每插件: {memory_info['avg_per_plugin']:.2f} MB
 └─ 系统可用: {memory_info['available']:.2f} MB
 
-⚡ 性能指标:
+ 性能指标:
 ├─ 平均响应时间: {response_times['average']:.2f} ms
 ├─ 最快响应: {response_times['min']:.2f} ms
 ├─ 最慢响应: {response_times['max']:.2f} ms
 └─ 插件管理器版本: HIkyuu v2.0
 
-🔄 最后更新: {self._get_current_time()}
+ 最后更新: {self._get_current_time()}
 """
             self.perf_text.setText(perf_info.strip())
 
@@ -1731,7 +1728,7 @@ class PluginManagerDialog(QDialog):
     def _show_basic_monitor_info(self):
         """显示基本监控信息（降级处理）"""
         total = len(self.plugin_widgets)
-        basic_info = f"""📊 插件基本信息
+        basic_info = f""" 插件基本信息
 
 总插件数: {total} 个
 监控数据获取中...
@@ -1748,7 +1745,7 @@ class PluginManagerDialog(QDialog):
             if plugin_name in self.plugin_widgets:
                 widget = self.plugin_widgets[plugin_name]
                 widget._update_status_display(new_status)
-                self.add_log(f"🔄 UI已更新插件 '{plugin_name}' 状态为: {self._get_status_text(new_status)}", "DEBUG")
+                self.add_log(f" UI已更新插件 '{plugin_name}' 状态为: {self._get_status_text(new_status)}", "DEBUG")
 
             # 立即更新监控统计
             self.update_monitor_stats()
@@ -1758,7 +1755,7 @@ class PluginManagerDialog(QDialog):
 
         except Exception as e:
             logger.error(f"立即更新插件状态失败: {e}")
-            self.add_log(f"❌ 更新插件状态显示失败: {e}", "ERROR")
+            self.add_log(f" 更新插件状态显示失败: {e}", "ERROR")
 
     def _get_status_text(self, status: PluginStatus) -> str:
         """获取状态文本 - 确保一致性"""
@@ -1820,7 +1817,7 @@ class PluginManagerDialog(QDialog):
     def _on_database_status_changed(self, plugin_name: str, old_status: str, new_status: str):
         """数据库状态变更处理"""
         try:
-            self.add_log(f"📊 数据库状态变更: {plugin_name} {old_status} -> {new_status}", "DEBUG")
+            self.add_log(f" 数据库状态变更: {plugin_name} {old_status} -> {new_status}", "DEBUG")
 
             # 强制刷新插件列表
             QTimer.singleShot(50, self.refresh_plugins)
@@ -1831,7 +1828,7 @@ class PluginManagerDialog(QDialog):
     def _on_database_updated(self):
         """数据库更新处理"""
         try:
-            self.add_log("📊 插件数据库已更新", "DEBUG")
+            self.add_log(" 插件数据库已更新", "DEBUG")
 
             # 刷新监控统计
             self.update_monitor_stats()
@@ -1843,7 +1840,6 @@ class PluginManagerDialog(QDialog):
         """关闭事件"""
         self.timer.stop()
         event.accept()
-
 
 # 测试代码
 if __name__ == "__main__":

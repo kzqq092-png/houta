@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 HIkyuu系统优化器服务
@@ -23,14 +24,12 @@ from core.services.base_service import AsyncBaseService
 from core.performance import PerformanceMonitor, get_performance_monitor
 from core.config import ConfigManager
 from core.events import EventBus
-from core.logger import get_logger
 
 # 工具模块导入
 from utils.cache import Cache
 from utils.manager_factory import get_config_manager
 
-
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 
 class OptimizationLevel(Enum):
@@ -1009,8 +1008,8 @@ def set_system_optimizer_service(service: SystemOptimizerService) -> None:
 
 async def main():
     """主函数"""
-    print("FactorWeave-Quant 系统优化器服务")
-    print("====================")
+    logger.info("FactorWeave-Quant 系统优化器服务")
+    logger.info("====================")
 
     # 创建并初始化优化器服务
     optimizer_service = SystemOptimizerService()
@@ -1020,34 +1019,33 @@ async def main():
 
         # 设置进度回调
         def progress_callback(message: str, progress: float):
-            print(f"进度: {progress:.1%} - {message}")
+            logger.info(f"进度: {progress:.1%} - {message}")
 
         def status_callback(status: str):
-            print(f"状态: {status}")
+            logger.info(f"状态: {status}")
 
         optimizer_service.set_progress_callback(progress_callback)
         optimizer_service.set_status_callback(status_callback)
 
         # 获取优化建议
         suggestions = await optimizer_service.get_optimization_suggestions()
-        print("\n优化建议:")
+        logger.info("\n优化建议:")
         for suggestion in suggestions:
-            print(f"- {suggestion}")
+            logger.info(f"- {suggestion}")
 
         # 运行完整优化
         result = await optimizer_service.run_full_optimization()
 
         # 生成报告
         report = await optimizer_service.generate_report()
-        print("\n优化报告:")
-        print(report)
+        logger.info("\n优化报告:")
+        logger.info(report)
 
     except Exception as e:
-        print(f"优化失败: {e}")
+        logger.info(f"优化失败: {e}")
 
     finally:
         await optimizer_service.dispose_async()
-
 
 if __name__ == "__main__":
     asyncio.run(main())

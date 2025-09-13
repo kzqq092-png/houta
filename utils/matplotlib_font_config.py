@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -65,12 +66,12 @@ class MatplotlibFontConfig:
             bool: 配置是否成功
         """
         if not MATPLOTLIB_AVAILABLE:
-            print("⚠️ matplotlib不可用，跳过字体配置")
+            logger.info(" matplotlib不可用，跳过字体配置")
             return False
 
         # 检查是否已经配置过
         if not force_config and cls._is_chinese_font_configured():
-            print("SUCCESS: matplotlib中文字体已配置")
+            logger.info("SUCCESS: matplotlib中文字体已配置")
             return True
 
         try:
@@ -84,14 +85,14 @@ class MatplotlibFontConfig:
 
             # 验证配置
             if cls._test_chinese_display():
-                print(f"SUCCESS: matplotlib中文字体配置成功，使用字体: {fonts[0]}")
+                logger.info(f"SUCCESS: matplotlib中文字体配置成功，使用字体: {fonts[0]}")
                 return True
             else:
-                print("⚠️ matplotlib中文字体配置可能有问题")
+                logger.info(" matplotlib中文字体配置可能有问题")
                 return False
 
         except Exception as e:
-            print(f"ERROR: matplotlib字体配置失败: {e}")
+            logger.info(f"ERROR: matplotlib字体配置失败: {e}")
             return False
 
     @classmethod
@@ -125,7 +126,7 @@ class MatplotlibFontConfig:
             plt.close(fig)  # 立即关闭图表
             return True
         except Exception as e:
-            print(f"中文字体测试失败: {e}")
+            logger.info(f"中文字体测试失败: {e}")
             return False
 
     @classmethod
@@ -144,7 +145,7 @@ class MatplotlibFontConfig:
                     chinese_fonts.append(font)
             return chinese_fonts
         except Exception as e:
-            print(f"获取字体列表失败: {e}")
+            logger.info(f"获取字体列表失败: {e}")
             return []
 
     @classmethod
@@ -155,9 +156,9 @@ class MatplotlibFontConfig:
 
         try:
             mpl.rcdefaults()
-            print("SUCCESS: matplotlib字体配置已重置为默认值")
+            logger.info("SUCCESS: matplotlib字体配置已重置为默认值")
         except Exception as e:
-            print(f"ERROR: 重置字体配置失败: {e}")
+            logger.info(f"ERROR: 重置字体配置失败: {e}")
 
 
 def configure_matplotlib_chinese_font(font_size: int = 10, force_config: bool = False) -> bool:
@@ -181,23 +182,23 @@ if __name__ != "__main__":
 
 if __name__ == "__main__":
     # 测试脚本
-    print("=== matplotlib字体配置测试 ===")
+    logger.info("=== matplotlib字体配置测试 ===")
 
-    print("\n1. 系统推荐字体:")
+    logger.info("\n1. 系统推荐字体:")
     fonts = MatplotlibFontConfig.get_system_fonts()
     for i, font in enumerate(fonts[:5]):  # 显示前5个
-        print(f"   {i+1}. {font}")
+        logger.info(f"   {i+1}. {font}")
 
-    print("\n2. 配置中文字体:")
+    logger.info("\n2. 配置中文字体:")
     success = MatplotlibFontConfig.configure_chinese_font(force_config=True)
-    print(f"   配置结果: {'成功' if success else '失败'}")
+    logger.info(f"   配置结果: {'成功' if success else '失败'}")
 
-    print("\n3. 系统可用中文字体:")
+    logger.info("\n3. 系统可用中文字体:")
     available_fonts = MatplotlibFontConfig.get_available_fonts()
     if available_fonts:
         for i, font in enumerate(available_fonts[:10]):  # 显示前10个
-            print(f"   {i+1}. {font}")
+            logger.info(f"   {i+1}. {font}")
     else:
-        print("   未找到中文字体")
+        logger.info("   未找到中文字体")
 
-    print("\n=== 测试完成 ===")
+    logger.info("\n=== 测试完成 ===")

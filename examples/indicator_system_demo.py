@@ -17,7 +17,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
-
+from loguru import logger
 # 添加项目根目录到Python路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -38,9 +38,9 @@ def load_sample_data():
             df.set_index('date', inplace=True)
             return df
         else:
-            print(f"测试数据文件 {test_data_path} 不存在，将创建随机数据")
+            logger.warning(f"测试数据文件 {test_data_path} 不存在，将创建随机数据")
     except Exception as e:
-        print(f"加载测试数据时发生错误: {str(e)}，将创建随机数据")
+        logger.error(f"加载测试数据时发生错误: {str(e)}，将创建随机数据")
 
     # 创建随机数据
     np.random.seed(42)
@@ -121,30 +121,30 @@ def plot_indicators(df):
 
 def main():
     """主函数"""
-    print("指标系统演示")
-    print("=" * 50)
+    logger.info("指标系统演示")
+    logger.info("=" * 50)
 
     # 加载数据
     df = load_sample_data()
-    print(f"加载了 {len(df)} 条数据")
-    print(df.head())
-    print("-" * 50)
+    logger.info(f"加载了 {len(df)} 条数据")
+    logger.info(df.head())
+    logger.info("-" * 50)
 
     # 获取所有指标元数据
     indicators_meta = get_all_indicators_metadata()
-    print(f"系统中共有 {len(indicators_meta)} 个指标")
+    logger.info(f"系统中共有 {len(indicators_meta)} 个指标")
     for name, meta in indicators_meta.items():
-        print(f"- {name}: {meta['display_name']}")
-    print("-" * 50)
+        logger.info(f"- {name}: {meta['display_name']}")
+    logger.info("-" * 50)
 
     # 计算MA指标
-    print("计算MA指标...")
+    logger.info("计算MA指标...")
     df_ma = calculate_indicator('MA', df, {'timeperiod': 20})
-    print(df_ma[['close', 'MA']].head())
-    print("-" * 50)
+    logger.info(df_ma[['close', 'MA']].head())
+    logger.info("-" * 50)
 
     # 计算MACD指标
-    print("计算MACD指标...")
+    logger.info("计算MACD指标...")
     df_macd = calculate_indicator('MACD', df_ma, {
         'fastperiod': 12,
         'slowperiod': 26,
@@ -154,25 +154,25 @@ def main():
     # 检查MACD列是否存在
     macd_columns = ['MACD', 'MACDSignal', 'MACDHist']
     if all(col in df_macd.columns for col in macd_columns):
-        print(df_macd[['close', 'MA'] + macd_columns].head())
+        logger.info(df_macd[['close', 'MA'] + macd_columns].head())
     else:
-        print("MACD指标计算失败")
-        print(df_macd.columns)
-    print("-" * 50)
+        logger.error("MACD指标计算失败")
+        logger.error(df_macd.columns)
+    logger.info("-" * 50)
 
     # 计算RSI指标
-    print("计算RSI指标...")
+    logger.info("计算RSI指标...")
     df_rsi = calculate_indicator('RSI', df_macd, {'timeperiod': 14})
 
     # 检查RSI列是否存在
     if 'RSI' in df_rsi.columns:
-        print(df_rsi[['close', 'MA', 'RSI']].head())
+        logger.info(df_rsi[['close', 'MA', 'RSI']].head())
     else:
-        print("RSI指标计算失败")
-    print("-" * 50)
+        logger.error("RSI指标计算失败")
+    logger.info("-" * 50)
 
     # 计算布林带指标
-    print("计算布林带指标...")
+    logger.info("计算布林带指标...")
     df_bbands = calculate_indicator('BBANDS', df_rsi, {
         'timeperiod': 20,
         'nbdevup': 2.0,
@@ -182,13 +182,13 @@ def main():
     # 检查布林带列是否存在
     bbands_columns = ['BBUpper', 'BBMiddle', 'BBLower']
     if all(col in df_bbands.columns for col in bbands_columns):
-        print(df_bbands[['close'] + bbands_columns].head())
+        logger.info(df_bbands[['close'] + bbands_columns].head())
     else:
-        print("布林带指标计算失败")
-    print("-" * 50)
+        logger.error("布林带指标计算失败")
+    logger.info("-" * 50)
 
     # 计算KDJ指标
-    print("计算KDJ指标...")
+    logger.info("计算KDJ指标...")
     df_kdj = calculate_indicator('KDJ', df_bbands, {
         'fastk_period': 9,
         'slowk_period': 3,
@@ -198,14 +198,14 @@ def main():
     # 检查KDJ列是否存在
     kdj_columns = ['K', 'D', 'J']
     if all(col in df_kdj.columns for col in kdj_columns):
-        print(df_kdj[['close'] + kdj_columns].head())
+        logger.info(df_kdj[['close'] + kdj_columns].head())
     else:
-        print("KDJ指标计算失败")
-        print("可用的列:", df_kdj.columns)
-    print("-" * 50)
+        logger.error("KDJ指标计算失败")
+        logger.error("可用的列:", df_kdj.columns)
+    logger.info("-" * 50)
 
     # 绘制指标图表
-    print("绘制指标图表...")
+    logger.info("绘制指标图表...")
     plot_indicators(df_kdj)
 
 

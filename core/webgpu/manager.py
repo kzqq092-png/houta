@@ -1,3 +1,4 @@
+from loguru import logger
 """
 WebGPU管理器模块
 
@@ -8,7 +9,6 @@ WebGPU管理器模块
 - 降级处理
 """
 
-import logging
 import threading
 from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass
@@ -17,7 +17,7 @@ from .environment import WebGPUEnvironment, get_webgpu_environment, GPUSupportLe
 from .compatibility import GPUCompatibilityChecker, CompatibilityReport, CompatibilityLevel
 from .fallback import FallbackRenderer, RenderBackend
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

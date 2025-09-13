@@ -1,3 +1,4 @@
+from loguru import logger
 """
 策略生命周期管理器 - 完整的策略生命周期管理
 
@@ -14,7 +15,7 @@ from typing import Dict, List, Any, Optional, Callable
 import pandas as pd
 import json
 
-from core.adapters import get_logger
+# Loguru导入已移除
 
 from .base_strategy import BaseStrategy
 from .strategy_registry import StrategyRegistry
@@ -22,7 +23,6 @@ from .strategy_factory import StrategyFactory
 from .strategy_engine import StrategyEngine
 from .parameter_manager import StrategyParameterManager, ParameterRange
 from core.performance import UnifiedPerformanceMonitor as StrategyPerformanceEvaluator, PerformanceStats as StrategyMetrics
-
 
 class LifecycleStage(Enum):
     """生命周期阶段"""
@@ -37,7 +37,6 @@ class LifecycleStage(Enum):
     ARCHIVED = "archived"                  # 已归档
     TERMINATED = "terminated"              # 已终止
 
-
 @dataclass
 class StrategyLifecycleEvent:
     """策略生命周期事件"""
@@ -48,7 +47,6 @@ class StrategyLifecycleEvent:
     details: Dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error_message: Optional[str] = None
-
 
 @dataclass
 class StrategyInstance:
@@ -84,13 +82,12 @@ class StrategyInstance:
         if success:
             self.current_stage = stage
 
-
 class StrategyLifecycleManager:
     """策略生命周期管理器 - 完整的策略生命周期管理"""
 
     def __init__(self):
         """初始化生命周期管理器"""
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 策略实例管理
         self._strategy_instances: Dict[str, StrategyInstance] = {}
@@ -259,11 +256,9 @@ class StrategyLifecycleManager:
         except:
             pass
 
-
 # 全局生命周期管理器实例
 _lifecycle_manager: Optional[StrategyLifecycleManager] = None
 _manager_lock = threading.RLock()
-
 
 def get_lifecycle_manager() -> StrategyLifecycleManager:
     """获取全局生命周期管理器实例
@@ -278,7 +273,6 @@ def get_lifecycle_manager() -> StrategyLifecycleManager:
             _lifecycle_manager = StrategyLifecycleManager()
 
         return _lifecycle_manager
-
 
 def initialize_lifecycle_manager() -> StrategyLifecycleManager:
     """初始化生命周期管理器

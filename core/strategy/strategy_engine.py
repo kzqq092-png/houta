@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 策略执行引擎
@@ -15,7 +16,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config, get_performance_monitor
+from core.adapters import get_config, get_performance_monitor
 from .base_strategy import BaseStrategy, StrategySignal
 from .strategy_registry import get_strategy_registry
 from .strategy_database import get_strategy_database_manager
@@ -33,7 +34,7 @@ class StrategyCache:
             max_size: 最大缓存条目数
             ttl_seconds: 缓存过期时间（秒）
         """
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
 
@@ -140,7 +141,7 @@ class StrategyEngine:
             cache_size: 缓存大小
             cache_ttl: 缓存过期时间（秒）
         """
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
         self.performance_monitor = get_performance_monitor()
         self.registry = get_strategy_registry()

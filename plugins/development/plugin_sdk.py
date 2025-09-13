@@ -1,5 +1,6 @@
+from loguru import logger
 """
-FactorWeave-Quant ‌ 插件开发工具包(SDK)
+FactorWeave-Quant  插件开发工具包(SDK)
 
 提供插件开发的便利工具、模板生成器和测试框架。
 """
@@ -14,7 +15,6 @@ import subprocess
 import tempfile
 
 from ..plugin_interface import PluginType, PluginCategory, PluginMetadata
-
 
 class PluginTemplate:
     """插件模板"""
@@ -33,7 +33,6 @@ from ..plugin_interface import (
     I{plugin_type}Plugin, PluginMetadata, PluginType, PluginCategory,
     plugin_metadata, register_plugin, PluginContext
 )
-
 
 @plugin_metadata(
     name="{name}",
@@ -82,18 +81,18 @@ class {class_name}(I{plugin_type}Plugin):
             if config:
                 self._config.update(config)
             
-            context.log_manager.info(f"{self.metadata.name}插件初始化成功")
+            context.logger.info(f"{self.metadata.name}插件初始化成功")
             return True
             
         except Exception as e:
             if context:
-                context.log_manager.error(f"{self.metadata.name}插件初始化失败: {{e}}")
+                context.logger.error(f"{self.metadata.name}插件初始化失败: {{e}}")
             return False
     
     def cleanup(self) -> None:
         """清理插件资源"""
         if self._context:
-            self._context.log_manager.info(f"{self.metadata.name}插件清理完成")
+            self._context.logger.info(f"{self.metadata.name}插件清理完成")
     
     {specific_methods}
 '''
@@ -129,7 +128,7 @@ class {class_name}(I{plugin_type}Plugin):
 ## 安装方法
 
 1. 下载插件文件
-2. 在FactorWeave-Quant ‌中打开插件管理器
+2. 在FactorWeave-Quant 中打开插件管理器
 3. 点击"安装本地插件"
 4. 选择插件文件进行安装
 
@@ -354,7 +353,6 @@ class {class_name}(I{plugin_type}Plugin):
         pass
 '''
     }
-
 
 class PluginSDK:
     """插件开发工具包"""
@@ -757,7 +755,6 @@ from unittest.mock import Mock
 
 from {template_vars['main_module']} import {template_vars['class_name']}
 
-
 class Test{template_vars['class_name']}(unittest.TestCase):
     """测试{template_vars['name']}插件"""
     
@@ -768,7 +765,7 @@ class Test{template_vars['class_name']}(unittest.TestCase):
         # 模拟插件上下文
         self.mock_context = Mock()
         self.mock_context.get_plugin_config.return_value = {{}}
-        self.mock_context.log_manager = Mock()
+        self.mock_context.# log_manager已迁移到Loguru
     
     def test_initialize(self):
         """测试插件初始化"""
@@ -790,7 +787,6 @@ class Test{template_vars['class_name']}(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         self.plugin.cleanup()
-
 
 if __name__ == '__main__':
     unittest.main()

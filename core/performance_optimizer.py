@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级性能优化器模块
 提供内存管理、缓存策略、并行处理等性能优化功能
@@ -17,10 +18,8 @@ import pandas as pd
 import numpy as np
 from collections import OrderedDict
 import weakref
-import logging
 from dataclasses import dataclass
 from enum import Enum
-from core.logger import LogManager, LogLevel
 from core.performance import measure_performance
 
 
@@ -49,8 +48,8 @@ class MemoryManager:
     监控和优化内存使用
     """
 
-    def __init__(self, log_manager: Optional[LogManager] = None):
-        self.log_manager = log_manager or LogManager()
+    def __init__(self):
+        # 纯Loguru架构，移除log_manager依赖
         self.memory_threshold = 0.8  # 内存使用阈值 80%
         self.cleanup_callbacks = []
         self._monitoring = False
@@ -78,13 +77,13 @@ class MemoryManager:
                 try:
                     callback()
                 except Exception as e:
-                    self.log_manager.log(
-                        f"内存清理回调执行失败: {str(e)}", LogLevel.WARNING)
+                    logger.warning(
+                        f"内存清理回调执行失败: {str(e)}")
 
             memory_after = self.monitor_memory()
             freed_memory = memory_before["used"] - memory_after["used"]
 
-            self.log_manager.log(
+            logger.info(
                 f"内存清理完成 - 回收对象: {collected}, 释放内存: {freed_memory:.2f}GB",
                 LogLevel.INFO
             )
@@ -92,7 +91,7 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            self.log_manager.log(f"内存清理失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"内存清理失败: {str(e)}")
             return False
 
     def register_cleanup_callback(self, callback: Callable):
@@ -103,7 +102,7 @@ class MemoryManager:
         """根据内存使用情况自动清理"""
         memory_info = self.monitor_memory()
         if memory_info["percentage"] > self.memory_threshold * 100:
-            self.log_manager.log(
+            logger.info(
                 f"内存使用率过高 ({memory_info['percentage']:.1f}%)，开始自动清理",
                 LogLevel.WARNING
             )
@@ -303,13 +302,12 @@ class ProfessionalPerformanceOptimizer:
     整合内存管理、缓存策略、并行处理等功能
     """
 
-    def __init__(self, optimization_level: OptimizationLevel = OptimizationLevel.PROFESSIONAL,
-                 log_manager: Optional[LogManager] = None):
+    def __init__(self, optimization_level: OptimizationLevel = OptimizationLevel.PROFESSIONAL):
         self.optimization_level = optimization_level
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 初始化组件
-        self.memory_manager = MemoryManager(log_manager)
+        self.memory_manager = MemoryManager()
         self.cache_manager = CacheManager()
         self.parallel_processor = ParallelProcessor()
 
@@ -430,8 +428,9 @@ class ProfessionalPerformanceOptimizer:
             "last_update": datetime.now().isoformat()
         }
 
-
 # 装饰器函数
+
+
 def performance_monitor(optimizer: ProfessionalPerformanceOptimizer):
     """性能监控装饰器"""
     def decorator(func):
@@ -443,10 +442,9 @@ def performance_monitor(optimizer: ProfessionalPerformanceOptimizer):
                 return result
             finally:
                 metrics = optimizer.stop_monitoring()
-                optimizer.log_manager.log(
+                logger.info(
                     f"函数 {func.__name__} 执行完成 - 耗时: {metrics.execution_time:.3f}s, "
-                    f"内存: {metrics.memory_usage:.1f}%, CPU: {metrics.cpu_usage:.1f}%",
-                    LogLevel.INFO
+                    f"内存: {metrics.memory_usage:.1f}%, CPU: {metrics.cpu_usage:.1f}%"
                 )
         return wrapper
     return decorator
@@ -496,8 +494,9 @@ def optimize_dataframe_memory(func):
         return result
     return wrapper
 
-
 # 便捷函数
+
+
 def create_performance_optimizer(level: OptimizationLevel = OptimizationLevel.PROFESSIONAL) -> ProfessionalPerformanceOptimizer:
     """创建性能优化器实例"""
     return ProfessionalPerformanceOptimizer(optimization_level=level)

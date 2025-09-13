@@ -4,7 +4,7 @@
 提供策略的创建、导入、导出、回测、优化等功能。
 """
 
-import logging
+from loguru import logger
 import os
 import json
 from typing import Dict, Any, List, Optional
@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QPixmap
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class StrategyManagerDialog(QDialog):

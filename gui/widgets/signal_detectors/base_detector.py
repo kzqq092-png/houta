@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -94,7 +95,7 @@ class BaseSignalDetector(ISignalDetector):
             return signals
 
         except Exception as e:
-            print(f"信号检测器 {self.name} 错误: {e}")
+            logger.info(f"信号检测器 {self.name} 错误: {e}")
             return []
 
     @abstractmethod
@@ -154,7 +155,7 @@ class FundamentalSignalDetector(BaseSignalDetector):
                     signals.append(growth_signal)
 
         except Exception as e:
-            print(f"基本面信号检测错误: {e}")
+            logger.info(f"基本面信号检测错误: {e}")
 
         return signals
 
@@ -300,7 +301,7 @@ class VolumeSignalDetector(BaseSignalDetector):
                 signals.append(divergence_signal)
 
         except Exception as e:
-            print(f"成交量信号检测错误: {e}")
+            logger.info(f"成交量信号检测错误: {e}")
 
         return signals
 
@@ -393,7 +394,7 @@ class VolumeSignalDetector(BaseSignalDetector):
                 )
 
         except Exception as e:
-            print(f"价量背离检测错误: {e}")
+            logger.info(f"价量背离检测错误: {e}")
 
         return None
 
@@ -416,13 +417,13 @@ class SignalDetectorRegistry:
     def register_detector(self, name: str, detector: ISignalDetector):
         """注册检测器"""
         self.detectors[name] = detector
-        print(f"已注册信号检测器: {name}")
+        logger.info(f"已注册信号检测器: {name}")
 
     def unregister_detector(self, name: str):
         """注销检测器"""
         if name in self.detectors:
             del self.detectors[name]
-            print(f"已注销信号检测器: {name}")
+            logger.info(f"已注销信号检测器: {name}")
 
     def get_detector(self, name: str) -> Optional[ISignalDetector]:
         """获取检测器"""
@@ -441,7 +442,7 @@ class SignalDetectorRegistry:
                 signals = detector.detect_signals(data)
                 all_signals[name] = signals
             except Exception as e:
-                print(f"检测器 {name} 执行失败: {e}")
+                logger.info(f"检测器 {name} 执行失败: {e}")
                 all_signals[name] = []
 
         return all_signals

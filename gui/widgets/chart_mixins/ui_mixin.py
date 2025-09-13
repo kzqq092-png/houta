@@ -1,3 +1,4 @@
+from loguru import logger
 """
 图表控件UI功能Mixin
 
@@ -42,10 +43,7 @@ class UIMixin:
             self._optimize_display()  # 保证初始化后也显示网格和刻度
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"初始化UI失败: {str(e)}")
-            else:
-                print(f"UIMixin init_ui错误: {str(e)}")
+            logger.error(f"初始化UI失败: {str(e)}")
 
     def _init_figure_layout(self):
         """初始化图表布局"""
@@ -76,10 +74,7 @@ class UIMixin:
                 self.layout().addWidget(self.canvas)
             self._optimize_display()  # 保证布局初始化后也显示网格和刻度
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"初始化图表布局失败: {str(e)}")
-            else:
-                print(f"UIMixin _init_figure_layout错误: {str(e)}")
+            logger.error(f"初始化图表布局失败: {str(e)}")
 
     def _optimize_display(self):
         """优化显示效果，所有坐标轴字体统一为8号，始终显示网格和XY轴刻度（任何操作都不隐藏）"""
@@ -127,10 +122,7 @@ class UIMixin:
                 self.canvas.draw()
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"显示无数据状态失败: {str(e)}")
-            else:
-                print(f"UIMixin show_no_data错误: {str(e)}")
+            logger.error(f"显示无数据状态失败: {str(e)}")
 
     def show_message(self, message: str, color: str = 'gray', fontsize: int = 16):
         """显示消息状态
@@ -162,10 +154,7 @@ class UIMixin:
                 self.canvas.draw()
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"显示消息状态失败: {str(e)}")
-            else:
-                print(f"UIMixin show_message错误: {str(e)}")
+            logger.error(f"显示消息状态失败: {str(e)}")
 
     def show_error(self, error_message: str):
         """显示错误消息
@@ -194,10 +183,7 @@ class UIMixin:
             if hasattr(self, 'canvas'):
                 self.canvas.draw_idle()
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"处理窗口大小变化失败: {str(e)}")
-            else:
-                print(f"UIMixin resizeEvent错误: {str(e)}")
+            logger.error(f"处理窗口大小变化失败: {str(e)}")
 
     def draw_overview(self, ax, kdata):
         """绘制概览图
@@ -216,7 +202,4 @@ class UIMixin:
             ax.tick_params(labelsize=6)
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"绘制概览图失败: {str(e)}")
-            else:
-                print(f"UIMixin draw_overview错误: {str(e)}")
+            logger.error(f"绘制概览图失败: {str(e)}")

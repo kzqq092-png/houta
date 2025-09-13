@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 数据导入实时监控仪表板
@@ -8,7 +9,6 @@
 
 import sys
 import json
-import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPainter, QPen
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class MetricCard(QFrame):
@@ -173,7 +173,7 @@ class PerformanceChart(QFrame):
         painter.setPen(QPen(QColor("#3d4152"), 1))
         for i in range(5):
             y = rect.top() + (rect.height() * i / 4)
-            painter.drawLine(rect.left(), y, rect.right(), y)
+            painter.drawLine(int(rect.left()), int(y), int(rect.right()), int(y))
 
         # 绘制数据线
         if len(self.data_points) > 1:
@@ -186,8 +186,8 @@ class PerformanceChart(QFrame):
                 points.append((x, y))
 
             for i in range(len(points) - 1):
-                painter.drawLine(points[i][0], points[i][1],
-                                 points[i+1][0], points[i+1][1])
+                painter.drawLine(int(points[i][0]), int(points[i][1]),
+                                 int(points[i+1][0]), int(points[i+1][1]))
 
 
 class LogViewer(QFrame):
@@ -203,7 +203,7 @@ class LogViewer(QFrame):
         # 标题栏
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("📝 实时日志")
+        title_label = QLabel(" 实时日志")
         title_label.setObjectName("logTitle")
         title_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
         header_layout.addWidget(title_label)
@@ -298,7 +298,7 @@ class DataSourceStatus(QFrame):
         layout.setContentsMargins(10, 10, 10, 10)
 
         # 标题
-        title_label = QLabel("🔗 数据源状态")
+        title_label = QLabel(" 数据源状态")
         title_label.setObjectName("statusTitle")
         title_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
         layout.addWidget(title_label)
@@ -357,10 +357,10 @@ class DataSourceStatus(QFrame):
     def _init_data(self):
         """初始化数据"""
         sources = [
-            ("Wind万得", "🟢 在线", "15ms", "15:30:05"),
-            ("Tushare", "🟢 在线", "120ms", "15:30:03"),
-            ("东方财富", "🟡 延迟", "2.5s", "15:29:58"),
-            ("同花顺", "🔴 离线", "--", "15:25:12")
+            ("Wind万得", " 在线", "15ms", "15:30:05"),
+            ("Tushare", " 在线", "120ms", "15:30:03"),
+            ("东方财富", " 延迟", "2.5s", "15:29:58"),
+            ("同花顺", " 离线", "--", "15:25:12")
         ]
 
         self.status_table.setRowCount(len(sources))
@@ -417,7 +417,7 @@ class DataImportDashboard(QWidget):
         title_layout = QHBoxLayout()
 
         # 标题
-        title_label = QLabel("📊 数据导入实时监控仪表板")
+        title_label = QLabel(" 数据导入实时监控仪表板")
         title_label.setObjectName("dashboardTitle")
         title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Bold))
         title_layout.addWidget(title_label)
@@ -425,13 +425,13 @@ class DataImportDashboard(QWidget):
         title_layout.addStretch()
 
         # 刷新按钮
-        refresh_button = QPushButton("🔄 刷新")
+        refresh_button = QPushButton(" 刷新")
         refresh_button.setFixedSize(80, 30)
         refresh_button.clicked.connect(self._refresh_data)
         title_layout.addWidget(refresh_button)
 
         # 设置按钮
-        settings_button = QPushButton("⚙️ 设置")
+        settings_button = QPushButton(" 设置")
         settings_button.setFixedSize(80, 30)
         title_layout.addWidget(settings_button)
 
@@ -507,7 +507,7 @@ class DataImportDashboard(QWidget):
         right_layout.addWidget(self.data_source_status)
 
         # 系统资源监控
-        system_group = QGroupBox("💻 系统资源")
+        system_group = QGroupBox(" 系统资源")
         system_layout = QVBoxLayout(system_group)
 
         # CPU使用率
@@ -540,7 +540,7 @@ class DataImportDashboard(QWidget):
         right_layout.addWidget(system_group)
 
         # 导入任务列表
-        tasks_group = QGroupBox("📋 活动任务")
+        tasks_group = QGroupBox(" 活动任务")
         tasks_layout = QVBoxLayout(tasks_group)
 
         self.tasks_table = QTableWidget()
@@ -549,9 +549,9 @@ class DataImportDashboard(QWidget):
 
         # 添加示例任务
         tasks = [
-            ("A股历史数据", "85%", "🟢 运行中"),
-            ("港股实时行情", "100%", "✅ 完成"),
-            ("宏观经济数据", "45%", "🟡 暂停")
+            ("A股历史数据", "85%", " 运行中"),
+            ("港股实时行情", "100%", " 完成"),
+            ("宏观经济数据", "45%", " 暂停")
         ]
 
         self.tasks_table.setRowCount(len(tasks))

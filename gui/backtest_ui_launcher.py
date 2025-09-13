@@ -4,6 +4,7 @@ HIkyuu专业级回测UI启动器
 提供统一的启动入口和配置管理
 """
 
+from loguru import logger
 import sys
 import os
 import subprocess
@@ -15,6 +16,11 @@ from typing import Optional, Dict, Any
 import webbrowser
 import socket
 from contextlib import closing
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QPushButton, QLabel, QComboBox, QSpinBox, QTextEdit, QTabWidget
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QFont, QIcon
+from loguru import logger
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
@@ -28,51 +34,51 @@ try:
     PYQT5_AVAILABLE = True
 except ImportError:
     PYQT5_AVAILABLE = False
-    print("PyQt5 not available, only Streamlit UI will be supported")
+    logger.info("PyQt5 not available, only Streamlit UI will be supported")
 
 try:
     import streamlit as st
     STREAMLIT_AVAILABLE = True
 except ImportError:
     STREAMLIT_AVAILABLE = False
-    print("Streamlit not available, only PyQt5 UI will be supported")
+    logger.info("Streamlit not available, only PyQt5 UI will be supported")
 
 # 导入回测UI组件
 if PYQT5_AVAILABLE:
     try:
         from gui.widgets.backtest_widget import ProfessionalBacktestWidget, create_backtest_widget
     except ImportError:
-        print("Warning: Could not import PyQt5 backtest widget")
+        logger.warning("Warning: Could not import PyQt5 backtest widget")
 
 if STREAMLIT_AVAILABLE:
     try:
         from backtest.professional_ui_system import run_professional_ui, create_professional_ui
     except ImportError:
-        print("Warning: Could not import Streamlit UI system")
+        logger.info("Debug: Streamlit UI system not available (optional component)")
+        STREAMLIT_AVAILABLE = False
 
 # 导入核心模块
 try:
-    from core.logger import LogManager
     from utils.config_manager import ConfigManager
     CORE_MODULES_AVAILABLE = True
 except ImportError:
     # 如果核心模块不可用，使用简化版本
     try:
         # 尝试导入基础日志管理器
-        from core.base_logger import BaseLogManager as LogManager
+        from core.base_logger import LogManager
     except ImportError:
         class LogManager:
             def log(self, message, level):
-                print(f"[{level}] {message}")
+                logger.info(f"[{level}] {message}")
 
             def info(self, message):
-                print(f"[INFO] {message}")
+                logger.info(f"[INFO] {message}")
 
             def warning(self, message):
-                print(f"[WARNING] {message}")
+                logger.warning(f"[WARNING] {message}")
 
             def error(self, message):
-                print(f"[ERROR] {message}")
+                logger.error(f"[ERROR] {message}")
 
     # 简化版配置管理器
     class ConfigManager:
@@ -174,14 +180,14 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         if PYQT5_AVAILABLE:
             super().__init__()
 
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.config_manager = ConfigManager()
         self.streamlit_thread = None
 
         if PYQT5_AVAILABLE:
             self.init_ui()
 
-        self.log_manager.log("回测UI启动器初始化完成", LogLevel.INFO)
+        logger.info("回测UI启动器初始化完成")
 
     def init_ui(self):
         """初始化UI"""
@@ -247,7 +253,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         main_layout = QVBoxLayout(central_widget)
 
         # 标题
-        title = QLabel("📈 HIkyuu Professional Backtest System")
+        title = QLabel(" HIkyuu Professional Backtest System")
         title.setStyleSheet("""
             QLabel {
                 font-size: 24px;
@@ -288,15 +294,15 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         description = QLabel("""
         HIkyuu专业级回测系统提供两种用户界面：
         
-        🌐 Web界面 (Streamlit)：
-        • 现代化的Web界面，支持实时图表
-        • 适合远程访问和团队协作
-        • 自动刷新和实时监控
+         Web界面 (Streamlit)：
+         现代化的Web界面，支持实时图表
+         适合远程访问和团队协作
+         自动刷新和实时监控
         
-        🖥️ 桌面界面 (PyQt5)：
-        • 原生桌面应用体验
-        • 更快的响应速度
-        • 更好的系统集成
+         桌面界面 (PyQt5)：
+         原生桌面应用体验
+         更快的响应速度
+         更好的系统集成
         """)
         description.setStyleSheet("""
             QLabel {
@@ -315,19 +321,19 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
 
         # Web界面按钮
         if STREAMLIT_AVAILABLE:
-            web_button = QPushButton("🌐 启动Web界面")
+            web_button = QPushButton(" 启动Web界面")
             web_button.clicked.connect(self.launch_web_ui)
             buttons_layout.addWidget(web_button)
 
         # 桌面界面按钮
         if PYQT5_AVAILABLE:
-            desktop_button = QPushButton("🖥️ 启动桌面界面")
+            desktop_button = QPushButton(" 启动桌面界面")
             desktop_button.clicked.connect(self.launch_desktop_ui)
             buttons_layout.addWidget(desktop_button)
 
         # 同时启动按钮
         if STREAMLIT_AVAILABLE and PYQT5_AVAILABLE:
-            both_button = QPushButton("🚀 同时启动两个界面")
+            both_button = QPushButton(" 同时启动两个界面")
             both_button.clicked.connect(self.launch_both_ui)
             buttons_layout.addWidget(both_button)
 
@@ -357,7 +363,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout = QVBoxLayout(config_tab)
 
         # 配置说明
-        config_label = QLabel("⚙️ 系统配置")
+        config_label = QLabel(" 系统配置")
         config_label.setStyleSheet(
             "font-size: 18px; font-weight: bold; color: #00ff88;")
         layout.addWidget(config_label)
@@ -382,7 +388,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout.addLayout(theme_layout)
 
         # 保存配置按钮
-        save_config_button = QPushButton("💾 保存配置")
+        save_config_button = QPushButton(" 保存配置")
         save_config_button.clicked.connect(self.save_config)
         layout.addWidget(save_config_button)
 
@@ -398,7 +404,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout = QVBoxLayout(log_tab)
 
         # 日志标题
-        log_label = QLabel("📋 系统日志")
+        log_label = QLabel(" 系统日志")
         log_label.setStyleSheet(
             "font-size: 18px; font-weight: bold; color: #f59e0b;")
         layout.addWidget(log_label)
@@ -419,7 +425,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         layout.addWidget(self.log_display)
 
         # 清除日志按钮
-        clear_log_button = QPushButton("🗑️ 清除日志")
+        clear_log_button = QPushButton(" 清除日志")
         clear_log_button.clicked.connect(self.clear_log)
         layout.addWidget(clear_log_button)
 
@@ -429,10 +435,10 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         """启动Web界面"""
         try:
             if not STREAMLIT_AVAILABLE:
-                self.log_message("Streamlit不可用", LogLevel.ERROR)
+                logger.error("Streamlit不可用")
                 return
 
-            self.log_message("正在启动Web界面...", LogLevel.INFO)
+            logger.info("正在启动Web界面...")
             self.ui_status.setText("状态: 正在启动Web界面...")
 
             # 启动Streamlit线程
@@ -443,16 +449,16 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             self.streamlit_thread.start()
 
         except Exception as e:
-            self.log_message(f"启动Web界面失败: {e}", LogLevel.ERROR)
+            logger.error(f"启动Web界面失败: {e}")
 
     def launch_desktop_ui(self):
         """启动桌面界面"""
         try:
             if not PYQT5_AVAILABLE:
-                self.log_message("PyQt5不可用", LogLevel.ERROR)
+                logger.error("PyQt5不可用")
                 return
 
-            self.log_message("正在启动桌面界面...", LogLevel.INFO)
+            logger.info("正在启动桌面界面...")
             self.ui_status.setText("状态: 正在启动桌面界面...")
 
             # 创建回测组件窗口
@@ -469,10 +475,10 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             self.backtest_window.show()
 
             self.ui_status.setText("状态: 桌面界面已启动")
-            self.log_message("桌面界面启动成功", LogLevel.INFO)
+            logger.info("桌面界面启动成功")
 
         except Exception as e:
-            self.log_message(f"启动桌面界面失败: {e}", LogLevel.ERROR)
+            logger.error(f"启动桌面界面失败: {e}")
             self.ui_status.setText("状态: 桌面界面启动失败")
 
     def launch_both_ui(self):
@@ -486,18 +492,18 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         url = f"http://localhost:{port}"
 
         self.ui_status.setText(f"状态: Web界面已启动 ({url})")
-        self.log_message(f"Web界面启动成功: {url}", LogLevel.INFO)
+        logger.info(f"Web界面启动成功: {url}")
 
         # 自动打开浏览器
         try:
             webbrowser.open(url)
         except Exception as e:
-            self.log_message(f"无法自动打开浏览器: {e}", LogLevel.WARNING)
+            logger.warning(f"无法自动打开浏览器: {e}")
 
     def on_web_ui_error(self, error_msg: str):
         """Web界面启动失败"""
         self.ui_status.setText("状态: Web界面启动失败")
-        self.log_message(error_msg, LogLevel.ERROR)
+        logger.error(error_msg)
 
     def save_config(self):
         """保存配置"""
@@ -508,10 +514,10 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             }
 
             # 这里可以保存到配置文件
-            self.log_message("配置已保存", LogLevel.INFO)
+            logger.info("配置已保存")
 
         except Exception as e:
-            self.log_message(f"保存配置失败: {e}", LogLevel.ERROR)
+            logger.error(f"保存配置失败: {e}")
 
     def clear_log(self):
         """清除日志"""
@@ -524,7 +530,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
         log_entry = f"[{timestamp}] [{level}] {message}"
 
         # 输出到控制台
-        print(log_entry)
+        logger.info(log_entry)
 
         # 输出到UI日志显示
         if PYQT5_AVAILABLE and hasattr(self, 'log_display'):
@@ -532,7 +538,7 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             self.log_display.ensureCursorVisible()
 
         # 记录到日志管理器
-        self.log_manager.log(message, level)
+        logger.info(message, level)
 
     def closeEvent(self, event):
         """关闭事件"""
@@ -545,32 +551,39 @@ class BacktestUILauncher(QMainWindow if PYQT5_AVAILABLE else object):
             if hasattr(self, 'backtest_window'):
                 self.backtest_window.close()
 
-            self.log_message("应用程序已关闭", LogLevel.INFO)
+            logger.info("应用程序已关闭")
             event.accept()
 
 
 def launch_streamlit_only():
     """仅启动Streamlit界面"""
     if not STREAMLIT_AVAILABLE:
-        print("错误: Streamlit不可用")
+        logger.error("错误: Streamlit不可用")
         return
 
     try:
         from backtest.professional_ui_system import run_professional_ui
         run_professional_ui()
     except Exception as e:
-        print(f"启动Streamlit界面失败: {e}")
+        logger.error(f"启动Streamlit界面失败: {e}")
 
 
 def launch_pyqt5_only():
     """仅启动PyQt5界面"""
     if not PYQT5_AVAILABLE:
-        print("错误: PyQt5不可用")
+        logger.error("错误: PyQt5不可用")
         return
 
     try:
-        app = QApplication(sys.argv)
-        app.setStyle('Fusion')
+        # 检查是否已有应用程序实例
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+            app.setStyle('Fusion')
+            created_app = True
+        else:
+            created_app = False
+            logger.info("检测到现有Qt应用程序实例，将在现有实例中创建窗口")
 
         # 创建回测组件
         backtest_widget = create_backtest_widget()
@@ -582,10 +595,19 @@ def launch_pyqt5_only():
         window.setCentralWidget(backtest_widget)
         window.show()
 
-        sys.exit(app.exec_())
+        # 只有在创建了新应用程序时才启动事件循环
+        if created_app:
+            logger.info("启动新的Qt事件循环...")
+            sys.exit(app.exec_())
+        else:
+            logger.info("使用现有Qt事件循环，窗口已显示")
+            return window
 
     except Exception as e:
-        print(f"启动PyQt5界面失败: {e}")
+        logger.error(f"启动PyQt5界面失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def main():
@@ -607,7 +629,7 @@ def main():
     else:
         # 启动完整的启动器
         if not PYQT5_AVAILABLE:
-            print("PyQt5不可用，回退到Streamlit界面")
+            logger.info("PyQt5不可用，回退到Streamlit界面")
             launch_streamlit_only()
             return
 

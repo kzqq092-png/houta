@@ -1,10 +1,10 @@
+from loguru import logger
 """
 服务引导模块
 
 负责在应用程序启动时按正确的顺序注册和初始化所有服务。
 """
 
-import logging
 import time
 from typing import Optional
 import traceback
@@ -25,7 +25,7 @@ from core.services.industry_service import IndustryService
 from core.services.ai_prediction_service import AIPredictionService
 from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
-from core.logger import LogManager
+# # from core.services.error_service import LoguruErrorService  # 暂时注释，让系统先启动
 
 # 最后导入监控服务
 from core.metrics.repository import MetricsRepository
@@ -33,7 +33,7 @@ from core.metrics.resource_service import SystemResourceService
 from core.metrics.app_metrics_service import ApplicationMetricsService, initialize_app_metrics_service
 from core.metrics.aggregation_service import MetricsAggregationService
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ServiceBootstrap:
@@ -97,7 +97,7 @@ class ServiceBootstrap:
         # 确保也注册具体类型，以便能够通过类型注入
         self.service_container.register_instance(
             type(self.event_bus), self.event_bus)
-        logger.info("✓ 事件总线注册完成")
+        logger.info(" 事件总线注册完成")
 
         # 注册统一配置服务
         config_service = ConfigService(config_file='config/config.json', use_sqlite=True)
@@ -107,12 +107,17 @@ class ServiceBootstrap:
         # 为了兼容性，也注册为ConfigManager类型
         from utils.config_manager import ConfigManager
         self.service_container.register_instance(ConfigManager, config_service)
-        logger.info("✓ 统一配置服务注册完成")
+        logger.info(" 统一配置服务注册完成")
 
-        # 注册日志服务
-        log_manager = LogManager()
-        self.service_container.register_instance(LogManager, log_manager)
-        logger.info("✓ 日志服务注册完成")
+        # 日志服务现在由纯Loguru系统全局管理，无需注册到容器
+        # log_manager = LogManager()
+        # self.service_container.register_instance(LogManager, log_manager)
+        logger.info(" 纯Loguru日志系统已全局可用")
+
+        # 注册基于Loguru的错误处理服务 (暂时注释)
+        # error_service = LoguruErrorService()
+        # self.service_container.register_instance(LoguruErrorService, error_service)
+        logger.info(" Loguru日志系统运行正常，错误处理集成待完善")
 
     def _register_business_services(self) -> None:
         """注册业务服务"""
@@ -131,9 +136,9 @@ class ServiceBootstrap:
                 scope=ServiceScope.SINGLETON
             )
             router = self.service_container.resolve(DataSourceRouter)
-            logger.info("✓ 数据源路由器注册完成")
+            logger.info(" 数据源路由器注册完成")
         except Exception as e:
-            logger.warning(f"⚠️ 数据源路由器注册失败: {e}")
+            logger.warning(f" 数据源路由器注册失败: {e}")
 
         # 然后注册UnifiedDataManager
         self.service_container.register_factory(
@@ -145,12 +150,12 @@ class ServiceBootstrap:
         # 确保初始化成功后再继续
         try:
             data_manager = self.service_container.resolve(UnifiedDataManager)
-            logger.info("✓ 统一数据管理器注册完成")
+            logger.info(" 统一数据管理器注册完成")
 
             # 同时注册为字符串键名，以便向后兼容
             # 使用name参数避免字符串类型错误
             self.service_container.register_instance(type(data_manager), data_manager, name='unified_data_manager')
-            logger.info("✓ 统一数据管理器别名注册完成")
+            logger.info(" 统一数据管理器别名注册完成")
 
         except Exception as e:
             logger.error(f"Failed to initialize UnifiedDataManager: {e}")
@@ -162,9 +167,9 @@ class ServiceBootstrap:
             ThemeService, scope=ServiceScope.SINGLETON)
         theme_service = self.service_container.resolve(ThemeService)
         theme_service.initialize()
-        logger.info("✓ 主题服务注册完成")
+        logger.info(" 主题服务注册完成")
 
-        # ✅ 股票服务 - 使用工厂方法传递服务容器
+        #  股票服务 - 使用工厂方法传递服务容器
         self.service_container.register_factory(
             StockService,
             lambda: StockService(service_container=self.service_container),
@@ -172,14 +177,14 @@ class ServiceBootstrap:
         )
         stock_service = self.service_container.resolve(StockService)
         stock_service.initialize()
-        logger.info("✓ 股票服务注册完成")
+        logger.info(" 股票服务注册完成")
 
         # 图表服务
         self.service_container.register(
             ChartService, scope=ServiceScope.SINGLETON)
         chart_service = self.service_container.resolve(ChartService)
         chart_service.initialize()
-        logger.info("✓ 图表服务注册完成")
+        logger.info(" 图表服务注册完成")
 
         # WebGPU图表渲染器
         try:
@@ -187,7 +192,7 @@ class ServiceBootstrap:
             webgpu_renderer = get_webgpu_chart_renderer()
             self.service_container.register_instance(
                 WebGPUChartRenderer, webgpu_renderer)
-            logger.info("✓ WebGPU图表渲染器注册完成")
+            logger.info(" WebGPU图表渲染器注册完成")
         except ImportError as e:
             logger.warning(f"WebGPU图表渲染器不可用: {e}")
         except Exception as e:
@@ -198,7 +203,7 @@ class ServiceBootstrap:
             AnalysisService, scope=ServiceScope.SINGLETON)
         analysis_service = self.service_container.resolve(AnalysisService)
         analysis_service.initialize()
-        logger.info("✓ 分析服务注册完成")
+        logger.info(" 分析服务注册完成")
 
         # 行业服务
         try:
@@ -206,9 +211,9 @@ class ServiceBootstrap:
                 IndustryService, scope=ServiceScope.SINGLETON)
             industry_service = self.service_container.resolve(IndustryService)
             industry_service.initialize()
-            logger.info("✓ 行业服务注册完成")
+            logger.info(" 行业服务注册完成")
         except Exception as e:
-            logger.error(f"❌ 行业服务注册失败: {e}")
+            logger.error(f" 行业服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
         # AI预测服务
@@ -216,9 +221,9 @@ class ServiceBootstrap:
             self.service_container.register(
                 AIPredictionService, scope=ServiceScope.SINGLETON)
             ai_prediction_service = self.service_container.resolve(AIPredictionService)
-            logger.info("✓ AI预测服务注册完成")
+            logger.info(" AI预测服务注册完成")
         except Exception as e:
-            logger.error(f"❌ AI预测服务注册失败: {e}")
+            logger.error(f" AI预测服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
         # 资产服务（多资产类型支持）
@@ -234,9 +239,9 @@ class ServiceBootstrap:
                 scope=ServiceScope.SINGLETON
             )
             asset_service = self.service_container.resolve(AssetService)
-            logger.info("✓ 资产服务注册完成")
+            logger.info(" 资产服务注册完成")
         except Exception as e:
-            logger.error(f"❌ 资产服务注册失败: {e}")
+            logger.error(f" 资产服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
             # 注意：情绪数据服务需要在插件管理器注册后才能初始化
@@ -258,16 +263,15 @@ class ServiceBootstrap:
                 try:
                     if self.service_container.is_registered(PluginManager):
                         plugin_manager = self.service_container.resolve(PluginManager)
-                        logger.info("✅ 成功获取插件管理器用于情绪数据服务")
+                        logger.info(" 成功获取插件管理器用于情绪数据服务")
                     else:
-                        logger.warning("⚠️ 插件管理器未注册，情绪数据服务将使用受限模式")
+                        logger.warning(" 插件管理器未注册，情绪数据服务将使用受限模式")
                 except Exception as e:
-                    logger.warning(f"⚠️ 获取插件管理器失败: {e}")
+                    logger.warning(f" 获取插件管理器失败: {e}")
 
                 return SentimentDataService(
                     plugin_manager=plugin_manager,
-                    config=sentiment_config,
-                    log_manager=logger
+                    config=sentiment_config
                 )
 
             self.service_container.register_factory(
@@ -276,24 +280,24 @@ class ServiceBootstrap:
                 scope=ServiceScope.SINGLETON
             )
 
-            logger.info("✓ 情绪数据服务注册完成（延迟初始化）")
+            logger.info(" 情绪数据服务注册完成（延迟初始化）")
 
         except Exception as e:
-            logger.error(f"❌ 情绪数据服务注册失败: {e}")
+            logger.error(f" 情绪数据服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
             # K线情绪分析服务
         try:
-            logger.info("🔄 开始注册K线情绪分析服务...")
+            logger.info(" 开始注册K线情绪分析服务...")
             from .kline_sentiment_analyzer import KLineSentimentAnalyzer
-            logger.info("📦 K线情绪分析服务模块导入成功")
+            logger.info(" K线情绪分析服务模块导入成功")
 
             def create_kline_analyzer():
-                logger.info("🏭 开始创建K线情绪分析器实例...")
+                logger.info(" 开始创建K线情绪分析器实例...")
                 start_time = time.time()
                 analyzer = KLineSentimentAnalyzer()
                 end_time = time.time()
-                logger.info(f"✅ K线情绪分析器实例创建完成，耗时: {(end_time - start_time):.2f}秒")
+                logger.info(f" K线情绪分析器实例创建完成，耗时: {(end_time - start_time):.2f}秒")
                 return analyzer
 
             self.service_container.register_factory(
@@ -302,52 +306,51 @@ class ServiceBootstrap:
                 scope=ServiceScope.SINGLETON
             )
 
-            logger.info("✓ K线情绪分析服务注册完成")
+            logger.info(" K线情绪分析服务注册完成")
         except Exception as e:
-            logger.error(f"❌ K线情绪分析服务注册失败: {e}")
+            logger.error(f" K线情绪分析服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
             # 板块资金流服务
         try:
-            logger.info("🔄 开始注册板块资金流服务...")
+            logger.info(" 开始注册板块资金流服务...")
             from .sector_fund_flow_service import SectorFundFlowService, SectorFlowConfig
-            logger.info("📦 板块资金流服务模块导入成功")
+            logger.info(" 板块资金流服务模块导入成功")
 
             # 创建配置
-            logger.info("⚙️ 创建板块资金流服务配置...")
+            logger.info(" 创建板块资金流服务配置...")
             sector_config = SectorFlowConfig(
                 cache_duration_minutes=5,
                 auto_refresh_interval_minutes=10,
                 enable_auto_refresh=True
             )
-            logger.info("✅ 板块资金流服务配置创建完成")
+            logger.info(" 板块资金流服务配置创建完成")
 
             def create_sector_flow_service():
-                logger.info("🏭 开始创建板块资金流服务实例...")
+                logger.info(" 开始创建板块资金流服务实例...")
                 start_time = time.time()
 
                 # 获取数据管理器
-                logger.info("🔍 尝试获取统一数据管理器...")
+                logger.info(" 尝试获取统一数据管理器...")
                 data_manager = None
                 try:
                     if self.service_container.is_registered(UnifiedDataManager):
                         data_manager = self.service_container.resolve(UnifiedDataManager)
-                        logger.info("✅ 统一数据管理器获取成功")
+                        logger.info(" 统一数据管理器获取成功")
                     else:
-                        logger.warning("⚠️ 统一数据管理器未注册")
+                        logger.warning(" 统一数据管理器未注册")
                 except Exception as e:
-                    logger.warning(f"⚠️ 统一数据管理器获取失败: {e}")
+                    logger.warning(f" 统一数据管理器获取失败: {e}")
 
                 # 创建服务
-                logger.info("🏗️ 创建板块资金流服务实例...")
+                logger.info(" 创建板块资金流服务实例...")
                 service = SectorFundFlowService(
                     data_manager=data_manager,
-                    config=sector_config,
-                    log_manager=logger
+                    config=sector_config
                 )
 
                 end_time = time.time()
-                logger.info(f"✅ 板块资金流服务实例创建完成，耗时: {(end_time - start_time):.2f}秒")
+                logger.info(f" 板块资金流服务实例创建完成，耗时: {(end_time - start_time):.2f}秒")
                 return service
 
             # 注册服务工厂
@@ -357,9 +360,9 @@ class ServiceBootstrap:
                 scope=ServiceScope.SINGLETON
             )
 
-            logger.info("✓ 板块资金流服务注册完成")
+            logger.info(" 板块资金流服务注册完成")
         except Exception as e:
-            logger.error(f"❌ 板块资金流服务注册失败: {e}")
+            logger.error(f" 板块资金流服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _check_dependencies(self):
@@ -381,7 +384,7 @@ class ServiceBootstrap:
             fallback_manager = UnifiedDataManager()
             self.service_container.register_instance(
                 type(fallback_manager), fallback_manager, name='unified_data_manager')
-            logger.info("✓ 回退数据管理器注册完成")
+            logger.info(" 回退数据管理器注册完成")
         except Exception as e:
             logger.error(f"Failed to initialize fallback data manager: {e}")
             # 创建最小可用的数据管理器
@@ -390,7 +393,7 @@ class ServiceBootstrap:
             minimal_manager = UnifiedDataManager()
             self.service_container.register_instance(
                 type(minimal_manager), minimal_manager, name='unified_data_manager')
-            logger.warning("✓ 最小数据管理器注册完成 - 功能受限")
+            logger.warning(" 最小数据管理器注册完成 - 功能受限")
 
     def _register_trading_service(self) -> None:
         """注册交易服务"""
@@ -406,7 +409,7 @@ class ServiceBootstrap:
             )
 
             self.service_container.register_instance(TradingEngine, trading_engine)
-            logger.info("✓ 交易引擎注册完成")
+            logger.info(" 交易引擎注册完成")
 
             # 兼容性：也注册为TradingService
             try:
@@ -424,28 +427,28 @@ class ServiceBootstrap:
                 # 初始化交易服务
                 trading_service = self.service_container.resolve(TradingService)
                 trading_service.initialize()
-                logger.info("✓ 交易服务（兼容性）注册完成")
+                logger.info(" 交易服务（兼容性）注册完成")
 
             except Exception as e:
-                logger.warning(f"⚠️ 交易服务兼容性注册失败: {e}")
+                logger.warning(f" 交易服务兼容性注册失败: {e}")
 
             # 注册TradingController
             try:
                 from ..trading_controller import TradingController
-                from ..logger import LogManager
+                # 移除LogManager依赖，TradingController现在直接使用Loguru
 
                 self.service_container.register_factory(
                     TradingController,
                     lambda: TradingController(
-                        service_container=self.service_container,
-                        log_manager=LogManager()
+                        service_container=self.service_container
+                        # log_manager=LogManager()  # 已移除，使用纯Loguru
                     ),
                     scope=ServiceScope.SINGLETON
                 )
-                logger.info("✓ 交易控制器注册完成")
+                logger.info(" 交易控制器注册完成")
 
             except Exception as e:
-                logger.warning(f"⚠️ 交易控制器注册失败: {e}")
+                logger.warning(f" 交易控制器注册失败: {e}")
 
             # 注册StrategyService
             try:
@@ -463,13 +466,13 @@ class ServiceBootstrap:
                 # 初始化策略服务
                 strategy_service = self.service_container.resolve(StrategyService)
                 strategy_service.initialize()
-                logger.info("✓ 策略服务注册完成")
+                logger.info(" 策略服务注册完成")
 
             except Exception as e:
-                logger.warning(f"⚠️ 策略服务注册失败: {e}")
+                logger.warning(f" 策略服务注册失败: {e}")
 
         except Exception as e:
-            logger.error(f"❌ 交易服务注册失败: {e}")
+            logger.error(f" 交易服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_monitoring_services(self) -> None:
@@ -480,14 +483,14 @@ class ServiceBootstrap:
             # 1. 注册数据库仓储
             self.service_container.register(
                 MetricsRepository, scope=ServiceScope.SINGLETON)
-            logger.info("✓ 指标数据库仓储(MetricsRepository)注册完成")
+            logger.info(" 指标数据库仓储(MetricsRepository)注册完成")
 
             # 2. 初始化并注册应用性能度量服务
             app_metrics_service = initialize_app_metrics_service(
                 self.event_bus)
             self.service_container.register_instance(
                 ApplicationMetricsService, app_metrics_service)
-            logger.info("✓ 应用性能度量服务(ApplicationMetricsService)初始化完成")
+            logger.info(" 应用性能度量服务(ApplicationMetricsService)初始化完成")
 
             # 3. 注册系统资源服务
             # 确保直接传递事件总线实例，而不是通过容器解析
@@ -498,7 +501,7 @@ class ServiceBootstrap:
             resource_service = self.service_container.resolve(
                 SystemResourceService)
             resource_service.start()
-            logger.info("✓ 系统资源服务(SystemResourceService)启动完成")
+            logger.info(" 系统资源服务(SystemResourceService)启动完成")
 
             # 4. 注册指标聚合服务
             # 同样使用工厂函数直接传递事件总线
@@ -510,27 +513,37 @@ class ServiceBootstrap:
             aggregation_service = self.service_container.resolve(
                 MetricsAggregationService)
             aggregation_service.start()
-            logger.info("✓ 指标聚合服务(MetricsAggregationService)启动完成")
+            logger.info(" 指标聚合服务(MetricsAggregationService)启动完成")
 
-            # 🔧 新增：注册告警事件处理器
+            # 5. 新增：注册性能数据桥接器
+            try:
+                from core.services.performance_data_bridge import initialize_performance_bridge, PerformanceDataBridge
+                performance_bridge = initialize_performance_bridge(auto_start=True)
+                self.service_container.register_instance(
+                    PerformanceDataBridge, performance_bridge)
+                logger.info(" 性能数据桥接器(PerformanceDataBridge)初始化完成")
+            except Exception as e:
+                logger.error(f"性能数据桥接器初始化失败: {e}")
+
+            #  新增：注册告警事件处理器
             try:
                 from core.services.alert_event_handler import register_alert_handlers
                 register_alert_handlers(self.event_bus)
-                logger.info("✓ 告警事件处理器注册完成")
+                logger.info(" 告警事件处理器注册完成")
             except Exception as e:
-                logger.error(f"❌ 告警事件处理器注册失败: {e}")
+                logger.error(f" 告警事件处理器注册失败: {e}")
                 logger.error(traceback.format_exc())
 
-            # 🔧 新增：确保告警数据库已初始化
+            #  新增：确保告警数据库已初始化
             try:
                 from db.models.alert_config_models import get_alert_config_database
                 alert_db = get_alert_config_database()
-                logger.info("✓ 告警数据库初始化完成")
+                logger.info(" 告警数据库初始化完成")
             except Exception as e:
-                logger.error(f"❌ 告警数据库初始化失败: {e}")
+                logger.error(f" 告警数据库初始化失败: {e}")
                 logger.error(traceback.format_exc())
 
-            # 🔧 新增：注册并启动告警规则引擎服务
+            #  新增：注册并启动告警规则引擎服务
             try:
                 from .alert_rule_engine import AlertRuleEngine, initialize_alert_rule_engine
                 self.service_container.register(
@@ -541,11 +554,11 @@ class ServiceBootstrap:
                 # 自动初始化并启动告警引擎
                 alert_engine = initialize_alert_rule_engine(self.event_bus)
                 alert_engine.start()
-                logger.info("✓ 告警规则引擎服务注册并启动完成")
+                logger.info(" 告警规则引擎服务注册并启动完成")
             except Exception as e:
-                logger.error(f"❌ 告警规则引擎服务注册失败: {e}")
+                logger.error(f" 告警规则引擎服务注册失败: {e}")
 
-            # 🔧 新增：注册并启动告警规则热加载服务
+            #  新增：注册并启动告警规则热加载服务
             try:
                 from .alert_rule_hot_loader import AlertRuleHotLoader, initialize_alert_rule_hot_loader
                 self.service_container.register(
@@ -561,16 +574,16 @@ class ServiceBootstrap:
                 try:
                     alert_engine = initialize_alert_rule_engine(self.event_bus)
                     hot_loader.add_update_callback(alert_engine.reload_rules_sync)
-                    logger.info("✓ 告警引擎与热加载服务关联完成")
+                    logger.info(" 告警引擎与热加载服务关联完成")
                 except:
                     pass
 
-                logger.info("✓ 告警规则热加载服务注册并启动完成")
+                logger.info(" 告警规则热加载服务注册并启动完成")
             except Exception as e:
-                logger.error(f"❌ 告警规则热加载服务注册失败: {e}")
+                logger.error(f" 告警规则热加载服务注册失败: {e}")
 
         except Exception as e:
-            logger.error(f"❌ 监控服务注册失败: {e}")
+            logger.error(f" 监控服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_plugin_services(self) -> None:
@@ -594,8 +607,7 @@ class ServiceBootstrap:
                     plugin_dir="plugins",
                     main_window=None,  # 稍后在主窗口创建时设置
                     data_manager=None,  # 稍后设置
-                    config_manager=config_manager,
-                    log_manager=logger
+                    config_manager=config_manager
                 ),
                 scope=ServiceScope.SINGLETON
             )
@@ -606,10 +618,10 @@ class ServiceBootstrap:
             if self.service_container.is_registered(UnifiedDataManager):
                 data_manager = self.service_container.resolve(UnifiedDataManager)
                 plugin_manager.data_manager = data_manager
-                logger.info("✅ 插件管理器已连接到UnifiedDataManager")
+                logger.info(" 插件管理器已连接到UnifiedDataManager")
 
             plugin_manager.initialize()
-            logger.info("✓ 插件管理器服务注册完成")
+            logger.info(" 插件管理器服务注册完成")
 
             # 现在插件管理器可用，初始化情绪数据服务
             try:
@@ -617,12 +629,12 @@ class ServiceBootstrap:
                 if self.service_container.is_registered(SentimentDataService):
                     sentiment_service = self.service_container.resolve(SentimentDataService)
                     sentiment_service.initialize()
-                    logger.info("✓ 情绪数据服务初始化完成")
+                    logger.info(" 情绪数据服务初始化完成")
             except Exception as sentiment_error:
-                logger.error(f"❌ 情绪数据服务初始化失败: {sentiment_error}")
+                logger.error(f" 情绪数据服务初始化失败: {sentiment_error}")
 
         except Exception as e:
-            logger.error(f"❌ 插件管理器服务注册失败: {e}")
+            logger.error(f" 插件管理器服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
     def _post_initialization_plugin_discovery(self) -> None:
@@ -650,10 +662,10 @@ class ServiceBootstrap:
 
             # 启动异步插件发现
             async_discovery.start_discovery(plugin_manager, data_manager)
-            logger.info("✓ 异步插件发现服务已启动")
+            logger.info(" 异步插件发现服务已启动")
 
         except Exception as e:
-            logger.error(f"❌ 启动异步插件发现失败: {e}")
+            logger.error(f" 启动异步插件发现失败: {e}")
             logger.error(traceback.format_exc())
 
             # 降级到同步模式
@@ -666,12 +678,12 @@ class ServiceBootstrap:
 
     def _on_plugin_discovery_completed(self, result: dict):
         """插件发现完成"""
-        logger.info("✓ 异步插件发现和注册完成")
+        logger.info(" 异步插件发现和注册完成")
         logger.info(f"发现结果: {result}")
 
     def _on_plugin_discovery_failed(self, error_msg: str):
         """插件发现失败"""
-        logger.error(f"❌ 异步插件发现失败: {error_msg}")
+        logger.error(f" 异步插件发现失败: {error_msg}")
         # 可以选择降级到同步模式
         logger.info("尝试降级到同步插件发现模式...")
         self._fallback_sync_plugin_discovery()
@@ -684,21 +696,21 @@ class ServiceBootstrap:
             # 1. 插件管理器插件发现
             plugin_manager = self.service_container.resolve(PluginManager)
             plugin_manager.discover_and_register_plugins()
-            logger.info("✓ 插件管理器插件发现完成")
+            logger.info(" 插件管理器插件发现完成")
 
             # 2. 统一数据管理器数据源插件发现
             if self.service_container.is_registered(UnifiedDataManager):
                 data_manager = self.service_container.resolve(UnifiedDataManager)
                 if hasattr(data_manager, 'discover_and_register_data_source_plugins'):
                     data_manager.discover_and_register_data_source_plugins()
-                    logger.info("✓ 数据源插件发现和注册完成")
+                    logger.info(" 数据源插件发现和注册完成")
                 else:
-                    logger.warning("⚠️ UnifiedDataManager不支持插件发现")
+                    logger.warning(" UnifiedDataManager不支持插件发现")
             else:
-                logger.warning("⚠️ UnifiedDataManager未注册")
+                logger.warning(" UnifiedDataManager未注册")
 
         except Exception as e:
-            logger.error(f"❌ 同步插件发现失败: {e}")
+            logger.error(f" 同步插件发现失败: {e}")
             logger.error(traceback.format_exc())
 
     def _register_advanced_services(self) -> None:
@@ -721,12 +733,12 @@ class ServiceBootstrap:
 
             # 立即解析以触发初始化
             gpu_service = self.service_container.resolve(GPUAccelerationManager)
-            logger.info("✓ GPU加速服务注册完成")
+            logger.info(" GPU加速服务注册完成")
 
         except ImportError:
-            logger.warning("⚠️ GPU加速模块不可用，跳过注册")
+            logger.warning(" GPU加速模块不可用，跳过注册")
         except Exception as e:
-            logger.error(f"❌ GPU加速服务注册失败: {e}")
+            logger.error(f" GPU加速服务注册失败: {e}")
             logger.error(traceback.format_exc())
 
 

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -15,10 +16,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-import logging
 
 from core.plugin_types import PluginType, PluginCategory
-from .base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
 
@@ -430,14 +430,14 @@ if __name__ == "__main__":
     # 获取数据
     response = plugin._fetch_raw_sentiment_data()
 
-    print(f"成功: {response.success}")
-    print(f"数据项: {len(response.data)}")
-    print(f"综合指数: {response.composite_score}")
+    logger.info(f"成功: {response.success}")
+    logger.info(f"数据项: {len(response.data)}")
+    logger.info(f"综合指数: {response.composite_score}")
 
     if response.data:
         for item in response.data:
-            print(f"- {item.indicator_name}: {item.value} ({item.status})")
+            logger.info(f"- {item.indicator_name}: {item.value} ({item.status})")
 
     # API使用信息
     usage_info = plugin.get_api_usage_info()
-    print(f"\nAPI信息: {json.dumps(usage_info, indent=2, ensure_ascii=False)}")
+    logger.info(f"\nAPI信息: {json.dumps(usage_info, indent=2, ensure_ascii=False)}")

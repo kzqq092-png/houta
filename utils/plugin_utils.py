@@ -47,15 +47,15 @@ class PluginDisplayUtils:
 
     # 插件类型图标映射
     PLUGIN_TYPE_ICONS = {
-        PluginType.INDICATOR.value: "📊",
-        PluginType.STRATEGY.value: "🎯",
-        PluginType.DATA_SOURCE.value: "📡",
-        PluginType.ANALYSIS.value: "🔍",
-        PluginType.UI_COMPONENT.value: "🖥️",
-        PluginType.EXPORT.value: "📤",
-        PluginType.NOTIFICATION.value: "🔔",
-        PluginType.CHART_TOOL.value: "📈",
-        "unknown": "❓"
+        PluginType.INDICATOR.value: "",
+        PluginType.STRATEGY.value: "",
+        PluginType.DATA_SOURCE.value: "",
+        PluginType.ANALYSIS.value: "",
+        PluginType.UI_COMPONENT.value: "",
+        PluginType.EXPORT.value: "",
+        PluginType.NOTIFICATION.value: "",
+        PluginType.CHART_TOOL.value: "",
+        "unknown": ""
     }
 
     # 插件分类颜色映射

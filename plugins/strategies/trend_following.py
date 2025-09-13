@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 趋势跟踪策略模块
@@ -525,7 +526,7 @@ class TrendFollowingManager:
                 else:
                     all_signals[strategy_name] = []
             except Exception as e:
-                print(f"策略 {strategy_name} 执行失败: {e}")
+                logger.info(f"策略 {strategy_name} 执行失败: {e}")
                 all_signals[strategy_name] = []
 
         return all_signals
@@ -591,21 +592,20 @@ if __name__ == "__main__":
     all_signals = manager.generate_all_signals(data)
     consensus_signals = manager.get_consensus_signals(data)
 
-    print("趋势跟踪策略测试结果:")
-    print("=" * 50)
+    logger.info("趋势跟踪策略测试结果:")
+    logger.info("=" * 50)
 
     for strategy_name, signals in all_signals.items():
-        print(f"{strategy_name}: {len(signals)} 个信号")
+        logger.info(f"{strategy_name}: {len(signals)} 个信号")
         if signals:
             avg_confidence = np.mean([s.confidence for s in signals])
-            print(f"  平均置信度: {avg_confidence:.3f}")
+            logger.info(f"  平均置信度: {avg_confidence:.3f}")
 
-    print(f"\n一致性信号: {len(consensus_signals)} 个")
+    logger.info(f"\n一致性信号: {len(consensus_signals)} 个")
     if consensus_signals:
         avg_confidence = np.mean([s.confidence for s in consensus_signals])
-        print(f"平均置信度: {avg_confidence:.3f}")
+        logger.info(f"平均置信度: {avg_confidence:.3f}")
 
-        print("\n一致性信号详情:")
+        logger.info("\n一致性信号详情:")
         for signal in consensus_signals[:5]:  # 显示前5个信号
-            print(
-                f"  {signal.timestamp.date()}: {signal.signal_type.value} @ {signal.price:.3f} (置信度: {signal.confidence:.3f})")
+            logger.info(f"  {signal.timestamp.date()}: {signal.signal_type.value} @ {signal.price:.3f} (置信度: {signal.confidence:.3f})")

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -19,14 +20,13 @@ import sqlite3
 import duckdb
 import json
 import os
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 # 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s')
+logger = logger
 
 
 class CompleteDatabaseInitializer:
@@ -902,7 +902,7 @@ class CompleteDatabaseInitializer:
 
     def create_indexes(self):
         """创建性能优化索引"""
-        logger.info("🔧 创建性能优化索引...")
+        logger.info(" 创建性能优化索引...")
 
         # SQLite索引
         with sqlite3.connect(self.sqlite_db_path) as conn:
@@ -928,34 +928,34 @@ class CompleteDatabaseInitializer:
 
             conn.commit()
 
-        logger.info("✅ 索引创建完成")
+        logger.info(" 索引创建完成")
 
 
 def main():
     """主函数"""
-    print("=" * 60)
-    print("FactorWeave-Quant 完整数据库初始化系统")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("FactorWeave-Quant 完整数据库初始化系统")
+    logger.info("=" * 60)
 
     initializer = CompleteDatabaseInitializer()
 
     if initializer.initialize_all_databases():
-        print("\n🎉 数据库系统初始化成功！")
-        print("\n📊 初始化内容:")
-        print("  ✅ SQLite系统数据库 (OLTP)")
-        print("  ✅ DuckDB分析数据库 (OLAP)")
-        print("  ✅ 完整表结构和索引")
-        print("  ✅ 初始配置和数据")
-        print("  ✅ 性能优化配置")
+        logger.info("\n 数据库系统初始化成功！")
+        logger.info("\n 初始化内容:")
+        logger.info("   SQLite系统数据库 (OLTP)")
+        logger.info("   DuckDB分析数据库 (OLAP)")
+        logger.info("   完整表结构和索引")
+        logger.info("   初始配置和数据")
+        logger.info("   性能优化配置")
 
-        print("\n📁 数据库文件:")
-        print(f"  📄 SQLite: {initializer.sqlite_db_path}")
-        print(f"  📄 FactorWeave: {initializer.factorweave_db_path}")
-        print(f"  📄 DuckDB: {initializer.duckdb_analytics_path}")
+        logger.info("\n 数据库文件:")
+        logger.info(f"   SQLite: {initializer.sqlite_db_path}")
+        logger.info(f"   FactorWeave: {initializer.factorweave_db_path}")
+        logger.info(f"   DuckDB: {initializer.duckdb_analytics_path}")
 
         return True
     else:
-        print("\n❌ 数据库系统初始化失败！")
+        logger.info("\n 数据库系统初始化失败！")
         return False
 
 

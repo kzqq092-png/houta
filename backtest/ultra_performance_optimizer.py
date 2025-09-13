@@ -1,3 +1,4 @@
+from loguru import logger
 """
 超高性能回测优化器
 使用GPU加速、分布式计算、内存映射等最新优化技术
@@ -24,11 +25,11 @@ from typing import Dict, List, Optional, Any, Tuple, Union, Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
-import logging
 from pathlib import Path
 import h5py  # 高性能数据存储
 import zarr  # 云原生数组存储
-from core.logger import LogManager, LogLevel
+import hashlib  # 哈希计算
+# 纯Loguru架构，移除旧的日志导入
 
 
 class PerformanceLevel(Enum):
@@ -68,19 +69,18 @@ class UltraPerformanceOptimizer:
 
     def __init__(self,
                  performance_level: PerformanceLevel = PerformanceLevel.ULTRA,
-                 compute_backend: ComputeBackend = ComputeBackend.HYBRID,
-                 log_manager: Optional[LogManager] = None):
+                 compute_backend: ComputeBackend = ComputeBackend.HYBRID):
         """
         初始化超高性能优化器
 
         Args:
             performance_level: 性能级别
             compute_backend: 计算后端
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
         """
         self.performance_level = performance_level
         self.compute_backend = compute_backend
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 系统信息
         self.cpu_count = mp.cpu_count()
@@ -164,10 +164,10 @@ class UltraPerformanceOptimizer:
                         threads_per_worker=2,
                         memory_limit=f"{self.config['memory_limit'] // self.config['max_workers']}B"
                     )
-                    self.log_manager.log(
-                        f"Dask客户端已初始化: {self.dask_client.dashboard_link}", LogLevel.INFO)
+                    logger.warning(
+                        f"Dask客户端已初始化: {self.dask_client.dashboard_link}")
                 except Exception as e:
-                    self.log_manager.log(f"Dask初始化失败: {e}", LogLevel.WARNING)
+                    logger.info(f"Dask初始化失败: {e}")
 
             # 初始化Ray
             if self.performance_level == PerformanceLevel.EXTREME:
@@ -179,12 +179,12 @@ class UltraPerformanceOptimizer:
                                 self.config['memory_limit'] * 0.3)
                         )
                         self.ray_initialized = True
-                        self.log_manager.log("Ray已初始化", LogLevel.INFO)
+                        logger.warning("Ray已初始化")
                 except Exception as e:
-                    self.log_manager.log(f"Ray初始化失败: {e}", LogLevel.WARNING)
+                    logger.info(f"Ray初始化失败: {e}")
 
         except Exception as e:
-            self.log_manager.log(f"计算环境初始化失败: {e}", LogLevel.ERROR)
+            logger.error(f"计算环境初始化失败: {e}")
 
     @staticmethod
     @njit(parallel=True, fastmath=True)
@@ -312,7 +312,7 @@ class UltraPerformanceOptimizer:
             return result
 
         except Exception as e:
-            self.log_manager.log(f"GPU加速回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"GPU加速回测失败: {e}")
             # 回退到CPU计算
             return self._cpu_optimized_backtest(data, **kwargs)
 
@@ -342,7 +342,7 @@ class UltraPerformanceOptimizer:
             return result
 
         except Exception as e:
-            self.log_manager.log(f"CPU优化回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"CPU优化回测失败: {e}")
             raise
 
     def _distributed_backtest(self, data: pd.DataFrame, **kwargs) -> pd.DataFrame:
@@ -371,7 +371,7 @@ class UltraPerformanceOptimizer:
             return result
 
         except Exception as e:
-            self.log_manager.log(f"分布式回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"分布式回测失败: {e}")
             # 回退到CPU计算
             return self._cpu_optimized_backtest(data, **kwargs)
 
@@ -404,50 +404,73 @@ class UltraPerformanceOptimizer:
             return final_result
 
         except Exception as e:
-            self.log_manager.log(f"Ray分布式回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"Ray分布式回测失败: {e}")
             return self._cpu_optimized_backtest(data, **kwargs)
 
     def _memory_mapped_backtest(self, data: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """内存映射回测（处理大数据集）"""
-        try:
-            # 创建临时文件
-            temp_file = Path("temp/backtest_data.h5")
-            temp_file.parent.mkdir(exist_ok=True)
+        from .resource_manager import managed_backtest_resources
+        from .async_io_manager import async_io_manager, smart_cache
 
-            # 保存数据到HDF5
-            with h5py.File(temp_file, 'w') as f:
-                f.create_dataset('prices', data=data['close'].values)
-                f.create_dataset('signals', data=data['signal'].values)
+        with managed_backtest_resources() as resource_manager:
+            try:
+                # 生成数据缓存键
+                data_hash = hashlib.md5(str(data.values.tobytes()).encode()).hexdigest()
+                cache_key = f"backtest_data_{data_hash}"
 
-            # 使用内存映射读取
-            with h5py.File(temp_file, 'r') as f:
-                prices = f['prices'][:]
-                signals = f['signals'][:]
+                # 尝试从缓存获取数据
+                cached_result = smart_cache.get(cache_key)
+                if cached_result is not None:
+                    logger.info("使用缓存的回测数据")
+                    return cached_result
 
-            # 执行回测
-            positions, capital, returns = self._ultra_fast_backtest_core(
-                prices, signals,
-                kwargs.get('initial_capital', 100000),
-                kwargs.get('position_size', 1.0),
-                kwargs.get('commission_pct', 0.001)
-            )
+                # 创建临时文件
+                temp_file = Path("temp/backtest_data.h5")
+                temp_file.parent.mkdir(exist_ok=True)
 
-            # 构建结果
-            result = data.copy()
-            result['position'] = positions
-            result['capital'] = capital
-            result['returns'] = returns
-            result['cumulative_returns'] = (
-                1 + pd.Series(returns)).cumprod() - 1
+                # 注册临时文件到资源管理器
+                resource_manager.register_temp_file(temp_file)
 
-            # 清理临时文件
-            temp_file.unlink(missing_ok=True)
+                # 异步写入HDF5数据
+                prices_data = data['close'].values.astype(np.float64)
+                signals_data = data['signal'].values.astype(np.float64)
 
-            return result
+                # 使用异步I/O管理器
+                future_write = async_io_manager.write_hdf5_async(temp_file, 'prices', prices_data)
+                future_write.result()  # 等待写入完成
 
-        except Exception as e:
-            self.log_manager.log(f"内存映射回测失败: {e}", LogLevel.ERROR)
-            return self._cpu_optimized_backtest(data, **kwargs)
+                future_write = async_io_manager.write_hdf5_async(temp_file, 'signals', signals_data)
+                future_write.result()  # 等待写入完成
+
+                # 异步读取数据
+                prices = async_io_manager.read_hdf5_async(temp_file, 'prices')
+                signals = async_io_manager.read_hdf5_async(temp_file, 'signals')
+
+                # 执行回测
+                positions, capital, returns = self._ultra_fast_backtest_core(
+                    prices, signals,
+                    kwargs.get('initial_capital', 100000),
+                    kwargs.get('position_size', 1.0),
+                    kwargs.get('commission_pct', 0.001)
+                )
+
+                # 构建结果（使用智能复制策略）
+                from .resource_manager import global_data_manager
+                result = global_data_manager.get_data_copy(data, copy_strategy='smart')
+                result['position'] = positions
+                result['capital'] = capital
+                result['returns'] = returns
+                result['cumulative_returns'] = (
+                    1 + pd.Series(returns)).cumprod() - 1
+
+                # 缓存结果
+                smart_cache.put(cache_key, result, ttl=3600)  # 缓存1小时
+
+                return result
+
+            except Exception as e:
+                logger.error(f"内存映射回测失败: {e}")
+                return self._cpu_optimized_backtest(data, **kwargs)
 
     def optimize_backtest(self, data: pd.DataFrame, **kwargs) -> Tuple[pd.DataFrame, PerformanceMetrics]:
         """
@@ -464,8 +487,8 @@ class UltraPerformanceOptimizer:
         start_memory = psutil.virtual_memory().used
 
         try:
-            self.log_manager.log(
-                f"开始超高性能回测 - 级别: {self.performance_level.value}, 后端: {self.compute_backend.value}", LogLevel.INFO)
+            logger.info(
+                f"开始超高性能回测 - 级别: {self.performance_level.value}, 后端: {self.compute_backend.value}")
 
             # 数据预处理
             processed_data = self._preprocess_data(data)
@@ -515,13 +538,13 @@ class UltraPerformanceOptimizer:
                 optimization_level=self.performance_level.value
             )
 
-            self.log_manager.log(
-                f"超高性能回测完成 - 耗时: {execution_time:.3f}秒, 吞吐量: {throughput:.0f}点/秒", LogLevel.INFO)
+            logger.info(
+                f"超高性能回测完成 - 耗时: {execution_time:.3f}秒, 吞吐量: {throughput:.0f}点/秒")
 
             return result, performance_metrics
 
         except Exception as e:
-            self.log_manager.log(f"超高性能回测失败: {e}", LogLevel.ERROR)
+            logger.error(f"超高性能回测失败: {e}")
             raise
 
     def _preprocess_data(self, data: pd.DataFrame) -> pd.DataFrame:
@@ -554,7 +577,7 @@ class UltraPerformanceOptimizer:
             return processed
 
         except Exception as e:
-            self.log_manager.log(f"数据预处理失败: {e}", LogLevel.ERROR)
+            logger.error(f"数据预处理失败: {e}")
             return data
 
     def _get_gpu_utilization(self) -> float:
@@ -632,11 +655,11 @@ class UltraPerformanceOptimizer:
                     finally:
                         self.compute_backend = original_backend
 
-            self.log_manager.log("性能基准测试完成", LogLevel.INFO)
+            logger.error("性能基准测试完成")
             return benchmark_results
 
         except Exception as e:
-            self.log_manager.log(f"性能基准测试失败: {e}", LogLevel.ERROR)
+            logger.info(f"性能基准测试失败: {e}")
             return {}
 
     def cleanup(self):
@@ -658,24 +681,34 @@ class UltraPerformanceOptimizer:
             # 强制垃圾回收
             gc.collect()
 
-            self.log_manager.log("资源清理完成", LogLevel.INFO)
+            logger.info("资源清理完成")
 
         except Exception as e:
-            self.log_manager.log(f"资源清理失败: {e}", LogLevel.ERROR)
+            logger.error(f"资源清理失败: {e}")
 
     def __del__(self):
         """析构函数"""
+        try:
+            self.cleanup()
+        except Exception as e:
+            logger.error(f"析构函数清理失败: {e}")
+
+    def __enter__(self):
+        """上下文管理器入口"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """上下文管理器出口"""
         self.cleanup()
 
-
 # 便捷函数
+
+
 def create_ultra_optimizer(
-    performance_level: PerformanceLevel = PerformanceLevel.ULTRA,
-    compute_backend: ComputeBackend = ComputeBackend.HYBRID,
-    log_manager: Optional[LogManager] = None
-) -> UltraPerformanceOptimizer:
+        performance_level: PerformanceLevel = PerformanceLevel.ULTRA,
+        compute_backend: ComputeBackend = ComputeBackend.HYBRID) -> UltraPerformanceOptimizer:
     """创建超高性能优化器"""
-    return UltraPerformanceOptimizer(performance_level, compute_backend, log_manager)
+    return UltraPerformanceOptimizer(performance_level, compute_backend)
 
 
 def run_ultra_fast_backtest(
@@ -692,12 +725,10 @@ def run_ultra_fast_backtest(
 
 
 def benchmark_all_backends(
-    data: pd.DataFrame,
-    log_manager: Optional[LogManager] = None
-) -> Dict[str, Any]:
+        data: pd.DataFrame) -> Dict[str, Any]:
     """基准测试所有后端"""
     optimizer = create_ultra_optimizer(
-        PerformanceLevel.EXTREME, ComputeBackend.HYBRID, log_manager)
+        PerformanceLevel.EXTREME, ComputeBackend.HYBRID)
     try:
         return optimizer.benchmark_performance([len(data)])
     finally:

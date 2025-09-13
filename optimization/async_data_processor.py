@@ -1,3 +1,4 @@
+from loguru import logger
 """
 异步数据处理器模块
 提供多线程数据处理、批量处理和性能优化功能
@@ -6,7 +7,6 @@
 import asyncio
 import threading
 import time
-import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional, Callable, Union
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ import psutil
 from utils.trace_context import get_trace_id, set_trace_id
 from core.performance import measure_performance
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ProcessingPriority(Enum):

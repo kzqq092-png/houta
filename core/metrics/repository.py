@@ -4,12 +4,12 @@ import threading
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
 import datetime
-import logging
 import json
 import time
 from threading import Lock
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 获取项目根目录的绝对路径
 try:

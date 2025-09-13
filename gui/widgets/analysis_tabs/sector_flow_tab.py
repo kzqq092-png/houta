@@ -1,3 +1,4 @@
+from loguru import logger
 """
 板块资金流分析标签页 - 专业版升级
 """
@@ -43,7 +44,7 @@ class SectorFlowTab(SectorFlowTabPro):
                 self.sector_flow_completed.emit(results)
 
         except Exception as e:
-            self.log_manager.error(f"分析完成处理失败: {e}")
+            logger.error(f"分析完成处理失败: {e}")
 
     def _update_flow_display(self, results):
         """更新资金流显示"""

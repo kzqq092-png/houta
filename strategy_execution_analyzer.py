@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 策略执行和风险控制逻辑分析器
@@ -9,7 +10,6 @@
 import sys
 import ast
 import inspect
-import logging
 from typing import Dict, List, Any, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,8 +20,8 @@ import re
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Loguru配置在core.loguru_config中统一管理
+logger = logger
 
 
 @dataclass
@@ -59,7 +59,7 @@ class StrategyExecutionAnalyzer:
 
     def analyze_strategy_execution(self) -> Dict[str, Any]:
         """分析策略执行逻辑"""
-        logger.info("🎯 开始分析策略执行和风险控制逻辑...")
+        logger.info(" 开始分析策略执行和风险控制逻辑...")
 
         results = {
             'execution_flow_analysis': {},
@@ -73,33 +73,33 @@ class StrategyExecutionAnalyzer:
 
         try:
             # 1. 分析执行流程
-            logger.info("📊 分析执行流程...")
+            logger.info(" 分析执行流程...")
             results['execution_flow_analysis'] = self._analyze_execution_flow()
 
             # 2. 分析风险控制
-            logger.info("🛡️ 分析风险控制机制...")
+            logger.info(" 分析风险控制机制...")
             results['risk_control_analysis'] = self._analyze_risk_control()
 
             # 3. 分析交易逻辑
-            logger.info("💰 分析交易逻辑...")
+            logger.info(" 分析交易逻辑...")
             results['trading_logic_issues'] = self._analyze_trading_logic()
 
             # 4. 分析数据完整性
-            logger.info("📋 分析数据完整性...")
+            logger.info(" 分析数据完整性...")
             results['data_integrity_issues'] = self._analyze_data_integrity()
 
             # 5. 分析性能问题
-            logger.info("⚡ 分析性能问题...")
+            logger.info(" 分析性能问题...")
             results['performance_issues'] = self._analyze_performance_issues()
 
             # 6. 生成安全建议
-            logger.info("🔒 生成安全建议...")
+            logger.info(" 生成安全建议...")
             results['safety_recommendations'] = self._generate_safety_recommendations()
 
             # 7. 识别关键修复项
             results['critical_fixes_needed'] = self._identify_critical_fixes(results)
 
-            logger.info("✅ 策略执行分析完成")
+            logger.info(" 策略执行分析完成")
             return results
 
         except Exception as e:
@@ -653,7 +653,7 @@ class StrategyExecutionAnalyzer:
         report.append("=" * 80)
 
         # 执行摘要
-        report.append(f"\n## 📊 执行摘要")
+        report.append(f"\n##  执行摘要")
 
         execution_flow = results.get('execution_flow_analysis', {})
         risk_control = results.get('risk_control_analysis', {})
@@ -670,7 +670,7 @@ class StrategyExecutionAnalyzer:
         # 关键修复项
         critical_fixes = results.get('critical_fixes_needed', [])
         if critical_fixes:
-            report.append(f"\n## 🚨 关键修复项")
+            report.append(f"\n##  关键修复项")
             for fix in critical_fixes:
                 report.append(f"\n### {fix['priority']}. {fix['title']} ({fix['risk_level']})")
                 report.append(f"**类别**: {fix['category']}")
@@ -687,7 +687,7 @@ class StrategyExecutionAnalyzer:
 
         # 执行流程分析
         if execution_flow:
-            report.append(f"\n## 🔄 执行流程分析")
+            report.append(f"\n##  执行流程分析")
 
             bottlenecks = execution_flow.get('bottleneck_points', [])
             if bottlenecks:
@@ -705,7 +705,7 @@ class StrategyExecutionAnalyzer:
 
         # 风险控制分析
         if risk_control:
-            report.append(f"\n## 🛡️ 风险控制分析")
+            report.append(f"\n##  风险控制分析")
 
             missing_controls = risk_control.get('missing_controls', [])
             if missing_controls:
@@ -724,36 +724,36 @@ class StrategyExecutionAnalyzer:
                         report.append(f"- **{method['name']}** ({Path(method['file']).name}:{method['line']})")
                         if method.get('potential_issues'):
                             for issue in method['potential_issues']:
-                                report.append(f"  ⚠️ {issue}")
+                                report.append(f"   {issue}")
 
         # 交易逻辑问题
         if trading_issues:
-            report.append(f"\n## 💰 交易逻辑问题")
+            report.append(f"\n##  交易逻辑问题")
 
             # 按严重程度分组
             high_issues = [issue for issue in trading_issues if issue.get('severity') == 'HIGH']
             medium_issues = [issue for issue in trading_issues if issue.get('severity') == 'MEDIUM']
 
             if high_issues:
-                report.append(f"\n### 🔴 高严重性问题")
+                report.append(f"\n###  高严重性问题")
                 for i, issue in enumerate(high_issues, 1):
                     report.append(f"{i}. **{issue['type']}** ({Path(issue['file']).name}:{issue['line']})")
                     report.append(f"   - 描述: {issue['description']}")
                     report.append(f"   - 代码: `{issue['code']}`")
 
             if medium_issues:
-                report.append(f"\n### 🟡 中严重性问题")
+                report.append(f"\n###  中严重性问题")
                 for i, issue in enumerate(medium_issues[:5], 1):
                     report.append(f"{i}. **{issue['type']}** ({Path(issue['file']).name}:{issue['line']})")
                     report.append(f"   - 描述: {issue['description']}")
 
         # 数据完整性问题
         if data_issues:
-            report.append(f"\n## 📋 数据完整性问题")
+            report.append(f"\n##  数据完整性问题")
 
             high_data_issues = [issue for issue in data_issues if issue.get('severity') == 'HIGH']
             if high_data_issues:
-                report.append(f"\n### 🔴 高风险数据问题")
+                report.append(f"\n###  高风险数据问题")
                 for i, issue in enumerate(high_data_issues, 1):
                     report.append(f"{i}. **{issue['type']}** ({Path(issue['file']).name}:{issue['line']})")
                     report.append(f"   - 描述: {issue['description']}")
@@ -762,7 +762,7 @@ class StrategyExecutionAnalyzer:
         # 安全建议
         safety_recommendations = results.get('safety_recommendations', [])
         if safety_recommendations:
-            report.append(f"\n## 🔒 安全建议")
+            report.append(f"\n##  安全建议")
 
             for rec in safety_recommendations:
                 report.append(f"\n### {rec['priority']} - {rec['title']}")
@@ -794,28 +794,28 @@ class StrategyExecutionAnalyzer:
                 json.dump(results, f, indent=2, ensure_ascii=False, default=str)
 
             # 显示摘要
-            print("\n" + "="*80)
-            print("🎯 策略执行和风险控制分析结果")
-            print("="*80)
+            logger.info("\n" + "="*80)
+            logger.info(" 策略执行和风险控制分析结果")
+            logger.info("="*80)
 
             execution_flow = results.get('execution_flow_analysis', {})
             trading_issues = results.get('trading_logic_issues', [])
             data_issues = results.get('data_integrity_issues', [])
             critical_fixes = results.get('critical_fixes_needed', [])
 
-            print(f"📊 分析结果:")
-            print(f"   执行方法: {len(execution_flow.get('main_execution_methods', []))} 个")
-            print(f"   瓶颈点: {len(execution_flow.get('bottleneck_points', []))} 个")
-            print(f"   交易问题: {len(trading_issues)} 个")
-            print(f"   数据问题: {len(data_issues)} 个")
+            logger.info(f" 分析结果:")
+            logger.info(f"   执行方法: {len(execution_flow.get('main_execution_methods', []))} 个")
+            logger.info(f"   瓶颈点: {len(execution_flow.get('bottleneck_points', []))} 个")
+            logger.info(f"   交易问题: {len(trading_issues)} 个")
+            logger.info(f"   数据问题: {len(data_issues)} 个")
 
             if critical_fixes:
-                print(f"\n🚨 关键修复项:")
+                logger.info(f"\n 关键修复项:")
                 for fix in critical_fixes[:3]:
-                    print(f"   - {fix['title']} ({fix['risk_level']})")
+                    logger.info(f"   - {fix['title']} ({fix['risk_level']})")
 
-            logger.info("📄 策略执行分析报告已保存到 strategy_execution_analysis.md")
-            logger.info("📄 原始分析数据已保存到 strategy_execution_data.json")
+            logger.info(" 策略执行分析报告已保存到 strategy_execution_analysis.md")
+            logger.info(" 原始分析数据已保存到 strategy_execution_data.json")
 
             return results
 

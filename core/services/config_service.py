@@ -1,3 +1,4 @@
+from loguru import logger
 """
 配置服务模块
 
@@ -5,7 +6,6 @@
 集成了原ConfigManager、PluginConfigManager等的所有功能。
 """
 
-import logging
 import json
 import os
 import sqlite3
@@ -40,7 +40,7 @@ try:
     from utils.theme_types import Theme
     from utils.theme_utils import load_theme_json_with_comments
 except ImportError as e:
-    logging.warning(f"配置类型导入失败: {e}")
+    logger.warning(f"配置类型导入失败: {e}")
     # 创建基本的配置类型
     ThemeConfig = dict
     ChartConfig = dict
@@ -50,7 +50,7 @@ except ImportError as e:
     LoggingConfig = dict
     Theme = dict
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'db', 'factorweave_system.sqlite')

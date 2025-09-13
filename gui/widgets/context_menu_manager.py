@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -16,9 +17,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QIcon, QKeySequence, QCursor
-
-from core.logger import get_logger
-
 
 class ContextMenuManager(QObject):
     """右键菜单管理器"""
@@ -39,7 +37,7 @@ class ContextMenuManager(QObject):
             parent: 父对象
         """
         super().__init__(parent)
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
         # 菜单缓存
         self.menu_cache = {}
@@ -711,7 +709,6 @@ class ContextMenuManager(QObject):
 
         except Exception as e:
             self.logger.error(f"处理菜单动作失败: {e}")
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel

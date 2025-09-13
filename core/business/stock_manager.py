@@ -1,3 +1,4 @@
+from loguru import logger
 """
 股票管理业务逻辑
 
@@ -8,7 +9,6 @@
 - 自选股管理
 """
 
-import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -20,7 +20,7 @@ class StockManager:
     """股票管理器"""
 
     def __init__(self, data_access: DataAccess):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
         self.data_access = data_access
         self._favorites = set()  # 自选股列表
         self._industry_cache = {}  # 行业缓存

@@ -1,0 +1,727 @@
+"""
+资产分数据库管理器
+
+提供按资产类型分数据库的管理功能，包括：
+- 资产类型自动识别和路由
+- 多数据库连接管理
+- 数据库自动创建和初始化
+- 统一的查询接口
+- 跨资产类型数据查询
+
+作者: FactorWeave-Quant团队
+版本: 1.0
+"""
+
+import threading
+import os
+from typing import Dict, Any, Optional, List, Union, Tuple
+from pathlib import Path
+from dataclasses import dataclass, field
+from datetime import datetime
+import json
+
+from loguru import logger
+from core.database.duckdb_manager import DuckDBConnectionManager, DuckDBConfig
+from core.asset_type_identifier import AssetTypeIdentifier, get_asset_type_identifier
+from core.plugin_types import AssetType
+
+logger = logger.bind(module=__name__)
+
+
+@dataclass
+class AssetDatabaseConfig:
+    """资产数据库配置"""
+    base_path: str = "data/databases"
+    pool_size: int = 10
+    auto_create: bool = True
+    enable_wal: bool = True
+    backup_enabled: bool = True
+    backup_interval_hours: int = 24
+    compression: str = "zstd"
+    memory_limit: str = "8GB"
+    threads: str = "auto"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            'base_path': self.base_path,
+            'pool_size': self.pool_size,
+            'auto_create': self.auto_create,
+            'enable_wal': self.enable_wal,
+            'backup_enabled': self.backup_enabled,
+            'backup_interval_hours': self.backup_interval_hours,
+            'compression': self.compression,
+            'memory_limit': self.memory_limit,
+            'threads': self.threads
+        }
+
+
+@dataclass
+class AssetDatabaseInfo:
+    """资产数据库信息"""
+    asset_type: AssetType
+    database_path: str
+    created_at: datetime
+    last_accessed: datetime
+    size_mb: float = 0.0
+    table_count: int = 0
+    record_count: int = 0
+    health_status: str = "unknown"
+    supported_data_sources: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            'asset_type': self.asset_type.value,
+            'database_path': self.database_path,
+            'created_at': self.created_at.isoformat(),
+            'last_accessed': self.last_accessed.isoformat(),
+            'size_mb': self.size_mb,
+            'table_count': self.table_count,
+            'record_count': self.record_count,
+            'health_status': self.health_status,
+            'supported_data_sources': self.supported_data_sources
+        }
+
+
+class AssetSeparatedDatabaseManager:
+    """
+    资产分数据库管理器
+
+    按资产类型分离数据库存储，每种资产类型使用独立的DuckDB数据库文件。
+    支持自动识别资产类型、路由到对应数据库、统一查询接口等功能。
+    """
+
+    _instance: Optional['AssetSeparatedDatabaseManager'] = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        """单例模式"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    @classmethod
+    def get_instance(cls, config: Optional[AssetDatabaseConfig] = None) -> 'AssetSeparatedDatabaseManager':
+        """获取单例实例"""
+        if cls._instance is None:
+            cls._instance = cls(config)
+        return cls._instance
+
+    def __init__(self, config: Optional[AssetDatabaseConfig] = None):
+        """
+        初始化资产分数据库管理器
+
+        Args:
+            config: 资产数据库配置
+        """
+        if self._initialized:
+            return
+
+        self.config = config or AssetDatabaseConfig()
+
+        # 核心组件
+        self.asset_identifier = get_asset_type_identifier()
+        self.duckdb_manager = DuckDBConnectionManager()
+
+        # 数据库映射和信息
+        self._asset_databases: Dict[AssetType, str] = {}
+        self._database_info: Dict[AssetType, AssetDatabaseInfo] = {}
+
+        # 线程锁
+        self._db_lock = threading.RLock()
+
+        # 标准表结构定义
+        self._table_schemas = self._initialize_table_schemas()
+
+        # 初始化
+        self._initialize_directories()
+        self._load_existing_databases()
+
+        self._initialized = True
+        logger.info("AssetSeparatedDatabaseManager 初始化完成")
+
+    def _initialize_directories(self):
+        """初始化目录结构"""
+        base_path = Path(self.config.base_path)
+        base_path.mkdir(parents=True, exist_ok=True)
+
+        # 创建各种资产类型的目录
+        for asset_type in AssetType:
+            asset_dir = base_path / asset_type.value.lower()
+            asset_dir.mkdir(exist_ok=True)
+
+        logger.debug(f"目录结构初始化完成: {base_path}")
+
+    def _initialize_table_schemas(self) -> Dict[str, str]:
+        """初始化标准表结构定义"""
+        return {
+            # K线数据表（通用）
+            'historical_kline_data': """
+                CREATE TABLE IF NOT EXISTS historical_kline_data (
+                    symbol VARCHAR NOT NULL,
+                    data_source VARCHAR NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
+                    open DECIMAL(18,6) NOT NULL,
+                    high DECIMAL(18,6) NOT NULL,
+                    low DECIMAL(18,6) NOT NULL,
+                    close DECIMAL(18,6) NOT NULL,
+                    volume BIGINT DEFAULT 0,
+                    amount DECIMAL(18,6) DEFAULT 0,
+                    frequency VARCHAR NOT NULL DEFAULT '1d',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (symbol, data_source, timestamp, frequency)
+                )
+            """,
+
+            # 数据源记录表
+            'data_source_records': """
+                CREATE TABLE IF NOT EXISTS data_source_records (
+                    record_id VARCHAR PRIMARY KEY,
+                    symbol VARCHAR NOT NULL,
+                    data_source VARCHAR NOT NULL,
+                    data_type VARCHAR NOT NULL,
+                    start_date DATE,
+                    end_date DATE,
+                    record_count INTEGER,
+                    file_size_bytes BIGINT,
+                    checksum VARCHAR,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+
+            # 数据质量监控表
+            'data_quality_monitor': """
+                CREATE TABLE IF NOT EXISTS data_quality_monitor (
+                    monitor_id VARCHAR PRIMARY KEY,
+                    symbol VARCHAR NOT NULL,
+                    data_source VARCHAR NOT NULL,
+                    check_date DATE NOT NULL,
+                    quality_score DECIMAL(5,2),
+                    anomaly_count INTEGER DEFAULT 0,
+                    missing_count INTEGER DEFAULT 0,
+                    outlier_count INTEGER DEFAULT 0,
+                    consistency_score DECIMAL(5,2),
+                    completeness_score DECIMAL(5,2),
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """,
+
+            # 统一视图 - 最优质量K线数据
+            'unified_best_quality_kline': """
+                CREATE VIEW IF NOT EXISTS unified_best_quality_kline AS
+                WITH ranked_data AS (
+                    SELECT 
+                        hkd.*,
+                        dqm.quality_score,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY hkd.symbol, hkd.timestamp, hkd.frequency 
+                            ORDER BY COALESCE(dqm.quality_score, 50) DESC, hkd.updated_at DESC
+                        ) as quality_rank
+                    FROM historical_kline_data hkd
+                    LEFT JOIN data_quality_monitor dqm ON (
+                        hkd.symbol = dqm.symbol 
+                        AND hkd.data_source = dqm.data_source 
+                        AND DATE(hkd.timestamp) = dqm.check_date
+                    )
+                )
+                SELECT * FROM ranked_data WHERE quality_rank = 1
+            """,
+
+            # 元数据表
+            'metadata': """
+                CREATE TABLE IF NOT EXISTS metadata (
+                    key VARCHAR PRIMARY KEY,
+                    value TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+        }
+
+    def _load_existing_databases(self):
+        """加载现有数据库"""
+        base_path = Path(self.config.base_path)
+
+        for asset_type in AssetType:
+            db_path = self._get_database_path(asset_type)
+
+            if Path(db_path).exists():
+                self._asset_databases[asset_type] = db_path
+
+                # 获取数据库信息
+                info = self._collect_database_info(asset_type, db_path)
+                self._database_info[asset_type] = info
+
+                logger.debug(f"加载现有数据库: {asset_type.value} -> {db_path}")
+
+    def _get_database_path(self, asset_type: AssetType) -> str:
+        """获取资产类型对应的数据库路径"""
+        base_path = Path(self.config.base_path)
+        asset_dir = base_path / asset_type.value.lower()
+        db_file = asset_dir / f"{asset_type.value.lower()}_data.duckdb"
+        return str(db_file)
+
+    def get_database_path(self, asset_type: AssetType) -> str:
+        """获取资产类型对应的数据库路径 (公共方法)"""
+        return self._get_database_path(asset_type)
+
+    def _collect_database_info(self, asset_type: AssetType, db_path: str) -> AssetDatabaseInfo:
+        """收集数据库信息"""
+        try:
+            # 获取文件信息
+            file_stat = Path(db_path).stat()
+            size_mb = file_stat.st_size / (1024 * 1024)
+
+            # 获取数据库内部信息
+            with self.duckdb_manager.get_connection(db_path) as conn:
+                # 获取表数量
+                tables_result = conn.execute("""
+                    SELECT COUNT(*) as table_count 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'main'
+                """).fetchone()
+                table_count = tables_result[0] if tables_result else 0
+
+                # 获取记录总数（仅查询historical_kline_data表）
+                record_count = 0
+                try:
+                    record_result = conn.execute("""
+                        SELECT COUNT(*) as record_count 
+                        FROM historical_kline_data
+                    """).fetchone()
+                    record_count = record_result[0] if record_result else 0
+                except:
+                    pass  # 表可能不存在
+
+                # 获取支持的数据源
+                supported_sources = []
+                try:
+                    sources_result = conn.execute("""
+                        SELECT DISTINCT data_source 
+                        FROM historical_kline_data
+                    """).fetchall()
+                    supported_sources = [row[0] for row in sources_result]
+                except:
+                    pass  # 表可能不存在
+
+            return AssetDatabaseInfo(
+                asset_type=asset_type,
+                database_path=db_path,
+                created_at=datetime.fromtimestamp(file_stat.st_ctime),
+                last_accessed=datetime.fromtimestamp(file_stat.st_atime),
+                size_mb=size_mb,
+                table_count=table_count,
+                record_count=record_count,
+                health_status="healthy",
+                supported_data_sources=supported_sources
+            )
+
+        except Exception as e:
+            logger.error(f"收集数据库信息失败 {asset_type.value}: {e}")
+            return AssetDatabaseInfo(
+                asset_type=asset_type,
+                database_path=db_path,
+                created_at=datetime.now(),
+                last_accessed=datetime.now(),
+                health_status="error"
+            )
+
+    def get_database_for_asset_type(self, asset_type: AssetType, auto_create: bool = True) -> str:
+        """
+        获取资产类型对应的数据库路径
+
+        Args:
+            asset_type: 资产类型
+            auto_create: 是否自动创建数据库
+
+        Returns:
+            数据库文件路径
+        """
+        with self._db_lock:
+            if asset_type not in self._asset_databases:
+                db_path = self._get_database_path(asset_type)
+
+                if auto_create and self.config.auto_create:
+                    self._create_asset_database(asset_type, db_path)
+
+                self._asset_databases[asset_type] = db_path
+
+            return self._asset_databases[asset_type]
+
+    def get_database_for_symbol(self, symbol: str, auto_create: bool = True) -> Tuple[str, AssetType]:
+        """
+        根据交易符号获取对应的数据库路径和资产类型
+
+        Args:
+            symbol: 交易符号
+            auto_create: 是否自动创建数据库
+
+        Returns:
+            (数据库路径, 资产类型)
+        """
+        asset_type = self.asset_identifier.identify_asset_type_by_symbol(symbol)
+        db_path = self.get_database_for_asset_type(asset_type, auto_create)
+        return db_path, asset_type
+
+    def _create_asset_database(self, asset_type: AssetType, db_path: str):
+        """创建资产数据库"""
+        try:
+            # 确保目录存在
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
+            # 创建数据库并初始化表结构
+            duckdb_config = DuckDBConfig(
+                memory_limit=self.config.memory_limit,
+                threads=self.config.threads,
+                compression=self.config.compression
+            )
+
+            with self.duckdb_manager.get_connection(db_path, config=duckdb_config) as conn:
+                # 创建标准表结构，跳过视图
+                for table_name, schema_sql in self._table_schemas.items():
+                    if table_name == 'unified_best_quality_kline':
+                        continue  # 先跳过视图创建，待基础表创建完成后再创建
+                    try:
+                        conn.execute(schema_sql)
+                        logger.debug(f"创建表 {table_name} 成功")
+                    except Exception as e:
+                        logger.error(f"创建表 {table_name} 失败: {e}")
+                        raise
+
+                # 创建视图（在表创建完成后）
+                if 'unified_best_quality_kline' in self._table_schemas:
+                    try:
+                        conn.execute(self._table_schemas['unified_best_quality_kline'])
+                        logger.debug("创建视图 unified_best_quality_kline 成功")
+                    except Exception as e:
+                        logger.warning(f"创建视图失败: {e}")
+
+                # 插入元数据
+                conn.execute("""
+                    INSERT OR REPLACE INTO metadata (key, value) 
+                    VALUES ('asset_type', ?), ('created_at', ?), ('version', '1.0')
+                """, [asset_type.value, datetime.now().isoformat()])
+
+            # 更新数据库信息
+            info = self._collect_database_info(asset_type, db_path)
+            self._database_info[asset_type] = info
+
+            logger.info(f"创建资产数据库: {asset_type.value} -> {db_path}")
+
+        except Exception as e:
+            logger.error(f"创建资产数据库失败 {asset_type.value}: {e}")
+            raise
+
+    def get_connection(self, asset_type: AssetType, auto_create: bool = True):
+        """
+        获取资产类型对应的数据库连接
+
+        Args:
+            asset_type: 资产类型
+            auto_create: 是否自动创建数据库
+
+        Returns:
+            数据库连接上下文管理器
+        """
+        db_path = self.get_database_for_asset_type(asset_type, auto_create)
+        return self.duckdb_manager.get_connection(db_path, pool_size=self.config.pool_size)
+
+    def get_connection_by_symbol(self, symbol: str, auto_create: bool = True):
+        """
+        根据交易符号获取对应的数据库连接
+
+        Args:
+            symbol: 交易符号
+            auto_create: 是否自动创建数据库
+
+        Returns:
+            数据库连接上下文管理器
+        """
+        db_path, asset_type = self.get_database_for_symbol(symbol, auto_create)
+        return self.duckdb_manager.get_connection(db_path, pool_size=self.config.pool_size)
+
+    def health_check_all(self) -> Dict[str, Dict[str, Any]]:
+        """检查所有资产数据库的健康状态"""
+        results = {}
+
+        with self._db_lock:
+            for asset_type, db_path in self._asset_databases.items():
+                try:
+                    # 基础连接测试
+                    with self.get_connection(asset_type) as conn:
+                        test_result = conn.execute("SELECT 1 as test").fetchone()
+
+                        # 更新数据库信息
+                        info = self._collect_database_info(asset_type, db_path)
+                        self._database_info[asset_type] = info
+
+                        results[asset_type.value] = {
+                            'status': 'healthy',
+                            'database_info': info.to_dict(),
+                            'test_query_result': test_result
+                        }
+
+                except Exception as e:
+                    logger.error(f"健康检查失败 {asset_type.value}: {e}")
+                    results[asset_type.value] = {
+                        'status': 'unhealthy',
+                        'error': str(e),
+                        'database_path': db_path
+                    }
+
+        return results
+
+    def get_all_database_info(self) -> Dict[str, Dict[str, Any]]:
+        """获取所有数据库信息"""
+        results = {}
+
+        with self._db_lock:
+            for asset_type, info in self._database_info.items():
+                results[asset_type.value] = info.to_dict()
+
+        return results
+
+    def get_supported_asset_types(self) -> List[AssetType]:
+        """获取支持的资产类型列表"""
+        with self._db_lock:
+            return list(self._asset_databases.keys())
+
+    def get_database_statistics(self) -> Dict[str, Any]:
+        """获取数据库统计信息"""
+        stats = {
+            'total_databases': len(self._asset_databases),
+            'total_size_mb': 0.0,
+            'total_records': 0,
+            'asset_breakdown': {}
+        }
+
+        with self._db_lock:
+            for asset_type, info in self._database_info.items():
+                stats['total_size_mb'] += info.size_mb
+                stats['total_records'] += info.record_count
+
+                stats['asset_breakdown'][asset_type.value] = {
+                    'size_mb': info.size_mb,
+                    'record_count': info.record_count,
+                    'table_count': info.table_count,
+                    'data_sources': len(info.supported_data_sources),
+                    'health_status': info.health_status
+                }
+
+        return stats
+
+    def backup_database(self, asset_type: AssetType, backup_path: Optional[str] = None) -> str:
+        """
+        备份指定资产类型的数据库
+
+        Args:
+            asset_type: 资产类型
+            backup_path: 备份路径（可选）
+
+        Returns:
+            备份文件路径
+        """
+        if asset_type not in self._asset_databases:
+            raise ValueError(f"资产类型 {asset_type.value} 的数据库不存在")
+
+        source_path = self._asset_databases[asset_type]
+
+        if backup_path is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = Path(self.config.base_path) / "backups"
+            backup_dir.mkdir(exist_ok=True)
+            backup_path = str(backup_dir / f"{asset_type.value.lower()}_backup_{timestamp}.duckdb")
+
+        try:
+            import shutil
+            import time
+
+            # 确保所有连接都已关闭（防止文件锁定）
+            self.duckdb_manager.remove_pool(source_path)
+            time.sleep(0.1)  # 给一点时间让文件句柄完全释放
+
+            shutil.copy2(source_path, backup_path)
+            logger.info(f"数据库备份完成: {asset_type.value} -> {backup_path}")
+            return backup_path
+
+        except Exception as e:
+            logger.error(f"数据库备份失败 {asset_type.value}: {e}")
+            raise
+
+    def restore_database(self, asset_type: AssetType, backup_path: str, force: bool = False):
+        """
+        从备份恢复数据库
+
+        Args:
+            asset_type: 资产类型
+            backup_path: 备份文件路径
+            force: 是否强制覆盖现有数据库
+        """
+        if not Path(backup_path).exists():
+            raise FileNotFoundError(f"备份文件不存在: {backup_path}")
+
+        target_path = self._get_database_path(asset_type)
+
+        if Path(target_path).exists() and not force:
+            raise ValueError(f"目标数据库已存在，使用 force=True 强制覆盖: {target_path}")
+
+        try:
+            import shutil
+
+            # 如果目标数据库存在，先备份
+            if Path(target_path).exists():
+                backup_existing = f"{target_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                shutil.copy2(target_path, backup_existing)
+                logger.info(f"现有数据库已备份: {backup_existing}")
+
+            # 恢复数据库
+            shutil.copy2(backup_path, target_path)
+
+            # 更新内部记录
+            self._asset_databases[asset_type] = target_path
+            info = self._collect_database_info(asset_type, target_path)
+            self._database_info[asset_type] = info
+
+            logger.info(f"数据库恢复完成: {asset_type.value} <- {backup_path}")
+
+        except Exception as e:
+            logger.error(f"数据库恢复失败 {asset_type.value}: {e}")
+            raise
+
+    def cleanup_old_backups(self, days_to_keep: int = 30):
+        """清理旧备份文件"""
+        backup_dir = Path(self.config.base_path) / "backups"
+
+        if not backup_dir.exists():
+            return
+
+        cutoff_time = datetime.now().timestamp() - (days_to_keep * 24 * 3600)
+        cleaned_count = 0
+
+        try:
+            for backup_file in backup_dir.glob("*_backup_*.duckdb"):
+                if backup_file.stat().st_mtime < cutoff_time:
+                    backup_file.unlink()
+                    cleaned_count += 1
+                    logger.debug(f"删除旧备份: {backup_file}")
+
+            logger.info(f"清理完成，删除了 {cleaned_count} 个旧备份文件")
+
+        except Exception as e:
+            logger.error(f"清理备份文件失败: {e}")
+
+    def check_database_health(self, asset_type: AssetType) -> Dict[str, Any]:
+        """检查指定资产类型数据库的健康状态"""
+        try:
+            db_path = self._get_database_path(asset_type)
+
+            # 检查数据库文件是否存在
+            if not Path(db_path).exists():
+                return {
+                    "status": "unhealthy",
+                    "reason": "database_file_not_found",
+                    "path": db_path
+                }
+
+            # 检查数据库连接
+            try:
+                with self.duckdb_manager.get_connection(db_path) as conn:
+                    # 执行简单查询测试连接
+                    result = conn.execute("SELECT 1").fetchone()
+                    if result and result[0] == 1:
+                        # 获取表数量
+                        table_count = conn.execute("""
+                            SELECT COUNT(*) as table_count 
+                            FROM information_schema.tables 
+                            WHERE table_schema = 'main'
+                        """).fetchone()[0]
+
+                        return {
+                            "status": "healthy",
+                            "path": db_path,
+                            "table_count": table_count,
+                            "connection_test": "passed"
+                        }
+                    else:
+                        return {
+                            "status": "unhealthy",
+                            "reason": "connection_test_failed",
+                            "path": db_path
+                        }
+            except Exception as conn_error:
+                return {
+                    "status": "unhealthy",
+                    "reason": "connection_error",
+                    "path": db_path,
+                    "error": str(conn_error)
+                }
+
+        except Exception as e:
+            logger.error(f"检查数据库健康状态失败 {asset_type.value}: {e}")
+            return {
+                "status": "error",
+                "reason": "health_check_failed",
+                "error": str(e)
+            }
+
+    def close_all_connections(self):
+        """关闭所有数据库连接"""
+        try:
+            self.duckdb_manager.close_all_pools()
+            logger.info("所有资产数据库连接已关闭")
+
+        except Exception as e:
+            logger.error(f"关闭数据库连接失败: {e}")
+
+
+# 全局实例
+_asset_db_manager: Optional[AssetSeparatedDatabaseManager] = None
+_manager_lock = threading.Lock()
+
+
+def get_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
+    """获取全局资产数据库管理器实例"""
+    global _asset_db_manager
+
+    with _manager_lock:
+        if _asset_db_manager is None:
+            _asset_db_manager = AssetSeparatedDatabaseManager(config)
+
+        return _asset_db_manager
+
+
+def initialize_asset_database_manager(config: Optional[AssetDatabaseConfig] = None) -> AssetSeparatedDatabaseManager:
+    """初始化资产数据库管理器"""
+    global _asset_db_manager
+
+    with _manager_lock:
+        if _asset_db_manager is not None:
+            _asset_db_manager.close_all_connections()
+
+        _asset_db_manager = AssetSeparatedDatabaseManager(config)
+        logger.info("AssetSeparatedDatabaseManager 已初始化")
+
+        return _asset_db_manager
+
+
+def cleanup_asset_database_manager():
+    """清理资产数据库管理器"""
+    global _asset_db_manager
+
+    with _manager_lock:
+        if _asset_db_manager is not None:
+            _asset_db_manager.close_all_connections()
+            _asset_db_manager = None
+            logger.info("AssetSeparatedDatabaseManager 已清理")
+
+
+def get_asset_separated_database_manager() -> AssetSeparatedDatabaseManager:
+    """获取资产分数据库管理器实例（便捷函数）"""
+    return AssetSeparatedDatabaseManager.get_instance()

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 数据访问最佳实践示例
@@ -5,7 +6,6 @@
 演示如何正确使用系统框架获取数据，而不是直接实例化DataAccess类。
 """
 
-import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
@@ -14,7 +14,7 @@ from core.containers import get_service_container
 from core.services.unified_data_manager import get_unified_data_manager
 from core.services.stock_service import StockService
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataAccessExamples:
@@ -29,19 +29,19 @@ class DataAccessExamples:
     def _initialize_services(self):
         """初始化服务"""
         try:
-            # ✅ 获取服务容器
+            #  获取服务容器
             self.service_container = get_service_container()
-            logger.info("✅ 获取服务容器成功")
+            logger.info(" 获取服务容器成功")
 
-            # ✅ 获取统一数据管理器
+            #  获取统一数据管理器
             self.data_manager = get_unified_data_manager()
             if self.data_manager:
-                logger.info("✅ 获取统一数据管理器成功")
+                logger.info(" 获取统一数据管理器成功")
 
-            # ✅ 从服务容器获取股票服务
+            #  从服务容器获取股票服务
             if self.service_container and self.service_container.is_registered(StockService):
                 self.stock_service = self.service_container.resolve(StockService)
-                logger.info("✅ 获取股票服务成功")
+                logger.info(" 获取股票服务成功")
 
         except Exception as e:
             logger.error(f"服务初始化失败: {e}")
@@ -49,7 +49,7 @@ class DataAccessExamples:
     def example_1_get_stock_list_via_unified_manager(self) -> List[Dict[str, Any]]:
         """
         示例1：通过统一数据管理器获取股票列表
-        ✅ 推荐方式
+         推荐方式
         """
         logger.info("=== 示例1：使用统一数据管理器获取股票列表 ===")
 
@@ -62,7 +62,7 @@ class DataAccessExamples:
             stock_list = self.data_manager.get_stock_list()
 
             if stock_list:
-                logger.info(f"✅ 通过统一数据管理器获取到 {len(stock_list)} 只股票")
+                logger.info(f" 通过统一数据管理器获取到 {len(stock_list)} 只股票")
                 return stock_list[:10]  # 返回前10只股票作为示例
             else:
                 logger.warning("未获取到股票数据")
@@ -75,7 +75,7 @@ class DataAccessExamples:
     def example_2_get_stock_list_via_stock_service(self) -> List[Dict[str, Any]]:
         """
         示例2：通过股票服务获取股票列表
-        ✅ 推荐方式
+         推荐方式
         """
         logger.info("=== 示例2：使用股票服务获取股票列表 ===")
 
@@ -88,7 +88,7 @@ class DataAccessExamples:
             stock_list = self.stock_service.get_stock_list()
 
             if stock_list:
-                logger.info(f"✅ 通过股票服务获取到 {len(stock_list)} 只股票")
+                logger.info(f" 通过股票服务获取到 {len(stock_list)} 只股票")
                 return stock_list[:10]  # 返回前10只股票作为示例
             else:
                 logger.warning("未获取到股票数据")
@@ -101,7 +101,7 @@ class DataAccessExamples:
     def example_3_get_stock_data_with_fallback(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
         示例3：获取单只股票数据（带回退机制）
-        ✅ 推荐方式 - 多重回退保证可用性
+         推荐方式 - 多重回退保证可用性
         """
         logger.info(f"=== 示例3：获取股票 {symbol} 的数据（带回退机制） ===")
 
@@ -110,7 +110,7 @@ class DataAccessExamples:
             if self.data_manager:
                 stock_data = self.data_manager.get_stock_data(symbol, period='D', count=30)
                 if stock_data is not None and not stock_data.empty:
-                    logger.info(f"✅ 通过统一数据管理器获取到 {symbol} 的数据")
+                    logger.info(f" 通过统一数据管理器获取到 {symbol} 的数据")
                     return {
                         'symbol': symbol,
                         'data': stock_data,
@@ -125,7 +125,7 @@ class DataAccessExamples:
             if self.stock_service:
                 stock_data = self.stock_service.get_stock_data(symbol, period='D', count=30)
                 if stock_data is not None and not stock_data.empty:
-                    logger.info(f"✅ 通过股票服务获取到 {symbol} 的数据")
+                    logger.info(f" 通过股票服务获取到 {symbol} 的数据")
                     return {
                         'symbol': symbol,
                         'data': stock_data,
@@ -145,7 +145,7 @@ class DataAccessExamples:
 
             kline_data_obj = data_access.get_kline_data(symbol, period='D', count=30)
             if kline_data_obj and kline_data_obj.data is not None and not kline_data_obj.data.empty:
-                logger.info(f"✅ 通过备用方案获取到 {symbol} 的数据")
+                logger.info(f" 通过备用方案获取到 {symbol} 的数据")
                 return {
                     'symbol': symbol,
                     'data': kline_data_obj.data,
@@ -155,18 +155,18 @@ class DataAccessExamples:
         except Exception as e:
             logger.error(f"备用方案获取 {symbol} 失败: {e}")
 
-        logger.error(f"❌ 所有方法都无法获取 {symbol} 的数据")
+        logger.error(f" 所有方法都无法获取 {symbol} 的数据")
         return None
 
     def example_4_wrong_way_direct_instantiation(self):
         """
         示例4：错误的方式 - 直接实例化DataAccess
-        ❌ 不推荐，仅用于说明
+         不推荐，仅用于说明
         """
         logger.info("=== 示例4：错误的方式 - 直接实例化DataAccess ===")
-        logger.warning("❌ 以下代码展示了不推荐的做法：")
+        logger.warning(" 以下代码展示了不推荐的做法：")
 
-        # ❌ 错误的做法
+        #  错误的做法
         # from core.data.data_access import DataAccess
         # data_access = DataAccess()  # 直接实例化
 
@@ -176,7 +176,7 @@ class DataAccessExamples:
         logger.warning("3. 难以进行单元测试")
         logger.warning("4. 可能造成资源浪费")
 
-        logger.info("✅ 应该使用前面示例中的方法")
+        logger.info(" 应该使用前面示例中的方法")
 
 
 class ComponentWithProperDataAccess:
@@ -186,7 +186,7 @@ class ComponentWithProperDataAccess:
 
     def __init__(self, service_container=None):
         """
-        ✅ 正确的构造函数 - 接收服务容器
+         正确的构造函数 - 接收服务容器
         """
         self.service_container = service_container
         self.data_manager = None
@@ -196,25 +196,25 @@ class ComponentWithProperDataAccess:
     def initialize(self):
         """初始化组件"""
         try:
-            # ✅ 从服务容器获取依赖
+            #  从服务容器获取依赖
             if self.service_container:
                 try:
                     from core.services.unified_data_manager import UnifiedDataManager
                     self.data_manager = self.service_container.resolve(UnifiedDataManager)
-                    logger.info("✅ 组件获取到统一数据管理器")
+                    logger.info(" 组件获取到统一数据管理器")
                 except Exception as e:
                     logger.warning(f"无法获取统一数据管理器: {e}")
 
                 try:
                     self.stock_service = self.service_container.resolve(StockService)
-                    logger.info("✅ 组件获取到股票服务")
+                    logger.info(" 组件获取到股票服务")
                 except Exception as e:
                     logger.warning(f"无法获取股票服务: {e}")
 
             # 备用方案
             if not self.data_manager and not self.stock_service:
                 self.data_manager = get_unified_data_manager()
-                logger.info("✅ 组件通过全局函数获取到统一数据管理器")
+                logger.info(" 组件通过全局函数获取到统一数据管理器")
 
             self._initialized = True
 
@@ -226,7 +226,7 @@ class ComponentWithProperDataAccess:
         if not self._initialized:
             self.initialize()
 
-        # ✅ 使用注入的依赖获取数据
+        #  使用注入的依赖获取数据
         if self.data_manager:
             return self.data_manager.get_stock_data(symbol)
         elif self.stock_service:
@@ -277,9 +277,7 @@ def main():
 
 if __name__ == "__main__":
     # 配置日志
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Loguru配置在core.loguru_config中统一管理s - %(name)s - %(levelname)s - %(message)s'
     )
 
     main()

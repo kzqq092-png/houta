@@ -1,3 +1,4 @@
+from loguru import logger
 """
 HIkyuu指标插件
 
@@ -5,7 +6,6 @@ HIkyuu指标插件
 HIkyuu是专业的量化分析框架，具有优秀的性能和丰富的指标库。
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import time
@@ -25,7 +25,7 @@ from core.indicator_extensions import (
     IndicatorCalculationContext
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class HikyuuIndicatorsPlugin(IIndicatorPlugin):

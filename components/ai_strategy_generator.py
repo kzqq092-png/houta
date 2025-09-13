@@ -1,3 +1,4 @@
+from loguru import logger
 """
 AI策略生成器 - 重构版本
 
@@ -6,9 +7,8 @@ AI策略生成器 - 重构版本
 
 from core.containers import get_service_container
 from core.services.trading_service import TradingService
-import logging
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 def run_backtest(params):

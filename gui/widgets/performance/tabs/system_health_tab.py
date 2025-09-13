@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -6,7 +7,6 @@
 """
 
 import json
-import logging
 from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton,
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSlot
 from gui.widgets.performance.workers.async_workers import SystemHealthCheckThread
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ModernSystemHealthTab(QWidget):
@@ -26,6 +26,30 @@ class ModernSystemHealthTab(QWidget):
         super().__init__()
         self._health_checker = health_checker
         self._check_thread = None
+
+        # 如果没有传入health_checker，尝试创建一个
+        if not self._health_checker:
+            try:
+                from analysis.system_health_checker import SystemHealthChecker
+                from core.metrics.aggregation_service import MetricsAggregationService
+                from core.metrics.repository import MetricsRepository
+                from core.events import EventBus
+
+                # 创建必要的组件
+                event_bus = EventBus()
+                repo = MetricsRepository(db_path=':memory:')
+                agg_service = MetricsAggregationService(event_bus, repo)
+
+                # 创建健康检查器
+                self._health_checker = SystemHealthChecker(
+                    aggregation_service=agg_service,
+                    repository=repo
+                )
+                logger.info("已自动创建系统健康检查器")
+            except Exception as e:
+                logger.error(f"创建健康检查器失败: {e}")
+                self._health_checker = None
+
         self.init_ui()
 
     def init_ui(self):
@@ -34,10 +58,10 @@ class ModernSystemHealthTab(QWidget):
         layout.setSpacing(10)
 
         # 健康检查控制面板
-        control_group = QGroupBox("🏥 系统健康检查")
+        control_group = QGroupBox(" 系统健康检查")
         control_layout = QHBoxLayout()
 
-        self.check_button = QPushButton("🔍 开始健康检查")
+        self.check_button = QPushButton(" 开始健康检查")
         self.check_button.clicked.connect(self.run_health_check)
         control_layout.addWidget(self.check_button)
 
@@ -49,7 +73,7 @@ class ModernSystemHealthTab(QWidget):
         layout.addWidget(control_group)
 
         # 健康状态总览
-        overview_group = QGroupBox("📊 健康状态总览")
+        overview_group = QGroupBox(" 健康状态总览")
         overview_layout = QGridLayout()
 
         self.overall_status_label = QLabel("总体状态: 未检查")
@@ -78,19 +102,21 @@ class ModernSystemHealthTab(QWidget):
         layout.addWidget(overview_group)
 
         # 详细报告
-        report_group = QGroupBox("📋 详细报告")
+        report_group = QGroupBox(" 详细报告")
         report_layout = QVBoxLayout()
 
         self.report_text = QTextEdit()
         self.report_text.setReadOnly(True)
-        self.report_text.setMaximumHeight(200)
+        self.report_text.setMaximumHeight(300)
+        # 启用HTML渲染
+        self.report_text.setHtml("<p>点击'开始健康检查'按钮开始检查系统健康状态</p>")
         report_layout.addWidget(self.report_text)
 
         report_group.setLayout(report_layout)
         layout.addWidget(report_group)
 
         # 建议和操作
-        recommendations_group = QGroupBox("💡 建议和操作")
+        recommendations_group = QGroupBox(" 建议和操作")
         recommendations_layout = QVBoxLayout()
 
         self.recommendations_list = QListWidget()
@@ -160,7 +186,7 @@ class ModernSystemHealthTab(QWidget):
             return
 
         self.check_button.setEnabled(False)
-        self.check_button.setText("🔄 检查中...")
+        self.check_button.setText(" 检查中...")
 
         self._check_thread = SystemHealthCheckThread(self._health_checker)
         self._check_thread.health_check_completed.connect(self.on_check_completed)
@@ -171,7 +197,7 @@ class ModernSystemHealthTab(QWidget):
     def on_check_completed(self, report: dict):
         """健康检查完成处理"""
         self.check_button.setEnabled(True)
-        self.check_button.setText("🔍 开始健康检查")
+        self.check_button.setText(" 开始健康检查")
 
         # 更新总体状态
         overall_health = report.get('overall_health', 'unknown')
@@ -192,9 +218,9 @@ class ModernSystemHealthTab(QWidget):
             card.status_label.setText(status)
             card.status_label.setStyleSheet(f"color: {status_colors.get(status, '#7f8c8d')}; font-size: 11px;")
 
-        # 更新详细报告
-        report_text = json.dumps(report, indent=2, ensure_ascii=False)
-        self.report_text.setPlainText(report_text)
+        # 更新详细报告 - 使用HTML表格格式
+        report_html = self._generate_html_report(report)
+        self.report_text.setHtml(report_html)
 
         # 更新建议
         self.recommendations_list.clear()
@@ -206,13 +232,13 @@ class ModernSystemHealthTab(QWidget):
     def on_check_error(self, error: str):
         """健康检查错误处理"""
         self.check_button.setEnabled(True)
-        self.check_button.setText("🔍 开始健康检查")
+        self.check_button.setText(" 开始健康检查")
 
-        # 🔧 修复：更好的错误显示和日志
+        #  修复：更好的错误显示和日志
         logger.error(f"健康检查失败: {error}")
 
         # 在报告区域显示错误信息
-        error_report = f"""❌ 健康检查失败
+        error_report = f""" 健康检查失败
 
 错误信息: {error}
 
@@ -231,3 +257,119 @@ class ModernSystemHealthTab(QWidget):
 
         # 也显示弹窗
         QMessageBox.critical(self, "检查错误", f"健康检查失败：{error}")
+
+    def _generate_html_report(self, report: dict) -> str:
+        """生成HTML格式的健康检查报告"""
+        try:
+            html = """
+            <html>
+            <head>
+                <style>
+                    body { font-family: 'Microsoft YaHei', Arial, sans-serif; font-size: 12px; }
+                    .header { background: #2c3e50; color: white; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+                    .section { margin-bottom: 15px; }
+                    .section-title { font-weight: bold; color: #2c3e50; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; margin-bottom: 8px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+                    th, td { border: 1px solid #bdc3c7; padding: 8px; text-align: left; }
+                    th { background: #ecf0f1; font-weight: bold; }
+                    .status-healthy { color: #27ae60; font-weight: bold; }
+                    .status-warning { color: #f39c12; font-weight: bold; }
+                    .status-error { color: #e74c3c; font-weight: bold; }
+                    .status-critical { color: #c0392b; font-weight: bold; }
+                    .timestamp { color: #7f8c8d; font-size: 11px; }
+                    .metric-value { font-family: 'Consolas', monospace; }
+                </style>
+            </head>
+            <body>
+            """
+
+            # 报告头部
+            timestamp = report.get('timestamp', datetime.now().isoformat())
+            overall_health = report.get('overall_health', 'unknown')
+
+            html += f"""
+            <div class="header">
+                <h3>FactorWeave-Quant 系统健康检查报告</h3>
+                <div class="timestamp">检查时间: {timestamp}</div>
+                <div>总体状态: <span class="status-{overall_health}">{overall_health.upper()}</span></div>
+            </div>
+            """
+
+            # 系统概览表格
+            html += """
+            <div class="section">
+                <div class="section-title">系统概览</div>
+                <table>
+                    <tr><th>检查项目</th><th>状态</th><th>详细信息</th></tr>
+            """
+
+            # 各子系统状态
+            subsystem_names = {
+                'system_info': '系统信息',
+                'pattern_recognition': '形态识别',
+                'performance_metrics': '性能指标',
+                'cache_system': '缓存系统',
+                'memory_usage': '内存使用',
+                'dependencies': '依赖检查',
+                'database_connectivity': '数据库连接',
+                'ui_components': 'UI组件'
+            }
+
+            for key, name in subsystem_names.items():
+                subsystem_data = report.get(key, {})
+                status = subsystem_data.get('status', 'unknown')
+
+                # 提取关键信息
+                details = []
+                if key == 'system_info':
+                    version = subsystem_data.get('version', 'unknown')
+                    patterns = subsystem_data.get('supported_patterns', 0)
+                    details.append(f"版本: {version}, 支持形态: {patterns}种")
+                elif key == 'performance_metrics':
+                    ops = subsystem_data.get('live_monitored_operations', 0)
+                    calls = subsystem_data.get('live_total_calls', 0)
+                    success_rate = subsystem_data.get('live_success_rate', 0)
+                    details.append(f"监控操作: {ops}, 总调用: {calls}, 成功率: {success_rate:.1%}")
+                elif key == 'cache_system':
+                    size = subsystem_data.get('cache_size', 0)
+                    hit_rate = subsystem_data.get('hit_rate', 0)
+                    details.append(f"缓存大小: {size}, 命中率: {hit_rate:.1%}")
+                elif key == 'memory_usage':
+                    cpu = subsystem_data.get('cpu_percent', 0)
+                    mem = subsystem_data.get('memory_percent', 0)
+                    details.append(f"CPU: {cpu:.1f}%, 内存: {mem:.1f}%")
+
+                detail_text = '; '.join(details) if details else subsystem_data.get('error', '正常')
+
+                html += f"""
+                    <tr>
+                        <td>{name}</td>
+                        <td><span class="status-{status}">{status}</span></td>
+                        <td class="metric-value">{detail_text}</td>
+                    </tr>
+                """
+
+            html += "</table></div>"
+
+            # 建议和操作
+            recommendations = report.get('recommendations', [])
+            if recommendations:
+                html += """
+                <div class="section">
+                    <div class="section-title">优化建议</div>
+                    <ul>
+                """
+                for rec in recommendations:
+                    html += f"<li>{rec}</li>"
+                html += "</ul></div>"
+
+            html += """
+            </body>
+            </html>
+            """
+
+            return html
+
+        except Exception as e:
+            logger.error(f"生成HTML报告失败: {e}")
+            return f"<p>报告生成失败: {e}</p><pre>{json.dumps(report, indent=2, ensure_ascii=False)}</pre>"

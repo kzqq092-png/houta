@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -13,7 +14,6 @@ FactorWeave-Quant 性能监控集成模块
 
 import time
 import threading
-import logging
 import json
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -27,7 +27,7 @@ from .unified_monitor import (
 )
 from ..database.factorweave_analytics_db import get_analytics_db
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 行业管理器模块，负责管理股票行业分类数据
 """
@@ -38,7 +39,7 @@ except ImportError:
                 try:
                     callback(*args, **kwargs)
                 except Exception as e:
-                    print(f"Signal callback error: {e}")
+                    logger.info(f"Signal callback error: {e}")
 
         def connect(self, callback):
             if callback not in self._callbacks:
@@ -57,18 +58,18 @@ except ImportError:
 
 # 导入日志管理器
 try:
-    from core.logger import LogManager
+    # 纯Loguru架构，移除旧的日志导入
+    pass
 except ImportError:
     # 如果导入失败，创建简化版
     class LogManager:
         def __init__(self, config=None):
             pass
 
-        def info(self, msg): print(f"[INFO] {msg}")
-        def error(self, msg): print(f"[ERROR] {msg}")
-        def warning(self, msg): print(f"[WARNING] {msg}")
-        def debug(self, msg): print(f"[DEBUG] {msg}")
-
+        def info(self, msg): logger.info(f"[INFO] {msg}")
+        def error(self, msg): logger.info(f"[ERROR] {msg}")
+        def warning(self, msg): logger.info(f"[WARNING] {msg}")
+        def debug(self, msg): logger.info(f"[DEBUG] {msg}")
 
 class IndustryManager(QObject):
     """行业管理器类"""
@@ -76,27 +77,20 @@ class IndustryManager(QObject):
     industry_updated = pyqtSignal()  # 行业数据更新信号
     update_error = pyqtSignal(str)   # 更新错误信号
 
-    def __init__(self, config_dir: str = "", cache_file: str = "industry_cache.json", log_manager: Optional[LogManager] = None):
+    def __init__(self, config_dir: str = "", cache_file: str = "industry_cache.json"):
         """初始化行业管理器
 
         Args:
             config_dir: 配置目录
             cache_file: 缓存文件名
-            log_manager: 日志管理器实例
         """
         super().__init__()
         initialization_start_time = time.time()
 
         try:
-            # 确保日志管理器优先使用传入的实例
-            if log_manager is not None:
-                self.log_manager = log_manager
-                self.log_manager.info(
-                    f"IndustryManager初始化开始 - 使用外部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
-            else:
-                self.log_manager = LogManager()
-                self.log_manager.info(
-                    f"IndustryManager初始化开始 - 使用内部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
+            # 纯Loguru架构，移除log_manager依赖
+            logger.info(
+                f"IndustryManager初始化开始 - 使用内部日志管理器, PyQt5可用: {PYQT5_AVAILABLE}")
 
             # 设置配置目录
             if config_dir:
@@ -105,11 +99,11 @@ class IndustryManager(QObject):
                 self.config_dir = os.path.join(
                     os.path.dirname(os.path.dirname(__file__)), "config")
 
-            self.log_manager.info(f"配置目录设置为: {self.config_dir}")
+            logger.info(f"配置目录设置为: {self.config_dir}")
 
             # 设置缓存文件路径
             self.cache_file = os.path.join(self.config_dir, cache_file)
-            self.log_manager.info(f"缓存文件路径: {self.cache_file}")
+            logger.info(f"缓存文件路径: {self.cache_file}")
 
             # 初始化属性
             self.cache_lock = Lock()
@@ -117,45 +111,45 @@ class IndustryManager(QObject):
             self.last_update_time = None
             self.update_interval = timedelta(days=1)  # 默认1天更新一次
 
-            self.log_manager.info("基础属性初始化完成")
+            logger.info("基础属性初始化完成")
 
             # 确保配置目录存在
             if not os.path.exists(self.config_dir):
                 try:
                     os.makedirs(self.config_dir, exist_ok=True)
-                    self.log_manager.info(f"创建配置目录成功: {self.config_dir}")
+                    logger.info(f"创建配置目录成功: {self.config_dir}")
                 except Exception as e:
-                    self.log_manager.error(f"创建配置目录失败: {e}")
+                    logger.error(f"创建配置目录失败: {e}")
                     # 尝试使用临时目录
                     import tempfile
                     self.config_dir = tempfile.gettempdir()
                     self.cache_file = os.path.join(self.config_dir, cache_file)
-                    self.log_manager.warning(f"使用临时目录: {self.config_dir}")
+                    logger.warning(f"使用临时目录: {self.config_dir}")
 
             # 加载缓存数据
             try:
-                self.log_manager.info("开始加载缓存数据")
+                logger.info("开始加载缓存数据")
                 self.load_cache()
-                self.log_manager.info("缓存数据加载成功")
+                logger.info("缓存数据加载成功")
             except Exception as e:
-                self.log_manager.error(f"加载缓存数据失败: {e}")
+                logger.error(f"加载缓存数据失败: {e}")
                 # 加载失败时使用默认数据
                 self._load_default_industry_data()
 
             # 记录初始化完成
             initialization_time = int(
                 (time.time() - initialization_start_time) * 1000)
-            self.log_manager.info(
+            logger.info(
                 f"IndustryManager初始化完成 - 耗时: {initialization_time}ms, 行业数据: {len(self.industry_data)}个")
 
         except Exception as e:
             # 确保即使在严重错误时也能记录日志
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"IndustryManager初始化异常: {e}")
-                self.log_manager.error(f"异常堆栈: {traceback.format_exc()}")
+            if True:  # 使用Loguru日志
+                logger.error(f"IndustryManager初始化异常: {e}")
+                logger.error(f"异常堆栈: {traceback.format_exc()}")
             else:
-                print(f"IndustryManager初始化异常: {e}")
-                print(f"异常堆栈: {traceback.format_exc()}")
+                logger.info(f"IndustryManager初始化异常: {e}")
+                logger.info(f"异常堆栈: {traceback.format_exc()}")
 
             # 重新抛出异常，让调用方处理
             raise
@@ -163,7 +157,7 @@ class IndustryManager(QObject):
     def load_cache(self) -> None:
         """加载缓存数据"""
         start_time = time.time()
-        self.log_manager.info("开始加载缓存数据")
+        logger.info("开始加载缓存数据")
         try:
             if os.path.exists(self.cache_file):
                 with self.cache_lock:
@@ -171,7 +165,7 @@ class IndustryManager(QObject):
                         content = f.read()
                         if not content.strip():
                             # 文件为空，使用默认数据，后台更新
-                            self.log_manager.warning("缓存为空，使用默认数据")
+                            logger.warning("缓存为空，使用默认数据")
                             self._load_default_industry_data()
                             # 启动后台更新任务
                             self._schedule_background_update()
@@ -180,7 +174,7 @@ class IndustryManager(QObject):
                         try:
                             data = json.loads(content)
                         except Exception as e:
-                            self.log_manager.error(f"缓存损坏，使用默认数据: {e}")
+                            logger.error(f"缓存损坏，使用默认数据: {e}")
                             # 删除损坏的缓存文件
                             try:
                                 os.remove(self.cache_file)
@@ -198,18 +192,18 @@ class IndustryManager(QObject):
                                 last_update)
             else:
                 # 缓存文件不存在，使用默认数据
-                self.log_manager.warning("缓存文件不存在，使用默认数据")
+                logger.warning("缓存文件不存在，使用默认数据")
                 self._load_default_industry_data()
                 self._schedule_background_update()
 
         except Exception as e:
-            self.log_manager.error(f"加载缓存数据失败: {e}")
+            logger.error(f"加载缓存数据失败: {e}")
             # 加载失败，使用默认数据
             self._load_default_industry_data()
             self._schedule_background_update()
         finally:
             elapsed = int((time.time() - start_time) * 1000)
-            self.log_manager.info(f"加载缓存完成 - 耗时: {elapsed}ms")
+            logger.info(f"加载缓存完成 - 耗时: {elapsed}ms")
 
     def save_cache(self) -> None:
         """保存缓存数据"""
@@ -222,7 +216,7 @@ class IndustryManager(QObject):
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            self.log_manager.error(f"保存缓存数据失败: {e}")
+            logger.error(f"保存缓存数据失败: {e}")
 
     def _load_default_industry_data(self) -> None:
         """加载默认行业数据"""
@@ -250,10 +244,10 @@ class IndustryManager(QObject):
                 "BK0019": {"code": "BK0019", "name": "纺织服装", "type": "theme", "market": "THEME"},
                 "BK0020": {"code": "BK0020", "name": "医疗器械", "type": "theme", "market": "THEME"},
             }
-            self.log_manager.info(
+            logger.info(
                 f"加载默认行业数据成功 - 数据数量: {len(self.industry_data)}")
         except Exception as e:
-            self.log_manager.error(f"加载默认行业数据失败: {e}")
+            logger.error(f"加载默认行业数据失败: {e}")
             self.industry_data = {}
 
     def _schedule_background_update(self) -> None:
@@ -263,25 +257,25 @@ class IndustryManager(QObject):
 
             def background_update():
                 try:
-                    self.log_manager.info("开始后台更新任务")
+                    logger.info("开始后台更新任务")
                     # 等待一段时间后开始更新，避免影响启动速度
                     time.sleep(5)
                     success = self.update_industry_data(force=True)
                     if success:
-                        self.log_manager.info("后台更新任务成功")
+                        logger.info("后台更新任务成功")
                     else:
-                        self.log_manager.warning("后台更新任务失败")
+                        logger.warning("后台更新任务失败")
                 except Exception as e:
-                    self.log_manager.error(f"后台更新任务失败: {e}")
+                    logger.error(f"后台更新任务失败: {e}")
 
             # 创建后台线程
             update_thread = threading.Thread(
                 target=background_update, daemon=True)
             update_thread.start()
 
-            self.log_manager.info("后台更新任务安排成功")
+            logger.info("后台更新任务安排成功")
         except Exception as e:
-            self.log_manager.error(f"安排后台更新任务失败: {e}")
+            logger.error(f"安排后台更新任务失败: {e}")
 
     def _get_eastmoney_industry_data(self) -> Dict:
         """获取东方财富行业分类和板块数据
@@ -427,12 +421,12 @@ class IndustryManager(QObject):
                                 'market': 'INDEX'
                             }
 
-            self.log_manager.info(f"获取东方财富行业数据成功 - 记录数量: {len(result)}")
+            logger.info(f"获取东方财富行业数据成功 - 记录数量: {len(result)}")
             return result
 
         except Exception as e:
-            self.log_manager.error(f"获取东方财富行业数据失败: {e}")
-            self.log_manager.error(f"异常堆栈: {traceback.format_exc()}")
+            logger.error(f"获取东方财富行业数据失败: {e}")
+            logger.error(f"异常堆栈: {traceback.format_exc()}")
             return {}
 
     def update_industry_data(self, force: bool = False) -> bool:
@@ -482,7 +476,7 @@ class IndustryManager(QObject):
 
         except Exception as e:
             error_msg = f"更新行业数据失败: {str(e)}"
-            self.log_manager.error(error_msg)
+            logger.error(error_msg)
             self.update_error.emit(error_msg)
             return False
 
@@ -532,7 +526,7 @@ class IndustryManager(QObject):
             return {}
 
         except Exception as e:
-            print(f"获取上交所行业数据失败: {str(e)}")
+            logger.info(f"获取上交所行业数据失败: {str(e)}")
             return {}
 
     def _get_sz_industry_data(self) -> Dict:
@@ -566,7 +560,7 @@ class IndustryManager(QObject):
             return {}
 
         except Exception as e:
-            print(f"获取深交所行业数据失败: {str(e)}")
+            logger.info(f"获取深交所行业数据失败: {str(e)}")
             return {}
 
     def _get_bj_industry_data(self) -> Dict:
@@ -599,7 +593,7 @@ class IndustryManager(QObject):
             return {}
 
         except Exception as e:
-            print(f"获取北交所行业数据失败: {str(e)}")
+            logger.info(f"获取北交所行业数据失败: {str(e)}")
             return {}
 
     def get_industry(self, stock_code: str) -> Optional[Dict]:
@@ -700,7 +694,7 @@ class IndustryManager(QObject):
             return industries
 
         except Exception as e:
-            print(f"获取行业列表失败: {e}")
+            logger.info(f"获取行业列表失败: {e}")
             return []
 
     def get_industry_stocks(self, industry_code: str, source: str = "eastmoney") -> List[Dict[str, Any]]:
@@ -746,7 +740,7 @@ class IndustryManager(QObject):
             return stocks
 
         except Exception as e:
-            print(f"获取行业股票失败: {e}")
+            logger.info(f"获取行业股票失败: {e}")
             return []
 
     def get_supported_sources(self) -> List[str]:
@@ -777,7 +771,7 @@ class IndustryManager(QObject):
                 return False
             return True
         except Exception as e:
-            print(f"导出行业数据失败: {str(e)}")
+            logger.info(f"导出行业数据失败: {str(e)}")
             return False
 
     def get_eastmoney_board_data(self) -> Dict:
@@ -834,7 +828,7 @@ class IndustryManager(QObject):
                             }
             return result
         except Exception as e:
-            print(f"获取东方财富所有板块数据失败: {e}")
+            logger.info(f"获取东方财富所有板块数据失败: {e}")
             return {}
 
     def get_eastmoney_board_list(self, board_type='index'):
@@ -857,7 +851,7 @@ class IndustryManager(QObject):
             if data['rc'] == 0 and 'data' in data and 'diff' in data['data']:
                 return [{'code': item['f12'], 'name': item['f14']} for item in data['data']['diff']]
         except Exception as e:
-            print(f"获取东方财富板块列表失败: {e}")
+            logger.info(f"获取东方财富板块列表失败: {e}")
         return []
 
     def get_eastmoney_board_members(self, board_code):
@@ -871,7 +865,7 @@ class IndustryManager(QObject):
             if data['rc'] == 0 and 'data' in data and 'diff' in data['data']:
                 return [{'code': item['f12'], 'name': item['f14']} for item in data['data']['diff']]
         except Exception as e:
-            print(f"获取某板块成分股失败: {e}")
+            logger.info(f"获取某板块成分股失败: {e}")
         return []
 
     def get_major_indices(self) -> Dict[str, dict]:
@@ -887,7 +881,7 @@ class IndustryManager(QObject):
             }
             return indices
         except Exception as e:
-            print(f"获取主要指数信息失败: {e}")
+            logger.info(f"获取主要指数信息失败: {e}")
             return {}
 
     def get_industry_performance(self, period: str = "1d") -> Dict[str, Any]:
@@ -901,7 +895,7 @@ class IndustryManager(QObject):
             Dict: 行业表现数据
         """
         try:
-            print(f"开始获取行业表现数据 - 周期: {period}")
+            logger.info(f"开始获取行业表现数据 - 周期: {period}")
 
             # 获取行业板块数据
             industry_performance = {}
@@ -951,11 +945,11 @@ class IndustryManager(QObject):
                             'period': period
                         }
 
-            print(f"获取行业表现数据成功 - 行业数量: {len(industry_performance)}")
+            logger.info(f"获取行业表现数据成功 - 行业数量: {len(industry_performance)}")
             return industry_performance
 
         except Exception as e:
-            print(f"获取行业表现数据失败: {e}")
+            logger.info(f"获取行业表现数据失败: {e}")
             return {}
 
     def analyze_industry_trends(self, days: int = 30) -> Dict[str, Any]:
@@ -969,7 +963,7 @@ class IndustryManager(QObject):
             Dict: 行业趋势分析结果
         """
         try:
-            print(f"开始分析行业趋势 - 分析天数: {days}")
+            logger.info(f"开始分析行业趋势 - 分析天数: {days}")
 
             # 获取多个时间周期的行业表现
             periods = ['1d', '5d', '1m']
@@ -1027,12 +1021,12 @@ class IndustryManager(QObject):
                 'stable': [item for item in sorted_industries if -0.02 <= item[1]['trend_strength'] <= 0.02]
             }
 
-            print(f"行业趋势分析完成 - 总行业数: {len(result['top_performers'])}")
+            logger.info(f"行业趋势分析完成 - 总行业数: {len(result['top_performers'])}")
 
             return result
 
         except Exception as e:
-            print(f"行业趋势分析失败: {e}")
+            logger.info(f"行业趋势分析失败: {e}")
             return {}
 
     def get_industry_rotation_signals(self) -> Dict[str, Any]:
@@ -1043,7 +1037,7 @@ class IndustryManager(QObject):
             Dict: 行业轮动信号
         """
         try:
-            print("开始获取行业轮动信号")
+            logger.info("开始获取行业轮动信号")
 
             # 获取行业趋势分析
             trend_analysis = self.analyze_industry_trends()
@@ -1093,12 +1087,12 @@ class IndustryManager(QObject):
             rotation_signals['signals'].sort(
                 key=lambda x: x['signal_strength'], reverse=True)
 
-            print(f"行业轮动信号获取成功 - 信号数量: {len(rotation_signals['signals'])}")
+            logger.info(f"行业轮动信号获取成功 - 信号数量: {len(rotation_signals['signals'])}")
 
             return rotation_signals
 
         except Exception as e:
-            print(f"获取行业轮动信号失败: {e}")
+            logger.info(f"获取行业轮动信号失败: {e}")
             return {}
 
     def get_industry_valuation_metrics(self) -> Dict[str, Any]:
@@ -1109,7 +1103,7 @@ class IndustryManager(QObject):
             Dict: 行业估值指标
         """
         try:
-            print("开始获取行业估值指标")
+            logger.info("开始获取行业估值指标")
 
             valuation_metrics = {}
 
@@ -1129,12 +1123,12 @@ class IndustryManager(QObject):
                         'valuation_level': 'UNKNOWN'  # 估值水平
                     }
 
-            print(f"行业估值指标获取成功 - 指标数量: {len(valuation_metrics)}")
+            logger.info(f"行业估值指标获取成功 - 指标数量: {len(valuation_metrics)}")
 
             return valuation_metrics
 
         except Exception as e:
-            print(f"获取行业估值指标失败: {e}")
+            logger.info(f"获取行业估值指标失败: {e}")
             return {}
 
     def screen_industries_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1153,7 +1147,7 @@ class IndustryManager(QObject):
             List: 符合条件的行业列表
         """
         try:
-            print("开始根据条件筛选行业")
+            logger.info("开始根据条件筛选行业")
 
             # 获取行业表现数据
             performance_data = self.get_industry_performance()
@@ -1230,12 +1224,12 @@ class IndustryManager(QObject):
             filtered_industries.sort(
                 key=lambda x: x['change_percent'], reverse=True)
 
-            print(f"行业筛选完成 - 符合条件的行业数量: {len(filtered_industries)}")
+            logger.info(f"行业筛选完成 - 符合条件的行业数量: {len(filtered_industries)}")
 
             return filtered_industries
 
         except Exception as e:
-            print(f"根据条件筛选行业失败: {e}")
+            logger.info(f"根据条件筛选行业失败: {e}")
             return []
 
     def get_industry_correlation_matrix(self) -> Dict[str, Any]:
@@ -1246,7 +1240,7 @@ class IndustryManager(QObject):
             Dict: 行业相关性数据
         """
         try:
-            print("开始获取行业相关性矩阵")
+            logger.info("开始获取行业相关性矩阵")
 
             # 这里需要历史数据来计算相关性
             # 目前提供基础框架，实际实现需要更多历史数据
@@ -1258,12 +1252,12 @@ class IndustryManager(QObject):
                 'diversification_suggestions': []
             }
 
-            print("行业相关性矩阵获取成功")
+            logger.info("行业相关性矩阵获取成功")
 
             return correlation_matrix
 
         except Exception as e:
-            print(f"获取行业相关性矩阵失败: {e}")
+            logger.info(f"获取行业相关性矩阵失败: {e}")
             return {}
 
     def generate_industry_report(self) -> Dict[str, Any]:
@@ -1274,7 +1268,7 @@ class IndustryManager(QObject):
             Dict: 行业分析报告
         """
         try:
-            print("开始生成行业分析报告")
+            logger.info("开始生成行业分析报告")
 
             # 收集各种分析数据
             performance_data = self.get_industry_performance()
@@ -1299,12 +1293,12 @@ class IndustryManager(QObject):
                 )
             }
 
-            print("行业分析报告生成成功")
+            logger.info("行业分析报告生成成功")
 
             return report
 
         except Exception as e:
-            print(f"生成行业分析报告失败: {e}")
+            logger.info(f"生成行业分析报告失败: {e}")
             return {}
 
     def _generate_industry_recommendations(self, performance_data: Dict,
@@ -1361,6 +1355,6 @@ class IndustryManager(QObject):
                     })
 
         except Exception as e:
-            print(f"生成行业投资建议失败: {e}")
+            logger.info(f"生成行业投资建议失败: {e}")
 
         return recommendations

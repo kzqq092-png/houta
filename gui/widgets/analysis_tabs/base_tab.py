@@ -1,3 +1,4 @@
+from loguru import logger
 """
 分析标签页基类 - 增强版
 """
@@ -9,7 +10,6 @@ import pandas as pd
 import time
 import traceback
 from datetime import datetime
-from core.logger import LogManager, LogLevel
 from utils.config_manager import ConfigManager
 from utils.cache import Cache
 from utils.trace_context import get_trace_id, set_trace_id
@@ -34,9 +34,9 @@ class BaseAnalysisTab(QWidget):
         super().__init__()
 
         # 使用统一的管理器工厂
-        from utils.manager_factory import get_config_manager, get_log_manager
+        from utils.manager_factory import get_config_manager
         self.config_manager = config_manager or get_config_manager()
-        self.log_manager = get_log_manager()
+        # 纯Loguru架构，移除log_manager依赖
 
         self.data_cache = Cache(cache_dir=".cache/data", default_ttl=30*60)
 
@@ -65,9 +65,9 @@ class BaseAnalysisTab(QWidget):
         try:
             self.create_ui()
             self.is_initialized = True
-            self.log_manager.debug(f"{self.__class__.__name__} 初始化成功")
+            logger.debug(f"{self.__class__.__name__} 初始化成功")
         except Exception as e:
-            self.log_manager.error(f"{self.__class__.__name__} 初始化失败: {e}")
+            logger.error(f"{self.__class__.__name__} 初始化失败: {e}")
             self.error_occurred.emit(f"初始化失败: {str(e)}")
 
     def create_ui(self):
@@ -83,13 +83,13 @@ class BaseAnalysisTab(QWidget):
         try:
             # 数据验证
             if not self._validate_kdata(kdata):
-                self.log_manager.warning(f"{self.__class__.__name__}: 无效的K线数据")
+                logger.warning(f"{self.__class__.__name__}: 无效的K线数据")
                 return
 
             # 检测数据是否变化
             new_hash = self._calculate_data_hash(kdata)
             if new_hash == self.data_hash:
-                self.log_manager.debug(
+                logger.debug(
                     f"{self.__class__.__name__}: 数据未变化，跳过更新")
                 return
 
@@ -110,7 +110,7 @@ class BaseAnalysisTab(QWidget):
             self._schedule_async_refresh()
 
         except Exception as e:
-            self.log_manager.error(f"{self.__class__.__name__} 设置K线数据失败: {e}")
+            logger.error(f"{self.__class__.__name__} 设置K线数据失败: {e}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
 
     def append_kdata(self, new_data) -> None:
@@ -122,7 +122,7 @@ class BaseAnalysisTab(QWidget):
         """
         try:
             if not self._validate_kdata(new_data):
-                self.log_manager.warning(f"{self.__class__.__name__}: 追加数据验证失败")
+                logger.warning(f"{self.__class__.__name__}: 追加数据验证失败")
                 return
 
             if self.current_kdata is None:
@@ -165,7 +165,7 @@ class BaseAnalysisTab(QWidget):
             self._schedule_incremental_refresh(new_data)
 
         except Exception as e:
-            self.log_manager.error(f"{self.__class__.__name__} 追加K线数据失败: {e}")
+            logger.error(f"{self.__class__.__name__} 追加K线数据失败: {e}")
             self.error_occurred.emit(f"追加K线数据失败: {str(e)}")
 
     def _schedule_incremental_refresh(self, new_data):
@@ -179,7 +179,7 @@ class BaseAnalysisTab(QWidget):
                 self._schedule_async_refresh()
 
         except Exception as e:
-            self.log_manager.error(f"调度增量刷新失败: {e}")
+            logger.error(f"调度增量刷新失败: {e}")
             # 回退到完整刷新
             self._schedule_async_refresh()
 
@@ -199,20 +199,20 @@ class BaseAnalysisTab(QWidget):
             # 延迟100ms执行，让UI有机会响应
             self._refresh_timer.start(100)
 
-            self.log_manager.debug(f"{self.__class__.__name__}: 已调度异步刷新")
+            logger.debug(f"{self.__class__.__name__}: 已调度异步刷新")
 
         except Exception as e:
-            self.log_manager.error(f"调度异步刷新失败: {e}")
+            logger.error(f"调度异步刷新失败: {e}")
             # 如果异步调度失败，回退到同步刷新
             self.refresh_data()
 
     def _async_refresh_data(self):
         """异步刷新数据的实际执行方法"""
         try:
-            self.log_manager.debug(f"{self.__class__.__name__}: 开始异步刷新数据")
+            logger.debug(f"{self.__class__.__name__}: 开始异步刷新数据")
             self.refresh_data()
         except Exception as e:
-            self.log_manager.error(f"异步刷新数据失败: {e}")
+            logger.error(f"异步刷新数据失败: {e}")
             self.error_occurred.emit(f"异步刷新数据失败: {str(e)}")
 
     def _validate_kdata(self, kdata) -> bool:
@@ -227,12 +227,9 @@ class BaseAnalysisTab(QWidget):
         except Exception as e:
             # 安全的日志记录，避免LogManager被删除的问题
             try:
-                if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.error(f"数据验证失败: {e}")
-                else:
-                    print(f"[{self.__class__.__name__}] 数据验证失败: {e}")
+                logger.error(f"数据验证失败: {e}")
             except:
-                print(f"[{self.__class__.__name__}] 数据验证失败: {e}")
+                logger.info(f"[{self.__class__.__name__}] 数据验证失败: {e}")
             return False
 
     def _validate_kdata_fallback(self, kdata) -> bool:
@@ -249,7 +246,7 @@ class BaseAnalysisTab(QWidget):
             missing_columns = [
                 col for col in required_columns if col not in kdata.columns]
             if missing_columns:
-                self.log_manager.warning(f"缺少必要列: {missing_columns}")
+                logger.warning(f"缺少必要列: {missing_columns}")
                 return False
             return True
 
@@ -278,7 +275,7 @@ class BaseAnalysisTab(QWidget):
 
         # 防止重复刷新
         if hasattr(self, '_is_refreshing') and self._is_refreshing:
-            self.log_manager.debug(f"{self.__class__.__name__}: 正在刷新中，跳过重复请求")
+            logger.debug(f"{self.__class__.__name__}: 正在刷新中，跳过重复请求")
             return
 
         self._is_refreshing = True
@@ -293,7 +290,7 @@ class BaseAnalysisTab(QWidget):
 
         except Exception as e:
             self.performance_stats['error_count'] += 1
-            self.log_manager.error(f"{self.__class__.__name__} 刷新数据失败: {e}")
+            logger.error(f"{self.__class__.__name__} 刷新数据失败: {e}")
             self.error_occurred.emit(f"刷新数据失败: {str(e)}")
         finally:
             self._is_refreshing = False
@@ -328,9 +325,9 @@ class BaseAnalysisTab(QWidget):
             self.data_hash = None
             self.last_update_time = None
             self._do_clear_data()
-            self.log_manager.debug(f"{self.__class__.__name__} 数据已清除")
+            logger.debug(f"{self.__class__.__name__} 数据已清除")
         except Exception as e:
-            self.log_manager.error(f"{self.__class__.__name__} 清除数据失败: {e}")
+            logger.error(f"{self.__class__.__name__} 清除数据失败: {e}")
             self.error_occurred.emit(f"清除数据失败: {str(e)}")
 
     def _do_clear_data(self):
@@ -342,7 +339,7 @@ class BaseAnalysisTab(QWidget):
         self.is_loading = True
         if hasattr(self, 'parent_widget') and self.parent_widget:
             self.parent_widget.show_loading(message)
-        self.log_manager.debug(f"{self.__class__.__name__}: {message}")
+        logger.debug(f"{self.__class__.__name__}: {message}")
 
     def hide_loading(self):
         """隐藏加载状态 - 增强版"""
@@ -391,7 +388,7 @@ class BaseAnalysisTab(QWidget):
                 return None
             return kdata
         except Exception as e:
-            self.log_manager.error(f"数据预处理失败: {e}")
+            logger.error(f"数据预处理失败: {e}")
             return None
 
     def export_data(self, format_type: str = "json") -> Optional[Dict[str, Any]]:
@@ -430,7 +427,7 @@ class BaseAnalysisTab(QWidget):
             return export_data
 
         except Exception as e:
-            self.log_manager.error(f"导出数据失败: {e}")
+            logger.error(f"导出数据失败: {e}")
             return None
 
     def _get_export_specific_data(self):
@@ -459,14 +456,14 @@ class BaseAnalysisTab(QWidget):
                         writer.writeheader()
                         writer.writerows(flattened_data)
             else:
-                self.log_manager.warning(f"不支持的导出格式: {format_type}")
+                logger.warning(f"不支持的导出格式: {format_type}")
                 return False
 
-            self.log_manager.info(f"数据已导出到: {filename}")
+            logger.info(f"数据已导出到: {filename}")
             return True
 
         except Exception as e:
-            self.log_manager.error(f"导出到文件失败: {e}")
+            logger.error(f"导出到文件失败: {e}")
             return False
 
     def _flatten_export_data(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -498,7 +495,7 @@ class BaseAnalysisTab(QWidget):
             return flattened
 
         except Exception as e:
-            self.log_manager.error(f"数据展平失败: {e}")
+            logger.error(f"数据展平失败: {e}")
             return []
 
     def reset_performance_stats(self):
@@ -510,7 +507,7 @@ class BaseAnalysisTab(QWidget):
             'error_count': 0
         }
         self.analysis_count = 0
-        self.log_manager.info(f"{self.__class__.__name__} 性能统计已重置")
+        logger.info(f"{self.__class__.__name__} 性能统计已重置")
 
     def get_status_info(self) -> Dict[str, Any]:
         """获取状态信息"""
@@ -534,9 +531,9 @@ class BaseAnalysisTab(QWidget):
         """
         try:
             QMessageBox.warning(self, title, message)
-            self.log_manager.warning(f"{self.__class__.__name__}: {message}")
+            logger.warning(f"{self.__class__.__name__}: {message}")
         except Exception as e:
-            self.log_manager.error(f"显示警告消息失败: {e}")
+            logger.error(f"显示警告消息失败: {e}")
 
     def show_kdata_warning(self):
         """显示K线数据无效的标准警告"""
@@ -1380,11 +1377,11 @@ class BaseAnalysisTab(QWidget):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(str(data))
 
-            self.log_manager.info(f"数据已导出到: {file_path}")
+            logger.info(f"数据已导出到: {file_path}")
             return True
 
         except Exception as e:
-            self.log_manager.error(f"导出数据失败: {e}")
+            logger.error(f"导出数据失败: {e}")
             return False
 
     # ==================== 第十轮优化：线程管理统一化 ====================
@@ -1406,8 +1403,7 @@ class BaseAnalysisTab(QWidget):
             data_fetcher=data_fetcher,
             update_interval=update_interval,
             max_retries=max_retries,
-            retry_interval=retry_interval,
-            log_manager=self.log_manager
+            retry_interval=retry_interval
         )
 
         # 连接信号
@@ -1431,8 +1427,7 @@ class BaseAnalysisTab(QWidget):
         thread = BaseAnalysisThread(
             analysis_func=analysis_func,
             args=args,
-            kwargs=kwargs,
-            log_manager=self.log_manager
+            kwargs=kwargs
         )
 
         # 连接信号
@@ -1456,8 +1451,7 @@ class BaseAnalysisTab(QWidget):
         thread = BaseExportThread(
             export_func=export_func,
             file_path=file_path,
-            data=data,
-            log_manager=self.log_manager
+            data=data
         )
 
         # 连接信号
@@ -1471,44 +1465,44 @@ class BaseAnalysisTab(QWidget):
         """数据更新完成处理"""
         try:
             self.data_updated.emit(data)
-            self.log_manager.info("数据更新完成")
+            logger.info("数据更新完成")
         except Exception as e:
-            self.log_manager.error(f"处理数据更新失败: {e}")
+            logger.error(f"处理数据更新失败: {e}")
 
     def _on_analysis_completed(self, results: dict):
         """分析完成处理"""
         try:
             self.analysis_completed.emit(results)
             self.hide_loading()
-            self.log_manager.info("分析完成")
+            logger.info("分析完成")
         except Exception as e:
-            self.log_manager.error(f"处理分析完成失败: {e}")
+            logger.error(f"处理分析完成失败: {e}")
 
     def _on_export_completed(self, file_path: str):
         """导出完成处理"""
         try:
             self.show_info_message("导出成功", f"数据已导出到: {file_path}")
-            self.log_manager.info(f"导出完成: {file_path}")
+            logger.info(f"导出完成: {file_path}")
         except Exception as e:
-            self.log_manager.error(f"处理导出完成失败: {e}")
+            logger.error(f"处理导出完成失败: {e}")
 
     def _on_thread_error(self, error_msg: str):
         """线程错误处理"""
         try:
             self.error_occurred.emit(error_msg)
             self.hide_loading()
-            self.log_manager.error(f"线程错误: {error_msg}")
+            logger.error(f"线程错误: {error_msg}")
         except Exception as e:
-            self.log_manager.error(f"处理线程错误失败: {e}")
+            logger.error(f"处理线程错误失败: {e}")
 
     def _on_thread_status_changed(self, status: str):
         """线程状态变化处理"""
         try:
             if hasattr(self, 'status_label'):
                 self.status_label.setText(status)
-            self.log_manager.debug(f"线程状态: {status}")
+            logger.debug(f"线程状态: {status}")
         except Exception as e:
-            self.log_manager.error(f"处理线程状态变化失败: {e}")
+            logger.error(f"处理线程状态变化失败: {e}")
 
     def _on_thread_progress_updated(self, progress: int, message: str = ""):
         """线程进度更新处理"""
@@ -1519,10 +1513,10 @@ class BaseAnalysisTab(QWidget):
             if message and hasattr(self, 'status_label'):
                 self.status_label.setText(message)
         except Exception as e:
-            self.log_manager.error(f"处理线程进度更新失败: {e}")
-
+            logger.error(f"处理线程进度更新失败: {e}")
 
 # ==================== 统一线程基类 ====================
+
 
 class BaseDataUpdateThread(QThread):
     """统一的数据更新线程基类"""
@@ -1532,8 +1526,7 @@ class BaseDataUpdateThread(QThread):
     status_changed = pyqtSignal(str)  # 状态信号
 
     def __init__(self, data_fetcher: Callable, update_interval: int = 60,
-                 max_retries: int = 3, retry_interval: int = 5,
-                 log_manager: Optional[LogManager] = None):
+                 max_retries: int = 3, retry_interval: int = 5):
         super().__init__()
         self.data_fetcher = data_fetcher
         self.update_interval = update_interval
@@ -1541,8 +1534,7 @@ class BaseDataUpdateThread(QThread):
         self.retry_interval = retry_interval
 
         # 使用统一的管理器工厂
-        from utils.manager_factory import get_log_manager
-        self.log_manager = log_manager or get_log_manager()
+        # log_manager已迁移到Loguru
 
         self._stop_requested = False
 
@@ -1555,7 +1547,7 @@ class BaseDataUpdateThread(QThread):
 
         while self.running:
             try:
-                self.log_manager.debug("正在更新数据...")
+                logger.debug("正在更新数据...")
                 self.status_changed.emit("正在更新数据...")
 
                 # 调用数据获取函数
@@ -1563,7 +1555,7 @@ class BaseDataUpdateThread(QThread):
 
                 if data:
                     self.data_updated.emit(data)
-                    self.log_manager.debug("数据更新成功")
+                    logger.debug("数据更新成功")
                     self.status_changed.emit("数据更新成功")
                     retry_count = 0  # 重置重试计数
                 else:
@@ -1572,12 +1564,12 @@ class BaseDataUpdateThread(QThread):
             except Exception as e:
                 retry_count += 1
                 error_msg = f"数据更新失败 ({retry_count}/{self.max_retries}): {str(e)}"
-                self.log_manager.error(error_msg)
+                logger.error(error_msg)
                 self.error_occurred.emit(error_msg)
                 self.status_changed.emit("更新失败，准备重试...")
 
                 if retry_count >= self.max_retries:
-                    self.log_manager.warning("达到最大重试次数，等待下一轮更新")
+                    logger.warning("达到最大重试次数，等待下一轮更新")
                     self.status_changed.emit("达到最大重试次数，等待下一轮更新")
                     retry_count = 0
                     self._sleep_interruptible(self.update_interval)
@@ -1588,7 +1580,7 @@ class BaseDataUpdateThread(QThread):
             # 正常更新后的等待
             self._sleep_interruptible(self.update_interval)
 
-        self.log_manager.info("数据更新线程已停止")
+        logger.info("数据更新线程已停止")
         self.status_changed.emit("已停止更新")
 
     def _sleep_interruptible(self, seconds: int):
@@ -1611,22 +1603,21 @@ class BaseAnalysisThread(QThread):
     error_occurred = pyqtSignal(str)  # 错误信号
     progress_updated = pyqtSignal(int, str)  # 进度更新信号
 
-    def __init__(self, analysis_func: Callable, args: tuple = (), kwargs: dict = None,
-                 log_manager: Optional[LogManager] = None):
+    def __init__(self, analysis_func: Callable, args: tuple = (), kwargs: dict = None):
         super().__init__()
         self.analysis_func = analysis_func
         self.args = args
         self.kwargs = kwargs or {}
 
         # 使用统一的管理器工厂
-        self.log_manager = log_manager or get_log_manager()
+        # log_manager已迁移到Loguru
 
     @measure_performance("BaseAnalysisThread.run")
     def run(self):
         """运行分析线程"""
         set_trace_id(self.kwargs.get('trace_id', get_trace_id()))
         try:
-            self.log_manager.info(f"开始分析... trace_id={get_trace_id()}")
+            logger.info(f"开始分析... trace_id={get_trace_id()}")
             self.progress_updated.emit(0, "开始分析...")
 
             # 执行分析函数
@@ -1634,11 +1625,11 @@ class BaseAnalysisThread(QThread):
 
             self.progress_updated.emit(100, "分析完成")
             self.analysis_completed.emit(results)
-            self.log_manager.info(f"分析完成 trace_id={get_trace_id()}")
+            logger.info(f"分析完成 trace_id={get_trace_id()}")
 
         except Exception as e:
             error_msg = f"分析失败: {str(e)} trace_id={get_trace_id()}"
-            self.log_manager.error(error_msg)
+            logger.error(error_msg)
             self.error_occurred.emit(error_msg)
 
 
@@ -1649,15 +1640,14 @@ class BaseExportThread(QThread):
     error_occurred = pyqtSignal(str)  # 错误信号
     progress_updated = pyqtSignal(int, str)  # 进度更新信号
 
-    def __init__(self, export_func: Callable, file_path: str, data,
-                 log_manager: Optional[LogManager] = None):
+    def __init__(self, export_func: Callable, file_path: str, data):
         super().__init__()
         self.export_func = export_func
         self.file_path = file_path
         self.data = data
 
         # 使用统一的管理器工厂
-        self.log_manager = log_manager or get_log_manager()
+        # log_manager已迁移到Loguru
 
     @measure_performance("BaseExportThread.run")
     def run(self):
@@ -1665,7 +1655,7 @@ class BaseExportThread(QThread):
         set_trace_id(self.kwargs.get('trace_id', get_trace_id())
                      if hasattr(self, 'kwargs') else get_trace_id())
         try:
-            self.log_manager.info(
+            logger.info(
                 f"开始导出到: {self.file_path} trace_id={get_trace_id()}")
             self.progress_updated.emit(0, "开始导出...")
 
@@ -1675,14 +1665,14 @@ class BaseExportThread(QThread):
             if success:
                 self.progress_updated.emit(100, "导出完成")
                 self.export_completed.emit(self.file_path)
-                self.log_manager.info(
+                logger.info(
                     f"导出完成: {self.file_path} trace_id={get_trace_id()}")
             else:
                 raise Exception("导出函数返回失败")
 
         except Exception as e:
             error_msg = f"导出失败: {str(e)} trace_id={get_trace_id()}"
-            self.log_manager.error(error_msg)
+            logger.error(error_msg)
             self.error_occurred.emit(error_msg)
 
     def _init_safe_error_handling(self):
@@ -1695,14 +1685,14 @@ class BaseExportThread(QThread):
         """安全地处理错误，避免阻塞UI"""
         try:
             # 记录到日志
-            self.log_manager.error(f"错误处理: {error_msg}")
+            logger.error(f"错误处理: {error_msg}")
 
             # 使用QTimer延迟显示错误，避免阻塞当前线程
             QTimer.singleShot(0, lambda: self._show_error_safely(error_msg))
 
         except Exception as e:
             # 如果错误处理本身出错，至少记录到日志
-            print(f"错误处理失败: {e}")
+            logger.info(f"错误处理失败: {e}")
 
     def _show_error_safely(self, error_msg: str):
         """安全地显示错误信息"""
@@ -1729,5 +1719,5 @@ class BaseExportThread(QThread):
 
         except Exception as e:
             # 如果GUI显示失败，至少打印到控制台
-            print(f"GUI错误显示失败: {e}")
-            print(f"原始错误: {error_msg}")
+            logger.info(f"GUI错误显示失败: {e}")
+            logger.info(f"原始错误: {error_msg}")

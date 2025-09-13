@@ -6,6 +6,7 @@
 显示股票的详细信息，包括基本信息、财务数据、技术指标等
 """
 
+from loguru import logger
 import sys
 import os
 import traceback
@@ -21,9 +22,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPalette
 
-from core.logger import get_logger
-
-
 class StockDataWorker(QThread):
     """股票数据获取工作线程"""
 
@@ -35,7 +33,7 @@ class StockDataWorker(QThread):
         super().__init__()
         self.stock_code = stock_code
         self.data_manager = data_manager
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
     def run(self):
         """运行数据获取任务"""
@@ -248,7 +246,6 @@ class StockDataWorker(QThread):
             self.logger.error(f"获取相关股票失败: {e}")
             return []
 
-
 class StockDetailDialog(QDialog):
     """股票详情对话框"""
 
@@ -268,7 +265,7 @@ class StockDetailDialog(QDialog):
         super().__init__(parent)
         self.stock_code = stock_code
         self.data_manager = data_manager
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.stock_data = {}
 
         # 工作线程
@@ -899,7 +896,6 @@ class StockDetailDialog(QDialog):
         except Exception as e:
             self.logger.error(f"导出数据失败: {e}")
             QMessageBox.warning(self, "错误", f"导出数据失败: {e}")
-
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

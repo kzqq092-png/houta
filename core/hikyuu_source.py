@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 from core.data_source import DataSource, DataSourceType, MarketDataType, DataFrequency
+from loguru import logger
 
 
 class HikyuuDataSource(DataSource):
@@ -48,7 +49,7 @@ class HikyuuDataSource(DataSource):
                 end_date = stock.last_datetime
 
             query = hku.Query(start_date, end_date, ktype)
-            kdata = stock.getKData(query)
+            kdata = stock.get_kdata(query)
             return self._convert_kdata_to_df(kdata)
         except Exception as e:
             self.logger.error(f"获取K线数据失败: {str(e)}")

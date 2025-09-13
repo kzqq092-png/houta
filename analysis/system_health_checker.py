@@ -1,3 +1,4 @@
+from loguru import logger
 """
 FactorWeave-Quant 量化交易系统健康检查器
 监控形态识别系统的整体健康状态和性能指标
@@ -40,7 +41,7 @@ class SystemHealthChecker:
 
     def run_comprehensive_check(self) -> Dict[str, Any]:
         """运行全面的系统健康检查"""
-        print("🔍 开始FactorWeave-Quant 量化交易系统健康检查...")
+        logger.info(" 开始FactorWeave-Quant 量化交易系统健康检查...")
 
         health_report = {
             'timestamp': datetime.now().isoformat(),
@@ -63,18 +64,18 @@ class SystemHealthChecker:
         health_report['recommendations'] = self._generate_recommendations(
             health_report)
 
-        print(f"✅ 系统健康检查完成，总体状态: {health_report['overall_health']}")
+        logger.info(f" 系统健康检查完成，总体状态: {health_report['overall_health']}")
 
         return health_report
 
     def _check_system_info(self) -> Dict[str, Any]:
         """检查系统基本信息"""
         try:
-            # 🔧 修复：添加更安全的信息获取
+            #  修复：添加更安全的信息获取
             try:
                 info = get_pattern_recognizer_info()
             except Exception as e:
-                print(f"⚠️ 获取形态识别器信息失败: {e}")
+                logger.info(f" 获取形态识别器信息失败: {e}")
                 # 使用默认信息
                 info = {
                     'version': 'unknown',
@@ -99,7 +100,7 @@ class SystemHealthChecker:
                 }
             }
         except Exception as e:
-            print(f"❌ 系统信息检查失败: {e}")
+            logger.info(f" 系统信息检查失败: {e}")
             return {
                 'status': 'error',
                 'error': str(e),
@@ -109,24 +110,24 @@ class SystemHealthChecker:
     def _check_pattern_recognition(self) -> Dict[str, Any]:
         """检查形态识别功能"""
         try:
-            # 🔧 修复：添加更安全的形态识别检查
-            print("🔍 检查形态识别功能...")
+            #  修复：添加更安全的形态识别检查
+            logger.info(" 检查形态识别功能...")
 
             try:
                 # 创建测试数据
                 test_data = self._generate_test_kdata()
-                print(f"✓ 测试数据生成成功，数据量: {len(test_data)}")
+                logger.info(f" 测试数据生成成功，数据量: {len(test_data)}")
 
                 # 测试识别器创建
                 recognizer = EnhancedPatternRecognizer(debug_mode=False)
-                print("✓ 形态识别器创建成功")
+                logger.info(" 形态识别器创建成功")
 
                 # 测试形态识别
                 start_time = time.time()
                 patterns = recognizer.identify_patterns(
                     test_data, confidence_threshold=0.1)
                 processing_time = time.time() - start_time
-                print(f"✓ 形态识别完成，识别到 {len(patterns)} 个形态")
+                logger.info(f" 形态识别完成，识别到 {len(patterns)} 个形态")
 
                 return {
                     'status': 'healthy',
@@ -137,7 +138,7 @@ class SystemHealthChecker:
                     'average_confidence': np.mean([p.get('confidence', 0) for p in patterns]) if patterns else 0
                 }
             except ImportError as e:
-                print(f"⚠️ 形态识别模块导入失败: {e}")
+                logger.info(f" 形态识别模块导入失败: {e}")
                 return {
                     'status': 'warning',
                     'error': f'模块导入失败: {e}',
@@ -148,7 +149,7 @@ class SystemHealthChecker:
                     'average_confidence': 0
                 }
         except Exception as e:
-            print(f"❌ 形态识别检查失败: {e}")
+            logger.info(f" 形态识别检查失败: {e}")
             return {
                 'status': 'error',
                 'error': str(e),
@@ -159,17 +160,20 @@ class SystemHealthChecker:
         """从聚合服务和仓储检查性能指标"""
         try:
             # 尝试从聚合服务获取实时（内存中）的指标
-            live_metrics = self._aggregation_service.get_latest_app_metrics()
+            recent_metrics = self._aggregation_service.get_recent_metrics()
+            live_metrics = recent_metrics.get('applications', {})
 
             total_calls = 0
             total_errors = 0
             total_duration = 0
 
-            for op_data in live_metrics.values():
-                calls = len(op_data.get('durations', []))
+            for op_name, op_data in live_metrics.items():
+                calls = op_data.get('call_count', 0)
                 total_calls += calls
                 total_errors += op_data.get('error_count', 0)
-                total_duration += sum(op_data.get('durations', []))
+                # 使用平均持续时间乘以调用次数来估算总持续时间
+                avg_duration = op_data.get('avg_duration', 0)
+                total_duration += avg_duration * calls
 
             # 从数据库获取历史趋势（例如过去1小时）
             end_time = datetime.now()
@@ -456,14 +460,14 @@ class SystemHealthChecker:
 
         # 系统信息
         sys_info = report.get('system_info', {})
-        lines.append("📊 系统信息:")
+        lines.append(" 系统信息:")
         lines.append(f"  版本: {sys_info.get('version', 'unknown')}")
         lines.append(f"  支持形态: {sys_info.get('supported_patterns', 0)}种")
         lines.append("")
 
         # 性能指标
         perf = report.get('performance_metrics', {})
-        lines.append("⚡ 性能指标:")
+        lines.append(" 性能指标:")
         lines.append(f"  实时监控操作: {perf.get('live_monitored_operations', 0)}")
         lines.append(f"  实时总调用次数: {perf.get('live_total_calls', 0)}")
         lines.append(f"  实时成功率: {perf.get('live_success_rate', 0):.2%}")
@@ -473,7 +477,7 @@ class SystemHealthChecker:
 
         # 内存使用
         memory = report.get('memory_usage', {})
-        lines.append("💾 内存使用:")
+        lines.append(" 内存使用:")
         lines.append(f"  CPU使用率: {memory.get('cpu_percent', 0):.1f}%")
         lines.append(f"  内存使用率: {memory.get('memory_percent', 0):.1f}%")
         lines.append(f"  磁盘使用率: {memory.get('disk_percent', 0):.1f}%")
@@ -482,7 +486,7 @@ class SystemHealthChecker:
 
         # 建议
         recommendations = report.get('recommendations', [])
-        lines.append("💡 优化建议:")
+        lines.append(" 优化建议:")
         for i, rec in enumerate(recommendations, 1):
             lines.append(f"  {i}. {rec}")
 
@@ -494,7 +498,7 @@ class SystemHealthChecker:
 
 def main():
     """用于独立测试的入口点"""
-    print("运行系统健康检查器（独立测试模式）...")
+    logger.info("运行系统健康检查器（独立测试模式）...")
 
     # 在测试模式下，我们需要模拟服务容器和服务
     from core.events import EventBus
@@ -514,9 +518,9 @@ def main():
     # 4. 运行检查并打印报告
     report = checker.run_comprehensive_check()
     report_str = checker.generate_health_report(report)
-    print("\n--- 健康检查报告 ---")
-    print(report_str)
-    print("---------------------\n")
+    logger.info("\n--- 健康检查报告 ---")
+    logger.info(report_str)
+    logger.info("---------------------\n")
 
 
 if __name__ == '__main__':

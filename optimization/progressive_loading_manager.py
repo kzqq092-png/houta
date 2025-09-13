@@ -1,3 +1,4 @@
+from loguru import logger
 """
 渐进式加载管理器模块
 提供分阶段数据加载和优先级管理功能
@@ -7,7 +8,6 @@ import asyncio
 import os
 import threading
 import time
-import logging
 from typing import Dict, List, Any, Optional, Callable, Union
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,7 +17,7 @@ import pandas as pd
 from utils.trace_context import get_trace_id, set_trace_id
 from core.performance import measure_performance
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class LoadingStage(Enum):

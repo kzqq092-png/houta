@@ -11,7 +11,7 @@
 
 import os
 import json
-import logging
+from loguru import logger
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
@@ -35,11 +35,10 @@ try:
     from core.importdata.import_execution_engine import DataImportExecutionEngine
     IMPORT_ENGINE_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"导入引擎模块不可用: {e}")
+    logger.warning(f"导入引擎模块不可用: {e}")
     IMPORT_ENGINE_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class BatchImportWorker(QThread):
     """批量导入工作线程"""
@@ -115,7 +114,6 @@ class BatchImportWorker(QThread):
     def cancel(self):
         """取消导入"""
         self.is_cancelled = True
-
 
 class BatchImportDialog(QDialog):
     """批量数据导入对话框"""
@@ -609,7 +607,6 @@ class BatchImportDialog(QDialog):
                 border-radius: 3px;
             }
         """)
-
 
 if __name__ == "__main__":
     import sys

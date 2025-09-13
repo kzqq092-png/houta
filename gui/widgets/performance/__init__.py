@@ -21,15 +21,16 @@ from .workers.async_workers import (
 from .components.metric_card import ModernMetricCard
 from .components.performance_chart import ModernPerformanceChart
 
-# 导入标签页组件
+# 导入标签页组件 - 2024量化交易优化版
 from .tabs.system_monitor_tab import ModernSystemMonitorTab
-from .tabs.ui_optimization_tab import ModernUIOptimizationTab
 from .tabs.strategy_performance_tab import ModernStrategyPerformanceTab
-from .tabs.algorithm_performance_tab import ModernAlgorithmPerformanceTab
-from .tabs.auto_tuning_tab import ModernAutoTuningTab
+from .tabs.algorithm_optimization_tab import ModernAlgorithmOptimizationTab
+from .tabs.risk_control_center_tab import ModernRiskControlCenterTab
+from .tabs.trading_execution_monitor_tab import ModernTradingExecutionMonitorTab
+from .tabs.data_quality_monitor_tab import ModernDataQualityMonitorTab
 from .tabs.system_health_tab import ModernSystemHealthTab
-from .tabs.alert_config_tab import ModernAlertConfigTab
-from .tabs.deep_analysis_tab import ModernDeepAnalysisTab
+# 已删除的标签页：UI优化、深度分析、算法性能、自动调优、告警配置
+# 已合并或升级为新的专业量化交易标签页
 
 # 导入主要组件
 from .unified_performance_widget import ModernUnifiedPerformanceWidget
@@ -48,13 +49,15 @@ __all__ = [
     'ModernMetricCard',
     'ModernPerformanceChart',
     'ModernSystemMonitorTab',
-    'ModernUIOptimizationTab',
     'ModernStrategyPerformanceTab',
-    'ModernAlgorithmPerformanceTab',
-    'ModernAutoTuningTab',
+    'ModernAlgorithmOptimizationTab',
+    'ModernRiskControlCenterTab',
+    'ModernTradingExecutionMonitorTab',
+    'ModernDataQualityMonitorTab',
     'ModernSystemHealthTab',
-    'ModernAlertConfigTab',
-    'ModernDeepAnalysisTab',
+    # 已删除的标签页类名：
+    # 'ModernUIOptimizationTab', 'ModernDeepAnalysisTab',
+    # 'ModernAlgorithmPerformanceTab', 'ModernAutoTuningTab', 'ModernAlertConfigTab'
     'ModernUnifiedPerformanceWidget',
     # 'EnhancedStockPoolSettingsDialog',  # 暂时注释，类不存在
     # 'DataImportMonitoringWidget',       # 暂时注释，类不存在

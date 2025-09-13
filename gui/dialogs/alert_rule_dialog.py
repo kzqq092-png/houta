@@ -4,7 +4,7 @@
 提供完整的告警规则新增和编辑功能
 """
 
-import logging
+from loguru import logger
 from typing import Dict, Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AlertRuleDialog(QDialog):
@@ -46,15 +46,15 @@ class AlertRuleDialog(QDialog):
 
         # 基本信息标签页
         self.basic_tab = self.create_basic_tab()
-        self.tab_widget.addTab(self.basic_tab, "📋 基本信息")
+        self.tab_widget.addTab(self.basic_tab, " 基本信息")
 
         # 条件设置标签页
         self.condition_tab = self.create_condition_tab()
-        self.tab_widget.addTab(self.condition_tab, "⚙️ 触发条件")
+        self.tab_widget.addTab(self.condition_tab, " 触发条件")
 
         # 通知设置标签页
         self.notification_tab = self.create_notification_tab()
-        self.tab_widget.addTab(self.notification_tab, "📢 通知设置")
+        self.tab_widget.addTab(self.notification_tab, " 通知设置")
 
         layout.addWidget(self.tab_widget)
 
@@ -67,7 +67,7 @@ class AlertRuleDialog(QDialog):
         button_box.rejected.connect(self.reject)
 
         # 添加测试按钮
-        self.test_button = QPushButton("🧪 测试规则")
+        self.test_button = QPushButton(" 测试规则")
         self.test_button.clicked.connect(self.test_rule)
         button_box.addButton(self.test_button, QDialogButtonBox.ActionRole)
 
@@ -81,7 +81,7 @@ class AlertRuleDialog(QDialog):
         layout.setSpacing(10)
 
         # 基本信息组
-        basic_group = QGroupBox("📝 规则基本信息")
+        basic_group = QGroupBox(" 规则基本信息")
         basic_layout = QFormLayout()
 
         # 规则名称
@@ -118,7 +118,7 @@ class AlertRuleDialog(QDialog):
         layout.addWidget(basic_group)
 
         # 分类标签
-        tags_group = QGroupBox("🏷️ 分类标签")
+        tags_group = QGroupBox(" 分类标签")
         tags_layout = QFormLayout()
 
         self.tags = QLineEdit()
@@ -139,7 +139,7 @@ class AlertRuleDialog(QDialog):
         layout.setSpacing(10)
 
         # 监控指标组
-        metric_group = QGroupBox("📊 监控指标")
+        metric_group = QGroupBox(" 监控指标")
         metric_layout = QFormLayout()
 
         # 指标类型
@@ -180,7 +180,7 @@ class AlertRuleDialog(QDialog):
         layout.addWidget(metric_group)
 
         # 高级条件组
-        advanced_group = QGroupBox("🔧 高级条件")
+        advanced_group = QGroupBox(" 高级条件")
         advanced_layout = QFormLayout()
 
         # 检查频率
@@ -217,7 +217,7 @@ class AlertRuleDialog(QDialog):
         layout.setSpacing(10)
 
         # 通知方式组
-        method_group = QGroupBox("📧 通知方式")
+        method_group = QGroupBox(" 通知方式")
         method_layout = QFormLayout()
 
         self.email_notify = QCheckBox("邮件通知")
@@ -238,7 +238,7 @@ class AlertRuleDialog(QDialog):
         layout.addWidget(method_group)
 
         # 收件人设置组
-        recipients_group = QGroupBox("👥 收件人设置")
+        recipients_group = QGroupBox(" 收件人设置")
         recipients_layout = QFormLayout()
 
         self.email_recipients = QLineEdit()
@@ -253,7 +253,7 @@ class AlertRuleDialog(QDialog):
         layout.addWidget(recipients_group)
 
         # 消息模板组
-        template_group = QGroupBox("📝 消息模板")
+        template_group = QGroupBox(" 消息模板")
         template_layout = QFormLayout()
 
         self.message_template = QTextEdit()
@@ -448,19 +448,19 @@ class AlertRuleListWidget(QWidget):
         # 工具栏
         toolbar_layout = QHBoxLayout()
 
-        self.add_rule_btn = QPushButton("➕ 新增规则")
+        self.add_rule_btn = QPushButton(" 新增规则")
         self.add_rule_btn.clicked.connect(self.add_rule)
         toolbar_layout.addWidget(self.add_rule_btn)
 
-        self.edit_rule_btn = QPushButton("✏️ 编辑规则")
+        self.edit_rule_btn = QPushButton(" 编辑规则")
         self.edit_rule_btn.clicked.connect(self.edit_rule)
         toolbar_layout.addWidget(self.edit_rule_btn)
 
-        self.delete_rule_btn = QPushButton("🗑️ 删除规则")
+        self.delete_rule_btn = QPushButton(" 删除规则")
         self.delete_rule_btn.clicked.connect(self.delete_rule)
         toolbar_layout.addWidget(self.delete_rule_btn)
 
-        self.copy_rule_btn = QPushButton("📋 复制规则")
+        self.copy_rule_btn = QPushButton(" 复制规则")
         self.copy_rule_btn.clicked.connect(self.copy_rule)
         toolbar_layout.addWidget(self.copy_rule_btn)
 

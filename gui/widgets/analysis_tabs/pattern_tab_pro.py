@@ -4,7 +4,7 @@
 import json
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import QThread
-import logging
+from loguru import logger
 import numpy as np
 import pandas as pd
 import traceback
@@ -17,8 +17,7 @@ from .base_tab import BaseAnalysisTab
 from core.events.events import PatternSignalsDisplayEvent
 from analysis.pattern_manager import PatternManager
 
-logger = logging.getLogger(__name__)
-
+logger = logger
 
 class AnalysisThread(QThread, QApplication):
     """高性能分析线程 - 异步执行形态识别"""
@@ -48,8 +47,8 @@ class AnalysisThread(QThread, QApplication):
         try:
             self._connect_main_chart_signals()
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"连接主图信号失败: {e}")
+            if True:  # 使用Loguru日志
+                logger.error(f"连接主图信号失败: {e}")
 
     def run(self):
         """执行分析任务"""
@@ -176,7 +175,7 @@ class AnalysisThread(QThread, QApplication):
 
             print(f"[AnalysisThread-DETECT] 一键分析模式：即将调用identify_patterns，识别列表: {self.selected_patterns}")
 
-            # 🔄 一键分析特点：
+            #  一键分析特点：
             # 1. 只识别用户选择的形态类型
             # 2. 使用较高的置信度阈值，确保结果质量
             # 3. 数据采样优化，提升分析速度
@@ -583,7 +582,6 @@ class AnalysisThread(QThread, QApplication):
                 'summary': '历史分析失败'
             }
 
-
 class ProfessionalScanThread(QThread):
     """专业扫描专用线程"""
 
@@ -591,10 +589,10 @@ class ProfessionalScanThread(QThread):
     analysis_completed = pyqtSignal(dict)  # 分析完成信号
     error_occurred = pyqtSignal(str)  # 错误信号
 
-    def __init__(self, pattern_tab, log_manager=None):
+    def __init__(self, pattern_tab):
         super().__init__()
         self.pattern_tab = pattern_tab
-        self.log_manager = log_manager or pattern_tab.log_manager
+        # log_manager已迁移到Loguru
         self.is_cancelled = False
 
     def cancel(self):
@@ -604,7 +602,7 @@ class ProfessionalScanThread(QThread):
     def run(self):
         """在独立线程中执行专业扫描"""
         try:
-            self.log_manager.info("🚀 专业扫描线程启动")
+            logger.info(" 专业扫描线程启动")
             self.progress_updated.emit(0, "开始专业扫描...")
 
             if self.is_cancelled:
@@ -634,11 +632,11 @@ class ProfessionalScanThread(QThread):
             # 完成
             self.progress_updated.emit(100, "专业扫描完成")
             self.analysis_completed.emit(formatted_results)
-            self.log_manager.info(f"✅ 专业扫描完成，检测到 {len(patterns)} 个形态")
+            logger.info(f" 专业扫描完成，检测到 {len(patterns)} 个形态")
 
         except Exception as e:
-            self.log_manager.error(f"❌ 专业扫描线程执行失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f" 专业扫描线程执行失败: {e}")
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(f"专业扫描失败: {str(e)}")
 
     def _execute_pattern_recognition(self):
@@ -652,7 +650,7 @@ class ProfessionalScanThread(QThread):
             sensitivity = self.pattern_tab.sensitivity_slider.value() / 100.0 if hasattr(self.pattern_tab, 'sensitivity_slider') else 0.7
             confidence_threshold = max(0.1, sensitivity * 0.5)
 
-            self.log_manager.info(f"📊 执行形态识别，置信度阈值: {confidence_threshold}")
+            logger.info(f" 执行形态识别，置信度阈值: {confidence_threshold}")
 
             # 执行识别
             raw_patterns = recognizer.identify_patterns(
@@ -699,7 +697,7 @@ class ProfessionalScanThread(QThread):
             return processed_patterns
 
         except Exception as e:
-            self.log_manager.error(f"❌ 形态识别执行失败: {e}")
+            logger.error(f" 形态识别执行失败: {e}")
             raise
 
     def _filter_high_quality_patterns(self, patterns):
@@ -713,7 +711,7 @@ class ProfessionalScanThread(QThread):
             if p['confidence'] > 0.7 and p['success_rate'] > 0.6
         ]
 
-        self.log_manager.info(f"✨ 从 {len(patterns)} 个形态中过滤出 {len(high_quality)} 个高质量形态")
+        logger.info(f" 从 {len(patterns)} 个形态中过滤出 {len(high_quality)} 个高质量形态")
         return high_quality
 
     def _format_results(self, all_patterns, high_quality_patterns):
@@ -727,7 +725,6 @@ class ProfessionalScanThread(QThread):
             'high_quality_count': len(high_quality_patterns),
             'timestamp': self.pattern_tab._get_pattern_start_date()
         }
-
 
 class PatternAnalysisTabPro(BaseAnalysisTab):
     """专业级形态分析标签页 - 对标同花顺、Wind等专业软件"""
@@ -790,14 +787,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 # 连接父组件的analysis_completed信号到本组件的处理方法
                 if hasattr(self.parent_widget, 'analysis_completed'):
                     self.parent_widget.analysis_completed.connect(self.on_analysis_completed)
-                    logger.info("✅ 已连接parent_widget的analysis_completed信号")
+                    logger.info(" 已连接parent_widget的analysis_completed信号")
 
                 # 连接父组件的error_occurred信号
                 if hasattr(self.parent_widget, 'error_occurred'):
                     self.parent_widget.error_occurred.connect(self.on_analysis_error)
-                    logger.info("✅ 已连接parent_widget的error_occurred信号")
+                    logger.info(" 已连接parent_widget的error_occurred信号")
         except Exception as e:
-            logger.warning(f"⚠️ 连接parent_widget信号失败: {e}")
+            logger.warning(f" 连接parent_widget信号失败: {e}")
 
     def set_parent_widget(self, parent_widget):
         """设置父组件并连接信号"""
@@ -840,10 +837,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                 self.professional_patterns[category][pattern_config.name] = pattern_info
 
-            logger.info(f"✅ 已加载 {len(all_patterns)} 个专业形态，分为 {len(self.professional_patterns)} 个类别")
+            logger.info(f" 已加载 {len(all_patterns)} 个专业形态，分为 {len(self.professional_patterns)} 个类别")
 
         except Exception as e:
-            logger.error(f"❌ 初始化专业形态数据失败: {e}")
+            logger.error(f" 初始化专业形态数据失败: {e}")
             # 提供默认的形态数据结构
             self.professional_patterns = {
                 'candlestick': {
@@ -871,9 +868,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             service_container = get_service_container()
             self.ai_prediction_service = service_container.resolve(AIPredictionService)
-            logger.info("✅ AI预测服务初始化成功")
+            logger.info(" AI预测服务初始化成功")
         except Exception as e:
-            logger.warning(f"⚠️ AI预测服务初始化失败: {e}")
+            logger.warning(f" AI预测服务初始化失败: {e}")
             self.ai_prediction_service = None
 
     def create_ui(self):
@@ -925,7 +922,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         quick_layout = QHBoxLayout(quick_group)
 
         # 一键分析按钮
-        one_click_btn = QPushButton("🔍 一键分析")
+        one_click_btn = QPushButton(" 一键分析")
         one_click_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -939,7 +936,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         one_click_btn.clicked.connect(self.one_click_analysis)
 
         # AI预测按钮
-        ai_predict_btn = QPushButton("🤖 AI预测")
+        ai_predict_btn = QPushButton(" AI预测")
         ai_predict_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -952,7 +949,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         ai_predict_btn.clicked.connect(self.ai_prediction)
 
         # 专业扫描按钮
-        pro_scan_btn = QPushButton("📊 专业扫描")
+        pro_scan_btn = QPushButton(" 专业扫描")
         pro_scan_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -1098,19 +1095,19 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
         # 形态识别结果
         patterns_tab = self._create_patterns_tab()
-        self.results_tabs.addTab(patterns_tab, "🔍 形态识别")
+        self.results_tabs.addTab(patterns_tab, " 形态识别")
 
         # AI预测结果
         prediction_tab = self._create_prediction_tab()
-        self.results_tabs.addTab(prediction_tab, "🤖 AI预测")
+        self.results_tabs.addTab(prediction_tab, " AI预测")
 
         # 统计分析
         stats_tab = self._create_statistics_tab()
-        self.results_tabs.addTab(stats_tab, "📊 统计分析")
+        self.results_tabs.addTab(stats_tab, " 统计分析")
 
         # 历史回测
         backtest_tab = self._create_backtest_tab()
-        self.results_tabs.addTab(backtest_tab, "📈 历史回测")
+        self.results_tabs.addTab(backtest_tab, " 历史回测")
 
         layout.addWidget(self.results_tabs)
         return panel
@@ -1169,8 +1166,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             return btn
 
         # 创建操作按钮
-        export_btn = create_button("导出结果", "📤", "导出分析结果到文件", self.export_patterns)
-        detail_btn = create_button("查看详情", "🔍", "查看选中形态的详细信息", self.show_pattern_detail)
+        export_btn = create_button("导出结果", "", "导出分析结果到文件", self.export_patterns)
+        detail_btn = create_button("查看详情", "", "查看选中形态的详细信息", self.show_pattern_detail)
 
         buttons_layout.addWidget(export_btn)
         buttons_layout.addWidget(detail_btn)
@@ -1237,11 +1234,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         # 按钮区域 - 水平布局
         buttons_layout = QHBoxLayout()
 
-        predict_btn = QPushButton("🚀 开始预测")
+        predict_btn = QPushButton(" 开始预测")
         predict_btn.clicked.connect(self.start_prediction)
         buttons_layout.addWidget(predict_btn)
 
-        ai_config_btn = QPushButton("🤖 AI预测配置")
+        ai_config_btn = QPushButton(" AI预测配置")
         ai_config_btn.setToolTip("打开AI预测系统配置管理界面")
         ai_config_btn.clicked.connect(self._open_ai_config_dialog)
         buttons_layout.addWidget(ai_config_btn)
@@ -1309,8 +1306,8 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         """模型类型变更处理"""
         # === 详细调试日志 ===
         logger.info("="*80)
-        logger.info("🔄 UI模型切换 - _on_model_type_changed 开始")
-        logger.info(f"📝 显示名称: {display_name}")
+        logger.info(" UI模型切换 - _on_model_type_changed 开始")
+        logger.info(f" 显示名称: {display_name}")
         logger.info("="*80)
         # === 调试日志结束 ===
 
@@ -1318,132 +1315,132 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             # 获取实际的英文值
             model_type = self.model_combo.currentData()
             if not model_type:
-                logger.warning("⚠️ 模型类型为空，退出处理")
+                logger.warning(" 模型类型为空，退出处理")
                 return
 
-            logger.info(f"🧠 获取到模型类型: {model_type}")
+            logger.info(f" 获取到模型类型: {model_type}")
 
             config_manager = get_ai_config_manager()
 
             # 更新数据库中的配置
             model_config = config_manager.get_config('model_config') or {}
-            logger.info(f"📋 当前数据库配置: {model_config}")
+            logger.info(f" 当前数据库配置: {model_config}")
 
             model_config['model_type'] = model_type
             config_manager.update_config('model_config', model_config, 'UI调整')
-            logger.info(f"💾 配置已更新到数据库: model_type = {model_type}")
+            logger.info(f" 配置已更新到数据库: model_type = {model_type}")
 
             # 重新初始化AI服务
-            logger.info("🔄 开始重新初始化AI服务...")
+            logger.info(" 开始重新初始化AI服务...")
             self._initialize_ai_service()
 
             # 清除预测缓存，确保使用新模型
             if self.ai_prediction_service:
-                logger.info("🗑️ 清除AI预测缓存...")
+                logger.info(" 清除AI预测缓存...")
                 self.ai_prediction_service.clear_cache()
-                logger.info("✅ 缓存已清除")
+                logger.info(" 缓存已清除")
             else:
-                logger.warning("⚠️ AI预测服务不可用，无法清除缓存")
+                logger.warning(" AI预测服务不可用，无法清除缓存")
 
             # 不再自动触发预测，只更新配置
-            logger.info("💡 模型配置已更新，用户需手动点击预测按钮")
+            logger.info(" 模型配置已更新，用户需手动点击预测按钮")
 
-            logger.info(f"✅ 模型类型已更新为: {model_type} (显示名称: {display_name})")
+            logger.info(f" 模型类型已更新为: {model_type} (显示名称: {display_name})")
 
         except Exception as e:
-            logger.error(f"❌ 更新模型类型配置失败: {e}")
+            logger.error(f" 更新模型类型配置失败: {e}")
             logger.error(traceback.format_exc())
 
     def _auto_trigger_prediction_on_model_change(self):
         """在模型改变时自动触发预测"""
-        logger.info("🎯 === _auto_trigger_prediction_on_model_change 开始 ===")
+        logger.info(" === _auto_trigger_prediction_on_model_change 开始 ===")
 
         try:
             # 检查是否满足自动预测的条件
             has_kdata = hasattr(self, 'current_kdata') and self.current_kdata is not None
             has_ai_service = hasattr(self, 'ai_prediction_service') and self.ai_prediction_service is not None
 
-            logger.info(f"🔍 自动预测条件检查:")
-            logger.info(f"   📊 has_kdata: {has_kdata}")
-            logger.info(f"   🤖 has_ai_service: {has_ai_service}")
+            logger.info(f" 自动预测条件检查:")
+            logger.info(f"    has_kdata: {has_kdata}")
+            logger.info(f"    has_ai_service: {has_ai_service}")
 
             if has_kdata:
-                logger.info(f"   📈 K线数据长度: {len(self.current_kdata)}")
+                logger.info(f"    K线数据长度: {len(self.current_kdata)}")
 
             if has_ai_service:
-                logger.info(f"   🧠 AI服务实例: {type(self.ai_prediction_service).__name__}")
+                logger.info(f"    AI服务实例: {type(self.ai_prediction_service).__name__}")
 
             if has_kdata and has_ai_service:
-                logger.info("✅ 条件满足，模型类型已改变，自动触发新预测...")
+                logger.info(" 条件满足，模型类型已改变，自动触发新预测...")
 
                 # 异步执行预测，避免阻塞UI
                 from PyQt5.QtCore import QTimer
                 logger.info("⏰ 设置100ms后执行自动预测...")
                 QTimer.singleShot(100, self._execute_auto_prediction)
             else:
-                logger.warning("❌ 无法自动触发预测：缺少必要条件")
+                logger.warning(" 无法自动触发预测：缺少必要条件")
 
         except Exception as e:
-            logger.error(f"❌ 自动触发预测失败: {e}")
+            logger.error(f" 自动触发预测失败: {e}")
             logger.error(traceback.format_exc())
 
     def _execute_auto_prediction(self):
         """执行自动预测"""
-        logger.info("🚀 === _execute_auto_prediction 开始执行 ===")
+        logger.info(" === _execute_auto_prediction 开始执行 ===")
 
         try:
-            logger.info("📋 开始执行自动预测...")
+            logger.info(" 开始执行自动预测...")
 
             # 检查当前状态
-            logger.info(f"🔍 当前状态检查:")
-            logger.info(f"   📊 current_kdata存在: {hasattr(self, 'current_kdata') and self.current_kdata is not None}")
-            logger.info(f"   🤖 ai_prediction_service存在: {hasattr(self, 'ai_prediction_service') and self.ai_prediction_service is not None}")
-            logger.info(f"   📈 last_analysis_results存在: {hasattr(self, 'last_analysis_results') and self.last_analysis_results is not None}")
+            logger.info(f" 当前状态检查:")
+            logger.info(f"    current_kdata存在: {hasattr(self, 'current_kdata') and self.current_kdata is not None}")
+            logger.info(f"    ai_prediction_service存在: {hasattr(self, 'ai_prediction_service') and self.ai_prediction_service is not None}")
+            logger.info(f"    last_analysis_results存在: {hasattr(self, 'last_analysis_results') and self.last_analysis_results is not None}")
 
             # 直接调用现有的AI预测方法，它会处理所有必要的检查和异步执行
-            logger.info("🎯 调用 self.ai_prediction()...")
+            logger.info(" 调用 self.ai_prediction()...")
             self.ai_prediction()
 
-            logger.info("✅ 自动预测已触发")
+            logger.info(" 自动预测已触发")
 
         except Exception as e:
-            logger.error(f"❌ 执行自动预测失败: {e}")
+            logger.error(f" 执行自动预测失败: {e}")
             logger.error(traceback.format_exc())
 
     def _initialize_ai_service(self):
         """初始化AI预测服务"""
-        logger.info("🔄 === _initialize_ai_service 开始 ===")
+        logger.info(" === _initialize_ai_service 开始 ===")
 
         try:
-            # ✅ 正确导入并获取服务容器
+            #  正确导入并获取服务容器
             from core.containers import get_service_container
             from core.services.ai_prediction_service import AIPredictionService
 
             service_container = get_service_container()
-            logger.info(f"📦 获取到服务容器: {type(service_container).__name__}")
+            logger.info(f" 获取到服务容器: {type(service_container).__name__}")
 
             # 重新获取AI预测服务（会重新加载配置）
-            logger.info("🤖 正在解析AI预测服务...")
+            logger.info(" 正在解析AI预测服务...")
             self.ai_prediction_service = service_container.resolve(AIPredictionService)
 
-            logger.info(f"🔍 AI服务实例信息:")
-            logger.info(f"   📋 实例ID: {id(self.ai_prediction_service)}")
-            logger.info(f"   🧠 当前模型配置: {self.ai_prediction_service.model_config if self.ai_prediction_service else 'N/A'}")
+            logger.info(f" AI服务实例信息:")
+            logger.info(f"    实例ID: {id(self.ai_prediction_service)}")
+            logger.info(f"    当前模型配置: {self.ai_prediction_service.model_config if self.ai_prediction_service else 'N/A'}")
 
             if self.ai_prediction_service:
                 # 强制重新加载配置
-                logger.info("🔄 强制重新加载AI服务配置...")
+                logger.info(" 强制重新加载AI服务配置...")
                 self.ai_prediction_service.reload_config()
-                logger.info("✅ AI预测服务已重新初始化")
+                logger.info(" AI预测服务已重新初始化")
 
                 # 验证配置是否更新
                 current_model_type = self.ai_prediction_service.model_config.get('model_type', 'N/A')
-                logger.info(f"🎯 AI服务中的模型类型: {current_model_type}")
+                logger.info(f" AI服务中的模型类型: {current_model_type}")
             else:
-                logger.warning("⚠️ AI预测服务初始化失败")
+                logger.warning(" AI预测服务初始化失败")
 
         except Exception as e:
-            logger.error(f"❌ 初始化AI预测服务失败: {e}")
+            logger.error(f" 初始化AI预测服务失败: {e}")
             logger.error(traceback.format_exc())
             self.ai_prediction_service = None
 
@@ -1465,14 +1462,14 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def start_backtest(self):
         """开始回测 - 增强版"""
         try:
-            logger.info("🔍 开始历史回测...")
+            logger.info(" 开始历史回测...")
 
             # 第一步：验证K线数据
             if not hasattr(self, 'current_kdata') or self.current_kdata is None or self.current_kdata.empty:
                 QMessageBox.warning(self, "警告", "请先加载有效的K线数据")
                 return
 
-            logger.info("✅ K线数据验证通过")
+            logger.info(" K线数据验证通过")
 
             # 第二步：检查分析结果
             patterns = []
@@ -1502,7 +1499,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 QMessageBox.warning(self, "警告", "未发现任何形态，无法进行回测\n\n建议：\n1. 先执行专业扫描或一键分析\n2. 确保数据质量良好\n3. 调整灵敏度参数")
                 return
 
-            logger.info(f"✅ 形态数据准备完成，将回测 {len(patterns)} 个形态")
+            logger.info(f" 形态数据准备完成，将回测 {len(patterns)} 个形态")
 
             # 第三步：获取回测参数
             backtest_period = self.backtest_period.value() if hasattr(self, 'backtest_period') else 90
@@ -1588,7 +1585,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                 # 启动异步回测
                 self._backtest_worker.start()
-                logger.info("🚀 异步回测已启动")
+                logger.info(" 异步回测已启动")
 
             except ImportError as e:
                 logger.warning(f"专业回测引擎不可用，使用简化回测: {e}")
@@ -1821,7 +1818,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         self.backtest_period.setValue(90)
         config_layout.addRow("回测周期(天):", self.backtest_period)
 
-        backtest_btn = QPushButton("📈 开始回测")
+        backtest_btn = QPushButton(" 开始回测")
         backtest_btn.clicked.connect(self.start_backtest)
         config_layout.addRow(backtest_btn)
 
@@ -1992,7 +1989,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         except Exception as e:
             self.progress_bar.setVisible(False)
             QMessageBox.critical(self, "错误", f"启动分析失败: {str(e)}")
-            self.log_manager.error(f"[PatternAnalysisTabPro] 一键分析失败: {e}")
+            logger.error(f"[PatternAnalysisTabPro] 一键分析失败: {e}")
 
     def update_progress(self, value, message):
         """更新进度显示"""
@@ -2010,9 +2007,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
         # 同时保存到last_analysis_results供AI预测使用
         self.last_analysis_results = self.analysis_results
 
-        logger.info(f"✅ 已保存分析结果，形态数量: {len(self.analysis_results.get('patterns', []))}")
+        logger.info(f" 已保存分析结果，形态数量: {len(self.analysis_results.get('patterns', []))}")
         try:
-            logger.info(f"📥 收到分析结果: {type(results)}")
+            logger.info(f" 收到分析结果: {type(results)}")
 
             # 隐藏进度条
             if hasattr(self, 'progress_bar'):
@@ -2022,7 +2019,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 如果有错误，显示错误信息
             if isinstance(results, dict) and 'error' in results:
-                logger.error(f"❌ 分析错误: {results['error']}")
+                logger.error(f" 分析错误: {results['error']}")
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.critical(self, "分析错误", results['error'])
                 return
@@ -2032,12 +2029,12 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             QApplication.processEvents()
 
             # 更新各项结果显示
-            logger.info("🔄 开始更新结果显示...")
+            logger.info(" 开始更新结果显示...")
             self._update_results_display(results)
 
             # 发送形态检测信号
             if isinstance(results, dict) and results.get('patterns'):
-                logger.info(f"📡 发送形态检测信号，包含 {len(results['patterns'])} 个形态")
+                logger.info(f" 发送形态检测信号，包含 {len(results['patterns'])} 个形态")
                 self.pattern_detected.emit(results)
 
             # 显示完成消息
@@ -2051,10 +2048,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             if hasattr(self, 'status_label'):
                 self.status_label.setText(completion_msg)
 
-            logger.info(f"✅ 分析完成: {completion_msg}")
+            logger.info(f" 分析完成: {completion_msg}")
 
         except Exception as e:
-            logger.error(f"❌ 处理分析结果失败: {e}")
+            logger.error(f" 处理分析结果失败: {e}")
             logger.error(traceback.format_exc())
 
             QMessageBox.critical(self, "错误", f"处理分析结果失败: {e}")
@@ -2096,31 +2093,31 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             return results
 
         except Exception as e:
-            self.log_manager.error(f"[PatternAnalysisTabPro] 综合分析失败: {e}")
+            logger.error(f"[PatternAnalysisTabPro] 综合分析失败: {e}")
             return {'error': str(e)}
 
     def _detect_all_patterns(self):
         """检测所有形态 - 使用真实算法"""
         try:
             # 首先尝试使用真实的形态识别算法
-            logger.info("🔍 使用真实形态识别算法...")
+            logger.info(" 使用真实形态识别算法...")
 
             if hasattr(self, 'current_kdata') and self.current_kdata is not None and not self.current_kdata.empty:
                 # 使用真实的形态识别器
                 real_patterns = self._detect_patterns_with_real_algorithm()
                 if real_patterns:
-                    logger.info(f"✅ 真实算法检测到 {len(real_patterns)} 个形态")
+                    logger.info(f" 真实算法检测到 {len(real_patterns)} 个形态")
                     return real_patterns
                 else:
-                    logger.warning("⚠️ 真实算法未检测到形态，使用模拟数据")
+                    logger.warning(" 真实算法未检测到形态，使用模拟数据")
             else:
-                logger.warning("⚠️ 无有效K线数据，使用模拟数据")
+                logger.warning(" 无有效K线数据，使用模拟数据")
 
             # 如果真实算法没有结果，回退到模拟数据（但要标记）
             return self._generate_simulated_patterns_as_fallback()
 
         except Exception as e:
-            logger.error(f"❌ 形态检测失败: {e}")
+            logger.error(f" 形态检测失败: {e}")
             # 出错时使用模拟数据作为后备
             return self._generate_simulated_patterns_as_fallback()
 
@@ -2135,9 +2132,9 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             sensitivity = self.sensitivity_slider.value() / 100.0 if hasattr(self, 'sensitivity_slider') else 0.7
             confidence_threshold = max(0.1, sensitivity * 0.3)  # 专业扫描使用更低阈值，检测更多形态
 
-            logger.info(f"📊 专业扫描模式：执行深度形态识别，置信度阈值: {confidence_threshold}")
+            logger.info(f" 专业扫描模式：执行深度形态识别，置信度阈值: {confidence_threshold}")
 
-            # 🔍 专业扫描特点：
+            #  专业扫描特点：
             # 1. 使用全部历史数据，不限制范围
             # 2. 识别所有形态类型，不受用户选择限制
             # 3. 使用较低的置信度阈值，发现更多潜在形态
@@ -2145,7 +2142,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 使用全部数据进行完整分析
             kdata_sample = self.current_kdata
-            logger.info(f"📊 专业扫描：使用全部 {len(kdata_sample)} 根K线进行深度分析")
+            logger.info(f" 专业扫描：使用全部 {len(kdata_sample)} 根K线进行深度分析")
 
             # 完整形态识别，不限制类型
             raw_patterns = recognizer.identify_patterns(
@@ -2154,7 +2151,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 pattern_types=None  # 专业扫描识别所有类型，不受用户选择限制
             )
 
-            logger.info(f"📈 完整分析：处理 {len(kdata_sample)} 根K线，检测所有形态类型")
+            logger.info(f" 完整分析：处理 {len(kdata_sample)} 根K线，检测所有形态类型")
 
             # 转换为统一格式
             processed_patterns = []
@@ -2187,20 +2184,20 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             processed_patterns.sort(key=lambda x: x['confidence'], reverse=True)
 
             # 返回所有处理后的形态，保持数据完整性
-            logger.info(f"🎯 专业扫描算法处理完成，返回 {len(processed_patterns)} 个形态（深度扫描结果）")
+            logger.info(f" 专业扫描算法处理完成，返回 {len(processed_patterns)} 个形态（深度扫描结果）")
             return processed_patterns
 
         except ImportError as e:
-            logger.error(f"❌ 无法导入形态识别器: {e}")
+            logger.error(f" 无法导入形态识别器: {e}")
             return []
         except Exception as e:
-            logger.error(f"❌ 真实形态识别失败: {e}")
+            logger.error(f" 真实形态识别失败: {e}")
             logger.error(traceback.format_exc())
             return []
 
     def _generate_simulated_patterns_as_fallback(self):
         """生成模拟形态作为后备方案（明确标记）"""
-        logger.warning("🎭 使用模拟数据生成形态（仅用于演示）")
+        logger.warning(" 使用模拟数据生成形态（仅用于演示）")
 
         patterns = []
         sensitivity = self.sensitivity_slider.value() / 10.0 if hasattr(self, 'sensitivity_slider') else 0.5
@@ -2254,7 +2251,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
     def _generate_ml_predictions(self, patterns: List[Dict] = None) -> Dict:
         """生成机器学习预测"""
-        logger.info("🧠 === _generate_ml_predictions 开始 ===")
+        logger.info(" === _generate_ml_predictions 开始 ===")
 
         try:
             # 检查AI预测服务是否可用
@@ -2263,35 +2260,35 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if not patterns:
                     if hasattr(self, 'last_analysis_results') and self.last_analysis_results:
                         patterns = self.last_analysis_results.get('patterns', [])
-                        logger.info(f"📊 从 last_analysis_results 获取到 {len(patterns)} 个形态")
+                        logger.info(f" 从 last_analysis_results 获取到 {len(patterns)} 个形态")
                     else:
                         patterns = []
-                        logger.info("📊 没有 last_analysis_results，使用空形态列表")
+                        logger.info(" 没有 last_analysis_results，使用空形态列表")
 
-                logger.info(f"🔍 正在使用 {len(patterns)} 个形态进行AI预测")
-                logger.info(f"📈 K线数据长度: {len(self.current_kdata)}")
-                logger.info(f"🧠 AI服务实例ID: {id(self.ai_prediction_service)}")
+                logger.info(f" 正在使用 {len(patterns)} 个形态进行AI预测")
+                logger.info(f" K线数据长度: {len(self.current_kdata)}")
+                logger.info(f" AI服务实例ID: {id(self.ai_prediction_service)}")
 
                 # 使用AI预测服务进行形态预测
-                logger.info("🎯 调用 AI服务的 predict_patterns 方法...")
+                logger.info(" 调用 AI服务的 predict_patterns 方法...")
                 pattern_prediction = self.ai_prediction_service.predict_patterns(
                     self.current_kdata, patterns
                 )
-                logger.info(f"📊 形态预测结果: {pattern_prediction}")
+                logger.info(f" 形态预测结果: {pattern_prediction}")
 
                 # 获取趋势预测
-                logger.info("📈 调用 AI服务的 predict_trend 方法...")
+                logger.info(" 调用 AI服务的 predict_trend 方法...")
                 trend_prediction = self.ai_prediction_service.predict_trend(
                     self.current_kdata, self.prediction_days.value()
                 )
-                logger.info(f"📈 趋势预测结果: {trend_prediction}")
+                logger.info(f" 趋势预测结果: {trend_prediction}")
 
                 # 获取价格预测
-                logger.info("💰 调用 AI服务的 predict_price 方法...")
+                logger.info(" 调用 AI服务的 predict_price 方法...")
                 price_prediction = self.ai_prediction_service.predict_price(
                     self.current_kdata, self.prediction_days.value()
                 )
-                logger.info(f"💰 价格预测结果: {price_prediction}")
+                logger.info(f" 价格预测结果: {price_prediction}")
 
                 # 合并预测结果
                 predictions = {
@@ -2314,11 +2311,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 except ImportError:
                     predictions['model_display_name'] = predictions['model_type']
 
-                logger.info(f"✅ ML预测合并完成:")
-                logger.info(f"   📈 最终方向: {predictions['direction']}")
-                logger.info(f"   🎯 最终置信度: {predictions['confidence']}")
-                logger.info(f"   🧠 使用模型: {predictions.get('model_display_name', predictions['model_type'])}")
-                logger.info(f"   🛣️ 模型路径: {predictions['model_path']}")
+                logger.info(f" ML预测合并完成:")
+                logger.info(f"    最终方向: {predictions['direction']}")
+                logger.info(f"    最终置信度: {predictions['confidence']}")
+                logger.info(f"    使用模型: {predictions.get('model_display_name', predictions['model_type'])}")
+                logger.info(f"    模型路径: {predictions['model_path']}")
 
                 return predictions
 
@@ -2329,7 +2326,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if self.current_kdata is None:
                     error_msg.append("当前K线数据为空")
 
-                logger.error(f"❌ AI预测条件不满足: {', '.join(error_msg)}")
+                logger.error(f" AI预测条件不满足: {', '.join(error_msg)}")
                 return {
                     'direction': '数据不足',
                     'confidence': 0,
@@ -2339,7 +2336,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 }
 
         except Exception as e:
-            logger.error(f"❌ 生成ML预测失败: {e}")
+            logger.error(f" 生成ML预测失败: {e}")
             logger.error(traceback.format_exc())
             return {
                 'direction': '预测失败',
@@ -2489,7 +2486,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                         'type': 'high_confidence',
                         'level': 'high',
                         'pattern': pattern.get('name', 'Unknown'),
-                        'message': f"🔥 检测到高置信度形态: {pattern.get('name', 'Unknown')}",
+                        'message': f" 检测到高置信度形态: {pattern.get('name', 'Unknown')}",
                         'details': f"置信度: {confidence:.1%}, 成功率: {success_rate:.1%}",
                         'signal': signal_type,
                         'recommendation': pattern.get('recommendation', '谨慎操作'),
@@ -2504,7 +2501,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                         'type': 'strong_signal',
                         'level': 'medium',
                         'pattern': pattern.get('name', 'Unknown'),
-                        'message': f"⚡ 检测到强烈{'买入' if signal_type == 'bullish' else '卖出'}信号: {pattern.get('name', 'Unknown')}",
+                        'message': f" 检测到强烈{'买入' if signal_type == 'bullish' else '卖出'}信号: {pattern.get('name', 'Unknown')}",
                         'details': f"置信度: {confidence:.1%}, 信号: {signal_type}",
                         'signal': signal_type,
                         'recommendation': pattern.get('recommendation', '关注市场'),
@@ -2519,7 +2516,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                         'type': 'risk_warning',
                         'level': 'warning',
                         'pattern': pattern.get('name', 'Unknown'),
-                        'message': f"⚠️ 风险预警: {pattern.get('name', 'Unknown')}",
+                        'message': f" 风险预警: {pattern.get('name', 'Unknown')}",
                         'details': f"风险等级: {pattern.get('risk_level', 'unknown')}, 成功率较低",
                         'signal': signal_type,
                         'recommendation': '谨慎操作，控制仓位',
@@ -2540,7 +2537,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 summary = {
                     'type': 'summary',
                     'level': 'info',
-                    'message': f"📊 预警汇总: {len(high_alerts)}个高级预警, {len(medium_alerts)}个中级预警, {len(warning_alerts)}个风险预警",
+                    'message': f" 预警汇总: {len(high_alerts)}个高级预警, {len(medium_alerts)}个中级预警, {len(warning_alerts)}个风险预警",
                     'high_count': len(high_alerts),
                     'medium_count': len(medium_alerts),
                     'warning_count': len(warning_alerts),
@@ -2615,10 +2612,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     self.pattern_detected.connect(
                         lambda results: self._emit_to_main_chart(results)
                     )
-                    self.log_manager.info("✅ 已连接主图显示信号")
+                    logger.info(" 已连接主图显示信号")
 
         except Exception as e:
-            self.log_manager.error(f"连接主图信号失败: {e}")
+            logger.error(f"连接主图信号失败: {e}")
 
     def _emit_to_main_chart(self, results):
         """发送信号到主图"""
@@ -2646,10 +2643,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if hasattr(self, 'parent_widget') and hasattr(self.parent_widget, 'pattern_chart_update'):
                     self.parent_widget.pattern_chart_update.emit(chart_patterns)
 
-                self.log_manager.info(f"📈 已发送 {len(chart_patterns)} 个形态到主图")
+                logger.info(f" 已发送 {len(chart_patterns)} 个形态到主图")
 
         except Exception as e:
-            self.log_manager.error(f"发送主图信号失败: {e}")
+            logger.error(f"发送主图信号失败: {e}")
 
     def _connect_main_chart_signals(self):
         """连接主图显示信号"""
@@ -2662,10 +2659,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     self.pattern_detected.connect(
                         lambda results: self._emit_to_main_chart(results)
                     )
-                    self.log_manager.info("✅ 已连接主图显示信号")
+                    logger.info(" 已连接主图显示信号")
 
         except Exception as e:
-            self.log_manager.error(f"连接主图信号失败: {e}")
+            logger.error(f"连接主图信号失败: {e}")
 
     def _emit_to_main_chart(self, results):
         """发送信号到主图"""
@@ -2693,54 +2690,54 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if hasattr(self, 'parent_widget') and hasattr(self.parent_widget, 'pattern_chart_update'):
                     self.parent_widget.pattern_chart_update.emit(chart_patterns)
 
-                self.log_manager.info(f"📈 已发送 {len(chart_patterns)} 个形态到主图")
+                logger.info(f" 已发送 {len(chart_patterns)} 个形态到主图")
 
         except Exception as e:
-            self.log_manager.error(f"发送主图信号失败: {e}")
+            logger.error(f"发送主图信号失败: {e}")
 
     def ai_prediction(self):
         """AI预测"""
-        logger.info("🤖 === ai_prediction UI方法开始 ===")
+        logger.info(" === ai_prediction UI方法开始 ===")
 
         if not self.validate_kdata_with_warning():
-            logger.warning("⚠️ K线数据验证失败，退出AI预测")
+            logger.warning(" K线数据验证失败，退出AI预测")
             return
 
-        logger.info("📊 K线数据验证通过，开始AI预测...")
-        logger.info(f"🧠 当前AI服务状态: {self.ai_prediction_service is not None}")
+        logger.info(" K线数据验证通过，开始AI预测...")
+        logger.info(f" 当前AI服务状态: {self.ai_prediction_service is not None}")
 
         if self.ai_prediction_service:
-            logger.info(f"🎯 AI服务中的模型类型: {self.ai_prediction_service.model_config.get('model_type', 'N/A')}")
+            logger.info(f" AI服务中的模型类型: {self.ai_prediction_service.model_config.get('model_type', 'N/A')}")
 
         self.show_loading("AI正在分析预测...")
-        logger.info("🔄 启动异步分析线程...")
+        logger.info(" 启动异步分析线程...")
         self.run_analysis_async(self._ai_prediction_async)
 
     def _ai_prediction_async(self):
         """异步AI预测"""
-        logger.info("🔄 === _ai_prediction_async 异步方法开始 ===")
+        logger.info(" === _ai_prediction_async 异步方法开始 ===")
 
         try:
-            logger.info("📈 调用 _generate_ml_predictions...")
+            logger.info(" 调用 _generate_ml_predictions...")
             predictions = self._generate_ml_predictions()
-            logger.info(f"📊 预测生成完成，结果: {predictions}")
+            logger.info(f" 预测生成完成，结果: {predictions}")
             return {'predictions': predictions}
         except Exception as e:
-            logger.error(f"❌ 异步AI预测失败: {e}")
+            logger.error(f" 异步AI预测失败: {e}")
             logger.error(traceback.format_exc())
             return {'error': str(e)}
 
     def professional_scan(self):
         """专业扫描 - 线程优化版"""
         try:
-            logger.info("🔍 开始专业扫描...")
+            logger.info(" 开始专业扫描...")
 
             # 验证数据
             if not self.validate_kdata_with_warning():
-                logger.warning("❌ 数据验证失败，取消专业扫描")
+                logger.warning(" 数据验证失败，取消专业扫描")
                 return
 
-            logger.info("✅ 数据验证通过")
+            logger.info(" 数据验证通过")
 
             # 停止之前的扫描
             if hasattr(self, 'professional_scan_thread') and self.professional_scan_thread.isRunning():
@@ -2755,7 +2752,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 self.status_label.setText("准备专业扫描...")
 
             # 创建专业扫描线程
-            self.professional_scan_thread = ProfessionalScanThread(self, self.log_manager)
+            self.professional_scan_thread = ProfessionalScanThread(self)
 
             # 连接信号
             self.professional_scan_thread.progress_updated.connect(self.update_progress)
@@ -2764,10 +2761,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 启动线程
             self.professional_scan_thread.start()
-            logger.info("🚀 已启动专业扫描线程")
+            logger.info(" 已启动专业扫描线程")
 
         except Exception as e:
-            logger.error(f"❌ 专业扫描启动失败: {e}")
+            logger.error(f" 专业扫描启动失败: {e}")
             logger.error(traceback.format_exc())
 
             # 隐藏进度条
@@ -2780,16 +2777,16 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _professional_scan_async(self):
         """异步专业扫描 - 修复版"""
         try:
-            logger.info("🔍 执行专业扫描中...")
+            logger.info(" 执行专业扫描中...")
 
             # 执行深度扫描 - 性能优化版
-            logger.info("📊 开始检测所有形态...")
+            logger.info(" 开始检测所有形态...")
 
             # 显示进度信息
             self.status_label.setText("正在执行真实形态识别...") if hasattr(self, 'status_label') else None
 
             patterns = self._detect_all_patterns()
-            logger.info(f"📈 检测到 {len(patterns)} 个形态")
+            logger.info(f" 检测到 {len(patterns)} 个形态")
 
             # 更新进度
             self.status_label.setText("正在过滤高质量形态...") if hasattr(self, 'status_label') else None
@@ -2800,11 +2797,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if p['confidence'] > 0.7 and p['success_rate'] > 0.6
             ]
 
-            logger.info(f"✨ 过滤出 {len(high_quality_patterns)} 个高质量形态")
+            logger.info(f" 过滤出 {len(high_quality_patterns)} 个高质量形态")
 
             # 如果没有高质量形态，返回所有形态但增加提示
             if not high_quality_patterns and patterns:
-                logger.warning("⚠️ 未发现高质量形态，返回所有检测到的形态")
+                logger.warning(" 未发现高质量形态，返回所有检测到的形态")
                 result = {
                     'patterns': patterns,
                     'scan_type': 'professional',
@@ -2819,11 +2816,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     'message': f'专业扫描完成，发现{len(high_quality_patterns)}个高质量形态'
                 }
 
-            logger.info(f"✅ 专业扫描完成: {result['message']}")
+            logger.info(f" 专业扫描完成: {result['message']}")
             return result
 
         except Exception as e:
-            logger.error(f"❌ 专业扫描执行失败: {e}")
+            logger.error(f" 专业扫描执行失败: {e}")
             logger.error(traceback.format_exc())
             return {'error': str(e)}
 
@@ -2840,41 +2837,41 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if hasattr(self, '_update_patterns_table'):
                     self._update_patterns_table(results['patterns'])
                 else:
-                    self.log_manager.warning("对象没有_update_patterns_table方法")
+                    logger.warning("对象没有_update_patterns_table方法")
 
             # 更新AI预测
             if 'predictions' in results:
                 if hasattr(self, '_update_predictions_display'):
                     self._update_predictions_display(results['predictions'])
                 else:
-                    self.log_manager.warning("对象没有_update_predictions_display方法")
+                    logger.warning("对象没有_update_predictions_display方法")
 
             # 更新统计信息
             if 'statistics' in results:
                 if hasattr(self, '_update_statistics_display'):
                     self._update_statistics_display(results['statistics'])
                 else:
-                    self.log_manager.warning("对象没有_update_statistics_display方法")
+                    logger.warning("对象没有_update_statistics_display方法")
 
             # 处理预警
             if 'alerts' in results:
                 if hasattr(self, '_process_alerts'):
                     self._process_alerts(results['alerts'])
                 else:
-                    self.log_manager.warning("对象没有_process_alerts方法")
+                    logger.warning("对象没有_process_alerts方法")
 
         except Exception as e:
-            self.log_manager.error(f"更新结果显示失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"更新结果显示失败: {e}")
+            logger.error(traceback.format_exc())
 
     @pyqtSlot(list)
     def _update_patterns_table(self, patterns: List[Dict]):
         """使用识别出的形态数据更新表格 - 异步分批更新版"""
         # 新增日志，记录到达UI更新函数的形态数量
-        self.log_manager.info(f"_update_patterns_table received {len(patterns)} patterns to display.")
+        logger.info(f"_update_patterns_table received {len(patterns)} patterns to display.")
 
         if not hasattr(self, 'patterns_table'):
-            self.log_manager.error("形态表格尚未创建，无法更新。")
+            logger.error("形态表格尚未创建，无法更新。")
             return
 
         # 如果数据量大，使用异步分批更新
@@ -2914,10 +2911,10 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             self.batch_timer.timeout.connect(self._process_next_batch)
             self.batch_timer.start(10)  # 每10ms处理一批
 
-            self.log_manager.info(f"🚀 开始分批加载，共 {len(self.pattern_batches)} 批")
+            logger.info(f" 开始分批加载，共 {len(self.pattern_batches)} 批")
 
         except Exception as e:
-            self.log_manager.error(f"分批更新初始化失败: {e}")
+            logger.error(f"分批更新初始化失败: {e}")
             self._update_table_directly(patterns)  # 降级到直接更新
 
     def _process_next_batch(self):
@@ -2932,7 +2929,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 if hasattr(self, 'status_label'):
                     self.status_label.setText(f"完成! 共加载 {self.total_loaded} 个形态")
 
-                self.log_manager.info(f"✅ 分批加载完成，共 {self.total_loaded} 个形态")
+                logger.info(f" 分批加载完成，共 {self.total_loaded} 个形态")
                 return
 
             # 处理当前批次
@@ -2955,7 +2952,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             QApplication.processEvents()
 
         except Exception as e:
-            self.log_manager.error(f"处理批次 {self.current_batch_index} 失败: {e}")
+            logger.error(f"处理批次 {self.current_batch_index} 失败: {e}")
             self.batch_timer.stop()
             self._update_table_directly(self.pattern_batches[self.current_batch_index:])
 
@@ -3032,7 +3029,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             self.patterns_table.setItem(row, 7, QTableWidgetItem(price_str))
 
         except Exception as e:
-            self.log_manager.error(f"填充表格行 {row} 失败: {e}")
+            logger.error(f"填充表格行 {row} 失败: {e}")
 
     def _update_table_directly(self, patterns: List[Dict]):
         """直接更新表格（原有逻辑）"""
@@ -3046,7 +3043,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 如果没有形态，显示提示信息
             if not patterns:
-                self.log_manager.warning("没有检测到形态")
+                logger.warning("没有检测到形态")
                 # 兼容之前的修改，如果表格不存在则不操作
                 if hasattr(self, 'patterns_table'):
                     self.patterns_table.setRowCount(1)
@@ -3057,11 +3054,11 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     return
 
             # 输出详细的调试信息
-            self.log_manager.info(f"收到 {len(patterns)} 个形态数据")
+            logger.info(f"收到 {len(patterns)} 个形态数据")
             if patterns:
                 pattern_keys = list(patterns[0].keys() if isinstance(patterns[0], dict) else [])
-                self.log_manager.info(f"第一个形态数据的键: {pattern_keys}")
-                self.log_manager.info(f"第一个形态数据的值: {patterns[0]}")
+                logger.info(f"第一个形态数据的键: {pattern_keys}")
+                logger.info(f"第一个形态数据的值: {patterns[0]}")
 
             # 预处理：过滤无效数据 - 增强调试版
             valid_patterns = []
@@ -3069,7 +3066,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             for i, pattern in enumerate(patterns):
                 if not isinstance(pattern, dict):
                     skipped_count += 1
-                    self.log_manager.warning(f"跳过非字典类型数据 #{i}: {type(pattern)}")
+                    logger.warning(f"跳过非字典类型数据 #{i}: {type(pattern)}")
                     continue
 
                 # 确保必要字段存在 - 修复字段名检查
@@ -3079,20 +3076,20 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                 if not has_name_field:
                     skipped_count += 1
-                    self.log_manager.warning(f"跳过无效形态数据 #{i}（缺少名称字段）: keys={available_keys}")
+                    logger.warning(f"跳过无效形态数据 #{i}（缺少名称字段）: keys={available_keys}")
                     continue
 
                 # 这个形态有效，添加到列表
                 valid_patterns.append(pattern)
                 if i < 3:  # 只显示前3个的详细信息
-                    self.log_manager.info(f"有效形态 #{i}: name='{pattern.get('name', pattern.get('pattern_name', pattern.get('type', 'N/A')))}', keys={available_keys}")
+                    logger.info(f"有效形态 #{i}: name='{pattern.get('name', pattern.get('pattern_name', pattern.get('type', 'N/A')))}', keys={available_keys}")
 
-            self.log_manager.info(f"过滤统计: 输入{len(patterns)}个，跳过{skipped_count}个，有效{len(valid_patterns)}个")
+            logger.info(f"过滤统计: 输入{len(patterns)}个，跳过{skipped_count}个，有效{len(valid_patterns)}个")
 
             # 按置信度降序排序
             valid_patterns.sort(key=lambda x: x.get('confidence', 0), reverse=True)
 
-            self.log_manager.info(f"有效形态数: {len(valid_patterns)}（去重后）")
+            logger.info(f"有效形态数: {len(valid_patterns)}（去重后）")
 
             # 设置表格行数
             self.patterns_table.setRowCount(len(valid_patterns))
@@ -3207,7 +3204,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             # 确保表格为只读
             self.patterns_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
-            self.log_manager.info(f"成功更新形态表格，共 {len(valid_patterns)} 条记录")
+            logger.info(f"成功更新形态表格，共 {len(valid_patterns)} 条记录")
 
         finally:
             self.patterns_table.setUpdatesEnabled(True)  # 完成后重新启用UI更新
@@ -3252,7 +3249,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                         except (ValueError, IndexError):
                             pass
 
-            self.log_manager.info(f"点击了形态: {clicked_pattern_name}, 索引: {clicked_index}。共找到 {len(all_patterns)} 个同类信号。")
+            logger.info(f"点击了形态: {clicked_pattern_name}, 索引: {clicked_index}。共找到 {len(all_patterns)} 个同类信号。")
 
             # 发布事件，通知主图表更新
             if hasattr(self, 'event_bus') and self.event_bus:
@@ -3262,13 +3259,13 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                     highlighted_signal_index=clicked_index
                 )
                 self.event_bus.publish(display_event)
-                self.log_manager.info(f"发布了 PatternSignalsDisplayEvent 事件: {display_event}")
+                logger.info(f"发布了 PatternSignalsDisplayEvent 事件: {display_event}")
             else:
-                self.log_manager.warning("未能发布 PatternSignalsDisplayEvent 事件，因为 event_bus 不可用。")
+                logger.warning("未能发布 PatternSignalsDisplayEvent 事件，因为 event_bus 不可用。")
 
         except Exception as e:
-            self.log_manager.error(f"处理表格点击事件失败: {e}")
-            self.log_manager.error(traceback.format_exc())
+            logger.error(f"处理表格点击事件失败: {e}")
+            logger.error(traceback.format_exc())
 
     def _update_statistics_display(self, statistics):
         """更新统计信息显示"""
@@ -3319,15 +3316,15 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
                     # 根据级别添加不同的图标
                     if level == 'high':
-                        alert_messages.append(f"🔴 [高级] {message}")
+                        alert_messages.append(f" [高级] {message}")
                     elif level == 'medium':
-                        alert_messages.append(f"🟡 [中级] {message}")
+                        alert_messages.append(f" [中级] {message}")
                     elif level == 'warning':
-                        alert_messages.append(f"⚠️ [警告] {message}")
+                        alert_messages.append(f" [警告] {message}")
                     else:
-                        alert_messages.append(f"ℹ️ [信息] {message}")
+                        alert_messages.append(f"ℹ [信息] {message}")
                 else:
-                    alert_messages.append(f"⚠️ {alert}")
+                    alert_messages.append(f" {alert}")
 
             if alert_messages:
                 # 按级别分类显示预警
@@ -3469,24 +3466,24 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             # 计算风险等级
             if confidence > 0.8:
                 risk_level = "低风险"
-                risk_color = "🟢"
+                risk_color = ""
             elif confidence > 0.6:
                 risk_level = "中等风险"
-                risk_color = "🟡"
+                risk_color = ""
             else:
                 risk_level = "高风险"
-                risk_color = "🔴"
+                risk_color = ""
 
             # 方向emoji
             if direction in ['上涨', '上升']:
-                direction_emoji = "📈"
-                direction_color = "🟢"
+                direction_emoji = ""
+                direction_color = ""
             elif direction in ['下跌', '下降']:
-                direction_emoji = "📉"
-                direction_color = "🔴"
+                direction_emoji = ""
+                direction_color = ""
             else:
-                direction_emoji = "📊"
-                direction_color = "🟡"
+                direction_emoji = ""
+                direction_color = ""
 
             text = f"""
 {direction_emoji} AI智能预测报告
@@ -3499,7 +3496,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 │  使用模型: {model_display_name:<20} 
 └─────────────────────────────────────────────┘
 
-💰 价格分析
+ 价格分析
 ┌─────────────────────────────────────────────┐
 │  当前价格: {current_price:.2f}                 
 │  目标区间: {target_low:.2f} - {target_high:.2f}  
@@ -3508,28 +3505,28 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 │  价格幅度: {((target_high-target_low)/current_price*100) if current_price > 0 else 0:.1f}%  
 └─────────────────────────────────────────────┘
 
-📊 详细分析
+ 详细分析
 ┌─────────────────────────────────────────────┐
 │  形态信号: {pattern_pred.get('direction', 'N/A'):<8} 置信度: {pattern_pred.get('confidence', 0)*100:.1f}% 
 │  趋势信号: {trend_pred.get('direction', 'N/A'):<8} 置信度: {trend_pred.get('confidence', 0)*100:.1f}% 
 │  价格信号: {price_pred.get('direction', 'N/A'):<8} 置信度: {price_pred.get('confidence', 0)*100:.1f}% 
 └─────────────────────────────────────────────┘
 
-🎯 操作建议
+ 操作建议
 ┌─────────────────────────────────────────────┐
 {self._get_trading_advice(direction, confidence, risk_level)}
 └─────────────────────────────────────────────┘
 
-🔧 技术信息
+ 技术信息
 ┌─────────────────────────────────────────────┐
-│  AI模型状态: {'✅ 正常运行' if ai_model_used else '⚠️ 降级模式'}                   
+│  AI模型状态: {' 正常运行' if ai_model_used else ' 降级模式'}                   
 │  数据来源:   {'AI深度学习模型' if ai_model_used else '技术分析规则'}                 
 │  {f'备注: {fallback_reason}' if fallback_reason else '系统运行正常'}                       
 └─────────────────────────────────────────────┘
 
-🕒 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+ 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-⚠️  免责声明: 本预测仅供参考，投资有风险，决策需谨慎！
+  免责声明: 本预测仅供参考，投资有风险，决策需谨慎！
 """
 
             self.prediction_text.setText(text)
@@ -3541,7 +3538,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             # 显示错误信息
             if hasattr(self, 'prediction_text'):
-                self.prediction_text.setText(f"❌ AI预测显示更新失败\n\n错误信息: {str(e)}\n\n请检查日志获取详细信息")
+                self.prediction_text.setText(f" AI预测显示更新失败\n\n错误信息: {str(e)}\n\n请检查日志获取详细信息")
 
     def _get_trading_advice(self, direction, confidence, risk_level):
         """根据预测结果生成交易建议"""
@@ -3550,27 +3547,27 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
 
             if confidence > 0.8:
                 if direction in ['上涨', '上升']:
-                    advice_lines.append("🚀 强烈看多，建议逢低买入")
-                    advice_lines.append("📍 设置止损点，控制风险")
+                    advice_lines.append(" 强烈看多，建议逢低买入")
+                    advice_lines.append(" 设置止损点，控制风险")
                 elif direction in ['下跌', '下降']:
-                    advice_lines.append("🔻 强烈看空，建议减仓观望")
-                    advice_lines.append("💰 持币为主，等待机会")
+                    advice_lines.append(" 强烈看空，建议减仓观望")
+                    advice_lines.append(" 持币为主，等待机会")
                 else:
-                    advice_lines.append("📊 震荡格局，区间操作")
-                    advice_lines.append("⚖️ 高抛低吸，控制仓位")
+                    advice_lines.append(" 震荡格局，区间操作")
+                    advice_lines.append(" 高抛低吸，控制仓位")
             elif confidence > 0.6:
                 if direction in ['上涨', '上升']:
-                    advice_lines.append("📈 谨慎看多，小仓位试探")
-                    advice_lines.append("🛡️ 严格止损，分批建仓")
+                    advice_lines.append(" 谨慎看多，小仓位试探")
+                    advice_lines.append(" 严格止损，分批建仓")
                 elif direction in ['下跌', '下降']:
-                    advice_lines.append("📉 谨慎看空，减少仓位")
-                    advice_lines.append("👀 密切观察，等待确认")
+                    advice_lines.append(" 谨慎看空，减少仓位")
+                    advice_lines.append(" 密切观察，等待确认")
                 else:
-                    advice_lines.append("🎯 方向不明，暂时观望")
-                    advice_lines.append("📋 制定计划，等待信号")
+                    advice_lines.append(" 方向不明，暂时观望")
+                    advice_lines.append(" 制定计划，等待信号")
             else:
-                advice_lines.append("⏸️ 信号不强，建议观望")
-                advice_lines.append("🔍 收集信息，耐心等待")
+                advice_lines.append(" 信号不强，建议观望")
+                advice_lines.append(" 收集信息，耐心等待")
 
             # 格式化为固定宽度
             formatted_lines = []
@@ -3640,18 +3637,18 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
                 self.ai_prediction_service.reload_config()
 
             # 显示配置更新提示
-            if hasattr(self, 'log_manager'):
-                self.log_manager.info(f"AI预测配置已更新: {config_key}")
+            if True:  # 使用Loguru日志
+                logger.info(f"AI预测配置已更新: {config_key}")
 
             # 在状态栏显示更新提示（如果有的话）
             if hasattr(self, 'status_label'):
-                self.status_label.setText(f"✅ AI配置已更新: {config_key}")
+                self.status_label.setText(f" AI配置已更新: {config_key}")
 
         except Exception as e:
             logger.error(f"处理AI配置变更失败: {e}")
             # 显示错误提示
             if hasattr(self, 'status_label'):
-                self.status_label.setText(f"❌ 配置更新失败: {e}")
+                self.status_label.setText(f" 配置更新失败: {e}")
 
     def _extract_patterns_from_table(self):
         """从表格中提取形态数据"""
@@ -3836,7 +3833,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
     def _on_backtest_completed(self, backtest_results: dict):
         """处理异步回测完成"""
         try:
-            logger.info("✅ 异步回测完成，正在处理结果...")
+            logger.info(" 异步回测完成，正在处理结果...")
 
             # 显示回测结果
             self._display_backtest_results(backtest_results)
@@ -3851,7 +3848,7 @@ class PatternAnalysisTabPro(BaseAnalysisTab):
             # 恢复界面状态
             self.hide_loading()
 
-            logger.info("✅ 回测结果处理完成")
+            logger.info(" 回测结果处理完成")
 
         except Exception as e:
             logger.error(f"处理回测结果失败: {str(e)}")

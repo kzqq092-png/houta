@@ -8,7 +8,7 @@
 
 import sys
 import json
-import logging
+from loguru import logger
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QDate
 from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPainter
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class DataImportWizardDialog(QDialog):
@@ -96,7 +96,7 @@ class DataImportWizardDialog(QDialog):
         title_layout.setContentsMargins(20, 0, 20, 0)
 
         # 图标和标题
-        title_label = QLabel("📊 专业数据导入系统")
+        title_label = QLabel(" 专业数据导入系统")
         title_label.setObjectName("titleLabel")
         title_font = QFont("Microsoft YaHei", 16, QFont.Bold)
         title_label.setFont(title_font)
@@ -231,7 +231,7 @@ class DataImportWizardDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 页面标题
-        title = QLabel("📊 选择数据源类型")
+        title = QLabel(" 选择数据源类型")
         title.setObjectName("pageTitle")
         title.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
         layout.addWidget(title)
@@ -242,12 +242,12 @@ class DataImportWizardDialog(QDialog):
 
         # 数据源选项
         data_sources = [
-            ("stock", "📈 股票数据", "沪深A股、港股、美股等全球股票市场"),
-            ("bond", "📊 债券数据", "国债、企业债、可转债等债券市场"),
-            ("futures", "⚡ 期货数据", "商品期货、金融期货等衍生品"),
-            ("forex", "💱 外汇数据", "主要货币对、人民币汇率等"),
-            ("fund", "🏦 基金数据", "公募基金、私募基金、ETF等"),
-            ("macro", "🌍 宏观数据", "GDP、CPI、PMI等宏观经济指标")
+            ("stock", " 股票数据", "沪深A股、港股、美股等全球股票市场"),
+            ("bond", " 债券数据", "国债、企业债、可转债等债券市场"),
+            ("futures", " 期货数据", "商品期货、金融期货等衍生品"),
+            ("forex", " 外汇数据", "主要货币对、人民币汇率等"),
+            ("fund", " 基金数据", "公募基金、私募基金、ETF等"),
+            ("macro", " 宏观数据", "GDP、CPI、PMI等宏观经济指标")
         ]
 
         self.source_buttons = {}
@@ -295,7 +295,7 @@ class DataImportWizardDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 页面标题
-        title = QLabel("⚙️ 配置导入参数")
+        title = QLabel(" 配置导入参数")
         title.setObjectName("pageTitle")
         title.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
         layout.addWidget(title)
@@ -403,7 +403,7 @@ class DataImportWizardDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 页面标题
-        title = QLabel("👁️ 数据预览")
+        title = QLabel(" 数据预览")
         title.setObjectName("pageTitle")
         title.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
         layout.addWidget(title)
@@ -454,7 +454,7 @@ class DataImportWizardDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 页面标题
-        title = QLabel("🚀 开始导入")
+        title = QLabel(" 开始导入")
         title.setObjectName("pageTitle")
         title.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
         layout.addWidget(title)
@@ -517,7 +517,7 @@ class DataImportWizardDialog(QDialog):
         self.next_button = QPushButton("下一步 >")
         self.next_button.clicked.connect(self._next_step)
 
-        self.start_button = QPushButton("🚀 开始导入")
+        self.start_button = QPushButton(" 开始导入")
         self.start_button.setVisible(False)
         self.start_button.clicked.connect(self._start_import)
 

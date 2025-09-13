@@ -1,9 +1,9 @@
+from loguru import logger
 """
 Core configuration module that re-exports the unified ConfigManager
 """
 
 from typing import Dict, Any, Optional
-import logging
 import os
 import json
 from datetime import datetime
@@ -16,7 +16,7 @@ from utils import (
     LoggingConfig
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 __all__ = [
     'ConfigManager',
@@ -52,8 +52,8 @@ def validate_config(config: Dict[str, Any]) -> bool:
         required_sections = {
             'theme': ThemeConfig,
             'trading': TradingConfig,
-            'data': DataConfig,
-            'logging': LoggingConfig
+            'data': DataConfig
+            # 移除复杂的logging配置验证，Loguru由代码直接管理
         }
 
         for section, config_class in required_sections.items():
@@ -112,8 +112,9 @@ def migrate_config(config: Dict[str, Any], current_version: str) -> Dict[str, An
             # 迁移到 1.2.0
             if 'ui' not in config:
                 config['ui'] = {'theme': 'default', 'language': 'zh_CN'}
-            if 'logging' not in config:
-                config['logging'] = LoggingConfig().to_dict()
+            # 移除logging配置，由Loguru直接管理
+            # if 'logging' not in config:
+            #     config['logging'] = LoggingConfig().to_dict()
             # 更新交易配置
             if 'trading' in config:
                 trading = config['trading']
@@ -228,7 +229,7 @@ if not validate_config(config_manager.get_all()):
         'theme': ThemeConfig().to_dict(),
         'trading': TradingConfig().to_dict(),
         'data': DataConfig().to_dict(),
-        'logging': LoggingConfig().to_dict(),
+        # 移除logging配置，由Loguru直接管理
         'ui': {'theme': 'default', 'language': 'zh_CN'}
     }
     # 保存各个配置项

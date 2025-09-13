@@ -1,3 +1,4 @@
+from loguru import logger
 """
 系统集成管理器
 
@@ -12,7 +13,6 @@
 版本: 1.0
 """
 
-import logging
 import asyncio
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
@@ -35,7 +35,7 @@ from ..utils.database_utils import (
 from ..plugin_types import DataType, AssetType
 from ..data_source_router import DataSourceRouter
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SystemIntegrationManager:
@@ -53,7 +53,7 @@ class SystemIntegrationManager:
             config: 系统配置字典
         """
         self.config = config
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # 核心组件
         self.tet_pipeline: Optional[TETDataPipeline] = None

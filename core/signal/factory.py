@@ -3,6 +3,7 @@ from .base import BaseSignal
 from .enhanced import EnhancedSignal
 from typing import Dict, Any, Optional, Type
 from core.data_manager import data_manager
+from loguru import logger
 
 
 class SignalFactory:
@@ -61,6 +62,6 @@ class SignalFactory:
                 for datetime in signal.get_sell_signals():
                     record.add_sell_signal(datetime)
             except Exception as e:
-                print(f"信号计算错误: {str(e)}")
+                logger.info(f"信号计算错误: {str(e)}")
                 return
         return crtSG(signal_calculate, params=params, name=signal_type)

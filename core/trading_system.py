@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易系统核心模块 - 重构版本
 
@@ -8,13 +9,12 @@ from typing import *
 from datetime import datetime
 import pandas as pd
 from dataclasses import asdict
-import logging
 
-from .logger import LogManager, LogLevel
+# LogManager, LogLevel 已删除 - 使用纯Loguru架构
 from .containers import ServiceContainer
 from core.performance import measure_performance as monitor_performance
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class TradingSystem:
@@ -77,7 +77,7 @@ class TradingSystem:
             logger.info(f"设置当前股票: {stock_code}")
 
         except Exception as e:
-            LogManager.log(f"设置股票失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"设置股票失败: {str(e)}")
 
     def load_kdata(self, start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
@@ -106,7 +106,7 @@ class TradingSystem:
                 self.current_kdata = pd.DataFrame()
 
         except Exception as e:
-            LogManager.log(f"加载K线数据失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载K线数据失败: {str(e)}")
             self.current_kdata = pd.DataFrame()
 
     def calculate_signals(self, strategy: str = 'MA策略') -> List[Dict[str, Any]]:
@@ -132,7 +132,7 @@ class TradingSystem:
             return signals
 
         except Exception as e:
-            LogManager.log(f"计算交易信号失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"计算交易信号失败: {str(e)}")
             return []
 
     def _calculate_simple_signals(self, strategy: str) -> List[Dict[str, Any]]:
@@ -208,7 +208,7 @@ class TradingSystem:
             return self._run_simple_backtest(params)
 
         except Exception as e:
-            LogManager.log(f"运行回测失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"运行回测失败: {str(e)}")
             return {}
 
     def _run_simple_backtest(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -344,7 +344,7 @@ class TradingSystem:
             }
 
         except Exception as e:
-            LogManager.log(f"获取市场概览失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取市场概览失败: {str(e)}")
             return {}
 
     def get_fund_flow(self) -> Dict[str, Any]:
@@ -363,7 +363,7 @@ class TradingSystem:
             }
 
         except Exception as e:
-            LogManager.log(f"获取资金流向失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取资金流向失败: {str(e)}")
             return {}
 
 

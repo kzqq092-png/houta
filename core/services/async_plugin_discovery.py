@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 异步插件发现服务
@@ -6,7 +7,6 @@
 避免阻塞主线程，提供实时进度更新。
 """
 
-import logging
 import threading
 import time
 from typing import Dict, Any, Optional, List
@@ -14,7 +14,7 @@ from pathlib import Path
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AsyncPluginDiscoveryWorker(QThread):

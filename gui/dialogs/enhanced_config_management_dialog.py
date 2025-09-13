@@ -9,7 +9,7 @@
 5. 系统参数配置
 """
 
-import logging
+from loguru import logger
 import json
 import os
 from typing import Dict, Any, List, Optional
@@ -34,7 +34,7 @@ from core.services.strategy_service import StrategyService
 from core.services.trading_service import TradingService
 from core.services.unified_data_manager import UnifiedDataManager
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

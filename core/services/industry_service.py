@@ -1,10 +1,10 @@
+from loguru import logger
 """
 行业服务
 
 提供行业数据的统一访问接口
 """
 
-import logging
 from typing import List, Dict, Any, Optional, Set
 import time
 from datetime import datetime
@@ -13,7 +13,7 @@ from ..events import DataUpdateEvent
 from ..industry_manager import IndustryManager
 # 移除循环导入，在需要时动态导入
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class IndustryService(CacheableService, ConfigurableService):

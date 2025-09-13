@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -78,13 +79,13 @@ class AutoTuner:
         Returns:
             优化结果摘要
         """
-        print("🚀 启动一键优化...")
+        logger.info(" 启动一键优化...")
 
         # 获取要优化的形态列表
         if pattern_names is None:
             pattern_names = self._get_all_pattern_names()
 
-        print(f"📋 待优化形态: {len(pattern_names)}个")
+        logger.info(f" 待优化形态: {len(pattern_names)}个")
 
         # 创建优化配置
         config = OptimizationConfig(
@@ -111,7 +112,7 @@ class AutoTuner:
         # 生成优化报告
         report = self._generate_optimization_report(results)
 
-        print("✅ 一键优化完成！")
+        logger.info(" 一键优化完成！")
         return report
 
     def smart_optimize(self, performance_threshold: float = 0.7,
@@ -126,13 +127,13 @@ class AutoTuner:
         Returns:
             优化结果
         """
-        print("🧠 启动智能优化...")
+        logger.info(" 启动智能优化...")
 
         # 评估所有形态的当前性能
         pattern_names = self._get_all_pattern_names()
         performance_scores = {}
 
-        print("评估当前性能...")
+        logger.info("评估当前性能...")
         for pattern_name in pattern_names:
             try:
                 test_datasets = self.evaluator.create_test_datasets(
@@ -142,11 +143,11 @@ class AutoTuner:
                 performance_scores[pattern_name] = metrics.overall_score
 
                 if self.debug_mode:
-                    print(f"  {pattern_name}: {metrics.overall_score:.3f}")
+                    logger.info(f"  {pattern_name}: {metrics.overall_score:.3f}")
 
             except Exception as e:
                 if self.debug_mode:
-                    print(f"  {pattern_name}: 评估失败 - {e}")
+                    logger.info(f"  {pattern_name}: 评估失败 - {e}")
                 performance_scores[pattern_name] = 0.0
 
         # 识别需要优化的形态
@@ -155,7 +156,7 @@ class AutoTuner:
             if score < performance_threshold
         ]
 
-        print(f"识别到 {len(patterns_to_optimize)} 个需要优化的形态")
+        logger.info(f"识别到 {len(patterns_to_optimize)} 个需要优化的形态")
 
         if not patterns_to_optimize:
             return {
@@ -196,14 +197,14 @@ class AutoTuner:
         self.task_queue.sort(key=lambda t: t.priority)  # 按优先级排序
 
         if self.debug_mode:
-            print(f"📝 添加任务: {task.pattern_name} (优先级: {task.priority})")
+            logger.info(f" 添加任务: {task.pattern_name} (优先级: {task.priority})")
 
     def run_batch_optimization(self) -> List[Dict[str, Any]]:
         """运行批量优化"""
         if not self.task_queue:
             return []
 
-        print(f"开始批量优化，共 {len(self.task_queue)} 个任务")
+        logger.info(f"开始批量优化，共 {len(self.task_queue)} 个任务")
 
         self.is_running = True
         results = []
@@ -231,7 +232,7 @@ class AutoTuner:
                     results.append(result)
 
                     if self.debug_mode:
-                        print(f"✅ 任务完成: {task.pattern_name}")
+                        logger.info(f" 任务完成: {task.pattern_name}")
 
                     # 调用完成回调
                     if self.completion_callback:
@@ -243,7 +244,7 @@ class AutoTuner:
                     task.end_time = datetime.now()
 
                     if self.debug_mode:
-                        print(f"❌ 任务失败: {task.pattern_name} - {e}")
+                        logger.info(f" 任务失败: {task.pattern_name} - {e}")
 
                 # 移除运行中的任务
                 if task.pattern_name in self.running_tasks:
@@ -268,7 +269,7 @@ class AutoTuner:
             self.is_running = False
             self.task_queue.clear()
 
-        print(f"🎉 批量优化完成，成功 {len(results)} 个任务")
+        logger.info(f" 批量优化完成，成功 {len(results)} 个任务")
         return results
 
     def _run_single_task(self, task: TuningTask) -> Dict[str, Any]:
@@ -307,7 +308,7 @@ class AutoTuner:
         conn = self.db_manager.db_path
         # 这里可以实现定时任务的数据库存储
 
-        print(f"⏰ 已调度优化任务: {pattern_name} 在 {schedule_time}")
+        logger.info(f"⏰ 已调度优化任务: {pattern_name} 在 {schedule_time}")
         return True
 
     def get_optimization_status(self) -> Dict[str, Any]:
@@ -344,7 +345,7 @@ class AutoTuner:
 
         except Exception as e:
             if self.debug_mode:
-                print(f"❌ 获取优化状态失败: {e}")
+                logger.info(f" 获取优化状态失败: {e}")
 
             return {
                 "active_optimizations": 0,
@@ -370,7 +371,7 @@ class AutoTuner:
         # 对于正在运行的任务，这里需要实现中断机制
         if pattern_name in self.running_tasks:
             # 实际实现中需要更复杂的中断逻辑
-            print(f"⚠️  正在运行的任务无法立即取消: {pattern_name}")
+            logger.info(f"  正在运行的任务无法立即取消: {pattern_name}")
             return False
 
         return False
@@ -382,7 +383,7 @@ class AutoTuner:
             return [p.english_name for p in patterns if p.is_active]
         except Exception as e:
             if self.debug_mode:
-                print(f"获取形态列表失败: {e}")
+                logger.info(f"获取形态列表失败: {e}")
             return []
 
     def _create_smart_configs(self, patterns: List[str],
@@ -555,11 +556,11 @@ class AutoTuner:
             with open(export_path, 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
 
-            print(f"✅ 优化历史已导出到: {export_path}")
+            logger.info(f" 优化历史已导出到: {export_path}")
             return True
 
         except Exception as e:
-            print(f"❌ 导出失败: {e}")
+            logger.info(f" 导出失败: {e}")
             return False
 
 
@@ -575,20 +576,20 @@ if __name__ == "__main__":
     # 测试一键优化（仅优化几个形态）
     test_patterns = ["hammer", "doji"]
 
-    print("🧪 测试一键优化...")
+    logger.info(" 测试一键优化...")
     result = tuner.one_click_optimize(
         pattern_names=test_patterns,
         optimization_method="random",  # 使用快速的随机优化进行测试
         max_iterations=5
     )
 
-    print(f"\n优化报告:")
-    print(f"  总任务数: {result['summary']['total_tasks']}")
-    print(f"  成功任务数: {result['summary']['successful_tasks']}")
-    print(f"  平均改进: {result['summary']['average_improvement']:.3f}%")
-    print(f"  最佳改进: {result['summary']['best_improvement']:.3f}%")
-    print(f"  最佳形态: {result['summary']['best_pattern']}")
+    logger.info(f"\n优化报告:")
+    logger.info(f"  总任务数: {result['summary']['total_tasks']}")
+    logger.info(f"  成功任务数: {result['summary']['successful_tasks']}")
+    logger.info(f"  平均改进: {result['summary']['average_improvement']:.3f}%")
+    logger.info(f"  最佳改进: {result['summary']['best_improvement']:.3f}%")
+    logger.info(f"  最佳形态: {result['summary']['best_pattern']}")
 
-    print(f"\n💡 建议:")
+    logger.info(f"\n 建议:")
     for rec in result['recommendations']:
-        print(f"  - {rec}")
+        logger.info(f"  - {rec}")

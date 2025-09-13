@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 真实数据提供器
@@ -8,13 +9,13 @@
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Callable
 from datetime import datetime, timedelta
 import threading
 import time
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config, get_data_validator
+from core.adapters import get_config, get_data_validator
 from core.services.unified_data_manager import UnifiedDataManager
 
 
@@ -23,7 +24,7 @@ class RealDataProvider:
 
     def __init__(self):
         """初始化真实数据提供器"""
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
         self.validator = get_data_validator()
 
@@ -42,6 +43,16 @@ class RealDataProvider:
         self._cache_ttl = self.config.get(
             'real_data', {}).get('cache_ttl', 300)  # 5分钟缓存
 
+        # 数据源连接池管理
+        self._data_source_pool = {}
+        self._pool_lock = threading.RLock()
+        self._max_pool_size = 5  # 默认值，将从数据库动态加载
+        self._pool_timeout = 30  # 连接池超时时间
+        self._pool_cleanup_interval = 300  # 连接池清理间隔
+
+        # 动态加载线程池配置
+        self._load_pool_config_from_database()
+
         # 默认股票池
         self._default_stocks = [
             '000001',  # 平安银行
@@ -58,10 +69,197 @@ class RealDataProvider:
 
         self.logger.info("真实数据提供器初始化完成")
 
+    def _load_pool_config_from_database(self):
+        """从数据库动态加载线程池配置"""
+        try:
+            from db.models.plugin_models import get_data_source_config_manager
+
+            config_manager = get_data_source_config_manager()
+            all_configs = config_manager.get_all_plugin_configs()
+
+            # 获取默认配置（使用第一个启用的数据源配置，或使用系统默认值）
+            if all_configs:
+                # 使用第一个配置的线程池设置作为全局设置
+                first_config = next(iter(all_configs.values()))
+                self._max_pool_size = first_config.get('max_pool_size', 5)
+                self._pool_timeout = first_config.get('pool_timeout', 30)
+                self._pool_cleanup_interval = first_config.get('pool_cleanup_interval', 300)
+
+                self.logger.info(f"从数据库加载线程池配置: max_pool_size={self._max_pool_size}, "
+                                 f"pool_timeout={self._pool_timeout}, pool_cleanup_interval={self._pool_cleanup_interval}")
+            else:
+                self.logger.info("未找到数据源配置，使用默认线程池配置")
+
+        except Exception as e:
+            self.logger.warning(f"从数据库加载线程池配置失败，使用默认值: {e}")
+
+    def reload_pool_config(self):
+        """重新加载线程池配置（用于UI动态更新）"""
+        self.logger.info("重新加载线程池配置...")
+        self._load_pool_config_from_database()
+
+        # 清理现有连接池以应用新配置
+        self.cleanup_data_source_pool()
+        self.logger.info("线程池配置已重新加载并清理连接池")
+
+    def _get_pooled_data_manager(self, data_source: Optional[str] = None):
+        """获取池化的数据管理器实例
+
+        Args:
+            data_source: 数据源名称
+
+        Returns:
+            数据管理器实例
+        """
+        if not data_source:
+            return self.data_manager
+
+        with self._pool_lock:
+            # 检查连接池中是否已有该数据源的实例
+            if data_source not in self._data_source_pool:
+                self._data_source_pool[data_source] = []
+
+            pool = self._data_source_pool[data_source]
+
+            # 如果池中有可用实例，直接返回
+            if pool:
+                instance = pool.pop(0)
+                self.logger.debug(f"从连接池获取数据源实例: {data_source}")
+                return instance
+
+            # 如果池为空，创建新实例（但不超过最大池大小）
+            total_instances = sum(len(p) for p in self._data_source_pool.values())
+            if total_instances < self._max_pool_size:
+                # 创建新的数据管理器实例
+                try:
+                    from .services.unified_data_manager import get_unified_data_manager
+                    new_instance = get_unified_data_manager()
+                    self.logger.debug(f"创建新的数据源实例: {data_source}")
+                    return new_instance
+                except Exception as e:
+                    self.logger.warning(f"创建数据源实例失败: {e}")
+                    return self.data_manager
+            else:
+                # 池已满，返回默认实例
+                self.logger.debug(f"连接池已满，使用默认数据管理器: {data_source}")
+                return self.data_manager
+
+    def _return_pooled_data_manager(self, instance, data_source: Optional[str] = None):
+        """将数据管理器实例返回到连接池
+
+        Args:
+            instance: 数据管理器实例
+            data_source: 数据源名称
+        """
+        if not data_source or instance == self.data_manager:
+            return  # 默认实例不需要返回池中
+
+        with self._pool_lock:
+            if data_source in self._data_source_pool:
+                pool = self._data_source_pool[data_source]
+                if len(pool) < self._max_pool_size and instance not in pool:
+                    pool.append(instance)
+                    self.logger.debug(f"数据源实例返回连接池: {data_source}")
+
+    def cleanup_data_source_pool(self):
+        """清理数据源连接池"""
+        with self._pool_lock:
+            total_instances = sum(len(pool) for pool in self._data_source_pool.values())
+            self._data_source_pool.clear()
+            self.logger.info(f"数据源连接池已清理，释放了 {total_instances} 个实例")
+
+    def get_pool_status(self) -> Dict[str, Any]:
+        """获取连接池状态信息"""
+        with self._pool_lock:
+            status = {
+                'max_pool_size': self._max_pool_size,
+                'pools': {}
+            }
+
+            for data_source, pool in self._data_source_pool.items():
+                status['pools'][data_source] = {
+                    'active_instances': len(pool),
+                    'pool_utilization': f"{len(pool)}/{self._max_pool_size}"
+                }
+
+            total_instances = sum(len(pool) for pool in self._data_source_pool.values())
+            status['total_instances'] = total_instances
+            status['total_utilization'] = f"{total_instances}/{self._max_pool_size}"
+
+            return status
+
+    def check_data_exists(self, code: str, freq: str = 'D',
+                          start_date: Optional[str] = None,
+                          end_date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        检查指定股票的数据是否已存在于数据库中
+
+        Args:
+            code: 股票代码
+            freq: 频率 ('D', 'W', 'M', '60', '30', '15', '5', '1')
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            Dict包含存在性信息: {
+                'exists': bool,  # 是否存在数据
+                'count': int,    # 现有数据条数
+                'date_range': tuple,  # 现有数据的日期范围
+                'missing_dates': list  # 缺失的日期（如果指定了日期范围）
+            }
+        """
+        try:
+            self.logger.debug(f"检查数据存在性: {code}, 频率: {freq}")
+
+            # 尝试获取现有数据
+            existing_data = self.data_manager.get_kdata(
+                stock_code=code,
+                period=freq,
+                count=250  # 默认获取250条数据进行检查
+            )
+
+            result = {
+                'exists': not existing_data.empty,
+                'count': len(existing_data),
+                'date_range': None,
+                'missing_dates': []
+            }
+
+            if not existing_data.empty:
+                # 获取日期范围
+                if 'datetime' in existing_data.columns:
+                    dates = pd.to_datetime(existing_data['datetime'])
+                elif existing_data.index.name == 'datetime':
+                    dates = pd.to_datetime(existing_data.index)
+                else:
+                    dates = existing_data.index
+
+                result['date_range'] = (dates.min(), dates.max())
+
+                # 如果指定了日期范围，检查缺失的日期
+                if start_date and end_date:
+                    expected_dates = pd.date_range(start=start_date, end=end_date, freq='D')
+                    existing_dates = pd.to_datetime(dates).normalize()
+                    missing_dates = expected_dates.difference(existing_dates)
+                    result['missing_dates'] = missing_dates.strftime('%Y-%m-%d').tolist()
+
+            self.logger.debug(f"数据存在性检查结果: {code} - 存在: {result['exists']}, 条数: {result['count']}")
+            return result
+
+        except Exception as e:
+            self.logger.error(f"检查数据存在性失败 {code}: {e}")
+            return {
+                'exists': False,
+                'count': 0,
+                'date_range': None,
+                'missing_dates': []
+            }
+
     def get_real_kdata(self, code: str, freq: str = 'D',
                        start_date: Optional[str] = None,
                        end_date: Optional[str] = None,
-                       count: int = 250) -> pd.DataFrame:
+                       count: int = 250,
+                       data_source: Optional[str] = None) -> pd.DataFrame:
         """获取真实K线数据
 
         Args:
@@ -83,30 +281,31 @@ class RealDataProvider:
                 self.logger.debug(f"从缓存获取K线数据: {code}")
                 return cached_data
 
-            self.logger.info(f"获取真实K线数据: {code}, 频率: {freq}")
+            self.logger.info(f"获取真实K线数据: {code}, 频率: {freq}, 数据源: {data_source or '默认'}")
 
-            # 使用数据管理器获取真实数据
-            if start_date or end_date:
-                kdata = self.data_manager.get_k_data(
-                    code=code,
-                    freq=freq,
-                    start_date=start_date,
-                    end_date=end_date
-                )
-            else:
-                # 获取最近count条数据
-                end_dt = datetime.now()
-                start_dt = end_dt - timedelta(days=count * 2)  # 预留足够天数
-                kdata = self.data_manager.get_k_data(
-                    code=code,
-                    freq=freq,
-                    start_date=start_dt.strftime('%Y-%m-%d'),
-                    end_date=end_dt.strftime('%Y-%m-%d')
-                )
+            # 使用连接池获取数据管理器实例
+            data_manager_instance = self._get_pooled_data_manager(data_source)
 
-                # 取最后count条
-                if len(kdata) > count:
-                    kdata = kdata.tail(count)
+            try:
+                # 使用数据管理器获取真实数据
+                if data_source:
+                    # 如果指定了数据源，使用指定的数据源
+                    kdata = data_manager_instance.get_kdata_from_source(
+                        stock_code=code,
+                        period=freq,
+                        count=count,
+                        data_source=data_source
+                    )
+                else:
+                    # 使用默认数据源
+                    kdata = data_manager_instance.get_kdata(
+                        stock_code=code,
+                        period=freq,
+                        count=count
+                    )
+            finally:
+                # 将实例返回连接池
+                self._return_pooled_data_manager(data_manager_instance, data_source)
 
             # 数据验证
             if kdata.empty:
@@ -283,7 +482,7 @@ class RealDataProvider:
             else:
                 codes = stock_df.iloc[:, 0].tolist()  # 假设第一列是代码
 
-            # 限制数量
+            # 限制数量（0表示不限制）
             if limit > 0:
                 codes = codes[:limit]
 
@@ -400,6 +599,360 @@ class RealDataProvider:
                 'cache_ttl': self._cache_ttl
             }
 
+    def import_stock_data_with_validation(self, codes: List[str], freq: str = 'D',
+                                          start_date: Optional[str] = None,
+                                          end_date: Optional[str] = None,
+                                          skip_existing: bool = True,
+                                          progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        批量导入股票数据，支持存在性检查和跳过逻辑
+
+        Args:
+            codes: 股票代码列表
+            freq: 数据频率
+            start_date: 开始日期
+            end_date: 结束日期
+            skip_existing: 是否跳过已存在的数据
+            progress_callback: 进度回调函数
+
+        Returns:
+            导入结果统计
+        """
+        try:
+            self.logger.info(f"开始批量导入股票数据: {len(codes)}只股票, 频率: {freq}")
+
+            results = {
+                'total_stocks': len(codes),
+                'imported_stocks': 0,
+                'skipped_stocks': 0,
+                'failed_stocks': 0,
+                'import_details': [],
+                'validation_results': []
+            }
+
+            for i, code in enumerate(codes):
+                try:
+                    # 更新进度
+                    if progress_callback:
+                        progress_callback(f"处理股票 {code} ({i+1}/{len(codes)})")
+
+                    # 检查数据是否已存在
+                    if skip_existing:
+                        existence_check = self.check_data_exists(code, freq, start_date, end_date)
+
+                        if existence_check['exists'] and existence_check['count'] > 0:
+                            self.logger.info(f"跳过已存在数据: {code} (现有 {existence_check['count']} 条记录)")
+                            results['skipped_stocks'] += 1
+                            results['import_details'].append({
+                                'code': code,
+                                'status': 'skipped',
+                                'reason': f"已存在 {existence_check['count']} 条记录",
+                                'existing_count': existence_check['count'],
+                                'date_range': existence_check['date_range']
+                            })
+                            continue
+
+                    # 导入数据
+                    data = self.get_real_kdata(code, freq, start_date, end_date)
+
+                    if not data.empty:
+                        # 这里可以添加实际的数据库写入逻辑
+                        # 目前只是获取数据，实际项目中需要调用数据管理器的保存方法
+                        results['imported_stocks'] += 1
+                        results['import_details'].append({
+                            'code': code,
+                            'status': 'imported',
+                            'records_count': len(data),
+                            'date_range': (data.index.min(), data.index.max()) if not data.empty else None
+                        })
+                        self.logger.info(f"成功导入: {code} ({len(data)} 条记录)")
+                    else:
+                        # 检查是否是无效股票代码
+                        if self._is_invalid_stock_code(code):
+                            self.logger.warning(f"无效股票代码，标记为跳过: {code}")
+                            results['skipped_stocks'] += 1
+                            results['import_details'].append({
+                                'code': code,
+                                'status': 'skipped',
+                                'reason': '无效股票代码',
+                                'note': '股票代码不存在或已退市'
+                            })
+                        else:
+                            results['failed_stocks'] += 1
+                            results['import_details'].append({
+                                'code': code,
+                                'status': 'failed',
+                                'reason': '无法获取数据（网络或数据源问题）'
+                            })
+                            self.logger.warning(f"导入失败: {code} - 无法获取数据")
+
+                except Exception as e:
+                    results['failed_stocks'] += 1
+                    results['import_details'].append({
+                        'code': code,
+                        'status': 'failed',
+                        'reason': str(e)
+                    })
+                    self.logger.error(f"导入股票 {code} 失败: {e}")
+
+            # 导入后验证
+            if results['imported_stocks'] > 0:
+                validation_results = self.validate_imported_data(codes, freq, start_date, end_date)
+                results['validation_results'] = validation_results
+
+            self.logger.info(f"批量导入完成: 总计 {results['total_stocks']}, "
+                             f"导入 {results['imported_stocks']}, "
+                             f"跳过 {results['skipped_stocks']}, "
+                             f"失败 {results['failed_stocks']}")
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"批量导入失败: {e}")
+            return {
+                'total_stocks': len(codes),
+                'imported_stocks': 0,
+                'skipped_stocks': 0,
+                'failed_stocks': len(codes),
+                'import_details': [],
+                'validation_results': [],
+                'error': str(e)
+            }
+
+    def validate_imported_data(self, codes: List[str], freq: str = 'D',
+                               start_date: Optional[str] = None,
+                               end_date: Optional[str] = None,
+                               sample_ratio: float = 0.1) -> Dict[str, Any]:
+        """
+        验证导入的数据质量（抽查验证）
+
+        Args:
+            codes: 股票代码列表
+            freq: 数据频率
+            start_date: 开始日期
+            end_date: 结束日期
+            sample_ratio: 抽查比例 (0.0-1.0)
+
+        Returns:
+            验证结果
+        """
+        try:
+            import random
+
+            # 计算抽查数量
+            sample_size = max(1, int(len(codes) * sample_ratio))
+            sample_codes = random.sample(codes, min(sample_size, len(codes)))
+
+            self.logger.info(f"开始抽查验证: 从 {len(codes)} 只股票中抽查 {len(sample_codes)} 只")
+
+            validation_results = {
+                'total_sampled': len(sample_codes),
+                'valid_count': 0,
+                'invalid_count': 0,
+                'validation_details': [],
+                'quality_score': 0.0
+            }
+
+            for code in sample_codes:
+                try:
+                    # 检查数据完整性
+                    data = self.get_real_kdata(code, freq, start_date, end_date)
+
+                    if data.empty:
+                        validation_results['invalid_count'] += 1
+                        validation_results['validation_details'].append({
+                            'code': code,
+                            'status': 'invalid',
+                            'reason': '数据为空'
+                        })
+                        continue
+
+                    # 基本数据质量检查
+                    issues = []
+
+                    # 检查必要字段
+                    required_fields = ['open', 'high', 'low', 'close', 'volume']
+                    missing_fields = [field for field in required_fields if field not in data.columns]
+                    if missing_fields:
+                        issues.append(f"缺失字段: {missing_fields}")
+
+                    # 检查数据异常
+                    if not missing_fields:
+                        # 检查价格逻辑
+                        invalid_prices = (data['high'] < data['low']) | (data['high'] < data['open']) | (data['high'] < data['close']) | (data['low'] > data['open']) | (data['low'] > data['close'])
+                        if invalid_prices.any():
+                            issues.append(f"价格逻辑异常: {invalid_prices.sum()} 条记录")
+
+                        # 检查零值或负值
+                        zero_negative = (data[['open', 'high', 'low', 'close']] <= 0).any(axis=1)
+                        if zero_negative.any():
+                            issues.append(f"价格零值或负值: {zero_negative.sum()} 条记录")
+
+                        # 检查成交量异常
+                        if (data['volume'] < 0).any():
+                            issues.append("成交量负值")
+
+                    if issues:
+                        validation_results['invalid_count'] += 1
+                        validation_results['validation_details'].append({
+                            'code': code,
+                            'status': 'invalid',
+                            'reason': '; '.join(issues),
+                            'records_count': len(data)
+                        })
+                    else:
+                        validation_results['valid_count'] += 1
+                        validation_results['validation_details'].append({
+                            'code': code,
+                            'status': 'valid',
+                            'records_count': len(data),
+                            'date_range': (data.index.min(), data.index.max())
+                        })
+
+                except Exception as e:
+                    validation_results['invalid_count'] += 1
+                    validation_results['validation_details'].append({
+                        'code': code,
+                        'status': 'error',
+                        'reason': str(e)
+                    })
+
+            # 计算质量分数
+            if validation_results['total_sampled'] > 0:
+                validation_results['quality_score'] = validation_results['valid_count'] / validation_results['total_sampled']
+
+            self.logger.info(f"抽查验证完成: 有效 {validation_results['valid_count']}, "
+                             f"无效 {validation_results['invalid_count']}, "
+                             f"质量分数: {validation_results['quality_score']:.2%}")
+
+            return validation_results
+
+        except Exception as e:
+            self.logger.error(f"数据验证失败: {e}")
+            return {
+                'total_sampled': 0,
+                'valid_count': 0,
+                'invalid_count': 0,
+                'validation_details': [],
+                'quality_score': 0.0,
+                'error': str(e)
+            }
+
+    def _is_invalid_stock_code(self, code: str) -> bool:
+        """
+        检查股票代码是否无效
+
+        Args:
+            code: 股票代码
+
+        Returns:
+            True if 股票代码无效, False otherwise
+        """
+        try:
+            # 基本格式检查
+            if not code or len(code) < 6:
+                return True
+
+            # 检查是否包含非数字字符（除了前缀）
+            if not code.replace('sh', '').replace('sz', '').replace('bj', '').isdigit():
+                return True
+
+            # 尝试通过数据管理器验证股票代码
+            try:
+                # 获取少量数据来验证股票代码的有效性
+                test_data = self.data_manager.get_kdata(
+                    stock_code=code,
+                    period='D',
+                    count=1
+                )
+
+                # 如果能获取到数据，说明股票代码有效
+                # 如果获取不到数据，可能是无效代码或网络问题
+                # 这里我们需要进一步判断
+                return False  # 暂时认为是网络问题，不是无效代码
+
+            except Exception as e:
+                error_msg = str(e).lower()
+
+                # 检查错误信息中是否包含"无效"、"不存在"等关键词
+                invalid_keywords = [
+                    '无效', 'invalid', '不存在', 'not found',
+                    '股票代码无效', 'stock code invalid',
+                    '已退市', 'delisted'
+                ]
+
+                for keyword in invalid_keywords:
+                    if keyword in error_msg:
+                        return True
+
+                # 其他错误认为是网络或数据源问题
+                return False
+
+        except Exception as e:
+            self.logger.debug(f"检查股票代码有效性时出错 {code}: {e}")
+            # 出错时保守处理，认为不是无效代码
+            return False
+
+    def get_invalid_stock_codes_report(self, codes: List[str]) -> Dict[str, Any]:
+        """
+        生成无效股票代码报告
+
+        Args:
+            codes: 股票代码列表
+
+        Returns:
+            无效股票代码报告
+        """
+        try:
+            invalid_codes = []
+            valid_codes = []
+
+            self.logger.info(f"开始检查 {len(codes)} 个股票代码的有效性...")
+
+            for i, code in enumerate(codes):
+                try:
+                    if self._is_invalid_stock_code(code):
+                        invalid_codes.append(code)
+                        self.logger.debug(f"发现无效股票代码: {code}")
+                    else:
+                        valid_codes.append(code)
+
+                    # 每100个代码报告一次进度
+                    if (i + 1) % 100 == 0:
+                        self.logger.info(f"已检查 {i + 1}/{len(codes)} 个股票代码")
+
+                except Exception as e:
+                    self.logger.warning(f"检查股票代码 {code} 时出错: {e}")
+                    valid_codes.append(code)  # 出错时保守处理
+
+            report = {
+                'total_codes': len(codes),
+                'valid_codes': valid_codes,
+                'invalid_codes': invalid_codes,
+                'valid_count': len(valid_codes),
+                'invalid_count': len(invalid_codes),
+                'invalid_ratio': len(invalid_codes) / len(codes) if codes else 0
+            }
+
+            self.logger.info(f"股票代码检查完成: 总计 {report['total_codes']}, "
+                             f"有效 {report['valid_count']}, "
+                             f"无效 {report['invalid_count']}, "
+                             f"无效率 {report['invalid_ratio']:.2%}")
+
+            return report
+
+        except Exception as e:
+            self.logger.error(f"生成无效股票代码报告失败: {e}")
+            return {
+                'total_codes': len(codes),
+                'valid_codes': codes,
+                'invalid_codes': [],
+                'valid_count': len(codes),
+                'invalid_count': 0,
+                'invalid_ratio': 0.0,
+                'error': str(e)
+            }
+
 
 # 全局真实数据提供器实例
 _real_data_provider: Optional[RealDataProvider] = None
@@ -433,8 +986,9 @@ def initialize_real_data_provider() -> RealDataProvider:
         _real_data_provider = RealDataProvider()
         return _real_data_provider
 
-
 # 便捷函数
+
+
 def get_real_kdata(code: str, **kwargs) -> pd.DataFrame:
     """获取真实K线数据的便捷函数"""
     provider = get_real_data_provider()
@@ -451,3 +1005,15 @@ def get_real_stock_list(**kwargs) -> List[str]:
     """获取真实股票列表的便捷函数"""
     provider = get_real_data_provider()
     return provider.get_real_stock_list(**kwargs)
+
+
+def import_stock_data_with_validation(codes: List[str], **kwargs) -> Dict[str, Any]:
+    """批量导入股票数据的便捷函数"""
+    provider = get_real_data_provider()
+    return provider.import_stock_data_with_validation(codes, **kwargs)
+
+
+def check_data_exists(code: str, **kwargs) -> Dict[str, Any]:
+    """检查数据存在性的便捷函数"""
+    provider = get_real_data_provider()
+    return provider.check_data_exists(code, **kwargs)

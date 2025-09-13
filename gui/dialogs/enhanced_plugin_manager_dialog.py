@@ -16,7 +16,7 @@ import concurrent.futures
 import os
 import json
 import requests
-import logging
+from loguru import logger
 import time
 import threading
 from datetime import datetime
@@ -32,7 +32,7 @@ try:
     from core.services.sentiment_data_service import SentimentDataService
     from gui.dialogs.plugin_manager_dialog import PluginConfigDialog
     from gui.dialogs.sentiment_plugin_config_dialog import PluginConfigWidget
-    print("✅ 核心服务导入成功")
+    logger.info(" 核心服务导入成功")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:
     PluginManager = None
@@ -40,23 +40,8 @@ except ImportError as e:
     PluginConfigDialog = None
     PluginConfigWidget = None
     PLUGIN_SYSTEM_AVAILABLE = False
-    print(f"⚠️ 部分服务导入失败: {e}")
+    logger.error(f" 部分服务导入失败: {e}")
 
-# 设置日志
-logger = logging.getLogger(__name__)
-
-# 如果日志记录器没有设置级别，设置为INFO
-if logger.level == logging.NOTSET:
-    logger.setLevel(logging.INFO)
-
-# 如果还没有处理器，添加一个
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s [%(name)s::%(funcName)s]')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-print("警告: 情绪数据服务不可用")
 
 # 如果PluginConfigWidget没有导入成功，创建一个简单的备用版本
 if not PLUGIN_SYSTEM_AVAILABLE or PluginConfigWidget is None:
@@ -97,7 +82,7 @@ class TablePopulationWorker(QThread):
         """异步填充表格数据"""
         self._is_running = True
         try:
-            print(f"🚀 开始异步填充表格数据，数据源数量: {len(self.data_sources)}")
+            logger.info(f" 开始异步填充表格数据，数据源数量: {len(self.data_sources)}")
 
             total_count = len(self.data_sources)
 
@@ -106,7 +91,7 @@ class TablePopulationWorker(QThread):
                     break
 
                 try:
-                    print(f"   📝 异步处理数据源 {row + 1}/{total_count}: {source_id}")
+                    logger.info(f"    异步处理数据源 {row + 1}/{total_count}: {source_id}")
 
                     # 在工作线程中获取所有数据
                     row_data = self._get_row_data(source_id, adapter, row)
@@ -121,11 +106,11 @@ class TablePopulationWorker(QThread):
                     self.msleep(10)
 
                 except Exception as e:
-                    print(f"   ❌ 异步处理数据源 {source_id} 失败: {e}")
+                    logger.error(f"    异步处理数据源 {source_id} 失败: {e}")
                     # 发送错误行数据
                     error_row_data = {
                         'name': str(source_id),
-                        'status': "❌ 错误",
+                        'status': " 错误",
                         'assets': "-",
                         'health_score': "-",
                         'priority': str(row + 1),
@@ -135,11 +120,11 @@ class TablePopulationWorker(QThread):
 
             if self._is_running:
                 self.population_completed.emit()
-                print("✅ 异步表格填充完成")
+                logger.info(" 异步表格填充完成")
 
         except Exception as e:
             self.population_failed.emit(str(e))
-            print(f"❌ 异步表格填充失败: {e}")
+            logger.error(f" 异步表格填充失败: {e}")
 
     def _get_row_data(self, source_id: str, adapter, row: int) -> dict:
         """获取单行数据（在工作线程中）"""
@@ -162,7 +147,7 @@ class TablePopulationWorker(QThread):
                     plugin_initialized = getattr(plugin_instance, 'initialized', False)
                     if not plugin_initialized:
                         status_message = "插件未初始化"
-                        print(f"❌ 插件 {source_id} 未初始化")
+                        logger.info(f" 插件 {source_id} 未初始化")
                     else:
                         # 2. 检查插件连接状态
                         if hasattr(plugin_instance, 'is_connected'):
@@ -170,7 +155,7 @@ class TablePopulationWorker(QThread):
                                 plugin_connected = bool(plugin_instance.is_connected())
                                 if not plugin_connected:
                                     status_message = "插件未连接"
-                                    print(f"❌ 插件 {source_id} is_connected() 返回 False")
+                                    logger.info(f" 插件 {source_id} is_connected() 返回 False")
                                 else:
                                     # 3. 执行健康检查（与手动测试保持一致）
                                     try:
@@ -179,17 +164,17 @@ class TablePopulationWorker(QThread):
                                             # 健康检查通过即认为连接正常
                                             is_connected = True
                                             status_message = "活跃"
-                                            print(f"✅ 插件 {source_id} 健康检查通过，状态活跃")
+                                            logger.info(f" 插件 {source_id} 健康检查通过，状态活跃")
                                         else:
                                             error_msg = getattr(health_result, 'error_message', '健康检查失败')
                                             status_message = error_msg
-                                            print(f"❌ 插件 {source_id} 健康检查失败: {error_msg}")
+                                            logger.info(f" 插件 {source_id} 健康检查失败: {error_msg}")
                                     except Exception as e:
                                         status_message = f"健康检查异常: {str(e)}"
-                                        print(f"❌ 插件 {source_id} 健康检查异常: {e}")
+                                        logger.info(f" 插件 {source_id} 健康检查异常: {e}")
                             except Exception as e:
                                 status_message = f"连接检查失败: {str(e)}"
-                                print(f"❌ 调用插件is_connected失败 {source_id}: {e}")
+                                logger.info(f" 调用插件is_connected失败 {source_id}: {e}")
                         else:
                             # 插件不支持is_connected方法，直接进行健康检查
                             try:
@@ -197,30 +182,30 @@ class TablePopulationWorker(QThread):
                                 if hasattr(health_result, 'is_healthy') and health_result.is_healthy:
                                     is_connected = True
                                     status_message = "活跃"
-                                    print(f"✅ 插件 {source_id} 健康检查通过（无is_connected方法）")
+                                    logger.info(f" 插件 {source_id} 健康检查通过（无is_connected方法）")
                                 else:
                                     error_msg = getattr(health_result, 'error_message', '健康检查失败')
                                     status_message = error_msg
-                                    print(f"❌ 插件 {source_id} 健康检查失败: {error_msg}")
+                                    logger.info(f" 插件 {source_id} 健康检查失败: {error_msg}")
                             except Exception as e:
                                 status_message = f"健康检查异常: {str(e)}"
-                                print(f"❌ 插件 {source_id} 健康检查异常: {e}")
+                                logger.info(f" 插件 {source_id} 健康检查异常: {e}")
                 else:
                     status_message = "插件实例不存在"
-                    print(f"❌ 插件 {source_id} 实例不存在")
+                    logger.info(f" 插件 {source_id} 实例不存在")
 
                 # 如果还没有连接，检查适配器错误状态以提供更详细的错误信息
                 if not is_connected and hasattr(adapter, 'last_error') and adapter.last_error:
                     status_message = adapter.last_error
 
-                status = "🟢 活跃" if is_connected else "🔴 未连接"
-                print(f"🔍 最终状态 {source_id}: {status} ({status_message})")
+                status = " 活跃" if is_connected else " 未连接"
+                logger.info(f" 最终状态 {source_id}: {status} ({status_message})")
 
             except Exception as e:
-                print(f"检查插件状态失败 {source_id}: {e}")
+                logger.error(f"检查插件状态失败 {source_id}: {e}")
                 import traceback
                 traceback.print_exc()
-                status = "🟡 未知"
+                status = " 未知"
 
             # 支持资产
             try:
@@ -277,19 +262,19 @@ class TablePopulationWorker(QThread):
                             health_score = "1.00"  # 新插件默认满分
                     else:
                         # 基于连接状态给出基础分数
-                        if status == "🟢 活跃":
+                        if status == " 活跃":
                             health_score = "0.85"
-                        elif status == "🔴 未连接":
+                        elif status == " 未连接":
                             health_score = "0.10"
                         else:
                             health_score = "0.50"
 
             except Exception as e:
-                print(f"计算健康分数失败 {source_id}: {e}")
+                logger.error(f"计算健康分数失败 {source_id}: {e}")
                 # 基于状态给出默认分数
-                if status == "🟢 活跃":
+                if status == " 活跃":
                     health_score = "0.80"
-                elif status == "🔴 未连接":
+                elif status == " 未连接":
                     health_score = "0.00"
                 else:
                     health_score = "N/A"
@@ -307,10 +292,10 @@ class TablePopulationWorker(QThread):
             }
 
         except Exception as e:
-            print(f"⚠️ 获取行数据失败 {source_id}: {e}")
+            logger.error(f" 获取行数据失败 {source_id}: {e}")
             return {
                 'name': str(source_id),
-                'status': "❌ 错误",
+                'status': " 错误",
                 'assets': "-",
                 'health_score': "-",
                 'priority': str(row + 1),
@@ -340,7 +325,7 @@ class DataSourceLoadingWorker(QThread):
         """异步加载数据源插件"""
         self._is_running = True
         try:
-            print("🚀 开始异步加载数据源插件...")
+            logger.info(" 开始异步加载数据源插件...")
 
             real_adapters = {}
             ds_plugins = {}
@@ -390,15 +375,15 @@ class DataSourceLoadingWorker(QThread):
                         self.loading_progress.emit(completed_count, total_count, plugin_name)
 
                     except Exception as e:
-                        print(f"❌ 处理插件 {plugin_name} 失败: {e}")
+                        logger.error(f" 处理插件 {plugin_name} 失败: {e}")
 
             if self._is_running:
                 self.loading_completed.emit(real_adapters)
-                print(f"✅ 异步加载完成，共加载 {len(real_adapters)} 个插件")
+                logger.info(f" 异步加载完成，共加载 {len(real_adapters)} 个插件")
 
         except Exception as e:
             self.loading_failed.emit(str(e))
-            print(f"❌ 异步加载失败: {e}")
+            logger.error(f" 异步加载失败: {e}")
 
     def _process_plugin(self, plugin_name, plugin_info, plugin_instance):
         """处理单个插件（在工作线程中）"""
@@ -412,7 +397,7 @@ class DataSourceLoadingWorker(QThread):
             return adapter
 
         except Exception as e:
-            print(f"⚠️ 创建插件适配器失败 {plugin_name}: {e}")
+            logger.error(f" 创建插件适配器失败 {plugin_name}: {e}")
             return None
 
     def stop(self):
@@ -447,7 +432,7 @@ class DataSourceLoadingWorker(QThread):
                 })()
 
         except Exception as e:
-            print(f"⚠️ 创建真实适配器失败 {plugin_name}: {e}")
+            logger.error(f" 创建真实适配器失败 {plugin_name}: {e}")
             # 返回最小可用适配器
             return type('MinimalAdapter', (), {
                 'get_plugin_info': lambda *args: type('PluginInfo', (), {
@@ -553,7 +538,7 @@ class EnhancedPluginManagerDialog(QDialog):
         self.refresh_timer.timeout.connect(self.refresh_status)
         self.refresh_timer.start(30000)  # 30秒刷新一次
 
-        print("🔄 准备启动数据源同步...")
+        logger.info(" 准备启动数据源同步...")
         # 数据源同步到统一管理器（延迟执行确保所有服务已初始化）
         QTimer.singleShot(500, self._sync_data_sources_to_unified_manager)
 
@@ -567,21 +552,21 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 标题栏
         title_layout = QHBoxLayout()
-        title_label = QLabel("🔧 插件管理器")
+        title_label = QLabel(" 插件管理器")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
 
         # 全局操作按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton(" 刷新")
         refresh_btn.clicked.connect(self.refresh_status)
         title_layout.addWidget(refresh_btn)
 
-        export_btn = QPushButton("📤 导出配置")
+        export_btn = QPushButton(" 导出配置")
         export_btn.clicked.connect(self.export_all_configs)
         title_layout.addWidget(export_btn)
 
-        import_btn = QPushButton("📥 导入配置")
+        import_btn = QPushButton(" 导入配置")
         import_btn.clicked.connect(self.import_all_configs)
         title_layout.addWidget(import_btn)
 
@@ -705,11 +690,11 @@ class EnhancedPluginManagerDialog(QDialog):
         # 工具栏
         toolbar_layout = QHBoxLayout()
 
-        test_all_btn = QPushButton("🧪 测试所有连接")
+        test_all_btn = QPushButton(" 测试所有连接")
         test_all_btn.clicked.connect(self.test_all_sentiment_plugins)
         toolbar_layout.addWidget(test_all_btn)
 
-        reset_weights_btn = QPushButton("🔄 重置权重")
+        reset_weights_btn = QPushButton(" 重置权重")
         reset_weights_btn.clicked.connect(self.reset_sentiment_weights)
         toolbar_layout.addWidget(reset_weights_btn)
 
@@ -802,7 +787,7 @@ class EnhancedPluginManagerDialog(QDialog):
         self.search_edit.setPlaceholderText("输入插件名称或关键词...")
         search_layout.addWidget(self.search_edit)
 
-        search_btn = QPushButton("🔍 搜索")
+        search_btn = QPushButton(" 搜索")
         search_btn.clicked.connect(self.search_plugins)
         search_layout.addWidget(search_btn)
 
@@ -818,7 +803,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         category_layout.addStretch()
 
-        refresh_market_btn = QPushButton("🔄 刷新市场")
+        refresh_market_btn = QPushButton(" 刷新市场")
         refresh_market_btn.clicked.connect(self.refresh_market)
         category_layout.addWidget(refresh_market_btn)
 
@@ -864,13 +849,13 @@ class EnhancedPluginManagerDialog(QDialog):
             try:
                 # 验证插件管理器是否已初始化
                 if not hasattr(self.plugin_manager, 'enhanced_plugins'):
-                    print("⚠️ 插件管理器未初始化，尝试重新初始化...")
+                    logger.info(" 插件管理器未初始化，尝试重新初始化...")
                     self.plugin_manager.initialize()
 
                     # 优先使用enhanced_plugins获取插件信息
                 if hasattr(self.plugin_manager, 'get_all_enhanced_plugins'):
                     enhanced_plugins = self.plugin_manager.get_all_enhanced_plugins()
-                    print(f"✅ 成功加载 {len(enhanced_plugins)} 个增强插件")
+                    logger.info(f" 成功加载 {len(enhanced_plugins)} 个增强插件")
 
                     if enhanced_plugins:
                         for plugin_name, plugin_info in enhanced_plugins.items():
@@ -897,7 +882,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     self._load_regular_plugins()
 
             except Exception as e:
-                print(f"❌ 加载真实插件失败: {e}")
+                logger.error(f" 加载真实插件失败: {e}")
                 import traceback
                 traceback.print_exc()
                 # 显示错误信息而不是fallback到示例数据
@@ -916,10 +901,10 @@ class EnhancedPluginManagerDialog(QDialog):
             container = get_service_container()
             if container and container.is_registered(PluginManager):
                 self.plugin_manager = container.resolve(PluginManager)
-                print("✅ 成功从服务容器获取插件管理器")
+                logger.info(" 成功从服务容器获取插件管理器")
                 return True
         except Exception as e:
-            print(f"⚠️ 从服务容器获取插件管理器失败: {e}")
+            logger.error(f" 从服务容器获取插件管理器失败: {e}")
 
         return False
 
@@ -940,7 +925,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(message_widget)
 
-        title = QLabel("📦 暂无插件")
+        title = QLabel(" 暂无插件")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c757d;")
         layout.addWidget(title)
 
@@ -968,7 +953,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(error_widget)
 
-        title = QLabel("⚠️ 插件加载失败")
+        title = QLabel(" 插件加载失败")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #856404;")
         layout.addWidget(title)
 
@@ -977,7 +962,7 @@ class EnhancedPluginManagerDialog(QDialog):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        retry_btn = QPushButton("🔄 重试加载")
+        retry_btn = QPushButton(" 重试加载")
         retry_btn.setMaximumWidth(100)
         retry_btn.clicked.connect(self.load_general_plugins)
         layout.addWidget(retry_btn)
@@ -991,19 +976,19 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 插件类型映射表
         type_mapping = {
-            'INDICATOR': '📈 技术指标',
-            'STRATEGY': '🎯 交易策略',
-            'DATA_SOURCE': '📊 数据源',
-            'ANALYSIS': '🔍 分析工具',
-            'UI_COMPONENT': '🎨 界面组件',
-            'EXPORT': '📤 导出工具',
-            'NOTIFICATION': '🔔 通知服务',
-            'CHART_TOOL': '📉 图表工具',
-            'RISK_MANAGEMENT': '⚠️ 风险管理',
-            'PORTFOLIO': '💼 投资组合',
-            'SENTIMENT': '💭 情绪分析',
-            'AI': '🤖 人工智能',
-            'MACHINE_LEARNING': '🧠 机器学习'
+            'INDICATOR': ' 技术指标',
+            'STRATEGY': ' 交易策略',
+            'DATA_SOURCE': ' 数据源',
+            'ANALYSIS': ' 分析工具',
+            'UI_COMPONENT': ' 界面组件',
+            'EXPORT': ' 导出工具',
+            'NOTIFICATION': ' 通知服务',
+            'CHART_TOOL': ' 图表工具',
+            'RISK_MANAGEMENT': ' 风险管理',
+            'PORTFOLIO': ' 投资组合',
+            'SENTIMENT': ' 情绪分析',
+            'AI': ' 人工智能',
+            'MACHINE_LEARNING': ' 机器学习'
         }
 
         # 转换为字符串进行匹配
@@ -1016,7 +1001,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 break
 
         # 查找映射
-        return type_mapping.get(plugin_type_str, f"🔧 {plugin_type_str.title()}")
+        return type_mapping.get(plugin_type_str, f" {plugin_type_str.title()}")
 
     def _show_plugin_manager_unavailable_message(self):
         """显示插件管理器不可用的消息"""
@@ -1035,21 +1020,21 @@ class EnhancedPluginManagerDialog(QDialog):
 
         layout = QVBoxLayout(unavailable_widget)
 
-        title = QLabel("❌ 插件管理器不可用")
+        title = QLabel(" 插件管理器不可用")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #721c24;")
         layout.addWidget(title)
 
         desc = QLabel(
             "无法连接到插件管理器。可能的原因：\n"
-            "• 服务容器未正确初始化\n"
-            "• 插件管理器服务未注册\n"
-            "• 系统启动时发生错误"
+            " 服务容器未正确初始化\n"
+            " 插件管理器服务未注册\n"
+            " 系统启动时发生错误"
         )
         desc.setStyleSheet("color: #721c24; margin-top: 10px;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        retry_btn = QPushButton("🔄 重新尝试连接")
+        retry_btn = QPushButton(" 重新尝试连接")
         retry_btn.setMaximumWidth(150)
         retry_btn.clicked.connect(self.load_general_plugins)
         layout.addWidget(retry_btn)
@@ -1060,7 +1045,7 @@ class EnhancedPluginManagerDialog(QDialog):
         """加载普通插件（fallback方法）"""
         try:
             all_plugins = self.plugin_manager.get_all_plugins()
-            print(f"✅ 成功加载 {len(all_plugins)} 个普通插件")
+            logger.info(f" 成功加载 {len(all_plugins)} 个普通插件")
 
             if all_plugins:
                 for plugin_name, plugin_instance in all_plugins.items():
@@ -1079,7 +1064,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 self._show_no_plugins_message()
 
         except Exception as e:
-            print(f"❌ 加载普通插件失败: {e}")
+            logger.error(f" 加载普通插件失败: {e}")
             self._show_no_plugins_message()
 
     def _create_general_plugin_widget(self, plugin_info):
@@ -1148,9 +1133,9 @@ class EnhancedPluginManagerDialog(QDialog):
                 if container and container.is_registered(SentimentDataService):
                     sentiment_service = container.resolve(SentimentDataService)
                     self.sentiment_service = sentiment_service
-                    print("✅ 从服务容器获取情绪数据服务成功")
+                    logger.info(" 从服务容器获取情绪数据服务成功")
             except Exception as e:
-                print(f"⚠️ 从服务容器获取情绪数据服务失败: {e}")
+                logger.error(f" 从服务容器获取情绪数据服务失败: {e}")
 
         # 加载真实的情绪插件
         if sentiment_service:
@@ -1158,7 +1143,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 # 使用新的get_available_plugins_info方法获取详细信息
                 if hasattr(sentiment_service, 'get_available_plugins_info'):
                     plugins_info = sentiment_service.get_available_plugins_info()
-                    print(f"✅ 获取到 {len(plugins_info)} 个情绪数据插件")
+                    logger.info(f" 获取到 {len(plugins_info)} 个情绪数据插件")
 
                     for plugin_name, plugin_info in plugins_info.items():
                         try:
@@ -1182,13 +1167,13 @@ class EnhancedPluginManagerDialog(QDialog):
                             # 使用显示名称而不是内部名称
                             self.add_sentiment_plugin_config(display_name, config, plugin_name)
                         except Exception as e:
-                            print(f"⚠️ 获取插件 {plugin_name} 配置失败: {e}")
+                            logger.error(f" 获取插件 {plugin_name} 配置失败: {e}")
                             # 使用默认配置
                             self.add_sentiment_plugin_config(plugin_name)
                 else:
                     # 回退到旧方法
                     plugins = sentiment_service.get_available_plugins()
-                    print(f"✅ 获取到 {len(plugins)} 个情绪数据插件: {plugins}")
+                    logger.info(f" 获取到 {len(plugins)} 个情绪数据插件: {plugins}")
 
                     for plugin_name in plugins:
                         # 获取插件的实际配置
@@ -1204,15 +1189,15 @@ class EnhancedPluginManagerDialog(QDialog):
                             }
                             self.add_sentiment_plugin_config(plugin_name, config)
                         except Exception as e:
-                            print(f"⚠️ 获取插件 {plugin_name} 配置失败: {e}")
+                            logger.error(f" 获取插件 {plugin_name} 配置失败: {e}")
                             # 使用默认配置
                             self.add_sentiment_plugin_config(plugin_name)
 
             except Exception as e:
-                print(f"❌ 获取情绪插件列表失败: {e}")
+                logger.error(f" 获取情绪插件列表失败: {e}")
                 self._load_sentiment_fallback_data()
         else:
-            print("⚠️ 情绪数据服务不可用，使用fallback数据")
+            logger.info(" 情绪数据服务不可用，使用fallback数据")
             self._load_sentiment_fallback_data()
 
     def _load_sentiment_fallback_data(self):
@@ -1235,10 +1220,10 @@ class EnhancedPluginManagerDialog(QDialog):
                     self.add_sentiment_plugin_config(plugin_name, config)
 
                 if sentiment_plugins:
-                    print(f"✅ 从插件管理器获取到 {len(sentiment_plugins)} 个情绪插件")
+                    logger.info(f" 从插件管理器获取到 {len(sentiment_plugins)} 个情绪插件")
                     return
             except Exception as e:
-                print(f"⚠️ 从插件管理器获取情绪插件失败: {e}")
+                logger.error(f" 从插件管理器获取情绪插件失败: {e}")
 
         # 最后的fallback - 示例配置
         example_configs = {
@@ -1263,7 +1248,7 @@ class EnhancedPluginManagerDialog(QDialog):
         for plugin_name, config in example_configs.items():
             self.add_sentiment_plugin_config(plugin_name, config)
 
-        print(f"✅ 使用示例配置加载了 {len(example_configs)} 个情绪插件")
+        logger.info(f" 使用示例配置加载了 {len(example_configs)} 个情绪插件")
 
     def add_sentiment_plugin_config(self, plugin_name: str, config: Dict[str, Any] = None, internal_name: str = None):
         """添加情绪插件配置widget - 简单2列布局
@@ -1330,10 +1315,10 @@ class EnhancedPluginManagerDialog(QDialog):
                     try:
                         # 使用内部名称（完整插件ID）来获取状态
                         status_info = self.sentiment_service.get_plugin_status(internal_name)
-                        print(f"✅ 获取到插件 {display_name} 的状态信息: {status_info}")
+                        logger.info(f" 获取到插件 {display_name} 的状态信息: {status_info}")
 
                         # 构建状态信息
-                        status = "✅ 已连接" if status_info.get('is_connected', False) else "❌ 未连接"
+                        status = " 已连接" if status_info.get('is_connected', False) else " 未连接"
                         last_update = self._format_timestamp(time.time())
                         quality = self._calculate_data_quality(status_info)
 
@@ -1346,12 +1331,12 @@ class EnhancedPluginManagerDialog(QDialog):
 
                         if hasattr(widget, 'update_status'):
                             widget.update_status(status_data)
-                        print(f"✅ 更新插件 {plugin_name} 状态显示: {status_data}")
+                        logger.info(f" 更新插件 {plugin_name} 状态显示: {status_data}")
 
                     except Exception as e:
-                        print(f"⚠️ 获取插件 {plugin_name} 状态信息失败: {e}")
+                        logger.error(f" 获取插件 {plugin_name} 状态信息失败: {e}")
                         default_status = {
-                            'status': "🔍 检测中",
+                            'status': " 检测中",
                             'last_update': "未知",
                             'data_quality': "未知"
                         }
@@ -1359,7 +1344,7 @@ class EnhancedPluginManagerDialog(QDialog):
                             widget.update_status(default_status)
                 else:
                     default_status = {
-                        'status': "🔍 检测中",
+                        'status': " 检测中",
                         'last_update': "未知",
                         'data_quality': "未知"
                     }
@@ -1401,7 +1386,7 @@ class EnhancedPluginManagerDialog(QDialog):
             self.sentiment_config_widgets[plugin_name] = widget
 
         except Exception as e:
-            print(f"添加情绪插件配置失败: {e}")
+            logger.error(f"添加情绪插件配置失败: {e}")
 
     def create_simple_sentiment_widget_compact(self, plugin_name: str, config: Dict[str, Any]) -> QWidget:
         """创建简单的情绪插件配置widget（紧凑版）"""
@@ -1414,7 +1399,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 标题
         title_layout = QHBoxLayout()
-        title_label = QLabel(f"📊 {plugin_name}")
+        title_label = QLabel(f" {plugin_name}")
         title_label.setFont(QFont("Arial", 14, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
@@ -1423,7 +1408,7 @@ class EnhancedPluginManagerDialog(QDialog):
         enable_cb.setChecked(config.get('enabled', True))
         title_layout.addWidget(enable_cb)
 
-        test_btn = QPushButton("🔍 测试")
+        test_btn = QPushButton(" 测试")
         test_btn.setMaximumWidth(80)
         title_layout.addWidget(test_btn)
 
@@ -1499,10 +1484,10 @@ class EnhancedPluginManagerDialog(QDialog):
         # 插件类型简化图标 - 专业无边框小图标
         plugin_type = plugin_info.get('type', '通用插件')
         type_icons = {
-            '📈 技术指标': '◐', '🎯 交易策略': '◈', '📊 数据源': '◇',
-            '🔍 分析工具': '◎', '🎨 界面组件': '□', '📤 导出工具': '◫',
-            '🔔 通知服务': '◉', '📉 图表工具': '◢', '⚠️ 风险管理': '△',
-            '💼 投资组合': '◪', '💭 情绪分析': '◦', '🤖 人工智能': '◈'
+            ' 技术指标': '◐', ' 交易策略': '◈', ' 数据源': '◇',
+            ' 分析工具': '◎', ' 界面组件': '□', ' 导出工具': '◫',
+            ' 通知服务': '◉', ' 图表工具': '◢', ' 风险管理': '△',
+            ' 投资组合': '◪', ' 情绪分析': '◦', ' 人工智能': '◈'
         }
         icon_text = type_icons.get(plugin_type, '●')
 
@@ -1596,7 +1581,7 @@ class EnhancedPluginManagerDialog(QDialog):
                             # 立即更新UI状态
                             self._update_single_plugin_ui(widget, plugin_key, True)
                             self.plugin_enabled.emit(plugin_key)
-                            print(f"✅ 启用插件: {plugin_key}")
+                            logger.info(f" 启用插件: {plugin_key}")
                         else:
                             # 回滚时避免递归触发
                             try:
@@ -1604,14 +1589,14 @@ class EnhancedPluginManagerDialog(QDialog):
                                 enable_cb.setChecked(False)
                             finally:
                                 enable_cb.blockSignals(False)
-                            print(f"❌ 启用插件失败: {plugin_key}")
+                            logger.error(f" 启用插件失败: {plugin_key}")
                     else:
                         result = self.plugin_manager.disable_plugin(plugin_key)
                         if result:
                             # 立即更新UI状态
                             self._update_single_plugin_ui(widget, plugin_key, False)
                             self.plugin_disabled.emit(plugin_key)
-                            print(f"✅ 禁用插件: {plugin_key}")
+                            logger.info(f" 禁用插件: {plugin_key}")
                         else:
                             # 回滚时避免递归触发
                             try:
@@ -1619,7 +1604,7 @@ class EnhancedPluginManagerDialog(QDialog):
                                 enable_cb.setChecked(True)
                             finally:
                                 enable_cb.blockSignals(False)
-                            print(f"❌ 禁用插件失败: {plugin_key}")
+                            logger.error(f" 禁用插件失败: {plugin_key}")
                 else:
                     QMessageBox.warning(widget, "警告", "插件管理器不可用")
                     # 回滚时避免递归触发
@@ -1629,7 +1614,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     finally:
                         enable_cb.blockSignals(False)
             except Exception as e:
-                print(f"❌ 切换插件状态失败: {e}")
+                logger.error(f" 切换插件状态失败: {e}")
                 QMessageBox.critical(widget, "错误", f"操作失败:\n{str(e)}")
                 # 回滚时避免递归触发
                 try:
@@ -1641,7 +1626,7 @@ class EnhancedPluginManagerDialog(QDialog):
         enable_cb.toggled.connect(on_enable_changed)
 
         # 配置按钮 - 专业小图标设计
-        config_btn = QPushButton("⚙")
+        config_btn = QPushButton("")
         config_btn.setFont(QFont("Arial", 11))
         config_btn.setStyleSheet("""
             QPushButton {
@@ -1679,7 +1664,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         actual_plugin_info, self.plugin_manager, widget)
                     if config_dialog.exec_() == QDialog.Accepted:
                         self.plugin_configured.emit(plugin_name, {})
-                        print(f"✅ 插件 {plugin_name} 配置已更新")
+                        logger.info(f" 插件 {plugin_name} 配置已更新")
                 else:
                     # 备用方案：显示简单配置信息
                     from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox
@@ -1703,7 +1688,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     config_dialog.exec_()
 
             except Exception as e:
-                print(f"❌ 配置插件失败: {e}")
+                logger.error(f" 配置插件失败: {e}")
                 QMessageBox.critical(widget, "错误", f"配置失败:\n{str(e)}")
 
         config_btn.clicked.connect(on_config_clicked)
@@ -1745,7 +1730,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 基本信息
             basic_info = f"""
-            <h3>📦 {plugin_info['name']}</h3>
+            <h3> {plugin_info['name']}</h3>
             <p><b>版本:</b> {plugin_info['version']}</p>
             <p><b>类型:</b> {plugin_info['type']}</p>
             <p><b>状态:</b> {plugin_info['status']}</p>
@@ -1862,7 +1847,7 @@ class EnhancedPluginManagerDialog(QDialog):
         meta_layout.addWidget(QLabel(f"版本: {plugin_info['version']}"))
         meta_layout.addWidget(QLabel(f"作者: {plugin_info['author']}"))
         meta_layout.addWidget(QLabel(f"下载: {plugin_info['downloads']}"))
-        meta_layout.addWidget(QLabel(f"评分: {plugin_info['rating']}⭐"))
+        meta_layout.addWidget(QLabel(f"评分: {plugin_info['rating']}"))
         meta_layout.addStretch()
         info_layout.addLayout(meta_layout)
 
@@ -1873,13 +1858,13 @@ class EnhancedPluginManagerDialog(QDialog):
 
         status = plugin_info['status']
         if status == "未安装":
-            install_btn = QPushButton("📥 安装")
+            install_btn = QPushButton(" 安装")
             install_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; }")
         elif status == "可更新":
-            install_btn = QPushButton("🔄 更新")
+            install_btn = QPushButton(" 更新")
             install_btn.setStyleSheet("QPushButton { background-color: #ffc107; color: black; }")
         else:
-            install_btn = QPushButton("✅ 已安装")
+            install_btn = QPushButton(" 已安装")
             install_btn.setEnabled(False)
 
         button_layout.addWidget(install_btn)
@@ -1909,7 +1894,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     total_plugins += len(enhanced_plugins)
                     active_plugins += sum(1 for plugin_info in enhanced_plugins.values() if plugin_info.enabled)
                 except Exception as e:
-                    print(f"⚠️ 获取插件管理器数据失败: {e}")
+                    logger.error(f" 获取插件管理器数据失败: {e}")
 
             # 从情绪数据服务获取插件数据
             if self.sentiment_service:
@@ -1921,14 +1906,14 @@ class EnhancedPluginManagerDialog(QDialog):
                         if status.get('enabled', False):
                             active_plugins += 1
                 except Exception as e:
-                    print(f"⚠️ 获取情绪服务数据失败: {e}")
+                    logger.error(f" 获取情绪服务数据失败: {e}")
 
             # 更新UI标签
             self.plugin_count_label.setText(f"插件总数: {total_plugins}")
             self.active_count_label.setText(f"活跃插件: {active_plugins}")
 
         except Exception as e:
-            print(f"❌ 更新状态计数失败: {e}")
+            logger.error(f" 更新状态计数失败: {e}")
             # fallback显示基本信息
             self.plugin_count_label.setText("插件总数: N/A")
             self.active_count_label.setText("活跃插件: N/A")
@@ -1950,7 +1935,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 'timestamp': time.time()
             }
         except Exception as e:
-            print(f"⚠️ 获取系统指标失败: {e}")
+            logger.error(f" 获取系统指标失败: {e}")
             # 返回默认值
             return {
                 'cpu_usage': 15.0,
@@ -1969,7 +1954,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 enhanced_plugins = self.plugin_manager.get_all_enhanced_plugins()
                 active_count += sum(1 for plugin_info in enhanced_plugins.values() if plugin_info.enabled)
             except Exception as e:
-                print(f"⚠️ 获取插件状态失败: {e}")
+                logger.error(f" 获取插件状态失败: {e}")
 
         # 从情绪数据服务获取数据
         if self.sentiment_service:
@@ -1980,7 +1965,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     if status.get('enabled', False):
                         active_count += 1
             except Exception as e:
-                print(f"⚠️ 获取情绪插件状态失败: {e}")
+                logger.error(f" 获取情绪插件状态失败: {e}")
 
         return active_count
 
@@ -1994,7 +1979,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 all_plugins = self.plugin_manager.get_all_plugins()
                 total_count = len(all_plugins)
             except Exception as e:
-                print(f"⚠️ 获取插件总数失败: {e}")
+                logger.error(f" 获取插件总数失败: {e}")
         return total_count
 
     def on_sentiment_config_changed(self, plugin_name: str, config: Dict[str, Any]):
@@ -2020,20 +2005,20 @@ class EnhancedPluginManagerDialog(QDialog):
 
                     if result:
                         status_text = "已启用" if enabled else "已禁用"
-                        print(f"✅ 插件 {plugin_name} {status_text}")
+                        logger.info(f" 插件 {plugin_name} {status_text}")
 
                         # 发送状态变更通知
                         self.sentiment_plugin_tested.emit(plugin_name, enabled)
                     else:
                         status_text = "启用" if enabled else "禁用"
-                        print(f"❌ 插件 {plugin_name} {status_text}失败")
+                        logger.error(f" 插件 {plugin_name} {status_text}失败")
 
                         # 可以在这里显示错误消息给用户
                         from PyQt5.QtWidgets import QMessageBox
                         QMessageBox.warning(self, "状态变更失败", f"插件 {plugin_name} {status_text}失败")
 
                 except Exception as e:
-                    print(f"❌ 设置插件 {plugin_name} 状态时发生错误: {e}")
+                    logger.error(f" 设置插件 {plugin_name} 状态时发生错误: {e}")
                     from PyQt5.QtWidgets import QMessageBox
                     QMessageBox.critical(self, "状态变更错误", f"设置插件状态时发生错误:\n{str(e)}")
 
@@ -2041,7 +2026,7 @@ class EnhancedPluginManagerDialog(QDialog):
             self.plugin_configured.emit(plugin_name, config)
 
         except Exception as e:
-            print(f"❌ 处理插件配置变更时发生错误: {e}")
+            logger.error(f" 处理插件配置变更时发生错误: {e}")
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "配置错误", f"处理配置变更时发生错误:\n{str(e)}")
 
@@ -2090,7 +2075,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         QMessageBox.warning(self, "测试失败", f"插件 {plugin_name} 测试失败:\n{error_msg}")
 
                 except Exception as e:
-                    print(f"❌ 测试插件 {plugin_name} 失败: {e}")
+                    logger.error(f" 测试插件 {plugin_name} 失败: {e}")
                     self.sentiment_plugin_tested.emit(plugin_name, False)
                     QMessageBox.critical(self, "测试错误", f"测试插件 {plugin_name} 时发生错误:\n{str(e)}")
             else:
@@ -2100,7 +2085,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 QMessageBox.warning(self, "测试失败", f"无法测试插件 {plugin_name}:\n{error_msg}")
 
         except Exception as e:
-            print(f"❌ 测试插件时发生错误: {e}")
+            logger.error(f" 测试插件时发生错误: {e}")
             self.sentiment_plugin_tested.emit(plugin_name, False)
             QMessageBox.critical(self, "测试错误", f"测试时发生错误:\n{str(e)}")
 
@@ -2134,14 +2119,14 @@ class EnhancedPluginManagerDialog(QDialog):
                             success = self.plugin_manager.enable_plugin(plugin_name)
                             if success:
                                 enabled_count += 1
-                                print(f"✅ 启用插件: {plugin_name}")
+                                logger.info(f" 启用插件: {plugin_name}")
                                 # 发射信号
                                 self.plugin_enabled.emit(plugin_name)
                             else:
-                                print(f"❌ 启用插件 {plugin_name} 失败")
+                                logger.error(f" 启用插件 {plugin_name} 失败")
 
                     except Exception as e:
-                        print(f"❌ 启用插件 {plugin_name} 失败: {e}")
+                        logger.error(f" 启用插件 {plugin_name} 失败: {e}")
             else:
                 # fallback到普通插件
                 all_plugins = self.plugin_manager.get_all_plugins()
@@ -2150,10 +2135,10 @@ class EnhancedPluginManagerDialog(QDialog):
                         success = self.plugin_manager.enable_plugin(plugin_name)
                         if success:
                             enabled_count += 1
-                            print(f"✅ 启用插件: {plugin_name}")
+                            logger.info(f" 启用插件: {plugin_name}")
                             self.plugin_enabled.emit(plugin_name)
                     except Exception as e:
-                        print(f"❌ 启用插件 {plugin_name} 失败: {e}")
+                        logger.error(f" 启用插件 {plugin_name} 失败: {e}")
 
             # 刷新插件列表
             self.load_general_plugins()
@@ -2161,7 +2146,7 @@ class EnhancedPluginManagerDialog(QDialog):
             QMessageBox.information(self, "操作完成", f"成功启用 {enabled_count} 个插件")
 
         except Exception as e:
-            print(f"❌ 启用所有插件失败: {e}")
+            logger.error(f" 启用所有插件失败: {e}")
             QMessageBox.critical(self, "错误", f"启用插件时发生错误:\n{str(e)}")
 
     def disable_all_general_plugins(self):
@@ -2194,14 +2179,14 @@ class EnhancedPluginManagerDialog(QDialog):
                             success = self.plugin_manager.disable_plugin(plugin_name)
                             if success:
                                 disabled_count += 1
-                                print(f"✅ 禁用插件: {plugin_name}")
+                                logger.info(f" 禁用插件: {plugin_name}")
                                 # 发射信号
                                 self.plugin_disabled.emit(plugin_name)
                             else:
-                                print(f"❌ 禁用插件 {plugin_name} 失败")
+                                logger.error(f" 禁用插件 {plugin_name} 失败")
 
                     except Exception as e:
-                        print(f"❌ 禁用插件 {plugin_name} 失败: {e}")
+                        logger.error(f" 禁用插件 {plugin_name} 失败: {e}")
             else:
                 # fallback到普通插件
                 all_plugins = self.plugin_manager.get_all_plugins()
@@ -2210,10 +2195,10 @@ class EnhancedPluginManagerDialog(QDialog):
                         success = self.plugin_manager.disable_plugin(plugin_name)
                         if success:
                             disabled_count += 1
-                            print(f"✅ 禁用插件: {plugin_name}")
+                            logger.info(f" 禁用插件: {plugin_name}")
                             self.plugin_disabled.emit(plugin_name)
                     except Exception as e:
-                        print(f"❌ 禁用插件 {plugin_name} 失败: {e}")
+                        logger.error(f" 禁用插件 {plugin_name} 失败: {e}")
 
             # 刷新插件列表
             self.load_general_plugins()
@@ -2221,7 +2206,7 @@ class EnhancedPluginManagerDialog(QDialog):
             QMessageBox.information(self, "操作完成", f"成功禁用 {disabled_count} 个插件")
 
         except Exception as e:
-            print(f"❌ 禁用所有插件失败: {e}")
+            logger.error(f" 禁用所有插件失败: {e}")
             QMessageBox.critical(self, "错误", f"禁用插件时发生错误:\n{str(e)}")
 
     def filter_general_plugins(self):
@@ -2269,10 +2254,10 @@ class EnhancedPluginManagerDialog(QDialog):
                         widget.setVisible(should_show)
                         break
 
-            print(f"✅ 应用过滤器: {filter_text}")
+            logger.info(f" 应用过滤器: {filter_text}")
 
         except Exception as e:
-            print(f"❌ 过滤插件失败: {e}")
+            logger.error(f" 过滤插件失败: {e}")
 
     def search_plugins(self):
         """搜索插件"""
@@ -2309,7 +2294,7 @@ class EnhancedPluginManagerDialog(QDialog):
                     result_text = f"找到 {len(matching_plugins)} 个匹配的插件:\n\n"
                     for plugin_name, plugin_info in matching_plugins:
                         status = "启用" if plugin_info.enabled else "禁用"
-                        result_text += f"• {plugin_name} ({status})\n"
+                        result_text += f" {plugin_name} ({status})\n"
                         result_text += f"  描述: {getattr(plugin_info, 'description', '无描述')}\n"
                         result_text += f"  类型: {getattr(plugin_info, 'type', '未知')}\n\n"
                 else:
@@ -2320,7 +2305,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 QMessageBox.warning(self, "搜索失败", "插件管理器不可用")
 
         except Exception as e:
-            print(f"❌ 搜索插件失败: {e}")
+            logger.error(f" 搜索插件失败: {e}")
             QMessageBox.critical(self, "搜索错误", f"搜索时发生错误:\n{str(e)}")
 
     def refresh_market(self):
@@ -2331,10 +2316,10 @@ class EnhancedPluginManagerDialog(QDialog):
                 self, "插件市场",
                 "插件市场功能正在开发中...\n\n"
                 "将支持:\n"
-                "• 浏览在线插件库\n"
-                "• 安装/更新插件\n"
-                "• 插件评分和评论\n"
-                "• 自动依赖管理"
+                " 浏览在线插件库\n"
+                " 安装/更新插件\n"
+                " 插件评分和评论\n"
+                " 自动依赖管理"
             )
 
             # TODO: 实现真正的插件市场刷新
@@ -2344,7 +2329,7 @@ class EnhancedPluginManagerDialog(QDialog):
             # 4. 显示在市场界面
 
         except Exception as e:
-            print(f"❌ 刷新插件市场失败: {e}")
+            logger.error(f" 刷新插件市场失败: {e}")
             QMessageBox.critical(self, "市场错误", f"刷新市场时发生错误:\n{str(e)}")
 
     def clear_logs(self):
@@ -2410,7 +2395,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         self.plugin_configured.emit(plugin_name, config)
                         applied_count += 1
                 except Exception as e:
-                    print(f"❌ 应用插件 {plugin_name} 配置失败: {e}")
+                    logger.error(f" 应用插件 {plugin_name} 配置失败: {e}")
 
             # 应用情绪插件配置
             for plugin_name, widget in self.sentiment_config_widgets.items():
@@ -2428,7 +2413,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         applied_count += 1
 
                 except Exception as e:
-                    print(f"❌ 应用情绪插件 {plugin_name} 配置失败: {e}")
+                    logger.error(f" 应用情绪插件 {plugin_name} 配置失败: {e}")
 
             # 刷新显示
             self.load_plugins()
@@ -2439,7 +2424,7 @@ class EnhancedPluginManagerDialog(QDialog):
             )
 
         except Exception as e:
-            print(f"❌ 应用配置失败: {e}")
+            logger.error(f" 应用配置失败: {e}")
             QMessageBox.critical(self, "应用失败", f"应用配置时发生错误:\n{str(e)}")
 
     def accept(self):
@@ -2454,13 +2439,13 @@ class EnhancedPluginManagerDialog(QDialog):
 
         # 标题和说明
         title_layout = QHBoxLayout()
-        title_label = QLabel("🔌 数据源插件管理")
+        title_label = QLabel(" 数据源插件管理")
         title_label.setFont(QFont("Arial", 14, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn = QPushButton(" 刷新")
         refresh_btn.clicked.connect(self.refresh_data_source_plugins)
         title_layout.addWidget(refresh_btn)
 
@@ -2543,15 +2528,15 @@ class EnhancedPluginManagerDialog(QDialog):
         # 插件操作按钮
         button_layout = QHBoxLayout()
 
-        load_plugin_btn = QPushButton("📁 加载插件")
+        load_plugin_btn = QPushButton(" 加载插件")
         load_plugin_btn.clicked.connect(self.load_data_source_plugin)
         button_layout.addWidget(load_plugin_btn)
 
-        unload_plugin_btn = QPushButton("🗑️ 卸载插件")
+        unload_plugin_btn = QPushButton(" 卸载插件")
         unload_plugin_btn.clicked.connect(self.unload_data_source_plugin)
         button_layout.addWidget(unload_plugin_btn)
 
-        apply_reconnect_btn = QPushButton("⚡ 批量保存并重连")
+        apply_reconnect_btn = QPushButton(" 批量保存并重连")
         apply_reconnect_btn.setToolTip("对选中数据源保存配置到数据库并重连；若未选中则对全部进行重连。")
         apply_reconnect_btn.clicked.connect(self.batch_apply_and_reconnect_data_sources)
         button_layout.addWidget(apply_reconnect_btn)
@@ -2646,7 +2631,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 self.asset_type_combo.addItem(chinese_name)
                 self.asset_type_display_map[chinese_name] = asset_type.value
 
-            print(f"📋 已加载资产类型选项: {list(self.asset_type_display_map.keys())}")
+            logger.info(f" 已加载资产类型选项: {list(self.asset_type_display_map.keys())}")
         except ImportError:
             # 回退到静态列表
             fallback_items = ["股票", "期货", "数字货币", "外汇", "债券"]
@@ -2658,7 +2643,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 "外汇": "forex",
                 "债券": "bond"
             }
-            print("⚠️ 使用静态资产类型列表")
+            logger.info(" 使用静态资产类型列表")
 
         self.asset_type_combo.currentTextChanged.connect(self.update_priority_list)
         routing_layout.addWidget(self.asset_type_combo, 0, 1)
@@ -2671,16 +2656,16 @@ class EnhancedPluginManagerDialog(QDialog):
         # 路由按钮布局
         routing_btn_layout = QHBoxLayout()
 
-        save_priority_btn = QPushButton("💾 保存优先级")
+        save_priority_btn = QPushButton(" 保存优先级")
         save_priority_btn.clicked.connect(self.save_priority_config)
         routing_btn_layout.addWidget(save_priority_btn)
 
-        test_routing_btn = QPushButton("🧪 测试路由")
+        test_routing_btn = QPushButton(" 测试路由")
         test_routing_btn.clicked.connect(self.test_routing_config)
         test_routing_btn.setToolTip("测试路由配置是否生效")
         routing_btn_layout.addWidget(test_routing_btn)
 
-        sync_datasource_btn = QPushButton("🔄 同步数据源")
+        sync_datasource_btn = QPushButton(" 同步数据源")
         sync_datasource_btn.clicked.connect(self._sync_data_sources_to_unified_manager)
         sync_datasource_btn.setToolTip("手动同步数据源到统一管理器")
         routing_btn_layout.addWidget(sync_datasource_btn)
@@ -2730,7 +2715,7 @@ class EnhancedPluginManagerDialog(QDialog):
     def refresh_data_source_plugins(self):
         """刷新数据源插件列表（单一路径：从路由器读取）。"""
         try:
-            print("🔄 刷新数据源插件列表（router 单一来源）...")
+            logger.info(" 刷新数据源插件列表（router 单一来源）...")
             # 清空现有数据
             self.data_source_table.setRowCount(0)
 
@@ -2744,11 +2729,11 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 若路由器为空，尝试强制加载并注册
             if not adapters and self.plugin_manager:
-                print("⚠️ 路由器暂无数据源，尝试强制重新加载插件并注册...")
+                logger.info(" 路由器暂无数据源，尝试强制重新加载插件并注册...")
                 try:
                     self.plugin_manager.load_all_plugins()
                 except Exception as e:
-                    print(f"⚠️ 重新加载插件失败: {e}")
+                    logger.error(f" 重新加载插件失败: {e}")
                 # 重新读取
                 unified_manager = get_unified_data_manager()
                 router = getattr(unified_manager, 'data_source_router', None) if unified_manager else None
@@ -2765,54 +2750,54 @@ class EnhancedPluginManagerDialog(QDialog):
                     ds_candidates = set(getattr(self.plugin_manager, 'data_source_plugins', {}).keys())
                     router_keys = set(adapters.keys())
                     missing_list = sorted(list(ds_candidates - router_keys))
-                print(f"📊 插件加载数: {loaded_count} | 路由器注册数: {router_count}")
+                logger.info(f" 插件加载数: {loaded_count} | 路由器注册数: {router_count}")
                 if missing_list:
-                    print(f"❗ 未注册到路由器的数据源插件: {missing_list}")
+                    logger.info(f" 未注册到路由器的数据源插件: {missing_list}")
             except Exception as obs_e:
-                print(f"⚠️ 统计打印失败: {obs_e}")
+                logger.error(f" 统计打印失败: {obs_e}")
 
             if adapters:
                 self._populate_data_source_table(adapters, None)
-                print(f"✅ 数据源插件表格已填充: {len(adapters)} 个插件")
+                logger.info(f" 数据源插件表格已填充: {len(adapters)} 个插件")
             else:
                 self._show_no_plugins_message()
         except Exception as e:
-            print(f"❌ 刷新数据源插件列表失败: {e}")
+            logger.error(f" 刷新数据源插件列表失败: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.warning(self, "刷新失败", f"刷新数据源插件列表失败:\n{str(e)}")
 
     def _on_plugin_loaded(self, plugin_name: str, plugin_info: dict, adapter):
         """单个插件加载完成回调"""
-        print(f"✅ 插件加载完成: {plugin_name}")
+        logger.info(f" 插件加载完成: {plugin_name}")
 
     def _on_loading_progress(self, current: int, total: int, plugin_name: str):
         """加载进度更新回调"""
         if hasattr(self, 'data_source_table') and self.data_source_table.rowCount() > 0:
-            progress_text = f"🔄 加载中... ({current}/{total}) {plugin_name}"
+            progress_text = f" 加载中... ({current}/{total}) {plugin_name}"
             self.data_source_table.item(0, 0).setText(progress_text)
             QApplication.processEvents()  # 更新UI
 
     def _on_loading_completed(self, adapters: dict):
         """异步加载完成回调"""
         try:
-            print(f"🎉 异步加载完成，共 {len(adapters)} 个插件")
+            logger.info(f" 异步加载完成，共 {len(adapters)} 个插件")
             if adapters:
                 self._populate_data_source_table(adapters, None)
-                print(f"✅ 数据源插件表格已填充: {len(adapters)} 个插件")
+                logger.info(f" 数据源插件表格已填充: {len(adapters)} 个插件")
             else:
                 self._show_no_plugins_message()
         except Exception as e:
-            print(f"❌ 处理加载完成事件失败: {e}")
+            logger.error(f" 处理加载完成事件失败: {e}")
 
     def _on_loading_failed(self, error_message: str):
         """异步加载失败回调"""
-        print(f"❌ 异步加载失败: {error_message}")
+        logger.error(f" 异步加载失败: {error_message}")
         self._show_error_message(f"加载失败: {error_message}")
 
     def _fallback_sync_loading(self):
         """回退到同步加载模式"""
-        print("⚠️ 回退到同步加载模式")
+        logger.info(" 回退到同步加载模式")
         # 这里保留原来的同步加载逻辑作为备用
         pass
 
@@ -2820,14 +2805,14 @@ class EnhancedPluginManagerDialog(QDialog):
         """显示无插件消息"""
         self.data_source_table.setRowCount(1)
         self.data_source_table.setItem(0, 0, QTableWidgetItem("未找到数据源插件"))
-        self.data_source_table.setItem(0, 1, QTableWidgetItem("🔴 无数据"))
+        self.data_source_table.setItem(0, 1, QTableWidgetItem(" 无数据"))
         for col in range(2, 6):
             self.data_source_table.setItem(0, col, QTableWidgetItem("-"))
 
     def _show_error_message(self, message: str):
         """显示错误消息"""
         self.data_source_table.setRowCount(1)
-        error_item = QTableWidgetItem(f"❌ {message}")
+        error_item = QTableWidgetItem(f" {message}")
         error_item.setTextAlignment(Qt.AlignCenter)
         self.data_source_table.setItem(0, 0, error_item)
         for col in range(1, 6):
@@ -2836,14 +2821,14 @@ class EnhancedPluginManagerDialog(QDialog):
     def _populate_data_source_table(self, data_sources: dict, router=None):
         """填充数据源表格 - 异步处理防止UI卡死"""
         try:
-            print(f"📊 开始异步填充数据源表格，数据源数量: {len(data_sources)}")
+            logger.info(f" 开始异步填充数据源表格，数据源数量: {len(data_sources)}")
 
             # 立即设置表格行数并显示加载状态
             self.data_source_table.setRowCount(len(data_sources))
 
             # 为每行设置初始加载状态
             for row in range(len(data_sources)):
-                loading_item = QTableWidgetItem("🔄 加载中...")
+                loading_item = QTableWidgetItem(" 加载中...")
                 loading_item.setTextAlignment(Qt.AlignCenter)
                 self.data_source_table.setItem(row, 0, loading_item)
                 for col in range(1, 6):
@@ -2875,10 +2860,10 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 启动异步填充
             self.table_worker.start()
-            print("✅ 异步表格填充线程已启动")
+            logger.info(" 异步表格填充线程已启动")
 
         except Exception as e:
-            print(f"❌ 启动表格填充失败: {e}")
+            logger.error(f" 启动表格填充失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -2903,13 +2888,13 @@ class EnhancedPluginManagerDialog(QDialog):
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(2, 2, 2, 2)
 
-            config_btn = QPushButton("⚙️")
+            config_btn = QPushButton("")
             config_btn.setToolTip("配置插件")
             config_btn.setMaximumSize(30, 25)
             source_id = row_data['source_id']
             config_btn.clicked.connect(lambda checked, name=source_id: self.configure_data_source_plugin(name))
 
-            test_btn = QPushButton("🔍")
+            test_btn = QPushButton("")
             test_btn.setToolTip("测试连接")
             test_btn.setMaximumSize(30, 25)
             test_btn.clicked.connect(lambda checked, name=source_id: self.test_data_source_plugin(name))
@@ -2920,10 +2905,10 @@ class EnhancedPluginManagerDialog(QDialog):
 
             self.data_source_table.setCellWidget(row, 5, action_widget)
 
-            print(f"   ✅ 完成数据源 {source_id} 的显示设置")
+            logger.info(f"    完成数据源 {source_id} 的显示设置")
 
         except Exception as e:
-            print(f"❌ 填充行数据失败 row {row}: {e}")
+            logger.error(f" 填充行数据失败 row {row}: {e}")
 
     def _on_table_population_progress(self, current: int, total: int, plugin_name: str):
         """表格填充进度更新回调"""
@@ -2932,11 +2917,11 @@ class EnhancedPluginManagerDialog(QDialog):
 
     def _on_table_population_completed(self):
         """表格填充完成回调"""
-        print("🎉 异步表格填充完成")
+        logger.info(" 异步表格填充完成")
 
     def _on_table_population_failed(self, error_message: str):
         """表格填充失败回调"""
-        print(f"❌ 异步表格填充失败: {error_message}")
+        logger.error(f" 异步表格填充失败: {error_message}")
         QMessageBox.warning(self, "填充失败", f"表格填充失败:\n{error_message}")
 
     def on_data_source_selection_changed(self):
@@ -2950,7 +2935,7 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 获取选中的插件名称
             plugin_name = self.data_source_table.item(current_row, 0).text()
-            print(f"🔍 选中数据源插件: {plugin_name}")
+            logger.info(f" 选中数据源插件: {plugin_name}")
 
             # 初始化默认值
             self._clear_data_source_details()
@@ -2984,7 +2969,7 @@ class EnhancedPluginManagerDialog(QDialog):
                             selected_adapter = plugin_instance
                             break
                 except Exception as e:
-                    print(f"从插件管理器获取信息失败: {e}")
+                    logger.error(f"从插件管理器获取信息失败: {e}")
 
             # 方法2：从统一数据管理器获取
             if not plugin_info:
@@ -3005,13 +2990,13 @@ class EnhancedPluginManagerDialog(QDialog):
                                 except:
                                     continue
                 except ImportError:
-                    print("统一数据管理器不可用")
+                    logger.error("统一数据管理器不可用")
                 except Exception as e:
-                    print(f"从统一数据管理器获取信息失败: {e}")
+                    logger.error(f"从统一数据管理器获取信息失败: {e}")
 
             # 方法3：使用默认值
             if not plugin_info:
-                print(f"未找到 {plugin_name} 的详细信息，使用默认值")
+                logger.info(f"未找到 {plugin_name} 的详细信息，使用默认值")
                 plugin_info = type('PluginInfo', (), {
                     'id': plugin_name,
                     'name': plugin_name,
@@ -3061,10 +3046,10 @@ class EnhancedPluginManagerDialog(QDialog):
             # 更新优先级列表
             self.update_priority_list()
 
-            print(f"✅ 已更新 {plugin_name} 的详情信息")
+            logger.info(f" 已更新 {plugin_name} 的详情信息")
 
         except Exception as e:
-            print(f"❌ 更新数据源插件详情失败: {str(e)}")
+            logger.error(f" 更新数据源插件详情失败: {str(e)}")
             import traceback
             traceback.print_exc()
 
@@ -3083,7 +3068,7 @@ class EnhancedPluginManagerDialog(QDialog):
             if hasattr(self, 'health_score_label'):
                 self.health_score_label.setText("0.00")
         except Exception as e:
-            print(f"清空详情显示失败: {e}")
+            logger.error(f"清空详情显示失败: {e}")
 
     def _update_performance_metrics(self, adapter, plugin_name):
         """更新性能指标"""
@@ -3133,7 +3118,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         health_score = plugin_metrics.health_score
 
             except Exception as e:
-                print(f"从路由器获取指标失败: {e}")
+                logger.error(f"从路由器获取指标失败: {e}")
 
             # 备用：从适配器获取统计信息
             if total_requests == 0 and adapter:
@@ -3156,7 +3141,7 @@ class EnhancedPluginManagerDialog(QDialog):
                         pass
 
                 except Exception as e:
-                    print(f"获取适配器统计信息失败: {e}")
+                    logger.error(f"获取适配器统计信息失败: {e}")
 
             # 更新显示
             self.total_requests_label.setText(str(total_requests))
@@ -3167,7 +3152,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 self.health_score_label.setText(f"{health_score:.2f}")
 
         except Exception as e:
-            print(f"更新性能指标失败: {e}")
+            logger.error(f"更新性能指标失败: {e}")
             # 显示默认值
             self.total_requests_label.setText("0")
             self.success_rate_label.setText("0.0%")
@@ -3184,26 +3169,26 @@ class EnhancedPluginManagerDialog(QDialog):
 
             unified_manager = get_unified_data_manager()
             if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
-                print("❌ 数据源路由器不可用")
+                logger.error(" 数据源路由器不可用")
                 self.priority_list_widget.clear()
                 return
 
             router = unified_manager.data_source_router
             asset_type_display = self.asset_type_combo.currentText()
-            print(f"🔍 更新优先级列表，资产类型显示名: {asset_type_display}")
+            logger.info(f" 更新优先级列表，资产类型显示名: {asset_type_display}")
 
             # 从中文显示名转换为英文枚举值
             asset_type_value = self.asset_type_display_map.get(asset_type_display)
             if not asset_type_value:
-                print(f"❌ 无法找到资产类型映射: {asset_type_display}")
+                logger.error(f" 无法找到资产类型映射: {asset_type_display}")
                 self.priority_list_widget.clear()
                 return
 
             try:
                 asset_type = AssetType(asset_type_value)
-                print(f"✅ 资产类型转换成功: {asset_type_display} -> {asset_type.value}")
+                logger.info(f" 资产类型转换成功: {asset_type_display} -> {asset_type.value}")
             except ValueError:
-                print(f"❌ 无效的资产类型值: {asset_type_value}")
+                logger.error(f" 无效的资产类型值: {asset_type_value}")
                 self.priority_list_widget.clear()
                 return
 
@@ -3214,16 +3199,16 @@ class EnhancedPluginManagerDialog(QDialog):
 
             # 获取所有支持该资产类型的数据源
             all_sources = []
-            print(f"🔍 检查 {len(router.data_sources)} 个已注册的数据源...")
+            logger.info(f" 检查 {len(router.data_sources)} 个已注册的数据源...")
 
             for source_id, adapter in router.data_sources.items():
                 try:
                     plugin_info = adapter.get_plugin_info()
                     supported_types = plugin_info.supported_asset_types
 
-                    print(f"  📋 数据源 {source_id}:")
-                    print(f"    - 支持的资产类型: {[t.value if hasattr(t, 'value') else str(t) for t in supported_types]}")
-                    print(f"    - 当前查找的资产类型: {asset_type.value}")
+                    logger.info(f"   数据源 {source_id}:")
+                    logger.info(f"    - 支持的资产类型: {[t.value if hasattr(t, 'value') else str(t) for t in supported_types]}")
+                    logger.info(f"    - 当前查找的资产类型: {asset_type.value}")
 
                     # 检查是否支持当前资产类型
                     is_supported = False
@@ -3240,18 +3225,18 @@ class EnhancedPluginManagerDialog(QDialog):
 
                     if is_supported:
                         all_sources.append(source_id)
-                        print(f"    ✅ 支持 {asset_type.value}")
+                        logger.info(f"     支持 {asset_type.value}")
                     else:
-                        print(f"    ❌ 不支持 {asset_type.value}")
+                        logger.info(f"     不支持 {asset_type.value}")
 
                 except Exception as e:
-                    print(f"  ⚠️ 检查数据源 {source_id} 支持的资产类型失败: {e}")
+                    logger.error(f"   检查数据源 {source_id} 支持的资产类型失败: {e}")
                     import traceback
                     traceback.print_exc()
                     continue
 
-            print(f"📊 找到支持 {asset_type_display}({asset_type.value}) 的数据源: {all_sources}")
-            print(f"📋 已配置的优先级: {configured_priorities}")
+            logger.info(f" 找到支持 {asset_type_display}({asset_type.value}) 的数据源: {all_sources}")
+            logger.info(f" 已配置的优先级: {configured_priorities}")
 
             # 显示数据源列表：先显示已配置的优先级，再显示其他未配置的
             displayed_sources = set()
@@ -3262,14 +3247,14 @@ class EnhancedPluginManagerDialog(QDialog):
                     try:
                         adapter = router.data_sources[source_id]
                         plugin_info = adapter.get_plugin_info()
-                        item = QListWidgetItem(f"📌 {plugin_info.name} ({source_id})")
+                        item = QListWidgetItem(f" {plugin_info.name} ({source_id})")
                         item.setData(Qt.UserRole, source_id)
                         item.setToolTip(f"已配置优先级，当前位置: {configured_priorities.index(source_id) + 1}")
                         self.priority_list_widget.addItem(item)
                         displayed_sources.add(source_id)
-                        print(f"  ✅ 添加已配置: {source_id}")
+                        logger.info(f"   添加已配置: {source_id}")
                     except Exception as e:
-                        print(f"  ❌ 添加已配置源失败 {source_id}: {e}")
+                        logger.error(f"   添加已配置源失败 {source_id}: {e}")
 
             # 2. 显示其他支持该资产类型但未配置优先级的数据源
             for source_id in all_sources:
@@ -3277,25 +3262,25 @@ class EnhancedPluginManagerDialog(QDialog):
                     try:
                         adapter = router.data_sources[source_id]
                         plugin_info = adapter.get_plugin_info()
-                        item = QListWidgetItem(f"➕ {plugin_info.name} ({source_id})")
+                        item = QListWidgetItem(f" {plugin_info.name} ({source_id})")
                         item.setData(Qt.UserRole, source_id)
                         item.setToolTip("未配置优先级，可拖拽到上方设置优先级")
                         self.priority_list_widget.addItem(item)
-                        print(f"  ✅ 添加未配置: {source_id}")
+                        logger.info(f"   添加未配置: {source_id}")
                     except Exception as e:
-                        print(f"  ❌ 添加未配置源失败 {source_id}: {e}")
+                        logger.error(f"   添加未配置源失败 {source_id}: {e}")
 
             total_count = self.priority_list_widget.count()
-            print(f"📝 优先级列表更新完成，共 {total_count} 个数据源")
+            logger.info(f" 优先级列表更新完成，共 {total_count} 个数据源")
 
             if total_count == 0:
                 # 添加提示项
-                info_item = QListWidgetItem("ℹ️ 暂无支持该资产类型的数据源")
+                info_item = QListWidgetItem("ℹ 暂无支持该资产类型的数据源")
                 info_item.setFlags(info_item.flags() & ~Qt.ItemIsSelectable)
                 self.priority_list_widget.addItem(info_item)
 
         except Exception as e:
-            print(f"❌ 更新优先级列表失败: {e}")
+            logger.error(f" 更新优先级列表失败: {e}")
             import traceback
             traceback.print_exc()
             logger.error(f"更新优先级列表失败: {str(e)}")
@@ -3341,7 +3326,7 @@ class EnhancedPluginManagerDialog(QDialog):
                                         f"已保存{asset_type_display}的优先级配置:\n" +
                                         "\n".join([f"{i+1}. {p}" for i, p in enumerate(new_priorities)]) +
                                         "\n\n配置已在路由器中生效，系统将按此优先级选择数据源。")
-                print(f"✅ 路由优先级配置成功: {asset_type_display} -> {new_priorities}")
+                logger.info(f" 路由优先级配置成功: {asset_type_display} -> {new_priorities}")
             else:
                 QMessageBox.warning(self, "配置验证失败",
                                     f"保存的配置与预期不符:\n期望: {new_priorities}\n实际: {saved_priorities}")
@@ -3350,7 +3335,7 @@ class EnhancedPluginManagerDialog(QDialog):
             self.refresh_data_source_plugins()
 
         except Exception as e:
-            print(f"❌ 保存优先级配置失败: {e}")
+            logger.error(f" 保存优先级配置失败: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "配置失败", f"保存优先级配置失败:\n{str(e)}")
@@ -3402,14 +3387,14 @@ class EnhancedPluginManagerDialog(QDialog):
                         # 获取选中数据源在优先级列表中的位置
                         try:
                             priority_index = configured_priorities.index(selected_source) + 1
-                            test_results.append(f"✅ {symbol}: 选择 {selected_source} (优先级第{priority_index})")
+                            test_results.append(f" {symbol}: 选择 {selected_source} (优先级第{priority_index})")
                         except ValueError:
-                            test_results.append(f"⚠️ {symbol}: 选择 {selected_source} (不在配置的优先级列表中)")
+                            test_results.append(f" {symbol}: 选择 {selected_source} (不在配置的优先级列表中)")
                     else:
-                        test_results.append(f"❌ {symbol}: 无可用数据源")
+                        test_results.append(f" {symbol}: 无可用数据源")
 
                 except Exception as e:
-                    test_results.append(f"❌ {symbol}: 测试失败 - {str(e)}")
+                    test_results.append(f" {symbol}: 测试失败 - {str(e)}")
 
             # 显示测试结果
             result_text = f"路由配置测试结果 ({asset_type_display}):\n\n"
@@ -3421,10 +3406,10 @@ class EnhancedPluginManagerDialog(QDialog):
             result_text += f"\n\n说明：系统会按配置的优先级顺序选择健康的数据源。"
 
             QMessageBox.information(self, "路由测试结果", result_text)
-            print(f"🧪 路由配置测试完成: {asset_type_display}")
+            logger.info(f" 路由配置测试完成: {asset_type_display}")
 
         except Exception as e:
-            print(f"❌ 路由配置测试失败: {e}")
+            logger.error(f" 路由配置测试失败: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "测试失败", f"路由配置测试失败:\n{str(e)}")
@@ -3447,12 +3432,12 @@ class EnhancedPluginManagerDialog(QDialog):
     def configure_data_source_plugin(self, source_id):
         """配置数据源插件"""
         try:
-            print(f"⚙️ 开始配置数据源插件: {source_id}")
+            logger.info(f" 开始配置数据源插件: {source_id}")
 
             from gui.dialogs.data_source_plugin_config_dialog import DataSourcePluginConfigDialog
-            print("✅ 成功导入配置对话框")
+            logger.info(" 成功导入配置对话框")
         except ImportError as ie:
-            print(f"❌ 导入配置对话框失败: {ie}")
+            logger.error(f" 导入配置对话框失败: {ie}")
             QMessageBox.information(self, "功能开发中", f"插件 {source_id} 的配置功能正在开发中...")
             return
 
@@ -3464,20 +3449,20 @@ class EnhancedPluginManagerDialog(QDialog):
                 router = unified_manager.data_source_router
                 if router and source_id not in router.data_sources:
                     available_sources = list(router.data_sources.keys())
-                    print(f"❌ 插件 {source_id} 不存在，可用插件: {available_sources}")
+                    logger.info(f" 插件 {source_id} 不存在，可用插件: {available_sources}")
                     QMessageBox.warning(self, "配置失败", f"插件 {source_id} 不存在\n可用插件: {', '.join(available_sources)}")
                     return
 
-            print(f"🔧 创建配置对话框...")
+            logger.info(f" 创建配置对话框...")
             config_dialog = DataSourcePluginConfigDialog(source_id, self)
             config_dialog.config_changed.connect(self.on_plugin_config_changed)
 
-            print(f"📋 显示配置对话框...")
+            logger.info(f" 显示配置对话框...")
             result = config_dialog.exec_()
-            print(f"配置对话框结果: {result}")
+            logger.info(f"配置对话框结果: {result}")
 
         except Exception as e:
-            print(f"❌ 配置插件时发生异常: {e}")
+            logger.error(f" 配置插件时发生异常: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "配置错误", f"打开插件配置对话框失败:\n{str(e)}")
@@ -3497,56 +3482,56 @@ class EnhancedPluginManagerDialog(QDialog):
     def test_data_source_plugin(self, source_id):
         """测试数据源插件"""
         try:
-            print(f"🧪 开始测试数据源插件: {source_id}")
+            logger.info(f" 开始测试数据源插件: {source_id}")
 
             from core.services.unified_data_manager import get_unified_data_manager
 
             unified_manager = get_unified_data_manager()
             if not unified_manager:
-                print("❌ 统一数据管理器不可用")
+                logger.error(" 统一数据管理器不可用")
                 QMessageBox.warning(self, "测试失败", "统一数据管理器不可用")
                 return
 
             if not hasattr(unified_manager, 'data_source_router'):
-                print("❌ 数据源路由器未启用")
+                logger.error(" 数据源路由器未启用")
                 QMessageBox.warning(self, "测试失败", "数据源路由器未启用")
                 return
 
             router = unified_manager.data_source_router
             if not router:
-                print("❌ 数据源路由器为空")
+                logger.error(" 数据源路由器为空")
                 QMessageBox.warning(self, "测试失败", "数据源路由器为空")
                 return
 
             if source_id not in router.data_sources:
-                print(f"❌ 插件 {source_id} 不存在于路由器中")
+                logger.info(f" 插件 {source_id} 不存在于路由器中")
                 available_sources = list(router.data_sources.keys())
-                print(f"可用的数据源: {available_sources}")
+                logger.info(f"可用的数据源: {available_sources}")
                 QMessageBox.warning(self, "测试失败", f"插件 {source_id} 不存在\n可用插件: {', '.join(available_sources)}")
                 return
 
             # 执行健康检查
-            print(f"🔍 执行健康检查...")
+            logger.info(f" 执行健康检查...")
             adapter = router.data_sources[source_id]
-            print(f"适配器类型: {type(adapter).__name__}")
+            logger.info(f"适配器类型: {type(adapter).__name__}")
 
             health_result = adapter.health_check()
-            print(f"健康检查结果: is_healthy={health_result.is_healthy}, response_time={health_result.response_time_ms}ms")
+            logger.info(f"健康检查结果: is_healthy={health_result.is_healthy}, response_time={health_result.response_time_ms}ms")
 
             if health_result.is_healthy:
                 message = f"插件 {source_id} 测试通过\n响应时间: {health_result.response_time_ms:.1f}ms"
                 if health_result.error_message:
                     message += f"\n备注: {health_result.error_message}"
-                print(f"✅ 测试成功: {message}")
+                logger.info(f" 测试成功: {message}")
                 QMessageBox.information(self, "测试成功", message)
             else:
                 error_msg = health_result.error_message or '未知错误'
                 message = f"插件 {source_id} 测试失败\n错误: {error_msg}"
-                print(f"⚠️ 测试失败: {message}")
+                logger.info(f" 测试失败: {message}")
                 QMessageBox.warning(self, "测试失败", message)
 
         except Exception as e:
-            print(f"❌ 测试插件时发生异常: {e}")
+            logger.error(f" 测试插件时发生异常: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "测试错误", f"测试插件时发生错误:\n{str(e)}")
@@ -3570,7 +3555,7 @@ class EnhancedPluginManagerDialog(QDialog):
             tab = QWidget()
             layout = QVBoxLayout(tab)
 
-            placeholder = QLabel("🔧 状态监控功能开发中...")
+            placeholder = QLabel(" 状态监控功能开发中...")
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setStyleSheet("""
                 QLabel {
@@ -3592,7 +3577,7 @@ class EnhancedPluginManagerDialog(QDialog):
             tab = QWidget()
             layout = QVBoxLayout(tab)
 
-            error_label = QLabel(f"❌ 创建状态监控失败:\n{str(e)}")
+            error_label = QLabel(f" 创建状态监控失败:\n{str(e)}")
             error_label.setAlignment(Qt.AlignCenter)
             error_label.setStyleSheet("color: #dc3545; font-size: 14px;")
             layout.addWidget(error_label)
@@ -3690,10 +3675,10 @@ class EnhancedPluginManagerDialog(QDialog):
                                 border: 1px solid #{'00C851' if enabled else 'dddddd'};
                             """)
 
-            print(f"✅ UI状态已更新: {plugin_name} -> {'启用' if enabled else '禁用'}")
+            logger.info(f" UI状态已更新: {plugin_name} -> {'启用' if enabled else '禁用'}")
 
         except Exception as e:
-            print(f"❌ 更新UI状态失败: {plugin_name}, {e}")
+            logger.error(f" 更新UI状态失败: {plugin_name}, {e}")
 
     def _create_real_adapter(self, plugin_name: str, plugin_info, plugin_instance):
         """创建真实的数据源适配器，不使用模拟数据"""
@@ -3723,7 +3708,7 @@ class EnhancedPluginManagerDialog(QDialog):
                 })()
 
         except Exception as e:
-            print(f"⚠️ 创建真实适配器失败 {plugin_name}: {e}")
+            logger.error(f" 创建真实适配器失败 {plugin_name}: {e}")
             # 返回最小可用适配器
             return type('MinimalAdapter', (), {
                 'get_plugin_info': lambda *args: type('PluginInfo', (), {
@@ -3832,7 +3817,7 @@ class EnhancedPluginManagerDialog(QDialog):
             else:
                 return str(timestamp)
         except Exception as e:
-            print(f"⚠️ 格式化时间戳失败: {e}")
+            logger.error(f" 格式化时间戳失败: {e}")
             return "未知"
 
     def _calculate_data_quality(self, status_info):
@@ -3881,187 +3866,13 @@ class EnhancedPluginManagerDialog(QDialog):
                 return "未知"
 
         except Exception as e:
-            print(f"⚠️ 计算数据质量失败: {e}")
+            logger.error(f" 计算数据质量失败: {e}")
             return "未知"
 
     def _sync_data_sources_to_unified_manager(self):
         # SSOT: 本方法已废弃，避免在UI侧重复注册数据源（导致将 PluginInfo 当作实例传入适配器）
-        print("⛔ 跳过 _sync_data_sources_to_unified_manager：已启用路由器单一真源（SSOT）")
+        logger.info(" 跳过 _sync_data_sources_to_unified_manager：已启用路由器单一真源（SSOT）")
         return
-        try:
-            print("🚀 _sync_data_sources_to_unified_manager 方法被调用！")
-            print("�� 开始同步数据源到统一管理器...")
-
-            # 获取统一数据管理器
-            from core.services.unified_data_manager import get_unified_data_manager
-            from core.data_source_extensions import DataSourcePluginAdapter
-
-            unified_manager = get_unified_data_manager()
-            if not unified_manager or not hasattr(unified_manager, 'data_source_router'):
-                print("❌ 统一数据管理器不可用")
-                return
-
-            router = unified_manager.data_source_router
-            if not router:
-                print("❌ 数据源路由器未初始化")
-                return
-
-            print(f"📋 路由器当前状态: {len(router.data_sources)} 个已注册数据源")
-
-            # 获取插件管理器的数据源插件
-            if not self.plugin_manager:
-                print("❌ 插件管理器不可用")
-                return
-
-            print(f"📋 插件管理器信息: {type(self.plugin_manager)}")
-
-            # 尝试多种方式获取数据源插件
-            ds_plugins = {}
-
-            # 方式1：get_data_source_plugins
-            try:
-                if hasattr(self.plugin_manager, 'get_data_source_plugins'):
-                    ds_plugins = self.plugin_manager.get_data_source_plugins()
-                    print(f"📊 方式1-从插件管理器获取到 {len(ds_plugins)} 个数据源插件")
-                else:
-                    print("⚠️ 插件管理器没有 get_data_source_plugins 方法")
-            except Exception as e:
-                print(f"⚠️ 方式1获取数据源插件失败: {e}")
-
-            # 方式2：检查data_source_plugins属性
-            if not ds_plugins and hasattr(self.plugin_manager, 'data_source_plugins'):
-                try:
-                    ds_plugins = self.plugin_manager.data_source_plugins
-                    print(f"📊 方式2-从data_source_plugins属性获取到 {len(ds_plugins)} 个数据源插件")
-                except Exception as e:
-                    print(f"⚠️ 方式2获取失败: {e}")
-
-            # 方式3：检查所有插件并过滤数据源插件
-            if not ds_plugins:
-                try:
-                    if hasattr(self.plugin_manager, 'enhanced_plugins'):
-                        all_plugins = self.plugin_manager.enhanced_plugins
-                        print(f"📊 方式3-从enhanced_plugins检查 {len(all_plugins)} 个插件")
-
-                        for plugin_id, pinfo in all_plugins.items():
-                            try:
-                                # 通过插件管理器获取实例与类型
-                                inst = None
-                                try:
-                                    inst = self.plugin_manager.plugin_instances.get(plugin_id)
-                                except Exception:
-                                    inst = None
-                                ptype = getattr(pinfo, 'plugin_type', None)
-                                # 检查是否为数据源插件
-                                if inst and self.plugin_manager._is_data_source_plugin(inst, ptype):
-                                    ds_plugins[plugin_id] = inst
-                                    print(f"    ✅ 发现数据源插件: {plugin_id}")
-                            except Exception as e:
-                                print(f"    ⚠️ 检查插件 {plugin_id} 失败: {e}")
-
-                        print(f"📊 方式3-过滤后找到 {len(ds_plugins)} 个数据源插件")
-
-                        # 方式3b：直接遍历 plugin_instances 兜底
-                        if not ds_plugins:
-                            try:
-                                for pid, inst in (self.plugin_manager.plugin_instances or {}).items():
-                                    try:
-                                        if self.plugin_manager._is_data_source_plugin(inst):
-                                            ds_plugins[pid] = inst
-                                            print(f"    ✅ 发现数据源插件(兜底): {pid}")
-                                    except Exception:
-                                        continue
-                                print(f"📊 方式3b-兜底后找到 {len(ds_plugins)} 个数据源插件")
-                            except Exception as e:
-                                print(f"⚠️ 方式3b兜底失败: {e}")
-                except Exception as e:
-                    print(f"⚠️ 方式3检查失败: {e}")
-
-            # 方式4：从数据管理器获取
-            if not ds_plugins and hasattr(self.plugin_manager, 'data_manager'):
-                try:
-                    data_manager = self.plugin_manager.data_manager
-                    if data_manager and hasattr(data_manager, 'get_plugin_data_sources'):
-                        plugin_sources = data_manager.get_plugin_data_sources()
-                        print(f"📊 方式4-从数据管理器获取到 {len(plugin_sources)} 个插件数据源")
-
-                        # 转换格式
-                        for source_id, source_info in plugin_sources.items():
-                            # 创建模拟的plugin_info对象
-                            class MockPluginInfo:
-                                def __init__(self, source_id, source_info):
-                                    self.id = source_id
-                                    self.name = source_info.get('info', {}).get('name', source_id)
-                                    self.instance = None  # 实际实例可能需要从其他地方获取
-
-                            ds_plugins[source_id] = MockPluginInfo(source_id, source_info)
-
-                except Exception as e:
-                    print(f"⚠️ 方式4获取失败: {e}")
-
-            if not ds_plugins:
-                print("❌ 所有方式都未能获取到数据源插件，可能需要手动加载插件")
-                return
-
-            sync_count = 0
-            error_count = 0
-
-            # 注册每个数据源插件到路由器
-            for plugin_id, plugin_instance in ds_plugins.items():
-                try:
-                    print(f"  🔄 处理数据源插件: {plugin_id}")
-
-                    if not plugin_instance:
-                        print(f"  ⚠️ 跳过插件 {plugin_id}：没有实例")
-                        continue
-
-                    print(f"    📋 插件实例类型: {type(plugin_instance)}")
-
-                    # 创建适配器
-                    adapter = DataSourcePluginAdapter(plugin_instance, plugin_id)
-                    print(f"    ✅ 适配器创建成功")
-
-                    # 尝试连接适配器
-                    try:
-                        connect_result = adapter.connect()
-                        print(f"    🔗 适配器连接结果: {connect_result}")
-                    except Exception as e:
-                        print(f"    ⚠️ 适配器连接失败: {e}")
-                        # 继续注册，但标记连接失败
-
-                    # 注册到路由器
-                    success = router.register_data_source(
-                        plugin_id,
-                        adapter,
-                        priority=0,
-                        weight=1.0
-                    )
-
-                    if success:
-                        sync_count += 1
-                        print(f"  ✅ 数据源 {plugin_id} 注册成功")
-                    else:
-                        error_count += 1
-                        print(f"  ❌ 数据源 {plugin_id} 注册失败")
-
-                except Exception as e:
-                    error_count += 1
-                    print(f"  ❌ 处理数据源 {plugin_id} 失败: {e}")
-                    import traceback
-                    traceback.print_exc()
-
-            print(f"✅ 数据源同步完成: 成功 {sync_count}, 失败 {error_count}")
-            print(f"📊 路由器最终注册数据源数量: {len(router.data_sources)}")
-
-            # 如果注册成功，触发状态监控刷新
-            if sync_count > 0:
-                print("🔄 触发状态监控刷新...")
-                # 可以在这里触发状态监控的刷新
-
-        except Exception as e:
-            print(f"❌ 同步数据源到统一管理器失败: {e}")
-            import traceback
-            traceback.print_exc()
 
     def batch_apply_and_reconnect_data_sources(self):
         """批量保存配置并重连选中的数据源（或全部）"""
@@ -4132,7 +3943,7 @@ class EnhancedPluginManagerDialog(QDialog):
     def _create_indicator_strategy_tab(self, tab: QWidget):
         """创建指标/策略插件管理标签页（V2）。"""
         layout = QVBoxLayout(tab)
-        title_label = QLabel("📐 指标/策略 插件管理")
+        title_label = QLabel(" 指标/策略 插件管理")
         title_label.setStyleSheet("font-weight: bold; font-size: 16px;")
         layout.addWidget(title_label)
 
@@ -4168,9 +3979,9 @@ class EnhancedPluginManagerDialog(QDialog):
         layout.addWidget(table)
 
         btn_bar = QHBoxLayout()
-        refresh_btn = QPushButton("🔄 刷新")
-        config_btn = QPushButton("🛠️ 配置")
-        batch_apply_btn = QPushButton("⚡ 批量保存并应用")
+        refresh_btn = QPushButton(" 刷新")
+        config_btn = QPushButton(" 配置")
+        batch_apply_btn = QPushButton(" 批量保存并应用")
         export_btn = QPushButton("导出配置")
         import_btn = QPushButton("导入配置")
         reset_btn = QPushButton("恢复默认")
@@ -4314,7 +4125,7 @@ class EnhancedPluginManagerDialog(QDialog):
             v = QVBoxLayout(dlg)
             v.addWidget(form_widget)
             btns = QHBoxLayout()
-            btn_save = QPushButton("💾 保存并应用")
+            btn_save = QPushButton(" 保存并应用")
             btn_cancel = QPushButton("取消")
             btns.addStretch(1)
             btns.addWidget(btn_save)

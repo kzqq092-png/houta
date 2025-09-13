@@ -9,6 +9,7 @@ from scipy import stats
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from utils.data_preprocessing import kdata_preprocess as _kdata_preprocess, validate_kdata
+from loguru import logger
 
 
 def calculate_advanced_indicators(df):
@@ -146,7 +147,7 @@ def create_pattern_recognition_features(df):
     # 确保有必要的列
     required_cols = ['open', 'high', 'low', 'close']
     if not all(col in df.columns for col in required_cols):
-        print("错误: 缺少必要的列 (open, high, low, close)")
+        logger.error("错误: 缺少必要的列 (open, high, low, close)")
         return df
 
     # 复制DataFrame以避免修改原始数据

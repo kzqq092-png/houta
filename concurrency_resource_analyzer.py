@@ -9,7 +9,7 @@
 import sys
 import ast
 import re
-import logging
+from loguru import logger
 from typing import Dict, List, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,8 +19,8 @@ import json
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Loguru配置在core.loguru_config中统一管理
+logger = logger
 
 
 @dataclass
@@ -61,7 +61,7 @@ class ConcurrencyResourceAnalyzer:
 
     def analyze_concurrency_and_resources(self) -> Dict[str, Any]:
         """分析并发安全性和资源管理"""
-        logger.info("🔒 开始分析并发安全性和资源管理...")
+        logger.info(" 开始分析并发安全性和资源管理...")
 
         results = {
             'thread_safety_analysis': {},
@@ -75,34 +75,34 @@ class ConcurrencyResourceAnalyzer:
 
         try:
             # 1. 分析线程安全性
-            logger.info("🧵 分析线程安全性...")
+            logger.info(" 分析线程安全性...")
             results['thread_safety_analysis'] = self._analyze_thread_safety()
 
             # 2. 分析资源管理
-            logger.info("💾 分析资源管理...")
+            logger.info(" 分析资源管理...")
             results['resource_management_analysis'] = self._analyze_resource_management()
 
             # 3. 检测并发问题
-            logger.info("⚠️ 检测并发问题...")
+            logger.info(" 检测并发问题...")
             results['concurrency_issues'] = self._detect_concurrency_issues()
 
             # 4. 检测资源泄漏
-            logger.info("🔍 检测资源泄漏...")
+            logger.info(" 检测资源泄漏...")
             results['resource_leaks'] = self._detect_resource_leaks()
 
             # 5. 分析内存管理
-            logger.info("🧠 分析内存管理...")
+            logger.info(" 分析内存管理...")
             results['memory_management_issues'] = self._analyze_memory_management()
 
             # 6. 评估性能影响
-            logger.info("📈 评估性能影响...")
+            logger.info(" 评估性能影响...")
             results['performance_impact'] = self._assess_performance_impact()
 
             # 7. 生成安全建议
-            logger.info("💡 生成安全建议...")
+            logger.info(" 生成安全建议...")
             results['safety_recommendations'] = self._generate_safety_recommendations()
 
-            logger.info("✅ 并发和资源分析完成")
+            logger.info(" 并发和资源分析完成")
             return results
 
         except Exception as e:
@@ -651,7 +651,7 @@ class ConcurrencyResourceAnalyzer:
         report.append("=" * 80)
 
         # 执行摘要
-        report.append(f"\n## 📊 执行摘要")
+        report.append(f"\n##  执行摘要")
 
         thread_safety = results.get('thread_safety_analysis', {})
         resource_mgmt = results.get('resource_management_analysis', {})
@@ -669,7 +669,7 @@ class ConcurrencyResourceAnalyzer:
 
         # 线程安全分析
         if thread_safety:
-            report.append(f"\n## 🧵 线程安全分析")
+            report.append(f"\n##  线程安全分析")
 
             shared_vars = thread_safety.get('shared_variables', [])
             if shared_vars:
@@ -693,7 +693,7 @@ class ConcurrencyResourceAnalyzer:
 
         # 资源管理分析
         if resource_mgmt:
-            report.append(f"\n## 💾 资源管理分析")
+            report.append(f"\n##  资源管理分析")
 
             file_ops = resource_mgmt.get('file_operations', [])
             if file_ops:
@@ -710,32 +710,32 @@ class ConcurrencyResourceAnalyzer:
             context_mgrs = resource_mgmt.get('context_managers', [])
             if context_mgrs:
                 report.append(f"\n### 上下文管理器 ({len(context_mgrs)} 个)")
-                report.append(f"✅ 发现 {len(context_mgrs)} 个上下文管理器，有助于资源管理")
+                report.append(f" 发现 {len(context_mgrs)} 个上下文管理器，有助于资源管理")
 
         # 并发问题
         if concurrency_issues:
-            report.append(f"\n## ⚠️ 并发问题")
+            report.append(f"\n##  并发问题")
 
             # 按严重程度分组
             high_issues = [issue for issue in concurrency_issues if issue.get('severity') == 'HIGH']
             medium_issues = [issue for issue in concurrency_issues if issue.get('severity') == 'MEDIUM']
 
             if high_issues:
-                report.append(f"\n### 🔴 高严重性问题")
+                report.append(f"\n###  高严重性问题")
                 for i, issue in enumerate(high_issues[:10], 1):
                     report.append(f"{i}. **{issue['issue_type']}** ({Path(issue['file']).name}:{issue['line']})")
                     report.append(f"   - 描述: {issue['description']}")
                     report.append(f"   - 建议: {issue['recommendation']}")
 
             if medium_issues:
-                report.append(f"\n### 🟡 中严重性问题")
+                report.append(f"\n###  中严重性问题")
                 for i, issue in enumerate(medium_issues[:5], 1):
                     report.append(f"{i}. **{issue['issue_type']}** ({Path(issue['file']).name}:{issue['line']})")
                     report.append(f"   - 描述: {issue['description']}")
 
         # 资源泄漏
         if resource_leaks:
-            report.append(f"\n## 🔍 资源泄漏风险")
+            report.append(f"\n##  资源泄漏风险")
 
             for i, leak in enumerate(resource_leaks[:10], 1):
                 report.append(f"{i}. **{leak['resource_type']}** ({Path(leak['file']).name}:{leak['line']})")
@@ -744,7 +744,7 @@ class ConcurrencyResourceAnalyzer:
 
         # 内存管理问题
         if memory_issues:
-            report.append(f"\n## 🧠 内存管理问题")
+            report.append(f"\n##  内存管理问题")
 
             for i, issue in enumerate(memory_issues[:10], 1):
                 report.append(f"{i}. **{issue['issue_type']}** ({Path(issue['file']).name}:{issue['line']})")
@@ -753,7 +753,7 @@ class ConcurrencyResourceAnalyzer:
 
         # 性能影响评估
         if performance_impact:
-            report.append(f"\n## 📈 性能影响评估")
+            report.append(f"\n##  性能影响评估")
             report.append(f"- 线程安全影响: {performance_impact.get('thread_safety_impact', 'UNKNOWN')}")
             report.append(f"- 资源管理影响: {performance_impact.get('resource_management_impact', 'UNKNOWN')}")
             report.append(f"- 内存影响: {performance_impact.get('memory_impact', 'UNKNOWN')}")
@@ -768,7 +768,7 @@ class ConcurrencyResourceAnalyzer:
         # 安全建议
         safety_recommendations = results.get('safety_recommendations', [])
         if safety_recommendations:
-            report.append(f"\n## 💡 安全建议")
+            report.append(f"\n##  安全建议")
 
             for rec in safety_recommendations:
                 report.append(f"\n### {rec['priority']} - {rec['title']}")
@@ -811,9 +811,9 @@ class ConcurrencyResourceAnalyzer:
                 json.dump(results, f, indent=2, ensure_ascii=False, default=str)
 
             # 显示摘要
-            print("\n" + "="*80)
-            print("🔒 并发安全性和资源管理分析结果")
-            print("="*80)
+            logger.info("\n" + "="*80)
+            logger.info(" 并发安全性和资源管理分析结果")
+            logger.info("="*80)
 
             thread_safety = results.get('thread_safety_analysis', {})
             resource_mgmt = results.get('resource_management_analysis', {})
@@ -822,23 +822,23 @@ class ConcurrencyResourceAnalyzer:
             memory_issues = results.get('memory_management_issues', [])
             performance_impact = results.get('performance_impact', {})
 
-            print(f"📊 分析结果:")
-            print(f"   线程安全评分: {thread_safety.get('thread_safety_score', 0)}/100")
-            print(f"   资源管理评分: {resource_mgmt.get('resource_management_score', 0)}/100")
-            print(f"   并发问题: {len(concurrency_issues)} 个")
-            print(f"   资源泄漏风险: {len(resource_leaks)} 个")
-            print(f"   内存管理问题: {len(memory_issues)} 个")
+            logger.info(f" 分析结果:")
+            logger.info(f"   线程安全评分: {thread_safety.get('thread_safety_score', 0)}/100")
+            logger.info(f"   资源管理评分: {resource_mgmt.get('resource_management_score', 0)}/100")
+            logger.info(f"   并发问题: {len(concurrency_issues)} 个")
+            logger.info(f"   资源泄漏风险: {len(resource_leaks)} 个")
+            logger.info(f"   内存管理问题: {len(memory_issues)} 个")
 
-            print(f"\n⚡ 性能影响: {performance_impact.get('overall_impact', 'UNKNOWN')}")
+            logger.info(f"\n 性能影响: {performance_impact.get('overall_impact', 'UNKNOWN')}")
 
             bottlenecks = performance_impact.get('bottleneck_areas', [])
             if bottlenecks:
-                print(f"\n🔥 瓶颈区域:")
+                logger.info(f"\n 瓶颈区域:")
                 for bottleneck in bottlenecks:
-                    print(f"   - {bottleneck}")
+                    logger.info(f"   - {bottleneck}")
 
-            logger.info("📄 并发和资源分析报告已保存到 concurrency_resource_analysis.md")
-            logger.info("📄 原始分析数据已保存到 concurrency_resource_data.json")
+            logger.info(" 并发和资源分析报告已保存到 concurrency_resource_analysis.md")
+            logger.info(" 原始分析数据已保存到 concurrency_resource_data.json")
 
             return results
 

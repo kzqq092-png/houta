@@ -1,3 +1,4 @@
+from loguru import logger
 """
 HIkyuu 插件管理数据库模型
 
@@ -12,14 +13,13 @@ HIkyuu 插件管理数据库模型
 
 import sqlite3
 import json
-import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class PluginStatus(Enum):
@@ -716,6 +716,9 @@ class DataSourcePluginConfigManager:
                     health_check_interval INTEGER DEFAULT 30,
                     timeout_seconds INTEGER DEFAULT 30,
                     retry_count INTEGER DEFAULT 3,
+                    max_pool_size INTEGER DEFAULT 5,  -- 线程池最大连接数
+                    pool_timeout INTEGER DEFAULT 30,  -- 连接池超时时间（秒）
+                    pool_cleanup_interval INTEGER DEFAULT 300,  -- 连接池清理间隔（秒）
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(plugin_id)
@@ -739,7 +742,8 @@ class DataSourcePluginConfigManager:
 
     def save_plugin_config(self, plugin_id: str, config_data: dict,
                            priority: int = 50, weight: float = 1.0,
-                           enabled: bool = True) -> bool:
+                           enabled: bool = True, max_pool_size: int = 5,
+                           pool_timeout: int = 30, pool_cleanup_interval: int = 300) -> bool:
         """保存数据源插件配置"""
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -750,12 +754,14 @@ class DataSourcePluginConfigManager:
 
                 cursor.execute('''
                 INSERT OR REPLACE INTO data_source_plugin_configs 
-                (plugin_id, config_data, priority, weight, enabled, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ''', (plugin_id, config_json, priority, weight, enabled, current_time))
+                (plugin_id, config_data, priority, weight, enabled, max_pool_size, 
+                 pool_timeout, pool_cleanup_interval, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (plugin_id, config_json, priority, weight, enabled, 
+                      max_pool_size, pool_timeout, pool_cleanup_interval, current_time))
 
                 conn.commit()
-                logger.info(f"数据源插件配置已保存: {plugin_id}")
+                logger.info(f"数据源插件配置已保存: {plugin_id}, 线程池大小: {max_pool_size}")
                 return True
 
         except Exception as e:
@@ -769,19 +775,23 @@ class DataSourcePluginConfigManager:
                 cursor = conn.cursor()
 
                 cursor.execute('''
-                SELECT config_data, priority, weight, enabled 
+                SELECT config_data, priority, weight, enabled, max_pool_size, 
+                       pool_timeout, pool_cleanup_interval 
                 FROM data_source_plugin_configs 
                 WHERE plugin_id = ?
                 ''', (plugin_id,))
 
                 row = cursor.fetchone()
                 if row:
-                    config_data, priority, weight, enabled = row
+                    config_data, priority, weight, enabled, max_pool_size, pool_timeout, pool_cleanup_interval = row
                     return {
                         'config_data': json.loads(config_data),
                         'priority': priority,
                         'weight': weight,
-                        'enabled': enabled
+                        'enabled': enabled,
+                        'max_pool_size': max_pool_size,
+                        'pool_timeout': pool_timeout,
+                        'pool_cleanup_interval': pool_cleanup_interval
                     }
 
         except Exception as e:
@@ -796,7 +806,8 @@ class DataSourcePluginConfigManager:
                 cursor = conn.cursor()
 
                 cursor.execute('''
-                SELECT plugin_id, config_data, priority, weight, enabled 
+                SELECT plugin_id, config_data, priority, weight, enabled, 
+                       max_pool_size, pool_timeout, pool_cleanup_interval 
                 FROM data_source_plugin_configs 
                 WHERE enabled = 1
                 ORDER BY priority ASC
@@ -804,12 +815,15 @@ class DataSourcePluginConfigManager:
 
                 configs = {}
                 for row in cursor.fetchall():
-                    plugin_id, config_data, priority, weight, enabled = row
+                    plugin_id, config_data, priority, weight, enabled, max_pool_size, pool_timeout, pool_cleanup_interval = row
                     configs[plugin_id] = {
                         'config_data': json.loads(config_data),
                         'priority': priority,
                         'weight': weight,
-                        'enabled': enabled
+                        'enabled': enabled,
+                        'max_pool_size': max_pool_size,
+                        'pool_timeout': pool_timeout,
+                        'pool_cleanup_interval': pool_cleanup_interval
                     }
 
                 return configs

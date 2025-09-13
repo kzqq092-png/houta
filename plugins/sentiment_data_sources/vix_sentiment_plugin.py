@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -10,8 +11,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 from core.plugin_types import PluginType, PluginCategory
-from .base_sentiment_plugin import BaseSentimentPlugin
-from .config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
+from plugins.sentiment_data_sources.base_sentiment_plugin import BaseSentimentPlugin
+from plugins.sentiment_data_sources.config_base import ConfigurablePlugin, PluginConfigField, create_config_file_path, validate_number_range
 from plugins.sentiment_data_source_interface import SentimentData, SentimentResponse
 
 import requests
@@ -326,9 +327,9 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
         vix_source = self.get_config("vix_source", "yahoo_finance")
         if vix_source == "alpha_vantage":
             if not self.is_properly_configured():
-                return "❌ 使用AlphaVantage需要配置API Key"
-            return "✅ AlphaVantage配置正常"
-        return "✅ 使用Yahoo Finance（免费）"
+                return " 使用AlphaVantage需要配置API Key"
+            return " AlphaVantage配置正常"
+        return " 使用Yahoo Finance（免费）"
 
     def _fetch_raw_sentiment_data(self, **kwargs) -> SentimentResponse:
         """获取VIX原始情绪数据"""
@@ -491,7 +492,7 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
                                 if percentile_data:
                                     sentiment_data.append(percentile_data)
 
-                            self._safe_log("info", f"✅ 成功获取Yahoo Finance VIX数据: {vix_value:.2f}")
+                            self._safe_log("info", f" 成功获取Yahoo Finance VIX数据: {vix_value:.2f}")
                             break
                         else:
                             self._safe_log("warning", "Yahoo Finance返回的VIX数据格式异常")
@@ -570,7 +571,7 @@ class VIXSentimentPlugin(BaseSentimentPlugin, ConfigurablePlugin):
                             )
                             sentiment_data.append(main_indicator)
 
-                            self._safe_log("info", f"✅ 成功获取AlphaVantage VIX数据: {vix_value:.2f}")
+                            self._safe_log("info", f" 成功获取AlphaVantage VIX数据: {vix_value:.2f}")
                             break
                         else:
                             self._safe_log("warning", "AlphaVantage返回的VIX数据格式异常")
@@ -754,10 +755,10 @@ if __name__ == "__main__":
     # 获取数据
     response = plugin._fetch_raw_sentiment_data()
 
-    print(f"成功: {response.success}")
-    print(f"数据项: {len(response.data)}")
-    print(f"综合指数: {response.composite_score}")
+    logger.info(f"成功: {response.success}")
+    logger.info(f"数据项: {len(response.data)}")
+    logger.info(f"综合指数: {response.composite_score}")
 
     if response.data:
         for item in response.data:
-            print(f"- {item.indicator_name}: {item.value} ({item.status})")
+            logger.info(f"- {item.indicator_name}: {item.value} ({item.status})")

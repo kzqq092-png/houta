@@ -7,7 +7,7 @@ AI预测配置管理对话框
 
 import sys
 import json
-import logging
+from loguru import logger
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QIcon
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AIPredictionConfigDialog(QDialog):
@@ -56,7 +56,7 @@ class AIPredictionConfigDialog(QDialog):
         main_layout = QVBoxLayout(self)
 
         # 标题
-        title_label = QLabel("🤖 AI预测系统配置管理")
+        title_label = QLabel(" AI预测系统配置管理")
         title_label.setFixedHeight(30)
         title_font = QFont()
         title_font.setPointSize(16)
@@ -101,23 +101,23 @@ class AIPredictionConfigDialog(QDialog):
 
         # 模型配置标签页
         model_tab = self.create_model_config_tab()
-        self.config_tabs.addTab(model_tab, "🧠 模型配置")
+        self.config_tabs.addTab(model_tab, " 模型配置")
 
         # 验证配置标签页
         validation_tab = self.create_validation_config_tab()
-        self.config_tabs.addTab(validation_tab, "✅ 验证配置")
+        self.config_tabs.addTab(validation_tab, " 验证配置")
 
         # 特征配置标签页
         feature_tab = self.create_feature_config_tab()
-        self.config_tabs.addTab(feature_tab, "🔧 特征配置")
+        self.config_tabs.addTab(feature_tab, " 特征配置")
 
         # 缓存配置标签页
         cache_tab = self.create_cache_config_tab()
-        self.config_tabs.addTab(cache_tab, "💾 缓存配置")
+        self.config_tabs.addTab(cache_tab, " 缓存配置")
 
         # 日志配置标签页
         logging_tab = self.create_logging_config_tab()
-        self.config_tabs.addTab(logging_tab, "📝 日志配置")
+        self.config_tabs.addTab(logging_tab, " 日志配置")
 
         return widget
 
@@ -346,7 +346,7 @@ class AIPredictionConfigDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 历史记录标题
-        history_label = QLabel("📜 配置变更历史")
+        history_label = QLabel(" 配置变更历史")
         history_font = QFont()
         history_font.setBold(True)
         history_label.setFont(history_font)
@@ -360,7 +360,7 @@ class AIPredictionConfigDialog(QDialog):
         layout.addWidget(self.history_table)
 
         # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新历史")
+        refresh_btn = QPushButton(" 刷新历史")
         refresh_btn.clicked.connect(self.load_history)
         layout.addWidget(refresh_btn)
 
@@ -371,29 +371,29 @@ class AIPredictionConfigDialog(QDialog):
         layout = QHBoxLayout()
 
         # 应用按钮
-        apply_btn = QPushButton("✅ 应用配置")
+        apply_btn = QPushButton(" 应用配置")
         apply_btn.clicked.connect(self.apply_config)
         layout.addWidget(apply_btn)
 
         # 重置按钮
-        reset_btn = QPushButton("🔄 重置默认")
+        reset_btn = QPushButton(" 重置默认")
         reset_btn.clicked.connect(self.reset_to_defaults)
         layout.addWidget(reset_btn)
 
         # 导出按钮
-        export_btn = QPushButton("📤 导出配置")
+        export_btn = QPushButton(" 导出配置")
         export_btn.clicked.connect(self.export_config)
         layout.addWidget(export_btn)
 
         # 导入按钮
-        import_btn = QPushButton("📥 导入配置")
+        import_btn = QPushButton(" 导入配置")
         import_btn.clicked.connect(self.import_config)
         layout.addWidget(import_btn)
 
         layout.addStretch()
 
         # 关闭按钮
-        close_btn = QPushButton("❌ 关闭")
+        close_btn = QPushButton(" 关闭")
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
 
@@ -411,7 +411,7 @@ class AIPredictionConfigDialog(QDialog):
 
         except Exception as e:
             logger.error(f"加载配置失败: {e}")
-            self.status_label.setText(f"❌ 加载配置失败: {e}")
+            self.status_label.setText(f" 加载配置失败: {e}")
 
     def populate_ui_from_configs(self):
         """从配置填充UI"""
@@ -465,11 +465,11 @@ class AIPredictionConfigDialog(QDialog):
 
             self.detailed_errors.setChecked(logging_config.get('detailed_errors', True))
 
-            self.status_label.setText("✅ 配置已加载")
+            self.status_label.setText(" 配置已加载")
 
         except Exception as e:
             logger.error(f"填充UI失败: {e}")
-            self.status_label.setText(f"❌ 填充UI失败: {e}")
+            self.status_label.setText(f" 填充UI失败: {e}")
 
     def collect_configs_from_ui(self) -> Dict[str, Any]:
         """从UI收集配置"""
@@ -534,14 +534,14 @@ class AIPredictionConfigDialog(QDialog):
                 self.config_manager.update_config(key, value, "UI用户")
                 self.config_changed.emit(key, value)
 
-            self.status_label.setText("✅ 配置已保存并应用")
+            self.status_label.setText(" 配置已保存并应用")
             self.load_history()  # 刷新历史记录
 
             QMessageBox.information(self, "成功", "配置已成功保存并应用！")
 
         except Exception as e:
             logger.error(f"应用配置失败: {e}")
-            self.status_label.setText(f"❌ 应用配置失败: {e}")
+            self.status_label.setText(f" 应用配置失败: {e}")
             QMessageBox.critical(self, "错误", f"保存配置失败: {e}")
 
     def reset_to_defaults(self):
@@ -560,12 +560,12 @@ class AIPredictionConfigDialog(QDialog):
             try:
                 self.config_manager.reset_to_defaults("UI重置")
                 self.load_current_configs()
-                self.status_label.setText("✅ 已重置为默认配置")
+                self.status_label.setText(" 已重置为默认配置")
                 QMessageBox.information(self, "成功", "配置已重置为默认值，原配置已备份！")
 
             except Exception as e:
                 logger.error(f"重置配置失败: {e}")
-                self.status_label.setText(f"❌ 重置失败: {e}")
+                self.status_label.setText(f" 重置失败: {e}")
                 QMessageBox.critical(self, "错误", f"重置配置失败: {e}")
 
     def export_config(self):
@@ -582,12 +582,12 @@ class AIPredictionConfigDialog(QDialog):
         if file_path:
             try:
                 self.config_manager.export_config(file_path)
-                self.status_label.setText(f"✅ 配置已导出到: {file_path}")
+                self.status_label.setText(f" 配置已导出到: {file_path}")
                 QMessageBox.information(self, "成功", f"配置已成功导出到:\n{file_path}")
 
             except Exception as e:
                 logger.error(f"导出配置失败: {e}")
-                self.status_label.setText(f"❌ 导出失败: {e}")
+                self.status_label.setText(f" 导出失败: {e}")
                 QMessageBox.critical(self, "错误", f"导出配置失败: {e}")
 
     def import_config(self):
@@ -612,12 +612,12 @@ class AIPredictionConfigDialog(QDialog):
                 try:
                     self.config_manager.import_config(file_path, "UI导入")
                     self.load_current_configs()
-                    self.status_label.setText(f"✅ 配置已从 {file_path} 导入")
+                    self.status_label.setText(f" 配置已从 {file_path} 导入")
                     QMessageBox.information(self, "成功", "配置导入成功！")
 
                 except Exception as e:
                     logger.error(f"导入配置失败: {e}")
-                    self.status_label.setText(f"❌ 导入失败: {e}")
+                    self.status_label.setText(f" 导入失败: {e}")
                     QMessageBox.critical(self, "错误", f"导入配置失败: {e}")
 
     def load_history(self):
@@ -642,7 +642,7 @@ class AIPredictionConfigDialog(QDialog):
                 self.history_table.setItem(row, 2, QTableWidgetItem(time_str))
 
                 # 查看详情按钮
-                view_btn = QPushButton("👁️ 查看")
+                view_btn = QPushButton(" 查看")
                 view_btn.clicked.connect(lambda checked, data=(old_value, new_value):
                                          self.show_change_details(data[0], data[1]))
                 self.history_table.setCellWidget(row, 3, view_btn)
@@ -652,7 +652,7 @@ class AIPredictionConfigDialog(QDialog):
 
         except Exception as e:
             logger.error(f"加载历史失败: {e}")
-            self.status_label.setText(f"❌ 加载历史失败: {e}")
+            self.status_label.setText(f" 加载历史失败: {e}")
 
     def show_change_details(self, old_value: str, new_value: str):
         """显示配置变更详情"""
@@ -663,7 +663,7 @@ class AIPredictionConfigDialog(QDialog):
         layout = QVBoxLayout(dialog)
 
         # 旧配置
-        layout.addWidget(QLabel("🔸 变更前:"))
+        layout.addWidget(QLabel(" 变更前:"))
         old_text = QTextEdit()
         old_text.setReadOnly(True)
         try:
@@ -677,7 +677,7 @@ class AIPredictionConfigDialog(QDialog):
         layout.addWidget(old_text)
 
         # 新配置
-        layout.addWidget(QLabel("🔹 变更后:"))
+        layout.addWidget(QLabel(" 变更后:"))
         new_text = QTextEdit()
         new_text.setReadOnly(True)
         try:

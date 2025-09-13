@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业风险指标计算模块
 符合CFA/FRM等国际金融标准的风险管理算法实现
@@ -14,9 +15,8 @@ import pandas as pd
 import scipy.stats as stats
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
-import logging
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ProfessionalRiskMetrics:

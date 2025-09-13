@@ -3,6 +3,7 @@ import json
 from typing import List, Dict, Any
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QListWidget,
                              QPushButton, QLineEdit, QLabel, QMessageBox, QInputDialog)
+from loguru import logger
 from PyQt5.QtCore import Qt
 from datetime import datetime
 
@@ -12,12 +13,12 @@ class CustomIndicatorManagerDialog(QDialog):
     自定义情绪指标管理对话框，支持添加、编辑、删除自定义指标，数据持久化。
     """
 
-    def __init__(self, indicator_file: str, log_manager=None, parent=None):
+    def __init__(self, indicator_file: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle("自定义指标管理")
         self.setMinimumSize(420, 320)
         self.indicator_file = indicator_file
-        self.log_manager = log_manager
+        # log_manager已迁移到Loguru
         self.indicators: List[Dict[str, Any]] = []
         self.init_ui()
         self.load_indicators()
@@ -49,24 +50,20 @@ class CustomIndicatorManagerDialog(QDialog):
                     self.indicators = json.load(f)
             except Exception as e:
                 self.indicators = []
-                if self.log_manager:
-                    self.log_manager.error(f"加载自定义指标失败: {str(e)}")
+                logger.error(f"加载自定义指标失败: {str(e)}")
         else:
             self.indicators = []
         for ind in self.indicators:
             self.list_widget.addItem(ind.get('name', '未命名'))
-        if self.log_manager:
-            self.log_manager.info(f"共加载{len(self.indicators)}个自定义指标")
+        logger.info(f"共加载{len(self.indicators)}个自定义指标")
 
     def save_indicators(self):
         try:
             with open(self.indicator_file, 'w', encoding='utf-8') as f:
                 json.dump(self.indicators, f, ensure_ascii=False, indent=2)
-            if self.log_manager:
-                self.log_manager.info(f"已保存{len(self.indicators)}个自定义指标")
+            logger.info(f"已保存{len(self.indicators)}个自定义指标")
         except Exception as e:
-            if self.log_manager:
-                self.log_manager.error(f"保存自定义指标失败: {str(e)}")
+            logger.error(f"保存自定义指标失败: {str(e)}")
 
     def add_indicator(self):
         name, ok = QInputDialog.getText(self, "添加指标", "请输入指标名称：")
@@ -83,8 +80,7 @@ class CustomIndicatorManagerDialog(QDialog):
         self.indicators.append(indicator)
         self.save_indicators()
         self.load_indicators()
-        if self.log_manager:
-            self.log_manager.info(f"添加自定义指标: {name}")
+        logger.info(f"添加自定义指标: {name}")
 
     def edit_indicator(self):
         item = self.list_widget.currentItem()
@@ -105,8 +101,7 @@ class CustomIndicatorManagerDialog(QDialog):
         ind['formula'] = formula
         self.save_indicators()
         self.load_indicators()
-        if self.log_manager:
-            self.log_manager.info(f"编辑自定义指标: {name}")
+        logger.info(f"编辑自定义指标: {name}")
 
     def delete_indicator(self):
         item = self.list_widget.currentItem()
@@ -119,5 +114,4 @@ class CustomIndicatorManagerDialog(QDialog):
             del self.indicators[idx]
             self.save_indicators()
             self.load_indicators()
-            if self.log_manager:
-                self.log_manager.info(f"删除自定义指标: {name}")
+            logger.info(f"删除自定义指标: {name}")

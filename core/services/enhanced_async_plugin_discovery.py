@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 增强版异步插件发现服务
@@ -9,7 +10,6 @@
 - 性能监控
 """
 
-import logging
 import threading
 import time
 import json
@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class PluginCache:

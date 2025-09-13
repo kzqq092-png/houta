@@ -1,9 +1,9 @@
+from loguru import logger
 """
 数据源插件扩展接口
 为HIkyuu插件化提供标准化的数据源插件接口和适配器
 """
 
-import logging
 import pandas as pd
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Union, Tuple
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AssetType(Enum):
@@ -389,7 +389,7 @@ class DataSourcePluginAdapter:
         """
         self.plugin = plugin
         self.plugin_id = plugin_id
-        self.logger = logging.getLogger(f"{self.__class__.__name__}.{plugin_id}")
+        self.logger = logger
         self._connection_info = None
         self._last_health_check = None
 

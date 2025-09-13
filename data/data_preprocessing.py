@@ -4,6 +4,7 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from collections import Counter
 from scipy import stats
 import warnings
+from loguru import logger
 
 
 def optimize_data_quality(df):
@@ -379,9 +380,9 @@ def balance_samples(X, y):
 
         # 查看标签分布
         class_counts = Counter(y)
-        print("原始类别分布:")
+        logger.info("原始类别分布:")
         for label, count in class_counts.items():
-            print(f"类别 {label}: {count} 样本")
+            logger.info(f"类别 {label}: {count} 样本")
 
         # 获取最小类别的样本数
         min_samples = min(class_counts.values())
@@ -475,9 +476,9 @@ def balance_samples(X, y):
 
         # 评估采样结果
         resampled_counts = Counter(y_resampled)
-        print("\n重采样后的分布:")
+        logger.info("\n重采样后的分布:")
         for label, count in resampled_counts.items():
-            print(f"类别 {label}: {count} 样本")
+            logger.info(f"类别 {label}: {count} 样本")
 
         # 计算采样质量指标
         original_dist = np.array([count for count in class_counts.values()])
@@ -491,15 +492,14 @@ def balance_samples(X, y):
         resampled_entropy = -np.sum((resampled_dist/sum(resampled_dist))
                                     * np.log2(resampled_dist/sum(resampled_dist)))
 
-        print("\n采样质量评估:")
-        print(f"原始分布熵: {original_entropy:.4f}")
-        print(f"重采样分布熵: {resampled_entropy:.4f}")
-        print(
-            f"分布改善: {((resampled_entropy - original_entropy) / original_entropy) * 100:.3f}%")
+        logger.info("\n采样质量评估:")
+        logger.info(f"原始分布熵: {original_entropy:.4f}")
+        logger.info(f"重采样分布熵: {resampled_entropy:.4f}")
+        logger.info(f"分布改善: {((resampled_entropy - original_entropy) / original_entropy) * 100:.3f}%")
 
         return X_resampled, y_resampled
 
     except Exception as e:
-        print(f"重采样过程出错: {e}")
+        logger.info(f"重采样过程出错: {e}")
         # 发生错误时返回原始数据
         return X, y

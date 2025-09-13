@@ -1,3 +1,4 @@
+from loguru import logger
 """
 事件总线模块
 
@@ -5,7 +6,6 @@
 """
 
 import asyncio
-import logging
 import threading
 import weakref
 import time
@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SimpleEventHandler:

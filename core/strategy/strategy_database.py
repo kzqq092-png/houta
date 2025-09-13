@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 策略数据库管理器
@@ -16,7 +17,7 @@ import threading
 from contextlib import contextmanager
 
 # 使用系统统一组件
-from core.adapters import get_logger, get_config, get_data_validator
+from core.adapters import get_config, get_data_validator
 from .base_strategy import BaseStrategy, StrategySignal, StrategyParameter
 
 
@@ -30,7 +31,7 @@ class StrategyDatabaseManager:
         Args:
             db_path: 数据库路径，如果为None则使用配置文件中的路径
         """
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
         self.config = get_config()
         self.validator = get_data_validator()
 

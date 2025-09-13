@@ -1,8 +1,7 @@
 import pandas as pd
 from typing import Dict, List, Optional
 from datetime import datetime
-import logging
-
+from loguru import logger
 
 class RiskAlertSystem:
     def __init__(self):
@@ -217,21 +216,21 @@ class RiskAlertSystem:
 
     def _monitor_risk(self, alert: Dict):
         """监控风险"""
-        logging.warning(f"风险监控: {alert['message']}")
+        logger.warning(f"风险监控: {alert['message']}")
 
     def _reduce_position(self, alert: Dict):
         """减少持仓"""
-        logging.warning(f"执行减仓: {alert['message']}")
+        logger.warning(f"执行减仓: {alert['message']}")
         # 实现减仓逻辑
 
     def _stop_trading(self, alert: Dict):
         """停止交易"""
-        logging.error(f"停止交易: {alert['message']}")
+        logger.error(f"停止交易: {alert['message']}")
         # 实现停止交易逻辑
 
     def _emergency_liquidation(self, alert: Dict):
         """紧急平仓"""
-        logging.critical(f"执行紧急平仓: {alert['message']}")
+        logger.critical(f"执行紧急平仓: {alert['message']}")
         # 实现紧急平仓逻辑
 
     def _record_alerts(self, alerts: List[Dict]):

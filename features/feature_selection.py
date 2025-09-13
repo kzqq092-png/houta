@@ -4,6 +4,7 @@ from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classi
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
+from loguru import logger
 
 
 def optimize_features_with_pca(X, variance_threshold=0.95):
@@ -37,9 +38,9 @@ def optimize_features_with_pca(X, variance_threshold=0.95):
     pca = PCA(n_components=n_components)
     X_pca = pca.fit_transform(X_std)
 
-    print(f"原始特征数量: {X.shape[1]}")
-    print(f"PCA后的特征数量: {X_pca.shape[1]}")
-    print(f"保留的方差比例: {pca.explained_variance_ratio_.sum():.4f}")
+    logger.info(f"原始特征数量: {X.shape[1]}")
+    logger.info(f"PCA后的特征数量: {X_pca.shape[1]}")
+    logger.info(f"保留的方差比例: {pca.explained_variance_ratio_.sum():.4f}")
 
     return X_pca, pca
 
@@ -113,7 +114,7 @@ def enhanced_feature_selection(X, y):
             return scores
 
         # 1. 使用各种方法评估特征重要性
-        print("正在计算特征重要性...")
+        logger.info("正在计算特征重要性...")
 
         # F检验（对于分类问题）
         f_scores = compute_feature_scores('f_classif', f_classif, X_values, y)
@@ -141,7 +142,7 @@ def enhanced_feature_selection(X, y):
         combined_scores /= len(selection_results)
 
         # 3. 特征稳定性分析
-        print("正在进行特征稳定性分析...")
+        logger.info("正在进行特征稳定性分析...")
         n_iterations = 5  # 稳定性分析的迭代次数
         stability_scores = np.zeros(X_values.shape[1])
 
@@ -201,10 +202,10 @@ def enhanced_feature_selection(X, y):
             k = min(5, X_values.shape[1])
             selected_features = feature_importance.head(k)
 
-        print(f"特征选择完成！从{X_values.shape[1]}个特征中选择了{len(selected_features)}个")
-        print("选择的前10个特征:")
+        logger.info(f"特征选择完成！从{X_values.shape[1]}个特征中选择了{len(selected_features)}个")
+        logger.info("选择的前10个特征:")
         for i, (index, row) in enumerate(selected_features.head(10).iterrows()):
-            print(f"{i+1}. {row['feature']} (分数: {row['final_score']:.4f})")
+            logger.info(f"{i+1}. {row['feature']} (分数: {row['final_score']:.4f})")
 
         # 返回选择的特征索引和完整的特征重要性DataFrame
         selected_indices = []
@@ -214,7 +215,7 @@ def enhanced_feature_selection(X, y):
         return selected_indices, feature_importance
 
     except Exception as e:
-        print(f"特征选择过程出错: {e}")
+        logger.info(f"特征选择过程出错: {e}")
         # 发生错误时返回所有特征的索引（相当于不进行选择）
         return list(range(X.shape[1])), None
 
@@ -239,24 +240,24 @@ def integrate_enhanced_features(df):
     from .advanced_indicators import create_pattern_recognition_features, create_market_regime_features
 
     if not has_basic_indicators:
-        print("计算基础技术指标...")
+        logger.info("计算基础技术指标...")
         df = calculate_base_indicators(df)
 
     if not has_advanced_indicators:
-        print("计算高级技术指标...")
+        logger.info("计算高级技术指标...")
         df = calculate_advanced_indicators(df)
 
     # 集成所有特征工程函数
-    print("创建高级非线性特征...")
+    logger.info("创建高级非线性特征...")
     df = create_advanced_nonlinear_features(df)
 
-    print("创建时间序列特征...")
+    logger.info("创建时间序列特征...")
     df = create_time_series_features(df)
 
-    print("创建K线形态识别特征...")
+    logger.info("创建K线形态识别特征...")
     df = create_pattern_recognition_features(df)
 
-    print("创建市场状态特征...")
+    logger.info("创建市场状态特征...")
     df = create_market_regime_features(df)
 
     # 删除重复的列
@@ -304,7 +305,7 @@ def select_features_pca(X, n_components=10):
     # 打印PCA结果
     variance_ratio = pca.explained_variance_ratio_
     total_variance = sum(variance_ratio)
-    print(f"PCA选择了{len(selected_features)}个特征，解释了{total_variance:.2%}的方差")
+    logger.info(f"PCA选择了{len(selected_features)}个特征，解释了{total_variance:.2%}的方差")
 
     return selected_features
 
@@ -345,9 +346,9 @@ def select_features_importance(X, y, n_features=20, model_type='random_forest', 
         selected_features = [X.columns[i] for i in indices[:n_features]]
 
         # 打印特征重要性
-        print("特征重要性排名:")
+        logger.info("特征重要性排名:")
         for i, feature in enumerate(selected_features[:10]):  # 只显示前10个
-            print(f"{i+1}. {feature}: {importances[indices[i]]:.4f}")
+            logger.info(f"{i+1}. {feature}: {importances[indices[i]]:.4f}")
 
     elif model_type == 'mutual_info':
         # 互信息特征选择
@@ -362,9 +363,9 @@ def select_features_importance(X, y, n_features=20, model_type='random_forest', 
         selected_features = [X.columns[i] for i in indices[:n_features]]
 
         # 打印特征重要性
-        print("互信息排名:")
+        logger.info("互信息排名:")
         for i, feature in enumerate(selected_features[:10]):  # 只显示前10个
-            print(f"{i+1}. {feature}: {scores[indices[i]]:.4f}")
+            logger.info(f"{i+1}. {feature}: {scores[indices[i]]:.4f}")
 
     elif model_type == 'f_classif':
         # F检验特征选择
@@ -379,15 +380,15 @@ def select_features_importance(X, y, n_features=20, model_type='random_forest', 
         selected_features = [X.columns[i] for i in indices[:n_features]]
 
         # 打印特征重要性
-        print("F统计量排名:")
+        logger.info("F统计量排名:")
         for i, feature in enumerate(selected_features[:10]):  # 只显示前10个
-            print(f"{i+1}. {feature}: {scores[indices[i]]:.4f}")
+            logger.info(f"{i+1}. {feature}: {scores[indices[i]]:.4f}")
 
     else:
         raise ValueError(
             "不支持的模型类型，请选择'random_forest'、'mutual_info'或'f_classif'")
 
-    print(f"总共选择了{len(selected_features)}个特征")
+    logger.info(f"总共选择了{len(selected_features)}个特征")
 
     return selected_features
 
@@ -420,12 +421,12 @@ def calculate_feature_correlations(X, threshold=0.7):
 
     # 打印结果
     if high_corr:
-        print(f"发现{len(high_corr)}对高度相关的特征 (相关性 > {threshold}):")
+        logger.info(f"发现{len(high_corr)}对高度相关的特征 (相关性 > {threshold}):")
         for i, ((feat1, feat2), val) in enumerate(sorted(high_corr.items(), key=lambda x: x[1], reverse=True)):
             if i < 10:  # 只显示前10对
-                print(f"{feat1} -- {feat2}: {val:.4f}")
+                logger.info(f"{feat1} -- {feat2}: {val:.4f}")
     else:
-        print(f"未发现高度相关的特征 (相关性 > {threshold})")
+        logger.info(f"未发现高度相关的特征 (相关性 > {threshold})")
 
     return high_corr
 
@@ -474,8 +475,8 @@ def remove_redundant_features(X, y, threshold=0.7, target_col=None):
     # 保留的特征
     keep_features = [feat for feat in X.columns if feat not in to_drop]
 
-    print(f"原始特征数量: {X.shape[1]}")
-    print(f"移除冗余特征后的特征数量: {len(keep_features)}")
-    print(f"移除的特征: {list(to_drop)}")
+    logger.info(f"原始特征数量: {X.shape[1]}")
+    logger.info(f"移除冗余特征后的特征数量: {len(keep_features)}")
+    logger.info(f"移除的特征: {list(to_drop)}")
 
     return keep_features

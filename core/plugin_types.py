@@ -120,6 +120,17 @@ class DataType(Enum):
     FINANCIAL_STATEMENT = "financial_statement"    # 财务报表
     MACRO_ECONOMIC = "macro_economic"              # 宏观经济数据
 
+    # Stage 4 新增：量化系统完整支持
+    STOCK_BASIC_INFO = "stock_basic_info"          # 股票基本信息
+    OPTION_DATA = "option_data"                    # 期权数据
+    FUTURES_DATA = "futures_data"                  # 期货数据
+    BOND_DATA = "bond_data"                        # 债券数据
+    INDEX_DATA = "index_data"                      # 指数数据
+    FUND_DATA = "fund_data"                        # 基金数据
+    RISK_METRICS = "risk_metrics"                  # 风险指标
+    EVENT_DATA = "event_data"                      # 事件数据
+    FACTOR_DATA = "factor_data"                    # 因子数据
+
 
 class DataSourceProvider(Enum):
     """

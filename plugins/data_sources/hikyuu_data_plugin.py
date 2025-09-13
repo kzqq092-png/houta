@@ -1,3 +1,4 @@
+from loguru import logger
 """
 HIkyuu数据源插件
 
@@ -8,7 +9,6 @@ HIkyuu数据源插件
 - 插件生命周期管理
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
@@ -21,7 +21,7 @@ from core.data_source_extensions import (
     AssetType, DataType
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -45,7 +45,7 @@ class HikyuuDataPlugin(IDataSourcePlugin):
             config: HIkyuu配置
         """
         self.config = config or HikyuuConfig()
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
 
         # HIkyuu相关
         self._hikyuu_available = False
@@ -123,15 +123,15 @@ class HikyuuDataPlugin(IDataSourcePlugin):
                 self._query_class = Query
                 self._hikyuu_available = True
 
-                self.logger.info("✅ HIkyuu模块导入成功")
+                self.logger.info(" HIkyuu模块导入成功")
 
             except ImportError as e:
-                self.logger.error(f"❌ HIkyuu模块导入失败: {e}")
+                self.logger.error(f" HIkyuu模块导入失败: {e}")
                 return False
 
             # 验证HIkyuu是否正常工作
             if self._sm is None:
-                self.logger.error("❌ HIkyuu StockManager未初始化")
+                self.logger.error(" HIkyuu StockManager未初始化")
                 return False
 
             # 测试基本功能
@@ -139,7 +139,7 @@ class HikyuuDataPlugin(IDataSourcePlugin):
                 # 尝试获取上证指数验证连接
                 test_stock = self._sm["sh000001"]
                 if test_stock and hasattr(test_stock, 'valid') and test_stock.valid:
-                    self.logger.info("✅ HIkyuu连接验证成功")
+                    self.logger.info(" HIkyuu连接验证成功")
                 else:
                     # 尝试其他测试股票
                     test_stocks = ["sz000001", "sh000300", "sz399001"]
@@ -148,27 +148,27 @@ class HikyuuDataPlugin(IDataSourcePlugin):
                         try:
                             test_stock = self._sm[test_code]
                             if test_stock and hasattr(test_stock, 'valid') and test_stock.valid:
-                                self.logger.info(f"✅ HIkyuu连接验证成功（使用 {test_code}）")
+                                self.logger.info(f" HIkyuu连接验证成功（使用 {test_code}）")
                                 found_valid = True
                                 break
                         except Exception:
                             continue
 
                     if not found_valid:
-                        self.logger.warning("⚠️ 无法找到有效的测试股票，但HIkyuu已加载")
+                        self.logger.warning(" 无法找到有效的测试股票，但HIkyuu已加载")
 
             except Exception as e:
-                self.logger.warning(f"⚠️ HIkyuu连接测试异常: {e}")
+                self.logger.warning(f" HIkyuu连接测试异常: {e}")
 
             # 记录连接时间
             self._connection_time = datetime.now()
             self._last_activity = datetime.now()
 
-            self.logger.info("🎉 HIkyuu数据源连接成功")
+            self.logger.info(" HIkyuu数据源连接成功")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ HIkyuu数据源连接失败: {e}")
+            self.logger.error(f" HIkyuu数据源连接失败: {e}")
             return False
 
     def disconnect(self) -> bool:
@@ -191,11 +191,11 @@ class HikyuuDataPlugin(IDataSourcePlugin):
             self._query_class = None
             self._connection_time = None
 
-            self.logger.info("✅ HIkyuu数据源已断开")
+            self.logger.info(" HIkyuu数据源已断开")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ HIkyuu数据源断开失败: {e}")
+            self.logger.error(f" HIkyuu数据源断开失败: {e}")
             return False
 
     def is_connected(self) -> bool:
@@ -364,7 +364,7 @@ class HikyuuDataPlugin(IDataSourcePlugin):
                             if stock_type != 1:  # 1=股票
                                 # 记录被过滤的指数代码，帮助调试
                                 if stock_code in ['980076', '399001', '399006']:
-                                    self.logger.info(f"🚫 过滤指数代码: {stock_market.lower()}{stock_code} (type={stock_type}, name={stock_name})")
+                                    self.logger.info(f" 过滤指数代码: {stock_market.lower()}{stock_code} (type={stock_type}, name={stock_name})")
                                 continue
                         elif asset_type == AssetType.INDEX:
                             if stock_type != 2:  # 2=指数

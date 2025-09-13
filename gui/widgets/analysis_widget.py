@@ -1,7 +1,8 @@
+from loguru import logger
 """
 重构后的分析控件模块 - 使用模块化标签页组件
 """
-from utils.manager_factory import get_config_manager, get_log_manager
+from utils.manager_factory import get_config_manager
 from analysis.pattern_manager import PatternManager
 from .analysis_tabs import (
     TechnicalAnalysisTab,
@@ -35,7 +36,7 @@ try:
     from utils.matplotlib_font_config import configure_matplotlib_chinese_font
     configure_matplotlib_chinese_font()
 except ImportError:
-    print("⚠️ 无法导入字体配置工具，使用默认配置")
+    logger.info(" 无法导入字体配置工具，使用默认配置")
 import importlib
 import traceback
 import os
@@ -43,7 +44,6 @@ import time
 from concurrent.futures import *
 import numba
 import json
-from core.logger import LogManager, LogLevel
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
 from hikyuu.indicator import *
@@ -93,7 +93,7 @@ class AnalysisWidget(QWidget):
 
         # 使用统一的管理器工厂
         self.config_manager = config_manager or get_config_manager()
-        self.log_manager = get_log_manager()
+        # 纯Loguru架构，移除log_manager依赖
         self.service_container = service_container
 
         # 如果没有service_container，尝试获取
@@ -102,7 +102,7 @@ class AnalysisWidget(QWidget):
                 from core.containers import get_service_container
                 self.service_container = get_service_container()
             except Exception as e:
-                self.log_manager.warning(f"无法获取服务容器: {e}")
+                logger.warning(f"无法获取服务容器: {e}")
                 self.service_container = None
 
         # 初始化更新节流器
@@ -120,10 +120,10 @@ class AnalysisWidget(QWidget):
                 self.pattern_manager = PatternManager()
             else:
                 self.pattern_manager = None
-                self.log_manager.warning("PatternManager未能成功导入，形态识别功能将受限")
+                logger.warning("PatternManager未能成功导入，形态识别功能将受限")
         except Exception as e:
             self.pattern_manager = None
-            self.log_manager.error(f"初始化PatternManager失败: {e}")
+            logger.error(f"初始化PatternManager失败: {e}")
 
         self.current_kdata = None
         self.analysis_futures = []  # 存储分析任务的future对象
@@ -154,7 +154,7 @@ class AnalysisWidget(QWidget):
             if self.pattern_manager is not None:
                 self._update_pattern_filter_options()
         except Exception as e:
-            self.log_manager.warning(f"初始化形态过滤器选项失败: {e}")
+            logger.warning(f"初始化形态过滤器选项失败: {e}")
 
     def show_loading(self, message="正在分析..."):
         """显示加载状态"""
@@ -289,7 +289,7 @@ class AnalysisWidget(QWidget):
                 self.sentiment_report_tab = self.sentiment_tab  # 共享同一个实例
                 self.tab_components['sentiment_report'] = self.sentiment_report_tab
             except ImportError as e:
-                print(f"⚠️ 专业情绪分析标签页导入失败: {e}")
+                logger.info(f" 专业情绪分析标签页导入失败: {e}")
                 # 使用占位符
                 self.sentiment_tab = QLabel("情绪分析功能暂不可用")
                 self.sentiment_report_tab = QLabel("情绪报告功能暂不可用")
@@ -313,14 +313,14 @@ class AnalysisWidget(QWidget):
                 self.kline_technical_tab.parent_widget = self
                 self.tab_components['kline_technical'] = self.kline_technical_tab
             except ImportError as e:
-                print(f"K线技术分析标签页导入失败: {e}")
+                logger.info(f"K线技术分析标签页导入失败: {e}")
                 self.kline_technical_tab = None
 
             # 连接信号
             self._connect_tab_signals()
 
         except Exception as e:
-            self.log_manager.error(f"创建标签页组件失败: {e}")
+            logger.error(f"创建标签页组件失败: {e}")
             # 创建简单的占位标签页
             self._create_placeholder_tabs()
 
@@ -377,32 +377,32 @@ class AnalysisWidget(QWidget):
     def _add_tabs_to_widget(self):
         """添加标签页到Tab控件"""
         # 技术分析
-        self.tab_widget.addTab(self.technical_tab, "📊 技术分析")
+        self.tab_widget.addTab(self.technical_tab, " 技术分析")
 
         # 形态识别
-        self.tab_widget.addTab(self.pattern_tab, "📈 形态识别")
+        self.tab_widget.addTab(self.pattern_tab, " 形态识别")
 
         # 趋势分析
-        self.tab_widget.addTab(self.trend_tab, "📉 趋势分析")
+        self.tab_widget.addTab(self.trend_tab, " 趋势分析")
 
         # 波浪分析
-        self.tab_widget.addTab(self.wave_tab, "🌊 波浪分析")
+        self.tab_widget.addTab(self.wave_tab, " 波浪分析")
 
         # 情绪分析
-        self.tab_widget.addTab(self.sentiment_tab, "💭 情绪分析")
+        self.tab_widget.addTab(self.sentiment_tab, " 情绪分析")
 
         # 板块资金流
-        self.tab_widget.addTab(self.sector_flow_tab, "💰 板块资金")
+        self.tab_widget.addTab(self.sector_flow_tab, " 板块资金")
 
         # 热点分析
-        self.tab_widget.addTab(self.hotspot_tab, "🔥 热点分析")
+        self.tab_widget.addTab(self.hotspot_tab, " 热点分析")
 
         # 情绪报告
-        self.tab_widget.addTab(self.sentiment_report_tab, "📊 情绪报告")
+        self.tab_widget.addTab(self.sentiment_report_tab, " 情绪报告")
 
         # K线技术分析 - 新增
         if hasattr(self, 'kline_technical_tab') and self.kline_technical_tab:
-            self.tab_widget.addTab(self.kline_technical_tab, "📈 K线技术")
+            self.tab_widget.addTab(self.kline_technical_tab, " K线技术")
 
     def _connect_tab_signals(self):
         """连接标签页信号 - 修复版"""
@@ -427,16 +427,16 @@ class AnalysisWidget(QWidget):
             # 【修复】设置pattern_tab的parent_widget并建立反向连接
             if hasattr(self.pattern_tab, 'set_parent_widget'):
                 self.pattern_tab.set_parent_widget(self)
-                self.log_manager.info("✅ 已设置pattern_tab的parent_widget")
+                logger.info(" 已设置pattern_tab的parent_widget")
             elif hasattr(self.pattern_tab, 'parent_widget'):
                 self.pattern_tab.parent_widget = self
                 # 手动连接信号
                 if hasattr(self.pattern_tab, '_connect_parent_signals'):
                     self.pattern_tab._connect_parent_signals()
-                self.log_manager.info("✅ 已设置pattern_tab的parent_widget（手动方式）")
+                logger.info(" 已设置pattern_tab的parent_widget（手动方式）")
 
         except Exception as e:
-            self.log_manager.error(f"连接标签页信号失败: {e}")
+            logger.error(f"连接标签页信号失败: {e}")
 
     def setup_shortcuts(self):
         """设置快捷键"""
@@ -473,23 +473,23 @@ class AnalysisWidget(QWidget):
         help_text = """
         分析控件帮助信息：
         
-        📊 技术分析：
+         技术分析：
         - 计算各种技术指标（MA、MACD、KDJ、RSI等）
         - 快捷键：Ctrl+Enter 计算指标，Ctrl+Delete 清除指标
         
-        📈 形态识别：
+         形态识别：
         - 自动识别股票价格形态
         - 支持多种经典技术分析形态
         
-        📉 趋势分析：
+         趋势分析：
         - 分析价格趋势和趋势强度
         - 识别趋势转折点
         
-        🌊 波浪分析：
+         波浪分析：
         - 艾略特波浪理论分析
         - 江恩理论分析
         
-        💭 情绪分析：
+         情绪分析：
         - 市场情绪指标分析
         - 投资者情绪监控
         
@@ -520,7 +520,7 @@ class AnalysisWidget(QWidget):
                 self._do_tab_changed_without_refresh(index)
 
         except Exception as e:
-            self.log_manager.error(f"Tab切换处理失败: {e}")
+            logger.error(f"Tab切换处理失败: {e}")
 
     def _do_tab_changed_without_refresh(self, index):
         """处理标签页切换但不立即刷新数据"""
@@ -531,7 +531,7 @@ class AnalysisWidget(QWidget):
             current_tab = self.tab_widget.widget(index)
             tab_name = self.tab_widget.tabText(index)
 
-            self.log_manager.debug(f"切换到标签页: {tab_name}")
+            logger.debug(f"切换到标签页: {tab_name}")
 
             # 只设置数据，不立即刷新（避免阻塞）
             if (self.current_kdata is not None and
@@ -542,10 +542,10 @@ class AnalysisWidget(QWidget):
                 if not hasattr(current_tab, 'current_kdata') or current_tab.current_kdata is None:
                     # 只有在标签页没有数据时才设置
                     current_tab.set_kdata(self.current_kdata)
-                    self.log_manager.debug(f"为 {tab_name} 设置K线数据")
+                    logger.debug(f"为 {tab_name} 设置K线数据")
 
         except Exception as e:
-            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
+            logger.error(f"处理标签页切换失败: {str(e)}")
 
     def _do_tab_changed(self, index):
         """实际处理标签页切换 - 延迟刷新版本"""
@@ -556,7 +556,7 @@ class AnalysisWidget(QWidget):
             current_tab = self.tab_widget.widget(index)
             tab_name = self.tab_widget.tabText(index)
 
-            self.log_manager.debug(f"切换到标签页: {tab_name}")
+            logger.debug(f"切换到标签页: {tab_name}")
 
             # 检查标签页是否需要数据
             if (self.current_kdata is not None and
@@ -572,9 +572,9 @@ class AnalysisWidget(QWidget):
                 if data_needs_update:
                     # 设置数据，let BaseAnalysisTab handle async refresh
                     current_tab.set_kdata(self.current_kdata)
-                    self.log_manager.debug(f"为 {tab_name} 更新K线数据")
+                    logger.debug(f"为 {tab_name} 更新K线数据")
                 else:
-                    self.log_manager.debug(f"{tab_name} 数据已是最新，跳过更新")
+                    logger.debug(f"{tab_name} 数据已是最新，跳过更新")
 
             # 如果标签页支持延迟刷新且需要刷新
             elif (hasattr(current_tab, 'refresh') and
@@ -590,7 +590,7 @@ class AnalysisWidget(QWidget):
                     )
 
         except Exception as e:
-            self.log_manager.error(f"处理标签页切换失败: {str(e)}")
+            logger.error(f"处理标签页切换失败: {str(e)}")
 
     def set_kdata(self, kdata):
         """设置K线数据 - 使用防抖机制
@@ -619,19 +619,19 @@ class AnalysisWidget(QWidget):
                 self._do_set_kdata(kdata)
 
         except Exception as e:
-            self.log_manager.error(f"设置K线数据失败: {e}")
+            logger.error(f"设置K线数据失败: {e}")
 
     def _do_set_kdata(self, kdata):
         """实际执行K线数据设置"""
         try:
             if kdata is None or kdata.empty:
-                self.log_manager.warning("传入的K线数据为空")
+                logger.warning("传入的K线数据为空")
                 return
 
             # 预处理数据
             processed_kdata = self._kdata_preprocess(kdata, "设置K线数据")
             if processed_kdata is None or processed_kdata.empty:
-                self.log_manager.warning("K线数据预处理后为空")
+                logger.warning("K线数据预处理后为空")
                 return
 
             self.current_kdata = processed_kdata
@@ -642,13 +642,13 @@ class AnalysisWidget(QWidget):
                     try:
                         tab_component.set_kdata(processed_kdata)
                     except Exception as e:
-                        self.log_manager.warning(
+                        logger.warning(
                             f"标签页 {tab_name} 设置K线数据失败: {str(e)}")
 
-            self.log_manager.info(f"K线数据设置完成，共 {len(processed_kdata)} 条记录")
+            logger.info(f"K线数据设置完成，共 {len(processed_kdata)} 条记录")
 
         except Exception as e:
-            self.log_manager.error(f"设置K线数据失败: {str(e)}")
+            logger.error(f"设置K线数据失败: {str(e)}")
             self.error_occurred.emit(f"设置K线数据失败: {str(e)}")
 
     def _kdata_preprocess(self, kdata, context="分析"):
@@ -667,13 +667,13 @@ class AnalysisWidget(QWidget):
                 missing_columns = [
                     col for col in required_columns if col not in kdata.columns]
                 if missing_columns:
-                    self.log_manager.warning(
+                    logger.warning(
                         f"{context}数据缺少必要列: {missing_columns}")
 
             return kdata
 
         except Exception as e:
-            self.log_manager.error(f"K线数据预处理失败: {e}")
+            logger.error(f"K线数据预处理失败: {e}")
             return None
 
     def refresh_current_tab(self):
@@ -691,7 +691,7 @@ class AnalysisWidget(QWidget):
                 )
 
         except Exception as e:
-            self.log_manager.error(f"刷新当前标签页失败: {str(e)}")
+            logger.error(f"刷新当前标签页失败: {str(e)}")
 
     def batch_update_indicators(self, indicators: List[str], delay_ms: int = 300):
         """批量更新指标 - 避免频繁的单个更新
@@ -718,7 +718,7 @@ class AnalysisWidget(QWidget):
             if not self.current_kdata or self.current_kdata.empty:
                 return
 
-            self.log_manager.info(f"批量更新指标: {indicators}")
+            logger.info(f"批量更新指标: {indicators}")
 
             # 并行计算所有指标
             with ThreadPoolExecutor(max_workers=min(len(indicators), os.cpu_count() * 2)) as executor:
@@ -736,7 +736,7 @@ class AnalysisWidget(QWidget):
                         if result is not None:
                             results[indicator] = result
                     except Exception as e:
-                        self.log_manager.warning(
+                        logger.warning(
                             f"计算指标 {indicator} 失败: {str(e)}")
 
                 # 批量更新UI
@@ -744,7 +744,7 @@ class AnalysisWidget(QWidget):
                     self._batch_update_ui(results)
 
         except Exception as e:
-            self.log_manager.error(f"批量更新指标失败: {str(e)}")
+            logger.error(f"批量更新指标失败: {str(e)}")
 
     def _calculate_single_indicator(self, indicator: str):
         """计算单个指标"""
@@ -753,7 +753,7 @@ class AnalysisWidget(QWidget):
             # 暂时返回None作为占位符
             return None
         except Exception as e:
-            self.log_manager.error(f"计算指标 {indicator} 失败: {str(e)}")
+            logger.error(f"计算指标 {indicator} 失败: {str(e)}")
             return None
 
     def _batch_update_ui(self, indicator_results: Dict[str, Any]):
@@ -768,7 +768,7 @@ class AnalysisWidget(QWidget):
                     current_tab.update_indicators(indicator, result)
 
         except Exception as e:
-            self.log_manager.error(f"批量更新UI失败: {str(e)}")
+            logger.error(f"批量更新UI失败: {str(e)}")
 
     def get_update_stats(self) -> Dict[str, Any]:
         """获取更新统计信息"""
@@ -787,17 +787,19 @@ class AnalysisWidget(QWidget):
             min_interval_ms: 最小更新间隔（毫秒）
         """
         self.update_throttler.min_interval_ms = min_interval_ms
-        self.log_manager.info(f"更新频率已优化为最小 {min_interval_ms}ms 间隔")
-
+        logger.info(f"更新频率已优化为最小 {min_interval_ms}ms 间隔")
 
 # 保持向后兼容性的函数
+
+
 def get_indicator_categories():
     """获取指标分类"""
     from core.indicator_service import get_indicator_categories as get_categories
     return get_categories()
 
-
 # 为了完全向后兼容，添加原有的一些重要方法
+
+
 class AnalysisWidgetCompat:
     """向后兼容性扩展类"""
 
@@ -836,8 +838,9 @@ class AnalysisWidgetCompat:
         """创建情绪报告标签页 - 兼容原接口"""
         return self.widget.sentiment_report_tab
 
-
 # 扩展AnalysisWidget类，添加向后兼容方法
+
+
 def _add_compatibility_methods(cls):
     """为AnalysisWidget类添加向后兼容方法"""
 
@@ -872,35 +875,35 @@ def _add_compatibility_methods(cls):
         if hasattr(self.trend_tab, 'analyze_trend'):
             return self.trend_tab.analyze_trend()
         else:
-            self.log_manager.warning("趋势分析功能暂未实现")
+            logger.warning("趋势分析功能暂未实现")
 
     def analyze_wave(self):
         """波浪分析 - 兼容原接口"""
         if hasattr(self.wave_tab, 'analyze_wave'):
             return self.wave_tab.analyze_wave()
         else:
-            self.log_manager.warning("波浪分析功能暂未实现")
+            logger.warning("波浪分析功能暂未实现")
 
     def analyze_sentiment(self):
         """情绪分析 - 兼容原接口"""
         if hasattr(self.sentiment_tab, 'analyze_sentiment'):
             return self.sentiment_tab.analyze_sentiment()
         else:
-            self.log_manager.warning("情绪分析功能暂未实现")
+            logger.warning("情绪分析功能暂未实现")
 
     def analyze_sector_flow(self):
         """板块资金流分析 - 兼容原接口"""
         if hasattr(self.sector_flow_tab, 'analyze_sector_flow'):
             return self.sector_flow_tab.analyze_sector_flow()
         else:
-            self.log_manager.warning("板块资金流分析功能暂未实现")
+            logger.warning("板块资金流分析功能暂未实现")
 
     def analyze_hotspot(self):
         """热点分析 - 兼容原接口"""
         if hasattr(self.hotspot_tab, 'analyze_hotspot'):
             return self.hotspot_tab.analyze_hotspot()
         else:
-            self.log_manager.warning("热点分析功能暂未实现")
+            logger.warning("热点分析功能暂未实现")
 
     # 添加清除方法
     def clear_technical(self):
@@ -979,7 +982,7 @@ def _add_compatibility_methods(cls):
         if hasattr(self.pattern_tab, 'auto_identify_patterns'):
             self.pattern_tab.auto_identify_patterns()
         else:
-            self.log_manager.warning("自动形态识别功能暂未实现")
+            logger.warning("自动形态识别功能暂未实现")
 
     def toggle_auto_refresh(self, state):
         """切换自动刷新 - 兼容原接口"""

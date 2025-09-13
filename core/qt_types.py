@@ -1,16 +1,16 @@
+from loguru import logger
 """
 Qt类型注册模块
 
 负责注册自定义Qt类型，解决信号槽中的类型注册问题。
 """
 
-import logging
 from PyQt5.QtCore import QMetaType, qRegisterMetaType, QObject, pyqtSignal, pyqtProperty, QVariant, QMetaObject, Qt, Q_ARG
 from PyQt5.QtGui import QTextCursor, QFont, QColor, QPen, QBrush, QTextCharFormat
 from PyQt5.QtWidgets import QWidget
 from typing import Dict, Any, List
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 def init_qt_types():

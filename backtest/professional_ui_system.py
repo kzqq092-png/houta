@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级回测UI系统
 提供实时图表、交互式仪表板、多维度数据展示
@@ -23,7 +24,6 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 import seaborn as sns
-from core.logger import LogManager, LogLevel
 from backtest.real_time_backtest_monitor import RealTimeBacktestMonitor, MonitoringLevel
 from backtest.ultra_performance_optimizer import UltraPerformanceOptimizer, PerformanceLevel
 from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
@@ -86,7 +86,7 @@ class ProfessionalUISystem:
         self.data_queue = queue.Queue()
         self.update_thread = None
         self.is_running = False
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 配置Streamlit页面
         self._configure_streamlit()
@@ -110,7 +110,7 @@ class ProfessionalUISystem:
         """配置Streamlit页面"""
         st.set_page_config(
             page_title="HIkyuu Professional Backtest System",
-            page_icon="📈",
+            page_icon="",
             layout="wide",
             initial_sidebar_state="expanded"
         )
@@ -301,7 +301,7 @@ class ProfessionalUISystem:
         """渲染主仪表板"""
         # 主标�?
         st.markdown(
-            '<h1 class="main-title">📈 HIkyuu Professional Backtest System</h1>', unsafe_allow_html=True)
+            '<h1 class="main-title"> HIkyuu Professional Backtest System</h1>', unsafe_allow_html=True)
 
         # 顶部状态栏
         self._render_status_bar()
@@ -345,7 +345,7 @@ class ProfessionalUISystem:
                 sharpe = getattr(risk_metrics, 'sharpe_ratio', 0) if hasattr(
                     risk_metrics, 'sharpe_ratio') else risk_metrics.get('sharpe_ratio', 0)
                 st.markdown(
-                    f'<div class="real-time-data">📊 Sharpe比率: {sharpe:.3f}</div>', unsafe_allow_html=True)
+                    f'<div class="real-time-data"> Sharpe比率: {sharpe:.3f}</div>', unsafe_allow_html=True)
 
         with col4:
             if st.session_state.monitoring_data:
@@ -353,7 +353,7 @@ class ProfessionalUISystem:
                 return_rate = latest_data.get('cumulative_return', 0) * 100
                 color = self.theme["success"] if return_rate >= 0 else self.theme["error"]
                 st.markdown(
-                    f'<div class="real-time-data">💰 累积收益: <span style="color:{color}">{return_rate:.2f}%</span></div>',
+                    f'<div class="real-time-data"> 累积收益: <span style="color:{color}">{return_rate:.2f}%</span></div>',
                     unsafe_allow_html=True
                 )
 
@@ -362,11 +362,11 @@ class ProfessionalUISystem:
                 latest_data = st.session_state.monitoring_data[-1]
                 drawdown = latest_data.get('max_drawdown', 0) * 100
                 st.markdown(
-                    f'<div class="real-time-data">📉 最大回撤: {drawdown:.2f}%</div>', unsafe_allow_html=True)
+                    f'<div class="real-time-data"> 最大回撤: {drawdown:.2f}%</div>', unsafe_allow_html=True)
 
     def _render_control_panel(self):
         """渲染控制面板"""
-        st.markdown('<h3 class="sub-title">🎛�?控制面板</h3>',
+        st.markdown('<h3 class="sub-title">�?控制面板</h3>',
                     unsafe_allow_html=True)
 
         with st.container():
@@ -408,17 +408,17 @@ class ProfessionalUISystem:
             # 控制按钮
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🚀 开始回测", use_container_width=True):
+                if st.button(" 开始回测", use_container_width=True):
                     self._start_backtest(
                         initial_capital, position_size, commission_pct, professional_level, performance_level)
 
             with col2:
-                if st.button("⏹️ 停止监控", use_container_width=True):
+                if st.button(" 停止监控", use_container_width=True):
                     self._stop_monitoring()
 
     def _render_metrics_summary(self):
         """渲染指标摘要"""
-        st.markdown('<h3 class="sub-title">📊 关键指标</h3>',
+        st.markdown('<h3 class="sub-title"> 关键指标</h3>',
                     unsafe_allow_html=True)
 
         if st.session_state.backtest_results:
@@ -441,7 +441,7 @@ class ProfessionalUISystem:
             metric_class = "metric-success" if total_return >= 0 else "metric-error"
             st.markdown(f'''
             <div class="metric-card {metric_class}">
-                <h4>💰 总收益率</h4>
+                <h4> 总收益率</h4>
                 <h2>{total_return:.2%}</h2>
                 <p>年化收益: {annualized_return:.2%}</p>
             </div>
@@ -454,7 +454,7 @@ class ProfessionalUISystem:
             metric_class = "metric-success" if sharpe_ratio >= 1.0 else "metric-warning" if sharpe_ratio >= 0.5 else "metric-error"
             st.markdown(f'''
             <div class="metric-card {metric_class}">
-                <h4>📈 Sharpe比率</h4>
+                <h4> Sharpe比率</h4>
                 <h2>{sharpe_ratio:.3f}</h2>
                 <p>最大回撤: {max_drawdown:.2%}</p>
             </div>
@@ -467,7 +467,7 @@ class ProfessionalUISystem:
             metric_class = "metric-success" if win_rate >= 0.5 else "metric-warning" if win_rate >= 0.4 else "metric-error"
             st.markdown(f'''
             <div class="metric-card {metric_class}">
-                <h4>🎯 胜率</h4>
+                <h4> 胜率</h4>
                 <h2>{win_rate:.2%}</h2>
                 <p>盈利因子: {profit_factor:.2f}</p>
             </div>
@@ -475,12 +475,12 @@ class ProfessionalUISystem:
 
     def _render_main_charts(self):
         """渲染主要图表"""
-        st.markdown('<h3 class="sub-title">📈 实时图表</h3>',
+        st.markdown('<h3 class="sub-title"> 实时图表</h3>',
                     unsafe_allow_html=True)
 
         # 图表选项�?
         tab1, tab2, tab3, tab4 = st.tabs(
-            ["📊 收益分析", "⚠️ 风险分析", "💹 交易分析", "🔧 性能分析"])
+            [" 收益分析", " 风险分析", " 交易分析", " 性能分析"])
 
         with tab1:
             self._render_performance_charts()
@@ -839,14 +839,14 @@ class ProfessionalUISystem:
 
     def _render_real_time_monitor(self):
         """渲染实时监控面板"""
-        st.markdown('<h3 class="sub-title">📡 实时监控</h3>',
+        st.markdown('<h3 class="sub-title"> 实时监控</h3>',
                     unsafe_allow_html=True)
 
         # 监控状态
         if self.is_running:
-            st.success("🟢 实时监控运行中")
+            st.success(" 实时监控运行中")
         else:
-            st.error("🔴 实时监控已停止")
+            st.error(" 实时监控已停止")
 
         # 最新指标
         if st.session_state.monitoring_data:
@@ -900,7 +900,7 @@ class ProfessionalUISystem:
 
     def _render_alerts_panel(self):
         """渲染预警面板"""
-        st.markdown('<h3 class="sub-title">⚠️ 预警中心</h3>',
+        st.markdown('<h3 class="sub-title"> 预警中心</h3>',
                     unsafe_allow_html=True)
 
         # 获取当前预警
@@ -918,13 +918,13 @@ class ProfessionalUISystem:
 
             if level == 'critical':
                 alert_class = 'alert-critical'
-                icon = '🚨'
+                icon = ''
             elif level == 'warning':
                 alert_class = 'alert-warning'
-                icon = '⚠️'
+                icon = ''
             else:
                 alert_class = 'alert-info'
-                icon = 'ℹ️'
+                icon = 'ℹ'
 
             st.markdown(f'''
             <div class="{alert_class}">
@@ -991,7 +991,7 @@ class ProfessionalUISystem:
 
         except Exception as e:
             st.error(f"回测启动失败: {str(e)}")
-            self.log_manager.log(f"回测启动失败: {e}", LogLevel.ERROR)
+            logger.error(f"回测启动失败: {e}")
 
     def _generate_mock_backtest_result(self, initial_capital: float) -> Dict:
         """生成模拟回测结果用于演示"""
@@ -1063,7 +1063,7 @@ class ProfessionalUISystem:
             }
 
         except Exception as e:
-            self.log_manager.log(f"生成模拟回测结果失败: {e}", LogLevel.ERROR)
+            logger.error(f"生成模拟回测结果失败: {e}")
             return {}
 
     def _start_real_time_monitoring(self):
@@ -1103,7 +1103,7 @@ class ProfessionalUISystem:
                     time.sleep(2)  # 每2秒更新一次
 
                 except Exception as e:
-                    self.log_manager.log(f"监控循环异常: {e}", LogLevel.ERROR)
+                    logger.error(f"监控循环异常: {e}")
                     break
 
         # 启动监控线程

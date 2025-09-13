@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -64,7 +65,7 @@ class VersionManager:
         Returns:
             新版本的ID
         """
-        print(f"💾 保存算法版本: {pattern_name}")
+        logger.info(f" 保存算法版本: {pattern_name}")
 
         # 保存算法版本
         version_id = self.db_manager.save_algorithm_version(
@@ -89,7 +90,7 @@ class VersionManager:
         # 自动清理旧版本
         self._cleanup_old_versions(pattern_name)
 
-        print(f"✅ 版本保存成功，版本ID: {version_id}")
+        logger.info(f" 版本保存成功，版本ID: {version_id}")
         return version_id
 
     def get_versions(self, pattern_name: str, limit: int = 10) -> List[AlgorithmVersion]:
@@ -191,19 +192,19 @@ class VersionManager:
             ''', (version.algorithm_code, json.dumps(version.parameters), version.pattern_name))
 
             conn.commit()
-            print(f"✅ 版本 {version.version_number} 已激活: {version.pattern_name}")
+            logger.info(f" 版本 {version.version_number} 已激活: {version.pattern_name}")
             return True
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ 激活版本失败: {e}")
+            logger.info(f" 激活版本失败: {e}")
             return False
         finally:
             conn.close()
 
     def rollback_to_version(self, pattern_name: str, version_number: int) -> bool:
         """回滚到指定版本"""
-        print(f"回滚 {pattern_name} 到版本 {version_number}")
+        logger.info(f"回滚 {pattern_name} 到版本 {version_number}")
 
         # 获取指定版本
         versions = self.get_versions(pattern_name)
@@ -215,7 +216,7 @@ class VersionManager:
                 break
 
         if not target_version:
-            print(f"❌ 未找到版本 {version_number}")
+            logger.info(f" 未找到版本 {version_number}")
             return False
 
         # 激活该版本
@@ -279,7 +280,7 @@ class VersionManager:
             return False
 
         if version.is_active:
-            print("❌ 不能删除激活的版本")
+            logger.info(" 不能删除激活的版本")
             return False
 
         conn = sqlite3.connect(self.db_manager.db_path)
@@ -295,12 +296,12 @@ class VersionManager:
                 'DELETE FROM algorithm_versions WHERE id = ?', (version_id,))
 
             conn.commit()
-            print(f"✅ 版本 {version.version_number} 已删除")
+            logger.info(f" 版本 {version.version_number} 已删除")
             return True
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ 删除版本失败: {e}")
+            logger.info(f" 删除版本失败: {e}")
             return False
         finally:
             conn.close()
@@ -490,11 +491,11 @@ class VersionManager:
             with open(export_path, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            print(f"✅ 版本已导出到: {export_path}")
+            logger.info(f" 版本已导出到: {export_path}")
             return True
 
         except Exception as e:
-            print(f"❌ 导出失败: {e}")
+            logger.info(f" 导出失败: {e}")
             return False
 
     def import_version(self, import_path: str, pattern_name: str) -> Optional[int]:
@@ -515,11 +516,11 @@ class VersionManager:
                 optimization_method="import"
             )
 
-            print(f"✅ 版本已导入，新版本ID: {version_id}")
+            logger.info(f" 版本已导入，新版本ID: {version_id}")
             return version_id
 
         except Exception as e:
-            print(f"❌ 导入失败: {e}")
+            logger.info(f" 导入失败: {e}")
             return None
 
 
@@ -534,11 +535,11 @@ if __name__ == "__main__":
 
     # 获取锤头线的版本历史
     history = manager.get_version_history("hammer")
-    print(f"锤头线版本历史: {len(history)} 个版本")
+    logger.info(f"锤头线版本历史: {len(history)} 个版本")
 
     for record in history[:3]:  # 显示前3个版本
-        print(f"  版本 {record['version_number']}: {record['description']}")
-        print(f"    创建时间: {record['created_time']}")
-        print(f"    优化方法: {record['optimization_method']}")
-        print(f"    是否激活: {record['is_active']}")
-        print()
+        logger.info(f"  版本 {record['version_number']}: {record['description']}")
+        logger.info(f"    创建时间: {record['created_time']}")
+        logger.info(f"    优化方法: {record['optimization_method']}")
+        logger.info(f"    是否激活: {record['is_active']}")
+        logger.info("")

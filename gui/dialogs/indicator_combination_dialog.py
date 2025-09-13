@@ -4,6 +4,7 @@
 提供用户界面来管理指标组合，包括加载、删除、导入导出等功能。
 """
 
+from loguru import logger
 import sys
 from typing import Dict, List, Any, Optional
 from PyQt5.QtWidgets import (
@@ -17,11 +18,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
 
-from core.logger import get_logger
 from core.indicator_combination_manager import get_combination_manager, IndicatorCombination
 
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 class CombinationLoadThread(QThread):
     """异步加载指标组合线程"""
@@ -49,7 +48,6 @@ class CombinationLoadThread(QThread):
 
         except Exception as e:
             self.error_occurred.emit(str(e))
-
 
 class IndicatorCombinationDialog(QDialog):
     """指标组合管理对话框"""
@@ -644,7 +642,6 @@ class IndicatorCombinationDialog(QDialog):
 
         event.accept()
 
-
 def main():
     """测试函数"""
     app = QApplication(sys.argv)
@@ -659,7 +656,6 @@ def main():
     dialog.show()
 
     sys.exit(app.exec_())
-
 
 if __name__ == '__main__':
     main()

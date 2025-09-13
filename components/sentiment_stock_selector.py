@@ -5,6 +5,7 @@ import json
 import os
 from trade_api import SimulatedTradeAPI
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from loguru import logger
 
 SIGNAL_CONFIG_FILE = os.path.expanduser("~/.hikyuu_signal_config.json")
 
@@ -298,7 +299,7 @@ class SentimentStockSelectorDialog(QDialog):
                         best_param = param
                         best_signal = sig
                 except Exception as e:
-                    print(f"调优子任务异常: {str(e)}")
+                    logger.info(f"调优子任务异常: {str(e)}")
         if best_signal:
             self.signal_config[best_signal] = best_param
             save_signal_config(self.signal_config)

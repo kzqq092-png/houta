@@ -1,10 +1,10 @@
+from loguru import logger
 """
 我的钢铁网数据插件
 提供钢铁、有色金属、煤炭等大宗商品价格和行情数据
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -28,7 +28,7 @@ class MySteelDataPlugin(IDataSourcePlugin):
         self.plugin_type = PluginType.DATA_SOURCE_COMMODITY
         self.supported_asset_types = [AssetType.COMMODITY]
         self.base_url = "https://api.mysteel.com"  # 示例URL
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # API配置
         self.api_config = {

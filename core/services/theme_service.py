@@ -1,10 +1,10 @@
+from loguru import logger
 """
 主题服务模块
 
 负责应用主题的管理和切换。
 """
 
-import logging
 import json
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -12,7 +12,7 @@ from .base_service import ConfigurableService
 from ..events import ThemeChangedEvent
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ThemeService(ConfigurableService):

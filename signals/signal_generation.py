@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 
 def generate_enhanced_trading_signals(df):
@@ -118,7 +119,7 @@ def optimize_signal_generation(df):
     # 确保DataFrame包含预测概率
     required_cols = ['buy_prob', 'sell_prob', 'hold_prob']
     if not all(col in df.columns for col in required_cols):
-        print("缺少概率列，无法优化信号")
+        logger.info("缺少概率列，无法优化信号")
         return df
 
     result_df = df.copy()

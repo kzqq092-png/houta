@@ -1,3 +1,4 @@
+from loguru import logger
 """
 选股策略核心类
 
@@ -11,8 +12,6 @@ from datetime import datetime, timedelta
 from hikyuu.interactive import *
 from hikyuu.indicator import *
 from core.services.unified_data_manager import UnifiedDataManager
-from core.logger import LogManager, LogLevel
-import os
 import json
 # 替换旧的指标系统导入
 from core.indicator_service import calculate_indicator, get_indicator_categories, get_all_indicators_metadata
@@ -22,15 +21,15 @@ import ptvsd
 class StockScreener:
     """选股策略核心类"""
 
-    def __init__(self, data_manager: UnifiedDataManager, log_manager: LogManager):
+    def __init__(self, data_manager: UnifiedDataManager):
         """初始化选股策略
 
         Args:
             data_manager: 数据管理器实例
-            log_manager: 日志管理器实例
+            # log_manager: 已迁移到Loguru日志系统
         """
         self.data_manager = data_manager
-        self.log_manager = log_manager
+        # log_manager已迁移到Loguru
 
     def screen_stocks(self,
                       strategy_type: str,
@@ -76,7 +75,7 @@ class StockScreener:
             return results
 
         except Exception as e:
-            self.log_manager.log(f"筛选股票失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"筛选股票失败: {str(e)}")
             return pd.DataFrame()
 
     def screen_by_technical(self, stock_list: List[str], params: Dict[str, Any]) -> pd.DataFrame:
@@ -96,24 +95,24 @@ class StockScreener:
             visible_count = {cat: len(names)
                              for cat, names in category_map.items() if names}
             for cat, count in visible_count.items():
-                self.log_manager.log(
-                    f"筛选分类: {cat}，可见指标数: {count}", LogLevel.INFO)
+                logger.error(
+                    f"筛选分类: {cat}，可见指标数: {count}")
 
             if not indicators:
-                self.log_manager.log(
-                    "未检测到任何指标，请检查指标系统是否正确初始化！", LogLevel.ERROR)
-                print("【错误】未检测到任何指标，请检查指标系统是否正确初始化！")
+                logger.warning(
+                    "未检测到任何指标，请检查指标系统是否正确初始化！")
+                logger.error("【错误】未检测到任何指标，请检查指标系统是否正确初始化！")
                 return pd.DataFrame()
         except Exception as e:
-            self.log_manager.log(f"获取指标元数据失败: {str(e)}", LogLevel.ERROR)
+            logger.info(f"获取指标元数据失败: {str(e)}")
             return pd.DataFrame()
 
         for stock in stock_list:
             try:
                 kdata = self.data_manager.get_kdata(stock)
                 if kdata.empty or len(kdata) < 30:
-                    self.log_manager.log(
-                        f"股票 {stock} K线数据为空或不足30根，跳过。", LogLevel.WARNING)
+                    logger.info(
+                        f"股票 {stock} K线数据为空或不足30根，跳过。")
                     continue
 
                 # 计算常用指标
@@ -140,8 +139,8 @@ class StockScreener:
                         "RSI", kdata, {"timeperiod": 14})
                     indicator_values['RSI'] = rsi_result['RSI']
                 except Exception as e:
-                    self.log_manager.log(
-                        f"股票 {stock} 指标计算失败: {str(e)}", LogLevel.WARNING)
+                    logger.warning(
+                        f"股票 {stock} 指标计算失败: {str(e)}")
                     continue
 
                 # 提取指标值
@@ -169,8 +168,8 @@ class StockScreener:
                     return x
 
                 # 增加日志，便于排查
-                self.log_manager.log(
-                    f"股票 {stock} 指标取值: MA={last_val(ma_short)}, EMA={last_val(ma_long)}, MACD={last_val(macd)}, RSI={last_val(rsi)}", LogLevel.INFO)
+                logger.info(
+                    f"股票 {stock} 指标取值: MA={last_val(ma_short)}, EMA={last_val(ma_long)}, MACD={last_val(macd)}, RSI={last_val(rsi)}")
 
                 if all(x is not None for x in [ma_short, ma_long, macd, rsi]):
                     try:
@@ -179,8 +178,8 @@ class StockScreener:
                         macd_val = last_val(macd)
                         rsi_val = last_val(rsi)
                         if ma_short_val is None or ma_long_val is None or macd_val is None or rsi_val is None:
-                            self.log_manager.log(
-                                f"股票 {stock} 指标有空值，跳过。", LogLevel.WARNING)
+                            logger.warning(
+                                f"股票 {stock} 指标有空值，跳过。")
                             continue
                         if ma_short_val > ma_long_val and macd_val > 0 and rsi_val > params.get('rsi_value', 50):
                             info = self.data_manager.get_stock_info(stock)
@@ -197,15 +196,15 @@ class StockScreener:
                                 'north_money': self.get_north_money(stock)
                             })
                     except Exception as e:
-                        self.log_manager.log(
-                            f"股票 {stock} 指标筛选判断异常: {str(e)}", LogLevel.WARNING)
+                        logger.warning(
+                            f"股票 {stock} 指标筛选判断异常: {str(e)}")
                         continue
                 else:
-                    self.log_manager.log(
-                        f"股票 {stock} 指标缺失，未参与筛选。", LogLevel.WARNING)
+                    logger.warning(
+                        f"股票 {stock} 指标缺失，未参与筛选。")
             except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                logger.warning(
+                    f"处理股票 {stock} 失败: {str(e)}")
                 continue
         return pd.DataFrame(results)
 
@@ -250,8 +249,8 @@ class StockScreener:
                     })
 
             except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                logger.warning(
+                    f"处理股票 {stock} 失败: {str(e)}")
                 continue
 
         return pd.DataFrame(results)
@@ -298,8 +297,8 @@ class StockScreener:
                     })
 
             except Exception as e:
-                self.log_manager.log(
-                    f"处理股票 {stock} 失败: {str(e)}", LogLevel.WARNING)
+                logger.warning(
+                    f"处理股票 {stock} 失败: {str(e)}")
                 continue
 
         return pd.DataFrame(results)
@@ -442,7 +441,7 @@ class StockScreener:
             return capital_flow['main_force'].tail(days).sum()
 
         except Exception as e:
-            self.log_manager.log(f"获取主力资金失败: {str(e)}", LogLevel.WARNING)
+            logger.warning(f"获取主力资金失败: {str(e)}")
             return 0
 
     def get_north_money(self, stock: str, days: int = 5) -> float:
@@ -465,7 +464,7 @@ class StockScreener:
             return north_money['amount'].tail(days).sum()
 
         except Exception as e:
-            self.log_manager.log(f"获取北向资金失败: {str(e)}", LogLevel.WARNING)
+            logger.warning(f"获取北向资金失败: {str(e)}")
             return 0
 
     def save_strategy(self, strategy_type: str, conditions: dict, template_name: str = None):
@@ -494,10 +493,10 @@ class StockScreener:
             with open(template_path, "w", encoding="utf-8") as f:
                 json.dump(template, f, ensure_ascii=False, indent=4)
 
-            self.log_manager.log(f"策略模板已保存: {template_name}")
+            logger.error(f"策略模板已保存: {template_name}")
 
         except Exception as e:
-            self.log_manager.log(f"保存策略模板失败: {str(e)}", LogLevel.ERROR)
+            logger.info(f"保存策略模板失败: {str(e)}")
 
     def load_strategy(self, template_name: str) -> tuple:
         """加载选股策略模板
@@ -520,7 +519,7 @@ class StockScreener:
             return template["strategy_type"], template["conditions"]
 
         except Exception as e:
-            self.log_manager.log(f"加载策略模板失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载策略模板失败: {str(e)}")
             return None, None
 
     def list_templates(self) -> list:
@@ -543,7 +542,7 @@ class StockScreener:
             return sorted(templates)
 
         except Exception as e:
-            self.log_manager.log(f"获取策略模板列表失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取策略模板列表失败: {str(e)}")
             return []
 
     def delete_template(self, template_name: str):
@@ -557,17 +556,17 @@ class StockScreener:
                 "templates/stock_screener", f"{template_name}.json")
             if os.path.exists(template_path):
                 os.remove(template_path)
-                self.log_manager.log(f"策略模板已删除: {template_name}")
+                logger.error(f"策略模板已删除: {template_name}")
 
         except Exception as e:
-            self.log_manager.log(f"删除策略模板失败: {str(e)}", LogLevel.ERROR)
+            logger.info(f"删除策略模板失败: {str(e)}")
 
     def get_indicator_categories(self):
         """获取指标分类"""
         try:
             return get_indicator_categories()
         except Exception as e:
-            self.log_manager.log(f"获取指标分类失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取指标分类失败: {str(e)}")
             return {
                 "趋势指标": ["MA", "EMA", "MACD"],
                 "震荡指标": ["RSI", "KDJ", "CCI"],

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 告警去重服务
 
@@ -5,13 +6,12 @@
 """
 
 import time
-import logging
 from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AlertLevel(Enum):

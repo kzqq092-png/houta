@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Stage 4 最终测试和验收
 
@@ -468,7 +469,7 @@ class TestPerformanceBenchmarks:
         assert processing_time < 5.0
         assert len(result) == n_rows
 
-        print(f"技术指标计算性能: {n_rows} 条记录耗时 {processing_time:.2f} 秒")
+        logger.info(f"技术指标计算性能: {n_rows} 条记录耗时 {processing_time:.2f} 秒")
 
     def test_cache_performance(self):
         """测试缓存性能"""
@@ -490,7 +491,7 @@ class TestPerformanceBenchmarks:
         assert write_time < 1.0
         assert read_time < 1.0
 
-        print(f"缓存性能: 写入 {write_time:.3f}s, 读取 {read_time:.3f}s")
+        logger.info(f"缓存性能: 写入 {write_time:.3f}s 读取 {read_time:.3f}s")
 
 
 class TestEndToEndIntegration:
@@ -523,7 +524,7 @@ class TestEndToEndIntegration:
         assert 'MA5' in enhanced_data.columns
         assert 'RSI' in enhanced_data.columns
 
-        print(f"端到端测试完成: 处理了 {len(enhanced_data)} 条记录，质量评分 {quality_report['quality_score']:.2f}")
+        logger.info(f"端到端测试完成: 处理了 {len(enhanced_data)} 条记录，质量评分 {quality_report['quality_score']:.2f}")
 
     def test_financial_data_processing_workflow(self):
         """测试财务数据处理工作流"""
@@ -555,7 +556,7 @@ class TestEndToEndIntegration:
         assert symbol_valid == True
         assert normalized_symbol == '000001.SZ'
 
-        print(f"财务数据处理完成: 计算了 {len(ratios)} 个财务比率")
+        logger.info(f"财务数据处理完成: 计算了 {len(ratios)} 个财务比率")
 
 
 if __name__ == "__main__":

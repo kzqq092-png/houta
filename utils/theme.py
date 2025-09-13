@@ -1,3 +1,4 @@
+from loguru import logger
 """
 Theme Management Module
 
@@ -157,7 +158,7 @@ class ThemeManager(QObject):
             self._theme_data = load_theme_json_with_comments(
                 self._theme_json_path)
         except Exception as e:
-            print(f"加载theme.json失败: {str(e)}")
+            logger.info(f"加载theme.json失败: {str(e)}")
             self._theme_data = {}
 
     @property
@@ -275,7 +276,7 @@ class ThemeManager(QObject):
             figure.canvas.draw()
 
         except Exception as e:
-            print(f"应用图表主题失败: {str(e)}")
+            logger.info(f"应用图表主题失败: {str(e)}")
 
     def is_dark_theme(self) -> bool:
         """Check if current theme is dark

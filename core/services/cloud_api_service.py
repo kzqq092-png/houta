@@ -1,3 +1,4 @@
+from loguru import logger
 """
 云端API服务模块
 
@@ -11,13 +12,12 @@ import threading
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
-import logging
 from urllib.parse import urljoin
 import hashlib
 import hmac
 import base64
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -79,7 +79,7 @@ class CloudAPIClient:
         self.config = config
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'FactorWeave-Quant ‌/2.0 Cloud Client'
+            'User-Agent': 'FactorWeave-Quant /2.0 Cloud Client'
         })
 
         # 配置SSL验证

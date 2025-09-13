@@ -1,3 +1,4 @@
+from loguru import logger
 """
 增强的单股分析器 - 专业级单股分析功能
 对标专业量化软件的单股分析标准
@@ -10,7 +11,6 @@ from datetime import datetime, timedelta
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-import logging
 from scipy import stats
 import talib
 
@@ -21,14 +21,12 @@ from analysis.pattern_recognition import EnhancedPatternRecognizer
 from analysis.technical_analysis import TechnicalAnalyzer
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
 
-
 class AnalysisDepth(Enum):
     """分析深度级别"""
     BASIC = "basic"              # 基础分析
     STANDARD = "standard"        # 标准分析
     COMPREHENSIVE = "comprehensive"  # 全面分析
     PROFESSIONAL = "professional"   # 专业级分析
-
 
 class RiskLevel(Enum):
     """风险等级"""
@@ -38,13 +36,11 @@ class RiskLevel(Enum):
     HIGH = "high"
     VERY_HIGH = "very_high"
 
-
 class InvestmentHorizon(Enum):
     """投资时间范围"""
     SHORT_TERM = "short_term"    # 短期 (1-30天)
     MEDIUM_TERM = "medium_term"  # 中期 (1-6个月)
     LONG_TERM = "long_term"      # 长期 (6个月以上)
-
 
 @dataclass
 class StockAnalysisResult:
@@ -103,7 +99,6 @@ class StockAnalysisResult:
     warnings: List[str]
     suggestions: List[str]
 
-
 class ProfessionalStockAnalyzer:
     """专业级股票分析器"""
 
@@ -115,7 +110,7 @@ class ProfessionalStockAnalyzer:
             analysis_depth: 分析深度级别
         """
         self.analysis_depth = analysis_depth
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 初始化组件
         self.data_validator = ProfessionalDataValidator(
@@ -710,7 +705,6 @@ class ProfessionalStockAnalyzer:
 
 # 便捷函数
 
-
 def analyze_single_stock(kdata: pd.DataFrame, stock_code: str,
                          stock_name: str = None,
                          analysis_depth: AnalysisDepth = AnalysisDepth.STANDARD) -> StockAnalysisResult:
@@ -728,7 +722,6 @@ def analyze_single_stock(kdata: pd.DataFrame, stock_code: str,
     """
     analyzer = ProfessionalStockAnalyzer(analysis_depth)
     return analyzer.analyze_stock(kdata, stock_code, stock_name)
-
 
 def batch_analyze_stocks(stock_data_dict: Dict[str, pd.DataFrame],
                          analysis_depth: AnalysisDepth = AnalysisDepth.STANDARD) -> Dict[str, StockAnalysisResult]:
@@ -750,6 +743,6 @@ def batch_analyze_stocks(stock_data_dict: Dict[str, pd.DataFrame],
             result = analyzer.analyze_stock(kdata, stock_code)
             results[stock_code] = result
         except Exception as e:
-            logging.error(f"分析股票 {stock_code} 失败: {e}")
+            logger.error(f"分析股票 {stock_code} 失败: {e}")
 
     return results

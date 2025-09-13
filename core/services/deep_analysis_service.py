@@ -1,10 +1,10 @@
+from loguru import logger
 """
 深度分析服务
 
 提供系统性能的深度分析功能，包括瓶颈分析、趋势预测、异常检测等
 """
 
-import logging
 import time
 import statistics
 from datetime import datetime, timedelta
@@ -13,7 +13,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 import threading
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

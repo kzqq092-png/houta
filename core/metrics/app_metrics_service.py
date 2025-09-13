@@ -1,3 +1,4 @@
+from loguru import logger
 # core/metrics/app_metrics_service.py
 """
 应用性能度量服务模块
@@ -5,7 +6,6 @@
 负责收集、记录和分析应用程序的性能指标，如操作响应时间、错误率等。
 """
 
-import logging
 import time
 import threading
 from typing import Dict, Any, Optional, List, Callable
@@ -17,7 +17,7 @@ from threading import Lock
 from ..events import EventBus
 from .events import ApplicationMetricRecorded
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass

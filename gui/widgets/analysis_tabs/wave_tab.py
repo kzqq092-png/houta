@@ -1,3 +1,4 @@
+from loguru import logger
 """
 波浪分析标签页 - 专业版升级
 """
@@ -42,7 +43,7 @@ class WaveAnalysisTab(WaveAnalysisTabPro):
                 self.wave_analysis_completed.emit(results)
 
         except Exception as e:
-            self.log_manager.error(f"分析完成处理失败: {e}")
+            logger.error(f"分析完成处理失败: {e}")
 
     def _update_wave_display(self, results):
         """更新波浪显示"""

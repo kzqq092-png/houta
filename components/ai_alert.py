@@ -2,13 +2,12 @@ import openai
 import threading
 import time
 from utils.notification import send_notification
-from core.logger import LogManager
-
+from loguru import logger
 
 class AIAlert:
-    def __init__(self, api_key: str, log_manager=None):
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         openai.api_key = api_key
         self.alert_history = []
         self.running = False
@@ -24,7 +23,7 @@ class AIAlert:
             import json
             return json.loads(resp['choices'][0]['message']['content'])
         except Exception as e:
-            self.log_manager.error(f"LLM解析预警条件失败: {e}")
+            logger.error(f"LLM解析预警条件失败: {e}")
             return {}
 
     def start_alert(self, user_input: str, push_type: str):
@@ -43,7 +42,7 @@ class AIAlert:
                         self.alert_history.append(
                             {"condition": user_input, "push_type": push_type, "time": time.strftime('%Y-%m-%d %H:%M:%S')})
                 except Exception as e:
-                    self.log_manager.error(f"预警检测异常: {e}")
+                    logger.error(f"预警检测异常: {e}")
                 time.sleep(60)
         threading.Thread(target=monitor, daemon=True).start()
         return {"status": "预警已启动"}

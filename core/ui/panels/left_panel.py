@@ -1,10 +1,10 @@
+from loguru import logger
 """
 左侧面板 - 股票列表
 
 提供股票搜索、筛选和管理功能。
 """
 
-import logging
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
 import asyncio  # Added for asyncio.create_task
@@ -28,7 +28,7 @@ from core.services.unified_data_manager import UnifiedDataManager
 from core.services.asset_service import AssetService
 from core.plugin_types import AssetType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class LeftPanel(BasePanel):
@@ -60,9 +60,9 @@ class LeftPanel(BasePanel):
             if hasattr(coordinator, 'service_container'):
                 self.asset_service = coordinator.service_container.resolve(AssetService)
                 self.multi_asset_enabled = True
-                logger.info("✅ 多资产支持已启用")
+                logger.info(" 多资产支持已启用")
         except Exception as e:
-            logger.info(f"ℹ️ 多资产服务不可用，使用股票模式: {e}")
+            logger.info(f"ℹ 多资产服务不可用，使用股票模式: {e}")
 
         # 当前选择的资产类型
         self.current_asset_type = AssetType.STOCK

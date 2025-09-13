@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易控件模块 - 重构版本
 
@@ -16,10 +17,9 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.io as pio
 
-from core.logger import LogManager
 from utils.theme import get_theme_manager
 from utils.config_manager import ConfigManager
-from utils.log_util import log_structured
+# log_structured已替换为直接的logger调用
 from core.containers import get_service_container
 
 
@@ -108,7 +108,7 @@ class TradingWidget(QWidget):
         self.current_stock = None
         self.current_signals = []
         self.current_positions = []
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.config_manager = config_manager or ConfigManager()
         self.theme_manager = get_theme_manager(self.config_manager)
         self.process_manager = AnalysisProcessManager()
@@ -123,12 +123,12 @@ class TradingWidget(QWidget):
             # 连接信号
             self.connect_signals()
 
-            log_structured(self.log_manager, "trading_widget_init", level="info", status="success")
+            logger.info("trading_widget_init", status="success")
 
         except Exception as e:
             error_msg = f"初始化交易控件失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager, traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def _initialize_services(self):
@@ -138,28 +138,28 @@ class TradingWidget(QWidget):
             from core.services.trading_service import TradingService
             self._trading_service = self.service_container.resolve(TradingService)
             if self._trading_service:
-                log_structured(self.log_manager, "交易服务初始化成功", level="info")
+                logger.info("交易服务初始化成功")
             else:
-                log_structured(self.log_manager, "交易服务初始化失败", level="warning")
+                logger.warning("交易服务初始化失败")
 
             # 初始化交易控制器
             from core.trading_controller import TradingController
             self._trading_controller = self.service_container.resolve(TradingController)
             if self._trading_controller:
-                log_structured(self.log_manager, "交易控制器初始化成功", level="info")
+                logger.info("交易控制器初始化成功")
             else:
-                log_structured(self.log_manager, "交易控制器初始化失败", level="warning")
+                logger.warning("交易控制器初始化失败")
 
             # 初始化统一数据管理器
             from core.services.unified_data_manager import UnifiedDataManager
             self._unified_data_manager = self.service_container.resolve(UnifiedDataManager)
             if self._unified_data_manager:
-                log_structured(self.log_manager, "统一数据管理器初始化成功", level="info")
+                logger.info("统一数据管理器初始化成功")
             else:
-                log_structured(self.log_manager, "统一数据管理器初始化失败", level="warning")
+                logger.warning("统一数据管理器初始化失败")
 
         except Exception as e:
-            log_structured(self.log_manager, f"服务初始化失败: {e}", level="error")
+            logger.error(f"服务初始化失败: {e}")
 
     def init_ui(self):
         """初始化UI"""
@@ -245,13 +245,12 @@ class TradingWidget(QWidget):
             ])
             layout.addWidget(self.trade_table)
 
-            log_structured(self.log_manager, "交易控件UI初始化完成", level="info")
+            logger.info("交易控件UI初始化完成")
 
         except Exception as e:
             error_msg = f"初始化UI失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def connect_signals(self):
@@ -266,13 +265,12 @@ class TradingWidget(QWidget):
             self.sell_button.clicked.connect(self.execute_sell)
             self.cancel_button.clicked.connect(self.cancel_order)
 
-            log_structured(self.log_manager, "信号连接完成", level="info")
+            logger.info("信号连接完成")
 
         except Exception as e:
             error_msg = f"连接信号失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def execute_buy(self):
@@ -367,9 +365,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             error_msg = f"买入操作失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def execute_sell(self):
@@ -498,9 +495,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             error_msg = f"卖出操作失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def cancel_order(self):
@@ -580,9 +576,8 @@ class TradingWidget(QWidget):
 
         except Exception as e:
             error_msg = f"撤单操作失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def update_stock(self, stock_info: Dict[str, str]):
@@ -600,9 +595,8 @@ class TradingWidget(QWidget):
                 code = stock_info
             if not isinstance(code, str) or not code.strip():
                 self.current_stock = None
-                if hasattr(self, 'log_manager') and self.log_manager:
-                    log_structured(
-                        self.log_manager, "update_stock: 股票信息无效，未能提取到股票代码", level="error")
+                if True:  # 使用Loguru日志
+                    log_structured("update_stock: 股票信息无效，未能提取到股票代码", level="error")
                 QMessageBox.warning(
                     self, "股票选择错误", "update_stock：未能提取到有效的股票代码，请重新选择股票！")
                 return
@@ -616,11 +610,7 @@ class TradingWidget(QWidget):
             self.calculate_signals()
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager,
-                               f"更新股票信息失败: {str(e)}", level="error")
-            else:
-                print(f"更新股票信息失败: {str(e)}")
+            logger.error(f"更新股票信息失败: {str(e)}")
 
     def update_signals(self, signals: List[Dict[str, Any]]):
         """更新信号列表
@@ -664,11 +654,7 @@ class TradingWidget(QWidget):
             self.signal_table.resizeColumnsToContents()
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager,
-                               f"更新信号列表失败: {str(e)}", level="error")
-            else:
-                print(f"更新信号列表失败: {str(e)}")
+            logger.error(f"更新信号列表失败: {str(e)}")
 
     def update_backtest_results(self, results: Dict[str, Any]):
         """美化回测结果表格，支持多策略对比和多种可视化"""
@@ -800,9 +786,8 @@ class TradingWidget(QWidget):
                 self.detail_btn.clicked.connect(
                     lambda: self.show_detail_dialog(results))
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                log_structured(self.log_manager,
-                               f"回测结果展示美化/多策略对比失败: {str(e)}", level="error")
+            if True:  # 使用Loguru日志
+                logger.error(f"回测结果展示美化/多策略对比失败: {str(e)}")
 
     def show_detail_dialog(self, results: dict):
         """弹出详细结果对话框，整合所有分组表格和图表，主UI可并行操作"""
@@ -941,11 +926,7 @@ class TradingWidget(QWidget):
             self.current_positions = []
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                log_structured(self.log_manager,
-                               f"清除数据失败: {str(e)}", level="error")
-            else:
-                print(f"清除数据失败: {str(e)}")
+            logger.error(f"清除数据失败: {str(e)}")
 
     def _run_analysis_async(self, button, analysis_func, *args, progress_callback=None, **kwargs):
         original_text = button.text()
@@ -975,9 +956,8 @@ class TradingWidget(QWidget):
                         *args, progress_callback=progress_callback, **kwargs)
                     return result
             except Exception as e:
-                if hasattr(self, 'log_manager'):
-                    log_structured(self.log_manager,
-                                   f"分析异常: {str(e)}", level="error")
+                if True:  # 使用Loguru日志
+                    logger.error(f"分析异常: {str(e)}")
                 return None
             finally:
                 QTimer.singleShot(0, lambda: on_done(None))
@@ -1011,7 +991,7 @@ class TradingWidget(QWidget):
                 QMessageBox.warning(self, "提示", "请选择一个有效的策略。")
                 return None
 
-            self.log_manager.info(f"开始计算信号，策略: {strategy_name}")
+            logger.info(f"开始计算信号，策略: {strategy_name}")
 
             # 使用交易服务计算信号
             if self._trading_service and hasattr(self._trading_service, 'calculate_signals'):
@@ -1024,10 +1004,10 @@ class TradingWidget(QWidget):
                 signals = []
 
             if signals is None:
-                self.log_manager.error(f"策略 {strategy_name} 未能生成信号。")
+                logger.error(f"策略 {strategy_name} 未能生成信号。")
                 return {"error": f"策略 {strategy_name} 未能生成信号。"}
 
-            self.log_manager.info(f"成功计算 {len(signals)} 个信号")
+            logger.info(f"成功计算 {len(signals)} 个信号")
 
             # 更新UI
             self.update_signals(signals)
@@ -1035,7 +1015,7 @@ class TradingWidget(QWidget):
             return {"signals": signals}
         except Exception as e:
             error_msg = f"计算信号时出错: {e}"
-            self.log_manager.error(error_msg, exc_info=True)
+            logger.error(error_msg, exc_info=True)
             return {"error": error_msg}
 
     def run_backtest(self):
@@ -1060,8 +1040,7 @@ class TradingWidget(QWidget):
             self.slippage_spin.setValue(0.0001)
 
         except Exception as e:
-            log_structured(LogManager.log_manager,
-                           f"重置参数失败: {str(e)}", level="error")
+            logger.info(f"重置参数失败: {str(e)}")
 
     def on_strategy_changed(self, strategy: str):
         """处理策略变更事件，仅切换参数区，不自动回测"""
@@ -1070,8 +1049,7 @@ class TradingWidget(QWidget):
             # 只刷新参数区，不自动回测
             self.update_parameters_visibility()
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"处理策略变更失败: {str(e)}", level="error")
+            logger.error(f"处理策略变更失败: {str(e)}")
 
     def refresh(self) -> None:
         """
@@ -1082,9 +1060,8 @@ class TradingWidget(QWidget):
             self.calculate_signals()
         except Exception as e:
             error_msg = f"刷新交易控件失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             # 发射异常信号，主窗口可捕获弹窗
             self.error_occurred.emit(error_msg)
 
@@ -1104,7 +1081,7 @@ class TradingWidget(QWidget):
         """统一回测实现，支持所有策略，参数标准化，结果自动刷新到UI"""
         try:
             if not self.current_stock or not isinstance(self.current_stock, str) or not self.current_stock.strip():
-                log_structured(self.log_manager, "请先选择股票", level="warning")
+                logger.warning("请先选择股票")
                 QMessageBox.warning(self, "回测错误", "未选择有效的股票代码，请先选择股票！")
                 return
             strategy = self.strategy_combo.currentText()
@@ -1126,8 +1103,7 @@ class TradingWidget(QWidget):
                 self, 'commission_spin') and self.commission_spin is not None else 0.0003
             params['slippage'] = self.slippage_spin.value() if hasattr(
                 self, 'slippage_spin') and self.slippage_spin is not None else 0.0001
-            log_structured(self.log_manager,
-                           f"开始回测 - 策略: {strategy}", level="info")
+            logger.info(f"开始回测 - 策略: {strategy}")
 
             # 使用统一回测引擎
             from backtest.unified_backtest_engine import UnifiedBacktestEngine, BacktestLevel
@@ -1141,33 +1117,33 @@ class TradingWidget(QWidget):
             service_container = get_service_container()
             kdata = None
 
-            # 🚀 优先尝试AssetService（TET模式）
+            #  优先尝试AssetService（TET模式）
             try:
                 asset_service = service_container.resolve(AssetService)
                 if asset_service:
-                    log_structured(self.log_manager, f"🚀 TradingWidget使用TET模式获取数据: {self.current_stock.strip()}", level="info")
+                    logger.info(f" TradingWidget使用TET模式获取数据: {self.current_stock.strip()}")
                     kdata = asset_service.get_historical_data(
                         symbol=self.current_stock.strip(),
                         asset_type=AssetType.STOCK,
                         period='D'
                     )
                     if kdata is not None and not kdata.empty:
-                        log_structured(self.log_manager, f"✅ TET模式获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}", level="info")
+                        logger.info(f" TET模式获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}")
                     else:
-                        log_structured(self.log_manager, f"⚠️ TET模式返回空数据: {self.current_stock.strip()}", level="warning")
+                        logger.warning(f" TET模式返回空数据: {self.current_stock.strip()}")
                         kdata = None
             except Exception as e:
-                log_structured(self.log_manager, f"❌ TET模式获取失败: {e}", level="warning")
+                logger.warning(f" TET模式获取失败: {e}")
                 kdata = None
 
-            # 📊 降级到StockService
+            #  降级到StockService
             if kdata is None or (hasattr(kdata, 'empty') and kdata.empty):
                 stock_service = service_container.get_service(StockService)
                 if stock_service:
-                    log_structured(self.log_manager, f"🔄 降级到StockService模式: {self.current_stock.strip()}", level="info")
+                    logger.info(f" 降级到StockService模式: {self.current_stock.strip()}")
                     kdata = stock_service.get_kdata(self.current_stock.strip())
                     if kdata is not None and not kdata.empty:
-                        log_structured(self.log_manager, f"✅ StockService获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}", level="info")
+                        logger.info(f" StockService获取成功: {self.current_stock.strip()} | 记录数: {len(kdata)}")
 
             if kdata is None or kdata.empty:
                 raise ValueError("无法获取股票数据 - 所有数据源都失败")
@@ -1216,12 +1192,11 @@ class TradingWidget(QWidget):
                 raise ValueError("无法获取主窗口或股票数据")
 
             self.update_backtest_results(metrics)
-            log_structured(self.log_manager, "回测完成", level="info")
+            logger.info("回测完成")
         except Exception as e:
             error_msg = f"回测失败: {str(e)}"
-            log_structured(self.log_manager, error_msg, level="error")
-            log_structured(self.log_manager,
-                           traceback.format_exc(), level="error")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             self.error_occurred.emit(error_msg)
 
     def on_analyze(self):
@@ -1296,11 +1271,11 @@ class TradingWidget(QWidget):
             error: 是否为错误信息
         """
         # 这里只做日志记录，或可扩展为UI提示
-        if hasattr(self, 'log_manager') and self.log_manager:
+        if True:  # 使用Loguru日志
             if error:
-                log_structured(self.log_manager, message, level="error")
+                logger.error(message)
             else:
-                log_structured(self.log_manager, message, level="info")
+                logger.info(message)
         # 可扩展为弹窗或状态栏提示
 
     def _execute_analysis(self, strategy: str, params: dict) -> dict:
@@ -1343,8 +1318,7 @@ class TradingWidget(QWidget):
                 self.set_status_message(results['error'], error=True)
                 return results
             params['stock'] = stock_code  # 保证后续都是字符串
-            log_structured(self.log_manager,
-                           f"准备回测股票:{stock_code}", level="info")
+            logger.info(f"准备回测股票:{stock_code}")
             cache_key = f"{stock_code}_{params.get('period','D')}"
             if not hasattr(self, '_kdata_cache'):
                 self._kdata_cache = {}
@@ -1356,7 +1330,7 @@ class TradingWidget(QWidget):
 
                 service_container = get_service_container()
 
-                # 🚀 优先尝试AssetService（TET模式）
+                #  优先尝试AssetService（TET模式）
                 try:
                     asset_service = service_container.resolve(AssetService)
                     if asset_service:
@@ -1367,19 +1341,19 @@ class TradingWidget(QWidget):
                         )
                         if data is not None and not data.empty:
                             self._kdata_cache[cache_key] = data
-                            log_structured(self.log_manager, f"✅ 分析缓存TET模式: {stock_code} | 记录数: {len(data)}", level="info")
+                            logger.info(f" 分析缓存TET模式: {stock_code} | 记录数: {len(data)}")
                 except Exception as e:
-                    log_structured(self.log_manager, f"❌ 分析TET模式失败: {e}", level="warning")
+                    logger.warning(f" 分析TET模式失败: {e}")
                     data = None
 
-                # 📊 降级到StockService
+                #  降级到StockService
                 if data is None or (hasattr(data, 'empty') and data.empty):
                     stock_service = service_container.get_service(StockService)
                     if stock_service:
                         data = stock_service.get_kdata(stock_code)
                         if data is not None and not data.empty:
                             self._kdata_cache[cache_key] = data
-                            log_structured(self.log_manager, f"✅ 分析缓存StockService: {stock_code} | 记录数: {len(data)}", level="info")
+                            logger.info(f" 分析缓存StockService: {stock_code} | 记录数: {len(data)}")
             if data is None or data.empty:
                 results['error'] = f"{stock_code}股票K线数据为空，无法分析"
                 self.set_status_message(results['error'], error=True)
@@ -1793,7 +1767,7 @@ class TradingWidget(QWidget):
             if not self.current_stock:
                 return None
 
-            # 🚀 尝试从AssetService获取实时/历史价格（TET模式优先）
+            #  尝试从AssetService获取实时/历史价格（TET模式优先）
             try:
                 from core.containers import get_service_container
                 from core.services import AssetService
@@ -1826,9 +1800,9 @@ class TradingWidget(QWidget):
                         else:  # KData
                             return float(kdata[-1].close)
             except Exception as e:
-                log_structured(self.log_manager, f"❌ TET模式获取当前价格失败: {e}", level="warning")
+                logger.warning(f" TET模式获取当前价格失败: {e}")
 
-            # 📊 降级到传统data_manager
+            #  降级到传统data_manager
             try:
                 from core.data_manager import data_manager
                 realtime_data = data_manager.get_realtime_quotes([self.current_stock])
@@ -1844,13 +1818,12 @@ class TradingWidget(QWidget):
                     else:  # KData
                         return float(kdata[-1].close)
             except Exception as e:
-                log_structured(self.log_manager, f"❌ 传统模式获取当前价格失败: {e}", level="error")
+                logger.error(f" 传统模式获取当前价格失败: {e}")
 
             return None
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"获取当前价格失败: {str(e)}", level="error")
+            logger.error(f"获取当前价格失败: {str(e)}")
             return None
 
     def _get_position(self, stock_code: str) -> Optional[Dict[str, Any]]:
@@ -1862,8 +1835,7 @@ class TradingWidget(QWidget):
             return None
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"获取持仓信息失败: {str(e)}", level="error")
+            logger.error(f"获取持仓信息失败: {str(e)}")
             return None
 
     def _update_position(self, trade_record: Dict[str, Any]):
@@ -1906,8 +1878,7 @@ class TradingWidget(QWidget):
             self._update_position_table()
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"更新持仓信息失败: {str(e)}", level="error")
+            logger.error(f"更新持仓信息失败: {str(e)}")
 
     def _record_trade(self, trade_record: Dict[str, Any]):
         """记录交易记录"""
@@ -1936,8 +1907,7 @@ class TradingWidget(QWidget):
             self.trade_table.resizeColumnsToContents()
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"记录交易失败: {str(e)}", level="error")
+            logger.error(f"记录交易失败: {str(e)}")
 
     def _update_position_table(self):
         """更新持仓表格显示"""
@@ -1983,8 +1953,7 @@ class TradingWidget(QWidget):
             self.position_table.resizeColumnsToContents()
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"更新持仓表格失败: {str(e)}", level="error")
+            logger.error(f"更新持仓表格失败: {str(e)}")
 
     def _get_pending_orders(self) -> List[Dict[str, Any]]:
         """获取待处理订单列表"""
@@ -2011,8 +1980,7 @@ class TradingWidget(QWidget):
             ]
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"获取待处理订单失败: {str(e)}", level="error")
+            logger.error(f"获取待处理订单失败: {str(e)}")
             return []
 
     def _cancel_order(self, order_id: str):
@@ -2020,9 +1988,8 @@ class TradingWidget(QWidget):
         try:
             # 这里实现撤单逻辑
             # 在实际应用中，应该调用交易接口撤销订单
-            log_structured(self.log_manager, f"撤销订单 {order_id}", level="info")
+            logger.info(f"撤销订单 {order_id}")
 
         except Exception as e:
-            log_structured(self.log_manager,
-                           f"撤销订单失败: {str(e)}", level="error")
+            logger.error(f"撤销订单失败: {str(e)}")
             raise

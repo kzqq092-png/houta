@@ -1,5 +1,6 @@
+from loguru import logger
 """
-FactorWeave-Quant ‌ 插件市场系统
+FactorWeave-Quant  插件市场系统
 
 提供插件发现、下载、安装、评分、更新等完整的插件生态功能。
 """
@@ -11,7 +12,6 @@ import requests
 import zipfile
 import shutil
 import hashlib
-import logging
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from dataclasses import dataclass, asdict
@@ -26,7 +26,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # 定义基础类型，以防导入失败
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 尝试导入插件接口
 PluginMetadata = None

@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import logging
-
+from loguru import logger
 
 class RiskControlStrategy:
     def __init__(self, params: Optional[Dict] = None):
@@ -63,7 +62,7 @@ class RiskControlStrategy:
             return risk_budget
 
         except Exception as e:
-            logging.error(f"分配风险预算时出错: {str(e)}")
+            logger.error(f"分配风险预算时出错: {str(e)}")
             return {}
 
     def calculate_position_limits(self, risk_metrics: Dict) -> Dict[str, float]:
@@ -103,7 +102,7 @@ class RiskControlStrategy:
             return position_limits
 
         except Exception as e:
-            logging.error(f"计算持仓限制时出错: {str(e)}")
+            logger.error(f"计算持仓限制时出错: {str(e)}")
             return {}
 
     def calculate_stop_loss(self, asset: str, price: float,
@@ -136,7 +135,7 @@ class RiskControlStrategy:
             return base_stop
 
         except Exception as e:
-            logging.error(f"计算止损水平时出错: {str(e)}")
+            logger.error(f"计算止损水平时出错: {str(e)}")
             return price * 0.9  # 默认10%止损
 
     def setup_hedge(self, asset: str, position: float,
@@ -165,7 +164,7 @@ class RiskControlStrategy:
             return (hedge_asset, hedge_position)
 
         except Exception as e:
-            logging.error(f"设置对冲头寸时出错: {str(e)}")
+            logger.error(f"设置对冲头寸时出错: {str(e)}")
             return None
 
     def _detect_market_regime(self, risk_metrics: Dict) -> str:
@@ -183,7 +182,7 @@ class RiskControlStrategy:
                 return 'neutral'
 
         except Exception as e:
-            logging.error(f"检测市场状态时出错: {str(e)}")
+            logger.error(f"检测市场状态时出错: {str(e)}")
             return 'neutral'
 
     def _need_hedge(self, asset: str, position: float,
@@ -207,7 +206,7 @@ class RiskControlStrategy:
             return True
 
         except Exception as e:
-            logging.error(f"判断是否需要对冲时出错: {str(e)}")
+            logger.error(f"判断是否需要对冲时出错: {str(e)}")
             return False
 
     def _select_hedge_asset(self, asset: str, risk_metrics: Dict) -> Optional[str]:
@@ -228,7 +227,7 @@ class RiskControlStrategy:
             return hedge_asset
 
         except Exception as e:
-            logging.error(f"选择对冲工具时出错: {str(e)}")
+            logger.error(f"选择对冲工具时出错: {str(e)}")
             return None
 
     def _calculate_hedge_ratio(self, asset: str, hedge_asset: str,
@@ -251,7 +250,7 @@ class RiskControlStrategy:
             return min(abs(hedge_ratio), 1.0)  # 限制最大对冲比例为1
 
         except Exception as e:
-            logging.error(f"计算对冲比例时出错: {str(e)}")
+            logger.error(f"计算对冲比例时出错: {str(e)}")
             return 0.5  # 默认50%对冲
 
     def update_risk_metrics_history(self, risk_metrics: Dict):
@@ -267,7 +266,7 @@ class RiskControlStrategy:
                 self.risk_metrics_history.pop(0)
 
         except Exception as e:
-            logging.error(f"更新风险指标历史时出错: {str(e)}")
+            logger.error(f"更新风险指标历史时出错: {str(e)}")
 
     def get_risk_metrics_history(self, start_time: Optional[datetime] = None,
                                  end_time: Optional[datetime] = None) -> List[Dict]:
@@ -279,9 +278,8 @@ class RiskControlStrategy:
             return self.risk_metrics_history
 
         except Exception as e:
-            logging.error(f"获取风险指标历史时出错: {str(e)}")
+            logger.error(f"获取风险指标历史时出错: {str(e)}")
             return []
-
 
 class RiskMonitor:
     """风险监控和预警系统"""
@@ -338,7 +336,7 @@ class RiskMonitor:
             return alerts
 
         except Exception as e:
-            logging.error(f"风险监控时出错: {str(e)}")
+            logger.error(f"风险监控时出错: {str(e)}")
             return []
 
     def _monitor_market_risk(self, risk_metrics: Dict) -> List[Dict]:
@@ -518,7 +516,6 @@ class RiskMonitor:
                     if start_time <= snapshot['timestamp'] <= end_time]
         return self.risk_snapshots
 
-
 class RiskReportGenerator:
     """风险报告生成器"""
 
@@ -547,7 +544,7 @@ class RiskReportGenerator:
             return report
 
         except Exception as e:
-            logging.error(f"生成风险报告时出错: {str(e)}")
+            logger.error(f"生成风险报告时出错: {str(e)}")
             return {}
 
     def _generate_summary(self, portfolio: Dict[str, float],
@@ -704,7 +701,7 @@ class RiskReportGenerator:
             return min(max(score, 0), 1)  # 归一化到[0,1]区间
 
         except Exception as e:
-            logging.error(f"计算总体风险分数时出错: {str(e)}")
+            logger.error(f"计算总体风险分数时出错: {str(e)}")
             return 0.5
 
     def _get_key_risk_indicators(self, risk_metrics: Dict) -> List[Dict]:
@@ -743,7 +740,7 @@ class RiskReportGenerator:
             hhi = np.sum(weights ** 2)  # Herfindahl-Hirschman Index
             return hhi
         except Exception as e:
-            logging.error(f"计算组合集中度时出错: {str(e)}")
+            logger.error(f"计算组合集中度时出错: {str(e)}")
             return 0
 
     def _analyze_risk_trend(self, risk_metrics: Dict) -> str:
@@ -765,7 +762,7 @@ class RiskReportGenerator:
                 return "stable"
 
         except Exception as e:
-            logging.error(f"分析风险趋势时出错: {str(e)}")
+            logger.error(f"分析风险趋势时出错: {str(e)}")
             return "unknown"
 
     def _analyze_metric_trend(self, metric_name: str, metrics: Dict) -> str:
@@ -785,7 +782,7 @@ class RiskReportGenerator:
                 return "stable"
 
         except Exception as e:
-            logging.error(f"分析指标趋势时出错: {str(e)}")
+            logger.error(f"分析指标趋势时出错: {str(e)}")
             return "unknown"
 
     def _summarize_alerts(self, alerts: List[Dict]) -> Dict:

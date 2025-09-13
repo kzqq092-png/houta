@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -230,7 +231,7 @@ class StockSelectorWidget(QWidget):
         layout.setSpacing(8)
 
         # 标题
-        title_label = QLabel("📊 当前股票")
+        title_label = QLabel(" 当前股票")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;")
         layout.addWidget(title_label)
 
@@ -247,7 +248,7 @@ class StockSelectorWidget(QWidget):
         layout.addWidget(self.current_selection_label)
 
         # 状态说明
-        status_label = QLabel("💡 股票数据将在选择股票后自动加载")
+        status_label = QLabel(" 股票数据将在选择股票后自动加载")
         status_label.setStyleSheet("color: #666; font-size: 11px; margin: 5px;")
         layout.addWidget(status_label)
 
@@ -259,9 +260,9 @@ class StockSelectorWidget(QWidget):
             self.current_stock_code = code
             self.current_stock_name = name
             self.current_selection_label.setText(f"当前分析: {name} ({code})")
-            print(f"📊 股票选择器更新: {name} ({code})")
+            logger.info(f" 股票选择器更新: {name} ({code})")
         except Exception as e:
-            print(f"❌ 设置当前股票失败: {e}")
+            logger.info(f" 设置当前股票失败: {e}")
 
     def load_stock_data(self):
         """异步加载股票数据 - 延迟执行"""
@@ -271,19 +272,19 @@ class StockSelectorWidget(QWidget):
     def _delayed_load_stock_data(self):
         """延迟加载股票数据"""
         try:
-            print("📊 延迟加载股票数据...")
+            logger.info(" 延迟加载股票数据...")
             # 这里可以添加真正的数据加载逻辑
             # 但不在UI初始化时执行
         except Exception as e:
-            print(f"❌ 延迟加载股票数据失败: {e}")
+            logger.info(f" 延迟加载股票数据失败: {e}")
 
     def load_enhanced_default_stocks(self):
         """加载默认股票数据 - 简化版本"""
         try:
-            print("📊 使用默认股票数据")
+            logger.info(" 使用默认股票数据")
             # 简化的默认数据，不执行复杂操作
         except Exception as e:
-            print(f"❌ 加载默认股票数据失败: {e}")
+            logger.info(f" 加载默认股票数据失败: {e}")
 
     def filter_stocks(self, text):
         """股票筛选 - 简化版本"""
@@ -317,7 +318,7 @@ class RealTimeDataWorker(QThread):
         # TET框架组件
         self.tet_data_provider = None
         self.signal_aggregator_service = None
-        print("✅ TET框架数据工作线程初始化完成")
+        logger.info(" TET框架数据工作线程初始化完成")
 
     def run(self):
         """运行TET框架数据更新循环"""
@@ -336,7 +337,7 @@ class RealTimeDataWorker(QThread):
                         if result:
                             results[symbol] = result
                     except Exception as e:
-                        print(f"TET框架获取 {symbol} 数据失败: {e}")
+                        logger.info(f"TET框架获取 {symbol} 数据失败: {e}")
                         continue
 
                 if results:
@@ -371,34 +372,34 @@ class RealTimeDataWorker(QThread):
 
                     if unified_data_manager and asset_service:
                         self.tet_data_provider = TETDataProvider(unified_data_manager, asset_service)
-                        print("✅ 从服务容器成功初始化TET数据提供器")
+                        logger.info(" 从服务容器成功初始化TET数据提供器")
                     else:
                         raise Exception("服务容器中未找到必要服务")
 
                 except Exception as e:
-                    print(f"⚠️ 从服务容器获取服务失败: {e}")
+                    logger.info(f" 从服务容器获取服务失败: {e}")
                     # 降级到直接实例化
                     unified_data_manager = UnifiedDataManager()
                     asset_service = AssetService()
                     self.tet_data_provider = TETDataProvider(unified_data_manager, asset_service)
-                    print("✅ 直接实例化TET数据提供器")
+                    logger.info(" 直接实例化TET数据提供器")
             else:
                 # 直接实例化
                 unified_data_manager = UnifiedDataManager()
                 asset_service = AssetService()
                 self.tet_data_provider = TETDataProvider(unified_data_manager, asset_service)
-                print("✅ 直接实例化TET数据提供器")
+                logger.info(" 直接实例化TET数据提供器")
 
             # 初始化信号聚合服务
             try:
                 from core.services.integrated_signal_aggregator_service import IntegratedSignalAggregatorService
                 self.signal_aggregator_service = IntegratedSignalAggregatorService()
-                print("✅ 成功初始化信号聚合服务")
+                logger.info(" 成功初始化信号聚合服务")
             except Exception as e:
-                print(f"⚠️ 初始化信号聚合服务失败: {e}")
+                logger.info(f" 初始化信号聚合服务失败: {e}")
 
         except Exception as e:
-            print(f"❌ 初始化TET框架失败: {e}")
+            logger.info(f" 初始化TET框架失败: {e}")
             self.tet_data_provider = None
             self.signal_aggregator_service = None
 
@@ -434,9 +435,9 @@ class RealTimeDataWorker(QThread):
                         )
                     )
                     if kdata is not None and not kdata.empty:
-                        print(f"✅ TET获取K线数据成功: {symbol}, {len(kdata)} 条记录")
+                        logger.info(f"TET获取K线数据成功: {symbol} {len(kdata)} 条记录")
                 except Exception as e:
-                    print(f"⚠️ TET获取K线数据失败: {symbol} - {e}")
+                    logger.info(f" TET获取K线数据失败: {symbol} - {e}")
 
                 # 2. 获取实时行情数据
                 try:
@@ -450,9 +451,9 @@ class RealTimeDataWorker(QThread):
                     )
                     if realtime_df is not None and not realtime_df.empty:
                         realtime_data = realtime_df.iloc[-1].to_dict()
-                        print(f"✅ TET获取实时数据成功: {symbol}")
+                        logger.info(f" TET获取实时数据成功: {symbol}")
                 except Exception as e:
-                    print(f"⚠️ TET获取实时数据失败: {symbol} - {e}")
+                    logger.info(f" TET获取实时数据失败: {symbol} - {e}")
 
                 # 3. 获取技术指标数据
                 try:
@@ -466,9 +467,9 @@ class RealTimeDataWorker(QThread):
                     )
                     if indicators_df is not None and not indicators_df.empty:
                         technical_indicators = indicators_df.iloc[-1].to_dict()
-                        print(f"✅ TET获取技术指标成功: {symbol}")
+                        logger.info(f" TET获取技术指标成功: {symbol}")
                 except Exception as e:
-                    print(f"⚠️ TET获取技术指标失败: {symbol} - {e}")
+                    logger.info(f" TET获取技术指标失败: {symbol} - {e}")
 
                 # 4. 获取基本面数据
                 try:
@@ -482,9 +483,9 @@ class RealTimeDataWorker(QThread):
                     )
                     if fundamental_df is not None and not fundamental_df.empty:
                         fundamental_data = fundamental_df.iloc[-1].to_dict()
-                        print(f"✅ TET获取基本面数据成功: {symbol}")
+                        logger.info(f" TET获取基本面数据成功: {symbol}")
                 except Exception as e:
-                    print(f"⚠️ TET获取基本面数据失败: {symbol} - {e}")
+                    logger.info(f" TET获取基本面数据失败: {symbol} - {e}")
 
                 if not kdata.empty:
                     # 如果没有获取到技术指标，则从K线数据计算
@@ -501,14 +502,14 @@ class RealTimeDataWorker(QThread):
                         'source': 'TET_Enhanced'
                     }
                 else:
-                    print(f"⚠️ TET框架未获取到K线数据: {symbol}")
+                    logger.info(f" TET框架未获取到K线数据: {symbol}")
                     return self._generate_fallback_data(symbol)
 
             finally:
                 loop.close()
 
         except Exception as e:
-            print(f"❌ TET框架获取多源数据失败 {symbol}: {e}")
+            logger.info(f" TET框架获取多源数据失败 {symbol}: {e}")
             return self._generate_fallback_data(symbol)
 
     def _calculate_technical_indicators_from_kdata(self, kdata: pd.DataFrame) -> Dict:
@@ -555,7 +556,7 @@ class RealTimeDataWorker(QThread):
             }
 
         except Exception as e:
-            print(f"❌ 从K线数据计算技术指标失败: {e}")
+            logger.info(f" 从K线数据计算技术指标失败: {e}")
             return {'sentiment_score': 50.0}
 
     def _generate_fallback_data(self, symbol: str) -> Dict:
@@ -594,7 +595,7 @@ class RealTimeDataWorker(QThread):
             }
 
         except Exception as e:
-            print(f"❌ 生成TET降级数据失败 {symbol}: {e}")
+            logger.info(f" 生成TET降级数据失败 {symbol}: {e}")
             return None
 
     def _calculate_rsi(self, prices, period=14):
@@ -618,7 +619,7 @@ class RealTimeDataWorker(QThread):
             return rsi
 
         except Exception as e:
-            print(f"计算RSI失败: {e}")
+            logger.info(f"计算RSI失败: {e}")
             return 50.0
 
     def _calculate_macd(self, prices, fast=12, slow=26, signal=9):
@@ -637,7 +638,7 @@ class RealTimeDataWorker(QThread):
             return macd_line, signal_line, histogram
 
         except Exception as e:
-            print(f"计算MACD失败: {e}")
+            logger.info(f"计算MACD失败: {e}")
             return 0.0, 0.0, 0.0
 
     def _calculate_ema(self, prices, period):
@@ -653,7 +654,7 @@ class RealTimeDataWorker(QThread):
             return ema
 
         except Exception as e:
-            print(f"计算EMA失败: {e}")
+            logger.info(f"计算EMA失败: {e}")
             return np.mean(prices) if len(prices) > 0 else 0.0
 
     def _calculate_bollinger_bands(self, prices, period=20, std_dev=2):
@@ -672,7 +673,7 @@ class RealTimeDataWorker(QThread):
             return upper, middle, lower
 
         except Exception as e:
-            print(f"计算布林带失败: {e}")
+            logger.info(f"计算布林带失败: {e}")
             mean_price = np.mean(prices) if len(prices) > 0 else 0.0
             return mean_price, mean_price, mean_price
 
@@ -710,7 +711,7 @@ class RealTimeDataWorker(QThread):
             return score
 
         except Exception as e:
-            print(f"计算情绪评分失败: {e}")
+            logger.info(f"计算情绪评分失败: {e}")
             return 50.0
 
     def stop(self):
@@ -731,7 +732,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # 标题
-        title_label = QLabel("📊 技术指标面板")
+        title_label = QLabel(" 技术指标面板")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50; margin-bottom: 8px;")
         layout.addWidget(title_label)
 
@@ -740,15 +741,15 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
 
         # 趋势指标
         trend_widget = self.create_trend_indicators()
-        self.tab_widget.addTab(trend_widget, "📈 趋势")
+        self.tab_widget.addTab(trend_widget, " 趋势")
 
         # 震荡指标
         oscillator_widget = self.create_oscillator_indicators()
-        self.tab_widget.addTab(oscillator_widget, "🌊 震荡")
+        self.tab_widget.addTab(oscillator_widget, " 震荡")
 
         # 成交量指标
         volume_widget = self.create_volume_indicators()
-        self.tab_widget.addTab(volume_widget, "📊 成交量")
+        self.tab_widget.addTab(volume_widget, " 成交量")
 
         layout.addWidget(self.tab_widget)
 
@@ -758,7 +759,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout = QVBoxLayout(widget)
 
         # MA均线系统
-        ma_group = QGroupBox("📈 移动平均线系统")
+        ma_group = QGroupBox(" 移动平均线系统")
         ma_layout = QGridLayout(ma_group)
 
         self.ma5_label = QLabel("MA5: --")
@@ -774,7 +775,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout.addWidget(ma_group)
 
         # MACD
-        macd_group = QGroupBox("📊 MACD")
+        macd_group = QGroupBox(" MACD")
         macd_layout = QGridLayout(macd_group)
 
         self.macd_label = QLabel("MACD: --")
@@ -796,7 +797,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout = QVBoxLayout(widget)
 
         # RSI
-        rsi_group = QGroupBox("⚡ RSI 相对强弱指数")
+        rsi_group = QGroupBox(" RSI 相对强弱指数")
         rsi_layout = QVBoxLayout(rsi_group)
 
         self.rsi_label = QLabel("RSI(14): --")
@@ -811,7 +812,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout.addWidget(rsi_group)
 
         # KDJ
-        kdj_group = QGroupBox("🎯 KDJ 随机指标")
+        kdj_group = QGroupBox(" KDJ 随机指标")
         kdj_layout = QGridLayout(kdj_group)
 
         self.k_label = QLabel("K: --")
@@ -835,7 +836,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout = QVBoxLayout(widget)
 
         # 成交量分析
-        volume_group = QGroupBox("📊 成交量分析")
+        volume_group = QGroupBox(" 成交量分析")
         volume_layout = QGridLayout(volume_group)
 
         self.volume_label = QLabel("当前成交量: --")
@@ -851,7 +852,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
         layout.addWidget(volume_group)
 
         # OBV能量潮
-        obv_group = QGroupBox("🌊 OBV 能量潮")
+        obv_group = QGroupBox(" OBV 能量潮")
         obv_layout = QVBoxLayout(obv_group)
 
         self.obv_label = QLabel("OBV: --")
@@ -890,13 +891,13 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
 
             # RSI信号判断
             if rsi_value > 70:
-                self.rsi_signal_label.setText("信号: 🔴 超买")
+                self.rsi_signal_label.setText("信号:  超买")
                 self.rsi_signal_label.setStyleSheet("color: #d32f2f;")
             elif rsi_value < 30:
-                self.rsi_signal_label.setText("信号: 🟢 超卖")
+                self.rsi_signal_label.setText("信号:  超卖")
                 self.rsi_signal_label.setStyleSheet("color: #388e3c;")
             else:
-                self.rsi_signal_label.setText("信号: ⚪ 中性")
+                self.rsi_signal_label.setText("信号:  中性")
                 self.rsi_signal_label.setStyleSheet("color: #757575;")
 
     def clear_indicators(self):
@@ -933,7 +934,7 @@ class ProfessionalTechnicalIndicatorWidget(QWidget):
                 self.kdj_signal_label.setText("信号: --")
 
         except Exception as e:
-            print(f"清空技术指标显示失败: {e}")
+            logger.info(f"清空技术指标显示失败: {e}")
 
 
 class ProfessionalMarketOverviewWidget(QWidget):
@@ -949,12 +950,12 @@ class ProfessionalMarketOverviewWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # 标题
-        title_label = QLabel("🌍 市场概览")
+        title_label = QLabel(" 市场概览")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50; margin-bottom: 8px;")
         layout.addWidget(title_label)
 
         # 市场情绪仪表盘
-        sentiment_group = QGroupBox("📊 市场情绪仪表盘")
+        sentiment_group = QGroupBox(" 市场情绪仪表盘")
         sentiment_layout = QGridLayout(sentiment_group)
 
         # 综合情绪指数
@@ -993,7 +994,7 @@ class ProfessionalMarketOverviewWidget(QWidget):
         layout.addWidget(sentiment_group)
 
         # 市场统计
-        stats_group = QGroupBox("📈 市场统计")
+        stats_group = QGroupBox(" 市场统计")
         stats_layout = QGridLayout(stats_group)
 
         self.total_analyzed_label = QLabel("分析股票数: --")
@@ -1023,13 +1024,13 @@ class ProfessionalMarketOverviewWidget(QWidget):
         # 根据情绪值设置颜色
         if sentiment_score > 70:
             color = "#4ECDC4"  # 绿色 - 乐观
-            emotion = "😊 乐观"
+            emotion = " 乐观"
         elif sentiment_score > 30:
             color = "#FFE66D"  # 黄色 - 中性
-            emotion = "😐 中性"
+            emotion = " 中性"
         else:
             color = "#FF6B6B"  # 红色 - 悲观
-            emotion = "😰 悲观"
+            emotion = " 悲观"
 
         self.overall_sentiment_label.setText(f"综合情绪: {sentiment_score:.1f} ({emotion})")
         self.overall_sentiment_label.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {color};")
@@ -1075,7 +1076,7 @@ class ProfessionalMarketOverviewWidget(QWidget):
                 self.neutral_count_label.setText("中性: --")
 
         except Exception as e:
-            print(f"清空市场概览显示失败: {e}")
+            logger.info(f"清空市场概览显示失败: {e}")
 
 
 class EnhancedKLineTechnicalTab(BaseAnalysisTab):
@@ -1096,7 +1097,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         try:
             self.get_current_selected_stock()
         except Exception as e:
-            print(f"获取当前股票失败，使用默认值: {e}")
+            logger.info(f"获取当前股票失败，使用默认值: {e}")
 
         # 初始化分析器
         self.analyzer = get_kline_sentiment_analyzer()
@@ -1127,7 +1128,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                     if stock_info and stock_info.get('code'):
                         self.current_stock_code = stock_info['code']
                         self.current_stock_name = stock_info.get('name', self.current_stock_code)
-                        print(f"从父组件获取到当前股票: {self.current_stock_name} ({self.current_stock_code})")
+                        logger.info(f"从父组件获取到当前股票: {self.current_stock_name} ({self.current_stock_code})")
                         return
                 parent_widget = parent_widget.parent()
 
@@ -1140,15 +1141,15 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                     if last_stock.get('code'):
                         self.current_stock_code = last_stock['code']
                         self.current_stock_name = last_stock.get('name', self.current_stock_code)
-                        print(f"从配置获取到股票: {self.current_stock_name} ({self.current_stock_code})")
+                        logger.info(f"从配置获取到股票: {self.current_stock_name} ({self.current_stock_code})")
                         return
             except:
                 pass
 
-            print(f"未找到其他股票信息，保持默认: {self.current_stock_name} ({self.current_stock_code})")
+            logger.info(f"未找到其他股票信息，保持默认: {self.current_stock_name} ({self.current_stock_code})")
 
         except Exception as e:
-            print(f"获取当前选择股票失败: {e}")
+            logger.info(f"获取当前选择股票失败: {e}")
             # 保持已有的默认值，不再重新设置
 
     def connect_stock_events(self):
@@ -1156,9 +1157,9 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         try:
             # 暂时跳过事件连接，避免导入错误
             # 后续可以通过其他方式实现股票选择同步
-            print("股票事件连接功能暂时禁用，使用手动选择方式")
+            logger.info("股票事件连接功能暂时禁用，使用手动选择方式")
         except Exception as e:
-            print(f"连接股票事件失败: {e}")
+            logger.info(f"连接股票事件失败: {e}")
 
     def on_stock_selected_event(self, event):
         """处理股票选择事件"""
@@ -1177,10 +1178,10 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             if self.data_worker and self.data_worker.running:
                 self.restart_analysis()
 
-            print(f"K线技术分析更新到新股票: {self.current_stock_name} ({self.current_stock_code})")
+            logger.info(f"K线技术分析更新到新股票: {self.current_stock_name} ({self.current_stock_code})")
 
         except Exception as e:
-            print(f"处理股票选择事件失败: {e}")
+            logger.info(f"处理股票选择事件失败: {e}")
 
     def create_ui(self):
         """创建专业UI界面"""
@@ -1215,7 +1216,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         layout = QHBoxLayout(header_widget)
         layout.setSpacing(0)
         # 标题
-        title_label = QLabel("📈 专业K线技术分析系统")
+        title_label = QLabel(" 专业K线技术分析系统")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;")
         layout.addWidget(title_label)
 
@@ -1232,14 +1233,14 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         layout.addWidget(self.current_stock_label)
 
         # 状态显示
-        self.status_label = QLabel("🔴 待启动")
+        self.status_label = QLabel(" 待启动")
         self.status_label.setStyleSheet("color: #d32f2f; font-weight: bold; padding: 1px;")
         layout.addWidget(self.status_label)
 
         layout.addStretch()
 
         # 控制按钮
-        self.control_button = QPushButton("🚀 启动分析")
+        self.control_button = QPushButton(" 启动分析")
         self.control_button.setStyleSheet("""
             QPushButton {
                 background-color: #4caf50;
@@ -1297,7 +1298,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         layout.addWidget(self.stock_selector)
 
         # 分析参数配置
-        config_group = QGroupBox("⚙️ 分析配置")
+        config_group = QGroupBox(" 分析配置")
         config_layout = QVBoxLayout(config_group)
 
         # 更新频率
@@ -1342,7 +1343,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         config_layout.addLayout(indicators_layout)
 
         # 高级设置按钮
-        advanced_btn = QPushButton("🔧 高级设置")
+        advanced_btn = QPushButton(" 高级设置")
         advanced_btn.clicked.connect(self.show_advanced_settings)
         config_layout.addWidget(advanced_btn)
 
@@ -1363,19 +1364,19 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             }
 
             new_interval = freq_map.get(frequency_text, 30)
-            print(f"📊 更新频率改变为: {frequency_text} ({new_interval}秒)")
+            logger.info(f" 更新频率改变为: {frequency_text} ({new_interval}秒)")
 
             # 更新工作线程的更新间隔
             if self.data_worker:
                 self.data_worker.update_interval = new_interval
-                print(f"✅ 数据工作线程更新间隔已设置为{new_interval}秒")
+                logger.info(f" 数据工作线程更新间隔已设置为{new_interval}秒")
 
             # 保存配置
             if hasattr(self, 'config_manager') and self.config_manager:
                 self.config_manager.set('kline_sentiment.update_frequency', frequency_text)
 
         except Exception as e:
-            print(f"⚠️ 更新频率设置失败: {e}")
+            logger.info(f" 更新频率设置失败: {e}")
 
     def on_indicator_settings_changed(self):
         """技术指标设置改变处理"""
@@ -1390,7 +1391,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             }
 
             enabled_indicators = [name for name, enabled in selected_indicators.items() if enabled]
-            print(f"📊 技术指标设置已更改: {enabled_indicators}")
+            logger.info(f" 技术指标设置已更改: {enabled_indicators}")
 
             # 保存指标设置
             if hasattr(self, 'config_manager') and self.config_manager:
@@ -1398,26 +1399,26 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
 
             # 如果正在运行分析，应用新设置
             if self.data_worker and self.data_worker.running:
-                print("🔄 重新启动分析以应用新的指标设置")
+                logger.info(" 重新启动分析以应用新的指标设置")
                 self.restart_analysis_with_new_settings()
 
         except Exception as e:
-            print(f"⚠️ 技术指标设置失败: {e}")
+            logger.info(f" 技术指标设置失败: {e}")
 
     def restart_analysis_with_new_settings(self):
         """使用新设置重启分析"""
         try:
             if self.data_worker and self.data_worker.running:
-                print("⏹️ 停止当前分析...")
+                logger.info(" 停止当前分析...")
                 self.data_worker.stop()
                 # 使用异步方式重启，避免UI卡死
                 QTimer.singleShot(500, self._restart_after_stop)
             else:
                 # 如果没有运行的线程，直接重启
                 QTimer.singleShot(100, self.start_analysis)
-            print("🔄 将使用新设置重启分析")
+            logger.info(" 将使用新设置重启分析")
         except Exception as e:
-            print(f"⚠️ 重启分析失败: {e}")
+            logger.info(f" 重启分析失败: {e}")
 
     def _restart_after_stop(self):
         """停止后重启分析"""
@@ -1433,7 +1434,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             # 重启分析
             QTimer.singleShot(500, self.start_analysis)
         except Exception as e:
-            print(f"⚠️ 停止后重启失败: {e}")
+            logger.info(f" 停止后重启失败: {e}")
 
     def show_advanced_settings(self):
         """显示高级设置对话框"""
@@ -1442,24 +1443,24 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             if dialog.exec_() == QDialog.Accepted:
                 settings = dialog.get_settings()
                 self.apply_advanced_settings(settings)
-                print(f"✅ 应用高级设置: {settings}")
+                logger.info(f" 应用高级设置: {settings}")
         except Exception as e:
-            print(f"⚠️ 显示高级设置失败: {e}")
+            logger.info(f" 显示高级设置失败: {e}")
 
     def apply_advanced_settings(self, settings):
         """应用高级设置"""
         try:
             # 应用RSI周期设置
             if 'rsi_period' in settings:
-                print(f"📊 RSI周期设置为: {settings['rsi_period']}")
+                logger.info(f" RSI周期设置为: {settings['rsi_period']}")
 
             # 应用MACD参数设置
             if 'macd_fast' in settings and 'macd_slow' in settings:
-                print(f"📊 MACD参数设置为: 快线{settings['macd_fast']}, 慢线{settings['macd_slow']}")
+                logger.info(f"MACD参数设置为: 快线{settings['macd_fast']} 慢线{settings['macd_slow']}")
 
             # 应用MA周期设置
             if 'ma_periods' in settings:
-                print(f"📊 MA周期设置为: {settings['ma_periods']}")
+                logger.info(f" MA周期设置为: {settings['ma_periods']}")
 
             # 保存设置
             if hasattr(self, 'config_manager') and self.config_manager:
@@ -1470,7 +1471,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                 self.restart_analysis_with_new_settings()
 
         except Exception as e:
-            print(f"⚠️ 应用高级设置失败: {e}")
+            logger.info(f" 应用高级设置失败: {e}")
 
     def get_current_indicator_settings(self):
         """获取当前指标设置"""
@@ -1483,7 +1484,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                 'bb': self.bb_check.isChecked() if hasattr(self, 'bb_check') else False
             }
         except Exception as e:
-            print(f"⚠️ 获取指标设置失败: {e}")
+            logger.info(f" 获取指标设置失败: {e}")
             return {'rsi': True, 'macd': True, 'kdj': True, 'ma': True, 'bb': False}
 
     def create_right_panel(self):
@@ -1498,7 +1499,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
 
         # 市场概览标签页
         self.market_overview_widget = ProfessionalMarketOverviewWidget()
-        tab_widget.addTab(self.market_overview_widget, "🌍 市场概览")
+        tab_widget.addTab(self.market_overview_widget, " 市场概览")
 
         # 技术指标标签页
         self.technical_indicator_widget = ProfessionalTechnicalIndicatorWidget()
@@ -1510,7 +1511,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         # 添加情绪概览标签页
         from gui.widgets.sentiment_overview_widget import SentimentOverviewWidget
         self.sentiment_overview_widget = SentimentOverviewWidget()
-        tab_widget.addTab(self.sentiment_overview_widget, "🎭 情绪概览")
+        tab_widget.addTab(self.sentiment_overview_widget, " 情绪概览")
 
         # 添加智能提醒标签页
         from gui.widgets.smart_alert_widget import SmartAlertWidget
@@ -1523,7 +1524,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
         self.signal_aggregator.alert_generated.connect(self.smart_alert_widget.add_alert)
         self.sentiment_overview_widget.sentiment_updated.connect(self._on_sentiment_data_updated)
 
-        tab_widget.addTab(self.smart_alert_widget, "🚨 智能提醒")
+        tab_widget.addTab(self.smart_alert_widget, " 智能提醒")
 
         layout.addWidget(tab_widget)
         return panel
@@ -1537,17 +1538,17 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                 if hasattr(parent_widget, 'sentiment_tab'):
                     sentiment_tab = parent_widget.sentiment_tab
                     if hasattr(sentiment_tab, 'sentiment_results') and sentiment_tab.sentiment_results:
-                        print("✅ 成功获取专业情绪分析数据")
+                        logger.info(" 成功获取专业情绪分析数据")
                         return sentiment_tab.sentiment_results
                     elif hasattr(sentiment_tab, 'get_latest_sentiment_data'):
                         return sentiment_tab.get_latest_sentiment_data()
                 parent_widget = parent_widget.parent()
 
-            print("⚠️ 未找到专业情绪分析Tab或数据为空")
+            logger.info(" 未找到专业情绪分析Tab或数据为空")
             return None
 
         except Exception as e:
-            print(f"❌ 获取情绪数据失败: {e}")
+            logger.info(f" 获取情绪数据失败: {e}")
             return None
 
     def update_technical_indicators_with_sentiment(self, sentiment_data):
@@ -1559,15 +1560,15 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             # 更新技术指标组件，加入情绪数据作为参考
             if hasattr(self.technical_indicator_widget, 'update_with_sentiment_data'):
                 self.technical_indicator_widget.update_with_sentiment_data(sentiment_data)
-                print("✅ 技术指标已融入情绪数据")
+                logger.info(" 技术指标已融入情绪数据")
 
             # 更新市场概览组件
             if hasattr(self.market_overview_widget, 'update_sentiment_overview'):
                 self.market_overview_widget.update_sentiment_overview(sentiment_data)
-                print("✅ 市场概览已更新情绪数据")
+                logger.info(" 市场概览已更新情绪数据")
 
         except Exception as e:
-            print(f"❌ 融入情绪数据失败: {e}")
+            logger.info(f" 融入情绪数据失败: {e}")
 
     def on_stock_manually_selected(self, code, name):
         """处理手动选择股票"""
@@ -1603,9 +1604,9 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             self.data_worker.start()
 
             # 更新UI状态
-            self.status_label.setText("🟢 运行中")
+            self.status_label.setText(" 运行中")
             self.status_label.setStyleSheet("color: #4caf50; font-weight: bold; padding: 6px;")
-            self.control_button.setText("⏹️ 停止分析")
+            self.control_button.setText(" 停止分析")
             self.control_button.setStyleSheet("""
                     QPushButton {
                         background-color: #f44336;
@@ -1620,7 +1621,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                     }
                 """)
 
-            print(f"开始分析股票: {self.symbols}")
+            logger.info(f"开始分析股票: {self.symbols}")
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"启动分析失败: {e}")
@@ -1646,9 +1647,9 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             self.data_worker = None
 
         # 更新UI状态
-        self.status_label.setText("🔴 已停止")
+        self.status_label.setText(" 已停止")
         self.status_label.setStyleSheet("color: #d32f2f; font-weight: bold; padding: 6px;")
-        self.control_button.setText("🚀 启动分析")
+        self.control_button.setText(" 启动分析")
         self.control_button.setStyleSheet("""
             QPushButton {
                 background-color: #4caf50;
@@ -1692,24 +1693,24 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                         if self.technical_indicator_widget:
                             self.technical_indicator_widget.update_indicators(analysis_dict)
                         else:
-                            print("⚠️ 技术指标组件未初始化")
+                            logger.info(" 技术指标组件未初始化")
                     elif isinstance(analysis, dict):
                         # 如果已经是字典格式
                         if self.technical_indicator_widget:
                             self.technical_indicator_widget.update_indicators(analysis)
                         else:
-                            print("⚠️ 技术指标组件未初始化")
+                            logger.info(" 技术指标组件未初始化")
                 else:
-                    print("⚠️ 技术指标组件未初始化或分析数据为空")
+                    logger.info(" 技术指标组件未初始化或分析数据为空")
 
             # 更新市场概览
             market_data = self.calculate_market_overview(data)
             self.market_overview_widget.update_overview(market_data)
 
-            print(f"数据更新: {len(data)} 个股票")
+            logger.info(f"数据更新: {len(data)} 个股票")
 
         except Exception as e:
-            print(f"处理数据更新失败: {e}")
+            logger.info(f"处理数据更新失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1768,7 +1769,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
 
     def on_error_occurred(self, error_message):
         """处理错误"""
-        print(f"K线技术分析错误: {error_message}")
+        logger.info(f"K线技术分析错误: {error_message}")
         QMessageBox.warning(self, "分析错误", error_message)
         self.stop_analysis()
 
@@ -1783,7 +1784,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             # 触发信号聚合分析
             self._trigger_signal_aggregation()
         except Exception as e:
-            print(f"情绪数据更新处理失败: {e}")
+            logger.info(f"情绪数据更新处理失败: {e}")
 
     def _trigger_signal_aggregation(self):
         """触发信号聚合分析"""
@@ -1807,10 +1808,10 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                     sentiment_data=sentiment_data
                 )
 
-                print(f"生成了 {len(alerts)} 个聚合警报")
+                logger.info(f"生成了 {len(alerts)} 个聚合警报")
 
         except Exception as e:
-            print(f"信号聚合分析失败: {e}")
+            logger.info(f"信号聚合分析失败: {e}")
 
     def _get_current_kdata(self):
         """获取当前K线数据"""
@@ -1846,7 +1847,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
                 return kdata
 
         except Exception as e:
-            print(f"获取K线数据失败: {e}")
+            logger.info(f"获取K线数据失败: {e}")
 
         return None
 
@@ -1877,7 +1878,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             return indicators
 
         except Exception as e:
-            print(f"获取技术指标失败: {e}")
+            logger.info(f"获取技术指标失败: {e}")
             return {}
 
     def set_kdata(self, kdata):
@@ -1888,16 +1889,16 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
 
             # 如果没有数据，直接返回
             if kdata is None or kdata.empty:
-                print("⚠️ [EnhancedKLineTechnicalTab] 接收到空的K线数据")
+                logger.info(" [EnhancedKLineTechnicalTab] 接收到空的K线数据")
                 return
 
-            print(f"📊 [EnhancedKLineTechnicalTab] 接收到K线数据: {len(kdata)} 条记录")
+            logger.info(f" [EnhancedKLineTechnicalTab] 接收到K线数据: {len(kdata)} 条记录")
 
             # 异步处理K线数据，避免阻塞UI
             QTimer.singleShot(100, lambda: self._process_kdata_async(kdata))
 
         except Exception as e:
-            print(f"❌ [EnhancedKLineTechnicalTab] 设置K线数据失败: {e}")
+            logger.info(f" [EnhancedKLineTechnicalTab] 设置K线数据失败: {e}")
 
     def _process_kdata_async(self, kdata):
         """异步处理K线数据"""
@@ -1928,10 +1929,10 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             if hasattr(self, 'market_overview_widget') and self.market_overview_widget:
                 self.market_overview_widget.update_overview(market_data)
 
-            print(f"✅ [EnhancedKLineTechnicalTab] K线数据处理完成")
+            logger.info(f" [EnhancedKLineTechnicalTab] K线数据处理完成")
 
         except Exception as e:
-            print(f"❌ [EnhancedKLineTechnicalTab] 异步处理K线数据失败: {e}")
+            logger.info(f" [EnhancedKLineTechnicalTab] 异步处理K线数据失败: {e}")
 
     def _calculate_market_overview_from_kdata(self, kdata, technical_analysis):
         """基于K线数据计算市场概览"""
@@ -1982,7 +1983,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             }
 
         except Exception as e:
-            print(f"❌ 计算市场概览失败: {e}")
+            logger.info(f" 计算市场概览失败: {e}")
             return {}
 
     def refresh_data(self):
@@ -1992,9 +1993,9 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             if hasattr(self, 'current_kdata') and self.current_kdata is not None:
                 self._process_kdata_async(self.current_kdata)
             else:
-                print("⚠️ [EnhancedKLineTechnicalTab] 没有可刷新的K线数据")
+                logger.info(" [EnhancedKLineTechnicalTab] 没有可刷新的K线数据")
         except Exception as e:
-            print(f"❌ [EnhancedKLineTechnicalTab] 刷新数据失败: {e}")
+            logger.info(f" [EnhancedKLineTechnicalTab] 刷新数据失败: {e}")
 
     def clear_data(self):
         """清除数据 - 从BaseAnalysisTab继承的方法"""
@@ -2011,10 +2012,10 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             if hasattr(self, 'market_overview_widget') and self.market_overview_widget:
                 self.market_overview_widget.clear_overview()
 
-            print("✅ [EnhancedKLineTechnicalTab] 数据已清除")
+            logger.info(" [EnhancedKLineTechnicalTab] 数据已清除")
 
         except Exception as e:
-            print(f"❌ [EnhancedKLineTechnicalTab] 清除数据失败: {e}")
+            logger.info(f" [EnhancedKLineTechnicalTab] 清除数据失败: {e}")
 
     def _calculate_real_technical_indicators(self, kdata):
         """基于真实K线数据计算技术指标"""
@@ -2069,7 +2070,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             }
 
         except Exception as e:
-            print(f"❌ 计算技术指标失败: {e}")
+            logger.info(f" 计算技术指标失败: {e}")
             return {'sentiment_score': 50.0}  # 返回中性分数
 
     def _calculate_rsi(self, prices, period=14):
@@ -2092,7 +2093,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             rsi = 100 - (100 / (1 + rs))
             return rsi
         except Exception as e:
-            print(f"计算RSI失败: {e}")
+            logger.info(f"计算RSI失败: {e}")
             return 50.0
 
     def _calculate_macd(self, prices, fast=12, slow=26, signal=9):
@@ -2111,7 +2112,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             return macd_line, signal_line, histogram
 
         except Exception as e:
-            print(f"计算MACD失败: {e}")
+            logger.info(f"计算MACD失败: {e}")
             return 0.0, 0.0, 0.0
 
     def _calculate_ema(self, prices, period):
@@ -2127,7 +2128,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             return ema
 
         except Exception as e:
-            print(f"计算EMA失败: {e}")
+            logger.info(f"计算EMA失败: {e}")
             return np.mean(prices) if len(prices) > 0 else 0.0
 
     def _calculate_bollinger_bands(self, prices, period=20, std_dev=2):
@@ -2146,7 +2147,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             return upper, middle, lower
 
         except Exception as e:
-            print(f"计算布林带失败: {e}")
+            logger.info(f"计算布林带失败: {e}")
             mean_price = np.mean(prices) if len(prices) > 0 else 0.0
             return mean_price, mean_price, mean_price
 
@@ -2184,7 +2185,7 @@ class EnhancedKLineTechnicalTab(BaseAnalysisTab):
             return score
 
         except Exception as e:
-            print(f"计算情绪评分失败: {e}")
+            logger.info(f"计算情绪评分失败: {e}")
             return 50.0
 
 

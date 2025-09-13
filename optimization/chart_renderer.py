@@ -1,3 +1,4 @@
+from loguru import logger
 """
 优化的图表渲染器模块
 提供渲染优先级、异步渲染和性能优化功能
@@ -6,7 +7,6 @@
 import os
 import threading
 import time
-import logging
 from typing import Dict, List, Any, Optional, Callable, Union, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -28,7 +28,7 @@ from core.performance import measure_performance
 from optimization.update_throttler import get_update_throttler
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class RenderPriority(Enum):
@@ -920,7 +920,7 @@ class ChartRenderer(QObject):
                     logger.warning(f"处理K线数据行 {i} 时出错: {e}")
                     continue
 
-            # 修改：实现经典的“阳线空心，阴线实心”样式
+            # 修改：实现经典的阳线空心，阴线实心样式
             if verts_up:
                 # 阳线（上涨）：空心，只有红色边框
                 collection_up = PolyCollection(

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 DuckDB数据操作接口
 
@@ -12,7 +13,6 @@ DuckDB数据操作接口
 版本: 1.0
 """
 
-import logging
 import time
 import pandas as pd
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -25,7 +25,7 @@ import json
 from .duckdb_manager import DuckDBConnectionManager, get_connection_manager
 from .table_manager import DynamicTableManager, TableType, get_table_manager
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -182,9 +182,12 @@ class DuckDBOperations:
 
     def _insert_batch(self, conn, table_name: str, batch_data: pd.DataFrame):
         """插入单个批次数据"""
-        # 使用DuckDB的高效批量插入
+        # 使用DuckDB的高效批量插入，明确指定列名
+        columns = list(batch_data.columns)
+        columns_str = ', '.join(columns)
+        
         conn.register('temp_batch', batch_data)
-        conn.execute(f"INSERT INTO {table_name} SELECT * FROM temp_batch")
+        conn.execute(f"INSERT INTO {table_name} ({columns_str}) SELECT {columns_str} FROM temp_batch")
         conn.unregister('temp_batch')
 
     def _upsert_batch(self, conn, table_name: str, batch_data: pd.DataFrame,
@@ -206,9 +209,10 @@ class DuckDBOperations:
         conn.register('temp_batch', batch_data)
 
         # 执行upsert
+        columns_str = ', '.join(columns)
         upsert_sql = f"""
-        INSERT INTO {table_name} 
-        SELECT * FROM temp_batch
+        INSERT INTO {table_name} ({columns_str})
+        SELECT {columns_str} FROM temp_batch
         ON CONFLICT ({conflict_cols}) 
         DO UPDATE SET {update_set}
         """

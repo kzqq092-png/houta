@@ -1,3 +1,4 @@
+from loguru import logger
 """
 图表控件基础功能Mixin
 
@@ -19,7 +20,6 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from utils.cache import Cache
 from core.config import ConfigManager
 from utils.theme import get_theme_manager
-from core.logger import LogManager
 from ..async_data_processor import AsyncDataProcessor
 from ..chart_renderer import ChartRenderer
 
@@ -45,10 +45,10 @@ class BaseMixin:
                     try:
                         update_func(*args)
                     except Exception as e:
-                        self.log_manager.error(f"更新任务执行失败: {str(e)}")
+                        logger.error(f"更新任务执行失败: {str(e)}")
 
         except Exception as e:
-            self.log_manager.error(f"处理更新队列失败: {str(e)}")
+            logger.error(f"处理更新队列失败: {str(e)}")
 
     def queue_update(self, update_func, *args):
         """将更新任务加入队列
@@ -112,7 +112,7 @@ class BaseMixin:
                 left=0.04, right=0.99, top=0.99, bottom=0.06, hspace=0.00)
             self.canvas.draw_idle()
         except Exception as e:
-            self.log_manager.error(f"应用初始主题失败: {str(e)}")
+            logger.error(f"应用初始主题失败: {str(e)}")
 
     def apply_theme(self):
         """应用主题（兼容方法）"""
@@ -133,10 +133,7 @@ class BaseMixin:
                 self.figure.set_dpi(100)
 
         except Exception as e:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                self.log_manager.error(f"优化渲染失败: {str(e)}")
-            else:
-                print(f"BaseMixin _optimize_rendering错误: {str(e)}")
+            logger.error(f"优化渲染失败: {str(e)}")
 
     def _on_render_progress(self, progress: int, message: str):
         """渲染进度回调"""
@@ -149,7 +146,7 @@ class BaseMixin:
     def _on_render_error(self, error: str):
         """渲染错误回调"""
         self.set_loading_progress_error(f"渲染失败: {error}")
-        self.log_manager.error(f"渲染失败: {error}")
+        logger.error(f"渲染失败: {error}")
 
     def _on_calculation_progress(self, progress: int, message: str):
         """计算进度回调"""
@@ -161,12 +158,12 @@ class BaseMixin:
             if results:
                 self._update_chart_with_results(results)
         except Exception as e:
-            self.log_manager.error(f"处理计算结果失败: {str(e)}")
+            logger.error(f"处理计算结果失败: {str(e)}")
 
     def _on_calculation_error(self, error: str):
         """计算错误回调"""
         self.set_loading_progress_error(f"计算失败: {error}")
-        self.log_manager.error(f"计算失败: {error}")
+        logger.error(f"计算失败: {error}")
 
     def _update_chart_with_results(self, results: dict):
         """使用计算结果更新图表
@@ -179,4 +176,4 @@ class BaseMixin:
             # 具体实现在RenderingMixin中
             pass
         except Exception as e:
-            self.log_manager.error(f"更新图表失败: {str(e)}")
+            logger.error(f"更新图表失败: {str(e)}")

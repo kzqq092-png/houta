@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Optional
 from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
-import logging
+from loguru import logger
 
 
 class AkshareDataSource(DataSource):
@@ -11,7 +11,7 @@ class AkshareDataSource(DataSource):
 
     def __init__(self):
         super().__init__(DataSourceType.LOCAL)
-        self.logger = logging.getLogger("AkshareDataSource")
+        self.logger = logger
 
     def connect(self) -> bool:
         return True

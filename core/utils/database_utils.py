@@ -1,3 +1,4 @@
+from loguru import logger
 """
 数据库工具函数库
 
@@ -14,7 +15,6 @@
 """
 
 import re
-import logging
 import sqlite3
 import pandas as pd
 from typing import Dict, List, Optional, Union, Tuple, Any
@@ -24,7 +24,7 @@ import json
 
 from ..plugin_types import DataType, AssetType
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 def generate_table_name(plugin_name: str, data_type: Union[DataType, str],

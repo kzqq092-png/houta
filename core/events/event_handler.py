@@ -1,3 +1,4 @@
+from loguru import logger
 """
 事件处理器模块
 
@@ -5,13 +6,12 @@
 """
 
 import asyncio
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 from .events import BaseEvent
 
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class EventHandler(ABC):

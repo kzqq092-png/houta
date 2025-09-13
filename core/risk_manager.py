@@ -1,18 +1,16 @@
 """
 风险管理模块
 """
+from loguru import logger
 from typing import Dict, Optional
-from core.logger import Logger
-from core.logger import LogManager, LogLevel
 from core.performance import measure_performance as monitor_performance
-
 
 class RiskManager:
     """风险管理类"""
 
     def __init__(self):
         """初始化风险管理器"""
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.initialized = False
 
         # 风险控制参数
@@ -33,11 +31,11 @@ class RiskManager:
             self._load_risk_params()
 
             self.initialized = True
-            self.log_manager.log("风险管理器初始化成功", LogLevel.INFO)
+            logger.error("风险管理器初始化成功")
             return True
 
         except Exception as e:
-            self.log_manager.log(f"风险管理器初始化失败: {str(e)}", LogLevel.ERROR)
+            logger.info(f"风险管理器初始化失败: {str(e)}")
             return False
 
     def _load_risk_params(self):
@@ -47,9 +45,9 @@ class RiskManager:
             pass
 
         except Exception as e:
-            self.log_manager.log(f"加载风险控制参数失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"加载风险控制参数失败: {str(e)}")
 
-    @monitor_performance(name="check_risk", threshold_ms=1000)
+    @monitor_performance("check_risk")
     def check_risk(self, signal: Dict) -> bool:
         """
         检查交易信号的风险
@@ -79,7 +77,7 @@ class RiskManager:
             return True
 
         except Exception as e:
-            self.log_manager.log(f"风险检查失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"风险检查失败: {str(e)}")
             return False
 
     def _check_position_limit(self, signal: Dict) -> bool:
@@ -92,7 +90,7 @@ class RiskManager:
 
                 # 检查是否超过最大持仓比例
                 if total_position >= self.max_position_size:
-                    self.log_manager.log("超过最大持仓比例限制", LogLevel.WARNING)
+                    logger.warning("超过最大持仓比例限制")
                     return False
 
                 # 计算目标股票持仓比例
@@ -103,13 +101,13 @@ class RiskManager:
 
                 # 检查是否超过单个股票最大持仓比例
                 if position_ratio > self.max_single_position:
-                    self.log_manager.log("超过单个股票最大持仓比例限制", LogLevel.WARNING)
+                    logger.warning("超过单个股票最大持仓比例限制")
                     return False
 
             return True
 
         except Exception as e:
-            self.log_manager.log(f"检查持仓限制失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"检查持仓限制失败: {str(e)}")
             return False
 
     def _check_stop_loss(self, signal: Dict) -> bool:
@@ -129,13 +127,13 @@ class RiskManager:
 
             # 检查是否触发止损
             if profit_ratio <= -self.stop_loss:
-                self.log_manager.log(f"触发止损: {stock_code}", LogLevel.WARNING)
+                logger.warning(f"触发止损: {stock_code}")
                 return False
 
             return True
 
         except Exception as e:
-            self.log_manager.log(f"检查止损失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"检查止损失败: {str(e)}")
             return False
 
     def _check_drawdown(self) -> bool:
@@ -150,13 +148,13 @@ class RiskManager:
 
                 # 检查是否超过最大回撤限制
                 if drawdown >= self.max_drawdown:
-                    self.log_manager.log("超过最大回撤限制", LogLevel.WARNING)
+                    logger.warning("超过最大回撤限制")
                     return False
 
             return True
 
         except Exception as e:
-            self.log_manager.log(f"检查回撤失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"检查回撤失败: {str(e)}")
             return False
 
     def update_position(self, stock_code: str, amount: float, price: float):
@@ -193,7 +191,7 @@ class RiskManager:
                     current['amount'] = new_amount
 
         except Exception as e:
-            self.log_manager.log(f"更新持仓信息失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"更新持仓信息失败: {str(e)}")
 
     def update_equity(self, equity: float):
         """
@@ -211,7 +209,7 @@ class RiskManager:
                 self.peak_equity = equity
 
         except Exception as e:
-            self.log_manager.log(f"更新权益信息失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"更新权益信息失败: {str(e)}")
 
     def get_risk_metrics(self) -> Dict:
         """
@@ -244,7 +242,7 @@ class RiskManager:
             }
 
         except Exception as e:
-            self.log_manager.log(f"获取风险指标失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取风险指标失败: {str(e)}")
             return {}
 
     def get_current_price(self, stock_code: str) -> float:
@@ -254,5 +252,5 @@ class RiskManager:
             return 0.0
 
         except Exception as e:
-            self.log_manager.log(f"获取当前价格失败: {str(e)}", LogLevel.ERROR)
+            logger.error(f"获取当前价格失败: {str(e)}")
             return 0.0

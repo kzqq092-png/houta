@@ -1,3 +1,4 @@
+from loguru import logger
 """
 GPU兼容性检查器模块
 
@@ -8,14 +9,13 @@ GPU兼容性检查器模块
 4. 自动降级决策
 """
 
-import logging
 import re
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 from .environment import GPUSupportLevel, GPUCapabilities
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class CompatibilityLevel(Enum):

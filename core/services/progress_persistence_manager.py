@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 进度持久化管理器
@@ -9,7 +10,6 @@
 - 数据完整性检查
 """
 
-import logging
 import json
 import sqlite3
 import threading
@@ -20,7 +20,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class ProgressStatus(Enum):

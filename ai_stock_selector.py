@@ -1,3 +1,4 @@
+from loguru import logger
 """
 ai_stock_selector.py
 AI智能选股模块
@@ -8,7 +9,7 @@ AI智能选股模块
     criteria = {'industry': '科技', '市值_min': 100e8}
     selected = selector.select_stocks(stock_df, criteria)
     for code in selected:
-        print(code, selector.explain_selection(code))
+        logger.info(f"{code selector.explain_selection(code}"))
 """
 from typing import List, Dict, Any
 import pandas as pd
@@ -93,10 +94,10 @@ class AIStockSelector:
             return kdata_preprocess(df, context)
         except ImportError:
             # 如果导入失败，返回原数据
-            print(f"[WARNING] 无法导入统一的数据预处理模块，使用原数据")
+            logger.info(f"[WARNING] 无法导入统一的数据预处理模块，使用原数据")
             return df
         except Exception as e:
-            print(f"[ERROR] 数据预处理失败: {str(e)}")
+            logger.info(f"[ERROR] 数据预处理失败: {str(e)}")
             return df
 
 # 后续可扩展：模型训练、自动调参、批量选股等

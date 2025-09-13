@@ -4,6 +4,7 @@
 用于管理技术指标的参数设置，包括参数修改、保存和恢复默认值等功能。
 """
 
+from loguru import logger
 import sys
 from typing import Dict, Any, List, Optional
 from PyQt5.QtWidgets import (
@@ -16,10 +17,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
 
-from core.logger import get_logger
-
-logger = get_logger(__name__)
-
+logger = logger.bind(module=__name__)
 
 class IndicatorParamWidget(QWidget):
     """单个指标参数设置小部件"""
@@ -163,7 +161,6 @@ class IndicatorParamWidget(QWidget):
                     widget.setText(str(default_value))
                 elif isinstance(widget, QComboBox):
                     widget.setCurrentText(str(default_value))
-
 
 class IndicatorParamsDialog(QDialog):
     """指标参数管理对话框"""
@@ -495,7 +492,6 @@ class IndicatorParamsDialog(QDialog):
                 except Exception as e:
                     logger.error(f"设置参数失败 {indicator_name}: {e}")
 
-
 def main():
     """测试函数"""
     app = QApplication(sys.argv)
@@ -511,7 +507,6 @@ def main():
     dialog.show()
 
     sys.exit(app.exec_())
-
 
 if __name__ == '__main__':
     main()

@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -10,13 +11,12 @@ import sqlite3
 import duckdb
 import json
 import os
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s')
+logger = logger
 
 
 class DatabaseSchemaUpdater:
@@ -30,7 +30,7 @@ class DatabaseSchemaUpdater:
 
     def update_all_databases(self):
         """更新所有数据库"""
-        logger.info("🔄 开始更新FactorWeave-Quant数据库架构")
+        logger.info(" 开始更新FactorWeave-Quant数据库架构")
 
         try:
             # 1. 更新SQLite数据库
@@ -45,18 +45,18 @@ class DatabaseSchemaUpdater:
             # 4. 验证更新结果
             self.verify_update_results()
 
-            logger.info("✅ 数据库架构更新完成")
+            logger.info(" 数据库架构更新完成")
             return True
 
         except Exception as e:
-            logger.error(f"❌ 数据库更新失败: {e}")
+            logger.error(f" 数据库更新失败: {e}")
             import traceback
             traceback.print_exc()
             return False
 
     def update_sqlite_databases(self):
         """更新SQLite数据库"""
-        logger.info("📊 更新SQLite数据库架构...")
+        logger.info(" 更新SQLite数据库架构...")
 
         # 确保数据库文件存在
         if not self.sqlite_db_path.exists():
@@ -165,7 +165,7 @@ class DatabaseSchemaUpdater:
 
     def update_duckdb_database(self):
         """更新DuckDB分析数据库"""
-        logger.info("📈 更新DuckDB分析数据库...")
+        logger.info(" 更新DuckDB分析数据库...")
 
         conn = duckdb.connect(str(self.duckdb_analytics_path))
 
@@ -314,7 +314,7 @@ class DatabaseSchemaUpdater:
 
     def insert_initial_data(self):
         """插入初始数据"""
-        logger.info("📝 插入初始数据...")
+        logger.info(" 插入初始数据...")
 
         self._insert_sqlite_initial_data()
         self._insert_duckdb_initial_data()
@@ -413,7 +413,7 @@ class DatabaseSchemaUpdater:
 
     def verify_update_results(self):
         """验证更新结果"""
-        logger.info("🔍 验证数据库更新结果...")
+        logger.info(" 验证数据库更新结果...")
 
         # 验证SQLite数据库
         with sqlite3.connect(self.sqlite_db_path) as conn:
@@ -823,24 +823,24 @@ class DatabaseSchemaUpdater:
 
 def main():
     """主函数"""
-    print("=" * 60)
-    print("FactorWeave-Quant 数据库架构更新系统")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("FactorWeave-Quant 数据库架构更新系统")
+    logger.info("=" * 60)
 
     updater = DatabaseSchemaUpdater()
 
     if updater.update_all_databases():
-        print("\n🎉 数据库架构更新成功！")
-        print("\n📊 更新内容:")
-        print("  ✅ SQLite系统数据库架构")
-        print("  ✅ DuckDB分析数据库架构")
-        print("  ✅ 缺失表和列的创建")
-        print("  ✅ 初始配置和数据")
-        print("  ✅ 性能优化索引")
+        logger.info("\n 数据库架构更新成功！")
+        logger.info("\n 更新内容:")
+        logger.info("   SQLite系统数据库架构")
+        logger.info("   DuckDB分析数据库架构")
+        logger.info("   缺失表和列的创建")
+        logger.info("   初始配置和数据")
+        logger.info("   性能优化索引")
 
         return True
     else:
-        print("\n❌ 数据库架构更新失败！")
+        logger.info("\n 数据库架构更新失败！")
         return False
 
 

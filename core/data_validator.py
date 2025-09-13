@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级数据验证器模块
 确保量化交易系统中数据的真实性、准确性和有效性
@@ -9,12 +10,9 @@ import numpy as np
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
-import logging
 from dataclasses import dataclass
 import warnings
-from core.logger import LogManager, LogLevel
-
-
+# 纯Loguru架构，移除旧的日志导入
 class ValidationLevel(Enum):
     """验证级别枚举"""
     BASIC = "basic"          # 基础验证
@@ -22,14 +20,12 @@ class ValidationLevel(Enum):
     STRICT = "strict"        # 严格验证
     PROFESSIONAL = "professional"  # 专业级验证
 
-
 class DataQuality(Enum):
     """数据质量等级"""
     EXCELLENT = "excellent"  # 优秀 (95-100%)
     GOOD = "good"           # 良好 (85-94%)
     FAIR = "fair"           # 一般 (70-84%)
     POOR = "poor"           # 较差 (<70%)
-
 
 @dataclass
 class ValidationResult:
@@ -43,23 +39,22 @@ class ValidationResult:
     metrics: Dict[str, Any]
     validation_time: datetime
 
-
 class ProfessionalDataValidator:
     """
     专业级数据验证器
     对标行业专业软件标准，提供全面的数据质量控制
     """
 
-    def __init__(self, log_manager: Optional[LogManager] = None,
+    def __init__(self,
                  validation_level: ValidationLevel = ValidationLevel.PROFESSIONAL):
         """
         初始化专业级数据验证器
 
         Args:
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
             validation_level: 验证级别
         """
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.validation_level = validation_level
         self.validation_rules = self._initialize_validation_rules()
 
@@ -151,7 +146,7 @@ class ProfessionalDataValidator:
             suggestions = self._generate_suggestions(metrics, errors, warnings)
 
             # 记录验证结果
-            self.log_manager.log(
+            logger.info(
                 f"K线数据验证完成 - 股票: {stock_code}, 质量分数: {quality_score:.2f}, "
                 f"等级: {quality_level.value}, 错误: {len(errors)}, 警告: {len(warnings)}",
                 LogLevel.INFO
@@ -169,7 +164,7 @@ class ProfessionalDataValidator:
             )
 
         except Exception as e:
-            self.log_manager.log(f"数据验证异常: {str(e)}", LogLevel.ERROR)
+            logger.error(f"数据验证异常: {str(e)}")
             return ValidationResult(
                 is_valid=False,
                 quality_score=0.0,
@@ -377,15 +372,15 @@ class ProfessionalDataValidator:
         """
         results = {}
 
-        self.log_manager.log(f"开始批量验证 {len(data_dict)} 只股票的数据", LogLevel.INFO)
+        logger.info(f"开始批量验证 {len(data_dict)} 只股票的数据")
 
         for stock_code, data in data_dict.items():
             try:
                 result = self.validate_kline_data(data, stock_code)
                 results[stock_code] = result
             except Exception as e:
-                self.log_manager.log(
-                    f"验证股票 {stock_code} 数据失败: {str(e)}", LogLevel.ERROR)
+                logger.error(
+                    f"验证股票 {stock_code} 数据失败: {str(e)}")
                 results[stock_code] = ValidationResult(
                     is_valid=False,
                     quality_score=0.0,
@@ -414,12 +409,10 @@ class ProfessionalDataValidator:
                         if r.quality_level == level)
             quality_distribution[level.value] = count
 
-        self.log_manager.log(
+        logger.info(
             f"批量验证报告 - 总数: {total_stocks}, 有效: {valid_stocks}, "
-            f"平均分数: {avg_score:.2f}, 质量分布: {quality_distribution}",
-            LogLevel.INFO
+            f"平均分数: {avg_score:.2f}, 质量分布: {quality_distribution}"
         )
-
 
 def create_data_validator(validation_level: ValidationLevel = ValidationLevel.PROFESSIONAL) -> ProfessionalDataValidator:
     """
@@ -432,7 +425,6 @@ def create_data_validator(validation_level: ValidationLevel = ValidationLevel.PR
         ProfessionalDataValidator: 数据验证器实例
     """
     return ProfessionalDataValidator(validation_level=validation_level)
-
 
 # 便捷函数
 def validate_kline_data(data: pd.DataFrame, stock_code: str = None) -> ValidationResult:
@@ -448,7 +440,6 @@ def validate_kline_data(data: pd.DataFrame, stock_code: str = None) -> Validatio
     """
     validator = create_data_validator()
     return validator.validate_kline_data(data, stock_code)
-
 
 def get_data_quality_report(data: pd.DataFrame, stock_code: str = None) -> Dict[str, Any]:
     """

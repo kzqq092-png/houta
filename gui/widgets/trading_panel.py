@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易面板模块
 
@@ -5,7 +6,6 @@
 精简版，只包含交易功能，不包含重复的分析功能。
 """
 
-import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import asyncio
@@ -21,10 +21,8 @@ from PyQt5.QtGui import QFont, QColor
 
 from core.services.trading_service import TradingService, Portfolio, Position, TradeRecord
 from core.events import EventBus, StockSelectedEvent, TradeExecutedEvent, PositionUpdatedEvent
-from core.logger import LogManager
-
-logger = logging.getLogger(__name__)
-
+# 纯Loguru架构，移除旧的日志导入
+logger = logger
 
 class TradingPanel(QWidget):
     """
@@ -57,7 +55,7 @@ class TradingPanel(QWidget):
 
         self.trading_service = trading_service
         self.event_bus = event_bus
-        self.log_manager = LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 当前状态
         self._current_stock_code: Optional[str] = None

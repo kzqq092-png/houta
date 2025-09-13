@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 """
 AI模型生成脚本
@@ -12,7 +13,6 @@ python scripts/generate_ai_models.py [--quick] [--model pattern|trend|sentiment|
 """
 
 import sys
-import logging
 import argparse
 import numpy as np
 import pandas as pd
@@ -33,13 +33,13 @@ try:
     from tensorflow.keras.utils import to_categorical
     from models.deep_learning import build_deep_learning_model, TENSORFLOW_AVAILABLE
     TF_AVAILABLE = True
-    print("✅ TensorFlow 可用")
+    logger.info(" TensorFlow 可用")
 except ImportError as e:
     TF_AVAILABLE = False
-    print(f"❌ TensorFlow 不可用: {e}")
-    print("请安装TensorFlow: pip install tensorflow")
+    logger.info(f" TensorFlow 不可用: {e}")
+    logger.info("请安装TensorFlow: pip install tensorflow")
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class AIModelGenerator:
@@ -66,9 +66,9 @@ class AIModelGenerator:
             self.sample_size = 5000
             self.sequence_length = 20
 
-        print(f"模式: {'快速' if quick_mode else '标准'}")
-        print(f"训练轮次: {self.epochs}")
-        print(f"样本数量: {self.sample_size}")
+        logger.info(f"模式: {'快速' if quick_mode else '标准'}")
+        logger.info(f"训练轮次: {self.epochs}")
+        logger.info(f"样本数量: {self.sample_size}")
 
     def generate_sample_data(self, data_type="pattern", size=None):
         """
@@ -85,7 +85,7 @@ class AIModelGenerator:
         if size is None:
             size = self.sample_size
 
-        print(f"生成 {data_type} 训练数据，样本数: {size}")
+        logger.info(f"生成 {data_type} 训练数据，样本数: {size}")
 
         if data_type == "pattern":
             # 形态识别数据：技术指标 -> 形态类型
@@ -148,7 +148,7 @@ class AIModelGenerator:
 
         # 确保标签分布相对均衡
         unique, counts = np.unique(y, return_counts=True)
-        print(f"标签分布: {dict(zip(unique, counts))}")
+        logger.info(f"标签分布: {dict(zip(unique, counts))}")
 
         return X.astype(np.float32), y.astype(np.int32)
 
@@ -181,7 +181,7 @@ class AIModelGenerator:
             metrics=['accuracy']
         )
 
-        print(f"{model_name} 模型结构:")
+        logger.info(f"{model_name} 模型结构:")
         model.summary()
 
         return model
@@ -193,9 +193,9 @@ class AIModelGenerator:
         Args:
             model_type: 模型类型 (pattern, trend, sentiment, price)
         """
-        print(f"\n{'='*60}")
-        print(f"开始训练 {model_type} 模型")
-        print(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"开始训练 {model_type} 模型")
+        logger.info(f"{'='*60}")
 
         try:
             # 生成训练数据
@@ -210,15 +210,15 @@ class AIModelGenerator:
             y_train_cat = to_categorical(y_train, 3)
             y_test_cat = to_categorical(y_test, 3)
 
-            print(f"训练集大小: {X_train.shape[0]}")
-            print(f"测试集大小: {X_test.shape[0]}")
-            print(f"特征维度: {X_train.shape[1]}")
+            logger.info(f"训练集大小: {X_train.shape[0]}")
+            logger.info(f"测试集大小: {X_test.shape[0]}")
+            logger.info(f"特征维度: {X_train.shape[1]}")
 
             # 创建模型
             model = self.create_simple_model(X_train.shape[1], model_type)
 
             # 训练模型
-            print("开始训练...")
+            logger.info("开始训练...")
             history = model.fit(
                 X_train, y_train_cat,
                 validation_data=(X_test, y_test_cat),
@@ -229,12 +229,12 @@ class AIModelGenerator:
 
             # 评估模型
             test_loss, test_acc = model.evaluate(X_test, y_test_cat, verbose=0)
-            print(f"测试准确率: {test_acc:.4f}")
+            logger.info(f"测试准确率: {test_acc:.4f}")
 
             # 保存模型
             model_path = self.models_dir / f"{model_type}_model.h5"
             model.save(str(model_path))
-            print(f"✅ 模型已保存: {model_path}")
+            logger.info(f" 模型已保存: {model_path}")
 
             # 保存训练信息
             info = {
@@ -253,10 +253,10 @@ class AIModelGenerator:
             with open(info_path, 'w', encoding='utf-8') as f:
                 json.dump(info, f, indent=2, ensure_ascii=False)
 
-            print(f"✅ 模型信息已保存: {info_path}")
+            logger.info(f" 模型信息已保存: {info_path}")
 
         except Exception as e:
-            print(f"❌ {model_type} 模型训练失败: {e}")
+            logger.info(f" {model_type} 模型训练失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -264,13 +264,13 @@ class AIModelGenerator:
         """生成所有AI模型"""
         model_types = ['pattern', 'trend', 'sentiment', 'price']
 
-        print(f"\n🚀 开始生成AI预测模型")
-        print(f"目标目录: {self.models_dir}")
-        print(f"模型类型: {model_types}")
+        logger.info(f"\n 开始生成AI预测模型")
+        logger.info(f"目标目录: {self.models_dir}")
+        logger.info(f"模型类型: {model_types}")
 
         if not TF_AVAILABLE:
-            print("❌ TensorFlow不可用，无法生成深度学习模型")
-            print("请安装TensorFlow: pip install tensorflow")
+            logger.info(" TensorFlow不可用，无法生成深度学习模型")
+            logger.info("请安装TensorFlow: pip install tensorflow")
             return False
 
         success_count = 0
@@ -279,19 +279,19 @@ class AIModelGenerator:
                 self.train_and_save_model(model_type)
                 success_count += 1
             except Exception as e:
-                print(f"❌ {model_type} 模型生成失败: {e}")
+                logger.info(f" {model_type} 模型生成失败: {e}")
 
-        print(f"\n{'='*60}")
-        print(f"模型生成完成")
-        print(f"成功: {success_count}/{len(model_types)}")
-        print(f"模型保存目录: {self.models_dir}")
-        print(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"模型生成完成")
+        logger.info(f"成功: {success_count}/{len(model_types)}")
+        logger.info(f"模型保存目录: {self.models_dir}")
+        logger.info(f"{'='*60}")
 
         if success_count == len(model_types):
-            print("🎉 所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
+            logger.info(" 所有模型生成成功！现在可以重新启动FactorWeave-Quant 应用程序。")
             return True
         else:
-            print("⚠️ 部分模型生成失败，请检查错误信息。")
+            logger.info(" 部分模型生成失败，请检查错误信息。")
             return False
 
 
@@ -306,13 +306,11 @@ def main():
     args = parser.parse_args()
 
     # 配置日志
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+    # Loguru配置在core.loguru_config中统一管理s - %(levelname)s - %(message)s'
     )
 
-    print("FactorWeave-Quant  AI模型生成器")
-    print("=" * 60)
+    logger.info("FactorWeave-Quant  AI模型生成器")
+    logger.info("=" * 60)
 
     # 创建模型生成器
     generator = AIModelGenerator(quick_mode=args.quick)
@@ -325,14 +323,14 @@ def main():
             generator.train_and_save_model(args.model)
             success = True
         except Exception as e:
-            print(f"模型生成失败: {e}")
+            logger.info(f"模型生成失败: {e}")
             success = False
 
     if success:
-        print("\n🎯 下一步操作:")
-        print("1. 重新启动FactorWeave-Quant 应用程序")
-        print("2. 检查日志确认模型加载成功")
-        print("3. 测试AI预测功能")
+        logger.info("\n 下一步操作:")
+        logger.info("1. 重新启动FactorWeave-Quant 应用程序")
+        logger.info("2. 检查日志确认模型加载成功")
+        logger.info("3. 测试AI预测功能")
 
     sys.exit(0 if success else 1)
 

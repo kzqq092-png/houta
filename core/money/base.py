@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from hikyuu import MoneyManagerBase
+from loguru import logger
 
 
 class BaseMoneyManager(MoneyManagerBase):
@@ -33,7 +34,7 @@ class BaseMoneyManager(MoneyManagerBase):
             self._calculate_money_management(k)
 
         except Exception as e:
-            print(f"资金管理计算错误: {str(e)}")
+            logger.info(f"资金管理计算错误: {str(e)}")
             return
 
     @abstractmethod
@@ -60,7 +61,7 @@ class BaseMoneyManager(MoneyManagerBase):
         try:
             return self._get_position_size(k, price)
         except Exception as e:
-            print(f"获取持仓数量错误: {str(e)}")
+            logger.info(f"获取持仓数量错误: {str(e)}")
             return 0.0
 
     @abstractmethod
@@ -91,7 +92,7 @@ class BaseMoneyManager(MoneyManagerBase):
         try:
             return self._get_stop_loss_price(k, price)
         except Exception as e:
-            print(f"获取止损价格错误: {str(e)}")
+            logger.info(f"获取止损价格错误: {str(e)}")
             return 0.0
 
     @abstractmethod
@@ -122,7 +123,7 @@ class BaseMoneyManager(MoneyManagerBase):
         try:
             return self._get_take_profit_price(k, price)
         except Exception as e:
-            print(f"获取止盈价格错误: {str(e)}")
+            logger.info(f"获取止盈价格错误: {str(e)}")
             return 0.0
 
     @abstractmethod

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 期货数据源插件示例
 
@@ -25,9 +26,8 @@ import pandas as pd
 from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import AssetType, DataType
-from core.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 # 尝试导入akshare
 try:
@@ -69,6 +69,10 @@ class FuturesDataPlugin(IDataSourcePlugin):
         self.version = "1.0.0"
         self.description = "提供期货合约数据获取功能，支持主力合约、历史K线和实时行情"
         self.author = "FactorWeave-Quant 开发团队"
+
+        # 联网查询地址配置（endpointhost字段）
+        # 期货数据插件不需要联网查询地址，设为空
+        self.endpointhost = []
 
         # 插件类型标识（关键：确保被识别为数据源插件）
         from core.plugin_types import PluginType
@@ -781,7 +785,6 @@ class FuturesDataPlugin(IDataSourcePlugin):
             "config": {k: "***" if "password" in k or "key" in k else v for k, v in self.config.items()}
         }
 
-
 # 插件工厂函数
     def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
         """
@@ -796,10 +799,10 @@ class FuturesDataPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取futures板块资金流数据")
-            
+
             # TODO: 实现具体的futures板块资金流数据获取逻辑
             import pandas as pd
-            
+
             # 基础模拟数据结构
             records = [
                 {
@@ -810,11 +813,11 @@ class FuturesDataPlugin(IDataSourcePlugin):
                     'volume': 50000000
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取futures板块资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取futures板块资金流数据失败: {e}")
             import traceback
@@ -834,11 +837,11 @@ class FuturesDataPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取futures {symbol} 资金流数据")
-            
+
             # TODO: 实现具体的futures资金流数据获取逻辑
             import pandas as pd
             from datetime import datetime
-            
+
             records = [
                 {
                     'date': datetime.now().strftime('%Y-%m-%d'),
@@ -848,11 +851,11 @@ class FuturesDataPlugin(IDataSourcePlugin):
                     'price_change_pct': 0.02
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取futures资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取futures资金流数据失败: {e}")
             import traceback
@@ -872,10 +875,10 @@ class FuturesDataPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取futures市场主力资金流数据")
-            
+
             # TODO: 实现具体的futures市场资金流数据获取逻辑
             import pandas as pd
-            
+
             records = [
                 {
                     'market': 'FUTURES Market',
@@ -884,11 +887,11 @@ class FuturesDataPlugin(IDataSourcePlugin):
                     'market_sentiment': 'neutral'
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取futures市场资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取futures市场资金流数据失败: {e}")
             import traceback

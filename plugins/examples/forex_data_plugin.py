@@ -1,10 +1,10 @@
+from loguru import logger
 """
 外汇数据插件
 提供主要货币对的实时汇率和历史数据
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -39,7 +39,7 @@ class ForexDataPlugin(IDataSourcePlugin):
         self.config = self.DEFAULT_CONFIG.copy()
         self.base_url = self.config['base_url']  # 免费汇率API
         self.backup_url = self.config['backup_url']  # 备用API
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # API配置
         self.api_config = {

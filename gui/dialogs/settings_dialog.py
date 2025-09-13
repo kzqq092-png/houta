@@ -4,7 +4,7 @@
 提供应用程序设置界面，包括主题管理、基本设置等功能。
 """
 
-import logging
+from loguru import logger
 import os
 from typing import Optional, Dict, Any
 from PyQt5.QtWidgets import (
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SettingsDialog(QDialog):
@@ -315,7 +315,7 @@ class SettingsDialog(QDialog):
         button_layout = QVBoxLayout(button_group)
 
         # 打开高级配置按钮
-        self.advanced_config_btn = QPushButton("🔧 高级配置管理")
+        self.advanced_config_btn = QPushButton(" 高级配置管理")
         self.advanced_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -333,7 +333,7 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.advanced_config_btn)
 
         # 应用快速配置按钮
-        self.apply_quick_config_btn = QPushButton("✅ 应用快速配置")
+        self.apply_quick_config_btn = QPushButton(" 应用快速配置")
         self.apply_quick_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -350,7 +350,7 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.apply_quick_config_btn)
 
         # 重置为默认按钮
-        self.reset_duckdb_btn = QPushButton("🔄 重置为默认")
+        self.reset_duckdb_btn = QPushButton(" 重置为默认")
         self.reset_duckdb_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;

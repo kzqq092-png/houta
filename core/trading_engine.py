@@ -1,3 +1,4 @@
+from loguru import logger
 """
 交易引擎核心模块
 
@@ -9,12 +10,11 @@ from datetime import datetime
 import pandas as pd
 from dataclasses import dataclass, asdict
 from enum import Enum
-import logging
 
 from .events import EventBus
 from .containers import ServiceContainer
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class SignalType(Enum):

@@ -1,11 +1,11 @@
 from utils.imports import get_plotly
 import sys
 import os
-import logging
 from datetime import datetime
 
 # 使用统一的导入管理模块
 from utils.imports import (
+from loguru import logger
     pd, np, plt, mdates, sns, go, FigureCanvas,
     sklearn_metrics
 )
@@ -19,7 +19,7 @@ from .risk_analysis import RiskAnalysis
 from .model_analysis import ModelAnalysis
 from .common_visualization import CommonVisualization
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 # 获取sklearn.metrics中的具体函数
 confusion_matrix = getattr(

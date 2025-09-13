@@ -16,6 +16,7 @@ import inspect
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
 import importlib
+from loguru import logger
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent
@@ -245,7 +246,7 @@ def check_data_source_plugin(module_path: str, class_name: str) -> Dict[str, Any
 
 def main():
     """主函数"""
-    print("🚀 开始全面的数据源插件质量检查...\n")
+    logger.info(" 开始全面的数据源插件质量检查...\n")
 
     # 需要检查的数据源插件
     plugins_to_check = [
@@ -264,27 +265,25 @@ def main():
     results = []
 
     for module_path, class_name in plugins_to_check:
-        print(f"🔍 检查插件: {class_name}")
+        logger.info(f" 检查插件: {class_name}")
         result = check_data_source_plugin(module_path, class_name)
         results.append(result)
 
         # 显示检查结果
-        print(f"  导入成功: {'✅' if result['import_success'] else '❌'}")
-        print(f"  实例化成功: {'✅' if result['instantiation_success'] else '❌'}")
-        print(f"  总体评分: {result['overall_score']}/100")
+        logger.info(f"  导入成功: {'' if result['import_success'] else ''}")
+        logger.info(f"  实例化成功: {'' if result['instantiation_success'] else ''}")
+        logger.info(f"  总体评分: {result['overall_score']}/100")
 
         if result['issues']:
-            print(f"  问题: {', '.join(result['issues'])}")
+            logger.info(f"  问题: {', '.join(result['issues'])}")
 
         if result['recommendations']:
-            print(f"  建议: {', '.join(result['recommendations'])}")
-
-        print()
+            logger.info(f"  建议: {', '.join(result['recommendations'])}")
 
     # 生成总结报告
-    print(f"{'='*60}")
-    print("📊 检查结果总结")
-    print(f"{'='*60}")
+    logger.info(f"{'='*60}")
+    logger.info(" 检查结果总结")
+    logger.info(f"{'='*60}")
 
     total_plugins = len(results)
     successful_imports = sum(1 for r in results if r['import_success'])
@@ -293,34 +292,34 @@ def main():
     medium_quality = sum(1 for r in results if 50 <= r['overall_score'] < 80)
     low_quality = sum(1 for r in results if r['overall_score'] < 50)
 
-    print(f"总插件数: {total_plugins}")
-    print(f"成功导入: {successful_imports}/{total_plugins}")
-    print(f"成功实例化: {successful_instantiations}/{total_plugins}")
-    print(f"高质量插件 (≥80分): {high_quality}")
-    print(f"中等质量插件 (50-79分): {medium_quality}")
-    print(f"低质量插件 (<50分): {low_quality}")
+    logger.info(f"总插件数: {total_plugins}")
+    logger.info(f"成功导入: {successful_imports}/{total_plugins}")
+    logger.info(f"成功实例化: {successful_instantiations}/{total_plugins}")
+    logger.info(f"高质量插件 (≥80分): {high_quality}")
+    logger.info(f"中等质量插件 (50-79分): {medium_quality}")
+    logger.info(f"低质量插件 (<50分): {low_quality}")
 
     # 详细问题分析
-    print(f"\n🔍 详细问题分析:")
+    logger.info(f"\n 详细问题分析:")
     for result in results:
         if result['overall_score'] < 80:
-            print(f"\n{result['class_name']} (评分: {result['overall_score']}):")
+            logger.info(f"\n{result['class_name']} (评分: {result['overall_score']}):")
 
             # 接口问题
             if result['interface_check'].get('abstract_methods'):
-                print(f"  ❌ 未实现抽象方法: {result['interface_check']['abstract_methods']}")
+                logger.info(f"   未实现抽象方法: {result['interface_check']['abstract_methods']}")
             if result['interface_check'].get('missing_methods'):
-                print(f"  ❌ 缺失方法: {result['interface_check']['missing_methods']}")
+                logger.info(f"   缺失方法: {result['interface_check']['missing_methods']}")
 
             # 实现质量问题
             if result['quality_check'].get('empty_implementations'):
-                print(f"  ⚠️ 空实现方法: {result['quality_check']['empty_implementations']}")
+                logger.info(f"   空实现方法: {result['quality_check']['empty_implementations']}")
             if result['quality_check'].get('todo_implementations'):
-                print(f"  ⚠️ TODO方法: {result['quality_check']['todo_implementations']}")
+                logger.info(f"   TODO方法: {result['quality_check']['todo_implementations']}")
 
             # 功能问题
             if result['functional_check'].get('errors'):
-                print(f"  ❌ 功能错误: {result['functional_check']['errors'][:2]}")  # 只显示前2个错误
+                logger.info(f"   功能错误: {result['functional_check']['errors'][:2]}")  # 只显示前2个错误
 
     return results
 

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from loguru import logger
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix, classification_report,
                              roc_curve, auc, precision_recall_curve)
@@ -68,21 +69,21 @@ def evaluate_ml_model(model, X_test, y_test, predictions=None):
         metrics_dict['roc_data'] = roc_data
         metrics_dict['class_probs'] = class_probs
     except (AttributeError, ValueError) as e:
-        print(f"无法计算概率指标: {e}")
+        logger.info(f"无法计算概率指标: {e}")
 
     # 打印分类报告
-    print("\n分类报告:")
-    print(classification_report(y_test, predictions))
+    logger.info("\n分类报告:")
+    logger.info(f"{classification_report(y_test, predictions)}")
 
     # 打印主要指标
-    print(f"\n准确率: {accuracy:.4f}")
-    print(f"精确率: {precision:.4f}")
-    print(f"召回率: {recall:.4f}")
-    print(f"F1分数: {f1:.4f}")
+    logger.info(f"\n准确率: {accuracy:.4f}")
+    logger.info(f"精确率: {precision:.4f}")
+    logger.info(f"召回率: {recall:.4f}")
+    logger.info(f"F1分数: {f1:.4f}")
 
     # 打印混淆矩阵
-    print("\n混淆矩阵:")
-    print(cm)
+    logger.info("\n混淆矩阵:")
+    logger.info(cm)
 
     # 返回指标字典
     return metrics_dict
@@ -106,7 +107,7 @@ def analyze_feature_importance(model, feature_names, top_n=20):
     elif hasattr(model, 'coef_'):
         importances = np.abs(model.coef_[0])  # 对于线性模型，使用系数的绝对值
     else:
-        print("该模型不支持直接提取特征重要性")
+        logger.info("该模型不支持直接提取特征重要性")
         return None
 
     # 创建特征重要性DataFrame
@@ -122,9 +123,9 @@ def analyze_feature_importance(model, feature_names, top_n=20):
     # 显示前N个特征
     top_features = feature_importance.head(top_n)
 
-    print(f"\n前{top_n}个重要特征:")
+    logger.info(f"\n前{top_n}个重要特征:")
     for i, (index, row) in enumerate(top_features.iterrows()):
-        print(f"{i+1}. {row['feature']}: {row['importance']:.4f}")
+        logger.info(f"{i+1}. {row['feature']}: {row['importance']:.4f}")
 
     # 绘制特征重要性图
     plt.figure(figsize=(10, 8))

@@ -1,3 +1,4 @@
+from loguru import logger
 """
 增强数据管理器实现
 
@@ -9,7 +10,6 @@
 日期: 2025-01-27
 """
 
-import logging
 import sqlite3
 import pandas as pd
 import duckdb
@@ -31,7 +31,7 @@ from ..data.enhanced_models import (
     MacroEconomicData, DataQualityMetrics, generate_table_name
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 @dataclass
@@ -92,11 +92,11 @@ class PluginTableManager:
                     elif data_type == DataType.MACRO_ECONOMIC:
                         self._create_macro_table(conn, plugin_name)
 
-                logger.info(f"✅ 插件表创建完成: {plugin_name}")
+                logger.info(f" 插件表创建完成: {plugin_name}")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 创建插件表失败: {e}")
+            logger.error(f" 创建插件表失败: {e}")
             return False
 
     def _create_kline_tables(self, conn, plugin_name: str):
@@ -183,7 +183,7 @@ class PluginTableManager:
             conn.execute(f"CREATE INDEX idx_{table_name}_datetime ON {table_name}(datetime);")
             conn.execute(f"CREATE INDEX idx_{table_name}_data_source ON {table_name}(data_source);")
 
-            logger.info(f"✅ 创建K线表: {table_name}")
+            logger.info(f" 创建K线表: {table_name}")
 
     def _create_fundamental_table(self, conn, plugin_name: str):
         """创建基本面数据表"""
@@ -262,7 +262,7 @@ class PluginTableManager:
         conn.execute(f"CREATE INDEX idx_{table_name}_industry ON {table_name}(industry_l1, industry_l2);")
         conn.execute(f"CREATE INDEX idx_{table_name}_market ON {table_name}(market);")
 
-        logger.info(f"✅ 创建基本面表: {table_name}")
+        logger.info(f" 创建基本面表: {table_name}")
 
     def _create_financial_table(self, conn, plugin_name: str):
         """创建财务报表数据表"""
@@ -326,7 +326,7 @@ class PluginTableManager:
         conn.execute(f"CREATE INDEX idx_{table_name}_report_date ON {table_name}(report_date);")
         conn.execute(f"CREATE INDEX idx_{table_name}_report_type ON {table_name}(report_type);")
 
-        logger.info(f"✅ 创建财务报表表: {table_name}")
+        logger.info(f" 创建财务报表表: {table_name}")
 
     def _create_macro_table(self, conn, plugin_name: str):
         """创建宏观经济数据表"""
@@ -379,7 +379,7 @@ class PluginTableManager:
         conn.execute(f"CREATE INDEX idx_{table_name}_category ON {table_name}(category_l1, category_l2);")
         conn.execute(f"CREATE INDEX idx_{table_name}_country_region ON {table_name}(country, region);")
 
-        logger.info(f"✅ 创建宏观数据表: {table_name}")
+        logger.info(f" 创建宏观数据表: {table_name}")
 
     def _table_exists(self, conn, table_name: str) -> bool:
         """检查表是否存在"""
@@ -440,10 +440,10 @@ class DataQualityMonitor:
                     )
                 """)
 
-                logger.info("✅ 数据质量监控表初始化完成")
+                logger.info(" 数据质量监控表初始化完成")
 
         except Exception as e:
-            logger.error(f"❌ 数据质量监控表初始化失败: {e}")
+            logger.error(f" 数据质量监控表初始化失败: {e}")
 
     def calculate_quality_score(self, data: pd.DataFrame, data_type: str) -> float:
         """计算数据质量综合评分"""
@@ -594,7 +594,7 @@ class DataQualityMonitor:
                 ))
 
         except Exception as e:
-            logger.error(f"❌ 记录数据质量指标失败: {e}")
+            logger.error(f" 记录数据质量指标失败: {e}")
 
 
 class FieldMappingManager:
@@ -627,10 +627,10 @@ class FieldMappingManager:
                     )
                 """)
 
-                logger.info("✅ 字段映射表初始化完成")
+                logger.info(" 字段映射表初始化完成")
 
         except Exception as e:
-            logger.error(f"❌ 字段映射表初始化失败: {e}")
+            logger.error(f" 字段映射表初始化失败: {e}")
 
     def register_plugin_mappings(self, plugin: IDataSourcePlugin) -> bool:
         """注册插件字段映射"""
@@ -650,11 +650,11 @@ class FieldMappingManager:
                                 ) VALUES (?, ?, ?, ?, ?)
                             """, (plugin_name, data_type, source_field, target_field, 'string'))
 
-                logger.info(f"✅ 插件字段映射注册完成: {plugin_name}")
+                logger.info(f" 插件字段映射注册完成: {plugin_name}")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ 注册插件字段映射失败: {e}")
+            logger.error(f" 注册插件字段映射失败: {e}")
             return False
 
     def get_field_mapping(self, plugin_name: str, data_type: str) -> Dict[str, str]:
@@ -673,5 +673,5 @@ class FieldMappingManager:
                 return mappings
 
         except Exception as e:
-            logger.error(f"❌ 获取字段映射失败: {e}")
+            logger.error(f" 获取字段映射失败: {e}")
             return {}

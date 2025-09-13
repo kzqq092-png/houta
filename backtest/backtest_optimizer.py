@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级回测性能优化器模块
 提供向量化计算、并行处理、内存优化等高性能回测功能
@@ -18,8 +19,6 @@ import gc
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-import logging
-from core.logger import LogManager, LogLevel
 from core.performance_optimizer import ProfessionalPerformanceOptimizer, OptimizationLevel
 
 
@@ -51,10 +50,10 @@ class VectorizedBacktestEngine:
 
     def __init__(self, optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
         self.optimization_level = optimization_level
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     @staticmethod
-    @jit(nopython=True, parallel=True)
+    @jit(nopython=True, parallel=True, cache=True, fastmath=True)  # 启用并行、缓存和快速数学
     def _vectorized_backtest_core(prices: np.ndarray, signals: np.ndarray,
                                   initial_capital: float, position_size: float,
                                   commission_pct: float, slippage_pct: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -81,32 +80,22 @@ class VectorizedBacktestEngine:
         current_position = 0.0
         current_capital = initial_capital
 
-        for i in prange(1, n):
+        for i in range(1, n):  # 修复：使用range而不是prange
             signal = signals[i]
             price = prices[i]
 
-            # 处理交易信号
-            if signal != 0 and signal != current_position:
+            # 处理交易信号（简化逻辑）
+            if signal == 1 and current_position == 0:  # 买入信号且无持仓
                 # 计算交易成本
                 trade_cost = price * (commission_pct + slippage_pct)
-
-                if signal == 1:  # 买入信号
-                    if current_position <= 0:  # 开多仓或平空仓
-                        shares = (current_capital * position_size) / \
-                            (price + trade_cost)
-                        current_position = shares
-                        current_capital -= shares * (price + trade_cost)
-                elif signal == -1:  # 卖出信号
-                    if current_position >= 0:  # 开空仓或平多仓
-                        if current_position > 0:  # 平多仓
-                            current_capital += current_position * \
-                                (price - trade_cost)
-                            current_position = 0
-                        else:  # 开空仓
-                            shares = (current_capital * position_size) / \
-                                (price + trade_cost)
-                            current_position = -shares
-                            current_capital += shares * (price - trade_cost)
+                shares = (current_capital * position_size) / (price + trade_cost)
+                current_position = shares
+                current_capital -= shares * (price + trade_cost)
+            elif signal == -1 and current_position > 0:  # 卖出信号且有持仓
+                # 计算交易成本
+                trade_cost = price * (commission_pct + slippage_pct)
+                current_capital += current_position * (price - trade_cost)
+                current_position = 0
 
             positions[i] = current_position
 
@@ -146,14 +135,38 @@ class VectorizedBacktestEngine:
             pd.DataFrame: 回测结果
         """
         try:
-            # 提取数据为NumPy数组
-            prices = data[price_col].values
-            signals = data[signal_col].values
+            # 提取数据为NumPy数组，确保数据类型正确
+            prices = data[price_col].astype(float).values
+            signals = data[signal_col].astype(float).values
+
+            # 检查数据有效性
+            if np.any(np.isnan(prices)) or np.any(np.isinf(prices)):
+                raise ValueError("价格数据包含NaN或无穷大值")
+            if np.any(np.isnan(signals)) or np.any(np.isinf(signals)):
+                raise ValueError("信号数据包含NaN或无穷大值")
 
             # 运行向量化回测
-            positions, capital, returns = self._vectorized_backtest_core(
-                prices, signals, initial_capital, position_size, commission_pct, slippage_pct
-            )
+            # 使用优化的JIT函数
+            from .jit_optimizer import jit_optimizer, optimized_backtest_core
+
+            # 尝试使用预编译函数，如果失败则使用原始函数
+            try:
+                jit_func = jit_optimizer.get_function('backtest_core')
+                if jit_func:
+                    positions, capital, returns = jit_func(
+                        prices, signals, initial_capital, position_size,
+                        commission_pct, slippage_pct
+                    )
+                else:
+                    positions, capital, returns = optimized_backtest_core(
+                        prices, signals, initial_capital, position_size,
+                        commission_pct, slippage_pct
+                    )
+            except Exception as jit_error:
+                self.logger.warning(f"JIT优化函数失败，使用原始函数: {jit_error}")
+                positions, capital, returns = self._vectorized_backtest_core(
+                    prices, signals, initial_capital, position_size, commission_pct, slippage_pct
+                )
 
             # 构建结果DataFrame
             result = data.copy()
@@ -181,7 +194,7 @@ class ParallelBacktestEngine:
         self.max_workers = max_workers or min(
             32, (multiprocessing.cpu_count() or 1) + 4)
         self.optimization_level = optimization_level
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.vectorized_engine = VectorizedBacktestEngine(optimization_level)
 
     def run_parallel_backtest(self, data_dict: Dict[str, pd.DataFrame],
@@ -396,7 +409,7 @@ class MemoryOptimizedBacktestEngine:
                  optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
         self.chunk_size = chunk_size
         self.optimization_level = optimization_level
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def run_chunked_backtest(self, data: pd.DataFrame, strategy_func: Callable,
                              **kwargs) -> pd.DataFrame:
@@ -411,45 +424,68 @@ class MemoryOptimizedBacktestEngine:
         Returns:
             pd.DataFrame: 回测结果
         """
-        try:
-            self.logger.info(
-                f"开始分块回测 - 数据长度: {len(data)}, 块大小: {self.chunk_size}")
+        # 导入资源管理器
+        from .resource_manager import managed_backtest_resources, global_data_manager
 
-            # 初始化结果列表
-            result_chunks = []
+        with managed_backtest_resources() as resource_manager:
+            try:
+                self.logger.info(
+                    f"开始分块回测 - 数据长度: {len(data)}, 块大小: {self.chunk_size}")
 
-            # 分块处理
-            for i in range(0, len(data), self.chunk_size):
-                chunk_end = min(i + self.chunk_size, len(data))
-                chunk_data = data.iloc[i:chunk_end].copy()
+                # 初始化结果列表
+                result_chunks = []
 
-                # 应用策略
-                chunk_with_signals = strategy_func(chunk_data, **kwargs)
+                # 分块处理
+                for i in range(0, len(data), self.chunk_size):
+                    chunk_end = min(i + self.chunk_size, len(data))
 
-                # 运行回测
-                vectorized_engine = VectorizedBacktestEngine(
-                    self.optimization_level)
-                chunk_result = vectorized_engine.run_vectorized_backtest(
-                    chunk_with_signals)
+                    # 使用智能数据复制策略
+                    chunk_data = global_data_manager.get_data_copy(
+                        data.iloc[i:chunk_end], copy_strategy='smart'
+                    )
 
-                result_chunks.append(chunk_result)
+                    # 应用策略
+                    chunk_with_signals = strategy_func(chunk_data, **kwargs)
 
-                # 内存清理
-                del chunk_data, chunk_with_signals
-                gc.collect()
+                    # 运行回测
+                    vectorized_engine = VectorizedBacktestEngine(
+                        self.optimization_level)
 
-            # 合并结果
-            final_result = pd.concat(result_chunks, ignore_index=True)
+                    # 注册引擎到资源管理器
+                    resource_manager.register_resource(
+                        vectorized_engine,
+                        cleanup_func=lambda x: setattr(x, '_cleanup_flag', True)
+                    )
 
-            # 重新计算累积指标
-            final_result = self._recalculate_cumulative_metrics(final_result)
+                    chunk_result = vectorized_engine.run_vectorized_backtest(
+                        chunk_with_signals)
 
-            self.logger.info("分块回测完成")
-            return final_result
+                    result_chunks.append(chunk_result)
 
-        except Exception as e:
-            self.logger.error(f"分块回测失败: {e}")
-            raise
+                    # 显式清理变量（资源管理器会确保彻底清理）
+                    del chunk_data, chunk_with_signals, vectorized_engine
+
+                    # 每处理10个块进行一次内存检查
+                    if (i // self.chunk_size) % 10 == 0:
+                        memory_info = resource_manager.get_memory_usage()
+                        if memory_info['percentage'] > 85:  # 内存使用超过85%
+                            self.logger.warning(f"内存使用率过高: {memory_info['percentage']:.1f}%")
+                            # 强制垃圾回收
+                            import gc
+                            gc.collect()
+
+                # 合并结果
+                final_result = pd.concat(result_chunks, ignore_index=True)
+
+                # 重新计算累积指标
+                final_result = self._recalculate_cumulative_metrics(final_result)
+
+                self.logger.info("分块回测完成")
+                return final_result
+
+            except Exception as e:
+                self.logger.error(f"分块回测失败: {e}")
+                raise
 
     def _recalculate_cumulative_metrics(self, result: pd.DataFrame) -> pd.DataFrame:
         """重新计算累积指标"""
@@ -477,10 +513,9 @@ class ProfessionalBacktestOptimizer:
     整合向量化、并行处理、内存优化等功能
     """
 
-    def __init__(self, optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL,
-                 log_manager: Optional[LogManager] = None):
+    def __init__(self, optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
         self.optimization_level = optimization_level
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
 
         # 初始化各个引擎
         self.vectorized_engine = VectorizedBacktestEngine(optimization_level)
@@ -491,7 +526,7 @@ class ProfessionalBacktestOptimizer:
 
         # 性能监控
         self.performance_optimizer = ProfessionalPerformanceOptimizer(
-            OptimizationLevel.PROFESSIONAL, log_manager
+            OptimizationLevel.PROFESSIONAL
         )
 
     def optimize_backtest_execution(self, data: pd.DataFrame, strategy_func: Callable,
@@ -517,8 +552,8 @@ class ProfessionalBacktestOptimizer:
             else:
                 engine = self.vectorized_engine
 
-            self.log_manager.log(
-                f"使用引擎: {type(engine).__name__}", LogLevel.INFO)
+            logger.info(
+                f"使用引擎: {type(engine).__name__}")
 
             # 执行回测
             if isinstance(engine, VectorizedBacktestEngine):
@@ -548,7 +583,7 @@ class ProfessionalBacktestOptimizer:
             return result, backtest_metrics
 
         except Exception as e:
-            self.log_manager.log(f"优化回测执行失败: {e}", LogLevel.ERROR)
+            logger.error(f"优化回测执行失败: {e}")
             raise
 
     def _select_optimal_engine(self, data: pd.DataFrame) -> Any:
@@ -558,10 +593,10 @@ class ProfessionalBacktestOptimizer:
 
         # 基于数据大小和内存使用情况选择引擎
         if data_size > 100000 or memory_usage > 80:
-            self.log_manager.log("选择内存优化引擎", LogLevel.INFO)
+            logger.info("选择内存优化引擎")
             return self.memory_engine
         else:
-            self.log_manager.log("选择向量化引擎", LogLevel.INFO)
+            logger.info("选择向量化引擎")
             return self.vectorized_engine
 
     def _calculate_vectorization_ratio(self, result: pd.DataFrame) -> float:
@@ -599,8 +634,8 @@ class ProfessionalBacktestOptimizer:
             Dict: 批量优化结果
         """
         try:
-            self.log_manager.log(
-                f"开始批量优化 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}", LogLevel.INFO)
+            logger.info(
+                f"开始批量优化 - 股票数: {len(data_dict)}, 参数组合数: {len(param_combinations)}")
 
             # 设置并行引擎的工作线程数
             if max_workers:
@@ -622,7 +657,7 @@ class ProfessionalBacktestOptimizer:
             }
 
         except Exception as e:
-            self.log_manager.log(f"批量优化失败: {e}", LogLevel.ERROR)
+            logger.error(f"批量优化失败: {e}")
             raise
 
     def _analyze_batch_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -662,11 +697,12 @@ class ProfessionalBacktestOptimizer:
             }
 
         except Exception as e:
-            self.log_manager.log(f"分析批量结果失败: {e}", LogLevel.ERROR)
+            logger.error(f"分析批量结果失败: {e}")
             return {}
 
-
 # 装饰器函数
+
+
 def optimize_backtest_performance(optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL):
     """回测性能优化装饰器"""
     def decorator(func):
@@ -681,14 +717,15 @@ def optimize_backtest_performance(optimization_level: BacktestOptimizationLevel 
                 # 内存优化
                 optimized_data = optimizer.performance_optimizer.optimize_dataframe(
                     data)
-                args = (optimized_data,) + args[1:]
+                args = (optimized_data) + args[1:]
 
             return func(*args, **kwargs)
         return wrapper
     return decorator
 
-
 # 便捷函数
+
+
 def create_backtest_optimizer(optimization_level: BacktestOptimizationLevel = BacktestOptimizationLevel.PROFESSIONAL) -> ProfessionalBacktestOptimizer:
     """创建回测优化器实例"""
     return ProfessionalBacktestOptimizer(optimization_level=optimization_level)

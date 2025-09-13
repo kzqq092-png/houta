@@ -130,12 +130,12 @@ class AlertCard(QFrame):
     def _get_alert_icon(self) -> str:
         """获取警报图标"""
         icons = {
-            AlertLevel.SUCCESS: "✅",
-            AlertLevel.WARNING: "⚠️",
-            AlertLevel.DANGER: "🚨",
-            AlertLevel.INFO: "ℹ️"
+            AlertLevel.SUCCESS: "",
+            AlertLevel.WARNING: "",
+            AlertLevel.DANGER: "",
+            AlertLevel.INFO: "ℹ"
         }
-        return icons.get(self.alert.level, "ℹ️")
+        return icons.get(self.alert.level, "ℹ")
 
     def _get_confidence_color(self) -> str:
         """获取置信度颜色"""
@@ -418,7 +418,7 @@ class SmartAlertWidget(QWidget):
         # 标题栏
         header_layout = QHBoxLayout()
 
-        title_label = QLabel("🚨 智能交易提醒")
+        title_label = QLabel(" 智能交易提醒")
         title_font = QFont()
         title_font.setPointSize(11)
         title_font.setBold(True)

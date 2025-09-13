@@ -40,11 +40,11 @@ class StarRatingWidget(QWidget):
             if i < int(self.rating):
                 # 填充星星
                 painter.setPen(QColor("#ffa500"))
-                painter.drawText(x, 15, "★")
+                painter.drawText(x, 15, "")
             else:
                 # 空星星
                 painter.setPen(QColor("#ddd"))
-                painter.drawText(x, 15, "☆")
+                painter.drawText(x, 15, "")
 
     def mousePressEvent(self, event):
         if self.editable:
@@ -652,7 +652,7 @@ class IndicatorMarketDialog(QDialog):
         <p><b>作者:</b> {indicator_data['author']}</p>
         <p><b>版本:</b> {indicator_data['version']}</p>
         <p><b>分类:</b> {indicator_data['category']}</p>
-        <p><b>评分:</b> {'★' * int(indicator_data['rating'])}☆ ({indicator_data['rating']})</p>
+        <p><b>评分:</b> {'' * int(indicator_data['rating'])} ({indicator_data['rating']})</p>
         <p><b>下载量:</b> {indicator_data['downloads']}</p>
         <p><b>价格:</b> {'免费' if indicator_data['price'] == 0 else f'¥{indicator_data["price"]}'}</p>
         <p><b>标签:</b> {', '.join(indicator_data.get('tags', []))}</p>

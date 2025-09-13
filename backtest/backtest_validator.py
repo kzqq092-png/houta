@@ -1,3 +1,4 @@
+from loguru import logger
 """
 专业级回测数据验证器模块
 确保回测数据质量和参数合理性，对标行业专业软件标准
@@ -8,10 +9,9 @@ import numpy as np
 from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
-import logging
 from dataclasses import dataclass
 import warnings
-from core.logger import LogManager, LogLevel
+# 纯Loguru架构，移除旧的日志导入
 
 
 class BacktestValidationLevel(Enum):
@@ -49,16 +49,16 @@ class ProfessionalBacktestValidator:
     对标行业专业软件标准，提供全面的回测质量控制
     """
 
-    def __init__(self, log_manager: Optional[LogManager] = None,
+    def __init__(self,
                  validation_level: BacktestValidationLevel = BacktestValidationLevel.PROFESSIONAL):
         """
         初始化专业级回测验证器
 
         Args:
-            log_manager: 日志管理器
+            # log_manager: 已迁移到Loguru日志系统
             validation_level: 验证级别
         """
-        self.log_manager = log_manager or LogManager()
+        # 纯Loguru架构，移除log_manager依赖
         self.validation_level = validation_level
         self.validation_rules = self._initialize_validation_rules()
 
@@ -151,10 +151,9 @@ class ProfessionalBacktestValidator:
             suggestions = self._generate_suggestions(metrics, errors, warnings)
 
             # 记录验证结果
-            self.log_manager.log(
+            logger.info(
                 f"回测数据验证完成 - 股票: {stock_code}, 质量分数: {quality_score:.2f}, "
-                f"等级: {quality_level.value}, 错误: {len(errors)}, 警告: {len(warnings)}",
-                LogLevel.INFO
+                f"等级: {quality_level.value}, 错误: {len(errors)}, 警告: {len(warnings)}"
             )
 
             return BacktestValidationResult(
@@ -169,7 +168,7 @@ class ProfessionalBacktestValidator:
             )
 
         except Exception as e:
-            self.log_manager.log(f"回测数据验证异常: {str(e)}", LogLevel.ERROR)
+            logger.error(f"回测数据验证异常: {str(e)}")
             return BacktestValidationResult(
                 is_valid=False,
                 quality_score=0.0,
@@ -242,7 +241,7 @@ class ProfessionalBacktestValidator:
             )
 
         except Exception as e:
-            self.log_manager.log(f"回测参数验证异常: {str(e)}", LogLevel.ERROR)
+            logger.error(f"回测参数验证异常: {str(e)}")
             return BacktestValidationResult(
                 is_valid=False,
                 quality_score=0.0,
@@ -559,7 +558,7 @@ class ProfessionalBacktestValidator:
             )
 
         except Exception as e:
-            self.log_manager.log(f"回测结果验证异常: {str(e)}", LogLevel.ERROR)
+            logger.error(f"回测结果验证异常: {str(e)}")
             return BacktestValidationResult(
                 is_valid=False,
                 quality_score=0.0,
@@ -571,8 +570,9 @@ class ProfessionalBacktestValidator:
                 validation_time=start_time
             )
 
-
 # 便捷函数
+
+
 def create_backtest_validator(validation_level: BacktestValidationLevel = BacktestValidationLevel.PROFESSIONAL) -> ProfessionalBacktestValidator:
     """
     创建回测验证器实例

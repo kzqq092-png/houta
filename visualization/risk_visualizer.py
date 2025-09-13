@@ -1,11 +1,11 @@
 from utils.imports import (
+from loguru import logger
     plt, pd, np, go, px, sns,
     get_plotly
 )
 
 from typing import Dict, List, Optional
 from datetime import datetime
-import logging
 
 # 获取plotly子模块
 _plotly_modules = get_plotly()
@@ -14,7 +14,6 @@ make_subplots = getattr(_plotly_modules.get(
 
 # 检查seaborn可用性
 HAS_SEABORN = sns is not None
-
 
 class RiskVisualizer:
     """风险报告可视化器"""
@@ -34,7 +33,7 @@ class RiskVisualizer:
             except:
                 # 如果ggplot也不可用，使用默认样式
                 plt.style.use('default')
-                logging.warning("无法设置seaborn或ggplot样式，使用默认样式")
+                logger.warning("无法设置seaborn或ggplot样式，使用默认样式")
 
     def visualize_risk_report(self, report: Dict, output_path: Optional[str] = None) -> None:
         """可视化风险报告"""
@@ -86,7 +85,7 @@ class RiskVisualizer:
             return fig
 
         except Exception as e:
-            logging.error(f"可视化风险报告时出错: {str(e)}")
+            logger.error(f"可视化风险报告时出错: {str(e)}")
             return None
 
     def _plot_risk_indicators(self, fig: go.Figure, summary: Dict, row: int, col: int) -> None:
@@ -109,7 +108,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="指标值", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制风险指标趋势时出错: {str(e)}")
+            logger.error(f"绘制风险指标趋势时出错: {str(e)}")
 
     def _plot_market_risk(self, fig: go.Figure, market_risk: Dict, row: int, col: int) -> None:
         """绘制市场风险分析"""
@@ -142,7 +141,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="指标值", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制市场风险分析时出错: {str(e)}")
+            logger.error(f"绘制市场风险分析时出错: {str(e)}")
 
     def _plot_sector_risk(self, fig: go.Figure, sector_risk: Dict, row: int, col: int) -> None:
         """绘制行业风险暴露"""
@@ -162,7 +161,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="暴露比例", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制行业风险暴露时出错: {str(e)}")
+            logger.error(f"绘制行业风险暴露时出错: {str(e)}")
 
     def _plot_liquidity_risk(self, fig: go.Figure, liquidity_risk: Dict, row: int, col: int) -> None:
         """绘制流动性风险分析"""
@@ -182,7 +181,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="流动性比率", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制流动性风险分析时出错: {str(e)}")
+            logger.error(f"绘制流动性风险分析时出错: {str(e)}")
 
     def _plot_portfolio_risk(self, fig: go.Figure, portfolio_risk: Dict, row: int, col: int) -> None:
         """绘制组合风险分析"""
@@ -215,7 +214,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="风险值", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制组合风险分析时出错: {str(e)}")
+            logger.error(f"绘制组合风险分析时出错: {str(e)}")
 
     def _plot_alert_analysis(self, fig: go.Figure, alert_analysis: Dict, row: int, col: int) -> None:
         """绘制预警分析"""
@@ -236,7 +235,7 @@ class RiskVisualizer:
             fig.update_yaxes(title_text="数量", row=row, col=col)
 
         except Exception as e:
-            logging.error(f"绘制预警分析时出错: {str(e)}")
+            logger.error(f"绘制预警分析时出错: {str(e)}")
 
     def create_risk_dashboard(self, report: Dict, output_path: Optional[str] = None) -> None:
         """创建风险仪表盘"""
@@ -316,5 +315,5 @@ class RiskVisualizer:
             return fig
 
         except Exception as e:
-            logging.error(f"创建风险仪表盘时出错: {str(e)}")
+            logger.error(f"创建风险仪表盘时出错: {str(e)}")
             return None

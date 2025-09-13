@@ -1,3 +1,4 @@
+from loguru import logger
 """
 策略服务
 
@@ -5,7 +6,6 @@
 支持多种策略框架（HIkyuu、Backtrader、自定义等）。
 """
 
-import logging
 import json
 import os
 import asyncio
@@ -29,7 +29,7 @@ from ..strategy_events import (
     StrategyStartedEvent, StrategyStoppedEvent, StrategyErrorEvent
 )
 
-logger = logging.getLogger(__name__)
+logger = logger
 
 
 class BacktestStatus(Enum):

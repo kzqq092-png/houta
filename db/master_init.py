@@ -1,3 +1,4 @@
+from loguru import logger
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -12,23 +13,14 @@ FactorWeave-Quant 数据库系统统一初始化入口
 
 import os
 import sys
-import logging
 from pathlib import Path
 from datetime import datetime
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('db/init_log.txt'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# 配置日志 - Loguru配置在core.loguru_config中统一管理
+logger = logger
 
 
 class MasterDatabaseInitializer:
@@ -129,16 +121,16 @@ class MasterDatabaseInitializer:
             f.write(f"# FactorWeave-Quant 数据库初始化报告\n\n")
             f.write(f"**初始化时间**: {datetime.now().isoformat()}\n\n")
 
-            f.write(f"## ✅ 成功步骤 ({len(self.success_steps)})\n")
+            f.write(f"##  成功步骤 ({len(self.success_steps)})\n")
             for step in self.success_steps:
                 f.write(f"- {step}\n")
 
             if self.failed_steps:
-                f.write(f"\n## ❌ 失败步骤 ({len(self.failed_steps)})\n")
+                f.write(f"\n##  失败步骤 ({len(self.failed_steps)})\n")
                 for step in self.failed_steps:
                     f.write(f"- {step}\n")
 
-            f.write(f"\n## 📊 数据库文件状态\n")
+            f.write(f"\n##  数据库文件状态\n")
             for db_file in self.db_dir.glob("*.db"):
                 size = db_file.stat().st_size / 1024 / 1024  # MB
                 f.write(f"- {db_file.name}: {size:.2f} MB\n")
@@ -202,38 +194,38 @@ class MasterDatabaseInitializer:
 
             f.write("成功步骤:\n")
             for step in self.success_steps:
-                f.write(f"  ✅ {step}\n")
+                f.write(f"   {step}\n")
 
             f.write("\n失败步骤:\n")
             for step in self.failed_steps:
-                f.write(f"  ❌ {step}\n")
+                f.write(f"   {step}\n")
 
         logger.error(f"错误报告已生成: {error_path}")
 
 
 def main():
     """主函数"""
-    print("=" * 60)
-    print("FactorWeave-Quant 数据库系统统一初始化")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("FactorWeave-Quant 数据库系统统一初始化")
+    logger.info("=" * 60)
 
     initializer = MasterDatabaseInitializer()
     success = initializer.initialize_all()
 
     if success:
-        print("\n🎉 数据库系统初始化成功！")
-        print("\n📊 初始化内容:")
-        print("  ✅ SQLite系统数据库 (OLTP)")
-        print("  ✅ DuckDB分析数据库 (OLAP)")
-        print("  ✅ 完整表结构和索引")
-        print("  ✅ 初始配置和数据")
-        print("  ✅ 形态算法代码")
-        print("  ✅ 系统完整性验证")
+        logger.info("\n 数据库系统初始化成功！")
+        logger.info("\n 初始化内容:")
+        logger.info("   SQLite系统数据库 (OLTP)")
+        logger.info("   DuckDB分析数据库 (OLAP)")
+        logger.info("   完整表结构和索引")
+        logger.info("   初始配置和数据")
+        logger.info("   形态算法代码")
+        logger.info("   系统完整性验证")
 
         return True
     else:
-        print("\n❌ 数据库系统初始化失败！")
-        print("请查看错误报告了解详细信息。")
+        logger.info("\n 数据库系统初始化失败！")
+        logger.info("请查看错误报告了解详细信息。")
         return False
 
 

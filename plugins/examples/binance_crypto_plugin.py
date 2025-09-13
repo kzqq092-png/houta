@@ -1,3 +1,4 @@
+from loguru import logger
 """
 币安数字货币数据源插件
 
@@ -24,14 +25,12 @@ import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
-import logging
 
 from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.data_source_data_models import QueryParams, StockInfo
 from core.plugin_types import PluginType, AssetType, DataType
-from core.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 # 默认配置集中管理
 DEFAULT_CONFIG = {
@@ -59,7 +58,7 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
     """币安数字货币数据源插件"""
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)  # 添加logger属性
+        self.logger = logger  # 添加logger属性
         self.initialized = False
         # 配置以 DB 为主，未提供时使用默认
         self.config = DEFAULT_CONFIG.copy()
@@ -81,6 +80,12 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
             'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT',
             'DOGEUSDT', 'DOTUSDT', 'UNIUSDT', 'LTCUSDT', 'LINKUSDT',
             'BCHUSDT', 'XLMUSDT', 'VETUSDT', 'ETCUSDT', 'THETAUSDT'
+        ]
+
+        # 联网查询地址配置（endpointhost字段）
+        # 币安官方API端点
+        self.endpointhost = [
+            "https://api.binance.com/api/v3/ping"
         ]
 
         # 币安K线周期映射引用配置
@@ -636,6 +641,7 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
             self.logger.error(f"实时数据获取失败: {e}")
             return {}
 # 插件工厂函数
+
     def get_sector_fund_flow_data(self, symbol: str = "sector", **kwargs) -> pd.DataFrame:
         """
         获取加密货币板块资金流数据
@@ -649,10 +655,10 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取加密货币板块资金流数据")
-            
+
             # TODO: 实现加密货币板块资金流数据获取逻辑
             import pandas as pd
-            
+
             # 模拟数据 - 基于DeFi、NFT、Layer1等板块
             records = [
                 {
@@ -674,11 +680,11 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
                     'market_cap': 20000000000
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取加密货币板块资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取加密货币板块资金流数据失败: {e}")
             import traceback
@@ -698,11 +704,11 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取个币 {symbol} 资金流数据")
-            
+
             # TODO: 实现加密货币资金流数据获取逻辑
             import pandas as pd
             from datetime import datetime
-            
+
             records = [
                 {
                     'date': datetime.now().strftime('%Y-%m-%d'),
@@ -714,11 +720,11 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
                     'whale_activity': 'high'
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取个币资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取个币资金流数据失败: {e}")
             import traceback
@@ -738,10 +744,10 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
         """
         try:
             self.logger.info(f"{self.name}获取加密货币市场主力资金流数据")
-            
+
             # TODO: 实现加密货币市场资金流数据获取逻辑
             import pandas as pd
-            
+
             records = [
                 {
                     'market': 'Total Crypto Market',
@@ -753,18 +759,16 @@ class BinanceCryptoPlugin(IDataSourcePlugin):
                     'institutional_flow': 200000000
                 }
             ]
-            
+
             df = pd.DataFrame(records)
             self.logger.info(f"获取加密货币市场资金流数据完成，共 {len(df)} 条记录")
             return df
-            
+
         except Exception as e:
             self.logger.error(f"获取加密货币市场资金流数据失败: {e}")
             import traceback
             self.logger.error(traceback.format_exc())
             return pd.DataFrame()
-
-
 
 
 def create_plugin() -> IDataSourcePlugin:

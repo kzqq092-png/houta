@@ -7,6 +7,7 @@ from hikyuu.indicator import MA, MACD, RSI, KDJ, CLOSE, VOL, ATR, CCI, OBV, DMI
 
 
 from core.indicator_service import calculate_indicator, get_indicator_metadata, get_all_indicators_metadata
+from loguru import logger
 
 
 class EnhancedSignal(SignalBase):
@@ -71,7 +72,7 @@ class EnhancedSignal(SignalBase):
             import joblib
             self.ml_model = joblib.load(self.get_param("ml_model_path"))
         except Exception as e:
-            print(f"加载机器学习模型失败: {str(e)}")
+            logger.info(f"加载机器学习模型失败: {str(e)}")
             self.ml_model = None
 
     def _calculate_ml_signal(self, k):
@@ -85,7 +86,7 @@ class EnhancedSignal(SignalBase):
             prediction = self.ml_model.predict_proba(features)[:, 1]
             return prediction[-1] if prediction[-1] > self.get_param("ml_threshold") else 0
         except Exception as e:
-            print(f"机器学习信号计算错误: {str(e)}")
+            logger.info(f"机器学习信号计算错误: {str(e)}")
             return 0
 
     def _prepare_ml_features(self, k):
@@ -105,7 +106,7 @@ class EnhancedSignal(SignalBase):
                 return None
             return np.column_stack(features)
         except Exception as e:
-            print(f"准备机器学习特征失败: {str(e)}")
+            logger.info(f"准备机器学习特征失败: {str(e)}")
             return None
 
     def _clone(self):
@@ -245,7 +246,7 @@ class EnhancedSignal(SignalBase):
                 if len(self.signal_history) > self.get_param("signal_confirm_window"):
                     self.signal_history.pop(0)
         except Exception as e:
-            print(f"信号计算错误: {str(e)}")
+            logger.info(f"信号计算错误: {str(e)}")
             return
 
     def _detect_market_regime(self, k, ma_fast, ma_slow):
@@ -259,7 +260,7 @@ class EnhancedSignal(SignalBase):
             else:
                 return "neutral"
         except Exception as e:
-            print(f"市场状态检测错误: {str(e)}")
+            logger.info(f"市场状态检测错误: {str(e)}")
             return "neutral"
 
     def _calculate_volatility(self, k, atr):
@@ -267,5 +268,5 @@ class EnhancedSignal(SignalBase):
         try:
             return atr[-1] / CLOSE(k)[-1]
         except Exception as e:
-            print(f"波动率计算错误: {str(e)}")
+            logger.info(f"波动率计算错误: {str(e)}")
             return 0.0

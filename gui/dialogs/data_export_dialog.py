@@ -4,7 +4,7 @@
 提供完整的数据导出功能，支持单股票和批量导出。
 """
 
-import logging
+from loguru import logger
 import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -20,7 +20,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate
 from PyQt5.QtGui import QFont
 
-logger = logging.getLogger(__name__)
 
 
 class ExportWorker(QThread):

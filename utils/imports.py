@@ -1,3 +1,4 @@
+from loguru import logger
 """
 统一数据处理库导入管理模块
 
@@ -17,12 +18,11 @@ import importlib
 from functools import lru_cache
 
 # 使用系统统一组件
-from core.adapters import get_logger
+# Loguru导入已移除
 
 # 导入状态缓存
 _import_cache: Dict[str, Any] = {}
 _import_errors: Dict[str, str] = {}
-
 
 class ImportManager:
     """导入管理器，负责统一管理所有第三方库的导入"""
@@ -31,7 +31,7 @@ class ImportManager:
         self._cache = {}
         self._errors = {}
         self._warnings_shown = set()
-        self.logger = get_logger(__name__)
+        self.logger = logger.bind(module=__name__)
 
     def _safe_import(self, module_name: str, package: Optional[str] = None,
                      alias: Optional[str] = None, required: bool = True) -> Optional[Any]:
@@ -109,7 +109,6 @@ class ImportManager:
         info['errors'] = self._errors.copy()
         return info
 
-
 # 全局导入管理器实例
 _import_manager = ImportManager()
 
@@ -117,18 +116,15 @@ _import_manager = ImportManager()
 # 基础数据处理库
 # =============================================================================
 
-
 @lru_cache(maxsize=1)
 def get_pandas():
     """获取pandas库"""
     return _import_manager._safe_import('pandas', required=True)
 
-
 @lru_cache(maxsize=1)
 def get_numpy():
     """获取numpy库"""
     return _import_manager._safe_import('numpy', required=True)
-
 
 # 创建标准别名
 pd = get_pandas()
@@ -138,24 +134,20 @@ np = get_numpy()
 # 可视化库
 # =============================================================================
 
-
 @lru_cache(maxsize=1)
 def get_matplotlib():
     """获取matplotlib库"""
     return _import_manager._safe_import('matplotlib', required=True)
-
 
 @lru_cache(maxsize=1)
 def get_matplotlib_pyplot():
     """获取matplotlib.pyplot"""
     return _import_manager._safe_import('matplotlib.pyplot', required=True)
 
-
 @lru_cache(maxsize=1)
 def get_matplotlib_dates():
     """获取matplotlib.dates"""
     return _import_manager._safe_import('matplotlib.dates', required=False)
-
 
 @lru_cache(maxsize=1)
 def get_matplotlib_backends():
@@ -169,18 +161,15 @@ def get_matplotlib_backends():
         }
     return None
 
-
 @lru_cache(maxsize=1)
 def get_matplotlib_figure():
     """获取matplotlib.figure"""
     return _import_manager._safe_import('matplotlib.figure', required=False)
 
-
 @lru_cache(maxsize=1)
 def get_seaborn():
     """获取seaborn库"""
     return _import_manager._safe_import('seaborn', required=False)
-
 
 @lru_cache(maxsize=1)
 def get_plotly():
@@ -200,7 +189,6 @@ def get_plotly():
         'plotly.io', required=False)
 
     return plotly_modules
-
 
 # 创建标准别名
 plt = get_matplotlib_pyplot()
@@ -226,7 +214,6 @@ Figure = getattr(_mpl_figure, 'Figure', None) if _mpl_figure else None
 # 科学计算库
 # =============================================================================
 
-
 @lru_cache(maxsize=1)
 def get_scipy():
     """获取scipy相关模块"""
@@ -240,7 +227,6 @@ def get_scipy():
 
     return scipy_modules
 
-
 # Scipy别名
 _scipy_modules = get_scipy()
 scipy_stats = _scipy_modules.get('stats') if _scipy_modules else None
@@ -249,7 +235,6 @@ scipy_optimize = _scipy_modules.get('optimize') if _scipy_modules else None
 # =============================================================================
 # 机器学习库
 # =============================================================================
-
 
 @lru_cache(maxsize=1)
 def get_sklearn():
@@ -278,7 +263,6 @@ def get_sklearn():
 
     return sklearn_modules
 
-
 # Sklearn别名
 _sklearn_modules = get_sklearn()
 sklearn_metrics = _sklearn_modules.get('metrics') if _sklearn_modules else None
@@ -291,19 +275,16 @@ sklearn_preprocessing = _sklearn_modules.get(
 # 技术分析库
 # =============================================================================
 
-
 @lru_cache(maxsize=1)
 def get_talib():
     """获取talib库"""
     return _import_manager._safe_import('talib', required=False)
-
 
 talib = get_talib()
 
 # =============================================================================
 # 便捷函数
 # =============================================================================
-
 
 def check_required_libraries() -> Dict[str, bool]:
     """检查必需库的可用性
@@ -319,7 +300,6 @@ def check_required_libraries() -> Dict[str, bool]:
     }
 
     return {name: lib is not None for name, lib in required_libs.items()}
-
 
 def get_import_summary() -> str:
     """获取导入状态摘要
@@ -347,7 +327,6 @@ def get_import_summary() -> str:
 
     return summary
 
-
 def ensure_required_libraries():
     """确保必需库可用，如果不可用则抛出异常"""
     required_status = check_required_libraries()
@@ -357,7 +336,6 @@ def ensure_required_libraries():
     if missing_libs:
         raise ImportError(
             f"Missing required libraries: {', '.join(missing_libs)}")
-
 
 def safe_import(module_name: str, required: bool = True) -> Optional[Any]:
     """安全导入模块的便捷函数
@@ -370,7 +348,6 @@ def safe_import(module_name: str, required: bool = True) -> Optional[Any]:
         导入的模块对象，失败时返回None
     """
     return _import_manager._safe_import(module_name, required=required)
-
 
 # =============================================================================
 # 模块级别的别名（向后兼容）

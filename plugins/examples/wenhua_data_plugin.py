@@ -1,10 +1,10 @@
+from loguru import logger
 """
 文华财经数据插件
 提供期货、股票等多种金融工具的数据服务
 """
 
 import json
-import logging
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -22,12 +22,13 @@ class WenhuaDataPlugin(IDataSourcePlugin):
     """文华财经数据源插件"""
 
     def __init__(self):
+        self.plugin_id = "examples.wenhua_data_plugin"  # 添加plugin_id属性
         self.name = "文华财经数据源"
         self.version = "1.0.0"
         self.description = "文华财经数据源"
         self.plugin_type = PluginType.DATA_SOURCE_FUTURES
         self.supported_asset_types = [AssetType.FUTURES, AssetType.STOCK]
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 文华财经API配置（模拟）
         self.api_config = {

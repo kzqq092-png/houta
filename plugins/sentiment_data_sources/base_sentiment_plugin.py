@@ -1,3 +1,4 @@
+from loguru import logger
 """
 情绪数据源插件基类
 提供情绪分析数据获取的标准接口
@@ -9,7 +10,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
-import logging
 
 from core.plugin_types import PluginType, PluginCategory
 from plugins.sentiment_data_source_interface import (
@@ -36,8 +36,8 @@ class SentimentPluginInfo:
         if self.tags is None:
             self.tags = []
 
-
 # 移除本地重复定义的类，使用统一接口
+
 
 class BaseSentimentPlugin(ISentimentDataSource):
     """情绪数据源插件基类"""
@@ -48,19 +48,16 @@ class BaseSentimentPlugin(ISentimentDataSource):
         self.cache_timeout = 300  # 5分钟缓存
         self.last_update = None
         # 创建本地logger作为备用
-        self._local_logger = logging.getLogger(__name__)
+        self._local_logger = logger
 
     def _safe_log(self, level: str, message: str):
         """安全的日志记录方法"""
         try:
-            if hasattr(self, 'log_manager') and self.log_manager:
-                getattr(self.log_manager, level)(message)
-            else:
-                # 使用本地logger作为备用
-                getattr(self._local_logger, level)(message)
+            logger.level(message)
+
         except Exception:
             # 最后的备用方案，直接打印
-            print(f"[{level.upper()}] {message}")
+            logger.info(f"[{level.upper()}] {message}")
 
     def get_plugin_info(self) -> SentimentPluginInfo:
         """
@@ -114,7 +111,7 @@ class BaseSentimentPlugin(ISentimentDataSource):
             self.context = context
 
             if context is not None:
-                self.log_manager = getattr(context, 'log_manager', None)
+                # log_manager已迁移到Loguru, 'log_manager', None)
                 # 尝试获取插件配置，如果context没有该方法也不会报错
                 if hasattr(context, 'get_plugin_config'):
                     plugin_info = self.get_plugin_info()
@@ -123,7 +120,7 @@ class BaseSentimentPlugin(ISentimentDataSource):
                     self.config = {}
             else:
                 # 处理context为None的情况，使用默认配置
-                self.log_manager = None
+                # log_manager已迁移到Loguru
                 self.config = {}
 
             return True

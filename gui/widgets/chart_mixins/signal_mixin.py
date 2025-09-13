@@ -1,3 +1,4 @@
+from loguru import logger
 """
 信号处理Mixin - 处理交易信号的绘制、高亮和管理
 """
@@ -7,7 +8,6 @@ import pandas as pd
 import matplotlib.patches as mpatches
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QTimer
-
 
 class SignalMixin:
 
@@ -28,8 +28,8 @@ class SignalMixin:
                 except Exception as e:
                     # 如果是ArtistList错误，不记录为错误，因为这是已知问题
                     if 'ArtistList' not in str(e):
-                        if hasattr(self, 'log_manager'):
-                            self.log_manager.debug(f"标准remove方法失败: {e}")
+                        if True:  # 使用Loguru日志
+                            logger.debug(f"标准remove方法失败: {e}")
 
             # 方法2: 对于PathCollection等集合类型，从axes中移除
             if hasattr(artist, 'axes') and artist.axes is not None:
@@ -50,8 +50,8 @@ class SignalMixin:
                             collection.remove(artist)
                             return True
                         except Exception as e:
-                            if hasattr(self, 'log_manager'):
-                                self.log_manager.debug(f"从{collection_name}中移除失败: {e}")
+                            if True:  # 使用Loguru日志
+                                logger.debug(f"从{collection_name}中移除失败: {e}")
                             continue
 
             # 方法3: 如果以上都失败，至少隐藏对象
@@ -75,8 +75,8 @@ class SignalMixin:
         except Exception as e:
             # 只有在非预期错误时才记录警告
             if 'ArtistList' not in str(e):
-                if hasattr(self, 'log_manager'):
-                    self.log_manager.debug(f"删除artist时出现问题: {e}")
+                if True:  # 使用Loguru日志
+                    logger.debug(f"删除artist时出现问题: {e}")
             return False
 
     def plot_signals(self, signals, visible_range=None, signal_filter=None):
@@ -131,14 +131,14 @@ class SignalMixin:
             self.canvas.draw_idle()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"绘制信号失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"绘制信号失败: {str(e)}")
 
     def draw_pattern_signals(self, all_indices: List[int], highlighted_index: int, pattern_name: str):
         """在图表上绘制并高亮形态信号"""
         try:
             if not hasattr(self, 'price_ax') or not self.price_ax or self.current_kdata is None:
-                self.log_manager.warning("无法绘制形态信号，因为图表或数据尚未准备好。")
+                logger.warning("无法绘制形态信号，因为图表或数据尚未准备好。")
                 return
 
             # 清除之前绘制的形态信号 - 使用安全的删除方法
@@ -176,12 +176,12 @@ class SignalMixin:
                         self._pattern_signal_artists.append(text)
 
             self.canvas.draw_idle()
-            self.log_manager.info(f"成功绘制了 {len(all_indices)} 个 '{pattern_name}' 形态信号，并高亮显示了索引 {highlighted_index}。")
+            logger.info(f"成功绘制了 {len(all_indices)} 个 '{pattern_name}' 形态信号，并高亮显示了索引 {highlighted_index}。")
 
         except Exception as e:
-            self.log_manager.error(f"绘制形态信号失败: {e}")
+            logger.error(f"绘制形态信号失败: {e}")
             import traceback
-            self.log_manager.error(traceback.format_exc())
+            logger.error(traceback.format_exc())
 
     def _select_important_signals(self, signals, max_count):
         """选择重要信号，根据置信度和类型优先级"""
@@ -226,8 +226,8 @@ class SignalMixin:
                 self._signal_artists.append(text)
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"绘制单个信号失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"绘制单个信号失败: {str(e)}")
 
     def _enable_signal_tooltips(self, signals):
         """启用信号气泡提示 - 通过标志位与十字光标协调工作"""
@@ -278,8 +278,8 @@ class SignalMixin:
             self.canvas.draw_idle()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"高亮信号失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"高亮信号失败: {str(e)}")
 
     def clear_signal_highlight(self):
         """清除信号高亮"""
@@ -303,8 +303,8 @@ class SignalMixin:
             self.canvas.draw_idle()
 
         except Exception as e:
-            if hasattr(self, 'log_manager'):
-                self.log_manager.error(f"清除信号高亮失败: {str(e)}")
+            if True:  # 使用Loguru日志
+                logger.error(f"清除信号高亮失败: {str(e)}")
 
     def plot_patterns(self, pattern_signals: list, highlight_index: int = None):
         """
@@ -390,12 +390,10 @@ class SignalMixin:
 
             except Exception as e:
                 invalid_patterns += 1
-                if hasattr(self, 'log_manager') and self.log_manager:
-                    self.log_manager.error(f"绘制形态信号出错 {idx}: {e}")
+                logger.error(f"绘制形态信号出错 {idx}: {e}")
 
         # 记录绘制结果
-        if hasattr(self, 'log_manager') and self.log_manager:
-            self.log_manager.info(
+        logger.info(
                 f"形态信号绘制完成: 有效 {valid_patterns} 个, 无效 {invalid_patterns} 个")
 
         # 高亮特定形态（如果指定）

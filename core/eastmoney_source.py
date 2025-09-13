@@ -7,6 +7,7 @@ from typing import List, Optional, Dict
 import threading
 
 from .data_source import DataSource, DataSourceType, DataFrequency, MarketDataType
+from loguru import logger
 
 
 class EastMoneyDataSource(DataSource):

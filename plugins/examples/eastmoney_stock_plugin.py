@@ -1,3 +1,4 @@
+from loguru import logger
 """
 东方财富股票数据源插件
 
@@ -24,14 +25,13 @@ import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
-import logging
 
 from core.data_source_extensions import IDataSourcePlugin, PluginInfo, HealthCheckResult
 from core.data_source_data_models import QueryParams
 from core.plugin_types import PluginType, AssetType, DataType
-from core.logger import get_logger
+from core.network.universal_network_config import INetworkConfigurable, NetworkEndpoint, PluginNetworkConfig
 
-logger = get_logger(__name__)
+logger = logger.bind(module=__name__)
 
 # 默认配置集中
 DEFAULT_CONFIG = {
@@ -47,11 +47,11 @@ DEFAULT_CONFIG = {
 }
 
 
-class EastMoneyStockPlugin(IDataSourcePlugin):
+class EastMoneyStockPlugin(IDataSourcePlugin, INetworkConfigurable):
     """东方财富股票数据源插件"""
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)  # 添加logger属性
+        self.logger = logger  # 添加logger属性
         self.initialized = False
         self.config = DEFAULT_CONFIG.copy()
         self.session = None
@@ -59,6 +59,7 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
         self.last_error = None
 
         # 插件基本信息
+        self.plugin_id = "examples.eastmoney_stock_plugin"  # 添加plugin_id属性
         self.name = "东方财富股票数据源插件"
         self.version = "1.0.0"
         self.description = "提供东方财富高频实时数据和技术分析数据"
@@ -66,6 +67,13 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
 
         # 插件类型标识
         self.plugin_type = PluginType.DATA_SOURCE_STOCK
+
+        # 联网查询地址配置（endpointhost字段）
+        self.endpointhost = [
+            "https://datacenter-web.eastmoney.com/api/status",
+            "https://push2.eastmoney.com/api/health",
+            "https://quote.eastmoney.com/api/status"
+        ]
 
         # 支持的市场
         self.supported_markets = {
@@ -77,12 +85,119 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
 
     def get_plugin_info(self) -> PluginInfo:
         """获取插件信息"""
+        return PluginInfo(
+            id=self.plugin_id,
+            name=self.name,
+            version=self.version,
+            description=self.description,
+            author=self.author,
+            supported_asset_types=[AssetType.STOCK],
+            supported_data_types=[
+                DataType.HISTORICAL_KLINE,
+                DataType.REAL_TIME_QUOTE,
+                DataType.FUNDAMENTAL
+            ],
+            capabilities={
+                "markets": ["SH", "SZ"],
+                "frequencies": ["1m", "5m", "15m", "30m", "60m", "D"],
+                "real_time_support": True,
+                "historical_data": True,
+                "fundamental_data": True,
+                "max_history_years": 10
+            }
+        )
 
-        pass
+    def connect(self, **kwargs) -> bool:
+        """连接数据源"""
+        try:
+            if not self.session:
+                self.session = requests.Session()
+                self.session.headers.update({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                })
+
+            # 测试连接
+            test_url = f"{self.config['base_url']}/api/qt/clist/get"
+            response = self.session.get(test_url, timeout=10, params={'pn': 1, 'pz': 1, 'po': 1, 'fid': 'f3'})
+
+            if response.status_code == 200:
+                self.initialized = True
+                self.logger.info("东方财富数据源连接成功")
+                return True
+            else:
+                self.logger.error(f"东方财富连接失败，状态码: {response.status_code}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"东方财富连接失败: {e}")
+            return False
+
+    def disconnect(self) -> bool:
+        """断开连接"""
+        try:
+            if self.session:
+                self.session.close()
+                self.session = None
+            self.initialized = False
+            self.logger.info("东方财富数据源断开连接")
+            return True
+        except Exception as e:
+            self.logger.error(f"东方财富断开连接失败: {e}")
+            return False
 
     def is_connected(self) -> bool:
         """检查连接状态"""
-        return getattr(self, 'initialized', False)
+        return getattr(self, 'initialized', False) and self.session is not None
+
+    def get_connection_info(self):
+        """获取连接信息"""
+        from core.data_source_extensions import ConnectionInfo
+        return ConnectionInfo(
+            host=self.config.get('base_url', DEFAULT_CONFIG['base_url']),
+            port=443,
+            is_connected=self.is_connected(),
+            connection_time=getattr(self, 'connection_time', None),
+            last_activity=getattr(self, 'last_activity', None)
+        )
+
+    def health_check(self):
+        """健康检查"""
+        from core.data_source_extensions import HealthCheckResult
+        import time
+
+        start_time = time.time()
+        try:
+            if not self.session:
+                return HealthCheckResult(
+                    is_healthy=False,
+                    message="未连接到东方财富数据源",
+                    response_time=(time.time() - start_time) * 1000
+                )
+
+            # 测试API调用
+            test_url = f"{self.config['base_url']}/api/qt/clist/get"
+            response = self.session.get(test_url, timeout=5, params={'pn': 1, 'pz': 1, 'po': 1, 'fid': 'f3'})
+            response_time = (time.time() - start_time) * 1000
+
+            if response.status_code == 200:
+                return HealthCheckResult(
+                    is_healthy=True,
+                    message="东方财富数据源健康",
+                    response_time=response_time
+                )
+            else:
+                return HealthCheckResult(
+                    is_healthy=False,
+                    message=f"东方财富API返回错误状态码: {response.status_code}",
+                    response_time=response_time
+                )
+
+        except Exception as e:
+            return HealthCheckResult(
+                is_healthy=False,
+                message=f"东方财富健康检查失败: {e}",
+                response_time=(time.time() - start_time) * 1000
+            )
 
     def get_plugin_info(self) -> PluginInfo:
         """获取插件信息"""
@@ -236,6 +351,90 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
                     message=str(e)
                 )
 
+    def get_asset_list(self, asset_type, market: str = None):
+        """获取资产列表"""
+        from core.data_source_extensions import AssetType
+
+        if asset_type == AssetType.STOCK:
+            # 获取股票列表
+            df = self.get_stock_list()
+            if not df.empty:
+                # 转换为标准格式
+                assets = []
+                for _, row in df.iterrows():
+                    assets.append({
+                        'symbol': row.get('代码', ''),
+                        'name': row.get('名称', ''),
+                        'market': row.get('市场', 'A股'),
+                        'asset_type': 'stock'
+                    })
+                return assets
+
+        return []
+
+    def get_kdata(self, symbol: str, freq: str = "D", start_date: str = None,
+                  end_date: str = None, count: int = None) -> pd.DataFrame:
+        """获取K线数据 - 抽象方法实现"""
+        try:
+            # 标准化股票代码
+            normalized_symbol = self._normalize_stock_code(symbol)
+
+            # 频率映射
+            freq_map = {
+                'D': 'daily',
+                '1d': 'daily',
+                'daily': 'daily',
+                '1': 'daily',
+                'W': 'weekly',
+                '1w': 'weekly',
+                'weekly': 'weekly',
+                'M': 'monthly',
+                '1m': 'monthly',
+                'monthly': 'monthly'
+            }
+
+            period = freq_map.get(freq, 'daily')
+
+            # 调用内部的get_kline_data方法
+            return self.get_kline_data(
+                symbol=normalized_symbol,
+                period=period,
+                start_date=start_date,
+                end_date=end_date
+            )
+
+        except Exception as e:
+            logger.error(f"东方财富获取K线数据失败: {symbol} - {str(e)}")
+            return pd.DataFrame()
+
+    def get_real_time_quotes(self, symbols: list) -> pd.DataFrame:
+        """获取实时行情数据 - 抽象方法实现"""
+        try:
+            # TODO: 实现实时行情获取逻辑
+            logger.warning("东方财富实时行情功能尚未实现")
+            return pd.DataFrame()
+        except Exception as e:
+            logger.error(f"东方财富获取实时行情失败: {str(e)}")
+            return pd.DataFrame()
+
+    @property
+    def plugin_info(self):
+        """插件信息 - 抽象属性实现"""
+        from core.data_source_extensions import PluginInfo, AssetType
+
+        return PluginInfo(
+            name='东方财富数据源',
+            version='1.0.0',
+            description='东方财富股票数据获取插件',
+            author='FactorWeave Team',
+            capabilities={
+                'supported_assets': [AssetType.STOCK],
+                'supported_frequencies': ['daily', 'weekly', 'monthly'],
+                'requires_auth': False,
+                'rate_limit': '100/minute'
+            }
+        )
+
     def get_stock_list(self) -> pd.DataFrame:
         """获取股票列表"""
         try:
@@ -307,17 +506,47 @@ class EastMoneyStockPlugin(IDataSourcePlugin):
             logger.error(f"获取股票列表失败: {e}")
             return pd.DataFrame()
 
+    def _normalize_stock_code(self, symbol: str) -> str:
+        """标准化股票代码格式
+
+        东方财富需要纯数字格式的股票代码，需要移除sz/sh前缀
+
+        Args:
+            symbol: 原始股票代码，如 'sz300110', 'sh000001', '000001'
+
+        Returns:
+            标准化后的股票代码，如 '300110', '000001'
+        """
+        if not symbol:
+            return symbol
+
+        # 转换为小写进行处理
+        symbol_lower = symbol.lower()
+
+        # 移除sz/sh前缀
+        if symbol_lower.startswith('sz'):
+            return symbol[2:]
+        elif symbol_lower.startswith('sh'):
+            return symbol[2:]
+
+        # 如果没有前缀，直接返回
+        return symbol
+
     def get_kline_data(self, symbol: str, period: str = 'daily',
                        start_date: str = None, end_date: str = None) -> pd.DataFrame:
         """获取K线数据"""
         try:
             self.request_count += 1
 
+            # 标准化股票代码格式
+            normalized_code = self._normalize_stock_code(symbol)
+            self.logger.info(f"股票代码标准化: {symbol} -> {normalized_code}")
+
             # 处理股票代码
-            if '.' in symbol:
-                code = symbol.split('.')[0]
+            if '.' in normalized_code:
+                code = normalized_code.split('.')[0]
             else:
-                code = symbol
+                code = normalized_code
 
             # 确定市场代码
             if code.startswith('6'):
@@ -817,3 +1046,108 @@ PLUGIN_METADATA = {
         }
     }
 }
+
+
+# 为EastMoneyStockPlugin添加网络配置方法
+def _add_network_config_methods():
+    """为东方财富插件添加网络配置方法"""
+
+    def get_default_endpoints(self) -> List[NetworkEndpoint]:
+        """获取默认网络端点配置"""
+        return [
+            NetworkEndpoint(
+                name="eastmoney_primary",
+                url="https://push2.eastmoney.com",
+                description="东方财富主API",
+                priority=10,
+                timeout=30
+            ),
+            NetworkEndpoint(
+                name="eastmoney_backup",
+                url="https://push2his.eastmoney.com",
+                description="东方财富备用API",
+                priority=8,
+                timeout=30
+            ),
+            NetworkEndpoint(
+                name="eastmoney_mobile",
+                url="https://mobileapi.eastmoney.com",
+                description="东方财富移动API",
+                priority=6,
+                timeout=45
+            ),
+            NetworkEndpoint(
+                name="eastmoney_overseas",
+                url="https://global.eastmoney.com/api",
+                description="东方财富海外API",
+                priority=5,
+                timeout=50
+            )
+        ]
+
+    def get_network_config_schema(self) -> Dict[str, Any]:
+        """获取网络配置架构"""
+        return {
+            "endpoints": {
+                "title": "数据端点",
+                "description": "东方财富数据获取端点",
+                "categories": {
+                    "primary": "主要API端点",
+                    "backup": "备用端点",
+                    "mobile": "移动端API",
+                    "overseas": "海外API"
+                }
+            },
+            "rate_limit": {
+                "title": "频率限制",
+                "description": "请求频率控制设置",
+                "default_requests_per_minute": 60,
+                "default_request_delay": 1.0,
+                "recommended_max_requests": 100
+            },
+            "proxy": {
+                "title": "代理设置",
+                "description": "代理服务器配置",
+                "support_types": ["http", "https", "socks5"]
+            }
+        }
+
+    def apply_network_config(self, config: PluginNetworkConfig) -> bool:
+        """应用网络配置"""
+        try:
+            # 获取最佳端点
+            from core.network.universal_network_config import get_universal_network_manager
+            network_manager = get_universal_network_manager()
+            best_endpoint = network_manager.get_available_endpoint(self.plugin_id)
+
+            if best_endpoint:
+                # 更新基础URL
+                self.config['base_url'] = best_endpoint.url
+                self.config['timeout'] = best_endpoint.timeout
+                self.logger.info(f"应用网络配置成功，使用端点: {best_endpoint.name}")
+
+            # 应用会话配置
+            if hasattr(self, 'session') and self.session:
+                # 更新超时设置
+                self.session.timeout = (config.request_delay, best_endpoint.timeout if best_endpoint else 30)
+
+                # 更新请求头
+                if config.user_agent:
+                    self.session.headers.update({'User-Agent': config.user_agent})
+
+                self.session.headers.update(config.custom_headers)
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"应用网络配置失败: {e}")
+            return False
+
+    # 将方法绑定到类
+    EastMoneyStockPlugin.get_default_endpoints = get_default_endpoints
+    EastMoneyStockPlugin.get_network_config_schema = get_network_config_schema
+    EastMoneyStockPlugin.apply_network_config = apply_network_config
+
+
+# 执行方法绑定
+_add_network_config_methods()
