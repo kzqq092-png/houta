@@ -7,6 +7,7 @@
 集成了所有智能化功能的数据导入UI启动器
 """
 
+from loguru import logger
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QMenuBar, QAction
@@ -19,14 +20,19 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
+# 预先导入QAbstractItemView以防止运行时错误
+try:
+    from PyQt5.QtWidgets import QAbstractItemView
+    logger.info("QAbstractItemView预导入成功")
+except ImportError as e:
+    logger.warning(f"QAbstractItemView预导入失败: {e}")
+
 try:
     from gui.widgets.enhanced_data_import_widget import EnhancedDataImportWidget
-    from loguru import logger
     UI_AVAILABLE = True
 except ImportError as e:
-    print(f"导入UI组件失败: {e}")
+    logger.error(f"导入UI组件失败: {e}")
     UI_AVAILABLE = False
-    logger = None
 
 
 class EnhancedDataImportMainWindow(QMainWindow):

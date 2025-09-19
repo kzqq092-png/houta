@@ -25,6 +25,7 @@ from core.services.industry_service import IndustryService
 from core.services.ai_prediction_service import AIPredictionService
 from core.services.unified_data_manager import UnifiedDataManager
 from core.plugin_manager import PluginManager
+from core.services.uni_plugin_data_manager import UniPluginDataManager
 # # from core.services.error_service import LoguruErrorService  # 暂时注释，让系统先启动
 
 # 最后导入监控服务
@@ -623,6 +624,9 @@ class ServiceBootstrap:
             plugin_manager.initialize()
             logger.info(" 插件管理器服务注册完成")
 
+            # 注册统一插件数据管理器
+            self._register_uni_plugin_data_manager()
+
             # 现在插件管理器可用，初始化情绪数据服务
             try:
                 from .sentiment_data_service import SentimentDataService
@@ -739,6 +743,57 @@ class ServiceBootstrap:
             logger.warning(" GPU加速模块不可用，跳过注册")
         except Exception as e:
             logger.error(f" GPU加速服务注册失败: {e}")
+            logger.error(traceback.format_exc())
+
+    def _register_uni_plugin_data_manager(self) -> None:
+        """注册统一插件数据管理器"""
+        logger.info("注册统一插件数据管理器...")
+        
+        try:
+            # 获取必需的依赖服务
+            plugin_manager = self.service_container.resolve(PluginManager)
+            
+            # 获取数据源路由器
+            from core.data_source_router import DataSourceRouter
+            data_source_router = None
+            if self.service_container.is_registered(DataSourceRouter):
+                data_source_router = self.service_container.resolve(DataSourceRouter)
+            else:
+                # 如果未注册，创建新实例
+                data_source_router = DataSourceRouter()
+                self.service_container.register_instance(
+                    DataSourceRouter, data_source_router)
+            
+            # 获取TET数据管道
+            from core.tet_data_pipeline import TETDataPipeline
+            tet_pipeline = TETDataPipeline(data_source_router)
+            
+            # 注册统一插件数据管理器工厂
+            def create_uni_plugin_data_manager():
+                manager = UniPluginDataManager(
+                    plugin_manager=plugin_manager,
+                    data_source_router=data_source_router,
+                    tet_pipeline=tet_pipeline
+                )
+                # 初始化管理器
+                manager.initialize()
+                return manager
+            
+            self.service_container.register_factory(
+                UniPluginDataManager,
+                create_uni_plugin_data_manager,
+                scope=ServiceScope.SINGLETON
+            )
+            
+            # 设置全局实例
+            uni_manager = self.service_container.resolve(UniPluginDataManager)
+            from core.services.uni_plugin_data_manager import set_uni_plugin_data_manager
+            set_uni_plugin_data_manager(uni_manager)
+            
+            logger.info("统一插件数据管理器注册完成")
+            
+        except Exception as e:
+            logger.error(f"统一插件数据管理器注册失败: {e}")
             logger.error(traceback.format_exc())
 
 

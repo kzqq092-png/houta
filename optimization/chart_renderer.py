@@ -1056,7 +1056,7 @@ class ChartRenderer(QObject):
     def _render_line_efficient(self, ax, data: pd.Series, style: Dict[str, Any]):
         """高效渲染线图"""
         color = style.get('color', '#1976d2')
-        linewidth = style.get('linewidth', 0.8)
+        linewidth = style.get('linewidth', 0.4)
         alpha = style.get('alpha', 0.85)
         label = style.get('label', '')
 

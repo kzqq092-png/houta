@@ -1,0 +1,208 @@
+<mxfile host="65bd71144e">
+    <diagram id="W7UJuLJ8NvUodgbQRF_W" name="Page-1">
+        <mxGraphModel dx="1804" dy="1215" grid="1" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" background="none" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="FactorWeave-Quant 数据获取流程图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#fafafa;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="20" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="start" value="开始" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="80" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="user_request" value="用户发起数据请求&#10;(symbol, data_type, params)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="170" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_center" value="数据管理中心&#10;DataManagementCenter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="270" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="cache_check" value="检查本地缓存" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;gradientColor=none;rounded=0;comic=0;enumerate=0;treeMoving=0;treeFolding=0;dashed=1;dashPattern=8 8;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="370" width="160" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="cache_hit" value="缓存命中&#10;返回缓存数据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="-120" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="router" value="数据源路由器&#10;DataSourceRouter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="500" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="routing_decision" value="路由决策" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="600" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="available_sources" value="获取可用数据源列表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="720" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="health_check" value="健康检查与&#10;熔断器验证" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="800" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="source_selection" value="应用路由策略选择最优数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="880" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="hikyuu_source" value="HIkyuu数据源&#10;hikyuu_data_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1ffc7;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="980" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="tdx_source" value="通达信数据源&#10;tongdaxin_stock_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="980" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="eastmoney_source" value="东方财富数据源&#10;eastmoney_plugin.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="450" y="980" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="akshare_source" value="AKShare数据源&#10;akshare_data_source.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="650" y="980" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="plugin_adapter" value="插件适配器&#10;DataSourcePluginAdapter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1080" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_fetch" value="执行数据获取" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1180" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="connection_test" value="连接测试" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="1260" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="connection_failed" value="连接失败&#10;记录错误&#10;熔断器动作" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="1260" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="failover" value="故障转移&#10;选择备用数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="1150" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="fetch_success" value="数据获取成功" style="diamond;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="1380" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_validation" value="数据质量验证&#10;- 完整性检查&#10;- 一致性检查&#10;- 异常值检测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1500" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="data_standardization" value="数据标准化&#10;- 格式转换&#10;- 字段映射&#10;- 类型转换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1620" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="cache_store" value="存储到缓存&#10;- 内存缓存&#10;- 磁盘缓存&#10;- 数据库缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1740" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="performance_monitor" value="性能监控&#10;- 响应时间记录&#10;- 成功率统计&#10;- 错误统计" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="1620" width="150" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="return_result" value="返回数据给用户" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1860" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="1940" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="error_handling" value="错误处理&#10;- 重试机制&#10;- 错误记录&#10;- 用户通知" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="1380" width="150" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="line1" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="start" target="user_request" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line2" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="user_request" target="data_center" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line3" value="" style="endArrow=classic;html=1;fontColor=#050505;dashed=1;dashPattern=8 8;snapToPoint=0;comic=1;enumerate=0;orthogonal=0;orthogonalLoop=0;ignoreEdge=0;flowAnimation=1;strokeColor=#4695F0;" parent="1" source="data_center" target="cache_check" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line4" value="命中" style="endArrow=classic;html=1;fontColor=#eb1414;strokeColor=#3083F0;strokeWidth=1;fontSize=20;dashed=1;dashPattern=8 8;snapToPoint=0;comic=1;enumerate=0;orthogonal=0;orthogonalLoop=0;ignoreEdge=0;flowAnimation=1;" parent="1" source="cache_check" target="cache_hit" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line5" value="未命中" style="endArrow=classic;html=1;fontColor=#f90b0b;fontSize=16;dashed=1;dashPattern=8 8;snapToPoint=0;comic=1;enumerate=0;orthogonal=0;orthogonalLoop=0;ignoreEdge=0;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="cache_check" target="router" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line6" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="router" target="routing_decision" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line7" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="routing_decision" target="available_sources" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line8" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="available_sources" target="health_check" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line9" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="health_check" target="source_selection" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10a" value="HIkyuu" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="hikyuu_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10b" value="通达信" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="tdx_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10c" value="东方财富" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="eastmoney_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10d" value="AKShare" style="endArrow=classic;html=1;fontColor=#f20202;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="source_selection" target="akshare_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line11a" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="hikyuu_source" target="plugin_adapter" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line11b" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="tdx_source" target="plugin_adapter" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line11c" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="eastmoney_source" target="plugin_adapter" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line11d" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="akshare_source" target="plugin_adapter" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line12" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="plugin_adapter" target="data_fetch" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line13" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="data_fetch" target="connection_test" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line14" value="失败" style="endArrow=classic;html=1;fontColor=#eb0505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="connection_test" target="connection_failed" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line15" value="" style="endArrow=classic;html=1;fontColor=#050505;" parent="1" source="connection_failed" target="failover" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line16" value="成功" style="endArrow=classic;html=1;fontColor=#f90606;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="connection_test" target="fetch_success" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line17" value="成功" style="endArrow=classic;html=1;fontColor=#fb0909;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="fetch_success" target="data_validation" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line18" value="失败" style="endArrow=classic;html=1;fontColor=#FF3333;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="fetch_success" target="error_handling" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line19" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="data_validation" target="data_standardization" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line20" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="data_standardization" target="cache_store" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line21" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="cache_store" target="return_result" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line22" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="return_result" target="end" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line23" value="" style="endArrow=classic;html=1;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="cache_hit" target="return_result" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="-60" y="1880"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="line24" value="" style="endArrow=classic;html=1;strokeStyle=dashed;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="data_standardization" target="performance_monitor" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line25" value="" style="endArrow=classic;html=1;strokeStyle=dashed;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="failover" target="source_selection" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="860" y="900"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="line26" value="" style="endArrow=classic;html=1;strokeStyle=dashed;fontColor=#050505;flowAnimation=1;strokeColor=#3083F0;" parent="1" source="error_handling" target="return_result" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="135" y="1880"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend" value="流程说明" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#66FFB3;strokeColor=#2D7600;fontSize=26;fontStyle=1;fontColor=#ffffff;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="900" y="200" width="300" height="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend_text" value="1. 用户请求数据&#10;2. 检查本地缓存&#10;3. 缓存命中直接返回&#10;4. 缓存未命中进入路由&#10;5. 获取可用数据源列表&#10;6. 执行健康检查&#10;7. 应用路由策略选择数据源&#10;8. 通过适配器调用插件&#10;9. 执行数据获取操作&#10;10. 连接和获取测试&#10;11. 失败时执行故障转移&#10;12. 成功时验证数据质量&#10;13. 数据标准化处理&#10;14. 存储到缓存系统&#10;15. 记录性能指标&#10;16. 返回结果给用户&#10;&#10;特殊处理：&#10;• 熔断器保护机制&#10;• 多重故障转移&#10;• 数据质量验证&#10;• 性能监控记录&#10;• 错误恢复策略" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=19;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="920" y="230" width="260" height="550" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

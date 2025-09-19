@@ -320,7 +320,7 @@ class ModernDataQualityMonitorTab(QWidget):
 
         # 缓存控制面板
         control_group = QGroupBox("缓存管理")
-        control_group.setMaximumHeight(40)
+        # control_group.setMaximumHeight(40)
         control_layout = QHBoxLayout(control_group)
 
         self.cache_clear_btn = QPushButton("清理缓存")

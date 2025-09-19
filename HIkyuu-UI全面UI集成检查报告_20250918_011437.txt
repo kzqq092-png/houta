@@ -1,0 +1,64 @@
+================================================================================
+HIkyuu-UI全面UI集成检查报告
+================================================================================
+检查时间: 2025-09-18 01:14:37
+
+✅ Menu Integration: PASSED
+    ✅ MainMenuBar导入成功
+    ✅ show_data_source_plugin_manager方法存在
+    ✅ show_plugin_manager方法存在
+    ✅ _on_enhanced_import方法存在
+    ✅ _create_plugin_dialog方法存在
+    ✅ 增强版数据导入启动器集成
+
+✅ Dialog Integration: PASSED
+    ✅ EnhancedPluginManagerDialog导入成功
+    ✅ UniPluginDataManager已集成到对话框
+    ✅ get_uni_plugin_data_manager导入存在
+
+✅ Widget Integration: PASSED
+    ✅ EnhancedDataImportWidget导入成功
+    ✅ get_stock_data已集成UniPluginDataManager
+    ✅ get_stock_data包含回退机制
+    ✅ get_fund_data已集成UniPluginDataManager
+    ✅ get_fund_data包含回退机制
+    ✅ get_index_data已集成UniPluginDataManager
+    ✅ get_index_data包含回退机制
+    ✅ EnhancedDataImportMainWindow导入成功
+
+✅ Data Access Integration: PASSED
+    ✅ UniPluginDataManager导入成功
+    ✅ get_stock_list方法存在
+    ✅ get_fund_list方法存在
+    ✅ get_index_list方法存在
+    ✅ get_kdata方法存在
+    ✅ get_real_time_quotes方法存在
+    ✅ health_check方法存在
+    ✅ initialize方法存在
+    ℹ️  UniPluginDataManager实例未初始化（正常，需要服务启动后才有）
+
+⏳ Service Registration: PENDING
+    ✅ ServiceBootstrap导入成功
+    ✅ _register_uni_plugin_data_manager方法存在
+    ✅ 服务注册逻辑完整
+    ❌ bootstrap方法中缺少UniPluginDataManager注册
+
+✅ Import Availability: PASSED
+    ✅ core.services.uni_plugin_data_manager.UniPluginDataManager 导入成功
+    ✅ core.data_source_router.DataSourceRouter 导入成功
+    ✅ core.tet_data_pipeline.TETDataPipeline 导入成功
+    ✅ core.plugin_manager.PluginManager 导入成功
+    ✅ gui.dialogs.enhanced_plugin_manager_dialog.EnhancedPluginManagerDialog 导入成功
+    ✅ gui.widgets.enhanced_data_import_widget.EnhancedDataImportWidget 导入成功
+    ✅ gui.enhanced_data_import_launcher.EnhancedDataImportMainWindow 导入成功
+    ✅ plugins.templates.standard_data_source_plugin.StandardDataSourcePlugin 导入成功
+
+✅ Error Handling: PASSED
+    ✅ get_stock_data包含异常处理
+    ✅ _on_enhanced_import包含异常处理
+    ✅ UniPluginDataManager.initialize包含异常处理
+
+================================================================================
+检查结果: 6/7 项通过
+⚠️  部分检查项目未通过，需要进一步修复。
+================================================================================

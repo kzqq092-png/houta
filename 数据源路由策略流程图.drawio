@@ -1,0 +1,176 @@
+<mxfile host="65bd71144e">
+    <diagram id="mzuJDqwnZT4n83KM9A8H" name="Page-1">
+        <mxGraphModel dx="1969" dy="1358" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="FactorWeave-Quant 数据源智能路由策略流程图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="350" y="20" width="500" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="route_start" value="路由请求开始&#10;RoutingRequest" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="80" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="request_parse" value="解析请求参数&#10;- asset_type&#10;- data_type&#10;- symbol&#10;- priority" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="180" width="250" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="get_sources" value="获取支持该资产类型的数据源列表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="300" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="sources_available" value="是否有可用数据源？" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#0f0f0f;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="400" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="no_sources" value="返回空结果&#10;记录错误日志" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="-140" y="420" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="circuit_check" value="熔断器状态检查&#10;过滤不可用数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="520" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="healthy_sources" value="是否有健康数据源？" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="620" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="no_healthy" value="所有数据源不可用&#10;触发降级策略" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#0d0d0d;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="690" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy_selection" value="选择路由策略" style="diamond;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="740" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="selected_source" value="选定数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="1100" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="performance_record" value="记录路由决策&#10;- 选择的数据源&#10;- 决策时间&#10;- 路由策略" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1180" width="250" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="route_end" value="路由完成&#10;返回数据源ID" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="1300" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy_box" value="路由策略详细说明" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontSize=21;fontStyle=1;strokeColor=#666666;gradientColor=#b3b3b3;verticalAlign=top;container=1;" parent="1" vertex="1">
+                    <mxGeometry x="950" y="130" width="400" height="870" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy_content" value="🎯 优先级路由 (PRIORITY)&#10;• 根据预设优先级选择数据源&#10;• 考虑健康状态作为次要因素&#10;• 适用于有明确偏好的场景&#10;&#10;🔄 轮询路由 (ROUND_ROBIN)&#10;• 依次循环使用可用数据源&#10;• 确保负载均匀分布&#10;• 过滤不健康的数据源&#10;&#10;⚖️ 加权轮询路由 (WEIGHTED_ROUND_ROBIN)&#10;• 根据权重分配请求&#10;• 权重与健康状态结合&#10;• 动态调整权重值&#10;&#10;💚 健康状态路由 (HEALTH_BASED)&#10;• 综合评估数据源质量&#10;• 健康分数 + 成功率 + 响应时间&#10;• 自动选择最优数据源&#10;&#10;🔗 最少连接路由 (LEAST_CONNECTIONS)&#10;• 选择当前连接数最少的数据源&#10;• 平衡并发请求负载&#10;• 避免单点过载&#10;&#10;🎲 随机路由 (RANDOM)&#10;• 随机选择可用数据源&#10;• 简单高效的负载分散&#10;• 适用于对顺序无要求的场景&#10;&#10;⚡ 熔断器路由 (CIRCUIT_BREAKER)&#10;• 基于熔断器状态路由&#10;• 自动隔离故障数据源&#10;• 支持自动恢复机制&#10;&#10;🛡️ 熔断器状态说明：&#10;• CLOSED: 正常工作状态&#10;• OPEN: 拒绝请求状态&#10;• HALF_OPEN: 试探恢复状态&#10;&#10;📊 健康分数计算：&#10;health_score = success_rate × 0.4 + &#10;              circuit_score × 0.3 + &#10;              response_score × 0.2&#10;&#10;🔧 路由决策因素：&#10;• 数据源可用性&#10;• 熔断器状态&#10;• 历史性能指标&#10;• 实时健康检查&#10;• 负载均衡需求" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="970" y="165" width="370" height="800" as="geometry"/>
+                </mxCell>
+                <mxCell id="line1" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="route_start" target="request_parse" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line2" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="request_parse" target="get_sources" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line3" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="get_sources" target="sources_available" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line4" value="否" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="sources_available" target="no_sources" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line5" value="是" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="sources_available" target="circuit_check" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line6" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="circuit_check" target="healthy_sources" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line7" value="否" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="healthy_sources" target="no_healthy" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line8" value="是" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="healthy_sources" target="strategy_selection" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line9a" value="优先级" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="strategy_selection" target="priority_routing" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line9b" value="轮询" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="strategy_selection" target="roundrobin_routing" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line9c" value="加权轮询" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="strategy_selection" target="weighted_routing" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line9d" value="健康状态" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="strategy_selection" target="health_routing" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10a" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="priority_routing" target="selected_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10b" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="roundrobin_routing" target="selected_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10c" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="weighted_routing" target="selected_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line10d" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="health_routing" target="selected_source" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line11" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="selected_source" target="performance_record" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line12" value="" style="endArrow=classic;html=1;flowAnimation=1;" parent="1" source="performance_record" target="route_end" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line13" value="降级策略" style="endArrow=classic;html=1;strokeStyle=dashed;flowAnimation=1;" parent="1" source="no_healthy" target="strategy_selection" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="line14" value="" style="endArrow=classic;html=1;strokeStyle=dashed;flowAnimation=1;" parent="1" source="no_sources" target="route_end" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="-70" y="1330"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="6" value="路由完成&#10;返回数据源ID" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="1300" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="记录路由决策&#10;- 选择的数据源&#10;- 决策时间&#10;- 路由策略" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="300" y="1180" width="250" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="选定数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="1100" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="选择路由策略" style="diamond;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="320" y="740" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="是否有健康数据源？" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="320" y="620" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="熔断器状态检查&#10;过滤不可用数据源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#000000;" vertex="1" parent="1">
+                    <mxGeometry x="300" y="520" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="" style="group" vertex="1" connectable="0" parent="1">
+                    <mxGeometry x="50" y="880" width="840" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="priority_routing" value="优先级路由策略&#10;PriorityRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1ffc7;strokeColor=#82b366;" parent="21" vertex="1">
+                    <mxGeometry width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="priority_details" value="1. 获取优先级配置&#10;2. 按优先级排序&#10;3. 考虑健康分数&#10;4. 选择最高优先级" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" parent="21" vertex="1">
+                    <mxGeometry y="110" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="roundrobin_routing" value="轮询路由策略&#10;RoundRobinRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="21" vertex="1">
+                    <mxGeometry x="220" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="roundrobin_details" value="1. 过滤健康数据源&#10;2. 维护轮询索引&#10;3. 循环选择数据源&#10;4. 线程安全处理" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" parent="21" vertex="1">
+                    <mxGeometry x="220" y="110" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="weighted_routing" value="加权轮询路由策略&#10;WeightedRoundRobinStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="21" vertex="1">
+                    <mxGeometry x="440" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="weighted_details" value="1. 计算有效权重&#10;2. 权重 × 健康分数&#10;3. 动态调整权重&#10;4. 选择最大权重" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" parent="21" vertex="1">
+                    <mxGeometry x="440" y="110" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="health_routing" value="健康状态路由策略&#10;HealthBasedRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="21" vertex="1">
+                    <mxGeometry x="660" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="health_details" value="1. 计算综合评分&#10;2. 健康分数 40%&#10;3. 成功率 40%&#10;4. 响应时间 20%" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" parent="21" vertex="1">
+                    <mxGeometry x="660" y="110" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="加权轮询路由策略&#10;WeightedRoundRobinStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#000000;" vertex="1" parent="21">
+                    <mxGeometry x="440" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="健康状态路由策略&#10;HealthBasedRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#000000;" vertex="1" parent="21">
+                    <mxGeometry x="660" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="轮询路由策略&#10;RoundRobinRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;" vertex="1" parent="21">
+                    <mxGeometry x="220" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="优先级路由策略&#10;PriorityRoutingStrategy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1ffc7;strokeColor=#82b366;fontColor=#000000;" vertex="1" parent="21">
+                    <mxGeometry width="180" height="100" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

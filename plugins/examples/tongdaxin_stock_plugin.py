@@ -60,7 +60,7 @@ except ImportError:
 class ConnectionPool:
     """通达信连接池管理器，支持多IP并行数据获取"""
 
-    def __init__(self, max_connections: int = 5, timeout: int = 30):
+    def __init__(self, max_connections: int = 10, timeout: int = 30):
         self.max_connections = max_connections
         self.timeout = timeout
         self.connections = queue.Queue(maxsize=max_connections)
@@ -289,7 +289,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             'local_data_path': '',     # 本地数据文件路径
             'auto_select_server': True,  # 是否自动选择最快服务器
             'use_connection_pool': True,  # 是否使用连接池模式
-            'connection_pool_size': 5   # 连接池大小
+            'connection_pool_size': 10   # 连接池大小
         }
 
         # 联网查询地址配置（endpointhost字段）
@@ -2035,7 +2035,7 @@ class TongdaxinStockPlugin(IDataSourcePlugin):
             from core.database.tdx_server_manager import get_tdx_db_manager
 
             db_manager = get_tdx_db_manager()
-            available_servers = db_manager.get_available_servers(limit=10)
+            available_servers = db_manager.get_available_servers(limit=20)
 
             if available_servers:
                 # 从数据库加载服务器

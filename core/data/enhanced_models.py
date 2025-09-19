@@ -18,12 +18,11 @@ import pandas as pd
 import json
 
 
-class DataQuality(Enum):
-    """数据质量等级"""
-    EXCELLENT = "excellent"  # 优秀 (>0.95)
-    GOOD = "good"           # 良好 (0.85-0.95)
-    FAIR = "fair"           # 一般 (0.70-0.85)
-    POOR = "poor"           # 较差 (<0.70)
+# 导入统一的数据质量模型
+from .unified_quality_models import (
+    DataQuality, QualityDimension, QualityCheckStatus, QualityIssueLevel,
+    UnifiedDataQualityMetrics, QualityProfile, get_default_quality_profiles
+)
 
 
 class MarketType(Enum):
@@ -402,51 +401,8 @@ class FieldMapping:
     updated_at: datetime = field(default_factory=datetime.now)
 
 
-@dataclass
-class DataQualityMetrics:
-    """
-    数据质量监控指标模型
-    """
-    plugin_name: str                        # 插件名称
-    table_name: str                         # 表名
-    metric_date: date                       # 指标日期
-
-    # 完整性指标
-    total_records: int = 0                  # 总记录数
-    null_records: int = 0                   # 空值记录数
-    duplicate_records: int = 0              # 重复记录数
-    completeness_score: Decimal = Decimal('0.0')  # 完整性评分
-
-    # 准确性指标
-    validation_errors: int = 0              # 验证错误数
-    format_errors: int = 0                  # 格式错误数
-    range_errors: int = 0                   # 范围错误数
-    accuracy_score: Decimal = Decimal('0.0')      # 准确性评分
-
-    # 及时性指标
-    data_delay_minutes: int = 0             # 数据延迟分钟数
-    timeliness_score: Decimal = Decimal('0.0')    # 及时性评分
-
-    # 一致性指标
-    consistency_errors: int = 0             # 一致性错误数
-    consistency_score: Decimal = Decimal('0.0')   # 一致性评分
-
-    # 综合评分
-    overall_score: Decimal = Decimal('0.0')  # 综合评分
-
-    created_at: datetime = field(default_factory=datetime.now)
-
-    def get_quality_level(self) -> DataQuality:
-        """获取数据质量等级"""
-        score = float(self.overall_score)
-        if score >= 0.95:
-            return DataQuality.EXCELLENT
-        elif score >= 0.85:
-            return DataQuality.GOOD
-        elif score >= 0.70:
-            return DataQuality.FAIR
-        else:
-            return DataQuality.POOR
+# 兼容性别名 - DataQualityMetrics现在指向UnifiedDataQualityMetrics
+DataQualityMetrics = UnifiedDataQualityMetrics
 
 
 # 工具函数

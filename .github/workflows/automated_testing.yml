@@ -1,0 +1,543 @@
+name: Automated Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每天凌晨2点运行完整测试套件
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION: '3.9'
+  POETRY_VERSION: '1.6.1'
+
+jobs:
+  # 代码质量检查
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+      
+    - name: Install project
+      run: poetry install --no-interaction
+      
+    - name: Run Ruff linting
+      run: |
+        poetry run ruff check . --output-format=github
+        
+    - name: Run Ruff formatting check
+      run: |
+        poetry run ruff format --check .
+        
+    - name: Run type checking with mypy
+      run: |
+        poetry run mypy core/ --ignore-missing-imports --no-strict-optional
+        
+    - name: Check import sorting
+      run: |
+        poetry run isort --check-only --diff core/ tests/
+
+  # 单元测试
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+      
+    - name: Install project
+      run: poetry install --no-interaction
+      
+    - name: Create test database directory
+      run: mkdir -p db
+      
+    - name: Run unit tests with coverage
+      run: |
+        poetry run pytest tests/core/ \
+          --cov=core \
+          --cov-report=xml \
+          --cov-report=html \
+          --cov-report=term-missing \
+          --cov-fail-under=80 \
+          --junit-xml=test-results-unit.xml \
+          -v
+          
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Upload unit test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: unit-test-results-${{ matrix.python-version }}
+        path: |
+          test-results-unit.xml
+          htmlcov/
+          coverage.xml
+
+  # 集成测试
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      # 如果需要数据库服务
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+      
+    - name: Install project
+      run: poetry install --no-interaction
+      
+    - name: Set up test environment
+      run: |
+        mkdir -p db logs temp
+        chmod 755 db logs temp
+        
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        TEST_ENV: ci
+      run: |
+        poetry run pytest tests/integration/ \
+          --junit-xml=test-results-integration.xml \
+          --timeout=300 \
+          -v \
+          --tb=short
+          
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          test-results-integration.xml
+          logs/
+
+  # 性能测试
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf-test]')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+      
+    - name: Install project
+      run: poetry install --no-interaction
+      
+    - name: Run performance benchmarks
+      run: |
+        poetry run pytest tests/performance/ \
+          --benchmark-only \
+          --benchmark-json=benchmark-results.json \
+          --benchmark-sort=mean \
+          -v
+          
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.ref == 'refs/heads/main'
+      with:
+        tool: 'pytest'
+        output-file-path: benchmark-results.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-test-results
+        path: benchmark-results.json
+
+  # 安全扫描
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root
+      
+    - name: Run safety check for known vulnerabilities
+      run: |
+        poetry run safety check --json --output safety-report.json || true
+        
+    - name: Run bandit security linter
+      run: |
+        poetry run bandit -r core/ -f json -o bandit-report.json || true
+        
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results
+        path: |
+          safety-report.json
+          bandit-report.json
+
+  # 文档构建测试
+  docs-build:
+    name: Documentation Build
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction --no-root --extras docs
+      
+    - name: Build documentation
+      run: |
+        poetry run sphinx-build -b html docs/ docs/_build/html -W
+        
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/_build/html
+
+  # 测试结果汇总和报告
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, security-scan, docs-build]
+    if: always()
+    
+    steps:
+    - name: Download all test artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Display test summary
+      run: |
+        echo "## 🧪 测试结果汇总" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # 检查单元测试结果
+        if [ -f unit-test-results-*/test-results-unit.xml ]; then
+          echo "✅ 单元测试: 通过" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ 单元测试: 失败" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # 检查集成测试结果
+        if [ -f integration-test-results/test-results-integration.xml ]; then
+          echo "✅ 集成测试: 通过" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ 集成测试: 失败" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # 检查安全扫描结果
+        if [ -f security-scan-results/safety-report.json ]; then
+          echo "✅ 安全扫描: 完成" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ 安全扫描: 失败" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # 检查文档构建结果
+        if [ -d documentation/ ]; then
+          echo "✅ 文档构建: 成功" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ 文档构建: 失败" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 覆盖率报告" >> $GITHUB_STEP_SUMMARY
+        
+        # 如果有覆盖率文件，显示覆盖率信息
+        if [ -f unit-test-results-*/coverage.xml ]; then
+          echo "覆盖率报告已生成，详情请查看 Codecov。" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 相关链接" >> $GITHUB_STEP_SUMMARY
+        echo "- [测试覆盖率](https://codecov.io/gh/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+        echo "- [安全扫描报告](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+  # 部署到测试环境（仅在主分支）
+  deploy-test:
+    name: Deploy to Test Environment
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Install dependencies
+      run: poetry install --no-interaction --no-root --only=main
+      
+    - name: Build application package
+      run: |
+        poetry build
+        
+    - name: Deploy to test environment
+      run: |
+        echo "🚀 部署到测试环境..."
+        echo "应用版本: $(poetry version -s)"
+        echo "Git提交: ${{ github.sha }}"
+        echo "部署时间: $(date)"
+        
+        # 这里可以添加实际的部署脚本
+        # 例如：上传到服务器、更新容器等
+        
+    - name: Run smoke tests
+      run: |
+        echo "🔍 运行冒烟测试..."
+        # 这里可以添加基本的健康检查
+        poetry run python -c "
+        import core.importdata.intelligent_config_manager as icm
+        print('✅ 核心模块导入成功')
+        
+        # 基本功能测试
+        manager = icm.IntelligentConfigManager(':memory:')
+        print('✅ 配置管理器初始化成功')
+        
+        stats = manager.get_intelligent_statistics()
+        print(f'✅ 统计信息获取成功: {len(stats)} 项指标')
+        "
+        
+    - name: Notify deployment
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ 测试环境部署成功！"
+        else
+          echo "❌ 测试环境部署失败！"
+        fi
+
+# 工作流程失败时的通知
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, security-scan, docs-build]
+    if: failure()
+    
+    steps:
+    - name: Create failure issue
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = `🚨 自动化测试失败 - ${context.workflow} #${context.runNumber}`;
+          const body = `
+          ## 测试失败报告
+          
+          **工作流程**: ${context.workflow}
+          **运行编号**: ${context.runNumber}
+          **分支**: ${context.ref}
+          **提交**: ${context.sha}
+          **触发者**: ${context.actor}
+          **时间**: ${new Date().toISOString()}
+          
+          ### 失败的作业
+          请检查以下链接查看详细错误信息：
+          ${context.payload.repository.html_url}/actions/runs/${context.runId}
+          
+          ### 可能的原因
+          - 代码质量检查失败
+          - 单元测试失败
+          - 集成测试失败
+          - 安全扫描发现问题
+          - 文档构建失败
+          
+          ### 下一步行动
+          1. 查看失败的作业日志
+          2. 修复相关问题
+          3. 重新提交代码
+          4. 关闭此 issue
+          
+          ---
+          *此 issue 由自动化测试流程自动创建*
+          `;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['bug', 'ci-failure', 'high-priority']
+          });

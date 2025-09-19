@@ -30,6 +30,7 @@ from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap
 try:
     from core.plugin_manager import PluginManager
     from core.services.sentiment_data_service import SentimentDataService
+    from core.services.uni_plugin_data_manager import UniPluginDataManager, get_uni_plugin_data_manager
     from gui.dialogs.plugin_manager_dialog import PluginConfigDialog
     from gui.dialogs.sentiment_plugin_config_dialog import PluginConfigWidget
     logger.info(" 核心服务导入成功")
@@ -37,6 +38,7 @@ try:
 except ImportError as e:
     PluginManager = None
     SentimentDataService = None
+    UniPluginDataManager = None
     PluginConfigDialog = None
     PluginConfigWidget = None
     PLUGIN_SYSTEM_AVAILABLE = False
@@ -508,6 +510,7 @@ class EnhancedPluginManagerDialog(QDialog):
         super().__init__(parent)
         self.plugin_manager = plugin_manager
         self.sentiment_service = sentiment_service
+        self.uni_plugin_data_manager = get_uni_plugin_data_manager()  # 添加统一插件数据管理器支持
         self.plugin_widgets = {}
         self.sentiment_config_widgets = {}
 

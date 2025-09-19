@@ -54,7 +54,6 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         self.last_error = None
         self.config = {}
 
-
     def get_plugin_info(self) -> PluginInfo:
         return PluginInfo(
             id="datasource.yahoo_finance",
@@ -564,23 +563,20 @@ class YahooFinanceDataSourcePlugin(IDataSourcePlugin):
         """连接数据源"""
         try:
             # TODO: 实现具体的连接逻辑
-            self.logger.info(f"{self.__class__.__name__} 连接成功")
+            logger.info(f"{self.__class__.__name__} 连接成功")
             return True
         except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"连接失败: {e}")
+            logger.error(f"连接失败: {e}")
             return False
 
     def disconnect(self) -> bool:
         """断开连接"""
         try:
             # TODO: 实现具体的断开连接逻辑
-            if hasattr(self, 'logger'):
-                self.logger.info(f"{self.__class__.__name__} 断开连接")
+            logger.info(f"{self.__class__.__name__} 断开连接")
             return True
         except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"断开连接失败: {e}")
+            logger.error(f"断开连接失败: {e}")
             return False
 
     def is_connected(self) -> bool:

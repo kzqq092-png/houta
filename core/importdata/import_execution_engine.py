@@ -145,9 +145,6 @@ class DataImportExecutionEngine(QObject):
         self.distributed_service = self._init_distributed_service()
         self.node_discovery = self._init_node_discovery()
 
-        # 自动调优系统
-        self.auto_tuner = self._init_auto_tuner()
-
         # 监控配置
         self.enable_performance_monitoring = True
         self.enable_anomaly_detection = True
@@ -161,6 +158,9 @@ class DataImportExecutionEngine(QObject):
         # 线程池（需要在其他组件之前初始化）
         self.executor = ThreadPoolExecutor(max_workers=max_workers,
                                            thread_name_prefix="ImportEngine")
+
+        # 自动调优系统（需要在线程池初始化之后）
+        self.auto_tuner = self._init_auto_tuner()
 
         # 数据质量监控系统
         self.data_quality_monitor = self._init_data_quality_monitor()

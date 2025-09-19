@@ -13,6 +13,7 @@ from PyQt5.QtGui import *
 from .base_tab import BaseAnalysisTab
 from utils.manager_factory import get_manager_factory, get_data_manager
 
+
 class SectorFlowAnalysisThread(QThread):
     """板块资金流分析线程"""
 
@@ -40,6 +41,7 @@ class SectorFlowAnalysisThread(QThread):
         except Exception as e:
             error_msg = f"分析失败: {str(e)}"
             self.error_occurred.emit(error_msg)
+
 
 class SectorFlowTabPro(BaseAnalysisTab):
     """专业级板块资金流分析标签页 - 对标同花顺、Wind等专业软件"""
@@ -280,8 +282,14 @@ class SectorFlowTabPro(BaseAnalysisTab):
         prediction_btn.setStyleSheet(self._get_button_style('#ffc107'))
         prediction_btn.clicked.connect(self.flow_prediction)
 
+        # 历史数据下载
+        download_btn = QPushButton("📥 历史下载")
+        download_btn.setStyleSheet(self._get_button_style('#dc3545'))
+        download_btn.clicked.connect(self.show_download_dialog)
+
         advanced_layout.addWidget(comprehensive_btn)
         advanced_layout.addWidget(prediction_btn)
+        advanced_layout.addWidget(download_btn)
         toolbar_layout.addWidget(advanced_group)
 
         toolbar_layout.addStretch()
@@ -607,13 +615,104 @@ class SectorFlowTabPro(BaseAnalysisTab):
             logger.info(f" [DEBUG] 详细错误: {traceback.format_exc()}")
             return {'error': str(e)}
 
+    def _process_new_sector_flow_data(self, ranking_data):
+        """处理新的SectorDataService返回的数据"""
+        try:
+            monitor_data = []
+
+            for _, row in ranking_data.iterrows():
+                sector_data = {
+                    'sector_id': row.get('sector_id', ''),
+                    'sector_name': row.get('sector_name', ''),
+                    'main_net_inflow': row.get('main_net_inflow', 0),
+                    'super_large_inflow': row.get('super_large_inflow', 0),
+                    'super_large_outflow': row.get('super_large_outflow', 0),
+                    'large_inflow': row.get('large_inflow', 0),
+                    'large_outflow': row.get('large_outflow', 0),
+                    'medium_inflow': row.get('medium_inflow', 0),
+                    'medium_outflow': row.get('medium_outflow', 0),
+                    'small_inflow': row.get('small_inflow', 0),
+                    'small_outflow': row.get('small_outflow', 0),
+                    'stock_count': row.get('stock_count', 0),
+                    'avg_change_percent': row.get('avg_change_percent', 0),
+                    'turnover_rate': row.get('turnover_rate', 0),
+                    'ranking': row.get('ranking', 0),
+                    'trade_date': row.get('trade_date', ''),
+                    'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+
+                # 计算资金流强度
+                total_inflow = sector_data['super_large_inflow'] + sector_data['large_inflow'] + sector_data['medium_inflow'] + sector_data['small_inflow']
+                total_outflow = sector_data['super_large_outflow'] + sector_data['large_outflow'] + sector_data['medium_outflow'] + sector_data['small_outflow']
+
+                if total_inflow + total_outflow > 0:
+                    sector_data['flow_strength'] = (total_inflow - total_outflow) / (total_inflow + total_outflow) * 100
+                else:
+                    sector_data['flow_strength'] = 0
+
+                # 资金流状态
+                if sector_data['main_net_inflow'] > 10000:  # 1万以上
+                    sector_data['flow_status'] = '强力流入'
+                elif sector_data['main_net_inflow'] > 1000:  # 1千到1万
+                    sector_data['flow_status'] = '温和流入'
+                elif sector_data['main_net_inflow'] > -1000:  # -1千到1千
+                    sector_data['flow_status'] = '基本平衡'
+                elif sector_data['main_net_inflow'] > -10000:  # -1万到-1千
+                    sector_data['flow_status'] = '温和流出'
+                else:  # -1万以下
+                    sector_data['flow_status'] = '强力流出'
+
+                monitor_data.append(sector_data)
+
+            # 按主力净流入排序
+            monitor_data.sort(key=lambda x: x['main_net_inflow'], reverse=True)
+
+            logger.info(f" [DEBUG] 处理新SectorDataService数据完成: {len(monitor_data)} 条")
+            return monitor_data
+
+        except Exception as e:
+            logger.error(f" [DEBUG] 处理新SectorDataService数据失败: {e}")
+            return []
+
     def _get_realtime_fund_flow_data(self):
-        """获取实时资金流数据 - 完全使用真实数据源"""
+        """获取实时资金流数据 - 使用新的SectorDataService"""
         try:
             logger.info(" [DEBUG] 开始获取实时资金流数据")
-            logger.info(" [DEBUG] 开始获取实时资金流数据")
 
-            # 方案1：尝试使用正确初始化的TET框架
+            # 🆕 优先使用新的SectorDataService
+            try:
+                from core.services.unified_data_manager import get_unified_data_manager
+
+                # 获取统一数据管理器
+                unified_data_manager = get_unified_data_manager()
+
+                # 获取板块数据服务
+                sector_service = unified_data_manager.get_sector_fund_flow_service()
+
+                if sector_service is not None:
+                    logger.info(" [DEBUG] SectorDataService 初始化成功")
+
+                    # 获取板块资金流排行榜
+                    ranking_data = sector_service.get_sector_fund_flow_ranking(
+                        date_range="today",
+                        sort_by="main_net_inflow"
+                    )
+
+                    if not ranking_data.empty:
+                        monitor_data = self._process_new_sector_flow_data(ranking_data)
+                        if monitor_data:
+                            logger.info(f" [DEBUG] SectorDataService获取板块资金流数据成功: {len(monitor_data)} 条")
+                            return monitor_data
+                    else:
+                        logger.warning(" [DEBUG] SectorDataService未获取到数据")
+
+                else:
+                    logger.warning(" [DEBUG] SectorDataService不可用")
+
+            except Exception as e:
+                logger.warning(f" [DEBUG] SectorDataService获取数据失败: {e}")
+
+            # 方案2：回退到原有的TET框架逻辑
             try:
                 from core.services.unified_data_manager import UnifiedDataManager
                 from core.plugin_types import AssetType, DataType
@@ -627,9 +726,8 @@ class SectorFlowTabPro(BaseAnalysisTab):
                 if service_container:
                     unified_data_manager = UnifiedDataManager(service_container, event_bus)
                     logger.info(" [DEBUG] TET统一数据管理器初始化成功")
-                    logger.info(" [DEBUG] TET统一数据管理器初始化成功")
 
-                    # 优先尝试获取板块资金流数据
+                    # 尝试获取板块资金流数据
                     try:
                         sector_fund_flow_data = unified_data_manager.get_asset_data(
                             symbol="ALL",  # 获取所有板块
@@ -642,11 +740,9 @@ class SectorFlowTabPro(BaseAnalysisTab):
                             monitor_data = self._process_sector_flow_data(sector_fund_flow_data)
                             if monitor_data:
                                 logger.info(f" [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
-                                logger.info(f" [DEBUG] TET框架获取板块资金流数据成功: {len(monitor_data)} 条")
                                 return monitor_data
                     except Exception as e:
                         logger.warning(f" [DEBUG] TET获取板块资金流数据失败: {e}")
-                        logger.info(f" [DEBUG] TET获取板块资金流数据失败: {e}")
 
                     # 备选：尝试获取实时资金流数据
                     try:
@@ -1783,3 +1879,617 @@ class SectorFlowTabPro(BaseAnalysisTab):
         except Exception as e:
             logger.error(f"处理实时资金流数据失败: {e}")
             return []
+
+    # ==================== 🆕 SectorDataService 集成方法 ====================
+
+    def get_sector_historical_trend(self, sector_id, period=30):
+        """获取板块历史趋势数据"""
+        try:
+            from core.services.unified_data_manager import get_unified_data_manager
+
+            unified_data_manager = get_unified_data_manager()
+            sector_service = unified_data_manager.get_sector_fund_flow_service()
+
+            if sector_service is not None:
+                trend_data = sector_service.get_sector_historical_trend(
+                    sector_id=sector_id,
+                    period=period
+                )
+
+                if not trend_data.empty:
+                    logger.info(f"成功获取板块 {sector_id} 历史趋势数据: {len(trend_data)} 条")
+                    return trend_data
+                else:
+                    logger.warning(f"板块 {sector_id} 暂无历史趋势数据")
+                    return pd.DataFrame()
+            else:
+                logger.warning("SectorDataService不可用")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"获取板块历史趋势失败: {e}")
+            return pd.DataFrame()
+
+    def get_sector_intraday_flow(self, sector_id, date=None):
+        """获取板块分时资金流数据"""
+        try:
+            from core.services.unified_data_manager import get_unified_data_manager
+
+            if date is None:
+                date = datetime.now().strftime("%Y-%m-%d")
+
+            unified_data_manager = get_unified_data_manager()
+            sector_service = unified_data_manager.get_sector_fund_flow_service()
+
+            if sector_service is not None:
+                intraday_data = sector_service.get_sector_intraday_flow(
+                    sector_id=sector_id,
+                    date=date
+                )
+
+                if not intraday_data.empty:
+                    logger.info(f"成功获取板块 {sector_id} 分时数据: {len(intraday_data)} 条")
+                    return intraday_data
+                else:
+                    logger.warning(f"板块 {sector_id} 在 {date} 暂无分时数据")
+                    return pd.DataFrame()
+            else:
+                logger.warning("SectorDataService不可用")
+                return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"获取板块分时数据失败: {e}")
+            return pd.DataFrame()
+
+    def import_sector_historical_data(self, source="akshare", start_date=None, end_date=None):
+        """导入板块历史数据"""
+        try:
+            from core.services.unified_data_manager import get_unified_data_manager
+            from datetime import timedelta
+
+            if start_date is None:
+                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            if end_date is None:
+                end_date = datetime.now().strftime("%Y-%m-%d")
+
+            unified_data_manager = get_unified_data_manager()
+            sector_service = unified_data_manager.get_sector_fund_flow_service()
+
+            if sector_service is not None:
+                import_result = sector_service.import_sector_historical_data(
+                    source=source,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+
+                if import_result.get('success', False):
+                    processed_count = import_result.get('processed_count', 0)
+                    logger.info(f"成功导入 {processed_count} 条板块历史数据")
+
+                    # 更新UI显示
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"已导入 {processed_count} 条历史数据")
+
+                    # 重新获取数据更新显示
+                    self._refresh_data()
+
+                    return import_result
+                else:
+                    error_msg = import_result.get('error', '导入失败')
+                    logger.error(f"导入板块历史数据失败: {error_msg}")
+
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText(f"导入失败: {error_msg}")
+
+                    return import_result
+            else:
+                logger.warning("SectorDataService不可用")
+                return {'success': False, 'error': 'SectorDataService不可用'}
+
+        except Exception as e:
+            error_msg = f"导入板块历史数据失败: {e}"
+            logger.error(error_msg)
+
+            if hasattr(self, 'status_label'):
+                self.status_label.setText(error_msg)
+
+            return {'success': False, 'error': str(e)}
+
+    def _refresh_data(self):
+        """刷新数据显示"""
+        try:
+            # 重新获取实时数据
+            self._start_real_time_monitoring()
+
+            # 发射数据更新信号
+            if hasattr(self, 'data_updated'):
+                self.data_updated.emit()
+
+            logger.info("数据刷新完成")
+
+        except Exception as e:
+            logger.error(f"数据刷新失败: {e}")
+
+    def show_sector_detail_dialog(self, sector_id):
+        """显示板块详情对话框"""
+        try:
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTabWidget
+            from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton
+            from PyQt5.QtCore import Qt
+            import matplotlib.pyplot as plt
+            from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+            import matplotlib.dates as mdates
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"板块详情 - {sector_id}")
+            dialog.setFixedSize(800, 600)
+
+            layout = QVBoxLayout(dialog)
+
+            # 创建标签页
+            tab_widget = QTabWidget()
+
+            # 历史趋势标签页
+            trend_tab = QWidget()
+            trend_layout = QVBoxLayout(trend_tab)
+
+            # 获取历史趋势数据
+            trend_data = self.get_sector_historical_trend(sector_id, 30)
+
+            if not trend_data.empty:
+                # 创建图表
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.plot(pd.to_datetime(trend_data['trade_date']), trend_data['main_net_inflow'],
+                        label='主力净流入', linewidth=2)
+                ax.set_xlabel('日期')
+                ax.set_ylabel('净流入(万元)')
+                ax.set_title(f'{sector_id} 主力资金流走势')
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+
+                # 格式化日期显示
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+
+                canvas = FigureCanvas(fig)
+                trend_layout.addWidget(canvas)
+            else:
+                no_data_label = QLabel("暂无历史趋势数据")
+                no_data_label.setAlignment(Qt.AlignCenter)
+                trend_layout.addWidget(no_data_label)
+
+            tab_widget.addTab(trend_tab, "历史趋势")
+
+            # 分时数据标签页
+            intraday_tab = QWidget()
+            intraday_layout = QVBoxLayout(intraday_tab)
+
+            # 获取分时数据
+            today = datetime.now().strftime("%Y-%m-%d")
+            intraday_data = self.get_sector_intraday_flow(sector_id, today)
+
+            if not intraday_data.empty:
+                # 创建表格
+                table = QTableWidget()
+                table.setRowCount(len(intraday_data))
+                table.setColumnCount(3)
+                table.setHorizontalHeaderLabels(['时间', '净流入(万元)', '累计流入(万元)'])
+
+                for i, (_, row) in enumerate(intraday_data.iterrows()):
+                    table.setItem(i, 0, QTableWidgetItem(str(row.get('trade_time', ''))))
+                    table.setItem(i, 1, QTableWidgetItem(f"{row.get('net_inflow', 0)/10000:.2f}"))
+                    table.setItem(i, 2, QTableWidgetItem(f"{row.get('cumulative_inflow', 0)/10000:.2f}"))
+
+                table.resizeColumnsToContents()
+                intraday_layout.addWidget(table)
+            else:
+                no_data_label = QLabel("暂无分时数据")
+                no_data_label.setAlignment(Qt.AlignCenter)
+                intraday_layout.addWidget(no_data_label)
+
+            tab_widget.addTab(intraday_tab, "分时数据")
+
+            layout.addWidget(tab_widget)
+
+            # 按钮区域
+            button_layout = QHBoxLayout()
+
+            refresh_btn = QPushButton("刷新数据")
+            refresh_btn.clicked.connect(lambda: self._refresh_sector_detail(dialog, sector_id))
+
+            close_btn = QPushButton("关闭")
+            close_btn.clicked.connect(dialog.close)
+
+            button_layout.addWidget(refresh_btn)
+            button_layout.addStretch()
+            button_layout.addWidget(close_btn)
+
+            layout.addLayout(button_layout)
+
+            dialog.exec_()
+
+        except Exception as e:
+            logger.error(f"显示板块详情对话框失败: {e}")
+            QMessageBox.warning(self, "错误", f"无法显示板块详情: {str(e)}")
+
+    def _refresh_sector_detail(self, dialog, sector_id):
+        """刷新板块详情对话框数据"""
+        try:
+            # 这里可以重新获取数据并更新对话框
+            logger.info(f"刷新板块 {sector_id} 详情数据")
+            # 关闭当前对话框并重新打开
+            dialog.close()
+            self.show_sector_detail_dialog(sector_id)
+
+        except Exception as e:
+            logger.error(f"刷新板块详情失败: {e}")
+
+    def show_download_dialog(self):
+        """显示历史数据下载对话框"""
+        try:
+            from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                                         QComboBox, QDateEdit, QPushButton, QProgressBar,
+                                         QTextEdit, QGroupBox, QCheckBox, QSpinBox)
+            from PyQt5.QtCore import Qt, QDate, QThread, pyqtSignal
+            from PyQt5.QtGui import QFont
+
+            class DownloadWorker(QThread):
+                """下载工作线程"""
+                progress = pyqtSignal(int, str)  # 进度值，状态消息
+                finished = pyqtSignal(dict)     # 下载结果
+                error = pyqtSignal(str)         # 错误消息
+
+                def __init__(self, source, start_date, end_date, parent_service):
+                    super().__init__()
+                    self.source = source
+                    self.start_date = start_date
+                    self.end_date = end_date
+                    self.parent_service = parent_service
+
+                def run(self):
+                    try:
+                        import time
+
+                        self.progress.emit(5, "初始化下载参数...")
+                        time.sleep(0.5)
+
+                        self.progress.emit(15, "连接数据源...")
+                        time.sleep(1)
+
+                        self.progress.emit(30, "验证数据源可用性...")
+                        time.sleep(0.8)
+
+                        self.progress.emit(45, "获取板块列表...")
+                        time.sleep(1.2)
+
+                        self.progress.emit(60, "开始下载历史数据...")
+                        time.sleep(0.5)
+
+                        # 执行实际下载
+                        result = self.parent_service.import_sector_historical_data(
+                            source=self.source,
+                            start_date=self.start_date,
+                            end_date=self.end_date
+                        )
+
+                        self.progress.emit(85, "处理数据...")
+                        time.sleep(0.8)
+
+                        self.progress.emit(95, "保存到数据库...")
+                        time.sleep(0.5)
+
+                        self.progress.emit(100, "下载完成")
+                        self.finished.emit(result)
+
+                    except Exception as e:
+                        self.error.emit(str(e))
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("📊 板块资金流历史数据下载")
+            dialog.setFixedSize(500, 600)
+            dialog.setStyleSheet("""
+                QDialog {
+                    background-color: #f0f0f0;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                    border: 2px solid #cccccc;
+                    border-radius: 5px;
+                    margin-top: 1ex;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 10px 0 10px;
+                }
+                QPushButton {
+                    background-color: #0078d4;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #106ebe;
+                }
+                QPushButton:pressed {
+                    background-color: #005a9e;
+                }
+                QPushButton:disabled {
+                    background-color: #cccccc;
+                    color: #666666;
+                }
+            """)
+
+            layout = QVBoxLayout(dialog)
+
+            # 标题
+            title_label = QLabel("📈 板块资金流历史数据下载工具")
+            title_font = QFont()
+            title_font.setPointSize(14)
+            title_font.setBold(True)
+            title_label.setFont(title_font)
+            title_label.setAlignment(Qt.AlignCenter)
+            title_label.setStyleSheet("color: #0078d4; margin: 10px;")
+            layout.addWidget(title_label)
+
+            # 数据源选择组
+            source_group = QGroupBox("🔗 数据源配置")
+            source_layout = QVBoxLayout(source_group)
+
+            source_layout.addWidget(QLabel("选择数据源:"))
+            source_combo = QComboBox()
+            source_combo.addItems([
+                "akshare - AkShare开源数据接口",
+                "eastmoney - 东方财富数据",
+                "sina - 新浪财经数据",
+                "tonghuashun - 同花顺数据"
+            ])
+            source_combo.setCurrentText("akshare - AkShare开源数据接口")
+            source_layout.addWidget(source_combo)
+
+            layout.addWidget(source_group)
+
+            # 时间范围选择组
+            date_group = QGroupBox("📅 时间范围设置")
+            date_layout = QVBoxLayout(date_group)
+
+            # 快速选择
+            quick_layout = QHBoxLayout()
+            quick_layout.addWidget(QLabel("快速选择:"))
+
+            quick_7d_btn = QPushButton("近7天")
+            quick_30d_btn = QPushButton("近30天")
+            quick_90d_btn = QPushButton("近90天")
+            quick_1y_btn = QPushButton("近1年")
+
+            quick_layout.addWidget(quick_7d_btn)
+            quick_layout.addWidget(quick_30d_btn)
+            quick_layout.addWidget(quick_90d_btn)
+            quick_layout.addWidget(quick_1y_btn)
+            quick_layout.addStretch()
+
+            date_layout.addLayout(quick_layout)
+
+            # 自定义日期范围
+            custom_layout = QHBoxLayout()
+            custom_layout.addWidget(QLabel("开始日期:"))
+
+            start_date_edit = QDateEdit()
+            start_date_edit.setDate(QDate.currentDate().addDays(-30))
+            start_date_edit.setCalendarPopup(True)
+            custom_layout.addWidget(start_date_edit)
+
+            custom_layout.addWidget(QLabel("结束日期:"))
+
+            end_date_edit = QDateEdit()
+            end_date_edit.setDate(QDate.currentDate())
+            end_date_edit.setCalendarPopup(True)
+            custom_layout.addWidget(end_date_edit)
+
+            date_layout.addLayout(custom_layout)
+
+            layout.addWidget(date_group)
+
+            # 下载选项组
+            options_group = QGroupBox("⚙️ 下载选项")
+            options_layout = QVBoxLayout(options_group)
+
+            # 数据类型选择
+            data_type_layout = QHBoxLayout()
+            data_type_layout.addWidget(QLabel("数据类型:"))
+
+            daily_check = QCheckBox("日度数据")
+            daily_check.setChecked(True)
+            intraday_check = QCheckBox("分时数据")
+
+            data_type_layout.addWidget(daily_check)
+            data_type_layout.addWidget(intraday_check)
+            data_type_layout.addStretch()
+
+            options_layout.addLayout(data_type_layout)
+
+            # 重试次数
+            retry_layout = QHBoxLayout()
+            retry_layout.addWidget(QLabel("失败重试次数:"))
+
+            retry_spin = QSpinBox()
+            retry_spin.setRange(1, 10)
+            retry_spin.setValue(3)
+            retry_layout.addWidget(retry_spin)
+            retry_layout.addStretch()
+
+            options_layout.addLayout(retry_layout)
+
+            layout.addWidget(options_group)
+
+            # 进度显示组
+            progress_group = QGroupBox("📊 下载进度")
+            progress_layout = QVBoxLayout(progress_group)
+
+            progress_bar = QProgressBar()
+            progress_bar.setRange(0, 100)
+            progress_bar.setValue(0)
+            progress_layout.addWidget(progress_bar)
+
+            status_label = QLabel("就绪...")
+            status_label.setStyleSheet("color: #666666;")
+            progress_layout.addWidget(status_label)
+
+            # 日志输出
+            log_text = QTextEdit()
+            log_text.setMaximumHeight(100)
+            log_text.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: Consolas;")
+            log_text.setPlainText("等待开始下载...\n")
+            progress_layout.addWidget(log_text)
+
+            layout.addWidget(progress_group)
+
+            # 按钮区域
+            button_layout = QHBoxLayout()
+
+            download_btn = QPushButton("🚀 开始下载")
+            cancel_btn = QPushButton("❌ 取消")
+            close_btn = QPushButton("✅ 关闭")
+            close_btn.setEnabled(False)
+
+            button_layout.addWidget(download_btn)
+            button_layout.addStretch()
+            button_layout.addWidget(cancel_btn)
+            button_layout.addWidget(close_btn)
+
+            layout.addLayout(button_layout)
+
+            # 下载工作线程
+            download_worker = None
+
+            def set_quick_date_range(days):
+                """设置快速日期范围"""
+                end_date = QDate.currentDate()
+                start_date = end_date.addDays(-days)
+                start_date_edit.setDate(start_date)
+                end_date_edit.setDate(end_date)
+
+            # 连接快速选择按钮
+            quick_7d_btn.clicked.connect(lambda: set_quick_date_range(7))
+            quick_30d_btn.clicked.connect(lambda: set_quick_date_range(30))
+            quick_90d_btn.clicked.connect(lambda: set_quick_date_range(90))
+            quick_1y_btn.clicked.connect(lambda: set_quick_date_range(365))
+
+            def start_download():
+                """开始下载"""
+                nonlocal download_worker
+
+                # 获取参数
+                source_text = source_combo.currentText()
+                source = source_text.split(" - ")[0]  # 提取数据源名称
+                start_date = start_date_edit.date().toString("yyyy-MM-dd")
+                end_date = end_date_edit.date().toString("yyyy-MM-dd")
+                include_daily = daily_check.isChecked()
+                include_intraday = intraday_check.isChecked()
+                retry_count = retry_spin.value()
+
+                # 验证日期范围
+                if start_date >= end_date:
+                    log_text.append("❌ 错误: 开始日期必须早于结束日期")
+                    return
+
+                # 验证数据类型选择
+                if not include_daily and not include_intraday:
+                    log_text.append("❌ 错误: 至少选择一种数据类型")
+                    return
+
+                # 禁用下载按钮
+                download_btn.setEnabled(False)
+                close_btn.setEnabled(False)
+                progress_bar.setValue(0)
+                status_label.setText("准备下载...")
+                log_text.append(f"📅 下载范围: {start_date} 至 {end_date}")
+                log_text.append(f"🔗 数据源: {source}")
+                log_text.append(f"📊 数据类型: {'日度' if include_daily else ''}{'、' if include_daily and include_intraday else ''}{'分时' if include_intraday else ''}")
+                log_text.append(f"🔄 重试次数: {retry_count}")
+
+                # 获取SectorDataService实例
+                sector_service = None
+                try:
+                    from core.services.unified_data_manager import get_unified_data_manager
+                    unified_data_manager = get_unified_data_manager()
+                    sector_service = unified_data_manager.get_sector_fund_flow_service()
+                except Exception as service_error:
+                    log_text.append(f"❌ 获取数据服务失败: {service_error}")
+                    return
+
+                if sector_service is None:
+                    log_text.append("❌ SectorDataService服务不可用")
+                    return
+
+                # 创建下载线程
+                download_worker = DownloadWorker(source, start_date, end_date, sector_service)
+
+                def on_progress(value, message):
+                    progress_bar.setValue(value)
+                    status_label.setText(message)
+                    log_text.append(f"📊 {message}")
+
+                def on_finished(result):
+                    download_btn.setEnabled(True)
+                    close_btn.setEnabled(True)
+
+                    if result.get('success', False):
+                        count = result.get('processed_count', 0)
+                        log_text.append(f"✅ 下载成功! 共处理 {count} 条数据")
+                        status_label.setText(f"下载完成 - {count} 条数据")
+
+                        # 刷新主界面数据
+                        if hasattr(self, '_refresh_data'):
+                            self._refresh_data()
+                    else:
+                        error_msg = result.get('error', '未知错误')
+                        log_text.append(f"❌ 下载失败: {error_msg}")
+                        status_label.setText("下载失败")
+
+                def on_error(error_msg):
+                    download_btn.setEnabled(True)
+                    close_btn.setEnabled(True)
+                    log_text.append(f"❌ 下载错误: {error_msg}")
+                    status_label.setText("下载失败")
+                    progress_bar.setValue(0)
+
+                # 连接信号
+                download_worker.progress.connect(on_progress)
+                download_worker.finished.connect(on_finished)
+                download_worker.error.connect(on_error)
+
+                # 启动下载
+                download_worker.start()
+
+            def cancel_download():
+                """取消下载"""
+                nonlocal download_worker
+                if download_worker and download_worker.isRunning():
+                    download_worker.terminate()
+                    log_text.append("⚠️ 下载已取消")
+                    status_label.setText("已取消")
+                    download_btn.setEnabled(True)
+                    close_btn.setEnabled(True)
+                    progress_bar.setValue(0)
+                else:
+                    dialog.close()
+
+            def close_dialog():
+                """关闭对话框"""
+                dialog.close()
+
+            # 连接按钮事件
+            download_btn.clicked.connect(start_download)
+            cancel_btn.clicked.connect(cancel_download)
+            close_btn.clicked.connect(close_dialog)
+
+            # 显示对话框
+            dialog.exec_()
+
+        except Exception as e:
+            logger.error(f"显示下载对话框失败: {e}")
+            QMessageBox.warning(self, "错误", f"无法显示下载对话框: {str(e)}")

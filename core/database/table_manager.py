@@ -54,6 +54,10 @@ class TableType(Enum):
     SECTOR_DATA = "sector_data"
     PATTERN_RECOGNITION = "pattern_recognition"
 
+    # 板块资金流相关表
+    SECTOR_FUND_FLOW_DAILY = "sector_fund_flow_daily"
+    SECTOR_FUND_FLOW_INTRADAY = "sector_fund_flow_intraday"
+
 
 @dataclass
 class TableSchema:
@@ -698,7 +702,102 @@ class TableSchemaRegistry:
             indexes=[{'name': 'idx_symbol', 'columns': ['symbol']}, {'name': 'idx_pattern_type', 'columns': ['pattern_type']}, {'name': 'idx_pattern_score', 'columns': ['pattern_score']}, {'name': 'idx_data_source', 'columns': ['data_source']}]
         )
 
-        logger.info("默认表结构初始化完成 - 已加载17种完整表结构")
+        # 板块资金流日度数据表
+        self._schemas[TableType.SECTOR_FUND_FLOW_DAILY] = TableSchema(
+            table_type=TableType.SECTOR_FUND_FLOW_DAILY,
+            columns={
+                'sector_id': 'VARCHAR(20) NOT NULL',              # 板块ID，对应现有FUND_FLOW表的symbol字段
+                'sector_name': 'VARCHAR(100) NOT NULL',           # 板块名称，例如"房地产"、"医药生物"
+                'sector_code': 'VARCHAR(20)',                     # 板块代码，例如"BK0001"
+                'trade_date': 'DATE NOT NULL',                    # 交易日期，分区键
+
+                # 复用现有FUND_FLOW表的标准资金流字段
+                'main_inflow': 'DECIMAL(20,2)',                   # 主力流入金额（万元）
+                'main_outflow': 'DECIMAL(20,2)',                  # 主力流出金额（万元）
+                'main_net_inflow': 'DECIMAL(20,2)',               # 主力净流入=main_inflow-main_outflow
+                'retail_inflow': 'DECIMAL(20,2)',                 # 散户流入金额（万元）
+                'retail_outflow': 'DECIMAL(20,2)',                # 散户流出金额（万元）
+                'retail_net_inflow': 'DECIMAL(20,2)',             # 散户净流入=retail_inflow-retail_outflow
+                'large_order_inflow': 'DECIMAL(20,2)',            # 大单流入
+                'large_order_outflow': 'DECIMAL(20,2)',           # 大单流出
+                'large_order_net_inflow': 'DECIMAL(20,2)',        # 大单净流入
+                'medium_order_inflow': 'DECIMAL(20,2)',           # 中单流入
+                'medium_order_outflow': 'DECIMAL(20,2)',          # 中单流出
+                'medium_order_net_inflow': 'DECIMAL(20,2)',       # 中单净流入
+                'small_order_inflow': 'DECIMAL(20,2)',            # 小单流入
+                'small_order_outflow': 'DECIMAL(20,2)',           # 小单流出
+                'small_order_net_inflow': 'DECIMAL(20,2)',        # 小单净流入
+
+                # 板块特有的聚合字段
+                'stock_count': 'INTEGER',                         # 板块内股票总数
+                'rise_count': 'INTEGER',                          # 上涨股票数量
+                'fall_count': 'INTEGER',                          # 下跌股票数量
+                'flat_count': 'INTEGER',                          # 平盘股票数量
+                'avg_change_pct': 'DECIMAL(8,4)',                 # 板块平均涨跌幅(%)
+                'total_turnover': 'DECIMAL(20,2)',                # 板块总成交金额
+                'rank_by_amount': 'INTEGER',                      # 按净流入金额排名
+                'rank_by_ratio': 'INTEGER',                       # 按流入占比排名
+
+                # 复用现有元数据字段
+                'plugin_specific_data': 'JSON',
+                'data_source': 'VARCHAR(50) NOT NULL',            # 数据来源："akshare"、"eastmoney"等
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'data_quality_score': 'DECIMAL(3,2)'              # 数据质量评分0.00-1.00
+            },
+            primary_key=['sector_id', 'trade_date'],
+            indexes=[
+                {'name': 'idx_sector_daily_date', 'columns': ['trade_date']},
+                {'name': 'idx_sector_daily_ranking', 'columns': ['trade_date', 'rank_by_amount']},
+                {'name': 'idx_sector_daily_inflow', 'columns': ['trade_date', 'main_net_inflow']},
+                {'name': 'idx_sector_daily_sector', 'columns': ['sector_id']},
+                {'name': 'idx_sector_daily_source', 'columns': ['data_source']}
+            ],
+            partitions={
+                'type': 'range',
+                'column': 'trade_date',
+                'interval': 'MONTH'
+            }
+        )
+
+        # 板块资金流分时数据表
+        self._schemas[TableType.SECTOR_FUND_FLOW_INTRADAY] = TableSchema(
+            table_type=TableType.SECTOR_FUND_FLOW_INTRADAY,
+            columns={
+                'sector_id': 'VARCHAR(20) NOT NULL',              # 板块ID
+                'trade_date': 'DATE NOT NULL',                    # 交易日期
+                'trade_time': 'TIME NOT NULL',                    # 交易时间，分钟级别，例如：09:30:00
+
+                # 累计数据（相对于开盘时间）
+                'cumulative_main_inflow': 'DECIMAL(18,2)',        # 开盘至当前时间的累计主力净流入
+                'cumulative_retail_inflow': 'DECIMAL(18,2)',      # 开盘至当前时间的累计散户净流入
+                'cumulative_turnover': 'DECIMAL(18,2)',           # 开盘至当前时间的累计成交金额
+
+                # 区间数据（相对于前一分钟）
+                'interval_main_inflow': 'DECIMAL(18,2)',          # 当前分钟相比前一分钟的主力净流入变化
+                'interval_retail_inflow': 'DECIMAL(18,2)',        # 当前分钟相比前一分钟的散户净流入变化
+                'interval_turnover': 'DECIMAL(18,2)',             # 当前分钟的成交金额
+
+                # 速度和强度指标
+                'main_inflow_speed': 'DECIMAL(12,4)',             # 主力流入速度（万元/分钟）
+                'retail_inflow_speed': 'DECIMAL(12,4)',           # 散户流入速度（万元/分钟）
+                'active_degree': 'DECIMAL(8,4)',                  # 活跃度指标（0-1之间）
+                'volatility_index': 'DECIMAL(8,4)',               # 波动率指数
+
+                # 元数据
+                'data_source': 'VARCHAR(50) NOT NULL',
+                'update_time': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            },
+            primary_key=['sector_id', 'trade_date', 'trade_time'],
+            indexes=[
+                {'name': 'idx_sector_intraday_lookup', 'columns': ['sector_id', 'trade_date']},
+                {'name': 'idx_sector_intraday_time', 'columns': ['trade_date', 'trade_time']},
+                {'name': 'idx_sector_intraday_sector', 'columns': ['sector_id']},
+                {'name': 'idx_sector_intraday_source', 'columns': ['data_source']}
+            ]
+        )
+
+        logger.info("默认表结构初始化完成 - 已加载19种完整表结构（新增板块资金流日度和分时表）")
 
     def get_schema(self, table_type: TableType) -> Optional[TableSchema]:
         """获取表结构"""
@@ -1133,6 +1232,18 @@ CREATE TABLE {table_name} (
         except Exception as e:
             logger.error(f"表结构迁移失败 {table_name}: {e}")
             return False
+
+    def get_schema(self, table_type: TableType) -> Optional[TableSchema]:
+        """
+        获取表结构
+
+        Args:
+            table_type: 表类型
+
+        Returns:
+            表结构对象或None
+        """
+        return self.schema_registry.get_schema(table_type)
 
     def clear_table_cache(self):
         """清理表缓存"""

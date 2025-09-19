@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QIcon
 import traceback
 from utils.theme import get_theme_manager
-# log_structured已替换为直接的logger调用
+from loguru import logger
 
 
 class MainMenuBar(QMenuBar):
@@ -314,10 +314,10 @@ class MainMenuBar(QMenuBar):
             self.data_menu.addSeparator()
 
             # 数据导入子菜单 - 专业级DuckDB导入系统
-            self.data_import_menu = self.data_menu.addMenu(" 数据导入")
+            self.data_import_menu = self.data_menu.addMenu("股票数据导入")
 
             # DuckDB专业数据导入（统一入口）
-            self.enhanced_import_action = QAction("🚀 DuckDB专业数据导入", self)
+            self.enhanced_import_action = QAction("K线数据导入", self)
             self.enhanced_import_action.setStatusTip("打开DuckDB专业数据导入系统（集成AI智能优化、任务管理、分布式执行、质量监控）")
             self.enhanced_import_action.setShortcut("Ctrl+Shift+I")
             self.data_import_menu.addAction(self.enhanced_import_action)

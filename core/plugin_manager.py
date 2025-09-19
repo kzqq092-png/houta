@@ -2059,8 +2059,8 @@ class PluginManager(QObject):
                         if base.__name__ == 'IPlugin' or 'Plugin' in base.__name__:
                             # 检查是否是抽象类
                             if hasattr(attr, '__abstractmethods__') and attr.__abstractmethods__:
-                                logger.info(
-                                    f"跳过抽象类: {attr.__name__}, 抽象方法: {attr.__abstractmethods__}")
+                                # logger.info(
+                                #     f"跳过抽象类: {attr.__name__}, 抽象方法: {attr.__abstractmethods__}")
                                 continue
 
                             logger.info(
@@ -2075,7 +2075,7 @@ class PluginManager(QObject):
                         attr.__name__ not in excluded_class_names):
                     # 检查是否是枚举类型
                     if hasattr(attr, '__members__'):
-                        logger.info(f"跳过枚举类型: {attr.__name__}")
+                        # logger.info(f"跳过枚举类型: {attr.__name__}")
                         continue
 
                     logger.info(f"找到名称符合插件特征的类: {attr.__name__}")

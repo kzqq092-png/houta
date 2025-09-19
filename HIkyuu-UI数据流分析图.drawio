@@ -1,0 +1,191 @@
+<mxfile host="65bd71144e">
+    <diagram name="数据流分析图" id="data-flow-analysis">
+        <mxGraphModel dx="1569" dy="2358" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="data-sources-layer" value="外部数据源层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="50" width="1500" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="tongdaxin-api" value="通达信API&#10;(股票数据)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="eastmoney-api" value="东方财富API&#10;(股票数据)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="binance-api" value="Binance API&#10;(加密货币)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="yahoo-api" value="Yahoo Finance&#10;(美股数据)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="ctp-api" value="CTP接口&#10;(期货数据)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="custom-sources" value="自定义数据源&#10;(CSV/JSON/DB)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="80" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="plugin-layer" value="插件抽象层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="200" width="1500" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="plugin-adapter" value="统一插件接口&#10;(IDataSourcePlugin)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="220" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="processing-pipeline" value="TET数据处理流水线" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontSize=14;fontStyle=1;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="320" width="1500" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="step1" value="1. 数据获取&#10;(Transform)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step1-details" value="• 插件路由选择&#10;• 参数验证&#10;• API调用&#10;• 原始数据获取" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step2" value="2. 数据提取&#10;(Extract)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step2-details" value="• 数据解析&#10;• 格式识别&#10;• 字段提取&#10;• 类型转换" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step3" value="3. 数据转换&#10;(Transform)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step3-details" value="• 数据标准化&#10;• 字段映射&#10;• 单位统一&#10;• 质量检查" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step4" value="4. 质量控制&#10;(Quality)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step4-details" value="• 异常检测&#10;• 完整性检查&#10;• 一致性验证&#10;• 质量评分" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step5" value="5. 数据存储&#10;(Store)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step5-details" value="• 资产类型路由&#10;• DuckDB存储&#10;• 索引创建&#10;• 备份管理" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step6" value="6. 缓存管理&#10;(Cache)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step6-details" value="• 多层缓存&#10;• TTL管理&#10;• 缓存更新&#10;• 内存优化" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step7" value="7. 监控反馈&#10;(Monitor)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#ff6600;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="350" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="step7-details" value="• 性能指标&#10;• 健康检查&#10;• 错误追踪&#10;• 自动调优" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="420" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="storage-layer" value="分离存储层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="610" width="1500" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="stock-storage" value="stock_data.duckdb&#10;• 历史K线&#10;• 实时行情&#10;• 股票列表" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="crypto-storage" value="crypto_data.duckdb&#10;• 币种列表&#10;• 交易数据&#10;• 市场深度" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="futures-storage" value="futures_data.duckdb&#10;• 合约信息&#10;• 持仓数据&#10;• 交割信息" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="forex-storage" value="forex_data.duckdb&#10;• 汇率数据&#10;• 央行政策&#10;• 经济指标" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="bond-storage" value="bond_data.duckdb&#10;• 债券基本信息&#10;• 收益率曲线&#10;• 信用评级" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="index-storage" value="index_data.duckdb&#10;• 指数成分&#10;• 权重信息&#10;• 历史走势" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="900" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="fund-storage" value="fund_data.duckdb&#10;• 基金净值&#10;• 持仓明细&#10;• 业绩表现" style="cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="1060" y="640" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;fontColor=#050505;" parent="1" source="tongdaxin-api" target="plugin-adapter" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;fontColor=#050505;" parent="1" source="binance-api" target="plugin-adapter" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="plugin-adapter" target="step1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step1" target="step2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step2" target="step3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step3" target="step4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step4" target="step5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step5" target="step6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#ff6600;fontColor=#050505;" parent="1" source="step6" target="step7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#050505;" parent="1" source="step5" target="stock-storage" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="780" y="560"/>
+                            <mxPoint x="160" y="560"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#050505;" parent="1" source="step5" target="crypto-storage" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="780" y="560"/>
+                            <mxPoint x="320" y="560"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#050505;" parent="1" source="stock-storage" target="unified-interface" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="160" y="780"/>
+                            <mxPoint x="500" y="780"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#050505;" parent="1" source="crypto-storage" target="unified-interface" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="320" y="780"/>
+                            <mxPoint x="500" y="780"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="feedback1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;strokeColor=#666666;dashed=1;fontColor=#050505;" parent="1" source="step7" target="step1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1100" y="330"/>
+                            <mxPoint x="140" y="330"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="data-types" value="数据类型处理能力:&#10;✓ HISTORICAL_KLINE (历史K线)&#10;✓ REAL_TIME_QUOTE (实时行情)&#10;✓ FUNDAMENTAL (基本面数据)&#10;✓ ASSET_LIST (资产列表)&#10;✓ SECTOR_FUND_FLOW (板块资金流)&#10;✓ MARKET_DEPTH (市场深度)&#10;✓ FINANCIAL_STATEMENTS (财务报表)" style="text;html=1;strokeColor=#0066cc;fillColor=#e6f3ff;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontFamily=Consolas;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="1250" y="350" width="280" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="performance" value="系统性能特征:&#10;• 并发处理：支持多插件并行执行&#10;• 智能缓存：多层缓存减少重复请求&#10;• 容错机制：自动降级和故障转移&#10;• 质量保证：实时数据质量监控&#10;• 弹性扩展：插件化支持水平扩展&#10;• 监控完善：全链路性能和健康监控" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontFamily=Consolas;fontColor=#050505;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="610" width="280" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="title" value="HIkyuu-UI TET数据处理流水线详细分析图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#fbf9f9;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="-20" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="group" vertex="1" connectable="0" parent="1">
+                    <mxGeometry x="50" y="830" width="1500" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="app-layer" value="应用访问层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;fontColor=#050505;" parent="2" vertex="1">
+                    <mxGeometry width="1500" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="unified-interface" value="统一查询接口&#10;(CrossAssetQueryEngine)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#050505;" parent="2" vertex="1">
+                    <mxGeometry x="350" y="20" width="200" height="40" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

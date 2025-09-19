@@ -1,0 +1,12 @@
+{
+  "id": "approval_1757778945234_f32vxj1mg",
+  "title": "DuckDB专业数据导入系统优化 - 专业级增强设计文档审批（对标专业软件）",
+  "filePath": ".spec-workflow/specs/duckdb-import-system-optimization/design.md",
+  "type": "document",
+  "status": "approved",
+  "createdAt": "2025-09-13T15:55:45.234Z",
+  "category": "spec",
+  "categoryName": "duckdb-import-system-optimization",
+  "response": "通过仪表板批准",
+  "respondedAt": "2025-09-13T15:57:28.802Z"
+}

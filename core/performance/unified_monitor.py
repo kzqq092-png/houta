@@ -673,6 +673,47 @@ class AutoTuner:
                 except Exception as e:
                     logger.error(f"调优回调失败: {param_name}, {e}")
 
+    def get_status(self) -> Dict[str, Any]:
+        """获取自动调优状态"""
+        try:
+            status = {
+                "enabled": True,
+                "total_params": len(self.tuning_params),
+                "tuned_params": len([p for p in self.tuning_params.values() if p.last_metric > 0]),
+                "history_count": len(self.tuning_history),
+                "parameters": {}
+            }
+            
+            # 添加每个参数的状态
+            for param_name, tuning_state in self.tuning_params.items():
+                status["parameters"][param_name] = {
+                    "current_value": tuning_state.value,
+                    "min_value": tuning_state.min_value,
+                    "max_value": tuning_state.max_value,
+                    "last_metric": tuning_state.last_metric,
+                    "direction": tuning_state.direction.value if hasattr(tuning_state, 'direction') else "stable",
+                    "momentum": getattr(tuning_state, 'momentum', 0)
+                }
+            
+            # 计算调优进度
+            if status["total_params"] > 0:
+                status["progress"] = (status["tuned_params"] / status["total_params"]) * 100
+            else:
+                status["progress"] = 0
+                
+            return status
+            
+        except Exception as e:
+            logger.error(f"获取AutoTuner状态失败: {e}")
+            return {
+                "enabled": False,
+                "error": str(e),
+                "total_params": 0,
+                "tuned_params": 0,
+                "progress": 0,
+                "parameters": {}
+            }
+
     def get_tuning_stats(self) -> Dict[str, float]:
         """获取调优统计信息"""
         try:

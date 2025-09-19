@@ -358,6 +358,21 @@ class AutoTuner:
                 "error": str(e),
                 "last_update": datetime.now().isoformat()
             }
+    
+    def get_status(self) -> Dict[str, Any]:
+        """获取自动调优状态 - get_optimization_status的别名，用于兼容性"""
+        status = self.get_optimization_status()
+        # 重新映射字段名以匹配import_execution_engine期望的格式
+        return {
+            "active_tasks": status.get("active_optimizations", 0),
+            "completed_tasks": status.get("completed_optimizations", 0),
+            "failed_tasks": status.get("failed_optimizations", 0),
+            "total_improvement": status.get("avg_improvement", 0),
+            "system_status": status.get("system_status", "idle"),
+            "last_update": status.get("last_update", datetime.now().isoformat()),
+            # 保留原有字段
+            **status
+        }
 
     def cancel_task(self, pattern_name: str) -> bool:
         """取消优化任务"""

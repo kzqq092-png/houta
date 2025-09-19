@@ -131,6 +131,12 @@ class FactorWeaveQuantApplication:
         """创建Qt应用程序"""
         logger.info("1. 创建Qt应用程序...")
 
+        # 设置QtWebEngine缓存目录，避免创建缓存失败
+        import os
+        cache_dir = os.path.join(os.path.expanduser("~"), ".factorweave", "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = f"--user-data-dir={cache_dir}"
+
         # 设置Qt应用程序属性
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
         QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)

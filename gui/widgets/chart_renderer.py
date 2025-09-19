@@ -216,7 +216,7 @@ class ChartRenderer(QObject):
         """
         # 获取样式
         color = style.get('color', 'blue')
-        linewidth = style.get('linewidth', 1.0)
+        linewidth = style.get('linewidth', 0.5)
         alpha = style.get('alpha', 0.8)
         label = style.get('label', '')
 

@@ -275,6 +275,66 @@ class TETDataPipeline:
                 'category': 'category', '分类': 'category', '指标分类': 'category',
                 'indicator_code': 'indicator_code', '指标代码': 'indicator_code', '代码': 'indicator_code',
                 'indicator_name': 'indicator_name', '指标名称': 'indicator_name', '名称': 'indicator_name'
+            },
+
+            # 新增：板块资金流数据映射
+            DataType.SECTOR_FUND_FLOW: {
+                # 板块基础信息
+                'sector_id': 'sector_id', '板块ID': 'sector_id', 'sector_code': 'sector_id', '板块代码': 'sector_id',
+                'sector_name': 'sector_name', '板块名称': 'sector_name', '板块': 'sector_name', 'name': 'sector_name',
+                'code': 'sector_code', 'sector_code': 'sector_code', '代码': 'sector_code',
+
+                # 主力资金流
+                'main_inflow': 'main_inflow', '主力流入': 'main_inflow', '主力买入': 'main_inflow', 'main_buy': 'main_inflow',
+                'main_outflow': 'main_outflow', '主力流出': 'main_outflow', '主力卖出': 'main_outflow', 'main_sell': 'main_outflow',
+                'main_net_inflow': 'main_net_inflow', '主力净流入': 'main_net_inflow', '主力净买入': 'main_net_inflow', 'main_net': 'main_net_inflow',
+
+                # 散户资金流
+                'retail_inflow': 'retail_inflow', '散户流入': 'retail_inflow', '散户买入': 'retail_inflow', 'retail_buy': 'retail_inflow',
+                'retail_outflow': 'retail_outflow', '散户流出': 'retail_outflow', '散户卖出': 'retail_outflow', 'retail_sell': 'retail_outflow',
+                'retail_net_inflow': 'retail_net_inflow', '散户净流入': 'retail_net_inflow', '散户净买入': 'retail_net_inflow', 'retail_net': 'retail_net_inflow',
+
+                # 大单资金流
+                'large_order_inflow': 'large_order_inflow', '大单流入': 'large_order_inflow', '大单买入': 'large_order_inflow', 'large_buy': 'large_order_inflow',
+                'large_order_outflow': 'large_order_outflow', '大单流出': 'large_order_outflow', '大单卖出': 'large_order_outflow', 'large_sell': 'large_order_outflow',
+                'large_order_net_inflow': 'large_order_net_inflow', '大单净流入': 'large_order_net_inflow', '大单净买入': 'large_order_net_inflow', 'large_net': 'large_order_net_inflow',
+
+                # 中单资金流
+                'medium_order_inflow': 'medium_order_inflow', '中单流入': 'medium_order_inflow', '中单买入': 'medium_order_inflow', 'medium_buy': 'medium_order_inflow',
+                'medium_order_outflow': 'medium_order_outflow', '中单流出': 'medium_order_outflow', '中单卖出': 'medium_order_outflow', 'medium_sell': 'medium_order_outflow',
+                'medium_order_net_inflow': 'medium_order_net_inflow', '中单净流入': 'medium_order_net_inflow', '中单净买入': 'medium_order_net_inflow', 'medium_net': 'medium_order_net_inflow',
+
+                # 小单资金流
+                'small_order_inflow': 'small_order_inflow', '小单流入': 'small_order_inflow', '小单买入': 'small_order_inflow', 'small_buy': 'small_order_inflow',
+                'small_order_outflow': 'small_order_outflow', '小单流出': 'small_order_outflow', '小单卖出': 'small_order_outflow', 'small_sell': 'small_order_outflow',
+                'small_order_net_inflow': 'small_order_net_inflow', '小单净流入': 'small_order_net_inflow', '小单净买入': 'small_order_net_inflow', 'small_net': 'small_order_net_inflow',
+
+                # 板块统计数据
+                'stock_count': 'stock_count', '股票数量': 'stock_count', '成分股数量': 'stock_count', 'count': 'stock_count',
+                'rise_count': 'rise_count', '上涨家数': 'rise_count', '涨股数': 'rise_count', 'up_count': 'rise_count',
+                'fall_count': 'fall_count', '下跌家数': 'fall_count', '跌股数': 'fall_count', 'down_count': 'fall_count',
+                'flat_count': 'flat_count', '平盘家数': 'flat_count', '平股数': 'flat_count', 'unchanged_count': 'flat_count',
+
+                # 价格变动
+                'avg_change_pct': 'avg_change_pct', '平均涨跌幅': 'avg_change_pct', '平均涨幅': 'avg_change_pct', 'avg_change': 'avg_change_pct',
+                'change_pct': 'avg_change_pct', '涨跌幅': 'avg_change_pct', '涨幅': 'avg_change_pct', 'pct_change': 'avg_change_pct',
+
+                # 成交数据
+                'total_turnover': 'total_turnover', '总成交额': 'total_turnover', '成交额': 'total_turnover', 'turnover': 'total_turnover',
+                'amount': 'total_turnover', '金额': 'total_turnover', 'volume_amount': 'total_turnover',
+
+                # 排名数据
+                'rank_by_amount': 'rank_by_amount', '按金额排名': 'rank_by_amount', '资金排名': 'rank_by_amount', 'amount_rank': 'rank_by_amount',
+                'rank_by_ratio': 'rank_by_ratio', '按占比排名': 'rank_by_ratio', '占比排名': 'rank_by_ratio', 'ratio_rank': 'rank_by_ratio',
+                'rank': 'rank_by_amount', '排名': 'rank_by_amount', 'ranking': 'rank_by_amount',
+
+                # 时间字段
+                'trade_date': 'trade_date', '交易日期': 'trade_date', '日期': 'trade_date', 'date': 'trade_date',
+                'trade_time': 'trade_time', '交易时间': 'trade_time', '时间': 'trade_time', 'time': 'trade_time',
+                'update_time': 'update_time', '更新时间': 'update_time', 'timestamp': 'update_time',
+
+                # 元数据字段
+                'data_source': 'data_source', '数据源': 'data_source', 'source': 'data_source', 'provider': 'data_source'
             }
         }
 

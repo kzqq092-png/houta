@@ -8,6 +8,9 @@ from loguru import logger
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+
+# 明确导入QAbstractItemView以防止运行时错误
+from PyQt5.QtWidgets import QAbstractItemView
 import sys
 import numpy as np
 import pandas as pd

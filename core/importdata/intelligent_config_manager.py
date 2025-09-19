@@ -135,9 +135,23 @@ class IntelligentConfigManager(ImportConfigManager):
         self._performance_history: List[Dict[str, Any]] = []
         self._optimization_cache: Dict[str, Dict[str, Any]] = {}
 
+        # 自动配置能力扩展
+        self._auto_config_enabled: bool = True
+        self._auto_optimization_interval: int = 3600  # 1小时
+        self._auto_conflict_resolution: bool = True
+        self._auto_template_learning: bool = True
+        self._config_adaptation_rules: Dict[str, Any] = {}
+        self._environment_profiles: Dict[str, Dict[str, Any]] = {}
+        self._performance_baselines: Dict[str, float] = {}
+        
+        # 自动配置线程锁
+        self._auto_config_lock = threading.Lock()
+        self._last_auto_optimization = datetime.now()
+
         # 初始化智能功能
         self._init_intelligent_tables()
         self._load_intelligent_data()
+        self._init_auto_config_capabilities()
 
         logger.info("智能配置管理器初始化完成")
 
@@ -192,6 +206,47 @@ class IntelligentConfigManager(ImportConfigManager):
                 )
             """)
 
+            # 自动配置规则表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auto_config_rules (
+                    rule_id TEXT PRIMARY KEY,
+                    rule_name TEXT NOT NULL,
+                    rule_type TEXT NOT NULL,
+                    conditions TEXT NOT NULL,
+                    actions TEXT NOT NULL,
+                    enabled BOOLEAN DEFAULT TRUE,
+                    priority INTEGER DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+
+            # 环境配置文件表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS environment_profiles (
+                    profile_id TEXT PRIMARY KEY,
+                    profile_name TEXT NOT NULL,
+                    environment_data TEXT NOT NULL,
+                    baseline_metrics TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+
+            # 自动优化日志表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auto_optimization_logs (
+                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    config_id TEXT NOT NULL,
+                    optimization_type TEXT NOT NULL,
+                    original_config TEXT NOT NULL,
+                    optimized_config TEXT NOT NULL,
+                    performance_improvement REAL,
+                    success BOOLEAN DEFAULT TRUE,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
             conn.commit()
 
     def _load_intelligent_data(self):
@@ -230,6 +285,195 @@ class IntelligentConfigManager(ImportConfigManager):
                     })
                 except Exception as e:
                     logger.error(f"加载性能历史失败: {e}")
+
+    def _init_auto_config_capabilities(self):
+        """初始化自动配置能力"""
+        try:
+            # 加载自动配置规则
+            self._load_auto_config_rules()
+            
+            # 加载环境配置文件
+            self._load_environment_profiles()
+            
+            # 初始化默认配置适应规则
+            self._init_default_adaptation_rules()
+            
+            # 建立性能基线
+            self._establish_performance_baselines()
+            
+            logger.info("自动配置能力初始化完成")
+            
+        except Exception as e:
+            logger.error(f"初始化自动配置能力失败: {e}")
+
+    def _load_auto_config_rules(self):
+        """加载自动配置规则"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT rule_id, rule_name, rule_type, conditions, actions, enabled, priority
+                    FROM auto_config_rules WHERE enabled = TRUE
+                    ORDER BY priority DESC
+                """)
+                
+                for row in cursor.fetchall():
+                    rule_id, rule_name, rule_type, conditions, actions, enabled, priority = row
+                    self._config_adaptation_rules[rule_id] = {
+                        'name': rule_name,
+                        'type': rule_type,
+                        'conditions': json.loads(conditions),
+                        'actions': json.loads(actions),
+                        'enabled': enabled,
+                        'priority': priority
+                    }
+                    
+                logger.info(f"加载自动配置规则: {len(self._config_adaptation_rules)}条")
+                
+        except Exception as e:
+            logger.error(f"加载自动配置规则失败: {e}")
+
+    def _load_environment_profiles(self):
+        """加载环境配置文件"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT profile_id, profile_name, environment_data, baseline_metrics
+                    FROM environment_profiles
+                """)
+                
+                for row in cursor.fetchall():
+                    profile_id, profile_name, env_data, baseline_metrics = row
+                    self._environment_profiles[profile_id] = {
+                        'name': profile_name,
+                        'environment_data': json.loads(env_data),
+                        'baseline_metrics': json.loads(baseline_metrics)
+                    }
+                    
+                logger.info(f"加载环境配置文件: {len(self._environment_profiles)}个")
+                
+        except Exception as e:
+            logger.error(f"加载环境配置文件失败: {e}")
+
+    def _init_default_adaptation_rules(self):
+        """初始化默认配置适应规则"""
+        default_rules = [
+            {
+                'rule_id': 'auto_scale_workers',
+                'name': '自动调整工作线程数',
+                'type': 'performance_optimization',
+                'conditions': {
+                    'cpu_utilization': {'operator': '<', 'value': 0.6},
+                    'success_rate': {'operator': '>', 'value': 0.9}
+                },
+                'actions': {
+                    'max_workers': {'operation': 'multiply', 'factor': 1.5, 'max': 16}
+                },
+                'priority': 10
+            },
+            {
+                'rule_id': 'auto_reduce_batch_on_error',
+                'name': '错误率高时自动减少批次大小',
+                'type': 'reliability_optimization',
+                'conditions': {
+                    'error_rate': {'operator': '>', 'value': 0.1},
+                    'execution_time': {'operator': '>', 'value': 300}
+                },
+                'actions': {
+                    'batch_size': {'operation': 'multiply', 'factor': 0.7, 'min': 100}
+                },
+                'priority': 20
+            },
+            {
+                'rule_id': 'auto_optimize_memory',
+                'name': '内存使用率高时自动优化',
+                'type': 'resource_optimization',
+                'conditions': {
+                    'memory_utilization': {'operator': '>', 'value': 0.8}
+                },
+                'actions': {
+                    'batch_size': {'operation': 'multiply', 'factor': 0.8, 'min': 100},
+                    'max_workers': {'operation': 'subtract', 'value': 1, 'min': 1}
+                },
+                'priority': 15
+            }
+        ]
+        
+        # 保存默认规则到数据库（如果不存在）
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                for rule in default_rules:
+                    cursor.execute("SELECT COUNT(*) FROM auto_config_rules WHERE rule_id = ?", (rule['rule_id'],))
+                    if cursor.fetchone()[0] == 0:
+                        cursor.execute("""
+                            INSERT INTO auto_config_rules
+                            (rule_id, rule_name, rule_type, conditions, actions, enabled, priority, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            rule['rule_id'],
+                            rule['name'],
+                            rule['type'],
+                            json.dumps(rule['conditions']),
+                            json.dumps(rule['actions']),
+                            True,
+                            rule['priority'],
+                            datetime.now().isoformat(),
+                            datetime.now().isoformat()
+                        ))
+                        
+                        # 添加到内存中
+                        self._config_adaptation_rules[rule['rule_id']] = {
+                            'name': rule['name'],
+                            'type': rule['type'],
+                            'conditions': rule['conditions'],
+                            'actions': rule['actions'],
+                            'enabled': True,
+                            'priority': rule['priority']
+                        }
+                
+                conn.commit()
+                logger.info("初始化默认配置适应规则完成")
+                
+        except Exception as e:
+            logger.error(f"初始化默认配置适应规则失败: {e}")
+
+    def _establish_performance_baselines(self):
+        """建立性能基线"""
+        try:
+            if not self._performance_history:
+                # 设置默认基线
+                self._performance_baselines = {
+                    'success_rate': 0.95,
+                    'error_rate': 0.05,
+                    'avg_execution_time': 60.0,
+                    'throughput': 1000.0
+                }
+                return
+            
+            # 基于历史数据计算基线
+            df = pd.DataFrame(self._performance_history)
+            
+            self._performance_baselines = {
+                'success_rate': df['success_rate'].quantile(0.8),  # 80分位数作为基线
+                'error_rate': df['error_rate'].quantile(0.2),     # 20分位数作为基线
+                'avg_execution_time': df['execution_time'].median(),
+                'throughput': df['throughput'].quantile(0.8)
+            }
+            
+            logger.info(f"建立性能基线: {self._performance_baselines}")
+            
+        except Exception as e:
+            logger.error(f"建立性能基线失败: {e}")
+            # 使用默认基线
+            self._performance_baselines = {
+                'success_rate': 0.95,
+                'error_rate': 0.05,
+                'avg_execution_time': 60.0,
+                'throughput': 1000.0
+            }
 
     def generate_intelligent_config(self,
                                     base_config: ImportTaskConfig,
@@ -1285,6 +1529,411 @@ class IntelligentConfigManager(ImportConfigManager):
         except Exception as e:
             logger.error(f"记录性能反馈失败: {e}")
 
+    def auto_optimize_config(self, config_id: str, current_metrics: Dict[str, float]) -> Optional[ImportTaskConfig]:
+        """
+        自动优化配置
+        
+        Args:
+            config_id: 配置ID
+            current_metrics: 当前性能指标
+            
+        Returns:
+            优化后的配置，如果无需优化则返回None
+        """
+        if not self._auto_config_enabled:
+            return None
+            
+        with self._auto_config_lock:
+            try:
+                config = self.get_import_task(config_id)
+                if not config:
+                    logger.error(f"配置不存在: {config_id}")
+                    return None
+                
+                # 检查是否需要优化
+                if not self._should_auto_optimize(config, current_metrics):
+                    return None
+                
+                # 应用自动配置规则
+                optimized_config = self._apply_auto_config_rules(config, current_metrics)
+                
+                if optimized_config and self._is_config_different(config, optimized_config):
+                    # 验证优化后的配置
+                    validation_result = self._validate_intelligent_config(optimized_config)
+                    if validation_result['is_valid']:
+                        # 更新配置
+                        self.update_import_task(
+                            config_id,
+                            max_workers=optimized_config.max_workers,
+                            batch_size=optimized_config.batch_size
+                        )
+                        
+                        # 记录自动优化日志
+                        self._log_auto_optimization(config, optimized_config, current_metrics)
+                        
+                        logger.info(f"自动优化配置完成: {config_id}")
+                        return optimized_config
+                    else:
+                        logger.warning(f"自动优化配置验证失败: {validation_result['issues']}")
+                
+                return None
+                
+            except Exception as e:
+                logger.error(f"自动优化配置失败: {e}")
+                return None
+
+    def _should_auto_optimize(self, config: ImportTaskConfig, current_metrics: Dict[str, float]) -> bool:
+        """检查是否应该自动优化"""
+        try:
+            # 检查优化间隔
+            if (datetime.now() - self._last_auto_optimization).total_seconds() < self._auto_optimization_interval:
+                return False
+            
+            # 检查性能是否低于基线
+            baseline_checks = [
+                current_metrics.get('success_rate', 1.0) < self._performance_baselines.get('success_rate', 0.95) * 0.9,
+                current_metrics.get('error_rate', 0.0) > self._performance_baselines.get('error_rate', 0.05) * 1.5,
+                current_metrics.get('execution_time', 0.0) > self._performance_baselines.get('avg_execution_time', 60.0) * 1.3
+            ]
+            
+            return any(baseline_checks)
+            
+        except Exception as e:
+            logger.error(f"检查自动优化条件失败: {e}")
+            return False
+
+    def _apply_auto_config_rules(self, config: ImportTaskConfig, current_metrics: Dict[str, float]) -> Optional[ImportTaskConfig]:
+        """应用自动配置规则"""
+        try:
+            # 创建配置副本
+            optimized_config = ImportTaskConfig(
+                task_id=config.task_id,
+                name=config.name,
+                data_source=config.data_source,
+                asset_type=config.asset_type,
+                data_type=config.data_type,
+                symbols=config.symbols,
+                frequency=config.frequency,
+                mode=config.mode,
+                start_date=config.start_date,
+                end_date=config.end_date,
+                schedule_cron=config.schedule_cron,
+                enabled=config.enabled,
+                max_workers=config.max_workers,
+                batch_size=config.batch_size,
+                created_at=config.created_at,
+                updated_at=datetime.now().isoformat()
+            )
+            
+            # 获取当前环境信息
+            environment_info = self._get_current_environment_info()
+            
+            # 按优先级排序规则
+            sorted_rules = sorted(
+                self._config_adaptation_rules.items(),
+                key=lambda x: x[1]['priority'],
+                reverse=True
+            )
+            
+            # 应用匹配的规则
+            applied_rules = []
+            for rule_id, rule in sorted_rules:
+                if self._rule_matches_conditions(rule, current_metrics, environment_info):
+                    optimized_config = self._apply_rule_actions(optimized_config, rule['actions'])
+                    applied_rules.append(rule_id)
+                    logger.info(f"应用自动配置规则: {rule['name']}")
+            
+            if applied_rules:
+                logger.info(f"共应用 {len(applied_rules)} 条自动配置规则")
+                return optimized_config
+            else:
+                return None
+                
+        except Exception as e:
+            logger.error(f"应用自动配置规则失败: {e}")
+            return None
+
+    def _rule_matches_conditions(self, rule: Dict[str, Any], current_metrics: Dict[str, float], environment_info: Dict[str, Any]) -> bool:
+        """检查规则条件是否匹配"""
+        try:
+            conditions = rule['conditions']
+            
+            for metric_name, condition in conditions.items():
+                operator = condition['operator']
+                threshold = condition['value']
+                
+                # 获取当前值
+                if metric_name in current_metrics:
+                    current_value = current_metrics[metric_name]
+                elif metric_name in environment_info:
+                    current_value = environment_info[metric_name]
+                else:
+                    continue  # 跳过无法获取的指标
+                
+                # 检查条件
+                if operator == '>':
+                    if not (current_value > threshold):
+                        return False
+                elif operator == '<':
+                    if not (current_value < threshold):
+                        return False
+                elif operator == '>=':
+                    if not (current_value >= threshold):
+                        return False
+                elif operator == '<=':
+                    if not (current_value <= threshold):
+                        return False
+                elif operator == '==':
+                    if not (current_value == threshold):
+                        return False
+                elif operator == '!=':
+                    if not (current_value != threshold):
+                        return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"检查规则条件失败: {e}")
+            return False
+
+    def _apply_rule_actions(self, config: ImportTaskConfig, actions: Dict[str, Any]) -> ImportTaskConfig:
+        """应用规则动作"""
+        try:
+            for param_name, action in actions.items():
+                operation = action['operation']
+                
+                if param_name == 'max_workers':
+                    current_value = config.max_workers
+                elif param_name == 'batch_size':
+                    current_value = config.batch_size
+                else:
+                    continue
+                
+                # 执行操作
+                if operation == 'multiply':
+                    new_value = int(current_value * action['factor'])
+                elif operation == 'add':
+                    new_value = current_value + action['value']
+                elif operation == 'subtract':
+                    new_value = current_value - action['value']
+                elif operation == 'set':
+                    new_value = action['value']
+                else:
+                    continue
+                
+                # 应用限制
+                if 'min' in action:
+                    new_value = max(new_value, action['min'])
+                if 'max' in action:
+                    new_value = min(new_value, action['max'])
+                
+                # 更新配置
+                if param_name == 'max_workers':
+                    config.max_workers = new_value
+                elif param_name == 'batch_size':
+                    config.batch_size = new_value
+            
+            return config
+            
+        except Exception as e:
+            logger.error(f"应用规则动作失败: {e}")
+            return config
+
+    def _get_current_environment_info(self) -> Dict[str, Any]:
+        """获取当前环境信息"""
+        try:
+            import psutil
+            
+            return {
+                'cpu_utilization': psutil.cpu_percent(interval=1) / 100.0,
+                'memory_utilization': psutil.virtual_memory().percent / 100.0,
+                'disk_utilization': psutil.disk_usage('/').percent / 100.0,
+                'cpu_count': psutil.cpu_count(),
+                'available_memory_gb': psutil.virtual_memory().available / (1024**3),
+                'current_hour': datetime.now().hour,
+                'is_business_hours': 9 <= datetime.now().hour <= 17
+            }
+            
+        except Exception as e:
+            logger.error(f"获取环境信息失败: {e}")
+            return {}
+
+    def _is_config_different(self, config1: ImportTaskConfig, config2: ImportTaskConfig) -> bool:
+        """检查两个配置是否不同"""
+        return (config1.max_workers != config2.max_workers or 
+                config1.batch_size != config2.batch_size)
+
+    def _log_auto_optimization(self, original_config: ImportTaskConfig, optimized_config: ImportTaskConfig, metrics: Dict[str, float]):
+        """记录自动优化日志"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # 计算性能改进估算
+                performance_improvement = self._estimate_performance_improvement(original_config, optimized_config, metrics)
+                
+                cursor.execute("""
+                    INSERT INTO auto_optimization_logs
+                    (config_id, optimization_type, original_config, optimized_config, performance_improvement, success, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    original_config.task_id,
+                    'auto_rule_based',
+                    json.dumps(original_config.to_dict()),
+                    json.dumps(optimized_config.to_dict()),
+                    performance_improvement,
+                    True,
+                    datetime.now().isoformat()
+                ))
+                
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"记录自动优化日志失败: {e}")
+
+    def _estimate_performance_improvement(self, original: ImportTaskConfig, optimized: ImportTaskConfig, metrics: Dict[str, float]) -> float:
+        """估算性能改进"""
+        try:
+            # 简化的性能改进估算
+            worker_improvement = (optimized.max_workers - original.max_workers) / original.max_workers * 0.3
+            batch_improvement = (optimized.batch_size - original.batch_size) / original.batch_size * 0.2
+            
+            total_improvement = worker_improvement + batch_improvement
+            return max(-0.5, min(0.5, total_improvement))  # 限制在-50%到+50%之间
+            
+        except Exception as e:
+            logger.error(f"估算性能改进失败: {e}")
+            return 0.0
+
+    def create_environment_profile(self, profile_name: str, environment_data: Dict[str, Any], baseline_metrics: Dict[str, float]) -> str:
+        """创建环境配置文件"""
+        try:
+            profile_id = f"env_profile_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO environment_profiles
+                    (profile_id, profile_name, environment_data, baseline_metrics, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    profile_id,
+                    profile_name,
+                    json.dumps(environment_data),
+                    json.dumps(baseline_metrics),
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat()
+                ))
+                conn.commit()
+            
+            # 添加到内存
+            self._environment_profiles[profile_id] = {
+                'name': profile_name,
+                'environment_data': environment_data,
+                'baseline_metrics': baseline_metrics
+            }
+            
+            logger.info(f"创建环境配置文件: {profile_name}")
+            return profile_id
+            
+        except Exception as e:
+            logger.error(f"创建环境配置文件失败: {e}")
+            return ""
+
+    def create_auto_config_rule(self, rule_name: str, rule_type: str, conditions: Dict[str, Any], actions: Dict[str, Any], priority: int = 0) -> str:
+        """创建自动配置规则"""
+        try:
+            rule_id = f"auto_rule_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO auto_config_rules
+                    (rule_id, rule_name, rule_type, conditions, actions, enabled, priority, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    rule_id,
+                    rule_name,
+                    rule_type,
+                    json.dumps(conditions),
+                    json.dumps(actions),
+                    True,
+                    priority,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat()
+                ))
+                conn.commit()
+            
+            # 添加到内存
+            self._config_adaptation_rules[rule_id] = {
+                'name': rule_name,
+                'type': rule_type,
+                'conditions': conditions,
+                'actions': actions,
+                'enabled': True,
+                'priority': priority
+            }
+            
+            logger.info(f"创建自动配置规则: {rule_name}")
+            return rule_id
+            
+        except Exception as e:
+            logger.error(f"创建自动配置规则失败: {e}")
+            return ""
+
+    def enable_auto_config(self, enabled: bool = True):
+        """启用/禁用自动配置"""
+        self._auto_config_enabled = enabled
+        logger.info(f"自动配置{'启用' if enabled else '禁用'}")
+
+    def set_auto_optimization_interval(self, interval_seconds: int):
+        """设置自动优化间隔"""
+        self._auto_optimization_interval = interval_seconds
+        logger.info(f"设置自动优化间隔: {interval_seconds}秒")
+
+    def get_auto_optimization_logs(self, config_id: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """获取自动优化日志"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                if config_id:
+                    cursor.execute("""
+                        SELECT log_id, config_id, optimization_type, original_config, optimized_config, 
+                               performance_improvement, success, created_at
+                        FROM auto_optimization_logs 
+                        WHERE config_id = ?
+                        ORDER BY created_at DESC 
+                        LIMIT ?
+                    """, (config_id, limit))
+                else:
+                    cursor.execute("""
+                        SELECT log_id, config_id, optimization_type, original_config, optimized_config, 
+                               performance_improvement, success, created_at
+                        FROM auto_optimization_logs 
+                        ORDER BY created_at DESC 
+                        LIMIT ?
+                    """, (limit,))
+                
+                logs = []
+                for row in cursor.fetchall():
+                    logs.append({
+                        'log_id': row[0],
+                        'config_id': row[1],
+                        'optimization_type': row[2],
+                        'original_config': json.loads(row[3]),
+                        'optimized_config': json.loads(row[4]),
+                        'performance_improvement': row[5],
+                        'success': row[6],
+                        'created_at': row[7]
+                    })
+                
+                return logs
+                
+        except Exception as e:
+            logger.error(f"获取自动优化日志失败: {e}")
+            return []
+
     def get_intelligent_statistics(self) -> Dict[str, Any]:
         """获取智能配置统计信息"""
         try:
@@ -1297,7 +1946,14 @@ class IntelligentConfigManager(ImportConfigManager):
                 'optimization_cache_entries': len(self._optimization_cache),
                 'active_recommendations': self._count_active_recommendations(),
                 'resolved_conflicts': self._count_resolved_conflicts(),
-                'average_optimization_improvement': self._calculate_average_improvement()
+                'average_optimization_improvement': self._calculate_average_improvement(),
+                'auto_config_enabled': self._auto_config_enabled,
+                'auto_config_rules': len(self._config_adaptation_rules),
+                'environment_profiles': len(self._environment_profiles),
+                'auto_optimization_interval_hours': self._auto_optimization_interval / 3600,
+                'total_auto_optimizations': self._count_auto_optimizations(),
+                'successful_auto_optimizations': self._count_successful_auto_optimizations(),
+                'auto_optimization_success_rate': self._calculate_auto_optimization_success_rate()
             }
 
             # 合并统计信息
@@ -1347,6 +2003,35 @@ class IntelligentConfigManager(ImportConfigManager):
         except:
             return 0.0
 
+    def _count_auto_optimizations(self) -> int:
+        """统计自动优化总数"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM auto_optimization_logs")
+                return cursor.fetchone()[0]
+        except:
+            return 0
+
+    def _count_successful_auto_optimizations(self) -> int:
+        """统计成功的自动优化数量"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM auto_optimization_logs WHERE success = TRUE")
+                return cursor.fetchone()[0]
+        except:
+            return 0
+
+    def _calculate_auto_optimization_success_rate(self) -> float:
+        """计算自动优化成功率"""
+        try:
+            total = self._count_auto_optimizations()
+            successful = self._count_successful_auto_optimizations()
+            return successful / total if total > 0 else 0.0
+        except:
+            return 0.0
+
 
 def main():
     """测试智能配置管理器"""
@@ -1391,9 +2076,75 @@ def main():
     conflicts = manager.detect_config_conflicts()
     logger.info(f"检测到冲突: {len(conflicts)}个")
 
-    # 获取统计信息
+    # 测试自动配置能力
+    logger.info("=== 测试自动配置能力 ===")
+    
+    # 创建自定义自动配置规则
+    rule_id = manager.create_auto_config_rule(
+        rule_name="测试自动扩展规则",
+        rule_type="performance_test",
+        conditions={
+            'success_rate': {'operator': '>', 'value': 0.95},
+            'cpu_utilization': {'operator': '<', 'value': 0.5}
+        },
+        actions={
+            'max_workers': {'operation': 'add', 'value': 2, 'max': 8}
+        },
+        priority=25
+    )
+    logger.info(f"创建自动配置规则: {rule_id}")
+
+    # 创建环境配置文件
+    profile_id = manager.create_environment_profile(
+        profile_name="测试环境",
+        environment_data={
+            'cpu_cores': 8,
+            'memory_gb': 16,
+            'network_type': 'high_speed'
+        },
+        baseline_metrics={
+            'success_rate': 0.98,
+            'avg_execution_time': 45.0,
+            'throughput': 1500.0
+        }
+    )
+    logger.info(f"创建环境配置文件: {profile_id}")
+
+    # 测试自动优化
+    test_metrics = {
+        'success_rate': 0.85,  # 低于基线，触发优化
+        'error_rate': 0.12,    # 高于基线，触发优化
+        'execution_time': 90.0, # 高于基线，触发优化
+        'cpu_utilization': 0.4,
+        'memory_utilization': 0.6
+    }
+    
+    auto_optimized = manager.auto_optimize_config(test_config.task_id, test_metrics)
+    if auto_optimized:
+        logger.info(f"自动优化成功: workers={auto_optimized.max_workers}, batch={auto_optimized.batch_size}")
+    else:
+        logger.info("未触发自动优化")
+
+    # 获取自动优化日志
+    auto_logs = manager.get_auto_optimization_logs(test_config.task_id, 5)
+    logger.info(f"自动优化日志数量: {len(auto_logs)}")
+
+    # 获取扩展统计信息
     stats = manager.get_intelligent_statistics()
     logger.info(f"智能统计: {json.dumps(stats, ensure_ascii=False, indent=2)}")
+    
+    # 测试自动配置开关
+    manager.enable_auto_config(False)
+    logger.info("禁用自动配置")
+    
+    # 再次尝试自动优化（应该不会执行）
+    auto_optimized2 = manager.auto_optimize_config(test_config.task_id, test_metrics)
+    logger.info(f"禁用后自动优化结果: {auto_optimized2 is not None}")
+    
+    # 重新启用
+    manager.enable_auto_config(True)
+    manager.set_auto_optimization_interval(1800)  # 30分钟
+    logger.info("重新启用自动配置，设置优化间隔为30分钟")
 
 
 if __name__ == "__main__":

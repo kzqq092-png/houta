@@ -280,6 +280,9 @@ class UnifiedDataManager:
             # 插件发现状态标记
             self._plugins_discovered = False
 
+            # 注册传统数据源到TET路由器
+            self._register_legacy_data_sources_to_router()
+
             # 延迟插件发现 - 不在初始化时立即执行
             # 将在服务引导完成后通过外部调用执行
             logger.info("TET数据管道初始化完成，等待插件发现...")
@@ -294,6 +297,10 @@ class UnifiedDataManager:
             logger.info(" 降级到传统HIkyuu模式")
             self.tet_enabled = False
             self._plugins_discovered = False
+
+        # 板块数据服务初始化
+        self._sector_data_service = None
+        self._initialize_sector_service()
 
         # 统计信息
         self._stats = {
@@ -397,6 +404,62 @@ class UnifiedDataManager:
         except Exception as e:
             logger.error(f"数据源初始化失败: {e}")
 
+    def _register_legacy_data_source_to_router(self, source_id: str, legacy_source):
+        """将传统数据源注册到TET路由器"""
+        try:
+            # 检查TET管道是否可用
+            if not (hasattr(self, 'tet_pipeline') and self.tet_pipeline and hasattr(self.tet_pipeline, 'router')):
+                logger.debug(f"TET管道不可用，跳过注册传统数据源: {source_id}")
+                return
+
+            # 创建传统数据源的适配器
+            from ..data_source_extensions import DataSourcePluginAdapter
+            from .legacy_datasource_adapter import LegacyDataSourceAdapter
+
+            # 包装传统数据源为IDataSourcePlugin接口
+            plugin_adapter = LegacyDataSourceAdapter(legacy_source, source_id)
+
+            # 创建数据源插件适配器
+            adapter = DataSourcePluginAdapter(plugin_adapter, source_id)
+
+            # 注册到路由器
+            router = self.tet_pipeline.router
+            success = router.register_data_source(source_id, adapter, priority=1, weight=1.0)
+
+            if success:
+                logger.info(f"传统数据源 {source_id} 已注册到TET路由器")
+
+                # 关键修复：同时注册到TET管道的适配器字典
+                if hasattr(self.tet_pipeline, '_adapters'):
+                    self.tet_pipeline._adapters[source_id] = adapter
+                    logger.info(f"传统数据源 {source_id} 已注册到TET管道适配器字典")
+                else:
+                    logger.warning("TET管道缺少_adapters属性")
+
+                # 如果适配器有对应的插件实例，也注册到_plugins字典
+                if hasattr(adapter, 'plugin') and hasattr(self.tet_pipeline, '_plugins'):
+                    self.tet_pipeline._plugins[source_id] = adapter.plugin
+                    logger.info(f"传统数据源 {source_id} 已注册到TET管道插件字典")
+            else:
+                logger.warning(f"传统数据源 {source_id} 注册到TET路由器失败")
+
+        except Exception as e:
+            logger.error(f"注册传统数据源 {source_id} 到TET路由器异常: {e}")
+
+    def _register_legacy_data_sources_to_router(self):
+        """将所有传统数据源注册到TET路由器"""
+        try:
+            logger.info("开始注册传统数据源到TET路由器")
+
+            # 注册所有已初始化的传统数据源
+            for source_id, legacy_source in self._data_sources.items():
+                if legacy_source is not None:
+                    self._register_legacy_data_source_to_router(source_id, legacy_source)
+
+            logger.info("传统数据源注册到TET路由器完成")
+        except Exception as e:
+            logger.error(f"注册传统数据源到TET路由器异常: {e}")
+
     def _load_industry_data(self):
         """加载行业数据"""
         if self.industry_manager:
@@ -463,7 +526,7 @@ class UnifiedDataManager:
                         asset_type=AssetType.STOCK,
                         data_type=DataType.ASSET_LIST,
                         market=market,
-                        provider=self._current_source  # 指定当前数据源
+                        provider=None  # 不指定数据源，让TET框架自动选择最健康的数据源
                     )
 
                     # 使用线程池执行，避免阻塞UI - 设置超时
@@ -478,20 +541,15 @@ class UnifiedDataManager:
                     with ThreadPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(_process_with_timeout)
                         try:
-                            result = future.result(timeout=5.0)  # 5秒超时
+                            result = future.result(timeout=10.0)  # 10秒超时
                         except TimeoutError:
-                            logger.warning(" TET管道处理超时，降级到传统模式")
+                            logger.warning(" TET管道处理超时:10s，降级到传统模式")
                             result = None
 
                     if result and result.data is not None:
                         # 转换为DataFrame格式
                         if isinstance(result.data, list) and len(result.data) > 0:
                             df = pd.DataFrame(result.data)
-
-                            # 缓存结果
-                            # if self.cache_manager and not df.empty:  # 已统一使用MultiLevelCacheManager
-                            if False:
-                                self.cache_manager.set(cache_key, df)
 
                             logger.info(f" 通过TET管道获取股票列表成功: {len(df)} 只股票")
                             return df
@@ -519,11 +577,6 @@ class UnifiedDataManager:
                 df = self._get_external_stock_list(market, self._current_source)
             else:
                 df = self._get_mock_stock_list(market)
-
-            # 缓存结果
-            # if self.cache_manager and not df.empty:  # 已统一使用MultiLevelCacheManager
-            if False:
-                self.cache_manager.set(cache_key, df)
 
             return df
 
@@ -2585,7 +2638,7 @@ class UnifiedDataManager:
             hikyuu_plugin = HikyuuDataPlugin()
 
             success = self.register_data_source_plugin(
-                "hikyuu_data_source",
+                "hikyuu",  # 修改为正确的插件ID，与TET管道中的数据源名称一致
                 hikyuu_plugin,
                 priority=1,  # 最高优先级
                 weight=2.0
@@ -3119,5 +3172,126 @@ class UnifiedDataManager:
         except Exception as e:
             logger.error(f" 获取资产路由优先级失败: {e}")
             return []
+
+    def _initialize_sector_service(self):
+        """
+        初始化板块数据服务
+        """
+        try:
+            # 延迟导入避免循环依赖
+            from .sector_data_service import get_sector_data_service
+
+            # 获取缓存管理器
+            cache_manager = getattr(self, 'cache_manager', None)
+
+            # 初始化板块数据服务
+            self._sector_data_service = get_sector_data_service(
+                cache_manager=cache_manager,
+                tet_pipeline=self.tet_pipeline
+            )
+
+            logger.info("板块数据服务初始化成功")
+
+        except Exception as e:
+            logger.error(f"板块数据服务初始化失败: {e}")
+            self._sector_data_service = None
+
+    def get_sector_fund_flow_service(self):
+        """
+        获取板块资金流服务实例
+
+        Returns:
+            SectorDataService: 板块数据服务实例，如果初始化失败则返回None
+        """
+        return self._sector_data_service
+
+    def get_sector_fund_flow_ranking(self, date_range: str = "today", sort_by: str = 'main_net_inflow'):
+        """
+        获取板块资金流排行榜（统一数据管理器入口）
+
+        Args:
+            date_range: 时间范围，如 "today", "3d", "5d", "1m"
+            sort_by: 排序字段，默认按主力净流入排序
+
+        Returns:
+            pd.DataFrame: 板块排行榜数据
+        """
+        try:
+            if self._sector_data_service is None:
+                logger.warning("板块数据服务不可用")
+                return pd.DataFrame()
+
+            return self._sector_data_service.get_sector_fund_flow_ranking(date_range, sort_by)
+
+        except Exception as e:
+            logger.error(f"获取板块资金流排行榜失败: {e}")
+            return pd.DataFrame()
+
+    def get_sector_historical_trend(self, sector_id: str, period: int = 30):
+        """
+        获取单板块历史趋势数据（统一数据管理器入口）
+
+        Args:
+            sector_id: 板块ID，如 "BK0001"
+            period: 查询天数，默认30天
+
+        Returns:
+            pd.DataFrame: 板块历史趋势数据
+        """
+        try:
+            if self._sector_data_service is None:
+                logger.warning("板块数据服务不可用")
+                return pd.DataFrame()
+
+            return self._sector_data_service.get_sector_historical_trend(sector_id, period)
+
+        except Exception as e:
+            logger.error(f"获取板块历史趋势失败: {e}")
+            return pd.DataFrame()
+
+    def get_sector_intraday_flow(self, sector_id: str, date: str):
+        """
+        获取板块分时资金流数据（统一数据管理器入口）
+
+        Args:
+            sector_id: 板块ID，如 "BK0001"
+            date: 查询日期，格式 "YYYY-MM-DD"
+
+        Returns:
+            pd.DataFrame: 板块分时资金流数据
+        """
+        try:
+            if self._sector_data_service is None:
+                logger.warning("板块数据服务不可用")
+                return pd.DataFrame()
+
+            return self._sector_data_service.get_sector_intraday_flow(sector_id, date)
+
+        except Exception as e:
+            logger.error(f"获取板块分时资金流失败: {e}")
+            return pd.DataFrame()
+
+    def import_sector_historical_data(self, source: str, start_date: str, end_date: str):
+        """
+        导入板块历史数据（统一数据管理器入口）
+
+        Args:
+            source: 数据源名称，如 "akshare", "eastmoney"
+            start_date: 开始日期，格式 "YYYY-MM-DD"
+            end_date: 结束日期，格式 "YYYY-MM-DD"
+
+        Returns:
+            Dict[str, Any]: 导入结果统计信息
+        """
+        try:
+            if self._sector_data_service is None:
+                logger.warning("板块数据服务不可用")
+                return {"success": False, "error": "板块数据服务不可用"}
+
+            return self._sector_data_service.import_sector_historical_data(source, start_date, end_date)
+
+        except Exception as e:
+            logger.error(f"导入板块历史数据失败: {e}")
+            return {"success": False, "error": str(e)}
 
 # 数据策略类

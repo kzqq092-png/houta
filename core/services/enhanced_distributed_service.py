@@ -166,7 +166,7 @@ class EnhancedDistributedTask(DistributedTask):
 
 
 class IntelligentLoadBalancer:
-    """智能负载均衡器"""
+    """智能负载均衡器 - 优化版"""
 
     def __init__(self, strategy: LoadBalancingStrategy = LoadBalancingStrategy.INTELLIGENT):
         self.strategy = strategy
@@ -174,6 +174,26 @@ class IntelligentLoadBalancer:
         self.node_connections: Dict[str, int] = defaultdict(int)
         self.round_robin_index = 0
         self.performance_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        
+        # 优化增强功能
+        self.node_scores: Dict[str, float] = defaultdict(float)
+        self.task_completion_times: Dict[str, deque] = defaultdict(lambda: deque(maxlen=50))
+        self.node_failure_counts: Dict[str, int] = defaultdict(int)
+        self.node_success_rates: Dict[str, float] = defaultdict(lambda: 1.0)
+        self.adaptive_weights = {
+            'resource': 0.25,
+            'performance': 0.25,
+            'latency': 0.20,
+            'affinity': 0.15,
+            'reliability': 0.10,
+            'load_trend': 0.05
+        }
+        
+        # 负载预测
+        self.load_predictions: Dict[str, float] = defaultdict(float)
+        self.last_update_time = datetime.now()
+        
+        logger.info("智能负载均衡器已优化初始化")
 
     def select_node(self, nodes: List[EnhancedNodeInfo], task: EnhancedDistributedTask) -> Optional[EnhancedNodeInfo]:
         """选择最适合的节点"""
@@ -279,7 +299,7 @@ class IntelligentLoadBalancer:
         return max(nodes, key=resource_score)
 
     def _intelligent_select(self, nodes: List[EnhancedNodeInfo], task: EnhancedDistributedTask) -> EnhancedNodeInfo:
-        """智能选择（综合多个因素）"""
+        """智能选择（优化版 - 综合多个因素）"""
         def intelligent_score(node: EnhancedNodeInfo) -> float:
             # 基础资源分数
             resource_score = self._calculate_resource_score(node)
@@ -292,25 +312,35 @@ class IntelligentLoadBalancer:
 
             # 任务亲和性分数
             affinity_score = self._calculate_affinity_score(node, task)
+            
+            # 可靠性分数（新增）
+            reliability_score = self._calculate_reliability_score(node)
+            
+            # 负载趋势分数（新增）
+            load_trend_score = self._calculate_load_trend_score(node)
 
-            # 综合分数
-            weights = {
-                'resource': 0.3,
-                'performance': 0.3,
-                'latency': 0.2,
-                'affinity': 0.2
-            }
-
+            # 使用自适应权重
             total_score = (
-                resource_score * weights['resource'] +
-                performance_score * weights['performance'] +
-                latency_score * weights['latency'] +
-                affinity_score * weights['affinity']
+                resource_score * self.adaptive_weights['resource'] +
+                performance_score * self.adaptive_weights['performance'] +
+                latency_score * self.adaptive_weights['latency'] +
+                affinity_score * self.adaptive_weights['affinity'] +
+                reliability_score * self.adaptive_weights['reliability'] +
+                load_trend_score * self.adaptive_weights['load_trend']
             )
 
+            # 更新节点评分历史
+            self.node_scores[node.node_id] = total_score
+            
             return total_score
 
-        return max(nodes, key=intelligent_score)
+        # 选择最高分节点
+        best_node = max(nodes, key=intelligent_score)
+        
+        # 记录选择决策
+        logger.debug(f"智能选择节点 {best_node.node_id}，评分: {self.node_scores[best_node.node_id]:.3f}")
+        
+        return best_node
 
     def _calculate_resource_score(self, node: EnhancedNodeInfo) -> float:
         """计算资源分数"""
@@ -319,6 +349,69 @@ class IntelligentLoadBalancer:
         load_score = max(0, 1 - node.current_load)
         return (cpu_score + memory_score + load_score) / 3
 
+    def _calculate_reliability_score(self, node: EnhancedNodeInfo) -> float:
+        """计算可靠性分数（新增）"""
+        try:
+            # 基于成功率计算
+            success_rate = self.node_success_rates.get(node.node_id, 1.0)
+            
+            # 基于故障次数计算
+            failure_count = self.node_failure_counts.get(node.node_id, 0)
+            failure_penalty = max(0, 1 - failure_count * 0.1)  # 每次故障减少0.1分
+            
+            # 基于节点状态计算
+            status_score = 1.0
+            if node.status == NodeStatus.OVERLOADED:
+                status_score = 0.3
+            elif node.status == NodeStatus.BUSY:
+                status_score = 0.7
+            elif node.status == NodeStatus.FAILED:
+                status_score = 0.0
+            
+            # 综合可靠性分数
+            reliability_score = (success_rate * 0.5 + failure_penalty * 0.3 + status_score * 0.2)
+            
+            return max(0.0, min(1.0, reliability_score))
+            
+        except Exception as e:
+            logger.error(f"计算可靠性分数失败: {e}")
+            return 0.5  # 默认中等可靠性
+    
+    def _calculate_load_trend_score(self, node: EnhancedNodeInfo) -> float:
+        """计算负载趋势分数（新增）"""
+        try:
+            # 获取历史负载数据
+            history = self.performance_history.get(node.node_id, deque())
+            
+            if len(history) < 3:
+                return 0.5  # 数据不足，返回中等分数
+            
+            # 计算负载趋势
+            recent_loads = [record.get('load', 0) for record in list(history)[-5:]]
+            if len(recent_loads) < 2:
+                return 0.5
+            
+            # 计算负载变化趋势
+            load_trend = np.polyfit(range(len(recent_loads)), recent_loads, 1)[0]
+            
+            # 负载下降趋势得高分，上升趋势得低分
+            if load_trend <= 0:  # 负载下降或稳定
+                trend_score = min(1.0, 1.0 + load_trend)  # load_trend为负值
+            else:  # 负载上升
+                trend_score = max(0.0, 1.0 - load_trend * 2)
+            
+            # 结合当前负载水平
+            current_load_score = max(0, 1 - node.current_load)
+            
+            # 综合分数
+            final_score = (trend_score * 0.6 + current_load_score * 0.4)
+            
+            return max(0.0, min(1.0, final_score))
+            
+        except Exception as e:
+            logger.error(f"计算负载趋势分数失败: {e}")
+            return 0.5
+    
     def _calculate_performance_score(self, node: EnhancedNodeInfo) -> float:
         """计算性能分数"""
         history = self.performance_history[node.node_id]
@@ -351,12 +444,126 @@ class IntelligentLoadBalancer:
         return min(1.0, score)
 
     def update_node_performance(self, node_id: str, response_time: float, success: bool):
-        """更新节点性能数据"""
-        self.performance_history[node_id].append({
+        """更新节点性能数据（优化版）"""
+        performance_data = {
             'response_time': response_time,
             'success_rate': 1.0 if success else 0.0,
-            'timestamp': datetime.now()
-        })
+            'timestamp': datetime.now(),
+            'load': 0.5  # 默认负载，实际应从节点获取
+        }
+        
+        self.performance_history[node_id].append(performance_data)
+        
+        # 记录任务完成情况
+        self.record_task_completion(node_id, "unknown", response_time, success)
+        
+        # 更新负载预测
+        self._update_load_prediction(node_id, performance_data)
+    
+    def record_task_completion(self, node_id: str, task_id: str, completion_time: float, success: bool):
+        """记录任务完成情况（新增）"""
+        try:
+            # 记录完成时间
+            self.task_completion_times[node_id].append(completion_time)
+            
+            # 更新成功率
+            if node_id not in self.node_success_rates:
+                self.node_success_rates[node_id] = 1.0 if success else 0.0
+            else:
+                # 使用指数移动平均更新成功率
+                alpha = 0.1  # 学习率
+                current_rate = self.node_success_rates[node_id]
+                new_rate = success * 1.0
+                self.node_success_rates[node_id] = alpha * new_rate + (1 - alpha) * current_rate
+            
+            # 更新故障计数
+            if not success:
+                self.node_failure_counts[node_id] += 1
+            
+            logger.debug(f"记录任务完成: 节点{node_id}, 任务{task_id}, 成功:{success}, 耗时:{completion_time:.2f}s")
+            
+        except Exception as e:
+            logger.error(f"记录任务完成失败: {e}")
+    
+    def _update_load_prediction(self, node_id: str, performance_data: Dict[str, Any]):
+        """更新负载预测（新增）"""
+        try:
+            current_load = performance_data.get('load', 0)
+            
+            # 简单的线性预测（可以扩展为更复杂的机器学习模型）
+            history = list(self.performance_history[node_id])
+            if len(history) >= 3:
+                recent_loads = [record.get('load', 0) for record in history[-5:]]
+                if len(recent_loads) >= 2:
+                    # 计算负载变化趋势
+                    trend = np.polyfit(range(len(recent_loads)), recent_loads, 1)[0]
+                    
+                    # 预测未来5分钟的负载
+                    predicted_load = current_load + trend * 5
+                    self.load_predictions[node_id] = max(0, min(1, predicted_load))
+            
+        except Exception as e:
+            logger.error(f"更新负载预测失败: {e}")
+    
+    def adapt_balancing_strategy(self):
+        """自适应调整负载均衡策略（新增）"""
+        try:
+            # 分析当前性能表现
+            total_tasks = sum(len(times) for times in self.task_completion_times.values())
+            
+            if total_tasks < 10:
+                return  # 数据不足，不进行调整
+            
+            # 计算各节点的平均完成时间
+            avg_completion_times = {}
+            for node_id, times in self.task_completion_times.items():
+                if times:
+                    avg_completion_times[node_id] = np.mean(list(times))
+            
+            if not avg_completion_times:
+                return
+            
+            # 分析性能差异
+            completion_times = list(avg_completion_times.values())
+            cv = np.std(completion_times) / np.mean(completion_times) if np.mean(completion_times) > 0 else 0
+            
+            # 根据性能差异调整权重
+            if cv > 0.3:  # 性能差异较大
+                # 增加性能权重，减少资源权重
+                self.adaptive_weights['performance'] = min(0.4, self.adaptive_weights['performance'] + 0.05)
+                self.adaptive_weights['resource'] = max(0.15, self.adaptive_weights['resource'] - 0.05)
+            elif cv < 0.1:  # 性能差异较小
+                # 增加资源权重，减少性能权重
+                self.adaptive_weights['resource'] = min(0.4, self.adaptive_weights['resource'] + 0.05)
+                self.adaptive_weights['performance'] = max(0.15, self.adaptive_weights['performance'] - 0.05)
+            
+            # 确保权重总和为1
+            total_weight = sum(self.adaptive_weights.values())
+            for key in self.adaptive_weights:
+                self.adaptive_weights[key] /= total_weight
+            
+            logger.debug(f"自适应权重调整: {self.adaptive_weights}")
+            
+        except Exception as e:
+            logger.error(f"自适应策略调整失败: {e}")
+    
+    def get_load_balancer_statistics(self) -> Dict[str, Any]:
+        """获取负载均衡器统计信息（新增）"""
+        try:
+            return {
+                'strategy': self.strategy.value,
+                'adaptive_weights': self.adaptive_weights.copy(),
+                'node_scores': dict(self.node_scores),
+                'node_success_rates': dict(self.node_success_rates),
+                'node_failure_counts': dict(self.node_failure_counts),
+                'load_predictions': dict(self.load_predictions),
+                'total_nodes_tracked': len(self.performance_history),
+                'total_tasks_completed': sum(len(times) for times in self.task_completion_times.values()),
+                'last_update': self.last_update_time.isoformat()
+            }
+        except Exception as e:
+            logger.error(f"获取负载均衡器统计失败: {e}")
+            return {'error': str(e)}
 
 
 class FailoverManager:

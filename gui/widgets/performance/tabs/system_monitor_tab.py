@@ -140,7 +140,7 @@ class ModernSystemMonitorTab(QWidget):
 
         # 系统资源历史图表 - 适应性显示区域
         self.resource_chart = ModernPerformanceChart("系统资源使用趋势", "line")
-        self.resource_chart.setMinimumHeight(400)  # 减少最小高度，避免过多空白
+        self.resource_chart.setMinimumHeight(200)  # 减少最小高度，避免过多空白
         # self.resource_chart.setMaximumHeight(400)  # 限制最大高度
         layout.addWidget(self.resource_chart, 1)  # 给图表适当的伸缩权重
 

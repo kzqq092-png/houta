@@ -1,3 +1,6 @@
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
+from .event_handler import EventHandler, AsyncEventHandler
 from loguru import logger
 """
 事件总线模块
@@ -12,9 +15,9 @@ import time
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 from .events import BaseEvent
-from .event_handler import EventHandler, AsyncEventHandler
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
+
+# 为兼容性提供Event别名
+Event = BaseEvent
 
 
 logger = logger

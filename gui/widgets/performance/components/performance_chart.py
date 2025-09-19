@@ -112,7 +112,7 @@ class ModernPerformanceChart(QWidget):
             color = colors[i % len(colors)]
 
             if self.chart_type == "line":
-                line = self.ax.plot(data, label=series_name, color=color, linewidth=1, alpha=0.8)[0]
+                line = self.ax.plot(data, label=series_name, color=color, linewidth=0.5, alpha=0.8)[0]
 
                 # 在最右边的点位显示当前数值
                 if data:

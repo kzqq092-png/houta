@@ -1,0 +1,283 @@
+<mxfile host="app.diagrams.net" modified="2024-09-19T12:30:00.000Z" agent="5.0" etag="xxx" version="20.3.0" type="device">
+  <diagram name="精确调用链时序图" id="accurate-sequence">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- 参与者 -->
+        <mxCell id="user" value="用户请求" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#f8cecc;strokeColor=#b85450" vertex="1" parent="1">
+          <mxGeometry x="80" y="50" width="100" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stock-service" value="StockService" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="220" y="50" width="100" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="repository" value="KlineRepository" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="1">
+          <mxGeometry x="360" y="50" width="120" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="asset-service" value="AssetService" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="520" y="50" width="100" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="uni-manager" value="UniPluginDataManager" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffcc99;strokeColor=#ff6600" vertex="1" parent="1">
+          <mxGeometry x="660" y="50" width="140" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="plugin-center" value="PluginCenter" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffcc99;strokeColor=#ff6600" vertex="1" parent="1">
+          <mxGeometry x="840" y="50" width="100" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="router-engine" value="TETRouterEngine" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffcc99;strokeColor=#ff6600" vertex="1" parent="1">
+          <mxGeometry x="980" y="50" width="120" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="risk-manager" value="RiskManager" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffcc99;strokeColor=#ff6600" vertex="1" parent="1">
+          <mxGeometry x="1140" y="50" width="100" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="plugin" value="TongdaxinPlugin" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="1280" y="50" width="120" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="standardization" value="DataStandardizationEngine" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#e6f3ff;strokeColor=#0066cc" vertex="1" parent="1">
+          <mxGeometry x="1440" y="50" width="160" height="1200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="database" value="AssetSeparatedDatabaseManager" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1640" y="50" width="180" height="1200" as="geometry" />
+        </mxCell>
+        
+        <!-- 激活框 -->
+        <mxCell id="act1" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" vertex="1" parent="stock-service">
+          <mxGeometry x="45" y="120" width="10" height="800" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="act2" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" vertex="1" parent="repository">
+          <mxGeometry x="55" y="150" width="10" height="750" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="act3" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" vertex="1" parent="asset-service">
+          <mxGeometry x="45" y="220" width="10" height="400" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="act4" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" vertex="1" parent="uni-manager">
+          <mxGeometry x="65" y="250" width="10" height="350" as="geometry" />
+        </mxCell>
+        
+        <!-- 消息流 -->
+        <mxCell id="msg1" value="1: get_kline_data(stock_code='000001', period='D', count=365)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="130" y="170" as="sourcePoint" />
+            <mxPoint x="265" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="note1" value="注：StockService.get_kline_data() 内部调用 get_kdata()" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;size=20;fontSize=9" vertex="1" parent="1">
+          <mxGeometry x="320" y="120" width="180" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="msg2" value="2: get_kline_data(QueryParams)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="275" y="200" as="sourcePoint" />
+            <mxPoint x="415" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg3" value="3: 检查缓存" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=9;strokeColor=#666666" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="425" y="220" as="sourcePoint" />
+            <mxPoint x="470" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg4" value="4: get_historical_data(symbol='000001', asset_type=AssetType.STOCK, period='D')" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="425" y="240" as="sourcePoint" />
+            <mxPoint x="565" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg5" value="5: get_asset_data() [如果TET启用]" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="575" y="270" as="sourcePoint" />
+            <mxPoint x="725" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg6" value="6: _execute_data_request(RequestContext)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="290" as="sourcePoint" />
+            <mxPoint x="745" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg7" value="7: get_available_plugins(DataType.HISTORICAL_KLINE, AssetType.STOCK)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="330" as="sourcePoint" />
+            <mxPoint x="885" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg8" value="8: [available_plugins_list]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="885" y="350" as="sourcePoint" />
+            <mxPoint x="735" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg9" value="9: select_optimal_plugin(available_plugins, context, plugin_center)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="370" as="sourcePoint" />
+            <mxPoint x="1035" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg10" value="10: [selected_plugin_id]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1035" y="390" as="sourcePoint" />
+            <mxPoint x="735" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg11" value="11: execute_with_monitoring(plugin_id, method, **params)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="410" as="sourcePoint" />
+            <mxPoint x="1185" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg12" value="12: get_kline_data(symbol, period, **kwargs)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10;strokeColor=#d79b00" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="1195" y="430" as="sourcePoint" />
+            <mxPoint x="1335" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="internal1" value="调用通达信API获取原始数据" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=9;strokeColor=#d79b00" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="1345" y="450" as="sourcePoint" />
+            <mxPoint x="1380" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg13" value="13: [raw_data_df]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10;strokeColor=#d79b00" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1335" y="470" as="sourcePoint" />
+            <mxPoint x="1195" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg14" value="14: [result, validation_result]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1185" y="490" as="sourcePoint" />
+            <mxPoint x="735" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg15" value="15: standardize_data() [如果需要标准化]" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10;strokeColor=#0066cc;dashed=1" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="510" as="sourcePoint" />
+            <mxPoint x="1515" y="510" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg16" value="16: standardize_and_store()" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10;strokeColor=#0066cc;dashed=1" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="1525" y="530" as="sourcePoint" />
+            <mxPoint x="1725" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg17" value="17: [storage_success]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10;strokeColor=#82b366" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1725" y="550" as="sourcePoint" />
+            <mxPoint x="1525" y="550" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg18" value="18: update_plugin_metrics(plugin_id, success, execution_time, quality_score)" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=10;strokeColor=#666666" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="735" y="570" as="sourcePoint" />
+            <mxPoint x="885" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg19" value="19: [standardized_historical_data]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="725" y="590" as="sourcePoint" />
+            <mxPoint x="575" y="590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg20" value="20: [historical_data_df] 转换为KlineData对象" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="575" y="610" as="sourcePoint" />
+            <mxPoint x="425" y="610" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="cache1" value="缓存KlineData结果" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;fontSize=9;strokeColor=#666666" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="425" y="630" as="sourcePoint" />
+            <mxPoint x="470" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg21" value="21: [KlineData]" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="415" y="650" as="sourcePoint" />
+            <mxPoint x="275" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="msg22" value="22: [DataFrame] 转换为DataFrame返回" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;fontSize=10" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="265" y="670" as="sourcePoint" />
+            <mxPoint x="130" y="670" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 降级路径 -->
+        <mxCell id="fallback-note" value="降级路径：如果TET模式失败" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffcccc;strokeColor=#ff0000;size=20;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="100" y="720" width="160" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="fallback1" value="降级: get_kdata() via DataManager" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeColor=#ff0000;dashed=1;fontSize=10" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="425" y="780" as="sourcePoint" />
+            <mxPoint x="280" y="800" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 关键节点标注 -->
+        <mxCell id="key-points" value="关键特性：&#xa;• 双重架构：TET+Plugin 优先，传统DataManager降级&#xa;• 智能路由：4种策略选择最优插件&#xa;• 风险监控：RiskManager监控执行过程&#xa;• 数据标准化：统一格式，质量检查&#xa;• 性能监控：插件指标更新&#xa;• 多层缓存：Repository层和系统级缓存" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#e6f3ff;strokeColor=#0066cc;size=20;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="1450" y="750" width="300" height="140" as="geometry" />
+        </mxCell>
+        
+        <!-- 数据流标注 -->
+        <mxCell id="data-flow" value="数据流转：&#xa;原始数据 → 质量检查 → 标准化 → 存储 → 缓存 → 返回" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#d5e8d4;strokeColor=#82b366;size=20;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="1100" y="750" width="250" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 时间标注 -->
+        <mxCell id="timing" value="执行时间监控：&#xa;• start_time记录&#xa;• execution_time计算&#xa;• 平均响应时间更新&#xa;• 性能指标统计" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;size=20;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="850" y="750" width="180" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- 标题 -->
+        <mxCell id="title" value="HIkyuu-UI K线数据获取精确调用链时序图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="10" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 图例 -->
+        <mxCell id="legend" value="图例：&#xa;━━━ 主要调用路径&#xa;╌╌╌ 降级路径&#xa;••••• 可选/条件路径&#xa;——— 返回数据" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#f0f0f0;strokeColor=#666666;size=20;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="80" y="850" width="150" height="100" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
