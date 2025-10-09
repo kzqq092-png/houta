@@ -371,14 +371,17 @@ class PerformanceService(BaseService):
     def _collect_disk_metrics(self) -> Dict[str, Any]:
         """收集磁盘指标"""
         try:
-            # Windows兼容性：使用固定路径
+            # 使用shutil.disk_usage()代替psutil.disk_usage()
+            # 原因：psutil 5.9.0与Python 3.12.7不兼容
             import platform
+            import shutil
+
             if platform.system() == "Windows":
-                disk_path = "C:\\"  # 使用固定的C盘路径
+                disk_path = "C:/"
             else:
                 disk_path = '/'
 
-            disk_usage = psutil.disk_usage(disk_path)
+            disk_usage = shutil.disk_usage(disk_path)
 
             metrics = {
                 "usage": {

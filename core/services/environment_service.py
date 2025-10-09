@@ -220,7 +220,15 @@ class EnvironmentService(BaseService):
 
     def detect_environment(self) -> Dict[str, Any]:
         """公共方法：检测环境信息"""
-        return self._detect_environment()
+        # 返回已检测的环境信息
+        return {
+            'environment': self._environment_type,
+            'os': self._os_info.get('system', 'unknown'),
+            'platform': self._os_info.get('platform', 'unknown'),
+            'python_version': self._os_info.get('python_version', 'unknown'),
+            'memory_gb': self._os_info.get('total_memory_gb', 0),
+            'cpu_count': self._os_info.get('cpu_count', 0),
+        } if hasattr(self, '_os_info') and self._os_info else {}
 
     def _detect_environment(self) -> None:
         """检测环境信息"""

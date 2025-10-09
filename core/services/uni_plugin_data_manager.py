@@ -87,8 +87,8 @@ class UniPluginDataManager:
         self._cache: Dict[str, Tuple[Any, datetime]] = {}
         self._cache_ttl = timedelta(minutes=5)
 
-        # 线程池
-        self._executor = ThreadPoolExecutor(max_workers=4)
+        # 线程池（v2.4性能优化）
+        self._executor = ThreadPoolExecutor(max_workers=8)  # 从4增加到8
 
         # 延迟初始化标志
 

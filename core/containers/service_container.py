@@ -12,6 +12,7 @@ from .service_registry import ServiceRegistry, ServiceInfo, ServiceScope
 logger = logger
 T = TypeVar('T')
 
+
 class ServiceContainer:
     """
     服务容器
@@ -478,6 +479,7 @@ class ServiceContainer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.dispose()
 
+
 class ServiceScopeContext:
     """
     服务作用域上下文管理器
@@ -494,9 +496,11 @@ class ServiceScopeContext:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.container._exit_scope(self.scope_name)
 
+
 # 全局服务容器实例
 _global_container: Optional[ServiceContainer] = None
 _container_lock = threading.Lock()
+
 
 def get_service_container() -> ServiceContainer:
     """
@@ -511,6 +515,7 @@ def get_service_container() -> ServiceContainer:
         if _global_container is None:
             _global_container = ServiceContainer()
         return _global_container
+
 
 def set_service_container(container: ServiceContainer) -> None:
     """

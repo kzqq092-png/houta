@@ -134,6 +134,13 @@ class PluginEvent:
 @dataclass
 class PluginMetrics:
     """插件服务指标"""
+    # 基础指标字段（与BaseService一致）
+    initialization_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    operation_count: int = 0
+
+    # 插件服务特定字段
     total_plugins: int = 0
     discovered_plugins: int = 0
     loaded_plugins: int = 0
@@ -222,7 +229,7 @@ class PluginService(BaseService):
         # 线程和锁
         self._plugin_lock = threading.RLock()
         self._discovery_lock = threading.Lock()
-        self._load_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="PluginLoader")
+        self._load_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="PluginLoader")  # v2.4: 从5增加到10
 
         # 监控和统计
         self._start_time = datetime.now()

@@ -116,6 +116,13 @@ class TransactionMetrics:
 @dataclass
 class DatabaseMetrics:
     """数据库服务指标"""
+    # 基础指标字段（与BaseService一致）
+    initialization_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    operation_count: int = 0
+
+    # 数据库特定字段
     total_queries: int = 0
     successful_queries: int = 0
     failed_queries: int = 0
@@ -239,10 +246,10 @@ class DatabaseService(BaseService):
         self._metrics = DatabaseMetrics()
         self._service_lock = threading.RLock()
 
-        # 配置参数
+        # 配置参数（v2.4性能优化：增加连接池大小）
         self._config = {
-            "default_pool_size": 10,
-            "max_pool_size": 50,
+            "default_pool_size": 20,  # 从10增加到20
+            "max_pool_size": 100,     # 从50增加到100
             "connection_timeout": 30.0,
             "query_timeout": 60.0,
             "transaction_timeout": 300.0,
@@ -259,20 +266,20 @@ class DatabaseService(BaseService):
             "main_duckdb": DatabaseConfig(
                 db_type=DatabaseType.DUCKDB,
                 db_path="data/main.duckdb",
-                pool_size=10,
-                max_pool_size=30
+                pool_size=20,      # 从10增加到20
+                max_pool_size=60   # 从30增加到60
             ),
             "analytics_duckdb": DatabaseConfig(
                 db_type=DatabaseType.DUCKDB,
                 db_path="data/analytics.duckdb",
-                pool_size=5,
-                max_pool_size=20
+                pool_size=15,      # 从5增加到15
+                max_pool_size=40   # 从20增加到40
             ),
             "strategy_sqlite": DatabaseConfig(
                 db_type=DatabaseType.SQLITE,
                 db_path="data/strategy.db",
-                pool_size=5,
-                max_pool_size=15
+                pool_size=10,      # 从5增加到10
+                max_pool_size=30   # 从15增加到30
             )
         }
 
@@ -354,7 +361,6 @@ class DatabaseService(BaseService):
 
             # 增强资产数据库管理器功能已集成到DatabaseService
 
-
             # (原EnhancedAssetDatabaseManager已合并)
 
             logger.info("✓ Asset database managers initialized")
@@ -387,22 +393,27 @@ class DatabaseService(BaseService):
             raise
 
     def _initialize_performance_optimizers(self) -> None:
-        """初始化性能优化器"""
+        """初始化性能优化器（临时禁用 - v2.2架构修复）"""
         try:
-            # 为每个DuckDB池创建优化器
-            for pool_name, config in self._pool_configs.items():
-                if config.db_type == DatabaseType.DUCKDB and config.enable_optimization:
-                    try:
-                        optimizer_config = DuckDBConfig(
-                            memory_limit=config.memory_limit,
-                            threads=config.thread_count
-                        )
-                        self._performance_optimizers[pool_name] = DuckDBPerformanceOptimizer(optimizer_config)
+            # TODO v2.2: 重新设计optimizer架构
+            # DuckDBPerformanceOptimizer需要db_path参数，不是config对象
+            # 当前optimizer在FactorWeaveAnalyticsDB中已经使用
+            # 这里暂时跳过创建，避免参数错误
 
-                    except Exception as e:
-                        logger.warning(f"Failed to create optimizer for pool {pool_name}: {e}")
+            logger.info(f"✓ Performance optimizers initialization skipped (architecture refactoring)")
+            # 注释掉原有的错误代码
+            # for pool_name, config in self._pool_configs.items():
+            #     if config.db_type == DatabaseType.DUCKDB and config.enable_optimization:
+            #         try:
+            #             optimizer_config = DuckDBConfig(
+            #                 memory_limit=config.memory_limit,
+            #                 threads=config.thread_count
+            #             )
+            #             self._performance_optimizers[pool_name] = DuckDBPerformanceOptimizer(optimizer_config)
+            #         except Exception as e:
+            #             logger.warning(f"Failed to create optimizer for pool {pool_name}: {e}")
 
-            logger.info(f"✓ Created {len(self._performance_optimizers)} performance optimizers")
+            # logger.info(f"✓ Created {len(self._performance_optimizers)} performance optimizers")
 
         except Exception as e:
             logger.error(f"Failed to initialize performance optimizers: {e}")

@@ -105,6 +105,13 @@ class DataResponse:
 @dataclass
 class DataMetrics:
     """数据服务指标"""
+    # 基础指标字段（与BaseService一致）
+    initialization_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    operation_count: int = 0
+
+    # 数据服务特定字段
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -188,13 +195,13 @@ class DataService(BaseService):
         self._request_futures: Dict[str, Future] = {}
         self._request_lock = threading.RLock()
 
-        # 线程池管理
+        # 线程池管理（v2.4性能优化：增加工作线程）
         self._data_executor = ThreadPoolExecutor(
-            max_workers=20,
+            max_workers=40,  # 从20增加到40
             thread_name_prefix="DataService-Worker"
         )
         self._cache_executor = ThreadPoolExecutor(
-            max_workers=5,
+            max_workers=10,  # 从5增加到10
             thread_name_prefix="DataService-Cache"
         )
 

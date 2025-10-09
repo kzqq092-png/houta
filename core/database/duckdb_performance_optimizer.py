@@ -26,15 +26,15 @@ class WorkloadType(Enum):
 
 @dataclass
 class DuckDBConfig:
-    """DuckDB配置参数"""
-    memory_limit: str           # 内存限制，如 "8GB"
-    threads: int               # 线程数
-    max_memory: str           # 最大内存，如 "16GB"
-    temp_directory: str       # 临时目录
-    enable_object_cache: bool  # 启用对象缓存
-    enable_progress_bar: bool  # 启用进度条
-    checkpoint_threshold: str  # 检查点阈值
-    wal_autocheckpoint: int   # WAL自动检查点
+    """DuckDB配置参数（统一定义，带默认值）"""
+    memory_limit: str = "8GB"              # 内存限制
+    threads: int = 4                       # 线程数
+    max_memory: str = "16GB"              # 最大内存
+    temp_directory: str = "temp"          # 临时目录
+    enable_object_cache: bool = True      # 启用对象缓存
+    enable_progress_bar: bool = False     # 启用进度条（默认关闭避免输出干扰）
+    checkpoint_threshold: str = "16MB"    # 检查点阈值
+    wal_autocheckpoint: int = 10000       # WAL自动检查点
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -210,15 +210,16 @@ class DuckDBPerformanceOptimizer:
                 config.checkpoint_threshold = "512MB"
 
             # 应用配置参数
+            # 只应用最关键和稳定的配置
             config_commands = [
                 f"SET memory_limit = '{config.memory_limit}'",
                 f"SET threads = {config.threads}",
-                # f"SET max_memory = '{config.max_memory}'",  # 移除不支持的max_memory配置
-                f"SET temp_directory = '{config.temp_directory}'",
-                f"SET enable_object_cache = {str(config.enable_object_cache).lower()}",
-                f"SET enable_progress_bar = {str(config.enable_progress_bar).lower()}",
-                f"SET checkpoint_threshold = '{config.checkpoint_threshold}'",
-                f"SET wal_autocheckpoint = {config.wal_autocheckpoint}"
+                # 以下配置可能导致问题，临时禁用
+                # f"SET temp_directory = '{config.temp_directory}'",  # 可能与memory_limit冲突
+                # f"SET enable_object_cache = {str(config.enable_object_cache).lower()}",
+                # f"SET enable_progress_bar = {str(config.enable_progress_bar).lower()}",
+                # f"SET checkpoint_threshold = '{config.checkpoint_threshold}'",
+                # f"SET wal_autocheckpoint = {config.wal_autocheckpoint}"
             ]
 
             for cmd in config_commands:

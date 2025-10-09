@@ -105,10 +105,16 @@ class UltraPerformanceOptimizer:
     def _check_gpu_availability(self) -> bool:
         """检查GPU可用性"""
         try:
+            # 优先检查CuPy
             import cupy
             cupy.cuda.Device(0).compute_capability
+            logger.info("✅ CuPy GPU可用")
             return True
-        except Exception:
+        except ImportError:
+            logger.info("⚠️ CuPy未安装，GPU加速不可用")
+            return False
+        except Exception as e:
+            logger.debug(f"GPU检测失败: {e}")
             return False
 
     def _initialize_performance_config(self) -> Dict[str, Any]:

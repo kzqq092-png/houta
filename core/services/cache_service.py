@@ -6,6 +6,7 @@
 完全重构以符合15个核心服务的架构精简目标。
 """
 
+from .metrics_base import add_dict_interface
 import asyncio
 import threading
 import time
@@ -29,7 +30,6 @@ from ..events import EventBus, get_event_bus
 from ..containers import ServiceContainer, get_service_container
 
 T = TypeVar('T')
-from .metrics_base import add_dict_interface
 
 
 class CacheLevel(Enum):
@@ -118,7 +118,16 @@ class CacheConfig:
 @dataclass
 class CacheMetrics:
     """缓存指标"""
+    # 必需字段（无默认值）
     level: CacheLevel
+
+    # 基础指标字段（与BaseService一致）
+    initialization_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    operation_count: int = 0
+
+    # 缓存特定字段
     stats: CacheStats = field(default_factory=CacheStats)
     avg_access_time: float = 0.0
     peak_memory_usage: int = 0
@@ -493,24 +502,24 @@ class CacheService(BaseService):
         self._l1_cache: Optional[MemoryCache] = None  # 内存缓存
         self._l2_cache: Optional[DiskCache] = None    # 磁盘缓存
 
-        # 缓存配置
+        # 缓存配置（v2.4性能优化：增加缓存容量）
         self._l1_config = CacheConfig(
-            max_size=1000,
-            max_memory_mb=100,
+            max_size=2000,        # 从1000增加到2000
+            max_memory_mb=200,    # 从100增加到200
             default_ttl=timedelta(minutes=30),
             strategy=CacheStrategy.LRU
         )
 
         self._l2_config = CacheConfig(
-            max_size=10000,
-            max_memory_mb=1000,
+            max_size=20000,       # 从10000增加到20000
+            max_memory_mb=2000,   # 从1000增加到2000
             default_ttl=timedelta(hours=6),
             strategy=CacheStrategy.LRU,
             enable_persistence=True
         )
 
-        # 指标和统计
-        self._metrics: Dict[CacheLevel, CacheMetrics] = {}
+        # 指标和统计（按缓存级别）
+        self._level_metrics: Dict[CacheLevel, CacheMetrics] = {}
         self._operation_history: deque = deque(maxlen=10000)
 
         # 访问模式分析
@@ -600,7 +609,7 @@ class CacheService(BaseService):
         try:
             # 初始化各级缓存指标
             for level in CacheLevel:
-                self._metrics[level] = CacheMetrics(level=level)
+                self._level_metrics[level] = CacheMetrics(level=level)
 
             logger.info("✓ Cache metrics initialized")
 
@@ -963,7 +972,7 @@ class CacheService(BaseService):
         """更新指标"""
         try:
             with self._service_lock:
-                metrics = self._metrics[level]
+                metrics = self._level_metrics[level]
                 execution_time = time.time() - start_time
 
                 # 更新平均访问时间
@@ -1174,14 +1183,14 @@ class CacheService(BaseService):
             'level_metrics': {}
         }
 
-        for level, cache_metrics in self._metrics.items():
+        for level, cache_metrics in self._level_metrics.items():
             level_name = level.value
             combined_metrics['level_metrics'][level_name] = {
                 'hits': cache_metrics.stats.hits,
                 'misses': cache_metrics.stats.misses,
                 'sets': cache_metrics.stats.sets,
                 'deletes': cache_metrics.stats.deletes,
-                'size': cache_metrics.stats.size,
+                'size': cache_metrics.stats.total_size,
                 'evictions': cache_metrics.stats.evictions,
                 'avg_access_time': cache_metrics.avg_access_time,
                 'peak_memory_usage': cache_metrics.peak_memory_usage
@@ -1190,7 +1199,7 @@ class CacheService(BaseService):
             combined_metrics['total_misses'] += cache_metrics.stats.misses
             combined_metrics['total_sets'] += cache_metrics.stats.sets
             combined_metrics['total_deletes'] += cache_metrics.stats.deletes
-            combined_metrics['total_size'] += cache_metrics.stats.size
+            combined_metrics['total_size'] += cache_metrics.stats.total_size
 
         return combined_metrics
 

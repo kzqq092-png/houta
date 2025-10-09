@@ -135,6 +135,13 @@ class CircuitBreakerConfig:
 @dataclass
 class NetworkMetrics:
     """网络服务指标"""
+    # 基础指标字段（与BaseService一致）
+    initialization_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    operation_count: int = 0
+    
+    # 网络服务特定字段
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
